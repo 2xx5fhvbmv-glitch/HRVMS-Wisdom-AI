@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateVisaRenewalsTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('visa_renewals', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedInteger('resort_id');
+            $table->unsignedInteger('employee_id');
+            $table->string('Visa_Number')->nullable();
+            $table->string('WP_No')->nullable();
+            $table->date('start_date');
+            $table->date('end_date');
+            $table->string('visa_file')->nullable();
+            $table->foreign('resort_id')->references('id')->on('resorts')->onDelete('cascade');
+            $table->foreign('employee_id')->references('id')->on('employees')->onDelete('cascade');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('visa_renewals');
+    }
+}

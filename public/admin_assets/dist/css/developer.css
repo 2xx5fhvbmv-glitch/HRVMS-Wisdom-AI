@@ -1,0 +1,29 @@
+.profile-rolename{font-size:15px}
+.parsley-errors-list.filled{padding:0}
+.parsley-errors-list li{list-style-type:none;padding-left:0;margin-bottom:0;color:red}
+.sidebar-collapse .main-sidebar .img-1{
+    display:none
+}
+
+.sidebar-collapse .main-sidebar .img-2{
+    display:inline-block!important;
+}
+
+.sidebar-mini.sidebar-collapse .main-sidebar:not(.sidebar-no-expand):hover .main-sidebar .img-1{
+    display:inline-block;
+}
+.sidebar-mini.sidebar-collapse .main-sidebar:not(.sidebar-no-expand):hover .main-sidebar .img-2{
+    display:none
+}
+
+.brand-image{
+    transition: all 0.3s linear;
+}
+.table-attendance th:nth-last-child(5), .table-attendance>tbody>tr>td:nth-last-child(5) {    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: #F5F8F8;
+    text-align: left;
+    width: 82px;
+    right: 220px;
+}

@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class AddCreatedByToIncidentsInvestigationMeetings extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::table('incidents_investigation_meetings', function (Blueprint $table) {
+            $table->integer('created_by')->after('attachments');
+            $table->integer('modified_by')->after('created_by');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::table('incidents_investigation_meetings', function (Blueprint $table) {
+            $table->dropColumn('created_by');
+            $table->dropColumn('modified_by');
+        });
+    }
+}

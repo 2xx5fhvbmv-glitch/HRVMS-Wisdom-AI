@@ -1,0 +1,9 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 22" width="25" height="22">
+	<title>video-marketing</title>
+	<defs>
+		<image  width="25" height="24" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAYCAMAAAA4a6b0AAAAAXNSR0IB2cksfwAAAPZQTFRFAAAAWWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2WWx2sUxe5jlQ4VVp5T5V40ddx9zi0qCs5EVb4k5jxuLnzrfB315xytDX2neH05yo5ERazMPMzC5DyENWqNPYrra+yzRIt5CcyjlNrMLIv2x7saqzxFNkyTxQqc7TtpWgyjpOxkpcyzNImj9ORlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphRlphAeEXjAAAAFJ0Uk5TAAEKCzze/9R8e478taH6eht/Xvbv8fT+////////////////////////////////////////////////9u/x9P56Gzz6f17e1Hx7jvy1oQEKCwLxGvAAAADGSURBVHicddJLDoJQDAXQe/lGxDjVJbgFGTpw6FrdmSgBQ4DaBvnpowN4yaHpJX0ESfyViDBwgRFDT0n7WiCgNIDvNaLQMdpoT5H4AniUDqCXp9pTMdqpMLdnLxJ0+pW8eHBNseJxPLFzi68paqfElrBcEe0rVgQI+VwRxK8hB09jtO+rcYs/5VtIyPcswUziZepBtvqnT7gEez6wkDNWipmNZsvfLQizyKTfaZnYTqvYpOaV07YnsRtyCQrXlLQhbu5bdf8ArB5IDNG5R1QAAAAASUVORK5CYII="/>
+	</defs>
+	<style>
+	</style>
+	<use id="Background" href="#img1" x="0" y="-1"/>
+</svg>

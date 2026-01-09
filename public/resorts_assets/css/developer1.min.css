@@ -1,0 +1,458 @@
+.profile-dropdown .img-box {
+    width: 49px;
+    height: 49px;
+    overflow: hidden;
+    border-radius: 100px;
+}
+
+.resort-logo img{
+    max-height: 72px;
+}
+.error{
+     color: red !important;
+
+}
+.div-email{
+    color: red !important;
+
+}
+
+#occupancy-chart-slider .slick-arrow { font-size: 18px; top: 11px; } #occupancy-chart-slider
+.slick-prev:before { content: '\f104'; font-family: "Font Awesome 6 Free"; color: #000; opacity: 1;    z-index: 2; }
+#occupancy-chart-slider .slick-next:before
+{ content: '\f105'; font-family: "Font Awesome 6 Free"; color: #000; opacity: 1; } #occupancy-chart-slider .slick-prev { left: -5px;     z-index: 2;}
+#occupancy-chart-slider .slick-next { right: -5px; }
+
+
+.currency{
+    height: 30px !important;
+
+}
+.profile-dropdown .switch-toggle{
+    overflow: hidden;
+}
+.select-left .left {
+    background: #00262D;
+    color: #fff;
+}
+
+.select-right .right {
+    background: #00262D;
+    color: #fff;
+}
+
+
+
+#loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #00000036;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index:11;
+  }
+
+  .currency-budget-icon{
+    height: 14px;filter: brightness(0);
+  }
+
+  .budget-accordion .accordion-button .currency-budget-icon {
+    filter: brightness(0) invert(1);height: 16px;
+}
+
+.budget-accordion .accordion-button.collapsed .currency-budget-icon {
+    filter: brightness(0);
+}
+
+.currency-budget-icon.h-18{
+    height: 18px;
+}
+/* new  */
+.table-viewMannAccording tbody tr td table tbody td {
+    padding: 6px 10px !important;
+    border:0!important;
+}
+
+.table-viewMannAccording tbody tr td table tbody td:first-child{
+    padding-left: 10px !important;
+}
+
+.table-viewMannAccording .w-120{width: 120px;}
+
+@media(max-width:767px) {
+    .currency-budget-icon.h-18{
+    height: 16px;
+}}
+
+
+.viewBudget-accordion-alldp .accordion-header{
+    background: #F5F8F8;
+}
+
+.accordion-button.accordion-arrow-none::after{
+    display: none !important;
+}
+.empType-chartBlock{
+    width:240px;
+}
+.ticketBook-list ol{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+.cke_notifications_area {
+display: none !important;
+}
+.talentAcQues-block .talentAc-block {
+    margin-bottom: 20px;
+}
+/* .videoQuestions-main
+{
+    margin-bottom: 35px;
+    counter-reset: section;
+}
+.btn-sm{
+    padding: 10px 16px !important;
+    font-size: 16px;
+    line-height: 23px;
+    margin-top: 15px;
+} */
+
+.ta-adv-disabled{
+    pointer-events: none;
+    color: gray;
+    text-decoration: none;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 22-11-2024 */
+.accordion-innerbox>*:last-child {
+    white-space: nowrap;
+}
+
+a.brand-logo.resort-logo {
+    display: block;
+    height: 74px;
+    min-width: 170px;
+    text-align: right;
+}
+
+.brand-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center right;
+}
+
+div.dt-container .dt-search input {
+    height: 45px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 400;
+    border-radius: 10px;
+    border: 1px solid #DDDDDD;
+    width: 100%;
+    margin-bottom: 16px;
+    background: url(https://projects.spaculus.live/3/wisdomAI/resorts_assets/images/search-green.svg) center right 10px no-repeat;
+    background-size: 20px;
+}
+
+@media(max-width:1024px) {
+    a.brand-logo.resort-logo {
+        height: 63px;
+        min-width: 145px;
+    }
+}
+
+@media(max-width:767px) {
+    div.dt-container .dt-search input {
+        height: 38px;
+        padding: 6px 10px;
+        margin-bottom: 10px;
+        background-size: 16px;
+    }
+}
+
+@media(max-width:575px) {
+    a.brand-logo.resort-logo {
+        height: 44px;
+        min-width: 101px;
+    }
+}
+
+@media(max-width:374px) {
+    a.brand-logo.resort-logo {
+        height: 34px;
+        min-width: 80px;
+    }
+}
+
+.sref-control{
+    padding:10px 12px;
+}
+
+.SportsAddCheckbox{
+    display: inline-block;
+    margin-right: 10px;
+    margin-right: 1rem;
+}
+.SportsAddCheckbox .form-check-inline{
+    margin-right: 4px;
+}
+.sport-checkbox  .form-check-inline{
+    margin-bottom: 8px;
+}
+/* End of New css  22-11-2024 */
+
+/* 29/11/2024 */
+.profile-dropdown .img-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+}
+
+.table-viewMannAccording td:first-child {
+    min-width: 130px;
+}
+@media (max-width: 575px) {
+    .profile-dropdown .img-box {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 424px) {
+    .profile-dropdown .img-box {
+        width: 36px;
+        height: 36px;
+    }
+}
+.viewBudget-accordion .accordion-button h3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* End of 29/11/2024 ghjgjhg*/
+.row_time{
+    position: relative;
+}
+.row_time input[type="checkbox"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;z-index: 11;
+    opacity: 0;
+}
+label#SlotBook-error {
+    margin-bottom: 10px;
+}
+.modal-timeSlotsModal
+.modal-body {
+    overflow: auto;
+    max-height: 500px;
+    padding-right: 4px;
+}
+.InterviewDateModel{
+    opacity: 0;
+}
+.progress-container .img-obj {
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.fc-basic-view .fc-day-number {
+    position: relative;
+
+}
+.fc-unthemed td.fc-today {
+    background: transparent;
+}
+
+
+
+
+.card-title .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 40px;
+}
+.fc-day.custom-dot {
+    position: relative;
+}
+
+.fc-day.custom-dot::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 10%; /* Adjust as needed */
+    transform: translateX(-50%);
+    width: 8px; /* Dot size */
+    height: 8px; /* Dot size */
+    background: #2EACB3; /* Dot color */
+    border-radius: 50%;
+}
+
+.form-control.overtime {
+    opacity: 0;
+}
+
+.form-control.overtime.OverTimeInput {
+    opacity: 1;
+}
+
+.createDuty-tableBlock .ot-details {
+    display: flex; /* Align child elements in a row */
+    gap: 10px; /* Optional spacing between the elements */
+}
+
+.createDuty-tableBlock .ot-details p {
+    margin: 0; /* Remove default margin to ensure proper alignment */
+}
+.editIcon-btn {
+    color: #004552;
+    font-size: 14px;
+    background: transparent;
+    border: 0;
+}
+.pagination-custom>nav>* {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.pagination-custom .bg-white {
+background-color: transparent !important;
+}
+.pagination-custom .flex.sm\:hidden {
+    display: none;
+}
+.pagination-custom span {
+    display: inline-block;
+}
+.pagination-custom .border{border: 0 !important;}
+.pagination-custom .py-2, .pagination-custom .px-2 {
+    padding: 0  !important;
+}
+.pagination-custom .shadow-sm {
+    box-shadow: none !important;
+}
+.pagination-custom li{
+    margin: 0 2px;
+}
+
+.pagination-custom .relative.shadow-sm>* {
+display: inline-block;
+    border: none;
+    font-size: 14px;
+    font-weight: 400;
+    color: #000;
+    min-width: 25px;
+    text-align: center;
+    padding: 2px 4px !important;
+    border-radius: 7px !important;
+    background-color: transparent;}
+
+.pagination-custom .relative svg{
+        width: 18px;
+    }
+.pagination-custom .relative.shadow-sm>*:hover{
+    color: #fff;
+    background-color: #004552  !important;
+    border-color: #004552 !important;
+    }
+.pagination-custom .relative.shadow-sm>span{
+    color: #fff;
+    background-color: #004552  !important;
+    border-color: #004552 !important;
+    }
+    .pagination-custom .relative.shadow-sm>span:first-child,
+    .pagination-custom .relative.shadow-sm>span:last-child{
+        color: #000;
+        background-color: transparent  !important;
+        border-color: transparent !important;
+    }
+    .pagination-custom .page-item.disabled .page-link {
+        color: #222;
+        background: #DEDEDE;
+    }
+
+    .profile-dropdown .dropdown-menu ul .img-box img {
+        object-fit: contain;
+    }
+
+    .flatpickr-am-pm
+    {
+        display: none !important;
+    }
+
+    .red-mark{
+        color:red;
+        font-size: 24px;
+        line-height: 0;
+    }
+
+    .parsley-errors-list.filled{padding:0}
+    .parsley-errors-list li{list-style-type:none;padding-left:0;margin-bottom:0;color:red}
+    .is-invalid {
+        border-color: #dc3545 !important; /* Bootstrap red */
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+    }
+
+
+
+    .dateRangeAb{position: relative;}
+    .dateRangeAb .daterangepicker {
+        position: absolute !important;
+        background-color: #fff;
+        width: 100%;
+        /* min-width: 350px; */
+    }
+
+
+
+    .dateRangeAb .form-control {
+        background-image: url('../images/calendar.svg');
+        background-position: right 10px center;
+        background-repeat: no-repeat;
+    }
+    td.Register-col-leave {
+        background: #9E5CF726;
+    }
+    button.accordion-button.GetInternalDetails.thresold-active{
+        background: rgb(200 0 0 / 18%);
+    }
+
+
+    button.accordion-button.GetInternalDetails .thresold-active{
+        padding-left: 36px !important;
+        position: relative;
+    }
+
+    button.accordion-button.GetInternalDetails.thresold-active:before {
+        content: "\f071 "; /* Ensure the message text is correct */
+        font-family: "Font Awesome 6 Free";  /* Use Font Awesome Free Regular font */
+        font-weight: 400;                    /* Regular font weight for Font Awesome */
+        font-size: 26px;
+        line-height: 1;
+        color: #C80000;                      /* Set the color to red */
+        position: absolute;
+        top: 18px;
+        left: 300px;
+    }
+
+    #msform.runPayroll-form fieldset:not(:first-of-type) {
+        display: block;
+        position: absolute;
+        visibility: hidden;
+        opacity: 0;
+    }
+
+
+    
+    .table-timeAttendance.table-payroll-attendance td:nth-child(6) {
+        max-width: initial;
+    }   .table-timeAttendance.table-payroll-attendance td:nth-child(6) br+span{margin-top: 4px;}

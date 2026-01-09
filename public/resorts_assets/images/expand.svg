@@ -1,0 +1,9 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 25" width="25" height="25">
+	<title>expand (3)</title>
+	<defs>
+		<image  width="25" height="25" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAZCAMAAADzN3VRAAAAAXNSR0IB2cksfwAAAFFQTFRFLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzLqyzMX9v9wAAABt0Uk5TkPn/5jMAmO887lUBxwjJtA3+tQWjDJc7ohriym1/zwAAANlJREFUeJyFUu1uwjAMvEsaymeLEEK8/9NN04RoKWwlpKbUFauAQP7Y8Z3PiW2CRHuoBhARNfdIImp56Rk06jgGdaz4nqJISp41MJLgh8iUf+jPmNUQwYJHdWZy+FdL7Qk5Wd7umUiBaahbxIqz1pgCK+6BpeyQN00InkxWrM4zs0dupcwYWsrlOJrLjq4T7UIbyndH0DqKqMzktxcdIshcXQB56ks8IFjzC9jKDx6RaE60zqu3JcbY5/+EpnnTg7ZvLq3uIl3WvPafev12PvGZvtqD+O5E9+0K1RKBYcZ7cpcAAAAASUVORK5CYII="/>
+	</defs>
+	<style>
+	</style>
+	<use id="Background" href="#img1" x="0" y="0"/>
+</svg>
