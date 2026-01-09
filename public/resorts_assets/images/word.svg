@@ -1,0 +1,20 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 23" width="25" height="23">
+	<title>Microsoft_Word-Logo</title>
+	<defs>
+		<clipPath clipPathUnits="userSpaceOnUse" id="cp1">
+			<path d="m0 0h25v23h-25z"/>
+		</clipPath>
+		<image  width="25" height="23" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAXCAMAAADJPRQhAAAAAXNSR0IB2cksfwAAAkBQTFRFAAAAAID/AFWqPabvQKTtQaXvP6TuAAD/P6TuQaXuQKXuJJL/P6TvAEC/ElvIOZXfO5nfO5jfPJndPqHoQKXuAACAIWbDIWXCIGXCIGTCH2PBHmLBHmLAHWHAHWDAHF+/HVytLn7FNZDgNZDgNZDhJJLbAFXVIGXCHGC/G1+/G16/G16+Glq2JGixKnvSK3zTK3zTJG3bH2PBJWjDWozRJWfCHmHATYLNTIHNI2PAV4jPGly9GVm0HmLBJmfD5+74XI3RJGXB7vL56O/3V4jO4+v2GVu8GFe0HWHArMXnnLnjM2/F6e/48PT6nbniorzjGFi6GFWyG2DAaZXUytnvVojPtcrpyNjuWojO2ePzTX7IF1a4FlKvIWSvKHfPKHfQJ3jRAG3bAFWqG1+/PHbIm7fhaZPTdZvVtsrp9vj7HFm5FlO2FE6sE0ueGFq8GFq9GFq8AEm2Gl6/Gl2+JWTA7PH55ez2L2jAOW/D8fX67fL5FVK1FVC0E0yrE0qeF1m8F1q8GV2+GVq8vM/q5ez3IFu69vn8t8nnFE+zFE6yE0mpGFq8F1e5HVq6Hlq5FVO2FVG1Hle2GlK0E02xE0uwEkenACqqF1i6FlS3FFC0E0ywEkqvEkmuEESkFVO3FlO4FlK2FFK0FE60D0CSDTmEDTiDDTeCDDaBDDWBCShgDTd/EEGVEECVACSSCSxnCixnCi1pDTqHDz6QED+RED6QDjuMDzyLDzyMDj2RDj2RDj6RADOZADeADT2RDTyRDTyNmkp+eQAAAMB0Uk5TAAIDP9jZhgGS/+IHkgQOmP////7+Arf//////////////v7/4gcG3///////////4gff/////////////9//////////////3////////////9//////////////////4gcG3////////////////+IH3//////////////////i3////////////9//////////////Bt3///////9KlpaWltP//////////+IHkv//////4pL//5KC1wUOT1Em4K2+dwAAAMpJREFUeJxjZIAARkYGFPCPASrAjC7DCBPgQJNAyPD8JUmGlxHiAEYw9ytCRpQRDhgY4WaAmGqMn4BcJkYumDRChgci8okfSHxEkRGHyLyQBBLPUGSUruqAZN6ALLyDIqNzTZsRCSBkkhiPW91WwyojgKyD8QNURvAjY5L8URtGxutaYPEvKDKaIBkoeIksM43xiO1lAbn33OxAmYfIMgzzUOzBCOt1jFAu3G0/oaytEJnfCD0wmR2/0eMHJrPzF5oMO8zcPRgpxBEAJ/suOWSWHVoAAAAASUVORK5CYII="/>
+	</defs>
+	<style>
+	</style>
+	<g id="Page 1" clip-path="url(#cp1)">
+		<g id="Background">
+			<use id="Bitmap" href="#img1" x="0" y="0"/>
+		</g>
+		<g id="Layer 1">
+		</g>
+		<g id="Web Layer">
+		</g>
+	</g>
+</svg>

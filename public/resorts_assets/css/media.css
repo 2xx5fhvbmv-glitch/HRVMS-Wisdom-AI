@@ -1,0 +1,4117 @@
+@media (min-width:1400px) {
+    .serch-box>div {
+        padding: 0 0 0 70px;
+    }
+
+    .col-xxl-cust5 {
+        flex: 0 0 auto;
+        width: 20%;
+    }
+
+    .empDetails-leave>.row {
+        --bs-gutter-x: 78px;
+        --bs-gutter-y: 78px;
+    }
+
+    .card-salaryIncrementManag .col-xxl {
+        flex: 1 0 0%;
+        width: auto;
+    }
+
+    .card-salaryIncrementSum .col-xxl {
+        width: 20%;
+    }
+}
+
+@media(min-width:1200px) {
+    .position-xl-sticky {
+        position: sticky;
+    }
+
+    .card-talentAcqPeople .leaveUser-block {
+        flex-wrap: nowrap;
+    }
+}
+
+@media(min-width:992px) {}
+
+@media(min-width:576px) {
+
+    /* .modal-dialog {
+        max-width: 545px;
+    } */
+    .modal-small,
+    .modal-dialog.modal-manning {
+        max-width: 545px;
+        /* width: 96%; */
+    }
+}
+
+@media(max-width:1899px) {
+    .reconciliation-block strong {
+        font-size: 20px;
+    }
+
+    .brand-logo {
+        max-width: 200px;
+        display: inline-block;
+    }
+    
+    .ExpDa-fillterbox>a {
+        width: 232px;
+    }
+}
+
+@media(max-width:1750px) {
+    .body-wrapper>.container-fluid {
+        padding: 0 60px;
+    }
+
+    .brand-logo {
+        max-width: 200px;
+        display: inline-block;
+    }
+    .requestsUser-block>div:first-child {
+        min-width: 176px;
+        padding-right: 16px;
+        margin-right: 16px;
+    }
+
+    .requestsUser-block .img-circle {
+        margin-right: 10px;
+    }
+
+    .empDetail-block.empDetailPro-block>div>span {
+        margin-left: 4px;
+    }
+
+    .leaveCate-block {
+        padding: 17px 12px 20px;
+    }
+
+    .leaveReqTicket-main {
+        width: 400px;
+    }
+
+    .card-title select.form-select {
+        padding: 4px 30px 4px 16px;
+    }
+
+    .card-title .form-select.form-select-large {
+        padding: 7px 30px 7px 16px;
+    }
+}
+
+@media(max-width:1750px) and (min-width:1200px) {
+    .vacanciesGrid-block {
+        padding: 21px 10px;
+    }
+
+    .brand-logo {
+        max-width: 200px;
+        display: inline-block;
+    }
+
+    .vacanciesGrid-block .bg div,
+    .talentPoolGrid-block .bg div,
+    .employeesGrid-block .bg div {
+        width: auto;
+        flex-grow: 1;
+        padding: 10px 6px;
+    }
+
+    .employeesGrid-block .bg div {
+        padding: 10px 2px;
+    }
+
+    .applicantsGrid-block {
+        padding: 12px 10px 20px;
+    }
+
+    .empAccomGrid-block,
+    .talentPoolGrid-block,
+    .employeesGrid-block,
+    .empDetailsGrid-block,
+    .leaveReqGrid-block,
+    .empPerforGrid-block,
+    .salaryIncrementManag-block,
+    .empListPeopleEmp-block,
+    .upArrivalGrid-block {
+        padding: 20px 10px;
+    }
+
+    .applicantsGrid-block .bg {
+        padding: 10px 16px;
+    }
+
+    .applicantsGrid-block .bg-table {
+        padding: 4px 8px;
+    }
+
+    .empDetailsGrid-block h6 {
+        font-size: 17px;
+    }
+
+    .leaveReqGrid-block .bg .date-block {
+        width: 64px;
+        min-width: 64px;
+    }
+
+    .leaveReqGrid-block .bg {
+        padding: 9px 8px 12px;
+    }
+
+    .leaveReqGrid-block .bg>div>div:nth-child(2) {
+        margin: 0 9px;
+    }
+
+    .leaveReqGrid-block .btn-block {
+        margin: 0 -2px;
+    }
+
+    .leaveReqGrid-block .btn {
+        font-size: 14px;
+        margin: 0 2px;
+        padding: 10px 8px !important;
+    }
+
+    .leaveReqGrid-block .bg.leave {
+        padding: 8px 16px;
+    }
+
+    .leaveReqGrid-block .d-flex .badge {
+        padding: 4px 6px;
+    }
+
+    .card-accomSummary .leaveUser-bgBlock h6,
+    .card-incidentResolTime .leaveUser-bgBlock h6 {
+        font-size: 16px;
+
+    }
+
+    .templateSelect-block {
+        padding: 20px 10px;
+    }
+}
+
+
+@media(max-width:1679px) {
+
+    .card,
+    .card.card-theme>.card-title,
+    .card.card-theme>.card-body {
+        padding: 20px 16px;
+    }
+
+    .card.pdngX-0 .card-header {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .brand-logo {
+        max-width: 200px;
+        display: inline-block;
+    }
+
+    .requestsUser-block>div:first-child {
+
+        padding-right: 10px;
+        margin-right: 10px;
+    }
+
+    .card.card-billingInvoiceSupport {
+        padding: 20px 20px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight,
+    .card-talentAcqEmpHOD .bg-themeGrayLight,
+    .card-talentAcqEmpGM .bg-themeGrayLight {
+        padding: 20px 16px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight.full {
+        padding: 14px 16px;
+    }
+
+    .card-talentAcqApproveBudgetHOD .bg-themeGrayLight {
+        padding: 10px 16px 6px;
+    }
+}
+
+@media(max-width:1599px) {
+    .body-wrapper>.container-fluid {
+        padding: 0 40px;
+    }
+
+    .brand-logo {
+        max-width: 200px;
+        display: inline-block;
+    }
+
+    .requestsUser-block .img-circle {
+        margin-right: 8px;
+    }
+
+    .requestsUser-block>div:first-child {
+        min-width: 164px;
+        padding-right: 8px;
+        margin-right: 8px;
+    }
+
+    .leaveReqTicket-main {
+        width: 360px;
+    }
+
+    .appleaveReq-block {
+        padding: 9px 20px 12px;
+    }
+
+    .dashboard-boxcard {
+        padding: 24px 20px 18px;
+    }
+
+    .card-accomSummary .leaveUser-bgBlock,
+    .card-incidentSeverity .leaveUser-bgBlock,
+    .card-incidentResolTime .leaveUser-bgBlock {
+        padding: 14px 12px;
+    }
+
+    .card-title select.form-select {
+        padding: 4px 24px 4px 10px;
+        background-position: right 7px center;
+    }
+
+    .card-title .form-select.form-select-large {
+        padding: 7px 24px 7px 10px;
+    }
+
+    .monthlyCheck-block .userImg-block,
+    .card-talentAcqPerforHOD .img-circle.userImg-block {
+        margin-right: 12px;
+    }
+
+    .reconciliation-block strong {
+        font-size: 18px;
+    }
+
+    .reconciliation-block {
+        padding: 18px 16px 15px;
+    }
+
+    .ExpDa-fillterbox>a {
+        width: 200px;
+        font-size: 16px;
+    }
+
+
+    .card-activePeopleEmp .leaveUser-bgBlock,
+    .card-annoPeopleEmp .leaveUser-bgBlock,
+    .card-salaryIncrePeopleEmp .leaveUser-bgBlock,
+    .card-promotionPeopleEmp .leaveUser-bgBlock,
+    .card-probationPeopleEmp .leaveUser-bgBlock,
+    .card-transferPeopleEmp .leaveUser-bgBlock,
+    .card-salaryadvPeopleEmp .leaveUser-bgBlock,
+    .card-repayTrackPeopleEmp .leaveUser-bgBlock,
+    .card-exitClearPeopleEmp .leaveUser-bgBlock,
+    .card-approvalsPeopleEmp .leaveUser-bgBlock,
+    .card-resignationPeopleEmp .leaveUser-bgBlock,
+    .card-liabilityTrackPeopleEmp .leaveUser-bgBlock {
+        padding: 14px 12px;
+    }
+
+    .card-probationPeopleEmp .leaveUser-bgBlock.flex-nowrap {
+        padding: 3px 16px;
+    }
+
+    .salaryadvPeopleEmp-chart {
+        width: 198px;
+    }
+
+    .card-liabilityTrackPeopleEmp .bg-themeGrayLight {
+        padding: 15px 12px;
+    }
+
+    .approvalsPeopleEmp-block {
+        padding: 11px 12px;
+    }
+
+    .card-talentAcqWorkPlan .bg-themeGrayLight,
+    .card-talentAcqPayroll .bg-themeGrayLight,
+    .card-talentAcqIncident .bg-themeGrayLight,
+    .card-talentAcqHRStatistics .bg-themeGrayLight,
+    .card-talentAcqTurnoverRatio .bg-themeGrayLight,
+    .card-talentAcqTurnoverRatioGM .bg-themeGrayLight,
+    .card-talentAcqTimeAttend .bg-themeGrayLight,
+    .card-talentAcqLearningDevel .bg-themeGrayLight,
+    .card-talentAcqRecruitment .bg-themeGrayLight,
+    .card-talentAcqLeaveHOD .bg-themeGrayLight,
+    .card-talentAcqLeaveGM .bg-themeGrayLight,
+    .card-talentAcqPerforHOD .bg-themeGrayLight,
+    .card-talentAcqIncidentHOD .bg-themeGrayLight,
+    .card-talentAcqIncidentGM .bg-themeGrayLight,
+    .card-talentAcqLearningDevelGM .bg-themeGrayLight,
+    .card-talentAcqPerforGM .bg-themeGrayLight {
+        padding: 9px 10px;
+    }
+
+    .tab-theme .nav-tabs .nav-link,
+    .empDetailPeopleEmp-tab .nav-tabs .nav-link,
+    .liabilityOverPeopleEmp-tab .nav-tabs .nav-link {
+        padding: 16px 11px;
+    }
+
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPronPeo-block,
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPromPeo-block {
+        padding: 13px 12px 12px;
+    }
+}
+
+@media(max-width:1599px) and (min-width:1400px) {
+    .leaveCate-block {
+        padding: 17px 9px 20px;
+    }
+
+    .card-appealsSection .bg-themeGrayLight {
+        padding: 14px 10px;
+    }
+
+    .user-block {
+        padding: 9px 10px 9px 10px;
+    }
+
+    .user-block h6 span {
+        padding: 2px 4px;
+        font-size: 9px;
+    }
+
+    .overdue-text,
+    .user-block h6 {
+        font-size: 12px;
+    }
+}
+
+@media(max-width:1499px) {
+    .requestsUser-block>div:first-child {
+        min-width: auto;
+    }
+
+    .card-salaryIncrementSum .bg-themeGrayLight {
+        padding: 16px 12px;
+    }
+}
+
+@media (max-width:1399px) {
+    .body-wrapper>.container-fluid {
+        padding: 0 24px;
+    }
+
+    .card {
+        padding: 20px 12px;
+    }
+
+    .card.card-theme>.card-title,
+    .card.card-theme>.card-body {
+        padding: 16px 12px;
+    }
+
+    .card.pdngX-0 .card-header {
+        margin-left: 12px;
+        margin-right: 12px;
+    }
+
+    .card.card-small {
+        padding: 14px 16px;
+    }
+
+    .dashboard-boxcard {
+        padding: 20px 12px;
+    }
+
+    .brand-logo {
+        max-width: 145px;
+    }
+
+    .navcarosel-box {
+        max-width: 560px;
+    }
+
+    .serch-box {
+        top: 88px;
+    }
+
+    .requestsUser-block>div:first-child {
+        min-width: auto;
+        padding-right: 10px;
+        margin-right: 10px;
+    }
+
+    .empDetails-leave {
+        padding: 24px 16px;
+    }
+
+    .empDetail-block.empDetailPro-block>div>span {
+        margin-left: 16px;
+    }
+
+    .card-upcomingLeve .leaveUser-bgBlock {
+        padding: 20px 16px;
+    }
+
+    .card-wiINsight .leaveUser-block>div:nth-child(3) {
+        flex-wrap: wrap;
+    }
+
+    .appleaveReq-block {
+        padding: 10px 16px;
+    }
+
+    .appleaveReq-block>.d-flex>div:nth-child(2) {
+        margin: 0 12px;
+    }
+
+    .leaveAdd-block {
+        padding: 20px 20px;
+    }
+
+    .nav-staffShop .slick-slide {
+        min-width: 140px;
+    }
+
+    .qualityMetrics-block {
+        margin-bottom: 20px;
+    }
+
+    .card-resolutionRate .progress-block {
+        margin-bottom: 16px;
+    }
+
+    .card.card-grievance .body,
+    .card.card-disciplinary .body {
+        padding: 20px 16px;
+    }
+
+    .responseKpi-block {
+        padding: 14px 16px;
+    }
+
+    #card-pendingActions,
+    #card-trainingHistory,
+    #card-pendingActionsHR,
+    #card-trainingHistoryHR {
+        height: auto !important;
+        max-height: 425px;
+    }
+
+    .card-billingInvoicePremiumPlan .billingInvoicePremiumPlan-block h6,
+    .card-billingInvoicePremiumPlan .billingInvoicePremiumPlan-block span {
+        font-size: 15px;
+    }
+
+    .ExpDa-fillterbox>a {
+        width: 178px;
+        padding: 16px 12px;
+    }
+
+
+    .card-activePeopleEmp .leaveUser-bgBlock h6,
+    .card-annoPeopleEmp .leaveUser-bgBlock h6,
+    .card-salaryIncrePeopleEmp .leaveUser-bgBlock h6,
+    .card-promotionPeopleEmp .leaveUser-bgBlock h6,
+    .card-probationPeopleEmp .leaveUser-bgBlock h6,
+    .card-transferPeopleEmp .leaveUser-bgBlock h6,
+    .card-salaryadvPeopleEmp .leaveUser-bgBlock h6,
+    .card-repayTrackPeopleEmp .leaveUser-bgBlock h6,
+    .card-exitClearPeopleEmp .leaveUser-bgBlock h6,
+    .card-approvalsPeopleEmp .leaveUser-bgBlock h6,
+    .card-resignationPeopleEmp .leaveUser-bgBlock h6,
+    .card-liabilityTrackPeopleEmp .leaveUser-bgBlock h6 {
+        font-size: 17px;
+    }
+
+    .card-probationPeopleEmp p.fw-500 {
+        font-size: 15px;
+    }
+
+    .card-probationPeopleEmp .leaveUser-bgBlock.flex-nowrap {
+        padding: 5px 12px;
+    }
+
+    .costDistribution-chart {
+        width: 300px;
+    }
+
+    .visaManagtalentAcq-tab .bg-themeGrayLight {
+        padding: 11px 14px;
+    }
+
+    .card-talentAcqPeople .bg-themeGrayLight .leaveUser-bgBlock {
+        padding: 19px 12px;
+    }
+
+    .card-talentAcqPeople .leaveUser-block {
+        padding-bottom: 15px;
+        margin-bottom: 14px;
+    }
+
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPronPeo-block,
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPromPeo-block {
+        padding: 13px 10px 12px;
+    }
+
+    .card-talentAcqPeople .talentAcqAppPeo-block .approvalsPeopleEmp-block,
+    .card-talentAcqPeople .talentAcqResPeo-block .approvalsPeopleEmp-block {
+        padding: 11px 12px;
+    }
+}
+
+@media (max-width:1400px) and (min-width:1200px) {
+    .accordion-innerbox>p {
+        font-size: 16px;
+    }
+
+    .accordion-innerbox>span {
+        font-size: 14px;
+    }
+
+    .accordion-innerbox .badge {
+        font-size: 12px;
+    }
+
+    .btn {
+        padding: 12px 18px;
+    }
+
+    .btn-small {
+        padding: 5px 17px;
+    }
+
+    .budget-accordion .accordion-button .lable-budget {
+        font-size: 16px;
+    }
+
+    .card-title h3 {
+        font-size: 16px;
+    }
+
+    .fs-18 {
+        font-size: 16px;
+    }
+
+    .accordion-innerbox:not(:last-of-type) {
+        margin-bottom: 18px;
+    }
+
+    .flex-xl-nowrap>div:last-child>.row {
+        display: block;
+    }
+
+    .two-progressbar .progress-container:first-child {
+        width: 224px;
+        height: 224px;
+    }
+
+    .two-progressbar .progress-container:nth-child(2) {
+        width: 190px;
+        height: 190px;
+    }
+
+    .two-progressbar .text h5 {
+        font-size: 48px;
+    }
+
+    .two-progressbar .text p {
+        font-size: 17px;
+    }
+
+    .card-appealsSection .bg-themeGrayLight {
+        padding: 14px 7px;
+    }
+
+    .card-appealsSection .doughnut-label br {
+        display: none;
+    }
+
+    .card.card-confiCases {
+        height: 214px;
+    }
+
+    .reconciliation-block {
+        padding: 16px 12px 15px;
+    }
+
+    .reconciliation-block strong {
+        font-size: 16px;
+    }
+
+    .locationEmp-chart,
+    .transferEmp-chart {
+        width: 224px;
+    }
+
+
+    .card-activePeopleEmp .leaveUser-bgBlock h6,
+    .card-annoPeopleEmp .leaveUser-bgBlock h6,
+    .card-salaryIncrePeopleEmp .leaveUser-bgBlock h6,
+    .card-promotionPeopleEmp .leaveUser-bgBlock h6,
+    .card-probationPeopleEmp .leaveUser-bgBlock h6,
+    .card-transferPeopleEmp .leaveUser-bgBlock h6,
+    .card-salaryadvPeopleEmp .leaveUser-bgBlock h6,
+    .card-repayTrackPeopleEmp .leaveUser-bgBlock h6,
+    .card-exitClearPeopleEmp .leaveUser-bgBlock h6,
+    .card-approvalsPeopleEmp .leaveUser-bgBlock h6,
+    .card-resignationPeopleEmp .leaveUser-bgBlock h6,
+    .card-liabilityTrackPeopleEmp .leaveUser-bgBlock h6 {
+        font-size: 16px;
+    }
+}
+
+@media(max-width:1365px) {
+    .leaveReq-card .bg-white {
+        padding: 20px 16px;
+    }
+
+    .leaveReqTicket-main {
+        width: 320px;
+    }
+
+    .leaveReqTicket-main>div:last-child {
+        padding: 18px 12px 25px;
+    }
+
+    .leaveReqTicket-main .d-flex {
+        padding: 10px 12px 14px;
+    }
+
+    .fileDocument-block {
+        padding: 20px 16px;
+    }
+
+    .sosResortMap-block {
+        padding: 16px 12px;
+    }
+
+    .sosResortMap-block>.d-flex {
+        padding: 15px 12px;
+    }
+
+    .tab-theme .nav-tabs .nav-link,
+    .empDetailPeopleEmp-tab .nav-tabs .nav-link,
+    .liabilityOverPeopleEmp-tab .nav-tabs .nav-link {
+        padding: 16px 10px;
+        font-size: 14px;
+    }
+
+    .empDetailPeopleEmp-sidebar {
+        width: 240px;
+        padding: 20px 10px;
+    }
+
+    .empDetailPeopleEmp-tab .bg-themeGrayLight {
+        padding: 20px 16px;
+    }
+
+    .recentActPeopleEmp-block {
+        padding: 18px 12px;
+    }
+}
+
+@media (max-width:1199px) and (min-width:992px) {
+    .exp-Date-userbox>div label {
+        font-size: 12px;
+    }
+}
+
+@media(max-width:1199px) {
+
+    .body-wrapper>.container-fluid {
+        padding: 0 12px;
+    }
+
+
+    .navcarosel-box {
+        max-width: 408px;
+    }
+
+    .top-navbar .navbar-nav .nav-item {
+        margin-left: 8px;
+    }
+
+    .card-hod {
+        padding: 17px 20px;
+    }
+
+    .modal .card {
+        padding: 20px 20px;
+    }
+
+    .login-left .head h1 {
+        font-size: calc(1.375rem + 1.5vw);
+        margin-bottom: 8px;
+    }
+
+    .login-left .head h2 {
+        font-size: 18px;
+    }
+
+    .login-form h3 {
+        font-size: calc(1.225rem + .9vw);
+    }
+
+    .createDuty-tableBlock {
+        width: 247px;
+        padding: 11px 10px;
+    }
+
+    #card-onLeave,
+    #card-upLeave {
+        height: 415px !important;
+    }
+
+    .card-wiINsight {
+        height: auto !important;
+        max-height: 415px !important;
+    }
+
+    .leaveCate-block {
+        padding: 17px 12px;
+    }
+
+    .leaveAdd-block {
+        padding: 20px 16px;
+    }
+
+    .leaveReqTicket-main {
+        width: 310px;
+    }
+
+    .leaveReqTicket-main .ratio h3,
+    .payrollConf-block .value {
+        font-size: calc(1.2rem + 0.5vw);
+    }
+
+    .appleaveReq-block {
+        padding: 10px 12px;
+    }
+
+    strong,
+    .card-accomSummary .leaveUser-bgBlock h3,
+    .PerformanceCyc-block h3 {
+        font-size: calc(1.3rem + .6vw);
+    }
+
+    .card-salaryIncrementSum strong,
+    .card-liabilityOverPeopleEmp .bg-themeGrayLight strong {
+        font-size: calc(1.2rem + 0.5vw);
+    }
+
+    .two-progressbar .text h5 {
+        font-size: calc(2.475rem + 0.9vw);
+    }
+
+    .two-progressbar .text p {
+        font-size: 17px;
+    }
+
+    .card-wiINsightPayroll,
+    .card-activityLog {
+        height: 100% !important;
+        max-height: inherit !important;
+    }
+
+    ul.listing-wrapper li {
+        margin-bottom: 24px;
+    }
+
+    .card-confingLink .listing-wrapper li {
+        margin-bottom: 16px;
+    }
+
+    .card-payrollMain .bg-themeGrayLight {
+        padding: 13px 12px;
+    }
+
+    .nav-staffShop .slick-slide {
+        min-width: 120px;
+    }
+
+    .cart-kpiList,
+    .card-wiINsightperforHod,
+    .card-offenseNearingExpiry {
+        height: 100% !important;
+        max-height: 415px !important;
+    }
+
+    .perforCycleMatrix-table .content {
+        width: 140px;
+    }
+
+    #right-ldDash {
+        height: auto !important;
+    }
+
+    #card-draftedSurveys,
+    #card-wiInsightsSurvey {
+        height: auto !important;
+        max-height: 425px;
+    }
+
+    .negPosi-block {
+        display: flex;
+        flex-wrap: wrap;
+        margin: -3px;
+    }
+
+    .negPosi-block .btn {
+        margin: 3px;
+    }
+
+    .negPosi-block .btn {
+        width: 47px;
+    }
+
+    .negPosi-block .btn-neg,
+    .negPosi-block .btn-posi {
+        padding: 16px 12px;
+        width: 90px;
+    }
+
+    .userDetailList-wrapper {
+        margin: 0 -10px;
+    }
+
+    .userDetailList-wrapper li {
+        padding: 0 10px;
+    }
+
+    .servey-card span {
+        margin-right: 4px;
+    }
+
+    .servey-card .card-title h3,
+    .incident-card .bg-themeGrayLight .card-title h3 {
+        line-height: 1.2;
+    }
+
+    .serveyResult-card .servey-boxCard {
+        padding: 14px 12px;
+    }
+
+    .servey-boxCard h3 {
+        font-size: 23px;
+    }
+
+    #card-incidentResolTime {
+        height: 100% !important;
+    }
+
+    #card-upMeetIncident,
+    #card-incidentHOD {
+        height: auto !important;
+        max-height: 383px;
+    }
+
+    .card.card-billingInvoiceSupport {
+        padding: 20px 16px;
+    }
+
+    .chat-msg .msg {
+        padding: 18px 20px;
+    }
+
+    .ExpDa-fillterbox>a {
+        width: 15.6%;
+        padding: 16px 8px;
+        font-size: 14px;
+    }
+
+    .renewal-innerbox {
+        margin-bottom: 18px;
+    }
+
+    .document-box .img-box,
+    .document-box .img-box img {
+        max-height: 120px;
+    }
+
+    .empDetailPeopleEmp-sidebar {
+        width: 220px;
+    }
+
+    .tab-theme .nav-tabs .nav-link,
+    .empDetailPeopleEmp-tab .nav-tabs .nav-link,
+    .liabilityOverPeopleEmp-tab .nav-tabs .nav-link {
+        font-size: 15px;
+        padding: 10px 5px;
+    }
+
+    .tab-theme .nav-tabs .nav-link,
+    .liabilityOverPeopleEmp-tab .nav-tabs .nav-link {
+        padding: 14px 12px;
+    }
+
+    .empDetailPeopleEmp-tab .table-lable tbody th {
+        padding: 15px 5px;
+    }
+
+    .empDetailPeopleEmp-tab .table-lable tbody th:first-child {
+        padding-left: 0 !important;
+    }
+
+    .empDetailPeopleEmp-tab .table-lable tbody td {
+        padding: 17px 5px;
+    }
+
+    .empDetailPeopleEmp-tab .table-lable tbody td:last-child {
+        padding-right: 0 !important;
+    }
+
+    .card-salaryAdvanceReqPeopleEmpHr .bg-white strong {
+        font-size: calc(1.2rem + 0.5vw);
+    }
+
+    .talentAcqUpInter-block {
+        overflow: auto;
+        height: 170px;
+        padding-right: 4px;
+    }
+
+    .reviewOnboardIti-block .bg-themeGrayLight,
+    .reviewOnboardIti-block .bg-themeGrayLight .bg-white {
+        padding: 20px 16px;
+    }
+
+    .peopleEmpCreationPersonalDetails-form .form-check:not(:last-of-type) {
+        margin-right: 30px;
+    }
+
+    .peopleEmpCreationPersonalDetails-form .btn {
+        min-width: auto;
+    }
+
+    .address-block {
+        padding: 20px 16px;
+    }
+    .search-bar-nav {
+    width: 375px;}
+}
+
+@media(max-width:991px) {
+    .search-bar-nav{
+        display: none;
+    }
+    .dashboard-boxcard {
+        padding: 18px 18px 18px;
+    }
+
+    /* .card {
+        padding: 18px;
+    } */
+
+    .p-20 {
+        padding: 18px !important;
+    }
+
+    .navcarosel-box {
+        max-width: calc(100vw - 242px);
+        display: none;
+    }
+
+    .navcarosel-box .dropdown-toggle {
+        font-size: 12px;
+    }
+
+    .btn {
+        padding: 12px 24px;
+    }
+
+    .btn-small {
+        padding: 5px 12px;
+    }
+
+    .serch-box>div {
+        padding: 16px;
+    }
+
+    .serch-box .serch-icon {
+        height: 44px;
+        width: 44px;
+    }
+
+    .serch-box input {
+        height: 48px;
+    }
+
+    .serch-box {
+        /* top: 140px; */
+        top: 95px;
+    }
+
+    .serch-box {
+        height: 70px;
+    }
+
+    .requestsUser-block>div:first-child {
+        min-width: 180px;
+    }
+
+    .modal .card {
+        padding: 20px 16px;
+    }
+
+    .table-respond th:first-child {
+        min-width: 190px;
+    }
+
+    div#card-todoList {
+        height: 465px !important;
+    }
+
+    .userApplicants-wrapper,
+    .userReviewTasks-wrapper,
+    .prReview-wrapper {
+        padding: 20px;
+        border-radius: 35px 0px 0px 35px;
+    }
+
+    .userApplicants-title .progress-container,
+    .userReviewTasks-wrapper .img-obj {
+        width: 70px;
+        min-width: 70px;
+        height: 70px;
+        margin-right: 12px;
+    }
+
+    .userApplicants-title h4 .badge {
+        margin-left: 8px;
+    }
+
+
+    .userApplicants-title .btn+.btn {
+        margin-left: 2px;
+    }
+
+    .userApplicants-body,
+    .userReviewTasks-body {
+        padding-top: 24px;
+    }
+
+    .empDetails-leave>.row>*:nth-child(2) {
+        border-right: 0;
+    }
+
+    .appleaveReq-block {
+        height: auto;
+    }
+
+    .appleaveReq-block i {
+        margin-bottom: 20px;
+    }
+
+    /*
+    .employee-progressMain h6 {
+        width: 89px;
+        font-size: 13px;
+    } */
+
+    #calsidebar {
+        height: 600px !important;
+    }
+
+    .card-boardingPass>.row>.col-lg-6:first-child {
+        border-right: 0;
+    }
+
+    .leaveReqTicket-main {
+        width: 360px;
+    }
+
+    .accordion-gary .accordion-button {
+        padding: 13px 12px;
+        gap: 8px;
+    }
+
+    .accordion-gary .accordion-button span {
+        font-size: 13px;
+        padding: 10px 8px;
+    }
+
+    .accordion-gary .accordion-button::after {
+        font-size: 16px;
+    }
+
+
+    .accordion-gary .accordion-collapse {
+        margin: 0 12px;
+    }
+
+    .accordion-gary .bg-white {
+        padding: 18px 16px;
+    }
+
+    .calendarAccom-card .leaveUser-main .d-flex {
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+
+    .calendarLD-card .leaveUser-main .d-flex,
+    .calendarIncident-card .leaveUser-main .d-flex {
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+
+    .card-wiINsightPayroll,
+    .card-activityLog {
+        height: 415px !important;
+        max-height: inherit !important;
+    }
+
+    .runPayroll-form .progressbar-tab li {
+        font-size: 13px;
+    }
+
+    .cart-monthlyCheck {
+        height: auto !important;
+        max-height: 415px;
+    }
+
+    .sumDisEmp-block,
+    .participants-block,
+    .fileDocument-block {
+        padding: 20px 16px;
+    }
+
+    .fileManagEmpWise-accordion .accordion-button {
+        padding: 16px 9px;
+    }
+
+    .sumDisEmp-block .img-circle.userImg-block,
+    .participants-block .img-circle.userImg-block,
+    .fileDocument-block .img-circle.userImg-block {
+        margin-right: 8px;
+    }
+
+    .selectFolderLocation-block,
+    .sumDisEmp-block .d-flex,
+    .fileDocument-block .d-flex {
+        padding: 16px 9px;
+    }
+
+    .employeesDetails-block .userImg-block {
+        margin-right: 12px;
+    }
+
+    .perforCycles-block {
+        padding: 21px 12px;
+    }
+
+    .perforCycles-block .bg-white {
+        padding: 15px 12px;
+    }
+
+    .card-empGrieSubmission p {
+        margin-bottom: 30px;
+    }
+
+    .card.card-empGrieSubmission {
+        padding: 50px 20px;
+    }
+
+    .card-empGrieSubmission .row {
+        margin-bottom: 40px;
+    }
+
+    .grieInv-card .bg-themeGrayLight>.row>*:first-child,
+    .appealReviewDecision-card .bg-themeGrayLight>.row>*:first-child {
+        border-right: 0;
+    }
+
+    .tab-userApplicants .nav-tabs .nav-link,
+    .tab-prReview .nav-tabs .nav-link {
+        padding: 0 17px 15px;
+    }
+
+
+    .negPosi-block .btn {
+        padding: 9px 10px;
+    }
+
+    .negPosi-block .btn-neg,
+    .negPosi-block .btn-posi {
+        padding: 12px 12px;
+    }
+
+    .incident-card .bg-themeGrayLight {
+        padding: 17px 12px;
+    }
+
+    .incident-card .bg-white {
+        padding: 14px 12px;
+    }
+
+    .fileDocument-block {
+        max-height: 500px;
+    }
+
+    .total-breakdown-visa>div>div:nth-child(2) {
+        margin-top: 12px;
+        text-align: left;
+    }
+
+    .total-breakdown-visa>div>div:last-child ul {
+        justify-content: start;
+    }
+
+    .expires-date-box {
+        grid-template-columns: auto auto auto;
+    }
+
+    .expires-date-box>div {
+        padding: 2px 0;
+    }
+
+    .ExpDa-fillterbox>a {
+        width: 31%;
+        padding: 8px;
+    }
+
+    .DepRefReq-checkbox {
+        padding: 18px;
+    }
+
+    .document-management-tabcard .uploadFileNew-block {
+        min-height: 260px;
+        padding: 24px;
+    }
+
+
+    .exp-Date-userbox.expiry-dat-box .expires-date-box {
+        grid-template-columns: auto auto;
+    }
+
+    .empDetailPeopleEmp-tab .table-lable tbody th {
+        padding: 10px 5px;
+    }
+
+
+
+    .empDetailPeopleEmp-tab .table-lable tbody td {
+        padding: 12px 5px;
+    }
+
+    .modal-reqApproval .bg-themeGrayLight {
+        padding: 21px 16px;
+    }
+
+    .card-salaryAdvanceReqPeopleEmp .bg-themeGrayLight,
+    .card-salaryAdvanceReqPeopleEmpHr .bg-themeGrayLight,
+    .card-repayTrackEmpDetailPeopleEmp .bg-themeGrayLight,
+    .card-exitProfilePeopleEmp .bg-themeGrayLight {
+        padding: 20px 16px;
+    }
+
+    .attachPdf-block {
+        min-width: inherit;
+    }
+
+    .table-repaySchedPeopleEmp .form-control {
+        max-width: 145px;
+    }
+
+    .card-liabilityOverPeopleEmp .bg-themeGrayLight {
+        padding: 15px 12px;
+    }
+
+    .visaManagtalentAcq-tab .bg-themeGrayLight {
+        padding: 11px 10px;
+    }
+
+    .profile-img-box {
+        width: 120px;
+        height: 120px;
+        margin-right: 20px;
+    }
+
+    .peopleEmpCreation-form .progressbar-tab li {
+        text-transform: capitalize;
+    }
+}
+
+@media (max-width:991px) and (min-width:768px) {
+    .uploadFileNew-block h5 {
+        font-size: 14px;
+    }
+}
+
+
+
+@media(max-width:767px) {
+    .container-fluid {
+        padding: 0 8px;
+    }
+
+    .page-title h1 {
+        font-size: 26px;
+    }
+
+    .page-hedding {
+        margin: 16px 0 16px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .card.card-theme>.card-title,
+    .card.card-theme>.card-body {
+        padding: 14px 12px;
+    }
+
+    .card.pdngX-0 .card-header {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .card.card-small {
+        padding: 12px 12px;
+    }
+
+    .card-footer {
+        padding: 16px 0 4px;
+    }
+
+    .mb-30 {
+        margin-bottom: 20px;
+    }
+
+    .fs-18,
+    .budget-e-box h4,
+    .card-confiTimeAtten h6 {
+        font-size: 16px;
+    }
+
+    /* strong {
+        font-size: 26px;
+    }
+ */
+
+    .accordion-innerbox>p {
+        font-size: 14px;
+    }
+
+    .accordion-innerbox>span {
+        font-size: 14px;
+    }
+
+    .accordion-innerbox .badge {
+        font-size: 12px;
+    }
+
+    .btn {
+        padding: 7px 18px;
+    }
+
+    .btn-small {
+        padding: 4px 10px;
+    }
+
+    .btn-sm {
+        font-size: 14px;
+        padding: 7px 12px !important;
+    }
+
+    .form-control,
+    .inputCustom-color {
+        padding: 10px 12px;
+    }
+
+    .form-control.form-control-small {
+        padding: 7px 12px;
+    }
+
+    .btn.btn-plusIcon {
+        padding: 7px 15px;
+    }
+
+    .inputCustom-color input[type="color"] {
+        width: 27px;
+        height: 27px;
+        right: 10px;
+    }
+
+
+    .budget-accordion .accordion-button .lable-budget {
+        font-size: 16px;
+    }
+
+    .card-title h3 {
+        font-size: 16px;
+        line-height: 1.2;
+    }
+
+    .fs-18 {
+        font-size: 16px;
+    }
+
+    .accordion-innerbox:not(:last-of-type) {
+        margin-bottom: 18px;
+    }
+
+    .budget-accordion .accordion-button .name {
+        font-size: 14px;
+    }
+
+    .p-20,
+    .accordion-innerbox {
+        padding: 12px 16px !important;
+    }
+
+    .budget-accordion .accordion-button.collapsed {
+        padding: 16px 18px 16px;
+    }
+
+    .accordion-body {
+        padding: 16px 10px;
+    }
+
+    .form-select {
+        padding: 8px 30px 8px 12px;
+        font-size: 14px;
+    }
+
+    .send-m-display {
+        padding: 16px;
+    }
+
+    .send-reminder-box {
+        padding: 12px;
+    }
+
+    .carosel-nav-menu .dropdown-item {
+        padding: 12px 14px;
+        font-size: 12px;
+    }
+
+    .accordion-button::after {
+        font-size: 16px;
+    }
+
+    .card-hod {
+        padding: 10px 20px;
+    }
+
+    .modal .card {
+        padding: 20px 12px;
+    }
+
+    .modal-manning .modal-body {
+        padding: 17px 0 70px;
+    }
+
+    .modal-manning .manningHeadcount-block {
+        padding: 10px 16px;
+    }
+
+    .modal-manning h4 {
+        margin-bottom: 20px;
+    }
+
+    ul.manning-timeline li {
+        padding-top: 20px;
+    }
+
+    ul.manning-timeline li::before {
+        top: 17px;
+    }
+
+    .modal-content {
+        padding: 0 16px;
+    }
+
+    table.dataTable>tbody>tr>td,
+    .table tbody td {
+        padding: 10px 7px 10px 7px;
+    }
+
+    .todoList-block h6,
+    .talentPool-block h6,
+    .hireReq-block h6 {
+        line-height: 1.4;
+    }
+
+    .modal-respondApp p {
+        line-height: 1.5;
+        margin-bottom: 24px;
+    }
+
+    .todoList-block h6,
+    .talentPool-block h6,
+    .hireReq-block h6,
+    .respond-block h6 {
+        line-height: 1.2;
+    }
+
+    .modal-footer .btn {
+        padding: 5px 12px;
+    }
+
+    .modal-respondApp .modal-body {
+        padding: 0 0 40px;
+    }
+
+    .modal-respondApp img {
+        margin-bottom: 16px;
+    }
+
+    .modal-respondApp h4 {
+        margin-bottom: 12px;
+    }
+
+    .input-group>i {
+        font-size: 16px;
+        top: 16px;
+        right: 12px;
+    }
+
+    .modal-footer {
+        padding: 12px 0 16px;
+    }
+
+    .sendRequestTime-main .block>div>div {
+        padding: 16px 10px;
+    }
+
+    .table-sendRequestFinal th,
+    .table-lable tbody th {
+        font-size: 15px;
+        padding: 8px 7px 8px 0;
+    }
+
+    .vacanciesGrid-block {
+        padding: 16px 10px;
+    }
+
+    .vacanciesGrid-block .bg div,
+    .talentPoolGrid-block .bg div,
+    .employeesGrid-block .bg div {
+        padding: 10px 5px;
+    }
+
+    .applicantsGrid-block {
+        padding: 12px 12px 16px;
+    }
+
+
+    .empAccomGrid-block,
+    .talentPoolGrid-block,
+    .employeesGrid-block,
+    .empDetailsGrid-block,
+    .leaveReqGrid-block,
+    .empPerforGrid-block,
+    .salaryIncrementManag-block,
+    .empListPeopleEmp-block,
+    .upArrivalGrid-block {
+        padding: 16px 12px;
+    }
+
+
+    .applicantsGrid-block .bg {
+        padding: 10px 16px;
+    }
+
+    .applicantsGrid-block .bg-table {
+        padding: 4px 8px;
+    }
+
+    .page-appHedding .btn {
+        padding: 8px 12px;
+    }
+
+    .page-appHedding .page-title {
+        margin-bottom: 5px;
+    }
+
+    .userApplicants-body,
+    .userReviewTasks-body {
+        padding-top: 16px;
+    }
+
+    .tab-userApplicants .nav-tabs .nav-link,
+    .tab-prReview .nav-tabs .nav-link {
+        font-size: 16px;
+        padding: 10px 6px;
+    }
+
+
+    .tab-userApplicants .tab-content,
+    .tab-prReview .tab-content {
+        padding-top: 10px;
+    }
+
+    .userApplicants-accordion .accordion-button {
+        padding: 10px 12px;
+    }
+
+    .userApplicants-accordion .accordion-body {
+        padding: 5px 12px 16px;
+    }
+
+    .userApplicants-accordion ol li {
+        margin-bottom: 4px;
+    }
+
+    .userApplicants-accordion .accordion-item {
+        padding-left: 18px;
+    }
+
+    .userApplicants-body .table-lable.table-intUserApp tbody th {
+        width: 160px;
+        min-width: 160px;
+    }
+
+    .addQue-block img {
+        margin-bottom: 16px;
+    }
+
+    .addQue-block h5 {
+        width: auto;
+        margin-bottom: 10px;
+    }
+
+    .table tbody td.p-table {
+        padding: 6px 0;
+    }
+
+    #filled-positions-table tr td table td,
+    #filled-positions-table tr td table td:first-child {
+        padding: 4px 10px !important;
+    }
+
+    .talentAc-main {
+        margin-bottom: 24px;
+    }
+
+    .talentAc-block {
+        margin-bottom: 20px;
+    }
+
+    .form-radio label::before,
+    .form-check .form-check-input {
+        width: 18px;
+        height: 18px;
+        top: 1px;
+        margin-top: 1px;
+    }
+
+    .form-check {
+        padding-left: 26px;
+    }
+
+    .form-check .form-check-input {
+        margin-left: -26px;
+    }
+
+    .form-radio label,
+    .form-check .form-radio label {
+        padding-left: 26px;
+    }
+
+    .form-radio input:checked~label::before {
+        border: 6px solid #014653;
+    }
+
+    .form-check.form-switch {
+        padding-left: 70px;
+    }
+
+    .form-check.form-switch {
+        padding-left: 70px;
+    }
+
+    .form-switchTheme .form-check-input {
+        width: 60px;
+        height: 28px;
+        margin-left: -70px;
+    }
+
+    .form-switchTheme .form-check-label {
+        line-height: 1.3;
+        padding-top: 5px;
+    }
+
+    .talentAc-block .form-select {
+        padding: 10px 30px 10px 12px;
+    }
+
+    .table-recHoD.table-collapseNew .bg {
+        padding: 16px 12px;
+    }
+
+    /* 25-09 */
+    .form-radio {
+        margin: 0 30px 16px 0;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        font-size: 13px;
+        line-height: 46px;
+        padding-left: 12px;
+        padding-right: 22px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow::after {
+        font-size: 16px;
+    }
+
+    .progressbar-wrapper {
+        padding-top: 20px;
+        margin-bottom: 24px;
+    }
+
+    .progressbar-tab li span {
+        display: none;
+    }
+
+    .progressbar-tab li:before {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .progressbar-tab li:after {
+        top: 16px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        right: 8px;
+    }
+
+    .login-left {
+        padding: 12px 16px 12px;
+        border-radius: 0 0 30px 30px;
+    }
+
+    .login-left .head h2 {
+        font-size: 16px;
+    }
+
+    .login-left .head {
+        margin: 30px auto 24px;
+    }
+
+    .login-slider {
+        margin-bottom: 30px;
+    }
+
+    .login-slider .slick-slide {
+        padding: 16px 12px;
+    }
+
+    .login-slider p {
+        line-height: 1.5;
+        margin-bottom: 12px;
+    }
+
+    .login-slider .img-circle {
+        margin-right: 8px;
+    }
+
+    .login-form {
+        padding: 50px 16px;
+    }
+
+    .login-form h3 {
+        margin-bottom: 16px;
+    }
+
+    .login-right>.footer {
+        padding-bottom: 12px;
+    }
+
+    .form-floating>.form-control,
+    .form-floating>.form-select {
+        height: 48px;
+        padding: 13px 12px;
+    }
+
+    .form-floating>label {
+        padding: 13px 12px;
+        height: auto;
+    }
+
+    .progress-custom {
+        height: 14px;
+    }
+
+    .employeesGrid-block p {
+        margin-bottom: 12px;
+    }
+
+    .employees-progress {
+        margin-bottom: 16px;
+    }
+
+    .empDetails-leave {
+        padding: 16px 12px;
+    }
+
+    .table-leave th,
+    .table-leave td {
+        padding: 2px 3px;
+    }
+
+    .card-header .form-control {
+        padding: 10px 12px;
+    }
+
+    .empDetails-user .img-circle {
+        width: 66px;
+        height: 66px;
+        min-width: 66px;
+        margin-right: 12px;
+    }
+
+    .progress-custom .progress-bar {
+        font-size: 9px;
+    }
+
+    .table-attendance th:nth-last-child(1),
+    .table-attendance th:nth-last-child(2),
+    .table-attendance th:nth-last-child(3),
+    .table-attendance th:nth-last-child(4),
+    .table-attendance th:nth-last-child(5),
+    .table-attendance>tbody>tr>td:nth-last-child(1),
+    .table-attendance>tbody>tr>td:nth-last-child(2),
+    .table-attendance>tbody>tr>td:nth-last-child(3),
+    .table-attendance>tbody>tr>td:nth-last-child(4),
+    .table-attendance>tbody>tr>td:nth-last-child(5) {
+        position: static;
+        width: auto;
+    }
+
+    .table-attendance th:nth-child(1),
+    .table-attendance>tbody>tr>td:nth-child(1) {
+        width: 61px;
+    }
+
+    .table-attendance th:nth-child(2),
+    .table-attendance>tbody>tr>td:nth-child(2) {
+        left: 61px;
+    }
+
+    .table-arrowAtten .arrow-left,
+    .table-arrowAtten .arrow-right {
+        display: none;
+    }
+
+    .timeAttend-boxcard p {
+        font-size: 16px;
+    }
+
+    input.datepicker,
+    input.timePicker {
+        background-size: 14px;
+        background-position: right 10px center;
+    }
+
+    .createDuty-date .bg-white {
+        height: 45px;
+        padding: 5px 10px;
+    }
+
+    .card-themeSkyblue {
+        padding: 12px 10px;
+    }
+
+    .createDuty-user .img-circle {
+        width: 47px;
+        height: 47px;
+        min-width: 47px;
+    }
+
+    .table-createDutyWeekly th:first-child,
+    .table-createDutyWeekly td:first-child,
+    .table-createDutymonthly th:first-child,
+    .table-createDutymonthly td:first-child,
+    .table-overtimemonthly th:first-child,
+    .table-overtimemonthly td:first-child {
+        left: 0;
+        min-width: 210px;
+    }
+
+    .table-createDutyWeekly th:last-child,
+    .table-createDutyWeekly td:last-child,
+    .table-overtimemonthly th:last-child,
+    .table-overtimemonthly td:last-child {
+        position: static;
+    }
+
+    #card-onLeave,
+    #card-upLeave,
+    .card-wiINsight,
+    .card-upcomingLeve,
+    .card-upcomingBirthLeve {
+        height: auto !important;
+        max-height: 415px !important;
+    }
+
+    .leaveUser-block .img {
+        margin-right: 8px;
+    }
+
+    .card-upcomingLeve .leaveUser-bgBlock {
+        padding: 16px 12px;
+    }
+
+    .leaveReqGrid-block .bg.leave {
+        padding: 8px 16px;
+    }
+
+    .leaveReqGrid-block .bg>div>div:nth-child(2) {
+        margin: 0 16px;
+    }
+
+    .leaveReqGrid-block .btn-block {
+        justify-content: center;
+    }
+
+    .leaveReqGrid-block .btn {
+        flex-grow: initial;
+        margin: 0 5px;
+        padding: 7px 10px !important;
+    }
+
+    .table-lableNew th,
+    .table-lableNew td {
+        padding: 4px 5px;
+    }
+
+    .empDetails-user h4 {
+        font-size: 22px;
+    }
+
+    .route-main .body {
+        padding: 7px 10px;
+    }
+
+    .form-check:not(:last-of-type) {
+        margin-right: 16px;
+    }
+
+    .calendar-event .fc-toolbar .fc-center h2 {
+        font-size: 20px;
+    }
+
+    .calendar-event .fc-toolbar .fc-state-default {
+        padding: 8px 7px;
+    }
+
+    .calendar-event .fc-toolbar {
+        margin-bottom: 12px;
+    }
+
+    .calendar-event .fc-event {
+        font-size: 12px;
+        padding: 2px 2px;
+    }
+
+    .calendar-event.fc th {
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .leaveReq-card .bg-white {
+        padding: 16px 10px;
+    }
+
+    .leaveReqTicket-name {
+        margin-bottom: 16px;
+    }
+
+    .employee-progressMain {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+
+    }
+
+    .card-accomSummary .leaveUser-bgBlock h6,
+    .card-incidentResolTime .leaveUser-bgBlock h6 {
+        font-size: 16px;
+    }
+
+    .table-accomMainten tr.danger-tr td:first-child:before {
+        font-size: 17px;
+        top: 14px;
+    }
+
+    .card-maintenReqDetail .table-lable th {
+        white-space: normal;
+    }
+
+    .accordion-gary .accordion-button {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 8px 10px;
+        gap: 6px;
+    }
+
+    .accordion-gary .accordion-button span {
+        font-size: 12px;
+        padding: 8px 6px;
+    }
+
+    .accordion-gary .accordion-button::after {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+    }
+
+
+    .accordion-gary .accordion-collapse {
+        margin: 0 10px;
+    }
+
+    .accordion-gary .bg-white {
+        padding: 12px 10px;
+    }
+
+    .empAccomGrid-block .bg {
+        padding: 8px 6px;
+    }
+
+    .table-empAccom th {
+        width: auto;
+    }
+
+    .viewBudget-accordion .accordion-button {
+        padding-right: 22px;
+    }
+
+    .viewBudget-accordion .accordion-button h3 {
+        font-size: 16px;
+    }
+
+    .viewBudget-accordion .accordion-button .badge,
+    .viewBudget-accordion .accordion-button .btn {
+        margin-left: 8px;
+    }
+
+    .viewBudget-accordion .accordion-button::after {
+        position: absolute;
+        top: 3px;
+        right: 0;
+    }
+
+    .paySlip-user .img-obj {
+        min-width: 140px;
+        width: 140px;
+        height: 140px;
+        margin-right: 12px;
+    }
+
+    .paySlip-user h4 {
+        margin-bottom: 12px;
+    }
+
+    .paySlip-table th,
+    .paySlip-table td {
+        padding: 3px 5px;
+    }
+
+    .paySlip-block {
+        padding: 16px 12px;
+    }
+
+    .paySlipBorder-table thead th {
+        padding: 5px 5px;
+    }
+
+    .bankDetail-block {
+        padding: 5px 16px;
+    }
+
+    .bankDetail-block table th,
+    .bankDetail-block table td {
+        padding: 5px 5px;
+    }
+
+
+    .card-paySlip .bg-themeGrayLight,
+    .card-fianlSettlement .bg-themeGrayLight {
+        padding: 12px 12px;
+    }
+
+    .card-wiINsightPayroll,
+    .card-activityLog {
+        height: auto !important;
+        max-height: 415px !important;
+    }
+
+    .payrollPeriod-block {
+        padding: 30px 24px;
+    }
+
+    .emp-select {
+        padding: 8px 10px;
+    }
+
+    .card-header {
+        padding: 0 0 12px;
+        margin-bottom: 16px;
+    }
+
+    .payrollConf-block {
+        padding: 20px 16px;
+        margin-bottom: 16px;
+    }
+
+    .payrollConfStep-block {
+        padding: 12px 16px;
+    }
+
+    ul.listing-wrapper li {
+        padding-left: 30px;
+        margin-bottom: 8px;
+    }
+
+    ul.listing-wrapper li::before {
+        width: 18px;
+        height: 18px;
+    }
+
+    .card-confingLink .listing-wrapper li {
+        margin-bottom: 10px;
+    }
+
+    .table-pension i.fa-circle-exclamation {
+        font-size: 16px;
+    }
+
+    .table-tax th,
+    .table-tax td {
+        white-space: normal;
+    }
+
+    .card-fianlSettlement .bg-themeGrayLight.d-flex>div {
+        padding-right: 15px;
+        margin-right: 15px;
+    }
+
+    .paySlip-header {
+        font-size: 16px;
+        padding: 10px 14px;
+    }
+
+    .paySlip-body {
+        padding: 16px 14px;
+    }
+
+    .fullFinal-main {
+        padding: 16px 14px;
+    }
+
+    .fullFinal-head {
+        font-size: 16px;
+        margin-bottom: 16px;
+    }
+
+    .page-hedding .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 45px;
+    }
+
+    .card.card-wiINsightperformance,
+    .card.card-qualityMetrics,
+    .card.cart-kpiAlert {
+        height: auto;
+        max-height: 437px;
+    }
+
+    .PerformanceCyc-block {
+        padding: 16px 12px;
+    }
+
+    .PerformanceCyc-block .PerformanceCyc-head {
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .PerformanceCyc-block .PerformanceCyc-head h5 {
+        font-size: 16px;
+        margin-bottom: 3px;
+    }
+
+    .PerformanceCyc-block .PerformanceCyc-head h5 span {
+        padding: 4px 12px;
+        margin-left: 8px;
+    }
+
+    .qualityMetrics-block {
+        margin-bottom: 14px;
+    }
+
+    .alert-custom i {
+        font-size: 18px;
+        margin-right: 12px;
+    }
+
+    .PerformanceCyc-block .d-flex {
+        padding: 14px 12px;
+    }
+
+    .cart-kpiAlert .alert-custom {
+        margin-bottom: 12px;
+    }
+
+    .kpiList-block {
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+
+    .img-circle.userImg-block {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+    }
+
+    .monthlyCheck-block .userImg-block,
+    .card-talentAcqPerforHOD .img-circle.userImg-block {
+        margin-right: 8px;
+    }
+
+    .monthlyCheck-block {
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+
+    .sumDisEmp-block,
+    .fileDocument-block {
+        padding: 16px 12px;
+    }
+
+    .selectFolderLocation-block,
+    .sumDisEmp-block .d-flex,
+    .fileDocument-block .d-flex {
+        padding: 10px 8px;
+    }
+
+    .sumDisEmp-block .img-circle.userImg-block,
+    .fileDocument-block .img-circle.userImg-block {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+    }
+
+    .empPerforGrid-block .btn {
+        min-width: auto;
+    }
+
+    .employeesDetails-block .userImg-block {
+        margin-right: 8px;
+    }
+
+    .selectReviewTypes-block .form-check {
+        padding-left: 26px;
+    }
+
+    .selectReviewTypes-block .form-check .form-check-input {
+        margin-top: 6px;
+        margin-left: -26px;
+    }
+
+    .perCycleSum-block .row>*:first-child {
+        border-right: 0;
+    }
+
+    .table-lableSmallLabel th,
+    .table-lableSmallLabel td,
+    .perCycleSum-block tbody th,
+    .perCycleSum-block tbody td {
+        padding: 4px 10px
+    }
+
+
+    .perCycleSum-block .tableUser-block,
+    .empList-block .tableUser-block {
+        margin-bottom: 10px;
+    }
+
+    .perCycleSum-block {
+        padding: 14px 12px;
+    }
+
+    .perActSch-block {
+        padding: 14px 12px;
+    }
+
+    .perActSch-block h6 {
+        font-size: 16px;
+        margin-bottom: 10px;
+    }
+
+    .perPartiSel-block {
+        padding: 20px 12px;
+    }
+
+    .perFinalConfirmation-block h5 {
+        font-size: 18px;
+    }
+
+    .perFinalConfirmation-block {
+        padding: 20px 12px;
+    }
+
+    .perFinalConselect-block {
+        padding: 16px 12px;
+    }
+
+    .perActSch-block h6 {
+        margin-bottom: 6px;
+    }
+
+    .perforCycles-block h3 {
+        margin-bottom: 4px;
+    }
+
+    .perforCycles-block h3 .badge {
+        padding: 4px 10px;
+    }
+
+    .table-perforCycles td:nth-last-child(3),
+    .table-perforCycles td:nth-last-child(2),
+    .table-perforCycles td:last-child {
+        min-width: 120px;
+    }
+
+    .perforCycleAnaly-block>.row>*:first-child {
+        border-right: 0;
+    }
+
+    .perforCycleMatrix-table td {
+        padding: 12px 10px;
+    }
+
+    .perforCycleMatrix-table .content {
+        width: 130px;
+        height: 36px;
+    }
+
+    .peopleRelation-boxcard p {
+        font-size: 16px;
+    }
+
+    .card.peopleRelation-boxcard {
+        padding: 16px;
+        min-height: inherit;
+    }
+
+    .card-confiCases .d-flex {
+        margin-bottom: 10px;
+    }
+
+    .card-appealsSection .bg-themeGrayLight {
+        padding: 14px 10px;
+    }
+
+    .caseTimelines-block,
+    .card-reportsResolved .progress-block {
+        margin-bottom: 10px;
+    }
+
+    .card.card-empGrieSubmission {
+        padding: 40px 12px;
+    }
+
+    .card-empGrieSubmission p {
+        line-height: 1.5;
+        margin-bottom: 24px;
+    }
+
+    .card-empGrieSubmission .row {
+        margin-bottom: 30px;
+    }
+
+    .empGrieSubmission-check {
+        width: auto;
+        height: 40px;
+        padding: 5px 16px 5px 10px;
+    }
+
+    .table-search input {
+        height: 38px;
+        padding: 6px 10px;
+    }
+
+    .table-search a {
+        width: 16px;
+    }
+
+    label.form-label {
+        font-size: 13px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }
+
+    .form-control {
+        font-size: 13px;
+    }
+
+    .grieInv-card .bg-themeGrayLight table span img,
+    .appealReviewDecision-card .bg-themeGrayLight table span img {
+        margin-right: 4px;
+    }
+
+    .grieInv-card .bg-themeGrayLight,
+    .appealReviewDecision-card .bg-themeGrayLight {
+        padding: 16px 12px;
+    }
+
+    .card-AccomGrieHearing h6,
+    .card-appeal h6,
+    .card-nonRetaliation h6,
+    .card-rightAccompanied h6 {
+        font-size: 16px;
+    }
+
+    .table-letterTemplates td {
+        padding: 4px 5px;
+    }
+
+    .prReview-body .table-lable tbody th {
+        white-space: normal;
+    }
+
+    .prReview-body {
+        padding: 5px 20px 0;
+    }
+
+    .prReviewWhen-wrapper .prReview-footer {
+        padding: 16px 24px;
+    }
+
+    .card.card-grievance .body,
+    .card.card-disciplinary .body {
+        padding: 16px 16px;
+    }
+
+    .responseKpi-block {
+        padding: 14px 12px;
+    }
+
+    .calendarLD-card .leaveUser-block p,
+    .calendarIncident-card .leaveUser-block p,
+    .leaveUser-block>div:nth-child(2) {
+        margin-bottom: 0;
+    }
+
+    .surveyStatus-block {
+        padding: 15px 12px;
+    }
+
+    .surveyTitle-block {
+        padding: 20px 12px;
+    }
+
+    .createSurvey-form .progressbar-wrapper {
+        padding-top: 16px;
+        margin-bottom: 16px;
+    }
+
+    .negPosi-block .btn {
+        width: 43px;
+        font-size: 14px;
+        padding: 10px 10px;
+    }
+
+    .negPosi-block .btn-neg,
+    .negPosi-block .btn-posi {
+        width: auto;
+        /* padding: 0; */
+    }
+
+    .filters-btn {
+        width: auto;
+    }
+
+    .filters-block::before {
+        left: calc(50% + 60px);
+    }
+
+    .filters-block {
+        padding: 16px 12px;
+    }
+
+    .confiCreateSurvey-switch label.form-label {
+        font-size: 16px;
+    }
+
+    .confiCreateSurvey-switch .d-flex {
+        flex-wrap: wrap;
+    }
+
+    .servey-card .bg-themeGrayLight,
+    .serveyResult-card .bg-themeGrayLight,
+    .serveyParticipant-card .bg-themeGrayLight {
+        padding: 11px 12px;
+    }
+
+    .servey-card .bg-white {
+        padding: 6px 10px;
+    }
+
+    .servey-card table th,
+    .servey-card table td,
+    .incident-card table th,
+    .incident-card table td {
+        padding: 5px 5px;
+    }
+
+    /* .card-title .text-nowrap {
+        white-space: normal !important;
+        background: red;
+    } */
+
+    .servey-card .card-title .img-circle {
+        margin-right: 2px;
+    }
+
+    .servey-card .card-title h3,
+    .incident-card .card-title h3,
+    .incident-card .bg-themeGrayLight .card-title h3 {
+        font-size: 20px;
+    }
+
+    .serveyResult-card .bg-white {
+        padding: 20px 12px;
+    }
+
+    .serveyResult-card .servey-boxCard {
+        padding: 14px 12px;
+    }
+
+    .serveyParticipant-card hr {
+        margin: 16px 0;
+    }
+
+    .incident-card .bg-themeGrayLight {
+        padding: 14px 12px;
+    }
+
+    .incident-card h6 {
+        margin-bottom: 8px;
+    }
+
+    .incident-card .img-circle.userImg-block {
+        width: 46px;
+        height: 46px;
+        min-width: 46px;
+    }
+
+    .modal-uploadFile .bg-themeGrayLight,
+    .modal-raiseATicket .bg-themeGrayLight {
+        padding: 16px;
+    }
+
+    .modal-uploadFile .uploadFileNew-block,
+    .modal-raiseATicket .uploadFileNew-block {
+        height: auto;
+    }
+
+    .modal-postUploadPrompt h4,
+    .modal-successNotification h4 {
+        line-height: 1.3;
+        margin-bottom: 24px;
+    }
+
+    .modal-postUploadPrompt .modal-body {
+        padding-bottom: 50px;
+    }
+
+    .modal-successNotification .modal-body>img {
+        margin-bottom: 24px;
+    }
+
+    .modal-successNotification .modal-body {
+        padding-bottom: 40px;
+    }
+
+    /* .selectFolderLocation-block {
+    padding: 16px 10px
+    } */
+
+    .selectFolderLocation-block>img {
+        width: 40px;
+        min-width: 40px;
+        margin-right: 10px;
+    }
+
+    .selectFolderLocation-block h5,
+    .fileDocument-block h6 {
+        font-size: 16px;
+    }
+
+    .selectFolderLocation-block>.btn-lg-icon {
+        margin-left: 12px;
+    }
+
+    .selectFolderLocation-block .form-control {
+        padding: 10px 12px;
+    }
+
+    .fileManagEmpWise-accordion .accordion-button {
+        padding: 10px 9px;
+    }
+
+    .fileManagEmpWise-accordion .accordion-collapse {
+        background: #fff;
+        padding: 0 14px 8px;
+    }
+
+    .fileDocument-block .fileManagEmpWise-accordion .accordion-collapse .d-flex {
+        padding: 6px 9px;
+    }
+
+    .fileDocument-block .fileManagEmpWise-accordion .accordion-collapse .img-circle.userImg-block {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        margin-right: 8px;
+    }
+
+    .fileDocument-block .fileManagEmpWise-accordion .accordion-collapse h6 {
+        font-size: 14px;
+    }
+
+    .modal-header .btn-close {
+        padding: 2px;
+        margin: -2px -2px -2px auto;
+    }
+
+    .card-title .form-select.form-select-large {
+        padding: 4px 24px 4px 10px;
+    }
+
+    .fileDocument-block .card-title select.form-select {
+        line-height: 1.786;
+    }
+
+    ul.listingNew-wrapper li {
+        font-size: 14px;
+        padding-left: 22px;
+        margin-bottom: 6px;
+    }
+
+    .card-billingInvoice h6 {
+        font-size: 16px;
+    }
+
+    .card-billingInvoice .img {
+        width: 220px;
+    }
+
+    .table-billingInvoiceTotal tbody th,
+    .table-billingInvoiceTotal tfoot th {
+        font-size: 16px;
+    }
+
+    .card-billingInvoice div:first-child p {
+        font-size: 15px;
+    }
+
+    .card-billingInvoice>div:first-child {
+        padding: 20px 12px 50px;
+    }
+
+    .table-billingInvoiceTotal tbody td {
+        padding: 4px 8px !important;
+    }
+
+    .table-billingInvoiceTotal tbody tr:last-child td,
+    .table-billingInvoiceTotal tbody tr:last-child th {
+        padding-bottom: 12px !important;
+    }
+
+    .table-billingInvoiceTotal tfoot th {
+        padding: 12px 8px 0 !important;
+        border-top: 1px solid #E7E7E7;
+    }
+
+    .card.card-billingInvoiceSupport {
+        padding: 16px;
+    }
+
+    .billingInvoiceChart-block>div:first-child {
+        height: 400px;
+    }
+
+    .card-billingInvoiceSupport .img-circle,
+    .PayReq-Details-box .img-circle {
+        width: 46px;
+        height: 46px;
+        min-width: 46px;
+    }
+
+    .chat-msg {
+        margin-bottom: 16px;
+    }
+
+    .chat-msg .msg {
+        padding: 10px 12px;
+    }
+
+    .chat-msg .time {
+        font-size: 10px;
+    }
+
+    .chat-msg p {
+        font-size: 14px;
+    }
+
+    .chatSend-input .btn {
+        font-size: 24px;
+        padding: 8px 10px;
+    }
+
+    .billingInvoiceSupport-accordion button.accordion-button {
+        padding: 16px 12px;
+    }
+
+    .billingInvoiceSupport-accordion .accordion-collapse {
+        padding: 0 12px 16px;
+    }
+
+    .sosResortMap-block {
+        padding: 14px 10px;
+    }
+
+    .sosResortMap-block>.d-flex {
+        padding: 12px 8px;
+    }
+
+    .sosResortMap-block>.d-flex .img-circle {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+    }
+
+    .sosEmpSafetyStatus-header .d-flex,
+    .sosEmpSafetyStatus-header .d-flex {
+        padding: 20px 16px;
+    }
+
+    .sosEmpSafetyStatus-header .badge,
+    .sosEmpSafetyStatus-header .badge {
+        padding: 8px 16px;
+    }
+
+    .sosEmpSafetyStatus-header i,
+    .sosEmpSafetyStatus-header i {
+        font-size: 16px;
+    }
+
+    .sosEmpSafetyStatus-form {
+        padding: 12px 12px;
+    }
+
+    .sosteamActivity-emp>.d-flex,
+    .sosEmpSafetyStatus-emp>.d-flex {
+        padding: 12px 12px;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:last-child ul,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul {
+        margin: 0 -12px 4px;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:last-child ul>li,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul>li {
+        padding: 0 12px;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:last-child ul li i,
+    .sosteamActivity-emp>.d-flex>div:last-child ul li img,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul li i,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul li img {
+        width: 16px;
+        font-size: 16px;
+        margin-right: 6px;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:last-child ul,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul {
+        flex-wrap: wrap;
+        gap: 4px 0;
+    }
+
+    .total-breakdown-visa>div>div:last-child ul {
+
+        flex-wrap: wrap;
+    }
+
+    .total-breakdown-visa>div>div:last-child ul li {
+        padding: 0 8px;
+        font-size: 12px;
+        margin: 4px 0;
+    }
+
+    .total-breakdown-visa>div {
+        padding: 12px;
+    }
+
+    .reconciliation-card h4,
+    .RecoDiff-block {
+        font-size: 16px;
+    }
+
+    .card-visa-management .nav-tabs .nav-link {
+        font-size: 14px;
+        padding: 12px;
+    }
+
+    .user-profilebox {
+        border-bottom: 1px solid #DDDDDD;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+
+    .renewal-innerbox {
+        margin-bottom: 12px;
+    }
+
+    .renewal-innerbox p {
+        margin-top: 2px;
+    }
+
+    .renewal-box .card-title {
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+    }
+
+    .renewal-box,
+    .PayReq-Details-box,
+    .PayReqprice-bar,
+    .document-box {
+        padding: 12px;
+    }
+
+    .PayReq-Details-box h6,
+    .DepRefReq-checkbox p {
+        font-size: 14px;
+        line-height: 1;
+        margin-bottom: 2px;
+    }
+
+    .PayReq-Details-box strong {
+        font-size: 14px;
+    }
+
+    .PayReq-Details-box .img-circle {
+        margin-right: 8px;
+    }
+
+    .PayReq-Details-box .border-top {
+        padding-top: 8px;
+        margin-top: 8px;
+    }
+
+    .DepRefReq-checkbox {
+        padding: 12px;
+    }
+
+    .DepRefReq-checkbox span {
+        font-size: 12px;
+    }
+
+    .document-management-tabcard .uploadFileNew-block img {
+        max-width: 40px;
+    }
+
+    .document-management-tabcard fieldset>div {
+        padding: 8px 0 0;
+    }
+
+    .document-management-tabcard .uploadFileNew-block {
+        min-height: 180px;
+    }
+
+    .document-management-tabcard fieldset>div h2 {
+        font-size: 20px;
+        line-height: 1.2;
+    }
+
+    .document-box .img-box,
+    .document-box .img-box img {
+        max-height: 80px;
+    }
+
+    .document-box .border-top {
+        padding-top: 8px;
+    }
+
+    .document-box p {
+        margin: 4px 0 8px;
+    }
+
+    .document-proces-listing li {
+        padding: 12px 12px 12px 46px !important;
+    }
+
+    ul.listing-wrapper.document-proces-listing li::before {
+        left: 16px;
+    }
+
+    .generated-folName .btn {
+        padding: 7px 18px;
+    }
+
+    .Xpat-Sync-card .uploadFileNew-block {
+        padding: 48px 0;
+    }
+
+    .uploadFileNew-block img {
+        width: 42px;
+        margin-bottom: 24px;
+    }
+
+    .exp-Date-userbox {
+        padding: 12px;
+    }
+
+    .iniPromotion-block,
+    .salaryIncrementManag-bgBlock {
+        padding: 20px 12px;
+        margin-bottom: 16px;
+    }
+
+
+
+    .cardBorder-block {
+        padding: 16px 12px;
+    }
+
+    .card-promoApprovalReview .cardBorder-block {
+        height: auto !important;
+    }
+
+    .promoApprovalReview-block {
+        padding: 10px 12px;
+    }
+
+    .card-salaryIncrementSum .bg-themeGrayLight {
+        min-height: auto;
+    }
+
+    .card-probationDetails .bg-themeGrayLight {
+        padding: 20px 10px;
+    }
+
+    .card-header .input-group .form-control {
+        padding-right: 35px;
+    }
+
+    .chat-msg .content p {
+        margin-bottom: 6px;
+    }
+
+    .card-localPeopleEmp .two-progressbar .progress-container:first-child {
+        width: 234px;
+        height: 234px;
+    }
+
+    .card-activePeopleEmp .leaveUser-bgBlock,
+    .card-annoPeopleEmp .leaveUser-bgBlock,
+    .card-salaryIncrePeopleEmp .leaveUser-bgBlock,
+    .card-promotionPeopleEmp .leaveUser-bgBlock,
+    .card-probationPeopleEmp .leaveUser-bgBlock,
+    .card-transferPeopleEmp .leaveUser-bgBlock,
+    .card-salaryadvPeopleEmp .leaveUser-bgBlock,
+    .card-repayTrackPeopleEmp .leaveUser-bgBlock,
+    .card-exitClearPeopleEmp .leaveUser-bgBlock,
+    .card-approvalsPeopleEmp .leaveUser-bgBlock,
+    .card-resignationPeopleEmp .leaveUser-bgBlock,
+    .card-liabilityTrackPeopleEmp .leaveUser-bgBlock {
+        margin-bottom: 8px;
+    }
+
+
+    .card-activePeopleEmp .leaveUser-bgBlock h6,
+    .card-annoPeopleEmp .leaveUser-bgBlock h6,
+    .card-salaryIncrePeopleEmp .leaveUser-bgBlock h6,
+    .card-promotionPeopleEmp .leaveUser-bgBlock h6,
+    .card-probationPeopleEmp .leaveUser-bgBlock h6,
+    .card-transferPeopleEmp .leaveUser-bgBlock h6,
+    .card-salaryadvPeopleEmp .leaveUser-bgBlock h6,
+    .card-repayTrackPeopleEmp .leaveUser-bgBlock h6,
+    .card-exitClearPeopleEmp .leaveUser-bgBlock h6,
+    .card-approvalsPeopleEmp .leaveUser-bgBlock h6,
+    .card-resignationPeopleEmp .leaveUser-bgBlock h6,
+    .card-liabilityTrackPeopleEmp .leaveUser-bgBlock h6 {
+        font-size: 16px;
+        line-height: 1.2;
+    }
+
+    .card-localPeopleEmp .two-progressbar .progress-container:nth-child(2) {
+        width: 190px;
+        height: 190px;
+    }
+
+    .card-exitInterviewPeopleEmp .bg-themeGrayLight {
+        padding: 15px 8px;
+    }
+
+    .card-probationPeopleEmp .leaveUser-bgBlock .d-flex {
+        padding-bottom: 8px;
+        margin-bottom: 0;
+    }
+
+    .table-totalAnnSPeopleEmp,
+    .table-transferPeopleEmp {
+        font-size: 14px;
+    }
+
+    .exitClearPeopleEmp-block {
+        padding: 6px 8px
+    }
+
+    .card-exitClearPeopleEmp .table-lableNew th,
+    .card-exitClearPeopleEmp .table-lableNew td {
+        padding: 8px 5px;
+    }
+
+    .table-liabilityTrackPeopleEmp th {
+        font-size: 15px;
+    }
+
+    .card-liabilityTrackPeopleEmp .bg-themeGrayLight .table-lableNew td {
+        font-size: 14px;
+        padding: 6px 5px;
+    }
+
+    .card-liabilityTrackPeopleEmp .bg-themeGrayLight .table-lableNew th {
+        font-size: 16px;
+        padding: 4px 5px;
+    }
+
+    .card-empListPeopleEmp>.form-check .form-check-label {
+        font-size: 16px;
+    }
+
+    .empListPeopleEmp-block p {
+        margin-bottom: 16px;
+    }
+
+    .empListPeopleEmp-block .block {
+        padding: 5px 0;
+        margin-bottom: 10px;
+    }
+
+    .empListPeopleEmp-block table td {
+        padding: 4px 2px;
+    }
+
+    .empDetailPeopleEmp-sidebar {
+        width: 100%;
+        padding: 16px 10px;
+    }
+
+    .empDetailPeopleEmp-tab .table-lable tbody td {
+        padding: 10px 5px;
+    }
+
+    .empDetailPeopleEmp-sidebar>.table tbody td {
+
+        padding: 8px 5px;
+    }
+
+    .empDetailPeopleEmp-sidebar>ul>li>a {
+        padding: 10px 8px;
+    }
+
+    .empDetailPeopleEmp-tab .bg-themeGrayLight {
+        padding: 16px 10px;
+    }
+
+    .tab-theme .nav-tabs .nav-link,
+    .empDetailPeopleEmp-tab .nav-tabs .nav-link,
+    .liabilityOverPeopleEmp-tab .nav-tabs .nav-link {
+        font-size: 14px;
+        padding: 8px 5px;
+    }
+
+
+    .recentActPeopleEmp-block {
+        padding: 14px 10px;
+    }
+
+    .empDetailPeopleEmp-tab .btn-lg-icon {
+        width: 24px;
+        height: 24px;
+        padding: 6px;
+    }
+
+    .data-Table thead th,
+    .table thead th,
+    .empDetailPeopleEmp-tab .table-lable tbody th {
+        font-size: 15px;
+    }
+
+    .card-transferRequestPeopleEmp .bg-themeGrayLight,
+    .card-salaryAdvanceReqPeopleEmp .bg-themeGrayLight,
+    .card-salaryAdvanceReqPeopleEmpHr .bg-themeGrayLight,
+    .card-repayTrackEmpDetailPeopleEmp .bg-themeGrayLight,
+    .card-exitProfilePeopleEmp .bg-themeGrayLight {
+        padding: 16px 12px;
+    }
+
+    .modal-reqApproval .bg-themeGrayLight {
+        padding: 14px 12px;
+    }
+
+    .modal-content {
+        padding: 0 12px;
+    }
+
+    .table-lable.table-repaySchedPeopleEmp tbody td {
+        padding: 7px 10px;
+    }
+
+    .card-salaryAdvanceReqPeopleEmpHr .bg-white {
+        padding: 14px 12px;
+    }
+
+    .table-repayTrackPeopleEmp th:nth-child(5) {
+        min-width: 140px;
+    }
+
+    .table-repayTrackPeopleEmp th:nth-child(6) {
+        min-width: 150px;
+    }
+
+    .card-exitInterviewResPeopleEmp .d-flex p {
+        margin-bottom: 10px;
+    }
+
+    .queAns-block {
+        padding-bottom: 16px;
+    }
+
+    .queAns-block h6 {
+        line-height: 1.2;
+        margin-bottom: 8px;
+    }
+
+    .queAns-block p {
+        line-height: 1.5;
+    }
+
+    .modal-requestApproval h6 {
+        font-size: 16px;
+    }
+
+    .modal-requestApproval .content {
+        margin-top: 12px;
+        padding-top: 12px;
+    }
+
+    .modal-requestApproval .content p {
+        margin-bottom: 10px;
+    }
+
+    .table-collapse.table-liabilityOverEmpPeopleEmp .collapsing td,
+    .table-collapse.table-liabilityOverEmpPeopleEmp .collapse td {
+        padding: 7px !important;
+    }
+
+    .card-resigSettPeopleEmp h6,
+    .card-exitProcessCustom h6 {
+        font-size: 16px;
+    }
+
+    .card-exitProcessCustom h6 {
+        margin-bottom: 2px;
+    }
+
+    .card-exitProcessCustom .a-link {
+        margin-left: 14px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight,
+    .card-talentAcqEmpHOD .bg-themeGrayLight,
+    .card-talentAcqEmpGM .bg-themeGrayLight {
+        padding: 16px 12px;
+    }
+
+    .card-talentAcqApproveBudgetHOD .bg-themeGrayLight {
+        padding: 8px 12px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight.full {
+        padding: 12px 12px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight p,
+    .card-talentAcqEmpHOD .bg-themeGrayLight p,
+    .card-talentAcqEmpGM .bg-themeGrayLight p,
+    .card-talentAcqApproveBudgetHOD .bg-themeGrayLight p {
+        font-size: 16px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight .img-fluid {
+        width: 30px;
+    }
+
+    .card-talentAcqDivisions .table-lableNew td,
+    .card-talentAcqEmpHOD .table-lableNew td,
+    .card-talentAcqEmpGM .table-lableNew td {
+        font-size: 14px;
+    }
+
+    .card-talentAcqDivisions .table-lableNew th,
+    .card-talentAcqEmpHOD .table-lableNew th,
+    .card-talentAcqEmpGM .table-lableNew th {
+        font-size: 18px;
+    }
+
+    .card-talentAcqCompliances h6 {
+        font-size: 15px;
+        margin-bottom: 6px;
+    }
+
+    .card-talentAcqCompliances .d-flex {
+        margin-bottom: 4px;
+    }
+
+    .card-talentAcqCompliances .border-bottom {
+        padding-bottom: 8px;
+        margin-bottom: 9px;
+    }
+
+    .card-talentAcqRecentActivity .border-bottom {
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+    }
+
+    .card-talentAcqRecentActivity .border-bottom h6 {
+        margin-bottom: 4px;
+    }
+
+    .card-talentAcqRecentActivity .border-bottom p {
+        margin-bottom: 4px;
+    }
+
+    .card.card-theme>.card-title h3 {
+        font-size: 14px;
+    }
+
+    .card-talentAcqWorkPlan .bg-themeGrayLight,
+    .card-talentAcqPayroll .bg-themeGrayLight,
+    .card-talentAcqIncident .bg-themeGrayLight,
+    .card-talentAcqHRStatistics .bg-themeGrayLight,
+    .card-talentAcqTurnoverRatio .bg-themeGrayLight,
+    .card-talentAcqTurnoverRatioGM .bg-themeGrayLight,
+    .card-talentAcqTimeAttend .bg-themeGrayLight,
+    .card-talentAcqLearningDevel .bg-themeGrayLight,
+    .card-talentAcqRecruitment .bg-themeGrayLight,
+    .card-talentAcqLeaveHOD .bg-themeGrayLight,
+    .card-talentAcqLeaveGM .bg-themeGrayLight,
+    .card-talentAcqPerforHOD .bg-themeGrayLight,
+    .card-talentAcqIncidentHOD .bg-themeGrayLight,
+    .card-talentAcqLearningDevelGM .bg-themeGrayLight,
+    .card-talentAcqPerforGM .bg-themeGrayLight {
+        padding: 9px 8px;
+    }
+
+    .visaManagtalentAcq-tab .bg-themeGrayLight {
+        padding: 11px 8px;
+    }
+
+    .user-block {
+        padding: 9px 8px;
+    }
+
+    .card-talentAcqTalentAcq .bg-themeGrayLight,
+    .card-talentAcqLeave .bg-themeGrayLight {
+        padding: 10px 8px;
+    }
+
+    .card-talentAcqPerformance .bg-themeGrayLight,
+    .card-talentAcqPeople .bg-themeGrayLight {
+        padding: 14px 10px;
+    }
+
+    .card-talentAcqPeople .bg-themeGrayLight .leaveUser-bgBlock {
+        padding: 12px 8px;
+    }
+
+    .card-talentAcqPeople .leaveUser-block>div:nth-child(2) {
+        max-width: calc(100% - 45px);
+    }
+
+    .card-talentAcqPeople .leaveUser-block {
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+    }
+
+    .card-talentAcqPeople .talentAcqAppPeo-block .leaveUser-bgBlock,
+    .card-talentAcqPeople .talentAcqResPeo-block .leaveUser-bgBlock,
+    .card-talentAcqPeople .talentAcqLiabilTrackPeo-block .leaveUser-bgBlock {
+        padding: 10px 8px;
+    }
+
+    .card-talentAcqPeople>.card-body .talentAcqLiabilTrackPeo-block .bg-themeGrayLight .table-lableNew th {
+        font-size: 16px;
+    }
+
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPromPeo-block .d-flex {
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPronPeo-block,
+    .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPromPeo-block {
+        padding: 10px 8px;
+    }
+
+    .card-talentAcqPeople .talentAcqAppPeo-block .approvalsPeopleEmp-block,
+    .card-talentAcqPeople .talentAcqResPeo-block .approvalsPeopleEmp-block {
+        padding: 10px 8px;
+    }
+
+    .card-talentAcqLearningDevel .table-lableNew td,
+    .card-talentAcqLearningDevelGM .table-lableNew td {
+        padding: 6px 5px;
+    }
+
+    .table-peopleProbationList td:nth-child(3) {
+        min-width: 130px;
+    }
+
+    .card-talentAcqPerforHOD .img-circle.userImg-block {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+    }
+
+    .table-talentAcqSos td:nth-child(2) {
+        min-width: 90px;
+    }
+
+    .talentAcqUpInter-block {
+        height: auto;
+    }
+
+    .upInterviews-block {
+        padding: 12px 10px;
+    }
+
+    .talentAcqUpInter-block .upInterviews-block {
+        padding: 10px 8px;
+    }
+
+    .form-check.large .form-check-label {
+        font-size: 16px;
+    }
+
+    .form-check.large .form-check-input {
+        width: 23px;
+        height: 23px;
+        margin-left: -32px;
+    }
+
+    .form-check.large {
+        padding-left: 32px;
+    }
+
+    .templateSelect-block {
+        padding: 16px 12px;
+    }
+
+    .templateSelect-block>.flex-grow-1 {
+        padding-bottom: 12px;
+        margin-bottom: 10px;
+    }
+
+    .reviewOnboardIti-block h4 {
+        font-size: calc(1.175rem + 0.2vw);
+    }
+
+    .reviewOnboardIti-block .bg-themeGrayLight,
+    .reviewOnboardIti-block .bg-themeGrayLight .bg-white {
+        padding: 14px 10px;
+    }
+
+    .reviewOnboardIti-block table th {
+        width: auto;
+    }
+
+    .reviewOnboardIti-block .img-circle.userImg-block {
+        width: 46px;
+        height: 46px;
+        min-width: 46px;
+    }
+
+    .profile-img-box {
+        width: 100px;
+        height: 100px;
+        margin-right: 0px;
+    }
+
+    .upload-area {
+        padding: 30px 12px 16px;
+        height: 140px;
+    }
+
+    .upload-area p {
+        margin-top: 30px;
+    }
+
+    .upload-area h3 {
+        font-size: 16px;
+    }
+
+    .peopleEmpCreationPersonalDetails-form .form-check:not(:last-of-type) {
+        margin-right: 16px;
+    }
+
+    .address-block {
+        padding: 16px 12px;
+    }
+}
+
+@media(max-width:575px) {
+    .card {
+        padding: 16px 12px;
+    }
+
+    .card.card-theme>.card-title,
+    .card.card-theme>.card-body {
+        padding: 14px 12px;
+    }
+
+    .card.pdngX-0 .card-header {
+        margin-left: 12px;
+        margin-right: 12px;
+    }
+
+    .card.pdngX-0 .card-header {
+        margin-left: 12px;
+        margin-right: 12px;
+    }
+
+    .card.card-small {
+        padding: 10px 10px;
+    }
+
+    .profile-dropdown .img-box {
+        max-width: 40px;
+    }
+
+    .nav-icon {
+        width: 34px;
+        height: 34px;
+        padding: 10px;
+    }
+
+    .navcarosel-box .btn-group {
+        width: 100%;
+        height: 40px;
+    }
+
+    .top-navbar .navbar-nav .nav-item {
+        margin-left: 4px;
+    }
+
+    .navcarosel-box {
+        max-width: calc(100vw - 170px);
+    }
+
+    .navcarosel-box .carosel-menu {
+        padding: 0 20px;
+    }
+
+    .navcarosel-box .slick-prev {
+        left: 5px;
+    }
+
+    .navcarosel-box .slick-next {
+        right: 5px;
+    }
+
+    header nav {
+        padding: 8px 0;
+    }
+
+    .btn {
+        padding: 7px 18px;
+        font-size: 14px;
+    }
+
+    .btn-small {
+        padding: 4px 6px;
+    }
+
+    .accordion-innerbox .badge {
+        /* display: block; */
+        /* margin-top: 4px; */
+        font-size: 10px;
+        /* border-radius: 3px; */
+    }
+
+    .budget-accordion .accordion-button .lable-budget {
+        font-size: 14px;
+    }
+
+    .accordion-innerbox {
+        padding: 8px 10px !important;
+    }
+
+    .budget-accordion .accordion-button.collapsed {
+        padding: 12px 10px 12px;
+    }
+
+    .accordion-innerbox:not(:last-of-type) {
+        margin-bottom: 12px;
+    }
+
+    .serch-box {
+        top: 61px;
+    }
+
+    header .toggle-icon label {
+        padding: 10px 0;
+    }
+
+    .brand-logo {
+        max-width: 101px;
+    }
+
+    .navigation-box .nav .nav-item .nav-link {
+        padding: 18px;
+        font-size: 14px;
+    }
+
+    .navigation-wrapper {
+        width: 275px;
+    }
+
+    .navigation-box .dropdown-menu .dropdown-item {
+        padding: 16px 18px;
+        font-size: 14px;
+    }
+
+    header .toggle-icon input[type="checkbox"]:checked~span:nth-of-type(1) {
+        transform: rotatez(45deg) translate(10px, 0px);
+    }
+
+    .notification-wrapper {
+        width: 280px;
+    }
+
+    .notification-box {
+        padding: 14px 16px;
+    }
+
+    .modal-header {
+        padding: 16px 0 12px;
+    }
+
+
+
+    .modal-header h5 {
+        font-size: 18px;
+    }
+
+    .requestsUser-block {
+        flex-wrap: wrap;
+
+    }
+
+    .requestsUser-block>div:first-child {
+        width: 100%;
+        min-width: auto;
+        margin-right: 0;
+        padding-left: 0;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-right: 0;
+        border-bottom: 1px solid rgb(112 112 112 / 56%);
+    }
+
+    .fc-basic-view .fc-day-number,
+    .fc-basic-view .fc-week-number {
+        padding: 6px 8px;
+    }
+
+    .vacanciesGrid-block .heading {
+        height: auto !important;
+    }
+
+    .page-appHedding .btn {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+
+    .userApplicants-wrapper,
+    .userReviewTasks-wrapper,
+    .prReview-wrapper {
+        padding: 12px;
+        border-radius: 25px 0 0 25px;
+    }
+
+    .userApplicants-title .progress-container,
+    .userReviewTasks-title .img-obj {
+        margin-right: 6px;
+    }
+
+    .userApplicants-title>div:last-child,
+    .userReviewTasks-title>div:last-child {
+        margin-top: 6px;
+    }
+
+    .userApplicants-body,
+    .userReviewTasks-body {
+        padding-top: 8px;
+    }
+
+    .tab-userApplicants .nav-tabs .nav-link {
+        padding: 8px 8px;
+    }
+
+    .userApplicants-body .table-lable.table-intUserApp tbody th {
+        width: 120px;
+        min-width: 120px;
+    }
+
+    #filled-positions-table th:nth-child(1),
+    #filled-positions-table th:nth-child(2),
+    #filled-positions-table>tbody>tr>td:nth-child(1),
+    #filled-positions-table>tbody>tr>td:nth-child(2),
+    #filled-positions-table th:nth-child(2),
+    #filled-positions-table>tbody>tr>td:nth-child(2) {
+        position: static;
+    }
+
+    .table-viewJobDes td:nth-child(4) {
+        min-width: 270px;
+    }
+
+    .empDetail-block.empDetailPro-block>div>span {
+        margin-left: 8px;
+    }
+
+    .table-attendance th:nth-child(1),
+    .table-attendance th:nth-child(2),
+    .table-attendance>tbody>tr>td:nth-child(1),
+    .table-attendance>tbody>tr>td:nth-child(2) {
+        position: static;
+        width: auto;
+    }
+
+    .data-Table thead th,
+    .table thead th {
+        font-size: 15px;
+    }
+
+
+    .table-createDutyWeekly th:first-child,
+    .table-createDutyWeekly td:first-child,
+    .table-createDutymonthly th:first-child,
+    .table-createDutymonthly td:first-child,
+    .table-overtimemonthly th:first-child,
+    .table-overtimemonthly td:first-child {
+        position: static;
+    }
+
+    .card-wiINsight .leaveUser-block {
+        flex-wrap: wrap;
+    }
+
+    .card-wiINsight .leaveUser-block>div:nth-child(2) {
+        max-width: calc(100% - 56px);
+    }
+
+    .calendar-event .fc-toolbar .fc-right {
+        margin-top: 4px;
+    }
+
+    .leaveAdd-block {
+        padding: 16px 12px;
+    }
+
+    .leaveReq-card .table-lableNew th {
+        width: auto;
+    }
+
+    .leaveReqTicket-main .ratio h5 {
+        font-size: 18px;
+    }
+
+    .leaveReqTicket-main .ratio h6 {
+        font-size: 14px;
+    }
+
+    .leaveReqTicket-main .d-flex {
+        padding: 10px 10px 14px;
+    }
+
+    .leaveReqTicket-main>div:last-child {
+        padding: 16px 10px;
+    }
+
+    .card-accomStati .accordion-item {
+        width: 100%;
+        border-right: 0;
+    }
+
+    .calendarAccom-card .leaveUser-main .d-flex .date-block {
+        width: 60px;
+        min-width: 60px;
+        margin-right: 8px;
+    }
+
+    .modal-selectBed .bg-themeGrayLight {
+        padding: 12px 10px;
+    }
+
+    .card-salaryCalc .border-right {
+        border: 0;
+    }
+
+    .paySlip-user .img-obj {
+        min-width: 100px;
+        width: 100px;
+        height: 100px;
+        margin-right: 12px;
+    }
+
+    .payrollPeriod-block {
+        padding: 30px 16px;
+    }
+
+    .modal-assign .bg-themeGrayLight {
+        padding: 5px 10px;
+        margin-bottom: 16px;
+    }
+
+    .modal-assign table th,
+    .modal-viewStaffShop table th {
+        padding: 3px 10px;
+        padding-left: 0;
+    }
+
+    .modal-assign table td,
+    .modal-viewStaffShop table td {
+        padding: 4px 10px;
+    }
+
+    .modal-viewStaffShop .bg-themeGrayLight {
+        padding: 20px 12px;
+    }
+
+    .card-fianlSettlement .bg-themeGrayLight.d-flex>div {
+        padding-right: 10px;
+        margin-right: 10px;
+    }
+
+    .card.card-grievance .body,
+    .card.card-disciplinary .body {
+        padding: 16px 12px;
+    }
+
+    .surveyStatus-block {
+        padding: 15px 10px;
+    }
+
+    .surveyStatus-block .body {
+        flex-wrap: wrap;
+    }
+
+    .surveyStatus-block .d-flex:first-child {
+        margin: 0 0 6px;
+    }
+
+    .filters-block::before {
+        left: 50px;
+    }
+
+    .incident-card .text-nowrap {
+        white-space: normal !important;
+    }
+
+    .ratio-authNoti .d-flex {
+        flex-wrap: wrap;
+    }
+
+    .incident-card .userDetailList-wrapper li {
+        flex-wrap: wrap;
+    }
+
+    .uploadedFilesProgress-block>.bg {
+        width: 60px;
+        height: 60px;
+        min-width: 60px;
+        font-size: 18px;
+        margin-right: 10px;
+    }
+
+    .uploadedFilesProgress-block>.icon {
+        font-size: 14px;
+        margin-left: 10px;
+    }
+
+    .uploadedFilesProgress-block h5 {
+        font-size: 16px;
+    }
+
+    .uploadedFilesProgress-block .dot {
+        margin: 0 8px;
+    }
+
+    .sosteamActivity-emp>.d-flex,
+    .sosEmpSafetyStatus-emp>.d-flex {
+        flex-wrap: wrap;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:last-child,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child {
+        flex-grow: 1;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:nth-child(2),
+    .sosEmpSafetyStatus-emp>.d-flex>div:nth-child(2) {
+        max-width: calc(100% - 55px);
+    }
+
+    .total-breakdown-visa>div>div:last-child ul li {
+        width: 100%;
+        border-right: none !important;
+        padding-left: 0;
+    }
+
+    .total-breakdown-visa>div>div:nth-child(2) {
+        margin-top: 8px;
+
+    }
+
+    .expires-date-box {
+        grid-template-columns: auto auto;
+        gap: 6px
+    }
+
+    .ExpDa-fillterbox>a {
+        width: 48%;
+        font-size: 12px;
+    }
+
+    .uploadFileNew-block h5 {
+        font-size: 14px;
+    }
+
+    .exp-Date-userbox>div label {
+        font-size: 12px;
+    }
+
+    .iniProSelectEmp-block .bor:nth-last-child(2) {
+        border-left: 0;
+    }
+
+    .card-infoUpdatePeopleEmp .leaveUser-block>div:nth-child(2),
+    .card-infoUpdatePeopleEmpPage .leaveUser-block>div:nth-child(2) {
+        width: calc(100% - 50px);
+    }
+
+    .table-oriReqDetailPeopleEmp th {
+        white-space: normal;
+    }
+
+    .talentAcqHRStatiEmp-chart {
+        margin: 0 auto;
+    }
+
+    .card-talentAcqPerforHOD .monthlyCheck-block .badge-themeNew1 {
+        font-size: 12px;
+    }
+
+    .address-block {
+        padding: 12px 10px;
+    }
+}
+
+@media(max-width:424px) {
+    .card {
+        padding: 16px 10px;
+    }
+
+    .card.card-theme>.card-title,
+    .card.card-theme>.card-body {
+        padding: 12px 10px;
+    }
+
+
+    .card.pdngX-0 .card-header {
+        margin-left: 10px;
+        margin-right: 10px;
+    }
+
+    .top-navbar .navbar-nav .nav-item {
+        margin-left: 4px;
+    }
+
+    .nav-icon {
+        width: 30px;
+        height: 30px;
+        padding: 8px;
+    }
+
+    .profile-dropdown .img-box {
+        max-width: 36px;
+    }
+
+    .notification-wrapper {
+        right: -150%;
+    }
+
+    .table-respond th:first-child {
+        min-width: 140px;
+    }
+
+    .hireReq-block {
+        flex-wrap: wrap;
+    }
+
+    .hireReq-block>div:nth-child(2) {
+        max-width: calc(100% - 47px);
+    }
+
+    .hireReq-block .icon {
+        flex-grow: 1;
+        margin-top: 4px;
+    }
+
+    .leaveReq-card .bg-white {
+        padding: 16px 8px;
+    }
+
+    .leaveReqTicket-main>div:last-child {
+        padding: 16px 7px;
+    }
+
+    .leaveReqTicket-block h6 {
+        font-size: 15px;
+    }
+
+    .leaveReqTicket-block p {
+        font-size: 11px;
+    }
+
+    .paySlip-user {
+        flex-wrap: wrap;
+    }
+
+    .paySlip-user .img-obj {
+        margin-right: 0;
+        margin-bottom: 12px;
+    }
+
+    .paySlip-user h4 {
+        margin-bottom: 8px;
+    }
+
+    .leaveReqTicket-main .ratio h3,
+    .payrollConf-block .value {
+        font-size: calc(1.1rem + 0.4vw);
+    }
+
+    .payrollConf-block {
+        padding: 20px 12px;
+    }
+
+    .card.card-grievance .body,
+    .card.card-disciplinary .body {
+        padding: 16px 12px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight,
+    .card-talentAcqEmpHOD .bg-themeGrayLight,
+    .card-talentAcqEmpGM .bg-themeGrayLight {
+        padding: 16px 10px;
+    }
+
+    .card-talentAcqApproveBudgetHOD .bg-themeGrayLight {
+        padding: 8px 10px;
+    }
+
+    .card-talentAcqDivisions .bg-themeGrayLight.full {
+        padding: 10px 10px;
+    }
+
+}
+
+@media(max-width:374px) {
+    .brand-logo {
+        max-width: 80px;
+    }
+
+    .nav-icon {
+        width: 26px;
+        height: 26px;
+        padding: 6px;
+    }
+
+    .employee-bg {
+        padding: 12px 10px;
+    }
+
+    .empGrieSubmission-check {
+        padding: 5px 10px 5px 8px;
+    }
+
+    .reconciliation-block strong {
+        font-size: 16px;
+    }
+
+    .card-visa-management .nav-tabs .nav-link {
+        font-size: 12px;
+
+    }
+
+    .exp-Date-userbox.expiry-dat-box .expires-date-box {
+        grid-template-columns: auto;
+    }
+}
+
+@media (max-width:359px) {
+
+    .sendRequestTime-main .block>div>div:first-child,
+    .sendRequestTime-main .head>div:first-child {
+        width: 46%;
+    }
+
+    .sendRequestTime-main .block>div>div:last-child,
+    .sendRequestTime-main .head>div:last-child {
+        width: 54%;
+    }
+
+    .sendRequestTime-main .block>div>div img {
+        margin-right: 6px;
+    }
+
+    .userApplicants-title h4 .badge {
+        white-space: normal;
+        text-align: left;
+    }
+
+    .empDetails-user .img-circle {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+        margin-right: 10px;
+    }
+
+    .ratio-authNoti .form-label {
+        width: 100%;
+    }
+
+
+    .card-incidentListing .nav-tabs .nav-link {
+        font-size: 14px;
+    }
+}

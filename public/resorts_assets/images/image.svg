@@ -1,0 +1,20 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 25" width="25" height="25">
+	<title>image2-fpng</title>
+	<defs>
+		<clipPath clipPathUnits="userSpaceOnUse" id="cp1">
+			<path d="m0 0h25v25h-25z"/>
+		</clipPath>
+		<image  width="25" height="25" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAZCAMAAADzN3VRAAAAAXNSR0IB2cksfwAAAbxQTFRFKoD/QnzsQn7sQnztJG3bQX7uQX7tQn7sQX/tP37vQX3tQn7uQn/tQX/tQX7tP33tQX7tQX7tQX7tQH7sQYDtQn/tP37rQID/QIC/P37uQX7tQIDtQ4DuAAAAN3bkQX/tP33sPHjpQn7tQH/uQIDtKlXVPXnzQH7tQn/tQX/tQX/sQX7uQX7uRYHtVIzwTIbuSIPtcKD1m7/+iLL6Qn7tQXvlYZDliK3tiq/ue6PqRn7iQX3qP3zpPHXaM2O5L1mmMFyrOm/RQHvnN2nHMF2vL1qpN2rHP3niQX7sU4vvL1qnLlmmNWa/PXbdh7H5dqT2L1mnMV+yO3LWQX7rj7b7n8L+mr79S4XuLlilLVaiK1OaR3nTi7P5oMP/m7/9cqL1R4LtLVejK1KaK1GWNlyggKTinsH+ncH+aJr0RIDtLlikNVufdZnZnMD8nMD9ZJfzQ4DtLlejLFOba4/Pmr76ZpnzR4PtMlidZYnKl7r3mr/9dKP2LFOcLVOYYIXGlbn1ncP/L1mmLlimLlekLFScWn/Blbj1nML/JlWhL1inLlikLVikK1SeKlGVKk+VRWqtl7n2oML/nsD9lbn/DgxxYAAAAJR0Uk5TBkJRRgdLzNzTUX74//Oocpjs/oiC+Y4IBHXyjC4AHOM1IuSTHAYVf/GtiaLq//////////n/////////gvn//////4P5//////+D+f///////////////////////////////////////////////////////4z/////jf////+NePj/////gRuTq6urq6urq6ubHSHT0h8AAAD4SURBVHichdKxTgJBEIDh+Q0CJwWSnDEQSBCstKPWCiveys73sNSWko7KzsrqhIJgNJogEAUuBma5g9wda5hmN/vtzmZmFwGxBHD4rxwlhXUsMrj8xkW3fp4wzu/KMebcl0XcP5EUHxY5NddMbNnKRoYLi4SxT87As8q5JvZfd6VqbjSVPyfkiqA9OjzFpYkfTNNqXR2vh14gLabhrnQGvyu1Kn0vIVLQUz85mGfbcSnC8kCXZw48RqXorB/G1K0PcR+Ry5GThdEm78NWGnyT5z3MjHY8FAUXBttyKhtp5N5KEO1QnVs6Ijf0pMZLtAcX3AVNg/gfghWxE0GQnQgprQAAAABJRU5ErkJggg=="/>
+	</defs>
+	<style>
+	</style>
+	<g id="Page 1" clip-path="url(#cp1)">
+		<g id="Background">
+			<use id="Bitmap" href="#img1" x="0" y="0"/>
+		</g>
+		<g id="Layer 1">
+		</g>
+		<g id="Web Layer">
+		</g>
+	</g>
+</svg>

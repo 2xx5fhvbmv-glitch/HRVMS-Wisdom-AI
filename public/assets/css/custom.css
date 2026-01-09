@@ -1,0 +1,207 @@
+.text-danger-custom{color:red}
+.red-mark{
+    color:red;
+    font-size: 24px;
+    line-height: 0;
+}
+.action-delete{margin-left:5px}
+.logo-img{max-width:60px;position:absolute;bottom:16px}
+.login-box .alert-dismissible{padding-right:2rem !important}
+.forgotpass-box{width:460px !important}
+.preview_audio{position:absolute;top:30px;height:40px}
+.preview_audio_table{height:40px}
+.delete-audio-btn{position:absolute;top:35px;border-radius:15px}
+.minicolors-theme-bootstrap .minicolors-swatch {top:5px !important;left:5px !important}
+.square-box{width:25px;height:25px}
+#datatable td, th {vertical-align:middle}
+.img_que{position:absolute;top:20px;height:50px;max-height:50px}
+.delButton{position:absolute;top:35px;max-height:50px;left:120px}
+.img-round{width:40px;height:40px;border:1px solid lightgrey;border-radius:50%}
+.arrow-animated{width:40px !important;height:auto !important;position:absolute !important}
+.arrow-zone-1-set-1{top:18% !important;right:50% !important}
+.arrow-zone-2-set-1{top:15% !important;left:24% !important}
+.arrow-zone-3-set-1{top:35% !important;left:40% !important}
+.arrow-zone-4-set-1{top:44% !important;left:27% !important}
+.arrow-zone-1-set-2{top:34% !important;right:46% !important}
+.arrow-zone-2-set-2{top:25% !important;left:32% !important}
+.arrow-zone-3-set-2{bottom:39% !important;left:39% !important}
+.arrow-zone-4-set-2{bottom:28% !important;left:23% !important}
+.profile-block{width:900px !important}
+.select2-container--default .select2-selection--multiple .select2-selection__choice {margin:3px !important}
+.close {opacity:1;position:absolute;right:25px;top:18px;padding:0}
+.select2-container--default .select2-selection--single,.select2-container--default .select2-selection--multiple{border:1px solid #cccccc !important}
+#uploadCategoryImgModal .close-modal-btn{width:30px;height:30px;color:#fff;font-size:15px;line-height:0;padding:0;background-color:rgb(0 0 0 / 65%) !important;border-radius:50% !important}
+#uploadCategoryImgModal .modal-header{padding:10px}
+.croppie-container .cr-slider-wrap{margin:5px auto !important}
+.modal-footer{padding:0.5rem !important}
+.tour-img-small{width:50px}
+.option-image{height:25px}
+.watermarkImg{width:100%}
+
+.row.gy-3 > *{ 
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+/* .btn-check {
+    position: absolute;
+    clip: rect(0, 0, 0, 0);
+    pointer-events: none;
+} */
+
+.test-checkbox,.sample-checkbox{
+    position: absolute;
+    clip: rect(0, 0, 0, 0);
+    pointer-events: none;
+}
+
+.form-check-label-custome {
+    padding: 11.5px 16px 11.5px 42px;
+    position: relative;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 1px 0px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+}
+
+.form-check-label-custome::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 16px;
+    border: 1px solid #68AFB5;
+    border-radius: 4px;
+    top: 14px;
+}
+
+.form-check-label-custome::after {
+    content: '\f00c';
+    position: absolute;
+    font-family:"Font Awesome 5 Free";
+    font-weight: 900;
+    left: 19px;
+    color: #68AFB5;
+    font-size: 12px;
+    top: 15px;
+    opacity: 0;
+    transform: scale(1.5);
+}
+
+.highlight {
+    padding: 11.5px 16px 11.5px 42px;
+    position: relative;
+    border: 1px solid #e6beb0;
+    box-shadow: 0 1px 0px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+}
+
+.highlight::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 16px;
+    border: 1px solid #b57768;
+    border-radius: 4px;
+    top: 14px;
+}
+
+.highlight::after {
+    content: '\f00c';
+    position: absolute;
+    font-family:"Font Awesome 5 Free";
+    font-weight: 900;
+    left: 19px;
+    color: #b57768;
+    font-size: 12px;
+    top: 15px;
+    opacity: 0;
+    transform: scale(1.5);
+}
+
+.form-check input[type="checkbox"]:checked~.form-check-label-custome,
+.form-check input[type="radio"]:checked~.form-check-label-custome {
+    /* background-color: #68AFB5;
+    color: white; */
+    background-color: hsl(185deg 34% 56% / 10%);
+    color: #68AFB5;
+    border-color: hsl(185deg 34% 56% / 10%);
+}
+
+.form-check input[type="checkbox"]:checked~.highlight,
+.form-check input[type="radio"]:checked~.highlight {
+    /* background-color: #68AFB5;
+    color: white; */
+    background-color: hsl(185deg 34% 56% / 10%);
+    color: #b57768;
+    border-color: hsl(185deg 34% 56% / 10%);
+}
+
+.form-check input[type="checkbox"]:checked~.form-check-label-custome::after,
+.form-check input[type="radio"]:checked~.form-check-label-custome::after {
+    opacity: 1;
+    transform: scale(1);
+    transition: all 0.2s linear;
+}
+
+.form-check-label-custome .price-bage {
+    border-radius: 4px;
+    float: inline-end;
+    padding: 0px 8px;
+    background: #68AFB5;
+    border: 1px solid #68AFB5;
+    opacity: 1;
+    visibility: visible;
+    transition: all 0.2s linear;
+    font-style: normal;
+    color: white;
+}
+
+.form-check input[type="checkbox"]:checked~.form-check-label-custome .price-bage {
+    color: #ebf5f5;
+}
+
+.form-check-label-custome span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+    width: 75%;
+    display: inline-block;
+}
+
+table.table-bordered.dataTable th, .table-bordered thead td, .table-bordered thead th {
+    white-space: nowrap;
+}
+
+.table-bordered td, .table-bordered th {
+    white-space: nowrap;
+}
+
+.table-permissions tbody tr td .form-check-input,.table-resort-permissions tbody tr td .form-check-input{
+    width: 16px;
+    height: 16px;
+    margin: auto;
+}
+
+.table-permissions td {
+    text-align: center !important;
+}
+.table-permissions td:first-child {
+    text-align: left !important;
+}
+.table-permissions th, .table-permissions td {
+    text-align: center !important;
+}
+
+.table-resort-permissions thead tr th{
+    text-align: center !important;
+}

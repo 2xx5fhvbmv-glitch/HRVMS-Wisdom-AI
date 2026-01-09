@@ -1,0 +1,38 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateTransferAccommodationsTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('transfer_accommodations', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedInteger('resort_id');
+            $table->integer('NewAccommodation_id')->nullable();
+            $table->integer('OldAccommodation_id')->nullable();
+            $table->text('Reason')->nullable();
+            $table->integer('created_by')->nullable();
+            $table->integer('modified_by')->nullable();
+            $table->foreign('resort_id')->references('id')->on('resorts');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('transfer_accommodations');
+    }
+}
