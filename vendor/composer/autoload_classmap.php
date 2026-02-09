@@ -406,6 +406,7 @@ return array(
     'App\\Models\\EmployeeLeaveStatus' => $baseDir . '/app/Models/EmployeeLeaveStatus.php',
     'App\\Models\\EmployeeNoticePeriod' => $baseDir . '/app/Models/EmployeeNoticePeriod.php',
     'App\\Models\\EmployeeOnboardingAcknowledgements' => $baseDir . '/app/Models/EmployeeOnboardingAcknowledgements.php',
+    'App\\Models\\EmployeeOvertime' => $baseDir . '/app/Models/EmployeeOvertime.php',
     'App\\Models\\EmployeePromotion' => $baseDir . '/app/Models/EmployeePromotion.php',
     'App\\Models\\EmployeePromotionApproval' => $baseDir . '/app/Models/EmployeePromotionApproval.php',
     'App\\Models\\EmployeeReminder' => $baseDir . '/app/Models/EmployeeReminder.php',

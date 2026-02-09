@@ -139,15 +139,15 @@
 
                 </div>
             </div>
-            <div class="col-xl-3 col-lg-6 col-md-6">
+            <!-- <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card">
                     <div class="card-title d-flex justify-content-between">
                         <h3>AI Insight's</h3>
                     </div>
                 </div>
-            </div>
+            </div> -->
             <div class="col-xl-3 col-lg-6 col-md-6">
-                <div class="card " id="card-todoList">
+                <div class="card " style="height: 440px;">
                     <div class="card-title d-flex justify-content-between">
                         <h3>To Do List</h3>
                         <a href="{{ route('resort.timeandattendance.todolist') }}" class="a-link">View all</a>
@@ -220,7 +220,7 @@
                 </div>
             </div>
             <div class="col-xl-3 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card">
+                <div class="card ">
                     <div class="card-title d-flex justify-content-between">
                         <h3>OT Hours</h3>
                     </div>
@@ -336,32 +336,38 @@
     let myAttendance;
     const ctx = document.getElementById('myAttendance');
     if (!ctx) {
-        console.error('Attendance chart canvas not found');
-    } else {
-        const ctx2d = ctx.getContext('2d');
-        const labelsAttandance = [];
-        const firstMonth = 0; // January (0-indexed in JavaScript)
-        const lastMonth = 11; // December (0-indexed in JavaScript)
-        const currentYear = new Date().getFullYear();
+    console.error('Attendance chart canvas not found');
+} else {
+    const ctx2d = ctx.getContext('2d');
+    const labelsAttandance = [];
 
-        for (let i = firstMonth; i <= lastMonth; i++) {
-            const month = new Date(currentYear, i);
-            labelsAttandance.push(month.toLocaleString('default', { month: 'short', year: 'numeric' }));
-        }
-        myAttendance = new Chart(ctx2d, {
-            type: 'bar',
-            data: {
-                labels: labelsAttandance, // Initialize with default month labels
-                datasets: [{
-                    label: 'Attendance Percentage',
-                    data: new Array(12).fill(0), // Initialize with zeros
-                    backgroundColor: '#014653',
-                    borderColor: '#014653',
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    barThickness: 25,
-                }]
-            },
+    const firstMonth = 0;   // January
+    const lastMonth = 11;   // December
+    const currentYear = new Date().getFullYear();
+
+    // Generate labels like "Jan 26"
+    for (let i = firstMonth; i <= lastMonth; i++) {
+        const date = new Date(currentYear, i);
+        const month = date.toLocaleString('en-US', { month: 'short' });
+        const year = date.getFullYear().toString().slice(-2);
+
+        labelsAttandance.push(`${month} ${year}`);
+    }
+
+    const myAttendance = new Chart(ctx2d, {
+        type: 'bar',
+        data: {
+            labels: labelsAttandance,
+            datasets: [{
+                label: 'Attendance Percentage',
+                data: new Array(12).fill(0),
+                backgroundColor: '#014653',
+                borderColor: '#014653',
+                borderWidth: 1,
+                borderRadius: 6,
+                barThickness: 25
+            }]
+        },
         options: {
             responsive: true,
             maintainAspectRatio: true,
@@ -369,51 +375,36 @@
                 legend: {
                     display: false
                 },
-                layout: {
-                    padding: {
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        right: 0
-                    }
-                },
                 tooltip: {
-                    enabled: true, // Enable tooltips
+                    enabled: true,
                     callbacks: {
-                        label: function (tooltipItem)
-                        {
-                            const value = tooltipItem.raw.toLocaleString();
-                            return `${value}%`;
+                        label: function (tooltipItem) {
+                            return `${tooltipItem.raw}%`;
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    beginAtZero: true, // Start x-axis at zero
                     grid: {
-                        display: false // Hide grid lines on the x-axis
-                    },
-                    border: {
-                        display: true // Show the x-axis border
+                        display: false
                     }
                 },
                 y: {
-                    beginAtZero: true, // Start y-axis at zero
+                    beginAtZero: true,
                     grid: {
-                        display: false // Hide grid lines on the y-axis
-                    }, 
+                        display: false
+                    },
                     ticks: {
                         stepSize: 20,
-                    },
-                    border: {
-                        display: true // Show the y-axis border
-                    },
+                        callback: value => `${value}%`
+                    }
                 }
             }
         }
     });
-    }
+}
+
     
     if (typeof myAttendance !== 'undefined') {
         GetAttandance();
@@ -742,6 +733,7 @@
                                 window.location.reload();
                             });
                         } else {
+                           
                             Swal.fire(
                                 'Error!',
                                 response.message || 'An error occurred.',
@@ -805,6 +797,7 @@
                             'An error occurred while processing the request.',
                             'error'
                         );
+                        
 
                         console.error(error);
                     }

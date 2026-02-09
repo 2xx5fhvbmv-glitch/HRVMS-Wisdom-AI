@@ -16,6 +16,7 @@ use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
 use Carbon\CarbonInterval;
 use DB;
+use Illuminate\Support\Str;
 class TimeandAttendanceDashboardController extends Controller
 {
 
@@ -1906,7 +1907,7 @@ class TimeandAttendanceDashboardController extends Controller
      */
     public function ManualCheckInOut(Request $request)
     {
-        try {
+        // try {
             DB::beginTransaction();
 
             $rosterId = $request->roster_id;
@@ -1944,12 +1945,12 @@ class TimeandAttendanceDashboardController extends Controller
                         'Shift_id' => $dutyRoster->Shift_id,
                         'Emp_id' => $dutyRoster->Emp_id,
                         'date' => $today,
-                        'CheckingTime' => $currentTime,
+                        'CheckingTime' => $shiftSettings->StartTime,
                         'Status' => 'Present',
                         'CheckInCheckOut_Type' => 'Manual',
                     ]);
                 } else {
-                    $attendance->CheckingTime = $currentTime;
+                    $attendance->CheckingTime = $shiftSettings->StartTime;
                     $attendance->Status = 'Present';
                     $attendance->CheckInCheckOut_Type = 'Manual';
                     $attendance->save();
@@ -1959,7 +1960,7 @@ class TimeandAttendanceDashboardController extends Controller
                 ChildAttendace::updateOrCreate(
                     ['Parent_attd_id' => $attendance->id],
                     [
-                        'InTime_out' => $currentTime,
+                        'InTime_out' => $shiftSettings->StartTime,
                         'OutTime_out' => '00:00',
                     ]
                 );
@@ -1977,12 +1978,12 @@ class TimeandAttendanceDashboardController extends Controller
                 }
 
                 // Update attendance record for check-out
-                $attendance->CheckingOutTime = $currentTime;
+                $attendance->CheckingOutTime = $shiftSettings->EndTime;
                 $attendance->CheckInCheckOut_Type = 'Manual';
 
                 // Calculate total hours worked
                 $checkInTime = Carbon::parse($attendance->CheckingTime);
-                $checkOutTime = Carbon::parse($currentTime);
+                $checkOutTime = Carbon::parse($shiftSettings->EndTime);
                 $totalMinutes = $checkInTime->diffInMinutes($checkOutTime);
                 $hours = floor($totalMinutes / 60);
                 $minutes = $totalMinutes % 60;
@@ -1999,20 +2000,105 @@ class TimeandAttendanceDashboardController extends Controller
                     ChildAttendace::create([
                         'Parent_attd_id' => $attendance->id,
                         'InTime_out' => $attendance->CheckingTime,
-                        'OutTime_out' => $currentTime,
+                        'OutTime_out' => $shiftSettings->EndTime,
                     ]);
                 }
 
                 DB::commit();
                 return response()->json(['success' => true, 'message' => 'Check-out recorded successfully.']);
-            } else {
-                return response()->json(['success' => false, 'message' => 'Invalid action.']);
-            }
+            } elseif ($action === 'overtime_pending') {
+                $employeeId = $dutyRoster->Emp_id; // from frontend
+            
+                // Get pending OT record
+                $employeeOt = EmployeeOvertime::where('Emp_id', $employeeId)
+                    // ->where('date', $otDate)
+                    ->where('status', 'pending')
+                    ->first();
+                    
+                  $otDate = $employeeOt->date;
+                if (!$employeeOt) {
+                    return response()->json(['success' => false, 'message' => 'Pending OT not found.']);
+                }
+            
+                // Get the duty roster for that employee on that date
+                $dutyRoster = DB::table('duty_rosters')
+                    ->where('Emp_id', $employeeId)
+                    // ->whereDate('ShiftDate', $otDate)
+                    ->first();
+            
+                if (!$dutyRoster) {
+                    return response()->json(['success' => false, 'message' => 'Duty roster not found for OT.']);
+                }
+            
+                // Get shift settings for the roster
+                
+                $shift = DB::table('shift_settings')->where('id', $dutyRoster->Shift_id)->first();
+                if (!$shift) {
+                    return response()->json(['success' => false, 'message' => 'Shift settings not found for OT.']);   }
+                    // Shift EndTime is FULL datetime like: 2026-01-01 09:18:09
+                    $shiftEnd = $shift->EndTime;
+                    
+                    // OT end time can be manual (time only like 11:00) or fallback
+                    $otEnd = $request->end_time ?? $shift->EndTime;
+                    
+                    // 1️⃣ OT starts exactly at shift end (FULL datetime → parse directly)
+                    $startTime = Carbon::parse($shiftEnd);
+                    
+                    // 2️⃣ OT end handling
+                    // If OT end has DATE already → parse directly
+                    // Else (time only) → attach date from startTime
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}/', $otEnd)) {
+                        $endTime = Carbon::parse($otEnd);
+                    } else {
+                        $endTime = Carbon::parse(
+                            $startTime->format('Y-m-d') . ' ' . $otEnd
+                        );
+                    }
+                    
+                    // 3️⃣ Overnight OT handling
+                    if ($endTime->lessThan($startTime)) {
+                        $endTime->addDay();
+                    }
+                    
+                    // 4️⃣ Calculate total OT
+                    $totalMinutes = $startTime->diffInMinutes($endTime);
+                    $hours = floor($totalMinutes / 60);
+                    $minutes = $totalMinutes % 60;
+                    
+                    // 5️⃣ Save OT
+                    $employeeOt->start_time = $startTime->format('H:i');
+                    $employeeOt->end_time = $endTime->format('H:i');
+                    $employeeOt->total_time = sprintf('%02d:%02d', $hours, $minutes);
+                    $employeeOt->status = 'approved';
+                    $employeeOt->approved_by = auth()->user()->id ?? null;
+                    $employeeOt->approved_at = now();
+                    $employeeOt->save();
+                    
+                    DB::commit();                    
+                    
+                return response()->json(['success' => true, 'message' => 'Pending OT recorded successfully.']);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
+         
+        
+
         }
+        else {
+            return response()->json(['success' => false, 'message' => 'Invalid action.']);
+        }
+                
+
+        // } catch (\Exception $e) {
+        //     DB::rollBack();
+            
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => $e->getMessage(),
+        //         'file' => $e->getFile(),
+        //         'line' => $e->getLine(),
+        //         'trace' => $e->getTraceAsString()
+        //     ], 500);
+        //     // return response()->json(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
+        // }
     }
 
     /**
