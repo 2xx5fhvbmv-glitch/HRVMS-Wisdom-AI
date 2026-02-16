@@ -33,6 +33,7 @@
                                 </select> -->
                                 <select id="vacancy_status" class="form-select select2t-none" name="budgeted">
                                     <option value="Budgeted">Budgeted</option>
+                                    <option value="Out of Budget">Out of Budget</option>
                                 </select>
                             </div>
                             <div class="col-sm-6 d-md-inline-block d-none">
@@ -66,14 +67,16 @@
                                         @if($resort_positions)
                                             <option value="">Select Position</option>
                                             @foreach($resort_positions as $position)
-                                                <option value="{{$position->id}}">{{$position->position_title}}</option>
+                                                <option value="{{$position->id}}" data-budgeted="{{ in_array($position->id, $budgetedPositionIds) ? '1' : '0' }}">{{$position->position_title}}</option>
                                             @endforeach
                                         @endif
                                     </select>
                                 </div>
                                 <div class="col-sm-6 ">
                                     <label for="txt-position-title" class="form-label">Required No of Vacancy</label>
-                                    <input type="number" name="Total_position_required" id="Total_position_required" class="form-control"/>
+                                    <input type="number" name="Total_position_required" id="Total_position_required" class="form-control" min="1"/>
+                                    <div id="vacancy-validation-msg" style="display:none; margin-top:5px;"></div>
+                                    <small id="vacancy-manning-info" class="text-muted" style="display:none; margin-top:3px;"></small>
                                 </div>
                                 <div class="col-sm-6 ">
                                     <label for="txt-reporting-to" class="form-label">REPORTING TO</label>
@@ -159,6 +162,11 @@
                                             </div>
                                         </div>
 
+                                        <div class="col">
+                                            <label for="txt-duration" class="form-label">DURATION</label>
+                                            <input type="text" class="form-control" name="duration" id="txt-duration" placeholder="e.g. 3 Months, 6 Months, 1 Year">
+                                        </div>
+
                                         <div class="col txt-salary">
                                             <label for="txt-budget-salary" class="form-label">Amount Unit <span class="req_span">*</span></label>
                                             <select name="amount_unit" id="amount_unit" required class="form-select">
@@ -188,14 +196,22 @@
                         </div>
 
                         <div id="replacement-employee" style="display: none;">
-                            <div class="col-md-4 col-sm-6">
-                                <label for="txt-employee" class="form-label">Employee Name</label>
-                                <input type="text" class="form-control" id="txt-employee-name" placeholder="Employee Name">
+                            <div class="col-md-4 col-sm-6 mb-3">
+                                <label for="txt-employee-name" class="form-label">Employee Name</label>
+                                <select name="employee_name" id="txt-employee-name" class="form-control form-select select2t-none">
+                                    <option value="">Select Employee</option>
+                                    @if(isset($departmentEmployees))
+                                        @foreach($departmentEmployees as $emp)
+                                            <option value="{{ $emp->first_name }} {{ $emp->last_name }}">{{ $emp->first_name }} {{ $emp->last_name }} - {{ $emp->position_title ?? '' }}</option>
+                                        @endforeach
+                                    @endif
+                                </select>
                             </div>
                         </div>
 
                         <div id="permanent-div">
-                            <div class="col-12">
+                            {{-- Budget, Funding & Benefits - commented out for now --}}
+                            {{-- <div class="col-12">
                                 <div class="card-title mt-md-4 mt-3">
                                     <div class="row justify-content-start align-items-center g-">
                                         <div class="col">
@@ -264,6 +280,21 @@
                                         </li>
                                     </ul>
                                 </div>
+                                <div class="col-md-4 col-sm-6 ">
+                                    <label for="txt-Medical" class="form-label">MEDICAL</label>
+                                    <input type="text" class="form-control" name="medical" id="txt-Medical" placeholder="Medical">
+                                </div>
+                                <div class="col-md-4 col-sm-6 ">
+                                    <label for="txt-Insurance" class="form-label">INSURANCE</label>
+                                    <input type="text" class="form-control" name="insurance" id="txt-Insurance" placeholder="Insurance">
+                                </div>
+                                <div class="col-md-4 col-sm-6 ">
+                                    <label for="txt-Pension" class="form-label">PENSION</label>
+                                    <input type="text" class="form-control" name="pension" id="txt-Pension" placeholder="Pension">
+                                </div>
+                            </div> --}}
+
+                            <div class="row g-md-3 g-2">
                                 <div class="col-md-3 col-sm-6 ">
                                     <label for="txt-transport" class="form-label">For Local</label>
                                     <ul class="d-flex nav align-items-center">
@@ -280,18 +311,6 @@
                                             </label>
                                         </li>
                                     </ul>
-                                </div>
-                                <div class="col-md-4 col-sm-6 ">
-                                    <label for="txt-Medical" class="form-label">MEDICAL</label>
-                                    <input type="text" class="form-control" name="medical" id="txt-Medical" placeholder="Medical">
-                                </div>
-                                <div class="col-md-4 col-sm-6 ">
-                                    <label for="txt-Insurance" class="form-label">INSURANCE</label>
-                                    <input type="text" class="form-control" name="insurance" id="txt-Insurance" placeholder="Insurance">
-                                </div>
-                                <div class="col-md-4 col-sm-6 ">
-                                    <label for="txt-Pension" class="form-label">PENSION</label>
-                                    <input type="text" class="form-control" name="pension" id="txt-Pension" placeholder="Pension">
                                 </div>
                             </div>
                         </div>
@@ -473,9 +492,6 @@
                     "section": { required: true },
                     "employee_type": { required: true },
                     "Total_position_required" :{ required: true },
-                    "salary": { required: true },
-                    "budget_salary": { required: true },
-                    "proposed_salary": { required: true },
                     "employee_name": {
                         required: function() {
                             return $("input[name='employee_type']:checked").val() === "Replacement";
@@ -492,8 +508,6 @@
                     "division": { required: "Division field is required." },
                     "section": { required: "Section field is required." },
                     "Total_position_required": { required: "Required No of Vacancy field is required." },
-                    "budget_salary": { required: "Budgeted Salary is required." },
-                    "proposed_salary": { required: "Proposed Salary is required." },
                     "employee_name": { required: "Employee Name is required when employee type is Replacement." }
                 },
                 submitHandler: function(form) {
@@ -561,6 +575,8 @@
                 }
             });
 
+            var vacancyValidationTimer = null;
+
             function updateVacancyStatus(positionId, requestedVacancy) {
                 $.ajax({
                     url: '{{route("resort.vacancies.getstatus")}}',
@@ -571,13 +587,7 @@
                     },
                     success: function(response) {
                         const selectBox = $('#vacancy_status');
-                        selectBox.empty(); // Clear existing options
-
-                        if (response.status === 'Budgeted') {
-                            selectBox.append('<option value="Budgeted">Budgeted</option>');
-                        } else {
-                            selectBox.append('<option value="Out of Budget">Out of Budget</option>');
-                        }
+                        selectBox.val(response.status).trigger('change.select2');
 
                         $('#txt-budget-salary').val(response.budgeted_salary);
                         $('#txt-proposed-salary').val(response.proposed_salary);
@@ -586,22 +596,100 @@
                         $('#txt-Medical').val(response.medical);
                         $('#txt-acommocation2').val(response.accommodation);
                         $('#txt-Insurance').val(response.insurance);
+
+                        // Show manning info
+                        var infoHtml = 'Approved: ' + response.headcount +
+                            ' | Filled: ' + response.filledcount +
+                            ' | Vacant: ' + response.vacantCount +
+                            ' | Active Vacancies: ' + response.existingVacancies +
+                            ' | Available: ' + response.availableSlots;
+                        $('#vacancy-manning-info').html(infoHtml).show();
+
+                        // Validate requested vacancy against available slots
+                        var msgDiv = $('#vacancy-validation-msg');
+                        var input = $('#Total_position_required');
+                        var requested = parseInt(requestedVacancy) || 0;
+
+                        if (response.availableSlots <= 0 && response.status === 'Budgeted') {
+                            msgDiv.html('<span class="text-danger"><i class="fas fa-exclamation-circle"></i> No available vacant slots for this position. All ' + response.vacantCount + ' vacant position(s) already have active vacancy requests.</span>').show();
+                            input.addClass('is-invalid');
+                        } else if (requested > response.availableSlots && response.status === 'Budgeted') {
+                            msgDiv.html('<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Requested (' + requested + ') exceeds available slots (' + response.availableSlots + '). This will be marked as Out of Budget.</span>').show();
+                            input.removeClass('is-invalid');
+                        } else if (response.status === 'Out of Budget') {
+                            msgDiv.html('<span class="text-warning"><i class="fas fa-info-circle"></i> This vacancy is Out of Budget. Approved headcount: ' + response.headcount + ', Vacant: ' + response.vacantCount + ', Available: ' + response.availableSlots + '</span>').show();
+                            input.removeClass('is-invalid');
+                        } else {
+                            msgDiv.html('<span class="text-success"><i class="fas fa-check-circle"></i> Within budget. ' + response.availableSlots + ' slot(s) available.</span>').show();
+                            input.removeClass('is-invalid');
+                        }
                     },
-                    error: function() 
+                    error: function()
                     {
-                        toastr.error('Error fetching vacancy status. Please add.', { positionClass: 'toast-bottom-right'});
+                        toastr.error('Error fetching vacancy status.', 'Error', { positionClass: 'toast-bottom-right'});
                     }
                 });
             }
 
-            // Trigger when the requested vacancy changes
-            $('#Total_position_required').on('change', function() {
-                const positionId = $('#position').val();
-                const requestedVacancy = $(this).val();
-                if (positionId && requestedVacancy) {
+            // Real-time validation on keyup with debounce
+            $('#Total_position_required').on('input', function() {
+                clearTimeout(vacancyValidationTimer);
+                var self = this;
+                vacancyValidationTimer = setTimeout(function() {
+                    const positionId = $('#position').val();
+                    const requestedVacancy = $(self).val();
+                    if (positionId && requestedVacancy && parseInt(requestedVacancy) > 0) {
+                        updateVacancyStatus(positionId, requestedVacancy);
+                    } else {
+                        $('#vacancy-validation-msg').hide();
+                        $('#vacancy-manning-info').hide();
+                        $(self).removeClass('is-invalid');
+                    }
+                }, 400); // 400ms debounce
+            });
+
+            // Also trigger when position changes
+            $('#position').on('change', function() {
+                const positionId = $(this).val();
+                const requestedVacancy = $('#Total_position_required').val();
+                if (positionId && requestedVacancy && parseInt(requestedVacancy) > 0) {
                     updateVacancyStatus(positionId, requestedVacancy);
+                } else {
+                    $('#vacancy-validation-msg').hide();
+                    $('#vacancy-manning-info').hide();
                 }
             });
+
+            // Filter position dropdown based on budget status selection
+            function filterPositionsByBudget(budgetStatus) {
+                const positionSelect = $('#position');
+                positionSelect.val('').trigger('change');
+
+                positionSelect.find('option').each(function() {
+                    const option = $(this);
+                    if (!option.val()) return; // Skip "Select Position" placeholder
+
+                    if (budgetStatus === 'Budgeted') {
+                        // Show only budgeted positions
+                        if (option.data('budgeted') == 1) {
+                            option.prop('disabled', false).show();
+                        } else {
+                            option.prop('disabled', true).hide();
+                        }
+                    } else {
+                        // Out of Budget - show all positions
+                        option.prop('disabled', false).show();
+                    }
+                });
+            }
+
+            // Trigger filter on budget status change
+            $('#vacancy_status').on('change', function() {
+                filterPositionsByBudget($(this).val());
+            });
+
+            // Apply filter on page load based on default selection
+            filterPositionsByBudget($('#vacancy_status').val());
 
         });
     </script>
