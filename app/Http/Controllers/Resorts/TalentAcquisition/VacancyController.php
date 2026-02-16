@@ -74,6 +74,40 @@ class VacancyController extends Controller
             $sectionName = isset($resort_sections[0]) ? $resort_sections[0]->name : '';
             $sectionId = isset($resort_sections[0]) ? $resort_sections[0]->id : '';
             $resort_positions = ResortPosition::where('dept_id',$Dept_id)->get();
+
+            // Get budgeted position IDs (positions with vacantcount > 0 in manning data)
+            $budgetedPositionIds = [];
+            $currentYear = \Carbon\Carbon::now()->year;
+            $manningresponse = ManningResponse::where('resort_id', $resort_id)
+                ->where('dept_id', $Dept_id)
+                ->where('year', $currentYear)
+                ->first();
+            if ($manningresponse) {
+                // Use max vacantcount across all months (same logic as manning page)
+                $budgetedPositionIds = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
+                    ->select('position_id')
+                    ->groupBy('position_id')
+                    ->havingRaw('MAX(vacantcount) > 0')
+                    ->pluck('position_id')
+                    ->toArray();
+            }
+
+            // Get department employees for replacement dropdown
+            $departmentEmployees = DB::table('employees')
+                ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+                ->leftJoin('resort_positions', 'employees.Position_id', '=', 'resort_positions.id')
+                ->where('employees.resort_id', $resort_id)
+                ->where('employees.Dept_id', $Dept_id)
+                ->where('employees.status', 'Active')
+                ->select(
+                    'employees.id',
+                    'resort_admins.first_name',
+                    'resort_admins.last_name',
+                    'resort_positions.position_title'
+                )
+                ->orderBy('resort_admins.first_name')
+                ->get();
+
             $serviceProviders = ServiceProvider::orderBy('name')->get();
             // Define the rank values for HOD, MGR, GM from settings config
             $targetRanks = [
@@ -100,7 +134,7 @@ class VacancyController extends Controller
                 ->get();
 
             // dd($reportingEmployees);
-            return view('resorts.talentacquisition.vacancies.create', compact('page_title','position_id', 'Dept_id', 'emp_details', 'department_details','resort_positions','resort_divisions','resort_sections','sectionName','sectionId','reportingEmployees','serviceProviders'));
+            return view('resorts.talentacquisition.vacancies.create', compact('page_title','position_id', 'Dept_id', 'emp_details', 'department_details','resort_positions','budgetedPositionIds','departmentEmployees','resort_divisions','resort_sections','sectionName','sectionId','reportingEmployees','serviceProviders'));
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -132,14 +166,15 @@ class VacancyController extends Controller
             'proposed_salary' => 'nullable|numeric',
             'budgeted_accommodation' => 'nullable|numeric',
             'allowance' => 'nullable|numeric',
-            'service_charge' => 'required|string|in:YES,NO',
-            'uniform' => 'nullable|required|string|in:YES,NO',
+            'service_charge' => 'nullable|string|in:YES,NO',
+            'uniform' => 'nullable|string|in:YES,NO',
             'medical' => 'nullable|numeric',
             'insurance' => 'nullable|numeric',
             'pension' => 'nullable|numeric',
             'recruitement' => 'nullable|array',
             'employee_name' => 'nullable|string|max:255',
-            'amount_unit'=> 'required|string|in:MVR,USD',
+            'duration' => 'nullable|string|max:255',
+            'amount_unit'=> 'nullable|string|in:MVR,USD',
             'is_required_local' => 'required|string|in:Yes,No'
         ]);
         $resort = Auth::guard('resort-admin')->user();
@@ -175,6 +210,75 @@ class VacancyController extends Controller
                                             'msg' => 'Duplicate vacancy found with the same position, department, and service provider.',
                                         ]);
             }
+            // Auto-populate budget fields from manning data
+            $currentYear = Carbon::now()->year;
+            $dept_id = $validatedData['dept_id'];
+            $positionId = $validatedData['position'];
+
+            $manningresponse = ManningResponse::where('resort_id', $resort_id)
+                ->where('year', $currentYear)
+                ->where('dept_id', $dept_id)
+                ->first();
+
+            $budgeted_salary = 0;
+            $proposed_salary = 0;
+            $budgetCosts = ['pension' => 0, 'allowance' => 0, 'medical' => 0, 'accommodation' => 0, 'insurance' => 0];
+            $hasServiceCharge = 'NO';
+            $hasUniform = 'NO';
+            $amountUnit = 'MVR';
+
+            if ($manningresponse) {
+                $smrParent = StoreManningResponseParent::where('Budget_id', $manningresponse->id)->first();
+                $manning_data = $smrParent ? StoreManningResponseChild::where('Parent_SMRP_id', $smrParent->id)->first() : null;
+
+                $budgeted_salary = $manning_data ? $manning_data->Current_Basic_salary : 0;
+                $proposed_salary = $manning_data ? $manning_data->Proposed_Basic_salary : 0;
+
+                // Get cost items from resort budget costs
+                $searchPatterns = [
+                    'pension' => '%pension%',
+                    'allowance' => '%allowance%',
+                    'medical' => 'medical%',
+                    'accommodation' => ['%accomodation%', '%accommodation%'],
+                    'insurance' => '%insurance%'
+                ];
+
+                foreach ($searchPatterns as $key => $pattern) {
+                    $query = ResortBudgetCost::where('resort_id', $resort_id);
+                    if (is_array($pattern)) {
+                        $query->where(function($q) use ($pattern) {
+                            foreach ($pattern as $subPattern) {
+                                $q->orWhere('particulars', 'LIKE', $subPattern);
+                            }
+                        });
+                    } else {
+                        $query->where('particulars', 'LIKE', $pattern);
+                    }
+                    $costData = $query->first();
+                    if ($costData) {
+                        $amount = $costData->amount;
+                        $unit = $costData->amount_unit;
+                        $budgetCosts[$key] = ($unit === '%') ? ($amount / 100) * $budgeted_salary : $amount;
+                    }
+                }
+
+                // Check if service charge exists in budget costs
+                $serviceChargeCost = ResortBudgetCost::where('resort_id', $resort_id)
+                    ->where('particulars', 'LIKE', '%service charge%')
+                    ->first();
+                if ($serviceChargeCost && $serviceChargeCost->amount > 0) {
+                    $hasServiceCharge = 'YES';
+                }
+
+                // Check if uniform exists in budget costs
+                $uniformCost = ResortBudgetCost::where('resort_id', $resort_id)
+                    ->where('particulars', 'LIKE', '%uniform%')
+                    ->first();
+                if ($uniformCost && $uniformCost->amount > 0) {
+                    $hasUniform = 'YES';
+                }
+            }
+
             // Save vacancy
             $vacancy = new Vacancies();
             $vacancy->Resort_id = $resort_id;
@@ -187,33 +291,34 @@ class VacancyController extends Controller
             $vacancy->division = $validatedData['division_id'];
             $vacancy->section = $validatedData['section_id'] ?? null;
             $vacancy->employee_type = $validatedData['employee_type'];
+            $vacancy->duration = $validatedData['duration'] ?? null;
             $vacancy->Total_position_required = $validatedData['Total_position_required'];
             $vacancy->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
-            $vacancy->salary = $validatedData['salary'];
-            $vacancy->food = $validatedData['food'];
-            $vacancy->accomodation = $validatedData['accommodation'];
-            $vacancy->transportation = $validatedData['transportation'];
+            $vacancy->salary = $budgeted_salary;
+            $vacancy->food = $validatedData['food'] ?? null;
+            $vacancy->accomodation = $budgetCosts['accommodation'];
+            $vacancy->transportation = $validatedData['transportation'] ?? null;
             $vacancy->employee = $validatedData['employee_name'] ?? null;
-            $vacancy->budgeted_salary = $validatedData['budget_salary'] ?? 0.00;
-            $vacancy->budgeted_accomodation = $validatedData['budgeted_accommodation'] ?? 0.00;
-            $vacancy->service_charge = $validatedData['service_charge'] ?? 0.00;
-            $vacancy->propsed_salary = $validatedData['proposed_salary'] ?? 0.00;
-            $vacancy->allowance = $validatedData['allowance'] ?? 0.00;
-            $vacancy->uniform = $validatedData['uniform'] ?? 0.00;
-            $vacancy->medical = $validatedData['medical'];
-            $vacancy->insurance = $validatedData['insurance'];
-            $vacancy->pension = $validatedData['pension'];
+            $vacancy->budgeted_salary = $budgeted_salary;
+            $vacancy->budgeted_accomodation = $budgetCosts['accommodation'];
+            $vacancy->service_charge = $hasServiceCharge;
+            $vacancy->propsed_salary = $proposed_salary;
+            $vacancy->allowance = $budgetCosts['allowance'];
+            $vacancy->uniform = $hasUniform;
+            $vacancy->medical = $budgetCosts['medical'];
+            $vacancy->insurance = $budgetCosts['insurance'];
+            $vacancy->pension = $budgetCosts['pension'];
             $vacancy->recruitment = $recruitment;
             $vacancy->status = $validatedData['status'];
-            $vacancy->amount_unit = $validatedData['amount_unit'];
+            $vacancy->amount_unit = $amountUnit;
             $vacancy->is_required_local = $request->is_required_local;
             $vacancy->save();
 
             $minWageMVR = 8021; // Minimum wage in MVR
             $minWageUSD = 520;
             $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-           
-            if($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD') {
+
+            if($notify_person && ($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD')) {
                     event(new ResortNotificationEvent(Common::nofitication(
                         $this->resort->resort_id,
                         10,
@@ -237,8 +342,8 @@ class VacancyController extends Controller
             }
 
             $position = ResortPosition::find($vacancy->position);
-           
-            if($position->is_reserved == 'Yes' && $vacancy->is_required_local == 'No') {
+
+            if($notify_person && $position && $position->is_reserved == 'Yes' && $vacancy->is_required_local == 'No') {
                     event(new ResortNotificationEvent(Common::nofitication(
                         $this->resort->resort_id,
                         10,
@@ -301,21 +406,28 @@ class VacancyController extends Controller
 
             DB::commit();
 
-            $msg = 'HOD Created new hiring request';
-            $title = ' Hiring Request';
-            $ModuleName = "Talent Acquisition  ";
-            $hr_id = Common::FindResortHR($this->resort)->id;
-            // event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, $this->type[6],$title,$msg,0,$hr_id,$ModuleName)));
-         
-            event(new ResortNotificationEvent(Common::nofitication(
-                            $this->resort->resort_id, // Make sure resort_id exists on the meetings table
-                            $this->type[6],
-                            'Upcoming Investigation Meeting Reminder',
-                            $msg,
-                            0,
-                            $hr_id,
-                            $ModuleName
-                        )));
+            // Send push notification (non-blocking)
+            try {
+                $msg = 'HOD Created new hiring request';
+                $title = ' Hiring Request';
+                $ModuleName = "Talent Acquisition  ";
+                $hr = Common::FindResortHR($this->resort);
+                if ($hr && env('NOTIFICATION_URL')) {
+                    $hr_id = $hr->id;
+                    event(new ResortNotificationEvent(Common::nofitication(
+                        $this->resort->resort_id,
+                        $this->type[6],
+                        'Upcoming Investigation Meeting Reminder',
+                        $msg,
+                        0,
+                        $hr_id,
+                        $ModuleName
+                    )));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Vacancy notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'msg' => 'Vacancy added successfully.',
@@ -812,25 +924,63 @@ class VacancyController extends Controller
         $positionId = $request->position_id;
         $requestedVacancy = $request->requested_vacancy;
         $currentMonth = Carbon::now()->month;
-        // $currentYear = Carbon::now()->year;
-        $currentYear = 2025;
-        // dd($currentYear);
-        $resort_id = Auth::guard('resort-admin')->user()->resort_id;;
+        $currentYear = Carbon::now()->year;
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
-        $manningresponse = ManningResponse::where('resort_id',$resort_id)->where('year',$currentYear)->get();
-        // dd( $manningresponse);
-        // Fetch budgeted vacant count for the position
-        $vacantCount = PositionMonthlyData::where('position_id', $positionId)
-            ->where('month', $currentMonth)->where('manning_response_id',$manningresponse[0]->id)
-            ->value('vacantcount');
+        // Get the department of the selected position
+        $position = ResortPosition::find($positionId);
+        $dept_id = $position ? $position->dept_id : null;
 
-        $result = StoreManningResponseParent::where('Budget_id',$manningresponse[0]->id)->get();
-        $manning_data = StoreManningResponseChild::where('Parent_SMRP_id',$result[0]->id)->get();
-        // dd($manning_data);
+        $manningresponse = ManningResponse::where('resort_id', $resort_id)
+            ->where('year', $currentYear)
+            ->when($dept_id, function($q) use ($dept_id) {
+                $q->where('dept_id', $dept_id);
+            })
+            ->first();
+
+        // Count existing active vacancies for this position
+        $existingVacancies = Vacancies::where('Resort_id', $resort_id)
+            ->where('position', $positionId)
+            ->whereNotIn('status', ['Closed', 'Cancelled'])
+            ->sum('Total_position_required') ?? 0;
+
+        if (!$manningresponse) {
+            return response()->json([
+                'status' => 'Out of Budget',
+                'headcount' => 0,
+                'filledcount' => 0,
+                'vacantCount' => 0,
+                'existingVacancies' => $existingVacancies,
+                'availableSlots' => 0,
+                'budgeted_salary' => 0,
+                'proposed_salary' => 0,
+                'accommodation' => 0,
+                'allowance' => 0,
+                'medical' => 0,
+                'insurance' => 0,
+                'pension' => 0,
+            ]);
+        }
+
+        // Fetch manning data for the position in current month
+        $positionData = PositionMonthlyData::where('position_id', $positionId)
+            ->where('month', $currentMonth)->where('manning_response_id',$manningresponse->id)
+            ->first();
+
+        $headcount = $positionData->headcount ?? 0;
+        $filledcount = $positionData->filledcount ?? 0;
+        $vacantCount = $positionData->vacantcount ?? 0;
+
+        // Available slots = vacant count minus already-created vacancies
+        $availableSlots = max(0, $vacantCount - $existingVacancies);
+
+        $result = StoreManningResponseParent::where('Budget_id',$manningresponse->id)->first();
+        $manning_data = $result ? StoreManningResponseChild::where('Parent_SMRP_id',$result->id)->first() : null;
+
         // Determine if the requested vacancy is within budget
         $status = $requestedVacancy <= $vacantCount ? 'Budgeted' : 'Out of Budget';
-        $budgeted_salary = $manning_data[0]->Current_Basic_salary;
-        $proposed_salary = $manning_data[0]->Proposed_Basic_salary;
+        $budgeted_salary = $manning_data ? $manning_data->Current_Basic_salary : 0;
+        $proposed_salary = $manning_data ? $manning_data->Proposed_Basic_salary : 0;
 
         $searchPatterns = [
             'pension' => '%pension%',
@@ -846,10 +996,12 @@ class VacancyController extends Controller
             $query = ResortBudgetCost::where('resort_id', $resort_id);
 
             if (is_array($pattern)) {
-                // Handle multiple patterns
-                foreach ($pattern as $subPattern) {
-                    $query->orWhere('particulars', 'LIKE', $subPattern);
-                }
+                // Handle multiple patterns with grouped OR
+                $query->where(function($q) use ($pattern) {
+                    foreach ($pattern as $subPattern) {
+                        $q->orWhere('particulars', 'LIKE', $subPattern);
+                    }
+                });
             } else {
                 $query->where('particulars', 'LIKE', $pattern);
             }
@@ -868,7 +1020,11 @@ class VacancyController extends Controller
 
         return response()->json([
             'status' => $status,
+            'headcount' => $headcount,
+            'filledcount' => $filledcount,
             'vacantCount' => $vacantCount,
+            'existingVacancies' => $existingVacancies,
+            'availableSlots' => $availableSlots,
             'budgeted_salary' =>$budgeted_salary,
             'proposed_salary'=>$proposed_salary,
             'accommodation' => $costs['accommodation'],

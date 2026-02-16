@@ -1888,6 +1888,7 @@ class Common
                     'vacancies.required_starting_date as Required',
                     't3.status',
                     't3.Approved_By',
+                    'vacancies.created_at',
 
                 ])
                 ->map(function ($vacancy) use ($config) {
