@@ -562,6 +562,7 @@ class TimeandAttendanceDashboardController extends Controller
                 $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
                 $item->Position = ucfirst($item->position_title ?? 'N/A');
                 $item->profileImg = Common::getResortUserPicture($item->Parentid);
+                $item->action = '<a href="'.route('resort.timeandattendance.hoddashboard').'" class="btn btn-sm btn-outline-primary">View</a>';
                 return $item;
             });
 
@@ -1170,6 +1171,7 @@ class TimeandAttendanceDashboardController extends Controller
                 $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
                 $item->Position = ucfirst($item->position_title ?? 'N/A');
                 $item->profileImg = Common::getResortUserPicture($item->Parentid);
+                $item->action = '<a href="'.route('resort.timeandattendance.hoddashboard').'" class="btn btn-sm btn-outline-primary">View</a>';
                 return $item;
             });
 
@@ -1179,10 +1181,6 @@ class TimeandAttendanceDashboardController extends Controller
                 'recordsTotal' => $Rosterdata->count(),
                 'recordsFiltered' => $Rosterdata->count()
             ];
-            // #region agent log
-            $logPath = base_path('.cursor/debug.log');
-            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'E','location'=>'TimeandAttendanceDashboardController.php:832','message'=>'Response data','data'=>['data_count'=>count($responseData['data']),'recordsTotal'=>$responseData['recordsTotal']],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-            // #endregion
             return response()->json($responseData);
         }
         // #region agent log

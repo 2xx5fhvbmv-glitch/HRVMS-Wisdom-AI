@@ -270,22 +270,25 @@ var itemClick;
 var xOffset = 0;
 var yOffset = 0;
 
+if (container) {
+  if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+    container.addEventListener("mouseup", dragEnd, false);
+    container.addEventListener("click", toggleSwitch, false);
+  } else {
+    container.addEventListener("touchstart", dragStart, false);
+    container.addEventListener("touchend", dragEnd, false);
+    container.addEventListener("touchmove", drag, false);
 
-if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
-  container.addEventListener("mouseup", dragEnd, false);
-  container.addEventListener("click", toggleSwitch, false);
-} else {
-  container.addEventListener("touchstart", dragStart, false);
-  container.addEventListener("touchend", dragEnd, false);
-  container.addEventListener("touchmove", drag, false);
+    container.addEventListener("mousedown", dragStart, false);
+    if (dragItem) {
+      dragItem.addEventListener("mousedown", itemDragStart, false);
+    }
 
-  container.addEventListener("mousedown", dragStart, false);
-  dragItem.addEventListener("mousedown", itemDragStart, false);
+    container.addEventListener("mousemove", drag, false);
 
-  container.addEventListener("mousemove", drag, false);
-
-  container.addEventListener("mouseup", dragEnd, false);
-  container.addEventListener("click", toggleSwitch, false);
+    container.addEventListener("mouseup", dragEnd, false);
+    container.addEventListener("click", toggleSwitch, false);
+  }
 }
 
 function dragStart(e) {

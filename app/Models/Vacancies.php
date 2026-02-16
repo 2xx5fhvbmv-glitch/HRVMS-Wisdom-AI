@@ -29,6 +29,7 @@ class Vacancies extends Model
       'division',
       'section',
       'employee_type',
+      'duration',
       'service_provider_name',
       'amount_unit',
       'salary',
