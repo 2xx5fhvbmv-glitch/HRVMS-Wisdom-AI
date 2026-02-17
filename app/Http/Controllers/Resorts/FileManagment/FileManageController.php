@@ -28,6 +28,7 @@ class FileManageController extends Controller
         public function __construct()
         {    
             $this->resort = $resortId = auth()->guard('resort-admin')->user();
+            if(!$this->resort) return;
             $reporting_to  = isset($this->globalUser->GetEmployee) ? $this->globalUser->GetEmployee->id:3;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }

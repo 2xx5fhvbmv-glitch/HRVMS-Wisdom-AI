@@ -19,6 +19,7 @@ class PerformanceDashboardController extends Controller
     {
         $this->globalUser = Auth::guard('resort-admin')->user();
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){
             $reporting_to = $this->globalUser->GetEmployee->id;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
