@@ -22,9 +22,10 @@ class InfoUpdateController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
     }
 
-    // Index 
+    // Index
     public function index(Request $request){
           $page_title = 'Info Update Requests';
           $resort = $this->resort;

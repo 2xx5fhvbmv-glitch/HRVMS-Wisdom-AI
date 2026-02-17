@@ -20,6 +20,7 @@ class OccupancyController extends Controller
     public function __construct()
     {
         $this->Authdata = Auth::guard('resort-admin')->user();
+        if(!$this->Authdata) return;
     }
     public function storeOccupancy(Request $request)
     {

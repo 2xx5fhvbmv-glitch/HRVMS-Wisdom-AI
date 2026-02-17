@@ -16,6 +16,7 @@ class ReportController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
     }
     public function index(Request $request)
     {

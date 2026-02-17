@@ -32,6 +32,7 @@ class MasterSearchController extends Controller
     public function __construct()
     {
         $this->globalUser = Auth::guard('resort-admin')->user();
+        if(!$this->globalUser) return;
     }
 
     public function index(Request $request){

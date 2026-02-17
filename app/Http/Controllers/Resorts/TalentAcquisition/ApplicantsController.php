@@ -40,6 +40,7 @@ class ApplicantsController extends Controller
     {
         $this->type = config('settings.Notifications');
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
     }
 
     public function VacnacyWiseApplicants(Request $request, $id)

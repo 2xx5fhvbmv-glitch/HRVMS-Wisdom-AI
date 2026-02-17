@@ -32,7 +32,8 @@ class ConfigController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
- 
+        if(!$this->resort) return;
+
 
         $this->rank = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id:3;
 

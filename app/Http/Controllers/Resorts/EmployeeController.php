@@ -27,6 +27,7 @@ class EmployeeController extends Controller
     public function __construct()
     {
         $this->globalUser = Auth::guard('resort-admin')->user();
+        if(!$this->globalUser) return;
         $this->currency = Common::GetResortCurrentCurrency();
         $this->currencylogo = Common::GetResortCurrencyLogo();
 
