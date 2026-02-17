@@ -11,7 +11,7 @@ Route::prefix('shopkeeper')->namespace('Shopkeeper')->group(function () {
     Route::get('/reset-password/{token}', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','resetPassword'])->name('shopkeeper.password.reset');
     Route::post('/reset-password-submit', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','resetPasswordSubmit'])->name('shopkeeper.password.reset-submit');
     Route::post('/check-email-exists', ['App\Http\Controllers\Shopkeeper\ForgotPasswordController','checkEmailExists'])->name('shopkeeper.emailExistForgotPassword');
-    Route::get('/permission-denied', ['App\Http\Controllers\Shopkeeper\LoginController@','permissionDenied'])->name('shopkeeper.permission.denied');
+    Route::get('/permission-denied', ['App\Http\Controllers\Shopkeeper\ShopkeeperLoginController','permissionDenied'])->name('shopkeeper.permission.denied');
 
 });
 
