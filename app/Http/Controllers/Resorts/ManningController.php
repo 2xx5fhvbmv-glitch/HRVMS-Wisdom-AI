@@ -31,7 +31,7 @@ class ManningController extends Controller
 {
     public $resort_id;
     function __construct() {
-        $this->resort_id=  Auth::guard('resort-admin')->user()->resort_id;
+        $this->resort_id = optional(Auth::guard('resort-admin')->user())->resort_id;
     }
 
     public function index()
