@@ -19,6 +19,7 @@ class InterviewAssessmentController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
         $this->rank=  $this->resort->GetEmployee->rank ?? '';
     }
     public function index(){

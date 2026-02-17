@@ -23,6 +23,7 @@ class EventController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){
             $this->reporting_to = $this->resort->GetEmployee->id;
             $this->underEmp_id = Common::getSubordinates($this->reporting_to);
