@@ -1,5 +1,5 @@
 <?php
-use App\Http\Controllers\Resorts\LoginController;
+
 
 /** Routes without login ***/
 Route::prefix('resort')->namespace('Resort')->group(function () {
@@ -13,7 +13,7 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
   Route::get('/reset-password/{token}', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','resetPassword'])->name('resort.password.reset');
   Route::post('/reset-password-submit', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','resetPasswordSubmit'])->name('resort.password.reset-submit');
   Route::post('/check-email-exists', ['App\Http\Controllers\Resorts\ResortforgotPasswordController','checkEmailExists'])->name('resort.emailExistForgotPassword');
-  Route::get('/permission-denied', ['App\Http\Controllers\Resorts\LoginController@','permissionDenied'])->name('resort.permission.denied');
+  Route::get('/permission-denied', ['App\Http\Controllers\Resorts\ResortLoginController','permissionDenied'])->name('resort.permission.denied');
 
   Route::get('/applicant-form/{id?}', ['App\Http\Controllers\Resorts\ApplicantController','showapplicantForm'])->name('resort.applicantForm');
 
