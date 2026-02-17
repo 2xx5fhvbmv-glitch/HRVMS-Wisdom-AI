@@ -101,7 +101,7 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::post('/resort/update-permissions/{id}', 'ResortsController@updatePermissions')->name('admin.resorts.update_permissions');
 
         // AJAX Route
-        Route::get('/get-positions-by-department', 'ResortController@getPositionsByDepartment');
+        Route::get('/get-positions-by-department', 'ResortsController@getPositionsByDepartment');
 
         /**Divisions Module **/
         Route::get('/divisions', 'DivisionController@index')->name('admin.divisions.index');
