@@ -56,6 +56,7 @@ class MasterDashboardController extends Controller
     public function __construct()
     {
         $this->globalUser = Auth::guard('resort-admin')->user();
+        if(!$this->globalUser) return;
     }
     public function admin_dashboard()
     {

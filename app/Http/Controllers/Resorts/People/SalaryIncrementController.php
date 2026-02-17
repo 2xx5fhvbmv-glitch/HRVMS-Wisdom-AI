@@ -28,6 +28,7 @@ class SalaryIncrementController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
     }
 
     // Employee List view and show if any update request is pending
