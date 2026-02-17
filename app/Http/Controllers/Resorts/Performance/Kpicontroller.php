@@ -19,6 +19,7 @@ class KpiController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
         $reporting_to = $this->resort->GetEmployee->id;
         $this->underEmp_id = Common::getSubordinates($reporting_to);
     }

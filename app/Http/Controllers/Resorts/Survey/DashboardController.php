@@ -18,6 +18,7 @@ class DashboardController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        if(!$this->resort) return;
         $reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 3;
         $this->newdates[]= Carbon::today()->format('Y-m-d');
         for($i=1; $i<=2; $i++)

@@ -33,6 +33,7 @@ class IncidentMeetingController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
         // dd( $this->resort);
         $this->reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id:0;
         $this->underEmp_id = Common::getSubordinates($this->reporting_to);

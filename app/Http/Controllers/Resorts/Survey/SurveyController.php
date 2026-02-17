@@ -26,6 +26,7 @@ class SurveyController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        if(!$this->resort) return;
         if($this->resort->GetEmployee)
         {
            $reporting_to = $this->resort->GetEmployee->id;
