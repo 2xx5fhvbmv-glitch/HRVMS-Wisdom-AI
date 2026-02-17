@@ -29,6 +29,7 @@ class DashboardController extends Controller
         // // dd($reporting_to);
         // $this->underEmp_id = Common::getSubordinates($this->reporting_to);
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        if(!$this->resort) return;
         if(isset($this->resort->GetEmployee))
         {
             $reporting_to = $this->resort->GetEmployee->id;
