@@ -23,6 +23,7 @@ class ResortInternalPermission extends Controller
     public function __construct()
     {
         $this->resortdata = Auth::guard('resort-admin')->user();
+        if(!$this->resortdata) return;
 
     }
     public function Permissionpage()

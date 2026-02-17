@@ -41,6 +41,7 @@ class VacancyController extends Controller
         $this->type = config('settings.Notifications');
 
         $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
     }
 
     public function index()
