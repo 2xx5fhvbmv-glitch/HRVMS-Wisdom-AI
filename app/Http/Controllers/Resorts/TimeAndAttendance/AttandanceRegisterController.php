@@ -27,6 +27,7 @@ class AttandanceRegisterController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        if(!$this->resort) return;
         $reporting_to = $this->resort->GetEmployee->id ?? null;
         $this->underEmp_id = Common::getSubordinates($reporting_to);
 
