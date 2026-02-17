@@ -1450,7 +1450,8 @@ class Common
 
     public static function GetResortCurrentCurrency()
     {
-        $resortid=Auth::guard('resort-admin')->user()->resort_id;
+        $resortid = optional(Auth::guard('resort-admin')->user())->resort_id;
+        if(!$resortid) return config('settings.currency.MVR');
         $resortexist =  ResortSiteSettings::where('resort_id', $resortid)->first(['currency']);
         if(isset($resortexist))
         {
@@ -1476,7 +1477,8 @@ class Common
 
     public static function GetResortCurrencyLogo()
     {
-        $resortid=Auth::guard('resort-admin')->user()->resort_id;
+        $resortid = optional(Auth::guard('resort-admin')->user())->resort_id;
+        if(!$resortid) return URL::asset(config('settings.Resort_currency').'/maldives-currency-icon-new.svg');
         $resortexist =  ResortSiteSettings::where('resort_id', $resortid)->select('currency','MVR_img','Doller_img')->first();
         if(isset($resortexist))
         {
