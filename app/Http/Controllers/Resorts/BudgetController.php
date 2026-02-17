@@ -41,6 +41,7 @@ class BudgetController extends Controller
     public function __construct(BudgetCalculationService $budgetCalculationService)
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        if(!$this->resort) return;
     }
 
     public function ViewManning(Request $request)
