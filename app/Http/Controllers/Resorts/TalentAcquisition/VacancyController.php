@@ -477,24 +477,55 @@ class VacancyController extends Controller
 
         $config = config('settings.Position_Rank');
         $rank = $this->resort->GetEmployee->rank;
-        // dd($this->resort->GetEmployee);
-        // if($rank == 2)
-        // {
-        //     $Vacancies = Vacancies::with(['Getdepartment','Getposition',
-        //         'TAnotificationParent.TAnotificationChildren' => function ($query) {
-        //             $query->where('status', '!=', ''); // Filter by valid status
-        //         }
-        //     ])
-        //     ->whereHas('TAnotificationParent.TAnotificationChildren', function ($query) {
-        //         $query->where('status', '!=', ''); // Ensure valid notifications exist
-        //     })
-        //     ->where('department', $this->resort->GetEmployee->Dept_id)
-        //     ->where('resort_id', $this->resort->GetEmployee->resort_id)
-        //     ->get();
-        // }
-        // else{
+        if($rank == 2)
+        {
+            $Vacancies = Vacancies::with(['Getdepartment','Getposition',
+                'TAnotificationParent.TAnotificationChildren'])
+                ->where('Resort_id', $this->resort->resort_id)
+                ->where('department', $this->resort->GetEmployee->Dept_id)
+                ->where('status', 'Active')
+                ->latest('created_at')
+                ->get()
+                ->map(function ($vacancy) use ($config) {
+                    $vacancy->Position = $vacancy->Getposition->position_title ?? '';
+                    $vacancy->Department = $vacancy->Getdepartment->name ?? '';
+                    $vacancy->NoOfVacnacy = $vacancy->Total_position_required;
+                    $vacancy->Required = $vacancy->required_starting_date;
+                    $vacancy->Budget = $vacancy->budgeted;
+                    $vacancy->EmployeeType = $vacancy->employee_type;
+                    $reportTo = \App\Models\Employee::find($vacancy->reporting_to);
+                    $admin = $reportTo ? \App\Models\ResortAdmin::find($reportTo->Admin_Parent_id) : null;
+                    $vacancy->ReportingTo = $admin ? $admin->first_name . '  ' . $admin->last_name : '';
+                    $vacancy->rank_name = $config[$reportTo->rank ?? ''] ?? 'Unknown Rank';
+
+                    // Compute approval status
+                    $hrSt = $finSt = $gmSt = 'Active';
+                    if($vacancy->TAnotificationParent->isNotEmpty()) {
+                        foreach ($vacancy->TAnotificationParent->first()->TAnotificationChildren as $ch) {
+                            if ($ch->Approved_By == 3) $hrSt = $ch->status;
+                            elseif ($ch->Approved_By == 7) $finSt = $ch->status;
+                            elseif ($ch->Approved_By == 8) $gmSt = $ch->status;
+                        }
+                    }
+                    if ($hrSt == 'Rejected' || $finSt == 'Rejected' || $gmSt == 'Rejected') {
+                        $vacancy->approval_status = 'Rejected';
+                    } elseif ($hrSt == 'Hold' || $finSt == 'Hold' || $gmSt == 'Hold') {
+                        $vacancy->approval_status = 'On Hold';
+                    } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
+                        $vacancy->approval_status = 'Approved';
+                    } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
+                        $vacancy->approval_status = 'Pending GM';
+                    } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext') {
+                        $vacancy->approval_status = 'Pending Finance';
+                    } else {
+                        $vacancy->approval_status = 'Pending HR';
+                    }
+                    return $vacancy;
+                });
+        }
+        else{
             $Vacancies = Common::GetTheFreshVacancies($this->resort->resort_id,"Active",$rank);
-        // }
+        }
 
         return datatables()->of($Vacancies)
           ->addColumn('action', function ($row) {
@@ -533,7 +564,20 @@ class VacancyController extends Controller
 
                         return '<span class="badge bg-primary">' . htmlspecialchars($row->rank_name, ENT_QUOTES, 'UTF-8') . '</span>';
                 })
-          ->rawColumns(['Department', 'Position', 'EmployeeType','Required','Budget','ReportingTo','rank_name'])
+                ->addColumn('approval_status', function ($row) {
+                    $status = $row->approval_status ?? 'N/A';
+                    $colors = [
+                        'Rejected' => 'bg-danger',
+                        'On Hold' => 'bg-warning text-dark',
+                        'Approved' => 'bg-success',
+                        'Pending GM' => 'bg-info',
+                        'Pending Finance' => 'bg-primary',
+                        'Pending HR' => 'bg-secondary',
+                    ];
+                    $badgeClass = $colors[$status] ?? 'bg-secondary';
+                    return '<span class="badge ' . $badgeClass . '">' . htmlspecialchars($status, ENT_QUOTES, 'UTF-8') . '</span>';
+                })
+          ->rawColumns(['Department', 'Position', 'EmployeeType','Required','Budget','ReportingTo','rank_name','approval_status'])
           ->make(true);
 
 

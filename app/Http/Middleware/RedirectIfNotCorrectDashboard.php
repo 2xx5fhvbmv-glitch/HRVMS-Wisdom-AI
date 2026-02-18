@@ -124,13 +124,15 @@ class RedirectIfNotCorrectDashboard
                 // dd(str_contains($currentRoute, 'leave'), !$request->routeIs('leave.admindashboard'));
             }
 
-            
+            // HR (rank 3) and Finance (rank 7) should always get HR-level dashboard access
+            $isHrOrFinance = in_array($employeeRank, [3, 7]);
+
                 $position_name = $employee->position->position_title ?? null;
                 $position_access = $Resort->resort->Position_access ?? null;
                 $Access_position = Position::where('status', 'Active')->where('id', $position_access)->first();
                 if($Access_position != null)
                 {
-                    if ($Access_position->position_title == $position_name) 
+                    if ($isHrOrFinance || $Access_position->position_title == $position_name)
                     {
                             if (str_contains($currentRoute, 'workforceplan') && !$request->routeIs('resort.workforceplan.dashboard')) 
                             {
@@ -240,8 +242,40 @@ class RedirectIfNotCorrectDashboard
                             }
                     }
                 }
+                elseif($isHrOrFinance)
+                {
+                    // HR/Finance users should get HR-level dashboards even when Position_access is not configured
+                    if (str_contains($currentRoute, 'recruitement') && !$request->routeIs('resort.recruitement.hrdashboard')) {
+                        Log::info("Redirecting HR/Finance to Recruitment HR Dashboard");
+                        return redirect()->route('resort.recruitement.hrdashboard');
+                    }
+                    elseif (str_contains($currentRoute, 'workforceplan') && !$request->routeIs('resort.workforceplan.dashboard')) {
+                        Log::info("Redirecting HR/Finance to Workforceplan Dashboard");
+                        return redirect()->route('resort.workforceplan.dashboard');
+                    }
+                    elseif (str_contains($currentRoute, 'timeandattendance') && !$request->routeIs('resort.timeandattendance.dashboard')) {
+                        Log::info("Redirecting HR/Finance to Time and Attendance Dashboard");
+                        return redirect()->route('resort.timeandattendance.dashboard');
+                    }
+                    elseif (str_contains($currentRoute, 'leave') && !$request->routeIs('leave.dashboard')) {
+                        Log::info("Redirecting HR/Finance to Leave Dashboard");
+                        return redirect()->route('leave.dashboard');
+                    }
+                    elseif (str_contains($currentRoute, 'accommodation') && !$request->routeIs('resort.accommodation.dashboard')) {
+                        Log::info("Redirecting HR/Finance to Accommodation Dashboard");
+                        return redirect()->route('resort.accommodation.dashboard');
+                    }
+                    elseif (str_contains($currentRoute, 'payroll') && !$request->routeIs('payroll.dashboard')) {
+                        Log::info("Redirecting HR/Finance to Payroll Dashboard");
+                        return redirect()->route('payroll.dashboard');
+                    }
+                    elseif(str_contains($currentRoute, 'master') && !$request->routeIs('resort.master.hr_dashboard')) {
+                        Log::info("Redirecting HR/Finance to Master Dashboard");
+                        return redirect()->route('resort.master.hr_dashboard');
+                    }
+                }
 
-            // if ( ($availableRank == 'HOD' || $availableRank == 'MGR' || $availableRank == 'EXCOM' ) && $Resort->is_master_admin == 0) 
+            // if ( ($availableRank == 'HOD' || $availableRank == 'MGR' || $availableRank == 'EXCOM' ) && $Resort->is_master_admin == 0)
             // {
 
          
