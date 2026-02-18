@@ -1833,31 +1833,35 @@ class Common
                                                 {
                                                     $query->where('t3.Approved_By', '=', $rank)
                                                     ->where('t3.status',$status);
-                                                    //   ->orWhereNull('t3.Approved_By');
                                                 }
-                                                if($rank == 9) //Todo
+                                                elseif($rank == 9) //Todo
                                                 {
                                                     $query->where('t3.Approved_By', '=',8)
                                                     ->where('t3.status',"Approved")
                                                     ->where('t3.Approved_By',"!=",8);
                                                 }
-                                                if($rank == 8)
+                                                elseif($rank == 8)
                                                 {
                                                     $query->where('t3.Approved_By', '=',7)
                                                     ->where('t3.status',"Approved")
                                                     ->where('t3.Approved_By',"!=",8);
                                                 }
-                                                if($rank == 7)
+                                                elseif($rank == 7)
                                                 {
                                                     $query->where('t3.Approved_By',3)
                                                     ->where('t3.status',"Approved")
                                                     ->where('t3.Approved_By',"!=",7);
                                                 }
-												if($rank == 2)
+												elseif($rank == 2)
                                                 {
-                                                    $query->where('t3.Approved_By',3);
-													// $query->where('t3.status',$status);
-                                                    // ->where('t3.Approved_By',"!=",7);
+                                                    $query->where('t3.Approved_By',3)
+                                                    ->where('t3.status',$status);
+                                                }
+                                                else
+                                                {
+                                                    // EXCOM and other ranks: show items pending at HR level
+                                                    $query->where('t3.Approved_By', '=', 3)
+                                                    ->where('t3.status', $status);
                                                 }
 
                                             });
@@ -1893,6 +1897,8 @@ class Common
                     'vacancies.created_at',
 
                 ])
+                ->unique('V_id')
+                ->values()
                 ->map(function ($vacancy) use ($config) {
                     $vacancy->rank_name = $config[$vacancy->rank] ?? 'Unknown Rank';
                     $vacancy->ReportingTo =  $vacancy->first_name.'  ' .$vacancy->last_name;

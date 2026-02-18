@@ -320,11 +320,11 @@ class TalentAcquisitionDashboardController extends Controller
             // Fetch hiring requests with related notifications
             $hiring_request = Vacancies::with(['Getdepartment','Getposition',
                 'TAnotificationParent.TAnotificationChildren' => function ($query) {
-                    $query->where('status', '!=', ''); // Filter by valid status
+                    $query->whereNotNull('status')->where('status', '<>', '');
                 }
             ])
             ->whereHas('TAnotificationParent.TAnotificationChildren', function ($query) {
-                $query->where('status', '!=', ''); // Ensure valid notifications exist
+                $query->whereNotNull('status')->where('status', '<>', '');
             })
             ->where('department', $Dept_id)
             ->where('resort_id', $resort_id)
@@ -456,8 +456,12 @@ class TalentAcquisitionDashboardController extends Controller
             ]);
 
             // Default empty collections in case of failure
+            $resort_id = optional($this->globalUser)->resort_id;
             $resort_divisions = $resort_departments = $resort_positions = collect();
-            $hiring_request = $vacancies = collect();
+            $hiring_request = $vacancies = $UpcomingApplicants = collect();
+            $TotalApplicants = 0;
+            $Interviews = 0;
+            $Hired = 0;
 
             return view('resorts.talentacquisition.dashboard.hoddashboard', compact(
                 'resort_id',
@@ -465,7 +469,11 @@ class TalentAcquisitionDashboardController extends Controller
                 'resort_departments',
                 'resort_positions',
                 'hiring_request',
-                'vacancies'
+                'vacancies',
+                'TotalApplicants',
+                'Interviews',
+                'Hired',
+                'UpcomingApplicants'
             ));
         }
     }
