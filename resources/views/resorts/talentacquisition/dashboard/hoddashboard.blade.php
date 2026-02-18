@@ -140,9 +140,39 @@
                                         <table class="table table-collapseNew table-recHoD">
                                             <tbody>
                                                 @foreach($leftRequests as $key => $request)
+                                                    @php
+                                                        $hrSt = $finSt = $gmSt = 'Active';
+                                                        if(isset($request->TAnotificationParent[0])) {
+                                                            foreach ($request->TAnotificationParent[0]->TAnotificationChildren as $ch) {
+                                                                if ($ch->Approved_By == 3) $hrSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 7) $finSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 8) $gmSt = $ch->status;
+                                                            }
+                                                        }
+                                                        if ($hrSt == 'Rejected' || $finSt == 'Rejected' || $gmSt == 'Rejected') {
+                                                            $overallStatus = 'Rejected';
+                                                            $badgeClass = 'bg-danger';
+                                                        } elseif ($hrSt == 'Hold' || $finSt == 'Hold' || $gmSt == 'Hold') {
+                                                            $overallStatus = 'On Hold';
+                                                            $badgeClass = 'bg-warning text-dark';
+                                                        } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
+                                                            $overallStatus = 'Approved';
+                                                            $badgeClass = 'bg-success';
+                                                        } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
+                                                            $overallStatus = 'Pending GM';
+                                                            $badgeClass = 'bg-info';
+                                                        } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext') {
+                                                            $overallStatus = 'Pending Finance';
+                                                            $badgeClass = 'bg-primary';
+                                                        } else {
+                                                            $overallStatus = 'Pending HR';
+                                                            $badgeClass = 'bg-secondary';
+                                                        }
+                                                    @endphp
                                                     <tr>
                                                         <td>{{ $request->Getposition->position_title }}</td>
                                                         <td>{{ $request->Total_position_required }}</td>
+                                                        <td><span class="badge {{ $badgeClass }}">{{ $overallStatus }}</span></td>
                                                         <td>
                                                             <a class="a-link collapsed" data-bs-toggle="collapse"
                                                                 data-bs-target="#LeftRequested{{ $key }}"
@@ -153,7 +183,7 @@
                                                         </td>
                                                     </tr>
                                                     <tr class="collapse" id="LeftRequested{{ $key }}">
-                                                        <td colspan="3">
+                                                        <td colspan="4">
                                                             <div class="bg">
                                                                 <ul class="manning-timeline text-start">
                                                                     @php
@@ -247,9 +277,39 @@
                                         <table class="table table-collapseNew table-recHoD">
                                             <tbody>
                                                 @foreach($rightRequests as $key => $request)
+                                                    @php
+                                                        $hrSt = $finSt = $gmSt = 'Active';
+                                                        if(isset($request->TAnotificationParent[0])) {
+                                                            foreach ($request->TAnotificationParent[0]->TAnotificationChildren as $ch) {
+                                                                if ($ch->Approved_By == 3) $hrSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 7) $finSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 8) $gmSt = $ch->status;
+                                                            }
+                                                        }
+                                                        if ($hrSt == 'Rejected' || $finSt == 'Rejected' || $gmSt == 'Rejected') {
+                                                            $overallStatus = 'Rejected';
+                                                            $badgeClass = 'bg-danger';
+                                                        } elseif ($hrSt == 'Hold' || $finSt == 'Hold' || $gmSt == 'Hold') {
+                                                            $overallStatus = 'On Hold';
+                                                            $badgeClass = 'bg-warning text-dark';
+                                                        } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
+                                                            $overallStatus = 'Approved';
+                                                            $badgeClass = 'bg-success';
+                                                        } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
+                                                            $overallStatus = 'Pending GM';
+                                                            $badgeClass = 'bg-info';
+                                                        } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext') {
+                                                            $overallStatus = 'Pending Finance';
+                                                            $badgeClass = 'bg-primary';
+                                                        } else {
+                                                            $overallStatus = 'Pending HR';
+                                                            $badgeClass = 'bg-secondary';
+                                                        }
+                                                    @endphp
                                                     <tr>
                                                         <td>{{ $request->Getposition->position_title }}</td>
                                                         <td>{{ $request->Total_position_required }}</td>
+                                                        <td><span class="badge {{ $badgeClass }}">{{ $overallStatus }}</span></td>
                                                         <td>
                                                             <a class="a-link collapsed" data-bs-toggle="collapse"
                                                                 data-bs-target="#RightRequested{{ $key }}"
@@ -261,7 +321,7 @@
                                                     </tr>
 
                                                     <tr class="collapse" id="RightRequested{{ $key }}">
-                                                    <td colspan="3">
+                                                    <td colspan="4">
                                                             <div class="bg">
                                                                 <ul class="manning-timeline text-start">
                                                                     @php

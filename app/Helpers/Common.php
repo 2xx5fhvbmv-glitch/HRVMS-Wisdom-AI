@@ -1902,6 +1902,9 @@ class Common
                 ->map(function ($vacancy) use ($config) {
                     $vacancy->rank_name = $config[$vacancy->rank] ?? 'Unknown Rank';
                     $vacancy->ReportingTo =  $vacancy->first_name.'  ' .$vacancy->last_name;
+                    // Compute approval status from notification children
+                    $statusMap = ['Active' => 'Pending HR', 'Approved' => 'In Progress', 'ForwardedToNext' => 'Forwarded', 'Rejected' => 'Rejected', 'Hold' => 'On Hold'];
+                    $vacancy->approval_status = $statusMap[$vacancy->status] ?? $vacancy->status;
                     return $vacancy;
                 });
 

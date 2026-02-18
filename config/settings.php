@@ -536,9 +536,11 @@ return [
         '8' => 'GM',
 		'1' => 'EXCOM',
         '2' => 'HOD',
+		'3' => 'HR',
 		'4' => 'MGR',
         '5' => 'SUP',
         '6' => 'LINE WORKERS',
+		'7' => 'Finance',
     ],
 
 	'final_rank' => [
