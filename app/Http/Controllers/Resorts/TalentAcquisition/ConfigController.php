@@ -399,14 +399,25 @@ class ConfigController extends Controller
     public function TaApprovedVcanciesNotification(Request $request)
     {
         $type = config('settings.Notifications');
-        // DB::beginTransaction();
-        // try
-        // {
+        DB::beginTransaction();
+        try
+        {
             $rank = (int) $this->resort->GetEmployee->rank;
             $config = config('settings.Position_Rank');
             $parentNotification = TAnotificationParent::find($request->ta_id);
             $taupdaet = TAnotificationChild::where("Parent_ta_id", $request->ta_id)->where("Approved_By", $rank)->first();
             $childstatus =  TAnotificationChild::find($request->Child_ta_id);
+
+            if(!$childstatus) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'msg' => 'No matching approval record found.'], 422);
+            }
+
+            // If no child exists for current rank, use the child record from the request
+            if(!$taupdaet) {
+                $taupdaet = $childstatus;
+            }
+
             $childstatus->update(["status"=>"ForwardedToNext"]);
             if( $rank == Common::TaFinalApproval($this->resort->resort_id))
             {
@@ -419,9 +430,9 @@ class ConfigController extends Controller
             }
             if($taupdaet->Approved_By == 3 )
             {
-                $newRank = 7; 
+                $newRank = 7;
             }
-            if($taupdaet->Approved_By == 7)
+            elseif($taupdaet->Approved_By == 7)
             {
                 $newRank = 8;
             }
@@ -432,18 +443,19 @@ class ConfigController extends Controller
 
 
                 $sentto =  Employee::where('resort_id',$this->resort->resort_id)->where("rank",$newRank)->first();
-               
-                $msg = "New Vacancy has been Approved by ".$config[$rank]." and forwarded to ".$config[$newRank]." for further processing.";
-                event(new ResortNotificationEvent(Common::nofitication(
-                                                                        $this->resort->resort_id, // Make sure resort_id exists on the meetings table
-                                                                        10,
-                                                                        'Upcoming Investigation Meeting Reminder',
-                                                                        $msg,
-                                                                        0,
-                                                                        $sentto->id,
-                                                                        'Talent Acquisition'
-                                                                    )));
-            // }
+
+                if($sentto && env('NOTIFICATION_URL')) {
+                    $msg = "New Vacancy has been Approved by ".$config[$rank]." and forwarded to ".$config[$newRank]." for further processing.";
+                    event(new ResortNotificationEvent(Common::nofitication(
+                                                                            $this->resort->resort_id,
+                                                                            10,
+                                                                            'Upcoming Investigation Meeting Reminder',
+                                                                            $msg,
+                                                                            0,
+                                                                            $sentto->id,
+                                                                            'Talent Acquisition'
+                                                                        )));
+                }
 
 
             $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,'Active',$rank);
@@ -455,16 +467,16 @@ class ConfigController extends Controller
             DB::commit();
             return response()->json(['success' => true,"view"=>$view ,'Todolistview'=>$Todolistview, 'message' => ' Your response has been Approved.'],200);
 
-        // }
-        // catch( \Exception $e )
-        // {
+        }
+        catch( \Exception $e )
+        {
 
-        //     DB::rollBack();
-        //     \Log::emergency("File: ".$e->getFile());
-        //     \Log::emergency("Line: ".$e->getLine());
-        //     \Log::emergency("Message: ".$e->getMessage());
-        //     return response()->json(['success' => false, 'msg' => 'Failed to to Approved hiring.'], 500);
-        // }
+            DB::rollBack();
+            \Log::emergency("File: ".$e->getFile());
+            \Log::emergency("Line: ".$e->getLine());
+            \Log::emergency("Message: ".$e->getMessage());
+            return response()->json(['success' => false, 'msg' => 'Failed to Approved hiring.'], 500);
+        }
     }
 
     public function FianlApproval(Request $request)
