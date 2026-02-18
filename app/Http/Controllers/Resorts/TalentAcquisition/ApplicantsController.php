@@ -1479,9 +1479,11 @@ class ApplicantsController extends Controller
             ->rawColumns(['action', 'details-control','Stage'])
             ->make(true);
         }
+        $rank = $this->resort->GetEmployee->rank ?? null;
+        $employeeDeptId = $this->resort->GetEmployee->Dept_id ?? null;
         $ResortDepartment = ResortDepartment::where("resort_id", $resort_id)->get();
 
-        return view("resorts.talentacquisition.Applicants.talentpool",compact('page_title','ResortDepartment'));
+        return view("resorts.talentacquisition.Applicants.talentpool",compact('page_title','ResortDepartment','rank','employeeDeptId'));
 
     }
     public function getTalentPoolGridApplicant(Request $request)

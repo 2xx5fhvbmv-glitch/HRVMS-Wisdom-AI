@@ -27,7 +27,11 @@ class InterviewAssessmentController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $page_title="Interview Assessment";
-        $positions = ResortPosition::where('status','active')->where('resort_id',$this->resort->resort_id)->get();
+        $positionsQuery = ResortPosition::where('status','active')->where('resort_id',$this->resort->resort_id);
+        if($this->rank == 2) {
+            $positionsQuery->where('dept_id', $this->resort->GetEmployee->Dept_id);
+        }
+        $positions = $positionsQuery->get();
 
         return view('resorts.talentacquisition.interview-assessment.index',compact('page_title','positions'));
     }
@@ -43,9 +47,13 @@ class InterviewAssessmentController extends Controller
             'interview_assessment_forms.resort_id',
         ])
         ->join('resort_positions as t4', 't4.id', '=', 'interview_assessment_forms.position')
-        ->where('interview_assessment_forms.resort_id', $this->resort->resort_id)
+        ->where('interview_assessment_forms.resort_id', $this->resort->resort_id);
 
-        ->orderBy('interview_assessment_forms.id', 'DESC');
+        if($this->rank == 2) {
+            $forms->where('t4.dept_id', $this->resort->GetEmployee->Dept_id);
+        }
+
+        $forms->orderBy('interview_assessment_forms.id', 'DESC');
 
         if ($searchTerm) {
             $forms->where(function ($query) use ($searchTerm) {
