@@ -30,6 +30,7 @@
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
+                        @if(!in_array($rank, [2, 7]))
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select" name="Department" id="ResortDepartment">
                                 <option selected disabled>Select Department</option>
@@ -42,6 +43,9 @@
                                 @endif
                             </select>
                         </div>
+                        @elseif($rank == 2)
+                        <input type="hidden" id="ResortDepartment" value="{{ $employeeDeptId }}">
+                        @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select  Positions" name="Positions">
                                 <option selected disabled>Select Poitions</option>
@@ -143,8 +147,28 @@
                 DatatableList();
             }
         });
-        $("#ResortDepartment").select2({"Placeholder":"Select Department"});
+        if($("#ResortDepartment").is("select")) {
+            $("#ResortDepartment").select2({"Placeholder":"Select Department"});
+        }
         $(".Positions").select2({"Placeholder":"Select Positions"});
+
+        @if($rank == 2 && $employeeDeptId)
+        // Auto-load positions for HOD's department
+        $.ajax({
+            url: "{{ route('resort.get.position') }}",
+            type: "post",
+            data: { deptId: {{ $employeeDeptId }} },
+            success: function(data) {
+                if(data.success == true) {
+                    let string = '<option selected disabled>Select Positions</option>';
+                    $.each(data.data, function(key, value) {
+                        string += '<option value="'+value.id+'">'+value.position_title+'</option>';
+                    });
+                    $(".Positions").html(string);
+                }
+            }
+        });
+        @endif
 
         $(document).on("change", ".Positions", function() {
             let girdview = $(".btn-grid").hasClass('active');

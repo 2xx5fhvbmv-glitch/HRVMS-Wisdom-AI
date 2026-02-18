@@ -41,6 +41,7 @@
                             <th>Budget</th>
                             <th>ReportingTo</th>
                             <th>Rank</th>
+                            <th>Status</th>
 
                         </tr>
                     </thead>
@@ -106,6 +107,7 @@ $(document).ready(function() {
             { data: 'Budget', name: 'action', className: 'text-nowrap'},
             { data: 'ReportingTo', name: 'ReportingTo', className: 'text-nowrap'},
             { data: 'rank_name', name: 'rank_name', className: 'text-nowrap'},
+            { data: 'approval_status', name: 'approval_status', className: 'text-nowrap'},
             {data:'created_at', visible:false,searchable:false},
         ]
     });
