@@ -61,6 +61,7 @@ class QuestionnaireController extends Controller
                 't1.Question',
                 'questionnaires.id as ParentId',
                 't1.questionType',
+                'questionnaires.created_at',
             ])->join('questionnaire_children as t1', 't1.Q_Parent_id', '=', 'questionnaires.id')
                 ->join('resort_divisions as t2', 't2.id', '=', 'questionnaires.Division_id')
                 ->join('resort_departments as t3', 't3.id', '=', 'questionnaires.Department_id')
@@ -84,9 +85,13 @@ class QuestionnaireController extends Controller
                     $editUrl = asset('resorts_assets/images/edit.svg');
                     $deleteUrl = asset('resorts_assets/images/trash-red.svg');
                     $editroute= route('resort.ta.Questions.edit',$row->ParentId);
+                    $showroute= route('resort.ta.Questions.show',$row->ParentId);
 
                     return '
                         <div class="d-flex align-items-center">
+                            <a href="'.$showroute.'" class="btn-tableIcon btnIcon-orange me-1">
+                                <i class="fa-regular fa-eye"></i>
+                            </a>
                             <a href="'.$editroute.'" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'"
                             data-dept-id="' . htmlspecialchars($row->child_id, ENT_QUOTES, 'UTF-8') . '">
                                 <img src="' . $editUrl . '" alt="Edit" class="img-fluid" />
@@ -127,7 +132,8 @@ class QuestionnaireController extends Controller
         $page_title = 'Questionnaire';
         $ResortDivision = ResortDivision::where("resort_id",$this->resort->resort_id)->get(["name","id"]);
         $ResortLanguages= ResortLanguages::orderBy("name","asc")->get();
-        return view('resorts.talentacquisition.questionnaire.create',compact('ResortLanguages','ResortDivision','page_title'));
+        $foreignLanguages = config('settings.foreign_languages');
+        return view('resorts.talentacquisition.questionnaire.create',compact('ResortLanguages','ResortDivision','page_title','foreignLanguages'));
     }
 
     public function store(Request $request)
@@ -213,9 +219,19 @@ class QuestionnaireController extends Controller
 
                 foreach($Language as $l => $l1)
                 {
+                    $langId = null;
+                    $foreignLang = null;
+
+                    if(str_starts_with($l1, 'foreign_')) {
+                        $foreignLang = str_replace('foreign_', '', $l1);
+                    } else {
+                        $langId = $l1;
+                    }
+
                     VideoQuestion::create([
                         "Q_Parent_id"=>$p->id,
-                        "lang_id"=>$l1,
+                        "lang_id"=>$langId,
+                        "foreign_language"=>$foreignLang,
                         "VideoQuestion"=>$VideoQuestion[$l],
                     ]);
                 }
@@ -240,6 +256,23 @@ class QuestionnaireController extends Controller
 
     }
 
+    public function show($id)
+    {
+        $page_title = 'View Questionnaire';
+        $Questionnaire = Questionnaire::where('resort_id', $this->resort->resort_id)->where('id', $id)->first();
+
+        if(!$Questionnaire) {
+            return abort(404, 'Questionnaire not found');
+        }
+
+        $Division = ResortDivision::find($Questionnaire->Division_id);
+        $Department = ResortDepartment::find($Questionnaire->Department_id);
+        $Position = ResortPosition::find($Questionnaire->Position_id);
+        $ResortLanguages = ResortLanguages::orderBy("name","asc")->get();
+
+        return view('resorts.talentacquisition.questionnaire.show', compact('Questionnaire', 'Division', 'Department', 'Position', 'ResortLanguages', 'page_title'));
+    }
+
     public function edit($id)
     {
         if(Common::checkRouteWisePermission('resort.ta.Questionnaire',config('settings.resort_permissions.edit')) == false){
@@ -253,8 +286,9 @@ class QuestionnaireController extends Controller
 
         $Questionnaire = Questionnaire::where('resort_id',$this->resort->resort_id)->where("id",$id)->first();
         $ResortLanguages= ResortLanguages::orderBy("name","asc")->get();
+        $foreignLanguages = config('settings.foreign_languages');
 
-        return view('resorts.talentacquisition.questionnaire.edit',compact('Questionnaire','ResortDivision','ResortDpartments','ResortSections','ResortLanguages','ResortPositions','page_title'));
+        return view('resorts.talentacquisition.questionnaire.edit',compact('Questionnaire','ResortDivision','ResortDpartments','ResortSections','ResortLanguages','ResortPositions','page_title','foreignLanguages'));
 
     }
 
@@ -355,9 +389,19 @@ class QuestionnaireController extends Controller
 
                 foreach($Language as $l => $l1)
                 {
+                    $langId = null;
+                    $foreignLang = null;
+
+                    if(str_starts_with($l1, 'foreign_')) {
+                        $foreignLang = str_replace('foreign_', '', $l1);
+                    } else {
+                        $langId = $l1;
+                    }
+
                     VideoQuestion::create([
                         "Q_Parent_id"=>$p->id,
-                        "lang_id"=>$l1,
+                        "lang_id"=>$langId,
+                        "foreign_language"=>$foreignLang,
                         "VideoQuestion"=>$VideoQuestion[$l],
                     ]);
                 }
@@ -379,24 +423,28 @@ class QuestionnaireController extends Controller
 
     public function destroy(Request $request)
     {
-
         try {
-            $QuestionnaireChild = QuestionnaireChild::where('id', $request->childId)->first();
+            $questionnaire = Questionnaire::where('id', $request->ParentId)
+                ->where('Resort_id', $this->resort->resort_id)
+                ->first();
 
-            $QuestionnaireChild = QuestionnaireChild::where('Q_Parent_id', $request->ParentId)->first();
-            if($QuestionnaireChild->count() == 1)
-            {
-
-                Questionnaire::where('id', $request->ParentId)->delete();
+            if (!$questionnaire) {
+                return response()->json(['success' => false, 'message' => 'Questionnaire not found.']);
             }
-            $QuestionnaireChild->delete();
 
+            // Delete all children questions
+            QuestionnaireChild::where('Q_Parent_id', $request->ParentId)->delete();
 
-            return response()->json(['success' => true, 'message' => 'Division deleted successfully.']);
+            // Delete all video questions
+            VideoQuestion::where('Q_Parent_id', $request->ParentId)->delete();
+
+            // Delete the parent questionnaire
+            $questionnaire->delete();
+
+            return response()->json(['success' => true, 'message' => 'Questionnaire deleted successfully.']);
         } catch (\Exception $e) {
-            // Log the error and return failure response
-            \Log::error("Error deleting division: " . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to delete division.']);
+            \Log::error("Error deleting questionnaire: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to delete questionnaire.']);
         }
     }
 

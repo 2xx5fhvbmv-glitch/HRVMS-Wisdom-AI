@@ -95,9 +95,18 @@
                                     <select class="form-select" name="language[]" id="Language_1" aria-label="Default select example">
                                         <option > </option>
                                         @if($ResortLanguages->isNotEmpty())
+                                            <optgroup label="Resort Languages">
                                             @foreach ($ResortLanguages as $l)
                                             <option value="{{$l->id}}">{{$l->name}}</option>
                                             @endforeach
+                                            </optgroup>
+                                        @endif
+                                        @if(!empty($foreignLanguages))
+                                            <optgroup label="Foreign Languages">
+                                            @foreach ($foreignLanguages as $flKey => $flLabel)
+                                            <option value="foreign_{{$flKey}}">{{$flLabel}}</option>
+                                            @endforeach
+                                            </optgroup>
                                         @endif
                                     </select>
                                 </div>
@@ -330,9 +339,18 @@
                                                         <select class="form-select" name="language[]" id="Language_${nos1}" aria-label="Default select example">
                                                             <option > </option>
                                                             @if($ResortLanguages->isNotEmpty())
+                                                                <optgroup label="Resort Languages">
                                                                 @foreach ($ResortLanguages as $l)
                                                                 <option value="{{$l->id}}">{{$l->name}}</option>
                                                                 @endforeach
+                                                                </optgroup>
+                                                            @endif
+                                                            @if(!empty($foreignLanguages))
+                                                                <optgroup label="Foreign Languages">
+                                                                @foreach ($foreignLanguages as $flKey => $flLabel)
+                                                                <option value="foreign_{{$flKey}}">{{$flLabel}}</option>
+                                                                @endforeach
+                                                                </optgroup>
                                                             @endif
                                                         </select>
                                                     </div>

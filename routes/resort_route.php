@@ -332,6 +332,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/talent-acquisition/inline-question-update', ['App\Http\Controllers\Resorts\TalentAcquisition\QuestionnaireController','update'])->name('resort.ta.update.Questionnaire');
 
     Route::post('talent-acquisition/destroy-questions/', ['App\Http\Controllers\Resorts\TalentAcquisition\QuestionnaireController','destroy'])->name('resort.ta.destroyQuestions');
+    Route::get( '/talent-acquisition/view-questions/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\QuestionnaireController','show'])->name('resort.ta.Questions.show');
     Route::get( '/talent-acquisition/edit-questions/{id}/edit', ['App\Http\Controllers\Resorts\TalentAcquisition\QuestionnaireController','edit'])->name('resort.ta.Questions.edit');
 
     Route::post('talent-acquisition/position-sections/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','PositionSections'])->name('resort.ta.PositionSections');
@@ -359,9 +360,10 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( '/talent-acquisition/job-description/show/{id}/', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','show'])->name('resort.ta.jobdescription.show');
     Route::get( '/talent-acquisition/job-description/download/{slug}/', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','download'])->name('resort.ta.jobdescription.download');
     // Job Advertisement
+    Route::get('/talent-acquisition/job-advertisement', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','index'])->name('resort.ta.jobadvertisment.index');
+    Route::get('/talent-acquisition/job-advertisement/list', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','getList'])->name('resort.ta.jobadvertisment.getList');
     Route::post('/talent-acquisition/job-advertisement/upload', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','StoreJobAvd'])->name('resort.ta.jobadvertisment.upload');
-
-    Route::post('/talent-acquisition/job-advertisement/upload', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','StoreJobAvd'])->name('resort.ta.jobadvertisment.upload');
+    Route::delete('/talent-acquisition/job-advertisement/destroy/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','destroy'])->name('resort.ta.jobadvertisment.destroy');
 
     Route::Post('/talent-acquisition/hold-vcancies', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','TaHoldVcanciesNotification'])->name('resort.ta.HiringNotification');
 

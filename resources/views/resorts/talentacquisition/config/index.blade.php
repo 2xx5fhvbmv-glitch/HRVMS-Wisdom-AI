@@ -194,6 +194,20 @@
                                 <form id="AdTemplete" enctype="multipart/form-data">
                                     @csrf
                                     <div class="card">
+                                        <div class="card-title">
+                                            <div class="row g-3 align-items-center justify-content-between">
+                                                <div class="col-auto">
+                                                    <div class="d-flex justify-content-start align-items-center">
+                                                        <h3>Job Ad Template</h3>
+                                                    </div>
+                                                </div>
+                                                <div class="col-auto">
+                                                    <div class="d-flex justify-content-sm-end align-items-center">
+                                                        <a href="{{ route('resort.ta.jobadvertisment.index') }}" class="a-link">View All Templates</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="uploadFileNew-block mb-md-3 mb-2" id="dropzone">
                                             <img src="{{ URL::asset('resorts_assets/images/upload.svg') }}" alt="icon">
                                             <h5>Upload The Job Ad Template</h5>
@@ -201,6 +215,12 @@
                                             <input type="file" id="file" name="Jobadvimg" hidden>
                                             <div id="fileName" class="mt-2 text-primary"></div>
                                         </div>
+                                        @if(isset($configset) && !empty($configset->Jobadvimg))
+                                        <div class="mb-2 text-center" id="currentTemplate">
+                                            <p class="mb-1 text-muted"><small>Current Template:</small></p>
+                                            <img src="{{ URL::asset(config('settings.Resort_JobAdvertisement').'/'.$configset->Resort_id.'/'.$configset->Jobadvimg) }}" alt="Job Ad Template" class="img-fluid rounded" style="max-height: 200px;">
+                                        </div>
+                                        @endif
                                         <div class="card-footer text-end">
                                             <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                                         </div>
@@ -375,6 +395,7 @@
 $(document).ready(function() 
 {
     AgentTicket();
+    HiringSourceTable();
         CKEDITOR.replace('terms_and_condition');
         $('#jobDesEdit-modal').on('shown.bs.modal', function () {
             if (CKEDITOR.instances['editor']) {
@@ -404,6 +425,10 @@ $(document).ready(function()
             },
             submitHandler: function(form)
             {
+                var $submitBtn = $('#jobDesEditForm button[type="submit"]');
+                if($submitBtn.prop('disabled')) return false;
+                $submitBtn.prop('disabled', true).text('Submitting...');
+
                 const content = CKEDITOR.instances['editor'].getData(); // Use CKEDITOR to get content
 
                 let Division_id = $("#FormResortDivision").val();
@@ -450,9 +475,8 @@ $(document).ready(function()
                             positionClass: 'toast-bottom-right'
                         });
                     },
-                    complete: function() {  // Changed from afterComplete to complete
-                        // $("#jobDesEdit-modal form")[0].reset();
-                        // $("#jobDesEdit-modal input[type='hidden']").val('');
+                    complete: function() {
+                        $submitBtn.prop('disabled', false).text('Submit');
                         // If you're using any rich text editor, reset it here
                         if (typeof CKEDITOR !== 'undefined' && CKEDITOR.instances['editor']) {
                             CKEDITOR.instances['editor'].setData('');
@@ -496,13 +520,11 @@ $(document).ready(function()
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {
-                            $row.remove();
-
                             toastr.success(result.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
 
-                            $('#positions-table').DataTable().ajax.reload();
+                            AgentTicket();
                         } else {
                             toastr.error(result.message, "Error", {
                                 positionClass: 'toast-bottom-right'
@@ -543,13 +565,11 @@ $(document).ready(function()
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {
-                            $row.remove();
-
                             toastr.success(result.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
 
-                            $('#hiringsource').DataTable().ajax.reload();
+                            HiringSourceTable();
                         } else {
                             toastr.error(result.message, "Error", {
                                 positionClass: 'toast-bottom-right'
@@ -662,8 +682,12 @@ $(document).ready(function()
                         required: "Please Name .",
                     }
                 },
-            submitHandler: function(form) 
+            submitHandler: function(form)
             {
+                var $btn = $(form).find('button[type="submit"]');
+                if($btn.prop('disabled')) return false;
+                $btn.prop('disabled', true).text('Saving...');
+
                 var emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
                 var email = $(form).find('[name="agents_email"]').val();
 
@@ -671,9 +695,10 @@ $(document).ready(function()
                     toastr.error("Invalid email format", "Error", {
                         positionClass: 'toast-bottom-right'
                     });
+                    $btn.prop('disabled', false).text('Save');
                     return false;
                 }
-                var formData = new FormData(form); // Use FormData to include file
+                var formData = new FormData(form);
 
                 $.ajax({
                     url: "{{ route('resort.ta.add.Agent') }}",
@@ -683,13 +708,10 @@ $(document).ready(function()
                     contentType: false,
                     success: function(response) {
                         if (response.success) {
-
                             toastr.success(response.msg, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
-
                             AgentTicket();
-
                         } else {
                             toastr.error(response.msg, "Error", {
                                 positionClass: 'toast-bottom-right'
@@ -700,10 +722,13 @@ $(document).ready(function()
                         var errors = response.responseJSON;
                         console.log(errors);
                         var errs = '';
-                        $.each(errors.errors, function(key, error) { // Adjust according to your response format
+                        $.each(errors.errors, function(key, error) {
                             errs += error + '<br>';
                         });
                         toastr.error(errs, {  positionClass: 'toast-bottom-right' });
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('Save');
                     }
                 });
             }
@@ -749,6 +774,97 @@ $(document).ready(function()
             ]
         });
     }
+
+    function HiringSourceTable()
+    {
+        if ($.fn.DataTable.isDataTable('#hiringsource'))
+        {
+            $('#hiringsource').DataTable().clear().destroy();
+        }
+        $('#hiringsource tbody').empty();
+        $('#hiringsource').DataTable({
+            searching: false,
+            bLengthChange: false,
+            bFilter: true,
+            bInfo: true,
+            bAutoWidth: false,
+            scrollX: true,
+            iDisplayLength: 6,
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: '{{ route("resort.ta.get.source") }}',
+                type: 'GET',
+            },
+            columns: [
+                { data: 'source_name', name: 'source_name', className: 'text-nowrap' },
+                { data: 'colour', name: 'colour', className: 'text-nowrap',
+                    render: function(data) {
+                        if(data) {
+                            return '<span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:'+data+'"></span> '+data;
+                        }
+                        return '-';
+                    }
+                },
+                { data: 'action', name: 'action', orderable: false, searchable: false }
+            ]
+        });
+    }
+
+    $('#HiringSource').validate({
+        rules: {
+            source_name: { required: true, maxlength: 100 },
+            color: { required: true }
+        },
+        messages: {
+            source_name: { required: "Please enter source name." },
+            color: { required: "Please select a color." }
+        },
+        submitHandler: function(form) {
+            var $btn = $(form).find('button');
+            if($btn.prop('disabled')) return false;
+            $btn.prop('disabled', true).text('Saving...');
+
+            var formData = new FormData(form);
+            $.ajax({
+                url: "{{ route('resort.ta.add.source') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if(response.success) {
+                        toastr.success(response.msg, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        form.reset();
+                        $('#color').val('#A264F7');
+                        HiringSourceTable();
+                    } else {
+                        toastr.error(response.msg || response.message || "Failed to add.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    var errs = '';
+                    if(xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                        $.each(xhr.responseJSON.errors, function(key, value) {
+                            errs += value[0] + '<br>';
+                        });
+                    } else {
+                        errs = 'An unexpected error occurred.';
+                    }
+                    toastr.error(errs, "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('Submit');
+                }
+            });
+        }
+    });
 
     $(document).on("click", "#AgentTicket .edit-row-btn", function (event) {
         event.preventDefault(); // Prevent default action
@@ -844,26 +960,80 @@ $(document).ready(function()
         });
     });
 
+    $('#terms_conditions_form').on('submit', function (e) {
+        e.preventDefault();
+        var $btn = $(this).find('button[type="submit"]');
+        if($btn.prop('disabled')) return false;
+
+        var content = CKEDITOR.instances['terms_and_condition'].getData();
+        if(!content || content.trim() === '') {
+            toastr.error("Please enter Terms and Conditions.", "Error", {
+                positionClass: 'toast-bottom-right'
+            });
+            return false;
+        }
+
+        $btn.prop('disabled', true).text('Saving...');
+
+        $.ajax({
+            url: "{{ route('resort.ta.termscondition.storeOrUpdate') }}",
+            type: "POST",
+            data: {
+                terms_and_condition: content,
+                _token: "{{ csrf_token() }}"
+            },
+            dataType: 'json',
+            success: function(response) {
+                if(response.success) {
+                    toastr.success(response.message, "Success", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                } else {
+                    toastr.error(response.message || "Failed to save.", "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+            },
+            error: function(xhr) {
+                var errs = '';
+                if(xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                    $.each(xhr.responseJSON.errors, function(key, value) {
+                        errs += value[0] + '<br>';
+                    });
+                } else if(xhr.responseJSON && xhr.responseJSON.message) {
+                    errs = xhr.responseJSON.message;
+                } else {
+                    errs = 'An unexpected error occurred. Please try again.';
+                }
+                toastr.error(errs, "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).text('Save');
+            }
+        });
+    });
+
     $('#TaFinalApprovalForm').on('submit', function (e) {
         e.preventDefault();
+        var $btn = $(this).find('button[type="submit"]');
+        if($btn.prop('disabled')) return false;
+        $btn.prop('disabled', true).text('Submitting...');
 
         let formData = new FormData(this);
         $.ajax({
-            url: "{{ route('ta.finalApproval.save') }}", // you will define this route
+            url: "{{ route('ta.finalApproval.save') }}",
             method: "POST",
             data: formData,
             contentType: false,
             processData: false,
-            beforeSend: function () {
-                // optional loader or disable button
-            },
             success: function (response) {
                 if (response.success) {
                     toastr.success(response.message || 'Final approval saved successfully.', "Success", {
                         positionClass: 'toast-bottom-right'
                     });
-                    // or refresh part of the page, etc.
-                } 
+                }
             },
             error: function (xhr) {
                 let res = xhr.responseJSON;
@@ -876,6 +1046,9 @@ $(document).ready(function()
                         positionClass: 'toast-bottom-right'
                     });
                 }
+            },
+            complete: function() {
+                $btn.prop('disabled', false).text('Submit');
             }
         });
     });
@@ -917,6 +1090,60 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Optional: click area triggers file input
     dropzone.addEventListener('click', () => fileInput.click());
+});
+
+$('#AdTemplete').on('submit', function(e) {
+    e.preventDefault();
+    var $submitBtn = $(this).find('button[type="submit"]');
+    if($submitBtn.prop('disabled')) return false;
+
+    var fileInput = document.getElementById('file');
+    if(!fileInput.files || fileInput.files.length === 0) {
+        toastr.error("Please select an image to upload.", "Error", {
+            positionClass: 'toast-bottom-right'
+        });
+        return false;
+    }
+
+    $submitBtn.prop('disabled', true).text('Uploading...');
+
+    var formData = new FormData(this);
+    $.ajax({
+        url: "{{ route('resort.ta.jobadvertisment.upload') }}",
+        type: "POST",
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if(response.success) {
+                toastr.success(response.message, "Success", {
+                    positionClass: 'toast-bottom-right'
+                });
+                document.getElementById('fileName').textContent = '';
+                fileInput.value = '';
+            } else {
+                toastr.error(response.message || "Upload failed.", "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
+            }
+        },
+        error: function(xhr) {
+            var errs = '';
+            if(xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                $.each(xhr.responseJSON.errors, function(key, value) {
+                    errs += value[0] + '<br>';
+                });
+            } else {
+                errs = 'An unexpected error occurred. Please try again.';
+            }
+            toastr.error(errs, "Error", {
+                positionClass: 'toast-bottom-right'
+            });
+        },
+        complete: function() {
+            $submitBtn.prop('disabled', false).text('Submit');
+        }
+    });
 });
 </script>
 
