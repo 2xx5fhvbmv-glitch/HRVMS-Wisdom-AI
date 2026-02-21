@@ -56,8 +56,9 @@ class JobDescriptionController extends Controller
                     't5.code as Section_Code',
 
                 'job_descriptions.jobdescription',
+                'job_descriptions.reason',
                 'job_descriptions.Resort_id',
-                'job_descriptions.created_at' // ✅ ADD THIS LINE
+                'job_descriptions.created_at'
 
 
             ])
@@ -156,7 +157,19 @@ class JobDescriptionController extends Controller
 
                 })
 
-                ->rawColumns(['Division', 'Department', 'Position', 'Section','Compliance','JobDescription','action'])
+                ->addColumn('Reason', function ($row) {
+                    if($row->compliance == "Rejected" && !empty($row->reason))
+                    {
+                        return '<span class="text-danger">'.htmlspecialchars($row->reason, ENT_QUOTES, 'UTF-8').'</span>';
+                    }
+                    else if($row->compliance == "Rejected")
+                    {
+                        return '<span class="text-muted">-</span>';
+                    }
+                    return '';
+                })
+
+                ->rawColumns(['Division', 'Department', 'Position', 'Section','Compliance','JobDescription','Reason','action'])
                 ->make(true);
 
         //    } catch (\Exception $e) {
@@ -250,49 +263,56 @@ class JobDescriptionController extends Controller
 
             $pdf->save($absolute_path);
 
-            // Call extraction API with the PDF content
+            // Call AI compliance check API with the PDF
             // try {
-                // $url = env('AI_URL').'check_agreement_compliance'; 
-                // $curl = curl_init();
-                // $postFields = [
-                //     'contract' => new \CURLFile($absolute_path, 'application/pdf', $filename),
-                // ];
-                //     curl_setopt_array($curl, [
-                //         CURLOPT_URL => $url,
-                //         CURLOPT_RETURNTRANSFER => true,
-                //         CURLOPT_POST => true,
-                //         CURLOPT_POSTFIELDS => $postFields,
-                //         CURLOPT_HTTPHEADER => [
-                //             'Accept: application/json',
-                //         ],
-                //     ]);
-                //     $response = curl_exec($curl);
-                //     $err = curl_error($curl);
-                //     curl_close($curl);
-                //     if($err) 
-                //     {
-                //         return response()->json(['status' => false, 'message' =>  $err]);
-                //     } 
-                //     $AI_Data = json_decode($response, true); 
-                    
-                //     dd($AI_Data);
+            //     $url = env('AI_URL').'check_agreement_compliance';
+            //     $curl = curl_init();
+            //     $postFields = [
+            //         'contract' => new \CURLFile($absolute_path, 'application/pdf', $filename),
+            //     ];
+            //     curl_setopt_array($curl, [
+            //         CURLOPT_URL => $url,
+            //         CURLOPT_RETURNTRANSFER => true,
+            //         CURLOPT_POST => true,
+            //         CURLOPT_POSTFIELDS => $postFields,
+            //         CURLOPT_HTTPHEADER => [
+            //             'Accept: application/json',
+            //         ],
+            //     ]);
+            //     $response = curl_exec($curl);
+            //     $err = curl_error($curl);
+            //     curl_close($curl);
+            //     if($err)
+            //     {
+            //         \Log::error("AI compliance API curl error: " . $err);
+            //     }
+            //     else
+            //     {
+            //         $AI_Data = json_decode($response, true);
+            //         \Log::info("AI Compliance Response: ", $AI_Data ?? []);
+            //
+            //         if(!empty($AI_Data)) {
+            //             $complianceStatus = $AI_Data['compliance_status'] ?? $AI_Data['status'] ?? null;
+            //             $reason = $AI_Data['reason'] ?? $AI_Data['message'] ?? $AI_Data['details'] ?? null;
+            //
+            //             if($complianceStatus === 'Approved' || $complianceStatus === true || $complianceStatus === 'passed') {
+            //                 $jobDescription->compliance = 'Approved';
+            //             } else {
+            //                 $jobDescription->compliance = 'Rejected';
+            //             }
+            //
+            //             if($reason) {
+            //                 $jobDescription->reason = is_array($reason) ? json_encode($reason) : $reason;
+            //             }
+            //
+            //             $jobDescription->save();
+            //         }
+            //     }
             // } catch (\Exception $e) {
             //     \Log::error("PDF extraction API error: " . $e->getMessage());
             // }
 
             return response()->json(['success' => true, 'message' => 'Job Description Added successfully.'],200);
-             DB::beginTransaction();
-        try{}
-        catch( \Exception $e )
-        {
-
-            DB::rollBack();
-            \Log::emergency("File: ".$e->getFile());
-            \Log::emergency("Line: ".$e->getLine());
-            \Log::emergency("Message: ".$e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to add Agent Email.'], 500);
-
-        }
 
     }
 

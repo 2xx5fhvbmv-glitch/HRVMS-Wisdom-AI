@@ -11,10 +11,101 @@ use App\Helpers\Common;
 use File;
 use DB;
 use App\Models\ApplicationLink;
+use App\Models\Admin;
 use Carbon\Carbon;
+use URL;
 class JobAdvertisementController extends Controller
 {
+    public $resort;
+    public function __construct()
+    {
+        $this->resort = Auth::guard('resort-admin')->user();
+        if(!$this->resort) return;
+    }
 
+    public function index()
+    {
+        $page_title = "Job Ad Templates";
+        return view('resorts.talentacquisition.jobadvertisement.index', compact('page_title'));
+    }
+
+    public function getList(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $storagePath = config('settings.Resort_JobAdvertisement');
+
+        $jobAds = JobAdvertisement::select([
+                'job_advertisements.id',
+                'job_advertisements.Jobadvimg',
+                'job_advertisements.Resort_id',
+                'job_advertisements.created_by',
+                'job_advertisements.created_at',
+                'job_advertisements.updated_at',
+            ])
+            ->where('job_advertisements.Resort_id', $resort_id)
+            ->orderBy('job_advertisements.id', 'DESC');
+
+        return datatables()->of($jobAds)
+            ->addColumn('Preview', function ($row) use ($storagePath) {
+                $imgUrl = URL::asset($storagePath.'/'.$row->Resort_id.'/'.$row->Jobadvimg);
+                return '<a href="'.$imgUrl.'" target="_blank"><img src="'.$imgUrl.'" alt="Template" style="max-height:60px; max-width:100px;" class="img-fluid rounded"></a>';
+            })
+            ->addColumn('FileName', function ($row) {
+                return htmlspecialchars($row->Jobadvimg, ENT_QUOTES, 'UTF-8');
+            })
+            ->addColumn('UploadedBy', function ($row) {
+                $admin = Admin::select('first_name', 'last_name')->where('id', $row->getRawOriginal('created_by'))->first();
+                if($admin) {
+                    return ucwords($admin->first_name.' '.$admin->last_name);
+                }
+                return '-';
+            })
+            ->addColumn('UploadedAt', function ($row) {
+                return $row->updated_at ?? $row->created_at ?? '-';
+            })
+            ->addColumn('action', function ($row) {
+                $deleteUrl = asset('resorts_assets/images/trash-red.svg');
+                $imgUrl = URL::asset(config('settings.Resort_JobAdvertisement').'/'.$row->Resort_id.'/'.$row->Jobadvimg);
+                return '
+                    <a href="'.$imgUrl.'" target="_blank" class="btn-tableIcon btnIcon-skyblue"><i class="fa-regular fa-eye"></i></a>
+                    <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn"
+                       data-id="'. htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
+                        <img src="' . $deleteUrl . '" alt="Delete" class="img-fluid" />
+                    </a>
+                ';
+            })
+            ->rawColumns(['Preview', 'action'])
+            ->make(true);
+    }
+
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+        try {
+            $jobAd = JobAdvertisement::where('id', $id)
+                ->where('Resort_id', $this->resort->resort_id)
+                ->first();
+
+            if(!$jobAd) {
+                return response()->json(['success' => false, 'message' => 'Template not found.'], 404);
+            }
+
+            $path = config('settings.Resort_JobAdvertisement').'/'.$jobAd->Resort_id.'/'.$jobAd->Jobadvimg;
+            if(File::exists(public_path($path))) {
+                File::delete(public_path($path));
+            }
+
+            $jobAd->delete();
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Template removed successfully.'], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: ".$e->getFile());
+            \Log::emergency("Line: ".$e->getLine());
+            \Log::emergency("Message: ".$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to remove template.'], 500);
+        }
+    }
 
     public function StoreJobAvd(Request $request)
     {

@@ -23,6 +23,7 @@ class JobDescription extends Model
         'created_by',
         'modified_by',
         'compliance',
+        'reason',
         'slug',
 
 
