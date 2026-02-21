@@ -14,7 +14,7 @@ class VideoQuestion extends Model
 
     protected  $table = 'video_questions';
     public  $fillable = [
-        "lang_id" ,"VideoQuestion", "created_by", "modified_by" ,"Q_Parent_id"
+        "lang_id" ,"foreign_language", "VideoQuestion", "created_by", "modified_by" ,"Q_Parent_id"
     ];
 
     public static function boot(){

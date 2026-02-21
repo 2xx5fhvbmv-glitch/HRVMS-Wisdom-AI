@@ -105,7 +105,7 @@
                                                     </div>
                                                     @php
                                                         $options = json_decode($item->options);
-                                                            $multipleCount = count(json_decode($item->options));
+                                                            $multipleCount = is_countable($options) ? count($options) : 0;
                                                             $m_iteration = 1;
                                                     @endphp
                                                     <div class="col-lg-5 col-md-4 col-sm-10">
@@ -135,7 +135,7 @@
                                                     </div>
                                                     @php
                                                             $options = json_decode($item->options);
-                                                            $RadioCount = count(json_decode($item->options));
+                                                            $RadioCount = is_countable($options) ? count($options) : 0;
                                                             $m_iteration = 1;
                                                     @endphp
                                                     <div class="col-lg-5 col-md-4 col-sm-10">
@@ -196,9 +196,18 @@
                                             <select class="form-select" name="language[]" id="Language_1" aria-label="Default select example">
                                                 <option > </option>
                                                 @if($ResortLanguages->isNotEmpty())
+                                                    <optgroup label="Resort Languages">
                                                     @foreach ($ResortLanguages as $l)
                                                     <option value="{{$l->id}}" {{$l->id == $v->lang_id ? 'selected' : '' }}>{{ $l->name}}</option>
                                                     @endforeach
+                                                    </optgroup>
+                                                @endif
+                                                @if(!empty($foreignLanguages))
+                                                    <optgroup label="Foreign Languages">
+                                                    @foreach ($foreignLanguages as $flKey => $flLabel)
+                                                    <option value="foreign_{{$flKey}}" {{ $v->foreign_language == $flKey ? 'selected' : '' }}>{{$flLabel}}</option>
+                                                    @endforeach
+                                                    </optgroup>
                                                 @endif
                                             </select>
                                         </div>
@@ -219,9 +228,18 @@
                                         <select class="form-select" name="language[]" id="Language_1" aria-label="Default select example">
                                             <option > </option>
                                             @if($ResortLanguages->isNotEmpty())
+                                                <optgroup label="Resort Languages">
                                                 @foreach ($ResortLanguages as $l)
                                                 <option value="{{$l->id}}">{{$l->name}}</option>
                                                 @endforeach
+                                                </optgroup>
+                                            @endif
+                                            @if(!empty($foreignLanguages))
+                                                <optgroup label="Foreign Languages">
+                                                @foreach ($foreignLanguages as $flKey => $flLabel)
+                                                <option value="foreign_{{$flKey}}">{{$flLabel}}</option>
+                                                @endforeach
+                                                </optgroup>
                                             @endif
                                         </select>
                                     </div>
@@ -471,9 +489,18 @@
                                                         <select class="form-select" name="language[]" id="Language_${nos1}" aria-label="Default select example">
                                                             <option > </option>
                                                             @if($ResortLanguages->isNotEmpty())
+                                                                <optgroup label="Resort Languages">
                                                                 @foreach ($ResortLanguages as $l)
                                                                 <option value="{{$l->id}}">{{$l->name}}</option>
                                                                 @endforeach
+                                                                </optgroup>
+                                                            @endif
+                                                            @if(!empty($foreignLanguages))
+                                                                <optgroup label="Foreign Languages">
+                                                                @foreach ($foreignLanguages as $flKey => $flLabel)
+                                                                <option value="foreign_{{$flKey}}">{{$flLabel}}</option>
+                                                                @endforeach
+                                                                </optgroup>
                                                             @endif
                                                         </select>
                                                     </div>
