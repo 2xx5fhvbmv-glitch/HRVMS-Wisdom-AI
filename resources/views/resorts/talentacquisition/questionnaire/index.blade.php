@@ -123,16 +123,16 @@ $(document).on('click', '.delete-row-btn', function (e) {
     // Get the division ID from the data attribute
     var position_id = $(this).data('dept-id');
     var ParentId =$(this).data('parent-id');
-    swal({
+    Swal.fire({
         title: 'Sure want to delete?',
         text: 'This cannot be undone',
-        type: 'warning',
+        icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Yes',
         cancelButtonText: 'No',
         confirmButtonColor: "#DD6B55"
-    }).then(function(success) {
-        if (success) {
+    }).then((result) => {
+        if (result.isConfirmed) {
             $.ajax({
                 type: "post",
                 url: "{{ route('resort.ta.destroyQuestions') }}",
@@ -140,13 +140,11 @@ $(document).on('click', '.delete-row-btn', function (e) {
                 dataType: "json",
             }).done(function(result) {
                 if (result.success == true) {
-                    $row.remove();
-
                     toastr.success(result.message, "Success", {
                         positionClass: 'toast-bottom-right'
                     });
 
-                    $('#positions-table').DataTable().ajax.reload();
+                    divisionTable.ajax.reload();
                 } else {
                     toastr.error(result.message, "Error", {
                         positionClass: 'toast-bottom-right'

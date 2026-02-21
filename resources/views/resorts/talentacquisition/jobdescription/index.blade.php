@@ -53,6 +53,7 @@
                                 <th>Section</th>
                                 <th>Job Description</th>
                                 <th>Compliance</th>
+                                <th>Reason</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -143,7 +144,7 @@
             iDisplayLength: 6,
             processing: true,
             serverSide: true,
-            order:[[7, 'desc']],
+            order:[[8, 'desc']],
             ajax: {
                 url: '{{ route("resort.ta.jobdescription.GetJobDescList") }}',
                 type: 'GET',
@@ -162,7 +163,7 @@
                 { data: 'Section', name: 'Section', className: 'text-nowrap' },
                 { data: 'JobDescription', name: 'JobDescription', className: 'text-nowrap' },
                 { data: 'Compliance', name: 'Compliance', className: 'text-nowrap' },
-
+                { data: 'Reason', name: 'Reason', className: 'text-nowrap', orderable: false, searchable: false },
                 { data: 'action', name: 'Action', orderable: false, searchable: false },
                 {data:'created_at', visible:false,searchable:false},
             ]

@@ -217,6 +217,7 @@ return array(
     'App\\Http\\Controllers\\Resorts\\People\\configuration\\ResignationReasonController' => $baseDir . '/app/Http/Controllers/Resorts/People/configuration/ResignationReasonController.php',
     'App\\Http\\Controllers\\Resorts\\Performance\\ConfigurationController' => $baseDir . '/app/Http/Controllers/Resorts/Performance/ConfigurationController.php',
     'App\\Http\\Controllers\\Resorts\\Performance\\CycleController' => $baseDir . '/app/Http/Controllers/Resorts/Performance/CycleController.php',
+    'App\\Http\\Controllers\\Resorts\\Performance\\KpiController' => $baseDir . '/app/Http/Controllers/Resorts/Performance/KpiController.php',
     'App\\Http\\Controllers\\Resorts\\Performance\\MonthlyCheckingController' => $baseDir . '/app/Http/Controllers/Resorts/Performance/MonthlyCheckingController.php',
     'App\\Http\\Controllers\\Resorts\\Performance\\PerformanceDashboardController' => $baseDir . '/app/Http/Controllers/Resorts/Performance/PerformanceDashboardController.php',
     'App\\Http\\Controllers\\Resorts\\Performance\\PerformanceMeetingController' => $baseDir . '/app/Http/Controllers/Resorts/Performance/PerformanceMeetingController.php',
