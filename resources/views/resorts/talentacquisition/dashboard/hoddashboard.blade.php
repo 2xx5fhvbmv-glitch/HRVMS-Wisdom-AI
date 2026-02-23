@@ -113,6 +113,48 @@
                             </div>
                         </div>
                     </div>
+                    @if(isset($drafts) && $drafts->count() > 0)
+                    <div class="col-lg-12">
+                        <div class="card h-auto" id="card-drafts">
+                            <div class="card-title">
+                                <div class="row justify-content-between align-items-center g-">
+                                    <div class="col">
+                                        <h3>Drafts <span class="badge bg-secondary">{{ $drafts->count() }}</span></h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-collapse">
+                                    <thead>
+                                        <tr>
+                                            <th>Position</th>
+                                            <th>Department</th>
+                                            <th>Employee Type</th>
+                                            <th>No. of Vacancy</th>
+                                            <th>Date</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($drafts as $draft)
+                                            <tr>
+                                                <td>{{ $draft->Getposition->position_title ?? 'N/A' }}</td>
+                                                <td>{{ $draft->Getdepartment->name ?? 'N/A' }}</td>
+                                                <td>{{ $draft->employee_type ?? 'N/A' }}</td>
+                                                <td>{{ $draft->Total_position_required }}</td>
+                                                <td>{{ $draft->created_at ? \Carbon\Carbon::parse($draft->created_at)->format('d M Y') : 'N/A' }}</td>
+                                                <td>
+                                                    <a href="{{ route('resort.vacancies.edit', $draft->id) }}" class="btn btn-sm btn-themeBlue">Edit</a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
                     <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card h-auto" id="card-vac">
                             <div class="card-title">
@@ -141,18 +183,21 @@
                                             <tbody>
                                                 @foreach($leftRequests as $key => $request)
                                                     @php
-                                                        $hrSt = $finSt = $gmSt = 'Active';
+                                                        $excomSt = $hodSt = $hrSt = $finSt = $gmSt = null;
                                                         if(isset($request->TAnotificationParent[0])) {
                                                             foreach ($request->TAnotificationParent[0]->TAnotificationChildren as $ch) {
-                                                                if ($ch->Approved_By == 3) $hrSt = $ch->status;
+                                                                if ($ch->Approved_By == 1) $excomSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 2) $hodSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 3) $hrSt = $ch->status;
                                                                 elseif ($ch->Approved_By == 7) $finSt = $ch->status;
                                                                 elseif ($ch->Approved_By == 8) $gmSt = $ch->status;
                                                             }
                                                         }
-                                                        if ($hrSt == 'Rejected' || $finSt == 'Rejected' || $gmSt == 'Rejected') {
+                                                        $allStatuses = array_filter([$excomSt, $hodSt, $hrSt, $finSt, $gmSt]);
+                                                        if (in_array('Rejected', $allStatuses)) {
                                                             $overallStatus = 'Rejected';
                                                             $badgeClass = 'bg-danger';
-                                                        } elseif ($hrSt == 'Hold' || $finSt == 'Hold' || $gmSt == 'Hold') {
+                                                        } elseif (in_array('Hold', $allStatuses)) {
                                                             $overallStatus = 'On Hold';
                                                             $badgeClass = 'bg-warning text-dark';
                                                         } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
@@ -161,7 +206,7 @@
                                                         } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending GM';
                                                             $badgeClass = 'bg-info';
-                                                        } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext') {
+                                                        } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext' || $excomSt == 'Approved' || $excomSt == 'ForwardedToNext' || $hodSt == 'Approved' || $hodSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending Finance';
                                                             $badgeClass = 'bg-primary';
                                                         } else {
@@ -187,78 +232,68 @@
                                                             <div class="bg">
                                                                 <ul class="manning-timeline text-start">
                                                                     @php
-                                                                        // Initialize the status for each role
-                                                                        $hrStatus = $financeStatus = $gmStatus = 'Active';
+                                                                        $excomStatusTL = $hodStatusTL = $hrStatus = $financeStatus = $gmStatus = null;
+                                                                        $hrDateTL = $financeDateTL = $gmDateTL = $excomDateTL = $hodDateTL = null;
 
-                                                                        // Loop through the TAnotificationChildren to get statuses for HR, Finance, GM
                                                                         foreach ($request->TAnotificationParent[0]->TAnotificationChildren as $child) {
-                                                                            if ($child->Approved_By == 3) { // HR
-                                                                                $hrStatus = $child->status;
-                                                                            } elseif ($child->Approved_By == 7) { // Finance
-                                                                                $financeStatus = $child->status;
-                                                                            } elseif ($child->Approved_By == 8) { // GM
-                                                                                $gmStatus = $child->status;
-                                                                            }
+                                                                            if ($child->Approved_By == 1) { $excomStatusTL = $child->status; $excomDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 2) { $hodStatusTL = $child->status; $hodDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 3) { $hrStatus = $child->status; $hrDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 7) { $financeStatus = $child->status; $financeDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 8) { $gmStatus = $child->status; $gmDateTL = $child->updated_at; }
                                                                         }
 
-                                                                        // Determine the active step based on status
+                                                                        $firstStepStatus = $hrStatus ?? $excomStatusTL ?? $hodStatusTL ?? 'Active';
+                                                                        $firstStepDate = $hrDateTL ?? $excomDateTL ?? $hodDateTL ?? null;
+                                                                        $financeStatus = $financeStatus ?? 'Active';
+                                                                        $gmStatus = $gmStatus ?? 'Active';
+
                                                                         $step = 0;
-
-                                                                        // Handle Rejection by HR, Finance, or GM
-                                                                        if ($hrStatus == 'Rejected' || $hrStatus == 'Hold') {
-                                                                            $step = -1; // Rejected or On Hold by HR, cycle stops here
-                                                                        } elseif ($hrStatus == 'Approved' || $hrStatus == 'ForwardedToNext') {
-                                                                            $step = 1; // Step 1: Respond to HR is complete
-                                                                        }
-
-                                                                        if ($financeStatus == 'Rejected' || $financeStatus == 'Hold') {
-                                                                            $step = -2; // Rejected or On Hold by Finance, cycle stops here after HR step
-                                                                        } elseif ($financeStatus == 'Approved' || $financeStatus == 'ForwardedToNext') {
-                                                                            $step = 2; // Step 2: Reviewed by HR and Sent to Finance is complete
-                                                                        }
-
-                                                                        if ($gmStatus == 'Rejected' || $gmStatus == 'Hold') {
-                                                                            $step = -3; // Rejected or On Hold by GM, cycle stops here after Finance step
-                                                                        } elseif ($gmStatus == 'Approved' || $gmStatus == 'ForwardedToNext') {
-                                                                            $step = 3; // Step 3: Reviewed by Finance and Sent to GM is complete
-                                                                        }
+                                                                        if ($firstStepStatus == 'Rejected' || $firstStepStatus == 'Hold') { $step = -1; }
+                                                                        elseif ($firstStepStatus == 'Approved' || $firstStepStatus == 'ForwardedToNext') { $step = 1; }
+                                                                        if ($financeStatus == 'Rejected' || $financeStatus == 'Hold') { $step = -2; }
+                                                                        elseif ($financeStatus == 'Approved' || $financeStatus == 'ForwardedToNext') { $step = 2; }
+                                                                        if ($gmStatus == 'Rejected' || $gmStatus == 'Hold') { $step = -3; }
+                                                                        elseif ($gmStatus == 'Approved' || $gmStatus == 'ForwardedToNext') { $step = 3; }
                                                                     @endphp
 
-                                                                    <!-- Step 1: Respond to HR -->
                                                                     <li class="active">
                                                                         <span>Respond to HR</span>
                                                                     </li>
 
-                                                                    <!-- Step 2: Reviewed by HR and Sent to Finance -->
-                                                                    @if ($hrStatus == 'Rejected' || $hrStatus == 'Hold')
+                                                                    @if ($firstStepStatus == 'Rejected' || $firstStepStatus == 'Hold')
                                                                         <li class="active">
-                                                                            <span>{{ $hrStatus == 'Rejected' ? 'Rejected by HR' : 'On Hold by HR' }}</span>
+                                                                            <span>{{ $firstStepStatus == 'Rejected' ? 'Rejected by HR' : 'On Hold by HR' }}</span>
+                                                                            @if($firstStepDate)<br><small class="text-muted">{{ $firstStepDate }}</small>@endif
                                                                         </li>
                                                                     @else
-                                                                        <li class="{{ $step >= 1 || $step < 0 && $hrStatus != 'Rejected' && $hrStatus != 'Hold' ? 'active' : '' }}">
+                                                                        <li class="{{ $step >= 1 ? 'active' : '' }}">
                                                                             <span>Reviewed by HR and Sent to Finance</span>
+                                                                            @if($step >= 1 && $firstStepDate)<br><small class="text-muted">{{ $firstStepDate }}</small>@endif
                                                                         </li>
                                                                     @endif
 
-                                                                    <!-- Step 3: Rejected by Finance or On Hold -->
                                                                     @if ($financeStatus == 'Rejected' || $financeStatus == 'Hold')
                                                                         <li class="active">
                                                                             <span>{{ $financeStatus == 'Rejected' ? 'Rejected by Finance' : 'On Hold by Finance' }}</span>
+                                                                            @if($financeDateTL)<br><small class="text-muted">{{ $financeDateTL }}</small>@endif
                                                                         </li>
                                                                     @else
-                                                                        <li class="{{ $step >= 2 || $step < 0 && $hrStatus != 'Rejected' && $hrStatus != 'Hold' && $financeStatus != 'Rejected' && $financeStatus != 'Hold' ? 'active' : '' }}">
+                                                                        <li class="{{ $step >= 2 ? 'active' : '' }}">
                                                                             <span>Reviewed by Finance and Sent to GM/Corporate Office</span>
+                                                                            @if($step >= 2 && $financeDateTL)<br><small class="text-muted">{{ $financeDateTL }}</small>@endif
                                                                         </li>
                                                                     @endif
 
-                                                                    <!-- Step 4: Rejected by GM or On Hold -->
                                                                     @if ($gmStatus == 'Rejected' || $gmStatus == 'Hold')
                                                                         <li class="active">
                                                                             <span>{{ $gmStatus == 'Rejected' ? 'Rejected by GM' : 'On Hold by GM' }}</span>
+                                                                            @if($gmDateTL)<br><small class="text-muted">{{ $gmDateTL }}</small>@endif
                                                                         </li>
                                                                     @else
-                                                                        <li class="{{ $step >= 3 && $hrStatus != 'Rejected' && $financeStatus != 'Rejected' && $gmStatus != 'Rejected' && $hrStatus != 'Hold' && $financeStatus != 'Hold' && $gmStatus != 'Hold' ? 'active' : '' }}">
+                                                                        <li class="{{ $step >= 3 ? 'active' : '' }}">
                                                                             <span>Approved by GM/Corporate Office</span>
+                                                                            @if($step >= 3 && $gmDateTL)<br><small class="text-muted">{{ $gmDateTL }}</small>@endif
                                                                         </li>
                                                                     @endif
                                                                 </ul>
@@ -278,18 +313,21 @@
                                             <tbody>
                                                 @foreach($rightRequests as $key => $request)
                                                     @php
-                                                        $hrSt = $finSt = $gmSt = 'Active';
+                                                        $excomSt = $hodSt = $hrSt = $finSt = $gmSt = null;
                                                         if(isset($request->TAnotificationParent[0])) {
                                                             foreach ($request->TAnotificationParent[0]->TAnotificationChildren as $ch) {
-                                                                if ($ch->Approved_By == 3) $hrSt = $ch->status;
+                                                                if ($ch->Approved_By == 1) $excomSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 2) $hodSt = $ch->status;
+                                                                elseif ($ch->Approved_By == 3) $hrSt = $ch->status;
                                                                 elseif ($ch->Approved_By == 7) $finSt = $ch->status;
                                                                 elseif ($ch->Approved_By == 8) $gmSt = $ch->status;
                                                             }
                                                         }
-                                                        if ($hrSt == 'Rejected' || $finSt == 'Rejected' || $gmSt == 'Rejected') {
+                                                        $allStatuses = array_filter([$excomSt, $hodSt, $hrSt, $finSt, $gmSt]);
+                                                        if (in_array('Rejected', $allStatuses)) {
                                                             $overallStatus = 'Rejected';
                                                             $badgeClass = 'bg-danger';
-                                                        } elseif ($hrSt == 'Hold' || $finSt == 'Hold' || $gmSt == 'Hold') {
+                                                        } elseif (in_array('Hold', $allStatuses)) {
                                                             $overallStatus = 'On Hold';
                                                             $badgeClass = 'bg-warning text-dark';
                                                         } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
@@ -298,7 +336,7 @@
                                                         } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending GM';
                                                             $badgeClass = 'bg-info';
-                                                        } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext') {
+                                                        } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext' || $excomSt == 'Approved' || $excomSt == 'ForwardedToNext' || $hodSt == 'Approved' || $hodSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending Finance';
                                                             $badgeClass = 'bg-primary';
                                                         } else {
@@ -325,78 +363,68 @@
                                                             <div class="bg">
                                                                 <ul class="manning-timeline text-start">
                                                                     @php
-                                                                        // Initialize the status for each role
-                                                                        $hrStatus = $financeStatus = $gmStatus = 'Active';
+                                                                        $excomStatusTL = $hodStatusTL = $hrStatus = $financeStatus = $gmStatus = null;
+                                                                        $hrDateTL = $financeDateTL = $gmDateTL = $excomDateTL = $hodDateTL = null;
 
-                                                                        // Loop through the TAnotificationChildren to get statuses for HR, Finance, GM
                                                                         foreach ($request->TAnotificationParent[0]->TAnotificationChildren as $child) {
-                                                                            if ($child->Approved_By == 3) { // HR
-                                                                                $hrStatus = $child->status;
-                                                                            } elseif ($child->Approved_By == 7) { // Finance
-                                                                                $financeStatus = $child->status;
-                                                                            } elseif ($child->Approved_By == 8) { // GM
-                                                                                $gmStatus = $child->status;
-                                                                            }
+                                                                            if ($child->Approved_By == 1) { $excomStatusTL = $child->status; $excomDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 2) { $hodStatusTL = $child->status; $hodDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 3) { $hrStatus = $child->status; $hrDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 7) { $financeStatus = $child->status; $financeDateTL = $child->updated_at; }
+                                                                            elseif ($child->Approved_By == 8) { $gmStatus = $child->status; $gmDateTL = $child->updated_at; }
                                                                         }
 
-                                                                        // Determine the active step based on status
+                                                                        $firstStepStatus = $hrStatus ?? $excomStatusTL ?? $hodStatusTL ?? 'Active';
+                                                                        $firstStepDate = $hrDateTL ?? $excomDateTL ?? $hodDateTL ?? null;
+                                                                        $financeStatus = $financeStatus ?? 'Active';
+                                                                        $gmStatus = $gmStatus ?? 'Active';
+
                                                                         $step = 0;
-
-                                                                        // Handle Rejection by HR, Finance, or GM
-                                                                        if ($hrStatus == 'Rejected' || $hrStatus == 'Hold') {
-                                                                            $step = -1; // Rejected or On Hold by HR, cycle stops here
-                                                                        } elseif ($hrStatus == 'Approved' || $hrStatus == 'ForwardedToNext') {
-                                                                            $step = 1; // Step 1: Respond to HR is complete
-                                                                        }
-
-                                                                        if ($financeStatus == 'Rejected' || $financeStatus == 'Hold') {
-                                                                            $step = -2; // Rejected or On Hold by Finance, cycle stops here after HR step
-                                                                        } elseif ($financeStatus == 'Approved' || $financeStatus == 'ForwardedToNext') {
-                                                                            $step = 2; // Step 2: Reviewed by HR and Sent to Finance is complete
-                                                                        }
-
-                                                                        if ($gmStatus == 'Rejected' || $gmStatus == 'Hold') {
-                                                                            $step = -3; // Rejected or On Hold by GM, cycle stops here after Finance step
-                                                                        } elseif ($gmStatus == 'Approved' || $gmStatus == 'ForwardedToNext') {
-                                                                            $step = 3; // Step 3: Reviewed by Finance and Sent to GM is complete
-                                                                        }
+                                                                        if ($firstStepStatus == 'Rejected' || $firstStepStatus == 'Hold') { $step = -1; }
+                                                                        elseif ($firstStepStatus == 'Approved' || $firstStepStatus == 'ForwardedToNext') { $step = 1; }
+                                                                        if ($financeStatus == 'Rejected' || $financeStatus == 'Hold') { $step = -2; }
+                                                                        elseif ($financeStatus == 'Approved' || $financeStatus == 'ForwardedToNext') { $step = 2; }
+                                                                        if ($gmStatus == 'Rejected' || $gmStatus == 'Hold') { $step = -3; }
+                                                                        elseif ($gmStatus == 'Approved' || $gmStatus == 'ForwardedToNext') { $step = 3; }
                                                                     @endphp
 
-                                                                    <!-- Step 1: Respond to HR -->
                                                                     <li class="active">
                                                                         <span>Respond to HR</span>
                                                                     </li>
 
-                                                                    <!-- Step 2: Reviewed by HR and Sent to Finance -->
-                                                                    @if ($hrStatus == 'Rejected' || $hrStatus == 'Hold')
+                                                                    @if ($firstStepStatus == 'Rejected' || $firstStepStatus == 'Hold')
                                                                         <li class="active">
-                                                                            <span>{{ $hrStatus == 'Rejected' ? 'Rejected by HR' : 'On Hold by HR' }}</span>
+                                                                            <span>{{ $firstStepStatus == 'Rejected' ? 'Rejected by HR' : 'On Hold by HR' }}</span>
+                                                                            @if($firstStepDate)<br><small class="text-muted">{{ $firstStepDate }}</small>@endif
                                                                         </li>
                                                                     @else
-                                                                        <li class="{{ $step >= 1 || $step < 0 && $hrStatus != 'Rejected' && $hrStatus != 'Hold' ? 'active' : '' }}">
+                                                                        <li class="{{ $step >= 1 ? 'active' : '' }}">
                                                                             <span>Reviewed by HR and Sent to Finance</span>
+                                                                            @if($step >= 1 && $firstStepDate)<br><small class="text-muted">{{ $firstStepDate }}</small>@endif
                                                                         </li>
                                                                     @endif
 
-                                                                    <!-- Step 3: Rejected by Finance or On Hold -->
                                                                     @if ($financeStatus == 'Rejected' || $financeStatus == 'Hold')
                                                                         <li class="active">
                                                                             <span>{{ $financeStatus == 'Rejected' ? 'Rejected by Finance' : 'On Hold by Finance' }}</span>
+                                                                            @if($financeDateTL)<br><small class="text-muted">{{ $financeDateTL }}</small>@endif
                                                                         </li>
                                                                     @else
-                                                                        <li class="{{ $step >= 2 || $step < 0 && $hrStatus != 'Rejected' && $hrStatus != 'Hold' && $financeStatus != 'Rejected' && $financeStatus != 'Hold' ? 'active' : '' }}">
+                                                                        <li class="{{ $step >= 2 ? 'active' : '' }}">
                                                                             <span>Reviewed by Finance and Sent to GM/Corporate Office</span>
+                                                                            @if($step >= 2 && $financeDateTL)<br><small class="text-muted">{{ $financeDateTL }}</small>@endif
                                                                         </li>
                                                                     @endif
 
-                                                                    <!-- Step 4: Rejected by GM or On Hold -->
                                                                     @if ($gmStatus == 'Rejected' || $gmStatus == 'Hold')
                                                                         <li class="active">
                                                                             <span>{{ $gmStatus == 'Rejected' ? 'Rejected by GM' : 'On Hold by GM' }}</span>
+                                                                            @if($gmDateTL)<br><small class="text-muted">{{ $gmDateTL }}</small>@endif
                                                                         </li>
                                                                     @else
-                                                                        <li class="{{ $step >= 3 && $hrStatus != 'Rejected' && $financeStatus != 'Rejected' && $gmStatus != 'Rejected' && $hrStatus != 'Hold' && $financeStatus != 'Hold' && $gmStatus != 'Hold' ? 'active' : '' }}">
+                                                                        <li class="{{ $step >= 3 ? 'active' : '' }}">
                                                                             <span>Approved by GM/Corporate Office</span>
+                                                                            @if($step >= 3 && $gmDateTL)<br><small class="text-muted">{{ $gmDateTL }}</small>@endif
                                                                         </li>
                                                                     @endif
                                                                 </ul>
@@ -453,7 +481,7 @@
                         @else
                             <div class="upInterviews-block">
                                 <div style="text-align: left;" >
-                                    No Recore Found
+                                    No Record Found
                                 </div>
                             </div>
                         @endif
