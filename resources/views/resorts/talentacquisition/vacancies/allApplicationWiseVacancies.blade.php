@@ -84,7 +84,7 @@
                                     <th>Applicant</th>
                                     <th>Application Date</th>
                                     <th>Expiry Date</th>
-                                    <th>Action</th>
+                                    @if($canSeeAction)<th>Action</th>@endif
                                 </tr>
                             </thead>
 
@@ -311,7 +311,7 @@ $(document).ready(function() {
                 iDisplayLength: 6,
                 processing: true,
                 serverSide: true,
-                order:[[7, 'desc']],
+                order:[[0, 'desc']],
                 ajax: {
                     url: '{{ route("resort.vacancies.FreshApplicant") }}',
                     type: 'GET',
@@ -334,7 +334,9 @@ $(document).ready(function() {
                     { data: 'NoOfApplication', name: 'Question', className: 'text-nowrap' },
                     { data: 'ApplicationDate', name: 'action', className: 'text-nowrap'},
                     { data: 'ExpiryDate', name: 'ReportingTo', className: 'text-nowrap'},
+                    @if($canSeeAction)
                     { data: 'action', name: 'action', orderable: false, searchable: false },
+                    @endif
                 ]
             });
         }

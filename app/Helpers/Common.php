@@ -1848,9 +1848,8 @@ class Common
                                                 }
                                                 elseif($rank == 7)
                                                 {
-                                                    $query->where('t3.Approved_By',3)
-                                                    ->where('t3.status',"Approved")
-                                                    ->where('t3.Approved_By',"!=",7);
+                                                    $query->where('t3.Approved_By', 7)
+                                                    ->where('t3.status', $status);
                                                 }
 												elseif($rank == 2)
                                                 {

@@ -76,21 +76,34 @@ class VacancyController extends Controller
             $sectionId = isset($resort_sections[0]) ? $resort_sections[0]->id : '';
             $resort_positions = ResortPosition::where('dept_id',$Dept_id)->get();
 
-            // Get budgeted position IDs (positions with vacantcount > 0 in manning data)
+            // Get budgeted position IDs and available slots per position
             $budgetedPositionIds = [];
+            $positionAvailableSlots = [];
             $currentYear = \Carbon\Carbon::now()->year;
+            $currentMonth = \Carbon\Carbon::now()->month;
             $manningresponse = ManningResponse::where('resort_id', $resort_id)
                 ->where('dept_id', $Dept_id)
                 ->where('year', $currentYear)
                 ->first();
             if ($manningresponse) {
-                // Use max vacantcount across all months (same logic as manning page)
                 $budgetedPositionIds = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
                     ->select('position_id')
                     ->groupBy('position_id')
                     ->havingRaw('MAX(vacantcount) > 0')
                     ->pluck('position_id')
                     ->toArray();
+
+                // Calculate available slots per position (vacant - active vacancies)
+                $positionMonthlyData = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
+                    ->where('month', $currentMonth)
+                    ->get();
+                foreach ($positionMonthlyData as $pmd) {
+                    $existingVacancies = Vacancies::where('Resort_id', $resort_id)
+                        ->where('position', $pmd->position_id)
+                        ->whereNotIn('status', ['Closed', 'Cancelled', 'Draft'])
+                        ->sum('Total_position_required') ?? 0;
+                    $positionAvailableSlots[$pmd->position_id] = max(0, ($pmd->vacantcount ?? 0) - $existingVacancies);
+                }
             }
 
             // Get department employees for replacement dropdown
@@ -135,7 +148,7 @@ class VacancyController extends Controller
                 ->get();
 
             // dd($reportingEmployees);
-            return view('resorts.talentacquisition.vacancies.create', compact('page_title','position_id', 'Dept_id', 'emp_details', 'department_details','resort_positions','budgetedPositionIds','departmentEmployees','resort_divisions','resort_sections','sectionName','sectionId','reportingEmployees','serviceProviders'));
+            return view('resorts.talentacquisition.vacancies.create', compact('page_title','position_id', 'Dept_id', 'emp_details', 'department_details','resort_positions','budgetedPositionIds','positionAvailableSlots','departmentEmployees','resort_divisions','resort_sections','sectionName','sectionId','reportingEmployees','serviceProviders'));
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -146,6 +159,8 @@ class VacancyController extends Controller
 
     public function store(Request $request)
     {
+
+        $isDraft = $request->input('status') === 'Draft';
 
         $validatedData = $request->validate([
             'status' => 'required|string',
@@ -195,21 +210,23 @@ class VacancyController extends Controller
                 $serviceProvider = null;
             }
 
-            // Check for duplicate
-            $duplicate = Vacancies::where('Resort_id', $resort_id)
-                ->where('department', $validatedData['dept_id'])
-                ->where('position', $validatedData['position'])
-                ->where('employee_type', $validatedData['employee_type'])
-                ->where('service_provider_name', $serviceProvider ? $serviceProvider->name : null)
-                ->whereDate('required_starting_date', Carbon::createFromFormat('d/m/Y', $request['required_starting_date'])->format('Y-m-d'))
-                ->exists();
+            // Check for duplicate (skip for drafts)
+            if (!$isDraft) {
+                $duplicate = Vacancies::where('Resort_id', $resort_id)
+                    ->where('department', $validatedData['dept_id'])
+                    ->where('position', $validatedData['position'])
+                    ->where('employee_type', $validatedData['employee_type'])
+                    ->where('service_provider_name', $serviceProvider ? $serviceProvider->name : null)
+                    ->whereDate('required_starting_date', Carbon::createFromFormat('d/m/Y', $request['required_starting_date'])->format('Y-m-d'))
+                    ->exists();
 
-            if ($duplicate) 
-            {
-                return response()->json([
-                                            'success' => false,
-                                            'msg' => 'Duplicate vacancy found with the same position, department, and service provider.',
-                                        ]);
+                if ($duplicate)
+                {
+                    return response()->json([
+                                                'success' => false,
+                                                'msg' => 'Duplicate vacancy found with the same position, department, and service provider.',
+                                            ]);
+                }
             }
             // Auto-populate budget fields from manning data
             $currentYear = Carbon::now()->year;
@@ -285,7 +302,7 @@ class VacancyController extends Controller
             $vacancy->Resort_id = $resort_id;
             $vacancy->budgeted = $validatedData['budgeted'];
             $vacancy->department = $validatedData['dept_id'];
-            $vacancy->required_starting_date = Carbon::createFromFormat('d/m/Y', $request['required_starting_date'])->format('Y-m-d');
+            $vacancy->required_starting_date = !empty($request['required_starting_date']) ? Carbon::createFromFormat('d/m/Y', $request['required_starting_date'])->format('Y-m-d') : Carbon::now()->format('Y-m-d');
             $vacancy->position = $validatedData['position'];
             $vacancy->reporting_to = $validatedData['reporting_to'];
             $vacancy->rank = $request['rank_id'];
@@ -315,123 +332,125 @@ class VacancyController extends Controller
             $vacancy->is_required_local = $request->is_required_local;
             $vacancy->save();
 
-            $minWageMVR = 8021; // Minimum wage in MVR
-            $minWageUSD = 520;
-            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
+            // Skip notifications, compliance checks, and approval flow for Draft
+            if (!$isDraft) {
+                $minWageMVR = 8021; // Minimum wage in MVR
+                $minWageUSD = 520;
+                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
 
-            if($notify_person && ($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD')) {
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id,
-                        10,
-                        'Talent Acquisition (Minimum Wage)',
-                        "Vacancy {$vacancy->Getposition->position_title} has a proposed salary {$vacancy->propsed_salary} below the minimum wage.",
-                        0,
-                        $notify_person->id,
-                        'Telent Acquisition (Minimum Wage)'
-                    )));
+                if($notify_person && ($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD')) {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            10,
+                            'Talent Acquisition (Minimum Wage)',
+                            "Vacancy {$vacancy->Getposition->position_title} has a proposed salary {$vacancy->propsed_salary} below the minimum wage.",
+                            0,
+                            $notify_person->id,
+                            'Telent Acquisition (Minimum Wage)'
+                        )));
 
-                    Compliance::firstOrCreate([
-                        'resort_id' => $this->resort->resort_id,
-                        'employee_id' => $this->resort->GetEmployee->id,
-                        'module_name' => 'Talent Acquisition',
-                        'compliance_breached_name' => 'Minimum Wage',
-                        'description' =>"Vacancy {$vacancy->Getposition->position_title} has a proposed salary {$vacancy->propsed_salary} below the minimum wage.",
-                        'reported_on' => Carbon::now(),
-                        'status' => 'Breached'
-                    ]);
+                        Compliance::firstOrCreate([
+                            'resort_id' => $this->resort->resort_id,
+                            'employee_id' => $this->resort->GetEmployee->id,
+                            'module_name' => 'Talent Acquisition',
+                            'compliance_breached_name' => 'Minimum Wage',
+                            'description' =>"Vacancy {$vacancy->Getposition->position_title} has a proposed salary {$vacancy->propsed_salary} below the minimum wage.",
+                            'reported_on' => Carbon::now(),
+                            'status' => 'Breached'
+                        ]);
 
-            }
-
-            $position = ResortPosition::find($vacancy->position);
-
-            if($notify_person && $position && $position->is_reserved == 'Yes' && $vacancy->is_required_local == 'No') {
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id,
-                        10,
-                        'Talent Acquisition (Reserved Position For Local Candidates)',
-                        "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
-                        0,
-                        $notify_person->id,
-                        'Telent Acquisition (Reserved Position For Local Candidates)'
-                    )));
-
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id,
-                        10,
-                        'Talent Acquisition (Reserved Position For Local Candidates)',
-                        "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
-                        0,
-                        $this->resort->GetEmployee->id,
-                        'Telent Acquisition (Reserved Position For Local Candidates)'
-                    )));
-
-
-                  $compli =  Compliance::Create([
-                        'resort_id' => $this->resort->resort_id,
-                        'employee_id' => $this->resort->GetEmployee->id,
-                        'module_name' => 'Talent Acquisition',
-                        'compliance_breached_name' => 'Reserved Position ',
-                        'description' =>"Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
-                        'reported_on' => Carbon::now(),
-                        'status' => 'Breached'
-                    ]);
-            }
-
-            // Save notifications
-                $t1 = TAnotificationParent::create([
-                    'Resort_id' => $resort_id,
-                    'V_id' => $vacancy->id,
-                ]);
-
-
-                 $FainalKey = Common::TaFinalApproval($resort_id) ;
-                $position_rank = config('settings.final_rank');
-
-
-                $CycleOfRequest = array_filter($position_rank, function ($value, $key) use ($FainalKey) {
-                    return $key < $FainalKey;
-                }, ARRAY_FILTER_USE_BOTH);
-
-
-                $newData = ["3" => "HR","8" => "GM"];
-                $CycleOfRequest += $newData;
-
-                foreach ($CycleOfRequest as $key => $value) {
-                    TAnotificationChild::create([
-                        'Parent_ta_id' => $t1->id,
-                        'status' => 'Active',
-                        'Approved_By' =>  $key,
-                    ]);
                 }
 
+                $position = ResortPosition::find($vacancy->position);
+
+                if($notify_person && $position && $position->is_reserved == 'Yes' && $vacancy->is_required_local == 'No') {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            10,
+                            'Talent Acquisition (Reserved Position For Local Candidates)',
+                            "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
+                            0,
+                            $notify_person->id,
+                            'Telent Acquisition (Reserved Position For Local Candidates)'
+                        )));
+
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            10,
+                            'Talent Acquisition (Reserved Position For Local Candidates)',
+                            "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
+                            0,
+                            $this->resort->GetEmployee->id,
+                            'Telent Acquisition (Reserved Position For Local Candidates)'
+                        )));
+
+
+                      $compli =  Compliance::Create([
+                            'resort_id' => $this->resort->resort_id,
+                            'employee_id' => $this->resort->GetEmployee->id,
+                            'module_name' => 'Talent Acquisition',
+                            'compliance_breached_name' => 'Reserved Position ',
+                            'description' =>"Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
+                            'reported_on' => Carbon::now(),
+                            'status' => 'Breached'
+                        ]);
+                }
+
+                // Save notifications
+                    $t1 = TAnotificationParent::create([
+                        'Resort_id' => $resort_id,
+                        'V_id' => $vacancy->id,
+                    ]);
+
+
+                     $FainalKey = Common::TaFinalApproval($resort_id) ;
+                    $position_rank = config('settings.final_rank');
+
+
+                    $CycleOfRequest = array_filter($position_rank, function ($value, $key) use ($FainalKey) {
+                        return $key < $FainalKey;
+                    }, ARRAY_FILTER_USE_BOTH);
+
+
+                    $newData = ["3" => "HR","8" => "GM"];
+                    $CycleOfRequest += $newData;
+
+                    foreach ($CycleOfRequest as $key => $value) {
+                        TAnotificationChild::create([
+                            'Parent_ta_id' => $t1->id,
+                            'status' => 'Active',
+                            'Approved_By' =>  $key,
+                        ]);
+                    }
+
+                // Send push notification (non-blocking)
+                try {
+                    $msg = 'HOD Created new hiring request';
+                    $title = ' Hiring Request';
+                    $ModuleName = "Talent Acquisition  ";
+                    $hr = Common::FindResortHR($this->resort);
+                    if ($hr && env('NOTIFICATION_URL')) {
+                        $hr_id = $hr->id;
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            $this->type[6],
+                            'Upcoming Investigation Meeting Reminder',
+                            $msg,
+                            0,
+                            $hr_id,
+                            $ModuleName
+                        )));
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Vacancy notification failed: ' . $e->getMessage());
+                }
+            }
 
             DB::commit();
 
-            // Send push notification (non-blocking)
-            try {
-                $msg = 'HOD Created new hiring request';
-                $title = ' Hiring Request';
-                $ModuleName = "Talent Acquisition  ";
-                $hr = Common::FindResortHR($this->resort);
-                if ($hr && env('NOTIFICATION_URL')) {
-                    $hr_id = $hr->id;
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id,
-                        $this->type[6],
-                        'Upcoming Investigation Meeting Reminder',
-                        $msg,
-                        0,
-                        $hr_id,
-                        $ModuleName
-                    )));
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Vacancy notification failed: ' . $e->getMessage());
-            }
-
             return response()->json([
                 'success' => true,
-                'msg' => 'Vacancy added successfully.',
+                'msg' => $isDraft ? 'Vacancy saved as draft.' : 'Vacancy added successfully.',
             ]);
         DB::beginTransaction();
         try
@@ -448,6 +467,367 @@ class VacancyController extends Controller
             return response()->json(['success' => false, 'msg' => $e->getMessage()]);
         }
     }
+    public function edit($id)
+    {
+        try {
+            $page_title = 'Edit Draft Vacancy';
+            $resort = Auth::guard('resort-admin')->user();
+            $resort_id = $resort->resort_id;
+            $Dept_id = $resort->GetEmployee->Dept_id;
+
+            $vacancy = Vacancies::where('id', $id)
+                ->where('Resort_id', $resort_id)
+                ->where('status', 'Draft')
+                ->firstOrFail();
+
+            $emp_details = Employee::where('Admin_Parent_id', $resort->id)->get();
+            $department_details = ResortDepartment::where('id', $emp_details[0]->Dept_id)->get();
+            $resort_divisions = ResortDivision::where('id', $department_details[0]->division_id)->get();
+            $resort_sections = ResortSection::where('dept_id', $Dept_id)->get();
+            $sectionName = isset($resort_sections[0]) ? $resort_sections[0]->name : '';
+            $sectionId = isset($resort_sections[0]) ? $resort_sections[0]->id : '';
+            $resort_positions = ResortPosition::where('dept_id', $Dept_id)->get();
+
+            $budgetedPositionIds = [];
+            $positionAvailableSlots = [];
+            $currentYear = Carbon::now()->year;
+            $currentMonth = Carbon::now()->month;
+            $manningresponse = ManningResponse::where('resort_id', $resort_id)
+                ->where('dept_id', $Dept_id)
+                ->where('year', $currentYear)
+                ->first();
+            if ($manningresponse) {
+                $budgetedPositionIds = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
+                    ->select('position_id')
+                    ->groupBy('position_id')
+                    ->havingRaw('MAX(vacantcount) > 0')
+                    ->pluck('position_id')
+                    ->toArray();
+
+                $positionMonthlyData = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
+                    ->where('month', $currentMonth)
+                    ->get();
+                foreach ($positionMonthlyData as $pmd) {
+                    $existingVacancies = Vacancies::where('Resort_id', $resort_id)
+                        ->where('position', $pmd->position_id)
+                        ->whereNotIn('status', ['Closed', 'Cancelled', 'Draft'])
+                        ->sum('Total_position_required') ?? 0;
+                    $positionAvailableSlots[$pmd->position_id] = max(0, ($pmd->vacantcount ?? 0) - $existingVacancies);
+                }
+            }
+
+            $departmentEmployees = DB::table('employees')
+                ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+                ->leftJoin('resort_positions', 'employees.Position_id', '=', 'resort_positions.id')
+                ->where('employees.resort_id', $resort_id)
+                ->where('employees.Dept_id', $Dept_id)
+                ->where('employees.status', 'Active')
+                ->select('employees.id', 'resort_admins.first_name', 'resort_admins.last_name', 'resort_positions.position_title')
+                ->orderBy('resort_admins.first_name')
+                ->get();
+
+            $serviceProviders = ServiceProvider::orderBy('name')->get();
+
+            $targetRanks = [
+                array_search('HOD', config('settings.Position_Rank')),
+                array_search('MGR', config('settings.Position_Rank')),
+                array_search('GM', config('settings.Position_Rank'))
+            ];
+            $reportingEmployees = DB::table('employees')
+                ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+                ->where('employees.resort_id', $resort_id)
+                ->whereIn('employees.rank', $targetRanks)
+                ->where(function ($query) use ($Dept_id) {
+                    $query->where('employees.rank', array_search('HOD', config('settings.Position_Rank')))
+                          ->where('employees.Dept_id', $Dept_id)
+                          ->orWhere('employees.rank', '<>', array_search('HOD', config('settings.Position_Rank')));
+                })
+                ->select('employees.*', 'resort_admins.first_name as first_name', 'resort_admins.last_name as last_name', 'resort_admins.email as admin_email')
+                ->get();
+
+            // Get rank name for the vacancy position
+            $rankName = '';
+            $positionModel = ResortPosition::find($vacancy->position);
+            if ($positionModel) {
+                $rankName = config("settings.Position_Rank.{$positionModel->Rank}") ?? '';
+            }
+
+            $position_id = $resort->GetEmployee->Position_id;
+
+            return view('resorts.talentacquisition.vacancies.edit', compact(
+                'page_title', 'vacancy', 'position_id', 'Dept_id', 'emp_details', 'department_details',
+                'resort_positions', 'budgetedPositionIds', 'positionAvailableSlots', 'departmentEmployees', 'resort_divisions',
+                'resort_sections', 'sectionName', 'sectionId', 'reportingEmployees', 'serviceProviders', 'rankName'
+            ));
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return back()->with('error', 'Error loading draft vacancy.');
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        $isDraft = $request->input('status') === 'Draft';
+
+        $validatedData = $request->validate([
+            'status' => 'required|string',
+            'budgeted' => 'required|string',
+            'dept_id' => 'required|integer',
+            'position' => 'required|string|max:255',
+            'reporting_to' => 'nullable|integer',
+            'division_id' => 'nullable|integer',
+            'section_id' => 'nullable|integer',
+            'employee_type' => 'nullable|string|max:255',
+            'Total_position_required' => 'required|integer',
+            'new_service_provider' => 'nullable|string|max:255',
+            'service_provider' => 'nullable|string|max:255',
+            'salary' => 'nullable|numeric',
+            'food' => 'nullable|string|max:255',
+            'accommodation' => 'nullable|string|max:255',
+            'transportation' => 'nullable|string|max:255',
+            'budget_salary' => 'nullable|numeric',
+            'proposed_salary' => 'nullable|numeric',
+            'budgeted_accommodation' => 'nullable|numeric',
+            'allowance' => 'nullable|numeric',
+            'service_charge' => 'nullable|string|in:YES,NO',
+            'uniform' => 'nullable|string|in:YES,NO',
+            'medical' => 'nullable|numeric',
+            'insurance' => 'nullable|numeric',
+            'pension' => 'nullable|numeric',
+            'recruitement' => 'nullable|array',
+            'employee_name' => 'nullable|string|max:255',
+            'duration' => 'nullable|string|max:255',
+            'amount_unit' => 'nullable|string|in:MVR,USD',
+            'is_required_local' => 'required|string|in:Yes,No'
+        ]);
+
+        $resort = Auth::guard('resort-admin')->user();
+        $resort_id = $resort->resort_id;
+
+        $vacancy = Vacancies::where('id', $id)
+            ->where('Resort_id', $resort_id)
+            ->where('status', 'Draft')
+            ->firstOrFail();
+
+        $recruitment = !empty($validatedData['recruitement']) ? implode(",", $validatedData['recruitement']) : null;
+
+        if (!empty($validatedData['new_service_provider'])) {
+            $serviceProvider = ServiceProvider::firstOrCreate(['name' => $validatedData['new_service_provider'], 'resort_id' => $resort_id]);
+            $validatedData['service_provider'] = $serviceProvider->name;
+        } elseif (!empty($validatedData['service_provider'])) {
+            $serviceProvider = ServiceProvider::where('name', $validatedData['service_provider'])->where('resort_id', $resort_id)->first();
+        } else {
+            $serviceProvider = null;
+        }
+
+        // Auto-populate budget fields from manning data
+        $currentYear = Carbon::now()->year;
+        $dept_id = $validatedData['dept_id'];
+        $positionId = $validatedData['position'];
+
+        $manningresponse = ManningResponse::where('resort_id', $resort_id)
+            ->where('year', $currentYear)
+            ->where('dept_id', $dept_id)
+            ->first();
+
+        $budgeted_salary = 0;
+        $proposed_salary = 0;
+        $budgetCosts = ['pension' => 0, 'allowance' => 0, 'medical' => 0, 'accommodation' => 0, 'insurance' => 0];
+        $hasServiceCharge = 'NO';
+        $hasUniform = 'NO';
+        $amountUnit = 'MVR';
+
+        if ($manningresponse) {
+            $smrParent = StoreManningResponseParent::where('Budget_id', $manningresponse->id)->first();
+            $manning_data = $smrParent ? StoreManningResponseChild::where('Parent_SMRP_id', $smrParent->id)->first() : null;
+            $budgeted_salary = $manning_data ? $manning_data->Current_Basic_salary : 0;
+            $proposed_salary = $manning_data ? $manning_data->Proposed_Basic_salary : 0;
+
+            $searchPatterns = [
+                'pension' => '%pension%',
+                'allowance' => '%allowance%',
+                'medical' => 'medical%',
+                'accommodation' => ['%accomodation%', '%accommodation%'],
+                'insurance' => '%insurance%'
+            ];
+
+            foreach ($searchPatterns as $key => $pattern) {
+                $query = ResortBudgetCost::where('resort_id', $resort_id);
+                if (is_array($pattern)) {
+                    $query->where(function($q) use ($pattern) {
+                        foreach ($pattern as $subPattern) {
+                            $q->orWhere('particulars', 'LIKE', $subPattern);
+                        }
+                    });
+                } else {
+                    $query->where('particulars', 'LIKE', $pattern);
+                }
+                $costData = $query->first();
+                if ($costData) {
+                    $amount = $costData->amount;
+                    $unit = $costData->amount_unit;
+                    $budgetCosts[$key] = ($unit === '%') ? ($amount / 100) * $budgeted_salary : $amount;
+                }
+            }
+
+            $serviceChargeCost = ResortBudgetCost::where('resort_id', $resort_id)->where('particulars', 'LIKE', '%service charge%')->first();
+            if ($serviceChargeCost && $serviceChargeCost->amount > 0) {
+                $hasServiceCharge = 'YES';
+            }
+            $uniformCost = ResortBudgetCost::where('resort_id', $resort_id)->where('particulars', 'LIKE', '%uniform%')->first();
+            if ($uniformCost && $uniformCost->amount > 0) {
+                $hasUniform = 'YES';
+            }
+        }
+
+        // Update vacancy fields
+        $vacancy->budgeted = $validatedData['budgeted'];
+        $vacancy->department = $validatedData['dept_id'];
+        $vacancy->required_starting_date = !empty($request['required_starting_date']) ? Carbon::createFromFormat('d/m/Y', $request['required_starting_date'])->format('Y-m-d') : $vacancy->required_starting_date;
+        $vacancy->position = $validatedData['position'];
+        $vacancy->reporting_to = $validatedData['reporting_to'];
+        $vacancy->rank = $request['rank_id'];
+        $vacancy->division = $validatedData['division_id'];
+        $vacancy->section = $validatedData['section_id'] ?? null;
+        $vacancy->employee_type = $validatedData['employee_type'];
+        $vacancy->duration = $validatedData['duration'] ?? null;
+        $vacancy->Total_position_required = $validatedData['Total_position_required'];
+        $vacancy->service_provider_name = $serviceProvider ? $serviceProvider->name : null;
+        $vacancy->salary = $budgeted_salary;
+        $vacancy->food = $validatedData['food'] ?? null;
+        $vacancy->accomodation = $budgetCosts['accommodation'];
+        $vacancy->transportation = $validatedData['transportation'] ?? null;
+        $vacancy->employee = $validatedData['employee_name'] ?? null;
+        $vacancy->budgeted_salary = $budgeted_salary;
+        $vacancy->budgeted_accomodation = $budgetCosts['accommodation'];
+        $vacancy->service_charge = $hasServiceCharge;
+        $vacancy->propsed_salary = $proposed_salary;
+        $vacancy->allowance = $budgetCosts['allowance'];
+        $vacancy->uniform = $hasUniform;
+        $vacancy->medical = $budgetCosts['medical'];
+        $vacancy->insurance = $budgetCosts['insurance'];
+        $vacancy->pension = $budgetCosts['pension'];
+        $vacancy->recruitment = $recruitment;
+        $vacancy->status = $validatedData['status'];
+        $vacancy->amount_unit = $amountUnit;
+        $vacancy->is_required_local = $request->is_required_local;
+        $vacancy->save();
+
+        // If submitted (not draft), run the approval workflow
+        if (!$isDraft) {
+            // Duplicate check
+            $duplicate = Vacancies::where('Resort_id', $resort_id)
+                ->where('department', $validatedData['dept_id'])
+                ->where('position', $validatedData['position'])
+                ->where('employee_type', $validatedData['employee_type'])
+                ->where('service_provider_name', $serviceProvider ? $serviceProvider->name : null)
+                ->whereDate('required_starting_date', $vacancy->required_starting_date)
+                ->where('id', '!=', $vacancy->id)
+                ->exists();
+
+            if ($duplicate) {
+                // Revert to draft
+                $vacancy->status = 'Draft';
+                $vacancy->save();
+                return response()->json([
+                    'success' => false,
+                    'msg' => 'Duplicate vacancy found with the same position, department, and service provider.',
+                ]);
+            }
+
+            $minWageMVR = 8021;
+            $minWageUSD = 520;
+            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank', '3')->first();
+
+            if ($notify_person && ($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD')) {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id, 10, 'Talent Acquisition (Minimum Wage)',
+                    "Vacancy {$vacancy->Getposition->position_title} has a proposed salary {$vacancy->propsed_salary} below the minimum wage.",
+                    0, $notify_person->id, 'Telent Acquisition (Minimum Wage)'
+                )));
+                Compliance::firstOrCreate([
+                    'resort_id' => $this->resort->resort_id,
+                    'employee_id' => $this->resort->GetEmployee->id,
+                    'module_name' => 'Talent Acquisition',
+                    'compliance_breached_name' => 'Minimum Wage',
+                    'description' => "Vacancy {$vacancy->Getposition->position_title} has a proposed salary {$vacancy->propsed_salary} below the minimum wage.",
+                    'reported_on' => Carbon::now(),
+                    'status' => 'Breached'
+                ]);
+            }
+
+            $position = ResortPosition::find($vacancy->position);
+            if ($notify_person && $position && $position->is_reserved == 'Yes' && $vacancy->is_required_local == 'No') {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id, 10, 'Talent Acquisition (Reserved Position For Local Candidates)',
+                    "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
+                    0, $notify_person->id, 'Telent Acquisition (Reserved Position For Local Candidates)'
+                )));
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id, 10, 'Talent Acquisition (Reserved Position For Local Candidates)',
+                    "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
+                    0, $this->resort->GetEmployee->id, 'Telent Acquisition (Reserved Position For Local Candidates)'
+                )));
+                Compliance::Create([
+                    'resort_id' => $this->resort->resort_id,
+                    'employee_id' => $this->resort->GetEmployee->id,
+                    'module_name' => 'Talent Acquisition',
+                    'compliance_breached_name' => 'Reserved Position ',
+                    'description' => "Vacancy {$vacancy->Getposition->position_title} is a reserved position for local candidates.",
+                    'reported_on' => Carbon::now(),
+                    'status' => 'Breached'
+                ]);
+            }
+
+            // Create notification parent/children for approval workflow
+            $t1 = TAnotificationParent::create([
+                'Resort_id' => $resort_id,
+                'V_id' => $vacancy->id,
+            ]);
+
+            $FainalKey = Common::TaFinalApproval($resort_id);
+            $position_rank = config('settings.final_rank');
+            $CycleOfRequest = array_filter($position_rank, function ($value, $key) use ($FainalKey) {
+                return $key < $FainalKey;
+            }, ARRAY_FILTER_USE_BOTH);
+
+            $newData = ["3" => "HR", "8" => "GM"];
+            $CycleOfRequest += $newData;
+
+            foreach ($CycleOfRequest as $key => $value) {
+                TAnotificationChild::create([
+                    'Parent_ta_id' => $t1->id,
+                    'status' => 'Active',
+                    'Approved_By' => $key,
+                ]);
+            }
+
+            // Send push notification
+            try {
+                $msg = 'HOD Created new hiring request';
+                $title = 'Hiring Request';
+                $ModuleName = "Talent Acquisition  ";
+                $hr = Common::FindResortHR($this->resort);
+                if ($hr && env('NOTIFICATION_URL')) {
+                    $hr_id = $hr->id;
+                    event(new ResortNotificationEvent(Common::nofitication(
+                        $this->resort->resort_id, $this->type[6], 'Upcoming Investigation Meeting Reminder',
+                        $msg, 0, $hr_id, $ModuleName
+                    )));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Vacancy notification failed: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'msg' => $isDraft ? 'Draft updated successfully.' : 'Vacancy submitted successfully.',
+        ]);
+    }
+
     public function getRank(Request $request)
     {
         $positionId = $request->query('positionId');
@@ -477,14 +857,19 @@ class VacancyController extends Controller
 
         $config = config('settings.Position_Rank');
         $rank = $this->resort->GetEmployee->rank;
-        if($rank == 2)
+        if(in_array($rank, [1, 2]))
         {
-            $Vacancies = Vacancies::with(['Getdepartment','Getposition',
+            $query = Vacancies::with(['Getdepartment','Getposition',
                 'TAnotificationParent.TAnotificationChildren'])
                 ->where('Resort_id', $this->resort->resort_id)
-                ->where('department', $this->resort->GetEmployee->Dept_id)
-                ->where('status', 'Active')
-                ->latest('created_at')
+                ->where('status', 'Active');
+
+            // HOD (rank 2): only their department; EXCOM (rank 1): all departments
+            if($rank == 2) {
+                $query->where('department', $this->resort->GetEmployee->Dept_id);
+            }
+
+            $Vacancies = $query->latest('created_at')
                 ->get()
                 ->map(function ($vacancy) use ($config) {
                     $vacancy->Position = $vacancy->Getposition->position_title ?? '';
@@ -499,23 +884,26 @@ class VacancyController extends Controller
                     $vacancy->rank_name = $config[$reportTo->rank ?? ''] ?? 'Unknown Rank';
 
                     // Compute approval status
-                    $hrSt = $finSt = $gmSt = 'Active';
+                    $excomSt = $hodSt = $hrSt = $finSt = $gmSt = null;
                     if($vacancy->TAnotificationParent->isNotEmpty()) {
                         foreach ($vacancy->TAnotificationParent->first()->TAnotificationChildren as $ch) {
-                            if ($ch->Approved_By == 3) $hrSt = $ch->status;
+                            if ($ch->Approved_By == 1) $excomSt = $ch->status;
+                            elseif ($ch->Approved_By == 2) $hodSt = $ch->status;
+                            elseif ($ch->Approved_By == 3) $hrSt = $ch->status;
                             elseif ($ch->Approved_By == 7) $finSt = $ch->status;
                             elseif ($ch->Approved_By == 8) $gmSt = $ch->status;
                         }
                     }
-                    if ($hrSt == 'Rejected' || $finSt == 'Rejected' || $gmSt == 'Rejected') {
+                    $allStatuses = array_filter([$excomSt, $hodSt, $hrSt, $finSt, $gmSt]);
+                    if (in_array('Rejected', $allStatuses)) {
                         $vacancy->approval_status = 'Rejected';
-                    } elseif ($hrSt == 'Hold' || $finSt == 'Hold' || $gmSt == 'Hold') {
+                    } elseif (in_array('Hold', $allStatuses)) {
                         $vacancy->approval_status = 'On Hold';
                     } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
                         $vacancy->approval_status = 'Approved';
                     } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
                         $vacancy->approval_status = 'Pending GM';
-                    } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext') {
+                    } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext' || $excomSt == 'Approved' || $excomSt == 'ForwardedToNext' || $hodSt == 'Approved' || $hodSt == 'ForwardedToNext') {
                         $vacancy->approval_status = 'Pending Finance';
                     } else {
                         $vacancy->approval_status = 'Pending HR';
@@ -787,13 +1175,27 @@ class VacancyController extends Controller
 
         $config = config('settings.Position_Rank');
 
+        // Check if current user is HR department HOD or HR department EXCOM
+        $canSeeAction = false;
+        $employee = $this->resort->GetEmployee ?? null;
+        if ($employee) {
+            $userRank = $employee->rank;
+            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name');
+            $isHrDept = stripos($userDeptName, 'Human Resources') !== false;
+            $isHodOrExcom = in_array($userRank, [1, 2]); // 1=EXCOM, 2=HOD
+            $canSeeAction = $isHrDept && $isHodOrExcom;
+        }
+
         if($request->ajax())
         {
-    
+
 
               return datatables()->of($NewVacancies)
 
-              ->addColumn('action', function ($row) {
+              ->addColumn('action', function ($row) use ($canSeeAction) {
+                  if (!$canSeeAction) {
+                      return '';
+                  }
                   $editUrl = asset('resorts_assets/images/edit.svg');
                   $deleteUrl = asset('resorts_assets/images/trash-red.svg');
 
@@ -826,7 +1228,7 @@ class VacancyController extends Controller
 
                     
         }
-        return view("resorts.talentacquisition.vacancies.allApplicationWiseVacancies",compact('page_title','ResortDepartment'));
+        return view("resorts.talentacquisition.vacancies.allApplicationWiseVacancies",compact('page_title','ResortDepartment','canSeeAction'));
     }
 
     public function GridViewData(Request $request)

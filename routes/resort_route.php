@@ -300,6 +300,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( '/talent-acquisition/view-vacancies', 'TalentAcquisition\VacancyController@index')->name('resort.vacancies.index');
     Route::get( '/talent-acquisition/add-vacancies', 'TalentAcquisition\VacancyController@create')->name('resort.vacancies.create');
     Route::post( '/talent-acquisition/store-vacancies', 'TalentAcquisition\VacancyController@store')->name('resort.vacancies.store');
+    Route::get('/talent-acquisition/edit-vacancy/{id}', 'TalentAcquisition\VacancyController@edit')->name('resort.vacancies.edit');
+    Route::put('/talent-acquisition/update-vacancy/{id}', 'TalentAcquisition\VacancyController@update')->name('resort.vacancies.update');
     Route::get('/talent-acquisition/get-rank', 'TalentAcquisition\VacancyController@getRank')->name('resort.getRank');
     // Route::get('/talent-acquisition/FreshApplicant', 'TalentAcquisition\VacancyController@GetAllApplicatioWiseVacancies')->name('');
 

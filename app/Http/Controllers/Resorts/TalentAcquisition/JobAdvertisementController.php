@@ -11,6 +11,7 @@ use App\Helpers\Common;
 use File;
 use DB;
 use App\Models\ApplicationLink;
+use App\Models\ResortDepartment;
 use App\Models\Admin;
 use Carbon\Carbon;
 use URL;
@@ -226,7 +227,27 @@ class JobAdvertisementController extends Controller
                     "ta_child_id" =>  $request->ta_child_id,
                 ]);
                 DB::commit();
-                return response()->json(['success' => true, 'ta_child_id'=> $request->ta_child_id,'message' => 'Job Advertisement Link Acitivate now.']);
+
+                // Return rendered views to refresh dashboard sections
+                $resort_id = $this->resort->resort_id;
+                $rank = (int) ($this->resort->GetEmployee->rank ?? 0);
+                $effectiveRank = $rank;
+                if (!in_array($rank, [3, 7, 8])) {
+                    $userDeptName = ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+                    $userPositionTitle = $this->resort->GetEmployee->position->position_title ?? '';
+                    if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                        || stripos($userPositionTitle, 'Finance') !== false) {
+                        $effectiveRank = 7;
+                    } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
+                        $effectiveRank = 3;
+                    }
+                }
+                $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($resort_id, 'Active', $effectiveRank);
+                $view = view('resorts.renderfiles.FreshVacancies', compact('getNotifications'))->render();
+                $TodoData = Common::GmApprovedVacancy($resort_id, $effectiveRank);
+                $Todolistview = view('resorts.renderfiles.TaTodoList', compact('TodoData'))->render();
+
+                return response()->json(['success' => true, 'ta_child_id'=> $request->ta_child_id, 'view' => $view, 'Todolistview' => $Todolistview, 'message' => 'Job Advertisement Link Acitivate now.']);
                 }
             }
             else
