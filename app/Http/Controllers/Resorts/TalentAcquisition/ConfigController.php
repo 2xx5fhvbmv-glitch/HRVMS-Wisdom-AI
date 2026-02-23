@@ -331,8 +331,20 @@ class ConfigController extends Controller
                                                                 ]);
                                                                 $rank = $this->resort->GetEmployee->rank;
 
+            // Detect effective rank: Finance-related → rank 7, HR-related → rank 3
+            $effectiveRank = $rank;
+            if (!in_array($rank, [3, 7, 8])) {
+                $userDeptName = ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+                $userPositionTitle = $this->resort->GetEmployee->position->position_title ?? '';
+                if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                    || stripos($userPositionTitle, 'Finance') !== false) {
+                    $effectiveRank = 7;
+                } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
+                    $effectiveRank = 3;
+                }
+            }
 
-            $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,"Active", $rank);
+            $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,"Active", $effectiveRank);
             $view = view('resorts.renderfiles.FreshVacancies', compact( 'getNotifications'))->render();
             DB::commit();
             return response()->json(['success' => true,"view"=>$view , 'message' => 'Hire Requests is on Hold Now.'],200);
@@ -371,7 +383,20 @@ class ConfigController extends Controller
         {
             $taupdaet = TAnotificationChild::find($request->Rejectio_ta_id)->update(['status'=>"Rejected","reason"=>$request->New_Vacancy_Rejected]);
             $rank = $this->resort->GetEmployee->rank;
-            $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,"Active", $rank);
+
+            // Detect effective rank: Finance-related → rank 7, HR-related → rank 3
+            $effectiveRank = $rank;
+            if (!in_array($rank, [3, 7, 8])) {
+                $userDeptName = ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+                $userPositionTitle = $this->resort->GetEmployee->position->position_title ?? '';
+                if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                    || stripos($userPositionTitle, 'Finance') !== false) {
+                    $effectiveRank = 7;
+                } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
+                    $effectiveRank = 3;
+                }
+            }
+            $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,"Active", $effectiveRank);
             $view = view('resorts.renderfiles.FreshVacancies', compact( 'getNotifications'))->render();
 
 
@@ -404,8 +429,22 @@ class ConfigController extends Controller
         {
             $rank = (int) $this->resort->GetEmployee->rank;
             $config = config('settings.Position_Rank');
+
+            // Detect effective rank: Finance-related → rank 7, HR-related → rank 3
+            $effectiveRank = $rank;
+            if (!in_array($rank, [3, 7, 8])) {
+                $userDeptName = ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+                $userPositionTitle = $this->resort->GetEmployee->position->position_title ?? '';
+                if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                    || stripos($userPositionTitle, 'Finance') !== false) {
+                    $effectiveRank = 7;
+                } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
+                    $effectiveRank = 3;
+                }
+            }
+
             $parentNotification = TAnotificationParent::find($request->ta_id);
-            $taupdaet = TAnotificationChild::where("Parent_ta_id", $request->ta_id)->where("Approved_By", $rank)->first();
+            $taupdaet = TAnotificationChild::where("Parent_ta_id", $request->ta_id)->where("Approved_By", $effectiveRank)->first();
             $childstatus =  TAnotificationChild::find($request->Child_ta_id);
 
             if(!$childstatus) {
@@ -419,14 +458,14 @@ class ConfigController extends Controller
             }
 
             $childstatus->update(["status"=>"ForwardedToNext"]);
-            if( $rank == Common::TaFinalApproval($this->resort->resort_id))
+            if( $effectiveRank == Common::TaFinalApproval($this->resort->resort_id))
             {
                 $taupdaet->update(["status"=>"ForwardedToNext"]);
                 $ApplicationLink = ApplicationLink::updateOrCreate(["ta_child_id"=> $taupdaet->id,"Resort_id"=>$this->resort->resort_id],["ta_child_id"=> $taupdaet->id,"Resort_id"=>$this->resort->resort_id]);
             }
             else
             {
-                $taupdaet->update(["status"=>"Approved" ,"Approved_By"=>$rank]);
+                $taupdaet->update(["status"=>"Approved" ,"Approved_By"=>$effectiveRank]);
             }
             if($taupdaet->Approved_By == 3 )
             {
@@ -445,7 +484,7 @@ class ConfigController extends Controller
                 $sentto =  Employee::where('resort_id',$this->resort->resort_id)->where("rank",$newRank)->first();
 
                 if($sentto && env('NOTIFICATION_URL')) {
-                    $msg = "New Vacancy has been Approved by ".$config[$rank]." and forwarded to ".$config[$newRank]." for further processing.";
+                    $msg = "New Vacancy has been Approved by ".$config[$effectiveRank]." and forwarded to ".$config[$newRank]." for further processing.";
                     event(new ResortNotificationEvent(Common::nofitication(
                                                                             $this->resort->resort_id,
                                                                             10,
@@ -458,11 +497,11 @@ class ConfigController extends Controller
                 }
 
 
-            $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,'Active',$rank);
+            $getNotifications['FreshVacancies'] = Common::GetTheFreshVacancies($this->resort->resort_id,'Active',$effectiveRank);
             $view = view('resorts.renderfiles.FreshVacancies', compact( 'getNotifications'))->render();
 
             // Apprved Vacancy GM approved Or Rank With set in specific resort
-            $TodoData = Common::GmApprovedVacancy($this->resort->resort_id,$rank);
+            $TodoData = Common::GmApprovedVacancy($this->resort->resort_id,$effectiveRank);
             $Todolistview = view('resorts.renderfiles.TaTodoList', compact( 'TodoData'))->render();
             DB::commit();
             return response()->json(['success' => true,"view"=>$view ,'Todolistview'=>$Todolistview, 'message' => ' Your response has been Approved.'],200);

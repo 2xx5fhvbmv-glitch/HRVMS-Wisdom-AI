@@ -124,8 +124,19 @@ class RedirectIfNotCorrectDashboard
                 // dd(str_contains($currentRoute, 'leave'), !$request->routeIs('leave.admindashboard'));
             }
 
-            // HR (rank 3) and Finance (rank 7) should always get HR-level dashboard access
-            $isHrOrFinance = in_array($employeeRank, [3, 7]);
+            // HR (rank 3), Finance (rank 7), and GM (rank 8) should always get HR-level dashboard access
+            $isHrOrFinance = in_array($employeeRank, [3, 7, 8]);
+
+            // Also check if user is in Finance/Accounting/HR department or has related position title
+            if (!$isHrOrFinance && $employee) {
+                $empDeptName = $employee->department->name ?? '';
+                $empPositionTitle = $employee->position->position_title ?? '';
+                if (stripos($empDeptName, 'Accounting') !== false || stripos($empDeptName, 'Finance') !== false
+                    || stripos($empPositionTitle, 'Finance') !== false
+                    || stripos($empDeptName, 'Human Resources') !== false || stripos($empPositionTitle, 'Human Resources') !== false) {
+                    $isHrOrFinance = true;
+                }
+            }
 
                 $position_name = $employee->position->position_title ?? null;
                 $position_access = $Resort->resort->Position_access ?? null;

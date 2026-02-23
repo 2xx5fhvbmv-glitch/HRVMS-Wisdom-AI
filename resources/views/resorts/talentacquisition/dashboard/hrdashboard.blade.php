@@ -381,6 +381,49 @@
                 </div>
             </div>
 
+            @if(isset($approvalHistory) && $approvalHistory->count() > 0)
+            <div class="col-xl-8 col-lg-6">
+                <div class="card h-auto">
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-3">
+                            <div class="col">
+                                <h3>Approval History</h3>
+                            </div>
+                            <div class="col-auto">
+                                <a href="{{ route('resort.ta.ViewVacancies') }}" class="a-link">View all</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-collapse">
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Department</th>
+                                    <th>Action</th>
+                                    <th>Level</th>
+                                    <th>By</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($approvalHistory as $history)
+                                    <tr>
+                                        <td>{{ $history->position_title }}</td>
+                                        <td>{{ $history->department_name }}</td>
+                                        <td><span class="badge {{ $history->badge_class }}">{{ $history->action_label }}</span></td>
+                                        <td>{{ $history->rank_name }}</td>
+                                        <td>{{ $history->action_by ?? 'N/A' }}</td>
+                                        <td>{{ $history->action_date ? \Carbon\Carbon::parse($history->action_date)->format('d M Y, h:i A') : 'N/A' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <div class="col-xl-4 col-lg-6   @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card h-auto">
                     <div class="mb-4 overflow-hidden">
@@ -1252,7 +1295,12 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                             .find('a')
                             .removeClass('ta-adv-disabled')
                             .attr('data-disabled', 'false')
-                            $("#FreshHiringRequest").html(response.view);
+                            if(response.view) {
+                                $("#FreshHiringRequest").html(response.view);
+                            }
+                            if(response.Todolistview) {
+                                $(".todoList-main").html(response.Todolistview);
+                            }
                                 toastr.success(response.message, "Success", {
                                     positionClass: 'toast-bottom-right'
                                 });
