@@ -32,6 +32,8 @@
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
+                       @if (\App\Helpers\Common::isHrAdmin()) 
+
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
                             <select class="form-select Department" id="department" name="department">
                                 <option ></option>
@@ -40,18 +42,41 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select Position" name="position" id="position">
 
+                        @endif
+                        
+                        <div class="col-xl-2 col-md-5 col-sm-4 col-6">
+                            <select class="form-select month" name="month" id="month">
+                                <option value="">Select Month</option>
+                                @foreach ([
+                                    1 => 'January', 2 => 'February', 3 => 'March',
+                                    4 => 'April', 5 => 'May', 6 => 'June',
+                                    7 => 'July', 8 => 'August', 9 => 'September',
+                                    10 => 'October', 11 => 'November', 12 => 'December'
+                                ] as $key => $month)
+                                    <option value="{{ $key }}">{{ $month }}</option>
+                                @endforeach
                             </select>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+
+                        <div class="col-xl-2 col-md-5 col-sm-4 col-6">
+                            <select class="form-select year" name="year" id="year">
+                                <option value="">Select Year</option>
+                                @for ($y = now()->year; $y >= now()->year - 5; $y--)
+                                    <option value="{{ $y }}">{{ $y }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        
+
+                       
+                        <!-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <input type="text"  class="form-control  datepicker" id="RegisterCreateDatePickerFilter" placeholder="Select Date">
 
-                        </div>
+                        </div> -->
 
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                            <button class="btn btn-themeBlue btn-sm" id="clearFilters">Clear Filter</button>
                         </div>
                         <div class="col-auto ms-auto">
                             <div class="view-toggle-group">
@@ -75,16 +100,37 @@
                                     <h5 class="mb-0"><i class="fa-regular fa-calendar me-2"></i>Attendance Tracker</h5>
                                     <p class="text-muted small mb-0">Monthly employee timesheets</p>
                                 </div> --}}
-                                <div class="col-auto ms-auto">
+                                <!-- <div class="col-auto ms-auto">
                                     <div class="attendance-legend">
                                         <span class="legend-item"><span class="legend-color bg-present"></span>Present</span>
                                         <span class="legend-item"><span class="legend-color bg-absent"></span>Absent</span>
                                         <span class="legend-item"><span class="legend-color bg-late"></span>Late</span>
                                     </div>
-                                </div>
+                                </div> -->
                             </div>
                         </div>
                         <div class="attendance-calendar-grid mb-4">
+                            @php
+                                $leaveCategoryTotalCount = [];
+                                if ($LeaveCategory->isNotEmpty() && $attandanceregister->isNotEmpty()) {
+                                    foreach ($attandanceregister as $empRow) {
+                                        $rosterData = Common::GetAttandanceRegister($resort_id, $empRow->duty_roster_id, $empRow->emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, "Monthwise");
+                                        foreach ($rosterData as $shiftData) {
+                                            if (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData)) {
+                                                foreach ($shiftData->LeaveData as $leaveData) {
+                                                    $catId = is_array($leaveData) ? ($leaveData['leave_cat_id'] ?? null) : (isset($leaveData->leave_cat_id) ? $leaveData->leave_cat_id : null);
+                                                    if ($catId !== null && $catId !== '') {
+                                                        $leaveCategoryTotalCount[(int)$catId] = ($leaveCategoryTotalCount[(int)$catId] ?? 0) + 1;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    $leaveCategoriesWithData = array_keys(array_filter($leaveCategoryTotalCount, function ($count) { return $count > 0; }));
+                                } else {
+                                    $leaveCategoriesWithData = [];
+                                }
+                            @endphp
                             <div class="table-responsive">
                                 <table class="table table-bordered attendance-grid-table mb-0">
                                     <thead>
@@ -100,13 +146,18 @@
                                                     <div>{{ $h['day'] }}</div>
                                                 </th>
                                             @endforeach
+                                            <th class="leave-stat-col">Present</th>
+                                            <th class="leave-stat-col">Absent</th>
+                                            <th class="leave-stat-col">Day-off</th>
                                             @if($LeaveCategory->isNotEmpty())
                                                 @foreach ($LeaveCategory as $l)
+                                                    @if(in_array($l->id, $leaveCategoriesWithData))
                                                     <th class="leave-stat-col">
                                                         <span class="leave-stat-badge" style="background-color: {{ $l->color }}">
                                                             {{ substr($l->leave_type, 0, 1) }}
                                                         </span>
                                                     </th>
+                                                    @endif
                                                 @endforeach
                                             @endif
                                         </tr>
@@ -116,6 +167,16 @@
                                             @foreach ($attandanceregister as $a)
                                                 @php
                                                     $RosterInternalDataMonth = Common::GetAttandanceRegister($resort_id, $a->duty_roster_id, $a->emp_id, $WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth, "Monthwise");
+                                                    $presentCountRow = 0;
+                                                    $absentCountRow = 0;
+                                                    $dayOffCountRow = 0;
+                                                    foreach ($RosterInternalDataMonth as $sd) {
+                                                        if (isset($sd->Status)) {
+                                                            if ($sd->Status == 'Present' && !empty($sd->CheckingTime)) $presentCountRow++;
+                                                            elseif ($sd->Status == 'Absent') $absentCountRow++;
+                                                            elseif ($sd->Status == 'DayOff') $dayOffCountRow++;
+                                                        }
+                                                    }
                                                 @endphp
                                                 <tr>
                                                     <td class="employee-col">
@@ -147,13 +208,24 @@
                                                             $cellStyle = '';
 
                                                             if ($shiftData) {
-                                                                if($shiftData->Status == "Present") {
+                                                                if($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
                                                                     $cellClass .= ' bg-present';
                                                                     $cellLabel = 'P';
                                                                     $cellStatus = 'PRESENT';
                                                                     $tooltipData = json_encode([
                                                                         'date' => $date,
                                                                         'status' => 'PRESENT',
+                                                                        'punchIn' => $shiftData->CheckingTime ?? '--:--',
+                                                                        'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
+                                                                        'overtime' => $overtimeValue
+                                                                    ]);
+                                                                } elseif($shiftData->Status == "Present") {
+                                                                    $cellClass .= ' bg-incomplete';
+                                                                    $cellLabel = 'I';
+                                                                    $cellStatus = 'INCOMPLETE (No check-in)';
+                                                                    $tooltipData = json_encode([
+                                                                        'date' => $date,
+                                                                        'status' => 'INCOMPLETE',
                                                                         'punchIn' => $shiftData->CheckingTime ?? '--:--',
                                                                         'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
                                                                         'overtime' => $overtimeValue
@@ -203,14 +275,19 @@
                                                             {{ $cellLabel }}
                                                         </td>
                                                     @endforeach
+                                                    <td class="leave-stat-cell"><span>{{ $presentCountRow }}</span></td>
+                                                    <td class="leave-stat-cell"><span>{{ $absentCountRow }}</span></td>
+                                                    <td class="leave-stat-cell"><span>{{ $dayOffCountRow }}</span></td>
                                                     @if($LeaveCategory->isNotEmpty())
                                                         @foreach ($LeaveCategory as $l)
+                                                            @if(in_array($l->id, $leaveCategoriesWithData))
                                                             @php
                                                                 $leaveTypeCount = 0;
                                                                 foreach ($RosterInternalDataMonth as $shiftData) {
                                                                     if (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData)) {
                                                                         foreach ($shiftData->LeaveData as $leaveData) {
-                                                                            if (isset($leaveData['leave_cat_id']) && $leaveData['leave_cat_id'] == $l->id) {
+                                                                            $lid = is_array($leaveData) ? ($leaveData['leave_cat_id'] ?? null) : (isset($leaveData->leave_cat_id) ? $leaveData->leave_cat_id : null);
+                                                                            if ($lid !== null && (int)$lid == (int)$l->id) {
                                                                                 $leaveTypeCount++;
                                                                             }
                                                                         }
@@ -218,10 +295,9 @@
                                                                 }
                                                             @endphp
                                                             <td class="leave-stat-cell">
-                                                                <span class="leave-stat-badge" style="background-color: {{ $l->color }}">
-                                                                    {{ $leaveTypeCount }}
-                                                                </span>
+                                                                <span>{{ $leaveTypeCount }}</span>
                                                             </td>
+                                                            @endif
                                                         @endforeach
                                                     @endif
                                                 </tr>
@@ -263,7 +339,7 @@
                                         }
 
                                         foreach ($RosterInternalDataMonth as $shiftData) {
-                                            if ($shiftData->Status == "Present") {
+                                            if ($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
                                                 $presentCount++;
                                             } elseif ($shiftData->Status == "Absent") {
                                                 $absentCount++;
@@ -347,7 +423,7 @@
                                                             }
                                                         @endphp
                                                         <div class="timeline-day {{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
-                                                            @if($shiftData && $shiftData->Status == "Present")
+                                                            @if($shiftData && $shiftData->Status == "Present" && !empty($shiftData->CheckingTime))
                                                                 <div class="day-label d-flex justify-content-between">
                                                                     {{ $h['dayname'] }} {{ $h['day'] }}
                                                                     <span class="workday-dot"></span>
@@ -367,6 +443,9 @@
                                                                         </div>
                                                                     @endif
                                                                 </div>
+                                                            @elseif($shiftData && $shiftData->Status == "Present")
+                                                                <div class="day-label">{{ $h['dayname'] }} {{ $h['day'] }}</div>
+                                                                <div class="day-content"><small class="text-warning">Incomplete (no check-in)</small></div>
                                                             @elseif($shiftData && $shiftData->Status == "Absent")
                                                                 <div class="day-label">{{ $h['dayname'] }} {{ $h['day'] }}</div>
                                                                 <div class="day-content absent-content">Absent</div>
@@ -560,6 +639,10 @@
 
         .bg-present {
             background-color: #3EB95F !important;
+        }
+
+        .bg-incomplete {
+            background-color: #F59E0B !important;
         }
 
         .bg-absent {
@@ -1042,10 +1125,6 @@
             $(".Department").select2({
                 placeholder: "Select Department"
             });
-
-            $(".Position").select2({
-                placeholder: "select Position"
-            });
             // Initialize: Show Normal view by default
             $(".view-normal-container").removeClass("d-none");
             $(".view-detailed-container").addClass("d-none");
@@ -1233,41 +1312,7 @@
     window.toggleEmployeeDetails = toggleEmployeeDetails;
 
     $(document).on('change', '.Department', function() {
-        var deptId = $(this).val();
-        $.ajax({
-            url: "{{ route('resort.ta.PositionSections') }}",
-            type: "post",
-            data: {
-                deptId: deptId
-            },
-            success: function(d) {
-                // Clear the dropdown and add a placeholder option
-
-
-                if (d.success == true) {
-
-                    let string = '<option></option>';
-                    $.each(d.data.ResortPosition, function(key, value) {
-                        string += '<option value="' + value.id + '">' + value
-                            .position_title + '</option>';
-                    });
-                    $(".Position").html(string);
-
-                    let string1 = '<option></option>';
-                    $.each(d.data.ResortSection, function(key, value) {
-                        string1 += '<option value="' + value.id + '">' + value
-                            .name + '</option>';
-                    });
-                    $(".Section").html(string1);
-
-                }
-            },
-            error: function(response) {
-                toastr.error("Position Not Found", {
-                    positionClass: 'toast-bottom-right'
-                });
-            }
-        });
+        updateRegisterFilterWiseTable();
     });
     $(document).on("click", ".LocationHistoryData", function()
     {
@@ -1397,14 +1442,22 @@
     $(document).on('keyup', '.search', function() {
         updateRegisterFilterWiseTable();
     });
-    $(document).on('change', '.Position', function() {
-        updateRegisterFilterWiseTable();
-    });
 
     $(document).on('change', '#RegisterCreateDatePickerFilter', function()
     {
         updateRegisterFilterWiseTable();
     });
+
+    $(document).on('change', '#month', function()
+    {
+        updateRegisterFilterWiseTable();
+    });
+
+    $(document).on('change', '#year', function()
+    {
+        updateRegisterFilterWiseTable();
+    });
+     
 
 
     document.getElementById('RegisterCreateDatePickerFilter').addEventListener('input', function () {
@@ -1417,7 +1470,10 @@
         function updateRegisterFilterWiseTable()
         {
             var search = $(".search").val();
-            var Poitions = $(".Position").val();
+            var department = $("#department").val();
+            var month = $(".month").val();
+            var year = $(".year").val();
+
             var DatePickerFilter = $("#RegisterCreateDatePickerFilter").val();
             let isDetailedView = $(".btn-detailed").hasClass("active");
             let sendclass = isDetailedView ? 'Detailed' : 'Normal';
@@ -1425,7 +1481,7 @@
             $.ajax({
                 url: "{{ route('resort.timeandattendance.ResigterRosterSearch') }}",
                 type: "get",
-                data: {"_token":"{{ csrf_token() }}","search":search,"Poitions":Poitions,"date":DatePickerFilter,"monthly":true,"sendclass":sendclass},
+                data: {"_token":"{{ csrf_token() }}","search":search,"department":department,"date":DatePickerFilter,"monthly":true,"sendclass":sendclass,"month":month,"year":year},
                 success: function (response)
                 {
                     if (response.success)
@@ -1460,13 +1516,17 @@
                 }
             });
         }
-    $(document).on('click', '#clearFilter', function() {
+   
+
+    </script>
+    <script>
+         $(document).on('click', '#clearFilters', function() {
         $(".search").val('');
         $("#RegisterCreateDatePickerFilter").val('');
         $("#department").val('').trigger('change');
-        $("#position").val('').trigger('change');
+        $("#month").val('').trigger('change');
+        $("#year").val('').trigger('change');
         updateRegisterFilterWiseTable();
     });
-
     </script>
     @endsection

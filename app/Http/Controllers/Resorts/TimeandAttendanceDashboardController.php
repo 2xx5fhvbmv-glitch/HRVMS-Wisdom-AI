@@ -15,8 +15,8 @@ use App\Models\DutyRosterEntry;
 use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
 use Carbon\CarbonInterval;
+
 use DB;
-use Illuminate\Support\Str;
 class TimeandAttendanceDashboardController extends Controller
 {
 
@@ -26,7 +26,6 @@ class TimeandAttendanceDashboardController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(!$this->resort) return;
         if(isset($this->resort->GetEmployee))
         {
             $reporting_to = $this->resort->GetEmployee->id;
@@ -270,6 +269,7 @@ class TimeandAttendanceDashboardController extends Controller
          }
 
          $ResortDepartment = ResortDepartment::where("resort_id",$this->resort->resort_id)->get();
+        //  dd($ResortDepartment);
 
         // Employee count - all departments if can view all (only active employees)
         // HR HOD/EXCOM: see all employees
@@ -326,6 +326,14 @@ class TimeandAttendanceDashboardController extends Controller
             ->where('t1.resort_id', $this->resort->resort_id)
             ->whereNotNull('t3.CheckingTime')
             ->count();
+            $todayAbsentCount = DB::table('parent_attendaces as t3')
+            ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
+            ->join('employees', 't2.Emp_id', '=', 'employees.id')
+            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            ->where('t3.date', date('Y-m-d'))
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('t3.status', '=', 'Absent' )
+            ->count();
         @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'TimeandAttendanceDashboardController.php:318','message'=>'HrDashobard present query check','data'=>['canViewAll'=>$canViewAll,'isDeptHOD'=>$isDeptHOD,'totalPresentEmployee'=>$totalPresentEmployee,'todayAttendanceRecords'=>$todayAttendanceCheck,'underEmpCount'=>count($this->underEmp_id)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
         // #endregion
         $totalPresentEmployee = $totalPresentEmployee ?? 0;
@@ -354,16 +362,47 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        // Total absent employees = Total Employees - Present - On Leave
+       
+        $totalAbsantEmployee = $todayAbsentCount;
+
+         // Total unknown status employees = Total Employees - Present - On Leave - todayAbsentCount
         // (Employees who are not present and not on leave are considered absent)
-        $totalAbsantEmployee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee;
-        $totalAbsantEmployee = max(0, $totalAbsantEmployee);
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
+
+            // dd($totalAbsentEmployee);
+
 
         // #region agent log
         @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'TimeandAttendanceDashboardController.php:345','message'=>'Final dashboard counts','data'=>['EmployeesCount'=>$EmployeesCount,'totalPresentEmployee'=>$totalPresentEmployee,'totalLeaveEmployee'=>$totalLeaveEmployee,'totalAbsantEmployee'=>$totalAbsantEmployee,'todoListCount'=>count($attendanceDataTodoList)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
         // #endregion
 
-        return view('resorts.timeandattendance.dashboard.hrdashboard',compact('attendanceDataTodoList', 'page_title','ResortPosition','ResortDepartment','EmployeesCount','totalPresentEmployee','totalAbsantEmployee','totalLeaveEmployee'));
+        $attendanceCounts = [];
+
+            $currentYear = now()->year;
+
+            for ($month = 1; $month <= 12; $month++) {
+
+                $startOfMonth = Carbon::create($currentYear, $month, 1)->startOfMonth()->format('Y-m-d');
+                $endOfMonth   = Carbon::create($currentYear, $month, 1)->endOfMonth()->format('Y-m-d');
+
+                // Count employees present in the month
+                $totalPresent = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                                    ->join('duty_rosters as t2', 't2.Emp_id', '=', 'employees.id')
+                                    ->join('parent_attendaces as t3', 't3.roster_id', '=', 't2.id')
+                                    ->whereNotNull('t3.CheckingTime')
+                                    ->whereIn('t3.Status', ['Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave'])
+                                    ->whereBetween('t3.date', [$startOfMonth, $endOfMonth])
+                                    ->where('t1.resort_id', $this->resort->resort_id)
+                                    ->where('employees.status', 'Active')
+                                    ->distinct('employees.id') // count unique employees
+                                    ->count('employees.id');
+
+                $attendanceCounts[] = $totalPresent;
+            }
+
+
+        return view('resorts.timeandattendance.dashboard.hrdashboard',compact('attendanceDataTodoList', 'page_title','ResortPosition','ResortDepartment','EmployeesCount','totalPresentEmployee','totalAbsantEmployee','totalLeaveEmployee','attendanceCounts','totalunknown_status_Employee'));
     }
 
     public function HrDashboardCount($date)
@@ -446,9 +485,19 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        // Total absent employees = Total Employees - Present - On Leave
-        $totalAbsantEmployee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee;
-        $totalAbsantEmployee = max(0, $totalAbsantEmployee);
+        $todayAbsentCount = DB::table('parent_attendaces as t3')
+            ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
+            ->join('employees', 't2.Emp_id', '=', 'employees.id')
+            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            ->where('t3.date', date('Y-m-d'))
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('t3.status', '=', 'Absent' )
+            ->count();
+
+            $totalAbsantEmployee = $todayAbsentCount;
+        // Total unknown status employees = Total Employees - Present - On Leave - total absent
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
         return response()->json([
             'success' => true,
@@ -456,6 +505,7 @@ class TimeandAttendanceDashboardController extends Controller
                 "totalPresentEmployee" => $totalPresentEmployee,
                 "totalAbsantEmployee" => $totalAbsantEmployee,
                 "totalLeaveEmployee" => $totalLeaveEmployee,
+                "totalunknown_status_Employee" => $totalunknown_status_Employee,
             ],
         ]);
     }
@@ -518,7 +568,7 @@ class TimeandAttendanceDashboardController extends Controller
                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
                     ->join('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
                     ->leftJoin('parent_attendaces as t4', "t4.roster_id", "=", "t3.id")
-                    ->leftJoin('shift_settings as t5', "t5.id", "=", "t4.Shift_id")
+                    ->leftJoin('shift_settings as t5', 't5.id', '=', 't3.Shift_id')
                     ->leftJoin('child_attendaces as t7', "t7.Parent_attd_id", "=", "t4.id")
                     ->where('employees.status', 'Active')
                     ->whereIn('t3.id', $latestRosterIds)
@@ -563,7 +613,6 @@ class TimeandAttendanceDashboardController extends Controller
                 $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
                 $item->Position = ucfirst($item->position_title ?? 'N/A');
                 $item->profileImg = Common::getResortUserPicture($item->Parentid);
-                $item->action = '<a href="'.route('resort.timeandattendance.hoddashboard').'" class="btn btn-sm btn-outline-primary">View</a>';
                 return $item;
             });
 
@@ -730,7 +779,6 @@ class TimeandAttendanceDashboardController extends Controller
         $canViewAll = $this->canViewAllDepartments();
         $isDeptHOD = $this->isDepartmentHOD();
         $currentYear = $Year;
-
         // Get base employee query for counting active employees
         $employeeBaseQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                             ->where("t1.resort_id", $this->resort->resort_id)
@@ -857,8 +905,9 @@ class TimeandAttendanceDashboardController extends Controller
         // Fill in missing months (if any)
         for ($i = 1; $i <= 12; $i++) {
             $attendancePercentages[] = isset($attendanceDataFormatted[$i]) ? $attendanceDataFormatted[$i]['attendance_percentage'] : 0;
-            $labelsAttendance[] = Carbon::createFromDate($currentYear, $i, 1)->format('M Y');
-        }
+            $date = Carbon::createFromDate($currentYear, $i, 1);
+            $labelsAttendance[] = $date->format('M y'); // e.g., Jan 26
+                    }
 
         // Prepare the data for the chart
         $data = [
@@ -960,12 +1009,21 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        // Total absent employees = Total Employees - Present - On Leave
-        // (Employees who are not present and not on leave are considered absent)
-        $totalAbsantEmployee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee;
-        $totalAbsantEmployee = max(0, $totalAbsantEmployee);
+        $todayAbsentCount = DB::table('parent_attendaces as t3')
+            ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
+            ->join('employees', 't2.Emp_id', '=', 'employees.id')
+            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            ->where('t3.date', date('Y-m-d'))
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('t3.status', '=', 'Absent' )
+            ->count();
 
-        return view('resorts.timeandattendance.dashboard.hoddashboard', compact('attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee'));
+            $totalAbsantEmployee = $todayAbsentCount;
+        // Total unknown status employees = Total Employees - Present - On Leave - total absent
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
+
+        return view('resorts.timeandattendance.dashboard.hoddashboard', compact('attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee', 'totalunknown_status_Employee'));
     }
 
     public function HodDashboardCount($date)
@@ -1037,9 +1095,19 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        // Total absent employees = Total Employees - Present - On Leave
-        $totalAbsantEmployee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee;
-        $totalAbsantEmployee = max(0, $totalAbsantEmployee);
+        $todayAbsentCount = DB::table('parent_attendaces as t3')
+            ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
+            ->join('employees', 't2.Emp_id', '=', 'employees.id')
+            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            ->where('t3.date', date('Y-m-d'))
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('t3.status', '=', 'Absent' )
+            ->count();
+
+            $totalAbsantEmployee = $todayAbsentCount;
+        // Total unknown status employees = Total Employees - Present - On Leave - total absent
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
         return response()->json([
             'success' => true,
@@ -1047,6 +1115,7 @@ class TimeandAttendanceDashboardController extends Controller
                 "totalPresentEmployee" => $totalPresentEmployee,
                 "totalAbsantEmployee" => $totalAbsantEmployee,
                 "totalLeaveEmployee" => $totalLeaveEmployee,
+                "totalunknown_status_Employee" => $totalunknown_status_Employee,
             ],
         ]);
     }
@@ -1119,7 +1188,7 @@ class TimeandAttendanceDashboardController extends Controller
                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
                     ->join('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
                     ->leftJoin('parent_attendaces as t4', "t4.roster_id", "=", "t3.id")
-                    ->leftJoin('shift_settings as t5', "t5.id", "=", "t4.Shift_id")
+                    ->leftJoin('shift_settings as t5', "t5.id", "=", "t3.Shift_id")
                     ->leftJoin('child_attendaces as t7', "t7.Parent_attd_id", "=", "t4.id")
                     ->where('employees.status', 'Active')
                     ->whereIn('t3.id', $latestRosterIds)
@@ -1172,7 +1241,6 @@ class TimeandAttendanceDashboardController extends Controller
                 $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
                 $item->Position = ucfirst($item->position_title ?? 'N/A');
                 $item->profileImg = Common::getResortUserPicture($item->Parentid);
-                $item->action = '<a href="'.route('resort.timeandattendance.hoddashboard').'" class="btn btn-sm btn-outline-primary">View</a>';
                 return $item;
             });
 
@@ -1182,6 +1250,10 @@ class TimeandAttendanceDashboardController extends Controller
                 'recordsTotal' => $Rosterdata->count(),
                 'recordsFiltered' => $Rosterdata->count()
             ];
+            // #region agent log
+            $logPath = base_path('.cursor/debug.log');
+            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'E','location'=>'TimeandAttendanceDashboardController.php:832','message'=>'Response data','data'=>['data_count'=>count($responseData['data']),'recordsTotal'=>$responseData['recordsTotal']],'timestamp'=>time()*1000])."\n", FILE_APPEND);
+            // #endregion
             return response()->json($responseData);
         }
         // #region agent log
@@ -1454,11 +1526,12 @@ class TimeandAttendanceDashboardController extends Controller
             $attendanceDataFormatted[$data['month']] = $data;
         }
 
-        // Fill in missing months (if any)
+         // Fill in missing months (if any)
         for ($i = 1; $i <= 12; $i++) {
             $attendancePercentages[] = isset($attendanceDataFormatted[$i]) ? $attendanceDataFormatted[$i]['attendance_percentage'] : 0;
-            $labelsAttendance[] = Carbon::createFromDate($currentYear, $i, 1)->format('M Y');
-        }
+            $date = Carbon::createFromDate($currentYear, $i, 1);
+            $labelsAttendance[] = $date->format('M y'); // e.g., Jan 26
+                    }
 
         // Prepare the data for the chart
         $data = [
@@ -1481,351 +1554,193 @@ class TimeandAttendanceDashboardController extends Controller
 
     }
 
-    public function Tododata()
-    {
-        $Rank = $this->resort->GetEmployee->rank ?? null;
-        $hod = $this->resort->GetEmployee->id ?? null;
-        $canViewAll = $this->canViewAllDepartments();
-        $isDeptHOD = $this->isDepartmentHOD();
-        $Dept_id = $this->resort->GetEmployee->Dept_id ?? null;
-        $today = Carbon::today()->format('Y-m-d');
-        $yesterday = Carbon::yesterday()->format('Y-m-d');
-        $currentTime = Carbon::now();
-        $gracePeriodMinutes = 10; // 10-minute grace period
+   public function Tododata()
+{
+    $Rank = $this->resort->GetEmployee->rank ?? null;
+    $hod = $this->resort->GetEmployee->id ?? null;
+    $canViewAll = $this->canViewAllDepartments();
+    $isDeptHOD = $this->isDepartmentHOD();
+    $Dept_id = $this->resort->GetEmployee->Dept_id ?? null;
 
-        // Get employees with duty roster for today only
-        $dutyRosterQuery = DB::table('duty_rosters as t2')
-            ->join('employees', 'employees.id', '=', 't2.Emp_id')
-            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-            ->join('shift_settings as t4', 't4.id', '=', 't2.Shift_id')
-            ->where('t1.resort_id', $this->resort->resort_id)
-            ->where('employees.status', 'Active')
-            ->whereDate('t2.ShiftDate', $today);
+    $today = Carbon::today();
+    $currentTime = Carbon::now();
+    $gracePeriodMinutes = 10;
 
-        // Apply department and subordinate filters
-        if (!$canViewAll && !$isDeptHOD) {
-            $dutyRosterQuery->whereIn('employees.id', $this->underEmp_id);
-        }
+    $todoList = collect();
 
-        if (!$canViewAll && $isDeptHOD && $Dept_id) {
-            $dutyRosterQuery->where('employees.Dept_id', $Dept_id);
-        }
+    /**
+     * STEP 1: Get duty rosters (past + today)
+     */
+    $dutyRosterQuery = DB::table('duty_roster_entries as t2')
+        ->join('employees', 'employees.id', '=', 't2.Emp_id')
+        ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+        ->join('shift_settings as t4', 't4.id', '=', 't2.Shift_id')
+        ->where('t1.resort_id', $this->resort->resort_id)
+        ->where('employees.status', 'Active')
+        ->whereDate('t2.date', '<=', $today);
 
-        if (!$canViewAll && $Dept_id) {
-            $dutyRosterQuery->where('employees.Dept_id', $Dept_id);
-        }
+    // Department Filters
+    if (!$canViewAll && !$isDeptHOD) {
+        $dutyRosterQuery->whereIn('employees.id', $this->underEmp_id);
+    }
 
-        $dutyRosters = $dutyRosterQuery->select([
-            't2.id as roster_id',
-            't2.Emp_id',
-            't2.Shift_id',
-            't1.first_name',
-            't1.last_name',
-            't1.id as Parentid',
-            't4.StartTime',
-            't4.EndTime',
-            't4.ShiftName',
-            'employees.id as employee_id',
-            'employees.Emp_id',
-        ])->get();
+    if (!$canViewAll && $Dept_id) {
+        $dutyRosterQuery->where('employees.Dept_id', $Dept_id);
+    }
 
-        $todoList = collect();
+    $dutyRosters = $dutyRosterQuery->select([
+        't2.roster_id',
+        't2.Emp_id',
+        't2.Shift_id',
+        't1.first_name',
+        't1.last_name',
+        't1.id as Parentid',
+        't4.StartTime',
+        't4.EndTime',
+        't4.ShiftName',
+        'employees.id as employee_id',
+        'employees.Emp_id as Emp_code',
+        't2.date',
+        't2.OverTime'
+    ])->get();
 
-        // Check for previous day overtime (employees who checked out yesterday but are still working)
-        $yesterdayAttendances = ParentAttendace::where('resort_id', $this->resort->resort_id)
-            ->whereDate('date', $yesterday)
-            ->whereNotNull('CheckingOutTime')
-            ->whereHas('Employee', function ($query) use ($Dept_id, $canViewAll, $isDeptHOD) {
-                if (!$canViewAll && !$isDeptHOD) {
-                    $query->whereIn('id', $this->underEmp_id);
-                }
-                if (!$canViewAll && $isDeptHOD && $Dept_id) {
-                    $query->where('Dept_id', $Dept_id);
-                }
-                if (!$canViewAll && $Dept_id) {
-                    $query->where('Dept_id', $Dept_id);
-                }
-            })
-            ->with(['Employee.resortAdmin', 'Getshift'])
-            ->get();
-
-        foreach ($yesterdayAttendances as $yesterdayAttendance) {
-            // Check if employee has a duty roster for today (indicating they're still working)
-            $todayRoster = DB::table('duty_rosters')
-                ->where('Emp_id', $yesterdayAttendance->Emp_id)
-                ->whereDate('ShiftDate', $today)
-                ->first();
-
-            if ($todayRoster) {
-                // Get shift info for yesterday
-                $yesterdayShift = DB::table('shift_settings')
-                    ->where('id', $yesterdayAttendance->Shift_id)
-                    ->first();
-
-                if ($yesterdayShift) {
-                    $yesterdayStartTime = Carbon::parse($yesterday . ' ' . $yesterdayShift->StartTime);
-                    $yesterdayEndTime = Carbon::parse($yesterday . ' ' . $yesterdayShift->EndTime);
-
-                    if ($yesterdayEndTime->lessThan($yesterdayStartTime)) {
-                        $yesterdayEndTime->addDay();
-                    }
-
-                    // Get overtime from attendance or duty roster entry
-                    $yesterdayOvertime = $yesterdayAttendance->OverTime ?? '00:00';
-                    $yesterdayDutyEntry = DB::table('duty_roster_entries')
-                        ->where('Emp_id', $yesterdayAttendance->Emp_id)
-                        ->whereDate('date', $yesterday)
-                        ->first();
-
-                    if ($yesterdayDutyEntry && $yesterdayDutyEntry->OverTime) {
-                        $yesterdayOvertime = $yesterdayDutyEntry->OverTime;
-                    }
-
-                    // Calculate end time with overtime
-                    $endTimeWithOvertime = $yesterdayEndTime->copy();
-                    if ($yesterdayOvertime && $yesterdayOvertime != '00:00') {
-                        list($otHours, $otMinutes) = explode(':', $yesterdayOvertime);
-                        $endTimeWithOvertime->addHours($otHours)->addMinutes($otMinutes);
-                    }
-
-                    // Calculate difference in hours - overtime worked beyond expected end time
-                    $checkOutTime = Carbon::parse($yesterdayAttendance->CheckingOutTime);
-                    // If checkout time is after expected end time, calculate the difference (overtime)
-                    if ($checkOutTime->greaterThan($endTimeWithOvertime)) {
-                        $differenceInMinutes = $checkOutTime->diffInMinutes($endTimeWithOvertime);
-                        $diffHours = intval($differenceInMinutes / 60);
-                        $diffMins = $differenceInMinutes % 60;
-                        $differenceInHoursFormatted = $diffHours . ' hours and ' . $diffMins . ' minutes';
-                    } else {
-                        // If checkout was before expected end, no overtime
-                        $differenceInHoursFormatted = '0 hours and 0 minutes';
-                    }
-
-                    $employee = $yesterdayAttendance->Employee;
-                    $resortAdmin = $employee ? $employee->resortAdmin : null;
-
-                    if ($resortAdmin) {
-                        $todoItem = (object)[
-                            'roster_id' => $todayRoster->id,
-                            'attendance_id' => $yesterdayAttendance->id,
-                            'employee_id' => $employee->id,
-                            'Emp_id' => $employee->Emp_id,
-                            'first_name' => $resortAdmin->first_name,
-                            'last_name' => $resortAdmin->last_name,
-                            'Parentid' => $resortAdmin->id,
-                            'EmployeeName' => ucfirst($resortAdmin->first_name . ' ' . $resortAdmin->last_name),
-                            'profileImg' => Common::getResortUserPicture($resortAdmin->id),
-                            'ShiftName' => $yesterdayShift->ShiftName,
-                            'StartTime' => $yesterdayStartTime->format('h:i A'),
-                            'EndTime' => $yesterdayEndTime->format('h:i A'),
-                            'EndTimeWithOvertime' => $endTimeWithOvertime->format('h:i A'),
-                            'ExpectedEndTime' => $endTimeWithOvertime->format('h:i A'),
-                            'OverTime' => $yesterdayOvertime,
-                            'differenceInHours' => $differenceInHoursFormatted,
-                            'flag' => 'previous_day',
-                            'action_type' => 'overtime',
-                            'message' => 'Overtime from yesterday',
-                            'Shift_id' => $yesterdayAttendance->Shift_id,
-                            'date' => $yesterday,
-                            'CheckingTime' => $yesterdayAttendance->CheckingTime,
-                            'CheckingOutTime' => $yesterdayAttendance->CheckingOutTime,
-                            'OTStatus' => $yesterdayAttendance->OTStatus ?? null,
-                        ];
-
-                        $todoList->push($todoItem);
-                    }
-                }
-            }
-        }
-
-        foreach ($dutyRosters as $roster) {
-            // Get existing attendance record for today if any
-            $attendance = ParentAttendace::where('roster_id', $roster->roster_id)
-                ->where('date', $today)
-                ->first();
-
-            // Get overtime from duty_roster_entries if exists
-            $dutyRosterEntry = DB::table('duty_roster_entries')
-                ->where('roster_id', $roster->roster_id)
-                ->whereDate('date', $today)
-                ->first();
-
-            $overtime = $dutyRosterEntry ? ($dutyRosterEntry->OverTime ?? '00:00') : '00:00';
-
-            // Parse shift times - combine with today's date
-            $shiftStartTime = Carbon::parse($today . ' ' . $roster->StartTime);
-            $shiftEndTime = Carbon::parse($today . ' ' . $roster->EndTime);
-
-            // Handle overnight shifts (end time < start time means next day)
-            if ($shiftEndTime->lessThan($shiftStartTime)) {
-                $shiftEndTime->addDay();
-            }
-
-            // Calculate expected end time with overtime
-            $expectedEndTime = $shiftEndTime->copy();
-            if ($overtime && $overtime != '00:00') {
-                list($otHours, $otMinutes) = explode(':', $overtime);
-                $expectedEndTime->addHours($otHours)->addMinutes($otMinutes);
-            }
-
-            // Calculate grace period deadlines
-            $checkInDeadline = $shiftStartTime->copy()->addMinutes($gracePeriodMinutes);
-            $checkOutDeadline = $expectedEndTime->copy()->addMinutes($gracePeriodMinutes);
-
-            // Determine action type
-            $actionType = null;
-            $message = '';
-
-            if (!$attendance || !$attendance->CheckingTime) {
-                // No check-in record - check if grace period has passed
-                if ($currentTime->greaterThan($checkInDeadline)) {
-                    $actionType = 'check_in';
-                    $message = 'Pending Check-In';
-                }
-            } else {
-                // Check-in exists - check if check-out is missing
-                if (!$attendance->CheckingOutTime) {
-                    // Check if grace period has passed
-                    if ($currentTime->greaterThan($checkOutDeadline)) {
-                        $actionType = 'check_out';
-                        $message = 'Pending Check-Out';
-
-                        // Calculate difference in hours for today's missing checkout
-                        $differenceInMinutes = $currentTime->diffInMinutes($expectedEndTime);
-                        $diffHours = intval($differenceInMinutes / 60);
-                        $diffMins = $differenceInMinutes % 60;
-                        $differenceInHoursFormatted = $diffHours . ' hours and ' . $diffMins . ' minutes';
-
-                        $todoItem = (object)[
-                            'roster_id' => $roster->roster_id,
-                            'attendance_id' => $attendance->id ?? null,
-                            'employee_id' => $roster->employee_id,
-                            'Emp_id' => $roster->Emp_id,
-                            'first_name' => $roster->first_name,
-                            'last_name' => $roster->last_name,
-                            'Parentid' => $roster->Parentid,
-                            'EmployeeName' => ucfirst($roster->first_name . ' ' . $roster->last_name),
-                            'profileImg' => Common::getResortUserPicture($roster->Parentid),
-                            'ShiftName' => $roster->ShiftName,
-                            'StartTime' => $shiftStartTime->format('h:i A'),
-                            'EndTime' => $shiftEndTime->format('h:i A'),
-                            'EndTimeWithOvertime' => $expectedEndTime->format('h:i A'),
-                            'ExpectedEndTime' => $expectedEndTime->format('h:i A'),
-                            'OverTime' => $overtime,
-                            'differenceInHours' => $differenceInHoursFormatted,
-                            'flag' => 'today',
-                            'action_type' => $actionType,
-                            'message' => $message,
-                            'Shift_id' => $roster->Shift_id,
-                            'date' => $today,
-                            'CheckingTime' => $attendance->CheckingTime ?? null,
-                            'CheckingOutTime' => $attendance->CheckingOutTime ?? null,
-                            'OTStatus' => $attendance->OTStatus ?? null,
-                        ];
-
-                        $todoList->push($todoItem);
-                    }
-                }
-            }
-        }
-
-        // Fetch employees with pending overtime entries
-        $overtimeQuery = EmployeeOvertime::join('employees', 'employee_overtimes.Emp_id', '=', 'employees.id')
-            ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-            ->where('employee_overtimes.resort_id', $this->resort->resort_id)
-            ->where('employee_overtimes.status', 'pending')
-            ->where('employees.status', 'Active')
-            ->whereDate('employee_overtimes.date', '<=', $today); // Include past dates with pending overtime
-
-        // Apply department and subordinate filters
-        if (!$canViewAll && !$isDeptHOD) {
-            $overtimeQuery->whereIn('employees.id', $this->underEmp_id);
-        }
-
-        if (!$canViewAll && $isDeptHOD && $Dept_id) {
-            $overtimeQuery->where('employees.Dept_id', $Dept_id);
-        }
-
-        if (!$canViewAll && $Dept_id) {
-            $overtimeQuery->where('employees.Dept_id', $Dept_id);
-        }
-
-        // Get pending overtime entries grouped by employee and date
-        $pendingOvertimes = $overtimeQuery->select([
-            'employee_overtimes.Emp_id',
-            'employee_overtimes.date',
-            'employees.id as employee_id',
-            't1.first_name',
-            't1.last_name',
-            't1.id as Parentid',
-            'employees.Emp_id as Emp_code',
-        ])
-        ->groupBy('employee_overtimes.Emp_id', 'employee_overtimes.date', 'employees.id', 't1.first_name', 't1.last_name', 't1.id', 'employees.Emp_id')
-        ->get();
-
-        // Add overtime todo items (one per employee per date)
-        foreach ($pendingOvertimes as $ot) {
-            // Get employee details
-            $employee = Employee::find($ot->employee_id);
-            if (!$employee) continue;
-
-            // Get duty roster entry for this date to get overtime from duty_roster_entries
-            $dutyRosterEntry = DutyRosterEntry::where('Emp_id', $ot->employee_id)
-                ->whereDate('date', $ot->date)
-                ->first();
-
-            $dutyRosterOvertime = $dutyRosterEntry ? ($dutyRosterEntry->OverTime ?? '00:00') : '00:00';
-
-            // Get shift info if available
-            $shiftName = 'N/A';
-            $startTime = 'N/A';
-            $endTime = 'N/A';
-
-            if ($dutyRosterEntry && $dutyRosterEntry->Shift_id) {
-                $shift = DB::table('shift_settings')->where('id', $dutyRosterEntry->Shift_id)->first();
-                if ($shift) {
-                    $shiftName = $shift->ShiftName ?? 'N/A';
-                    $startTime = $shift->StartTime ?? 'N/A';
-                    $endTime = $shift->EndTime ?? 'N/A';
-                }
-            }
-
-            // Determine flag based on date - if it's today, use 'today', otherwise use null (won't match view conditions)
-            $itemDate = Carbon::parse($ot->date);
-            $itemFlag = $itemDate->isToday() ? 'today' : ($itemDate->isYesterday() ? 'previous_day' : null);
-
-            $todoItem = (object)[
-                'roster_id' => $dutyRosterEntry->roster_id ?? null,
-                'attendance_id' => null,
-                'employee_id' => $ot->employee_id,
-                'Emp_id' => $ot->Emp_code,
-                'first_name' => $ot->first_name,
-                'last_name' => $ot->last_name,
-                'Parentid' => $ot->Parentid,
-                'EmployeeName' => ucfirst($ot->first_name . ' ' . $ot->last_name),
-                'profileImg' => Common::getResortUserPicture($ot->Parentid),
-                'ShiftName' => $shiftName,
-                'StartTime' => $startTime,
-                'EndTime' => $endTime,
-                'ExpectedEndTime' => $endTime,
-                'EndTimeWithOvertime' => $endTime, // Add for consistency
-                'OverTime' => $dutyRosterOvertime,
-                'differenceInHours' => '0 hours and 0 minutes', // Default value
-                'flag' => $itemFlag, // Add flag property to prevent undefined property error
-                'action_type' => 'overtime_pending',
-                'message' => 'Pending OT',
-                'Shift_id' => $dutyRosterEntry->Shift_id ?? null,
-                'date' => $ot->date,
-                'CheckingTime' => null,
-                'CheckingOutTime' => null,
-                'OTStatus' => null, // Add for consistency
-            ];
-
-            $todoList->push($todoItem);
-        }
-
+    if ($dutyRosters->isEmpty()) {
         return $todoList;
     }
+    /**
+     * STEP 3: Process each roster
+     */
+    foreach ($dutyRosters as $roster) {
+
+        $rosterDate = Carbon::parse($roster->date);
+
+        // Build shift start/end using roster date
+        $shiftStartTime = Carbon::parse(
+            $rosterDate->format('Y-m-d') . ' ' . date('H:i:s', strtotime($roster->StartTime))
+        );
+
+        $shiftEndTime = Carbon::parse(
+            $rosterDate->format('Y-m-d') . ' ' . date('H:i:s', strtotime($roster->EndTime))
+        );
+
+        // Handle overnight shift
+        if ($shiftEndTime->lessThan($shiftStartTime)) {
+            $shiftEndTime->addDay();
+        }
+
+        // Overtime
+        $expectedEndTime = $shiftEndTime->copy();
+        if (!empty($roster->OverTime) && $roster->OverTime != '00:00') {
+            list($otHours, $otMinutes) = explode(':', $roster->OverTime);
+            $expectedEndTime->addHours((int)$otHours)
+                            ->addMinutes((int)$otMinutes);
+        }
+
+        // Grace Period
+        $checkInDeadline = $shiftStartTime->copy()->addMinutes($gracePeriodMinutes);
+        $checkOutDeadline = $expectedEndTime->copy()->addMinutes($gracePeriodMinutes);
+
+        $attendance = ParentAttendace::where('roster_id', $roster->roster_id)->whereDate('date', $rosterDate)->first();
+
+
+      $actionType = null;
+        $message = '';
+
+        $hasAttendance = !is_null($attendance);
+
+        $hasCheckIn = $hasAttendance &&
+                    !empty($attendance->CheckingTime) &&
+                    $attendance->CheckingTime != '00:00:00' &&
+                    $attendance->CheckingTime != '0000-00-00 00:00:00';
+
+        $hasCheckOut = $hasAttendance &&
+                    !empty($attendance->CheckingOutTime) &&
+                    $attendance->CheckingOutTime != '00:00:00' &&
+                    $attendance->CheckingOutTime != '0000-00-00 00:00:00';
+
+
+        /**
+         * 1️⃣ Pending Check-In
+         */
+        if (!$hasCheckIn) {
+
+            if ($currentTime->greaterThan($checkInDeadline)) {
+                $actionType = 'check_in';
+                $message = 'Pending Check-In';
+            }
+        }
+
+        /**
+         * 2️⃣ Pending Check-Out
+         */
+        elseif ($hasCheckIn && !$hasCheckOut) {
+
+            if ($currentTime->greaterThan($checkOutDeadline)) {
+                $actionType = 'check_out';
+                $message = 'Pending Check-Out';
+            }
+        }
+
+        /**
+         * 3️⃣ Pending OT
+         */
+        elseif ($hasCheckIn && $hasCheckOut && $attendance->OTStatus === 'Pending') {
+
+            $actionType = 'pending_ot';
+            $message = 'Pending OT Approval';
+        }
+
+
+        /**
+         * Skip completed shifts
+         */
+        if ($actionType === null) {
+            continue;
+        }
+
+
+        // Calculate time difference if checkout missing
+        $differenceInHoursFormatted = '0 hours and 0 minutes';
+        if ($actionType === 'missed_check_out') {
+            $differenceInMinutes = $currentTime->diffInMinutes($expectedEndTime);
+            $diffHours = intval($differenceInMinutes / 60);
+            $diffMins = $differenceInMinutes % 60;
+            $differenceInHoursFormatted = $diffHours . ' hours and ' . $diffMins . ' minutes';
+        }
+
+        $todoList->push((object)[
+            'roster_id' => $roster->roster_id,
+            'attendance_id' => $attendance->id ?? null,
+            'employee_id' => $roster->employee_id,
+            'Emp_id' => $roster->Emp_code,
+            'first_name' => $roster->first_name,
+            'last_name' => $roster->last_name,
+            'Parentid' => $roster->Parentid,
+            'EmployeeName' => ucfirst($roster->first_name . ' ' . $roster->last_name),
+            'profileImg' => Common::getResortUserPicture($roster->Parentid),
+            'ShiftName' => $roster->ShiftName,
+            'StartTime' => $shiftStartTime->format('h:i A'),
+            'EndTime' => $shiftEndTime->format('h:i A'),
+            'ExpectedEndTime' => $expectedEndTime->format('h:i A'),
+            'OverTime' => $roster->OverTime ?? '00:00',
+            'differenceInHours' => $differenceInHoursFormatted,
+            'flag' => $rosterDate->isToday() ? 'today' : 'past',
+            'action_type' => $actionType,
+            'message' => $message,
+            'Shift_id' => $roster->Shift_id,
+            'date' => $rosterDate->format('Y-m-d'),
+            'CheckingTime' => $attendance->CheckingTime ?? null,
+            'CheckingOutTime' => $attendance->CheckingOutTime ?? null,
+            'OTStatus' => $attendance->OTStatus ?? null,
+             'shift_date' => $roster->date ?? null,
+             
+        ]);
+    }
+
+    return $todoList->values();
+}
+
+    
 
     public function Todolist(Request $request)
     {
@@ -1848,15 +1763,17 @@ class TimeandAttendanceDashboardController extends Controller
                 $endTime = $row->ExpectedEndTime ?? $row->EndTime;
                 $message = $row->message;
                 $date = $row->date ?? date('Y-m-d');
+                $shiftDate = $row->shift_date ?? $row->date ?? date('Y-m-d');
+                $formattedDate = Carbon::parse($shiftDate)->format('d M Y');
 
                 if ($row->action_type == 'check_in') {
                     return '<div>
-                                <p><strong>' . $message . '</strong></p>
+                                <p><strong>' . $message . ' for date ' . $formattedDate . '</strong></p>
                                 <p>' . $employeeName . ' has not checked in for shift: ' . $shiftName . ' (' . $startTime . ' - ' . $endTime . ')</p>
                             </div>';
                 } elseif ($row->action_type == 'check_out') {
                     return '<div>
-                                <p><strong>' . $message . '</strong></p>
+                                <p><strong>' . $message . ' for date ' . $formattedDate . '</strong></p>
                                 <p>' . $employeeName . ' has not checked out for shift: ' . $shiftName . ' (Expected: ' . $endTime . ')</p>
                             </div>';
                 } elseif ($row->action_type == 'overtime_pending') {
@@ -1883,11 +1800,15 @@ class TimeandAttendanceDashboardController extends Controller
                     $buttonClass = $row->action_type == 'check_in' ? 'btn-danger' : 'btn-success';
                     $buttonText = $row->action_type == 'check_in' ? 'Check-In' : 'Check-Out';
                     $icon = $row->action_type == 'check_in' ? 'fa-sign-in-alt' : 'fa-sign-out-alt';
+                    $shiftDate = $row->shift_date ?? $row->date ?? date('Y-m-d');
+                    $dataTime = $row->action_type == 'check_in' ? $row->StartTime : ($row->ExpectedEndTime ?? $row->EndTime ?? '');
 
                     return '<button type="button"
                                 class="btn btn-sm ' . $buttonClass . ' manual-check-action"
                                 data-roster-id="' . $row->roster_id . '"
                                 data-action="' . $row->action_type . '"
+                                data-date="' . htmlspecialchars($shiftDate) . '"
+                                data-time="' . htmlspecialchars($dataTime) . '"
                                 data-employee-name="' . htmlspecialchars($row->EmployeeName) . '">
                                 <i class="fa-solid ' . $icon . ' me-1"></i>' . $buttonText . '
                             </button>';
@@ -1906,14 +1827,14 @@ class TimeandAttendanceDashboardController extends Controller
      */
     public function ManualCheckInOut(Request $request)
     {
-        // try {
+        try {
             DB::beginTransaction();
 
             $rosterId = $request->roster_id;
             $action = $request->action; // 'check_in' or 'check_out'
-            $today = Carbon::today()->format('Y-m-d');
+            // $today = Carbon::today()->format('Y-m-d');
+            $today = $request->date;
             $currentTime = Carbon::now()->format('H:i');
-
             // Get duty roster
             $dutyRoster = DB::table('duty_rosters')->where('id', $rosterId)->first();
             if (!$dutyRoster) {
@@ -1935,21 +1856,22 @@ class TimeandAttendanceDashboardController extends Controller
                 if ($attendance && $attendance->CheckingTime) {
                     return response()->json(['success' => false, 'message' => 'Employee has already checked in.']);
                 }
-
+               $StartTime = $request->time? Carbon::parse($request->time)->format('H:i'): Carbon::parse($shiftSettings->StartTime)->format('H:i');
                 // Create or update attendance record for check-in
                 if (!$attendance) {
+
                     $attendance = ParentAttendace::create([
                         'roster_id' => $rosterId,
                         'resort_id' => $this->resort->resort_id,
                         'Shift_id' => $dutyRoster->Shift_id,
                         'Emp_id' => $dutyRoster->Emp_id,
                         'date' => $today,
-                        'CheckingTime' => $shiftSettings->StartTime,
+                        'CheckingTime' => $StartTime,
                         'Status' => 'Present',
                         'CheckInCheckOut_Type' => 'Manual',
                     ]);
                 } else {
-                    $attendance->CheckingTime = $shiftSettings->StartTime;
+                    $attendance->CheckingTime = $StartTime;
                     $attendance->Status = 'Present';
                     $attendance->CheckInCheckOut_Type = 'Manual';
                     $attendance->save();
@@ -1959,7 +1881,7 @@ class TimeandAttendanceDashboardController extends Controller
                 ChildAttendace::updateOrCreate(
                     ['Parent_attd_id' => $attendance->id],
                     [
-                        'InTime_out' => $shiftSettings->StartTime,
+                        'InTime_out' => $StartTime,
                         'OutTime_out' => '00:00',
                     ]
                 );
@@ -1975,14 +1897,15 @@ class TimeandAttendanceDashboardController extends Controller
                 if ($attendance->CheckingOutTime) {
                     return response()->json(['success' => false, 'message' => 'Employee has already checked out.']);
                 }
+                $EndTime = $request->time? Carbon::parse($request->time)->format('H:i'): Carbon::parse($shiftSettings->EndTime)->format('H:i');
 
                 // Update attendance record for check-out
-                $attendance->CheckingOutTime = $shiftSettings->EndTime;
+                $attendance->CheckingOutTime = $EndTime;
                 $attendance->CheckInCheckOut_Type = 'Manual';
 
                 // Calculate total hours worked
                 $checkInTime = Carbon::parse($attendance->CheckingTime);
-                $checkOutTime = Carbon::parse($shiftSettings->EndTime);
+                $checkOutTime = Carbon::parse($EndTime);
                 $totalMinutes = $checkInTime->diffInMinutes($checkOutTime);
                 $hours = floor($totalMinutes / 60);
                 $minutes = $totalMinutes % 60;
@@ -1993,13 +1916,13 @@ class TimeandAttendanceDashboardController extends Controller
                 // Update child attendance record
                 $childAttendance = ChildAttendace::where('Parent_attd_id', $attendance->id)->first();
                 if ($childAttendance) {
-                    $childAttendance->OutTime_out = $currentTime;
+                    $childAttendance->OutTime_out = $EndTime;
                     $childAttendance->save();
                 } else {
                     ChildAttendace::create([
                         'Parent_attd_id' => $attendance->id,
                         'InTime_out' => $attendance->CheckingTime,
-                        'OutTime_out' => $shiftSettings->EndTime,
+                        'OutTime_out' => $EndTime,
                     ]);
                 }
 
@@ -2010,8 +1933,13 @@ class TimeandAttendanceDashboardController extends Controller
             
                 // Get pending OT record
                 $employeeOt = EmployeeOvertime::where('Emp_id', $employeeId)
-                    // ->where('date', $otDate)
+                    ->where('date', $today)
                     ->where('status', 'pending')
+                    ->first();
+                    // Get pending OT record
+                $duty_roster_entries = DB::table('duty_roster_entries')->where('Emp_id', $employeeId)
+                    ->where('date', $today)
+                    ->where('OTStatus', null)
                     ->first();
                     
                   $otDate = $employeeOt->date;
@@ -2022,7 +1950,10 @@ class TimeandAttendanceDashboardController extends Controller
                 // Get the duty roster for that employee on that date
                 $dutyRoster = DB::table('duty_rosters')
                     ->where('Emp_id', $employeeId)
-                    // ->whereDate('ShiftDate', $otDate)
+                    ->whereRaw("
+                        STR_TO_DATE(SUBSTRING_INDEX(ShiftDate, ' - ', 1), '%m/%d/%Y') <= ?
+                        AND STR_TO_DATE(SUBSTRING_INDEX(ShiftDate, ' - ', -1), '%m/%d/%Y') >= ?
+                    ", [$otDate, $otDate])
                     ->first();
             
                 if (!$dutyRoster) {
@@ -2038,10 +1969,11 @@ class TimeandAttendanceDashboardController extends Controller
                     $shiftEnd = $shift->EndTime;
                     
                     // OT end time can be manual (time only like 11:00) or fallback
-                    $otEnd = $request->end_time ?? $shift->EndTime;
+                    // $otEnd = $request->time ?? $shift->EndTime+ duty_roster_entries->OverTime;
                     
+                    $otEnd = $request->time? Carbon::parse($request->time)->format('H:i'): Carbon::parse($employeeOt->end_time)->format('H:i');
                     // 1️⃣ OT starts exactly at shift end (FULL datetime → parse directly)
-                    $startTime = Carbon::parse($shiftEnd);
+                    $startTime = Carbon::parse($employeeOt->start_time);
                     
                     // 2️⃣ OT end handling
                     // If OT end has DATE already → parse directly
@@ -2072,6 +2004,11 @@ class TimeandAttendanceDashboardController extends Controller
                     $employeeOt->approved_by = auth()->user()->id ?? null;
                     $employeeOt->approved_at = now();
                     $employeeOt->save();
+
+                    
+                    $duty_roster_entries->OTStatus = 'approved';
+                    $duty_roster_entries->OTApproved_By = auth()->user()->id ?? null;
+                    $duty_roster_entries->save();
                     
                     DB::commit();                    
                     
@@ -2080,24 +2017,14 @@ class TimeandAttendanceDashboardController extends Controller
          
         
 
-        }
-        else {
-            return response()->json(['success' => false, 'message' => 'Invalid action.']);
-        }
-                
+        } else {
+                return response()->json(['success' => false, 'message' => 'Invalid action.']);
+            }
 
-        // } catch (\Exception $e) {
-        //     DB::rollBack();
-            
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => $e->getMessage(),
-        //         'file' => $e->getFile(),
-        //         'line' => $e->getLine(),
-        //         'trace' => $e->getTraceAsString()
-        //     ], 500);
-        //     // return response()->json(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
-        // }
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
+        }
     }
 
     /**
