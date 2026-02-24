@@ -197,15 +197,15 @@
                                                         if (in_array('Rejected', $allStatuses)) {
                                                             $overallStatus = 'Rejected';
                                                             $badgeClass = 'bg-danger';
-                                                        } elseif (in_array('Hold', $allStatuses)) {
-                                                            $overallStatus = 'On Hold';
-                                                            $badgeClass = 'bg-warning text-dark';
                                                         } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Approved';
                                                             $badgeClass = 'bg-success';
                                                         } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending GM';
                                                             $badgeClass = 'bg-info';
+                                                        } elseif (in_array('Hold', $allStatuses)) {
+                                                            $overallStatus = 'On Hold';
+                                                            $badgeClass = 'bg-warning text-dark';
                                                         } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext' || $excomSt == 'Approved' || $excomSt == 'ForwardedToNext' || $hodSt == 'Approved' || $hodSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending Finance';
                                                             $badgeClass = 'bg-primary';
@@ -327,15 +327,15 @@
                                                         if (in_array('Rejected', $allStatuses)) {
                                                             $overallStatus = 'Rejected';
                                                             $badgeClass = 'bg-danger';
-                                                        } elseif (in_array('Hold', $allStatuses)) {
-                                                            $overallStatus = 'On Hold';
-                                                            $badgeClass = 'bg-warning text-dark';
                                                         } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Approved';
                                                             $badgeClass = 'bg-success';
                                                         } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending GM';
                                                             $badgeClass = 'bg-info';
+                                                        } elseif (in_array('Hold', $allStatuses)) {
+                                                            $overallStatus = 'On Hold';
+                                                            $badgeClass = 'bg-warning text-dark';
                                                         } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext' || $excomSt == 'Approved' || $excomSt == 'ForwardedToNext' || $hodSt == 'Approved' || $hodSt == 'ForwardedToNext') {
                                                             $overallStatus = 'Pending Finance';
                                                             $badgeClass = 'bg-primary';
@@ -444,6 +444,7 @@
                     </div>
                 </div>
             </div>
+            <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id">
             <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card h-auto">
                     <div class="mb-4 overflow-hidden">
@@ -517,15 +518,73 @@
 
         var cal = $('#calendar').fullCalendar({
             header: {
-                left: 'prev ',
+                left: 'prev',
                 center: 'title',
                 right: 'next'
             },
             editable: true,
-            eventLimit: 0, // allow "more" link when too many events
-            navLinks: true,
-            dayRender: function (a) {
-                //console.log(a)
+            eventLimit: 0,
+            navLinks: false,
+            events: function(start, end, timezone, callback) {
+                let Resort_id = $("#Dasboard_resort_id").val();
+                $.ajax({
+                    url: "{{ route('resort.ta.GetDateclickWiseUpcomingInterview') }}",
+                    type: "POST",
+                    data: {
+                        start: start.format('YYYY-MM-DD'),
+                        end: end.format('YYYY-MM-DD'),
+                        Resort_id: Resort_id,
+                        "_token": "{{ csrf_token() }}",
+                    },
+                    success: function(response) {
+                        $("#upinterviews").html(response.view);
+                        $('.fc-day').removeClass('custom-dot');
+                        response.dates.forEach(function(date) {
+                            let formattedDate = moment(date).format('YYYY-MM-DD');
+                            let dayCell = $(`.fc-day[data-date="${formattedDate}"]`);
+                            if (dayCell.length) {
+                                dayCell.addClass('custom-dot');
+                            }
+                        });
+                        callback([]);
+                    },
+                    error: function(xhr) {
+                        console.error("Error fetching interview dates", xhr);
+                    }
+                });
+            },
+            dayClick: function(date, jsEvent, view) {
+                let Resort_id = $("#Dasboard_resort_id").val();
+                $.ajax({
+                    url: "{{ route('resort.ta.GetDateclickWiseUpcomingInterview') }}",
+                    type: "POST",
+                    data: {
+                        date: date.format('YYYY-MM-DD'),
+                        Resort_id: Resort_id,
+                        "_token": "{{ csrf_token() }}"
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $("#upinterviews").html(response.view);
+                        } else {
+                            toastr.error(response.message, "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    },
+                    error: function(response) {
+                        var errors = response.responseJSON;
+                        var errs = '';
+                        if (errors && errors.errors) {
+                            $.each(errors.errors, function(key, error) {
+                                errs += error + '<br>';
+                            });
+                        } else {
+                            errs = "An unexpected error occurred.";
+                        }
+                        toastr.error(errs, { positionClass: 'toast-bottom-right' });
+                    }
+                });
             }
         });
     });

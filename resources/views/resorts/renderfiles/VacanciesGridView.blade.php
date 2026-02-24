@@ -48,10 +48,12 @@
                     </tr>
                 </table>
 
-                <div class="text-center"><a href="javascript:void(0)"  data-id="{{ $v->vacancy_id }}"
-                        data-ExpiryDate="{{$v->ExpiryDate}}" data-ApplicationId="{{ $v->ApplicationId}}" class="a-link ExtendJobLink">Extend The Job Ad Link</a></div>
-                <div class="text-center"><a href="{{route('resort.ta.Applicants',base64_encode( $v->vacancy_id)) }}"  class="btn btn-themeSkyblue btn-sm">View Applicants</a>
+                @if($canSeeAction)
+                <div class="text-center mt-2">
+                    <a href="{{route('resort.ta.Applicants',base64_encode( $v->vacancy_id)) }}" class="btn btn-sm btn-themeBlue me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
+                    <a href="javascript:void(0)" data-id="{{ $v->vacancy_id }}" data-ExpiryDate="{{$v->ExpiryDate}}" data-ApplicationId="{{ $v->ApplicationId}}" class="btn btn-sm btn-theme ExtendJobLink" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
                 </div>
+                @endif
             </div>
         </div>
     @endforeach

@@ -1021,7 +1021,7 @@
                         processing: false,
                         serverSide: false,
                         data: tableData,
-                        order:[[4, 'desc']],
+                        order:[[3, 'desc']],
                         columns: [
                             { data: 'EmployeeName', name: 'EmployeeName', render: function (data, type, row) {
                                 return `<div class="tableUser-block">
@@ -1031,7 +1031,7 @@
                             }},
                             { data: 'Position', name: 'Position' },
                             { data: 'Shift', name: 'Shift' },
-                            {data:'created_at', visible:false,searchable:false},
+                            {data:'created_at', visible:false, searchable:false},
                         ]
                     });
                     // #region agent log

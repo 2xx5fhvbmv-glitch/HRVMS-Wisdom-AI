@@ -704,7 +704,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             },
             editable: true,
             eventLimit: 0, // Allow "more" link when too many events
-            navLinks: true,
+            navLinks: false,
             events: function(start, end, timezone, callback) {
                 let Resort_id = $("#Dasboard_resort_id").val();
 
@@ -810,7 +810,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     },
                     editable: true,
                     eventLimit: 0,
-                    navLinks: true,
+                    navLinks: false,
                     selectable: true,
                     select: function(start, end) {
                       var selectedStartDate = start.format('YYYY-MM-DD');  // Format as you need
@@ -829,7 +829,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     },
                     editable: true,
                     eventLimit: 0,
-                    navLinks: true,
+                    navLinks: false,
                     selectable: true, // Add this line
                     select: function(start, end) {
                       var selectedStartDate = start.format('YYYY-MM-DD');  // Format as you need

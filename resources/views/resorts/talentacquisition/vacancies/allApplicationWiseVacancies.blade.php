@@ -44,21 +44,24 @@
                                     <option value="2">abc</option>
                                 </select>
                             </div> --}}
+                            @if($showDeptFilter)
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                 <select class="form-select" name="Department" id="ResortDepartment">
                                     <option selected disabled>Select Department</option>
-                                    @if($ResortDepartment->isNotEmpty())
-                                        @foreach ($ResortDepartment as $item)
-                                            <option value="{{ $item->id }}" data-name="{{ $item->name }}">{{ $item->name }}</option>
-
-                                        @endforeach
-
-                                    @endif
+                                    @foreach ($ResortDepartment as $item)
+                                        <option value="{{ $item->id }}" data-name="{{ $item->name }}">{{ $item->name }}</option>
+                                    @endforeach
                                 </select>
                             </div>
+                            @else
+                            <input type="hidden" id="ResortDepartment" value="">
+                            @endif
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                <select class="form-select  Positions" name="Positions">
-                                     <option selected disabled>Select Poitions</option>
+                                <select class="form-select Positions" name="Positions">
+                                     <option selected disabled>Select Positions</option>
+                                     @foreach ($filterPositions as $pos)
+                                        <option value="{{ $pos->id }}">{{ $pos->position_title }}</option>
+                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -145,37 +148,34 @@
 
 $(document).ready(function() {
 
+    @if($showDeptFilter)
     $("#ResortDepartment").select2({"Placeholder":"Select Department"});
-    $(".Positions").select2({"Placeholder":"Select Positions"});
-            $(document).on('change', '#ResortDepartment', function() {
-                var deptId = $(this).val();
-
-                let currentDepartment = $(this).val();
-                let isDuplicate = false;
-
-                let string='<option selected disabled>Select Positions</option>';
-                $(".Positions").html(string);
-                    $.ajax({
-                        url: "{{ route('resort.get.position') }}",
-                        type: "post",
-                        data: {
-                            deptId: deptId
-                        },
-                        success: function(data) {
-                            if(data.success == true)
-                            {
-                                $.each(data.data, function(key, value) {
-                                    console.log(value.position_title);
-                                    string+='<option value="'+value.id+'">'+value.position_title+'</option>';
-                                });
-                                $(".Positions").html(string);
-                            }
-                        },
-                        error: function(response) {
-                            toastr.error("Position Not Found", { positionClass: 'toast-bottom-right' });
-                        }
+    $(document).on('change', '#ResortDepartment', function() {
+        var deptId = $(this).val();
+        let string = '<option selected disabled>Select Positions</option>';
+        $(".Positions").html(string);
+        $.ajax({
+            url: "{{ route('resort.get.position') }}",
+            type: "post",
+            data: { deptId: deptId },
+            success: function(data) {
+                if(data.success == true) {
+                    $.each(data.data, function(key, value) {
+                        string += '<option value="'+value.id+'">'+value.position_title+'</option>';
                     });
-            });
+                    $(".Positions").html(string);
+                }
+            },
+            error: function(response) {
+                toastr.error("Position Not Found", { positionClass: 'toast-bottom-right' });
+            }
+        });
+        // Reload data on department change
+        let girdview = $(".btn-grid").hasClass('active');
+        if(girdview) { DatatableGrid(); } else { datatablelist(); }
+    });
+    @endif
+    $(".Positions").select2({"Placeholder":"Select Positions"});
             $(".btn-grid").click(function () {
                 $(this).addClass("active");
                 $(".grid-main").addClass("d-block");
@@ -337,7 +337,10 @@ $(document).ready(function() {
                     @if($canSeeAction)
                     { data: 'action', name: 'action', orderable: false, searchable: false },
                     @endif
-                ]
+                ],
+                drawCallback: function() {
+                    $('[data-bs-toggle="tooltip"]').tooltip();
+                }
             });
         }
 
@@ -361,6 +364,7 @@ $(document).ready(function() {
                         // Empty the grid before adding new data
                         $('#vacanciesGrid').html(data);
                         $('#paginationLinks').html(response.pagination);
+                        $('[data-bs-toggle="tooltip"]').tooltip();
                     },
                     error: function() {
                         alert("Error loading vacancies.");

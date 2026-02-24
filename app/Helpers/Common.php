@@ -1820,6 +1820,8 @@ class Common
                                     ->join('resort_departments as t4','t4.id','=','vacancies.department')
                                     ->join('resort_positions as t5','t5.id','=','vacancies.position')
                                     ->join('resort_admins as t6','t6.id','=','t1.Admin_Parent_id')
+                                    ->leftJoin('resort_admins as creator','creator.id','=','vacancies.created_by')
+                                    ->leftJoin('employees as creator_emp','creator_emp.Admin_Parent_id','=','creator.id')
                                     ->where('vacancies.Resort_id',$resortId);
         							// dd($rank , Common::TaFinalApproval($resortId));
                                     if ($rank == Common::TaFinalApproval($resortId))
@@ -1912,12 +1914,15 @@ class Common
                     't3.status',
                     't3.Approved_By',
                     'vacancies.created_at',
+                    DB::raw("CONCAT(creator.first_name, ' ', creator.last_name) as created_by_name"),
+                    'creator_emp.rank as creator_rank',
 
                 ])
                 ->unique('V_id')
                 ->values()
                 ->map(function ($vacancy) use ($config) {
                     $vacancy->rank_name = $config[$vacancy->rank] ?? 'Unknown Rank';
+                    $vacancy->creator_rank_name = $config[$vacancy->creator_rank] ?? '';
                     $vacancy->ReportingTo =  $vacancy->first_name.'  ' .$vacancy->last_name;
                     // Compute approval status from notification children
                     $statusMap = ['Active' => 'Pending HR', 'Approved' => 'In Progress', 'ForwardedToNext' => 'Forwarded', 'Rejected' => 'Rejected', 'Hold' => 'On Hold'];
@@ -2080,6 +2085,9 @@ class Common
                 ->where('t3.status',"ForwardedToNext")
                 ->where('vacancies.status', '=', "Active")
                 ->where('t3.Approved_By', '=',Common::TaFinalApproval($resort_id))
+                ->where(function($q) {
+                    $q->whereNull('t8.link')->orWhere('t8.link', '');
+                })
                 ->latest('t3.created_at');
             if(!isset($take))
             {
@@ -2089,6 +2097,7 @@ class Common
                 [
                                 't3.reason',
                                 't1.rank',
+                                't3.Approved_By',
                                 'vacancies.id as V_id',
                                 't3.id as ta_childid',
 
@@ -2152,7 +2161,7 @@ class Common
                 //         return $vacancy;
                 // });
 				->map(function ($vacancy) use ($config, $resort_id, $resort_Location) {
-					$vacancy->rank_name = $config[$vacancy->rank] ?? 'Unknown Rank';
+					$vacancy->rank_name = $config[$vacancy->Approved_By] ?? 'Unknown Rank';
 
 					// Generate base applicant link
 					$resort_id_decode = base64_encode($resort_id . '/' . $vacancy->ta_childid . '/' . $vacancy->V_id);
@@ -2176,6 +2185,11 @@ class Common
 
 					// Generate other links
 					$vacancy->JobAdvertisement = URL::asset(config('settings.Resort_JobAdvertisement') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id . "/" . $vacancy->Jobadvimg);
+					// All job advertisement images for this resort
+					$allJobAds = JobAdvertisement::where('Resort_id', $resort_id)->get();
+					$vacancy->allJobAdImages = $allJobAds->map(function($ad) use ($resort_id) {
+						return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
+					})->values()->toArray();
 					$vacancy->profileImg = URL::asset($vacancy->passport_photo);
 					$vacancy->ApplicationStatus = $vacancy->ApplicationStatus == null ? " " : $vacancy->ApplicationStatus;
 					$vacancy->As_ApprovedBy = $vacancy->As_ApprovedBy == null ? 25 : $vacancy->As_ApprovedBy;

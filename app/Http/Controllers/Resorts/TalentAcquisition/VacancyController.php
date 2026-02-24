@@ -897,12 +897,12 @@ class VacancyController extends Controller
                     $allStatuses = array_filter([$excomSt, $hodSt, $hrSt, $finSt, $gmSt]);
                     if (in_array('Rejected', $allStatuses)) {
                         $vacancy->approval_status = 'Rejected';
-                    } elseif (in_array('Hold', $allStatuses)) {
-                        $vacancy->approval_status = 'On Hold';
                     } elseif ($gmSt == 'Approved' || $gmSt == 'ForwardedToNext') {
                         $vacancy->approval_status = 'Approved';
                     } elseif ($finSt == 'Approved' || $finSt == 'ForwardedToNext') {
                         $vacancy->approval_status = 'Pending GM';
+                    } elseif (in_array('Hold', $allStatuses)) {
+                        $vacancy->approval_status = 'On Hold';
                     } elseif ($hrSt == 'Approved' || $hrSt == 'ForwardedToNext' || $excomSt == 'Approved' || $excomSt == 'ForwardedToNext' || $hodSt == 'Approved' || $hodSt == 'ForwardedToNext') {
                         $vacancy->approval_status = 'Pending Finance';
                     } else {
@@ -1109,7 +1109,8 @@ class VacancyController extends Controller
             ->leftjoin("applicant_form_data as t6", "t6.Parent_v_id", "=", "vacancies.id")
             ->where("vacancies.resort_id", $resort_id)
             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
-            ->where('t4.status','ForwardedToNext');
+            ->where('t4.status','ForwardedToNext')
+;
             if (!empty($searchTerm))
             {
                 $Department ='';
@@ -1157,7 +1158,26 @@ class VacancyController extends Controller
             ")
             ->groupBy("vacancies.id", "t2.position_title", "t2.code", "t1.name", "t1.code", "t5.link_Expiry_date", "t6.Application_date", "t6.id", "vacancies.Total_position_required")
             ->get();
-        $ResortDepartment = ResortDepartment::where('resort_id',$resort_id)->get();
+        $ResortDepartment = ResortDepartment::where('resort_id', $resort_id)->get();
+
+        // Check if current user belongs to HR department
+        $employee = $this->resort->GetEmployee ?? null;
+        $userDeptName = '';
+        if ($employee) {
+            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+        }
+        $isHrUser = stripos($userDeptName, 'Human Resources') !== false;
+
+        // HR users: hide department filter, show only HR positions
+        // Non-HR users (GM, EXCOM): show department filter and all positions
+        if ($isHrUser) {
+            $showDeptFilter = false;
+            $hrDeptId = $ResortDepartment->first(function($d) { return stripos($d->name, 'Human Resources') !== false; });
+            $filterPositions = $hrDeptId ? ResortPosition::where('dept_id', $hrDeptId->id)->get() : collect();
+        } else {
+            $showDeptFilter = true;
+            $filterPositions = ResortPosition::where('resort_id', $resort_id)->get();
+        }
         foreach($NewVacancies  as $v)
         {
             // $applicationdata =$v->TAnotificationParent[0]->TaNotificationChildren->where("Approved_By",Common::TaFinalApproval($resort_id))->first();
@@ -1175,16 +1195,7 @@ class VacancyController extends Controller
 
         $config = config('settings.Position_Rank');
 
-        // Check if current user is HR department HOD or HR department EXCOM
-        $canSeeAction = false;
-        $employee = $this->resort->GetEmployee ?? null;
-        if ($employee) {
-            $userRank = $employee->rank;
-            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name');
-            $isHrDept = stripos($userDeptName, 'Human Resources') !== false;
-            $isHodOrExcom = in_array($userRank, [1, 2]); // 1=EXCOM, 2=HOD
-            $canSeeAction = $isHrDept && $isHodOrExcom;
-        }
+        $canSeeAction = $isHrUser;
 
         if($request->ajax())
         {
@@ -1199,18 +1210,9 @@ class VacancyController extends Controller
                   $editUrl = asset('resorts_assets/images/edit.svg');
                   $deleteUrl = asset('resorts_assets/images/trash-red.svg');
 
-                $route = route("resort.ta.Applicants",    base64_encode($row->vacancy_id));
-                    return'<div class="dropdown table-dropdown">
-                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
-                                    id="dropdownMenuButton'.$row->vacancy_id.'" data-bs-toggle="dropdown"
-                                    aria-expanded="false">
-                                    <i class="fa-solid fa-ellipsis"></i>
-                                </button>
-                                <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton'.$row->vacancy_id.'">
-                                    <li><a class="dropdown-item"  href="'.$route.'" data-id="'.$row->vacancy_id.'" >View Applicants</a></li>
-                                    <li><a class="dropdown-item ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'"   href="javascript:void(0)">Extend The Job Ad Link</a></li>
-                                </ul>
-                            </div>';
+                $route = route("resort.ta.Applicants", base64_encode($row->vacancy_id));
+                    return '<a href="'.$route.'" class="btn btn-sm btn-themeBlue me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
+                            <a href="javascript:void(0)" class="btn btn-sm btn-theme ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>';
 
                         })
                     ->addColumn('Position', function ($row) {
@@ -1228,7 +1230,7 @@ class VacancyController extends Controller
 
                     
         }
-        return view("resorts.talentacquisition.vacancies.allApplicationWiseVacancies",compact('page_title','ResortDepartment','canSeeAction'));
+        return view("resorts.talentacquisition.vacancies.allApplicationWiseVacancies",compact('page_title','ResortDepartment','canSeeAction','filterPositions','showDeptFilter'));
     }
 
     public function GridViewData(Request $request)
@@ -1288,7 +1290,8 @@ class VacancyController extends Controller
             ->join('job_advertisements as t7', 't7.Resort_id', '=', 'vacancies.Resort_id')
             ->where("vacancies.resort_id", $resort_id)
             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
-            ->where('t4.status','ForwardedToNext');
+            ->where('t4.status','ForwardedToNext')
+;
             if (!empty($searchTerm))
             {
                 $Department ='';
@@ -1300,7 +1303,7 @@ class VacancyController extends Controller
                         ->orWhere("t2.code", "like", "%$searchTerm%")
                         ->orWhere("vacancies.id", $searchTerm);
                     // Check if the searchTerm is a date
-                    try 
+                    try
                     {
                         $date = Carbon::createFromFormat('d-m-Y', $searchTerm)->format('Y-m-d');
                         $query->orWhere("t6.Application_date", "like", "%$date%")->orWhere("t5.link_Expiry_date", "like", "%$date%");
@@ -1358,7 +1361,14 @@ class VacancyController extends Controller
                         );
                         return $vacancy;
                     });
-            $view = view('resorts.renderfiles.VacanciesGridView',compact('NewVacancies'))->render();
+            // Check if current user belongs to HR department
+            $canSeeAction = false;
+            $employee = $this->resort->GetEmployee ?? null;
+            if ($employee) {
+                $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name');
+                $canSeeAction = stripos($userDeptName, 'Human Resources') !== false;
+            }
+            $view = view('resorts.renderfiles.VacanciesGridView',compact('NewVacancies','canSeeAction'))->render();
                 $pagination =  $NewVacancies->links()->render();
 
             return response()->json(['view' => $view,  'pagination'=>$pagination,   'success' => true]);
