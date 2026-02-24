@@ -705,7 +705,6 @@
                                                                 <th>Employee Name</th>
                                                                 <th>Poisition</th>
                                                                 <th>Shift</th>
-                                                                <th>Action</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -1462,7 +1461,7 @@
             },
             editable: true,
             eventLimit: 0, 
-            navLinks: true,
+            navLinks: false,
             events: function(start, end, timezone, callback) {
                 let Resort_id = $("#Dasboard_resort_id").val();
 
@@ -1564,7 +1563,7 @@
                 },
                 editable: true,
                 eventLimit: 0,
-                navLinks: true,
+                navLinks: false,
                 selectable: true,
                 select: function(start, end) {
                     var selectedStartDate = start.format('YYYY-MM-DD');  // Format as you need
@@ -1583,7 +1582,7 @@
                 },
                 editable: true,
                 eventLimit: 0,
-                navLinks: true,
+                navLinks: false,
                 selectable: true, // Add this line
                 select: function(start, end) {
                     var selectedStartDate = start.format('YYYY-MM-DD');  // Format as you need
@@ -2292,8 +2291,7 @@
                         </div>`;
                     }},
                     { data: 'Position', name: 'Position' },
-                    { data: 'Shift', name: 'Shift' },
-                    { data: 'action', name: 'action', orderable: false, searchable: false }
+                    { data: 'Shift', name: 'Shift' }
                 ]
             });
         }

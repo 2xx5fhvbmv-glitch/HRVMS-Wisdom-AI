@@ -167,10 +167,13 @@
                                                             data-Resort_id="{{ $t->Resort_id }}"
                                                             data-ta_childid="{{ $t->ta_childid }}"
                                                             data-ExpiryDate ="{{ $t->ExpiryDate}}" data-jobadvertisement="{{$t->JobAdvertisement}}" data-link="{{$t->adv_link}}"  data-applicationUrlshow="{{$t->applicationUrlshow}}" data-applicant_link="{{$t->applicant_link}}"
-                                                            data-source_links="{{ json_encode($t->source_links) }}" data-bs-toggle="modal" class="a-link jobAD-modal">Create Job Advertisement</a>
+                                                            data-source_links="{{ json_encode($t->source_links) }}" data-position="{{ $t->Position }}" data-alljobimages="{{ json_encode($t->allJobAdImages) }}" data-bs-toggle="modal" class="a-link jobAD-modal">Create Job Advertisement</a>
 
                                                         @endif
                                                         </div>
+                                                        <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="ms-auto" title="View Applicants">
+                                                            <i class="fa-solid fa-eye"></i>
+                                                        </a>
                                                     {{-- elseif($t->InterviewLinkStatus=="Active"  ||  $t->ApplicationStatus=="Sortlisted" || $t->As_ApprovedBy == 3 ) --}}
 
                                                     @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy == 3  &&  $t->InterviewLinkStatus == null )
@@ -208,28 +211,22 @@
                                 <div class="row justify-content-between align-items-center g-3">
                                     <div class="col">
                                         <h3>Top Countries</h3>
-
-                                    </div>
-
-                                    <div class="col-auto">
-                                        <select class="form-control select2" name="ResortPosition" id="ResortPosition">
-                                            @if( isset($Resort_Position) &&  $Resort_Position->isNotEmpty())
-                                                @foreach ($Resort_Position as $position)
-                                                    <option value="{{ $position->id }}">{{ $position->position_title }}</option>
-                                                @endforeach
-                                            @endif
-                                        </select>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="h-45 d-none d-lg-block"></div>
                                     </div>
                                 </div>
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-collapse table-topCoun">
                                     <tbody id="topCountriesWiseCount">
-
-
+                                        @if(isset($topCountries) && $topCountries->count() > 0)
+                                            @foreach($topCountries as $country)
+                                                <tr>
+                                                    <td><img src="{{ $country->flag_url }}" alt="flag" class="flag"> {{ $country->country }}</td>
+                                                    <td>{{ $country->total_count }}</td>
+                                                </tr>
+                                            @endforeach
+                                        @else
+                                            <tr><td colspan="3" class="text-center">No Data Found</td></tr>
+                                        @endif
                                     </tbody>
                                 </table>
                             </div>
@@ -355,7 +352,7 @@
                                             </div>
                                             <div>
                                                 <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                                                <p>Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>           
+                                                <p><strong>{{ $vacancy->created_by_name }} ({{ $vacancy->creator_rank_name }})</strong> Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
                                             </div>
                                             <div class="icon">
                                                 <a href="javascript:void(0)" class="respondOfFreshmodal"
@@ -365,7 +362,9 @@
                                                         data-rank="{{ $vacancy->rank_name }}"
                                                         data-position="{{ $vacancy->Position }}"
                                                         data-NoOfVacnacy="{{ $vacancy->NoOfVacnacy }}"
-                                                        data-Child_ta_id ="{{ $vacancy->Child_ta_id }}">
+                                                        data-Child_ta_id ="{{ $vacancy->Child_ta_id }}"
+                                                        data-createdby="{{ $vacancy->created_by_name }}"
+                                                        data-creatorrank="{{ $vacancy->creator_rank_name }}">
                                                         Respond
                                                 </a>
 
@@ -643,9 +642,16 @@
             <form id="jobAD-form">
                 @csrf
                 <div class="modal-body">
-                <p>Would you like to advertise below poster for job post for Assistant Front Desk Manager?</p>
-                <div class="text-center mb-sm-4 mb-3">
-                    <img id="JobAdvertisementImage" alt="image">
+                <p>Would you like to advertise below poster for job post for <strong id="jobAdPositionName"></strong>?</p>
+                <div id="jobAdCarousel" class="carousel slide mb-sm-4 mb-3" data-bs-interval="false">
+                    <div class="carousel-inner text-center" id="jobAdCarouselInner">
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#jobAdCarousel" data-bs-slide="prev" id="jobAdPrevBtn" style="display:none;">
+                        <span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 10px;"></span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#jobAdCarousel" data-bs-slide="next" id="jobAdNextBtn" style="display:none;">
+                        <span class="carousel-control-next-icon" aria-hidden="true" style="background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 10px;"></span>
+                    </button>
                 </div>
                 <div class="text-center mb-sm-4 mb-3">
                     <a href="javascript:void(0)" class="DowloadAdvertisement btn btn-themeSkyblue btn-sm">Download</a>
@@ -712,7 +718,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             },
             editable: true,
             eventLimit: 0, // Allow "more" link when too many events
-            navLinks: true,
+            navLinks: false,
             events: function(start, end, timezone, callback) {
                 let Resort_id = $("#Dasboard_resort_id").val();
 
@@ -936,6 +942,8 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             var rank = $(this).attr('data-rank');
             var ta_id= $(this).attr('data-ta_id');
             var Child_ta_id= $(this).attr('data-Child_ta_id');
+            var createdBy = $(this).attr('data-createdby');
+            var creatorRank = $(this).attr('data-creatorrank');
 
             $("#holdResponseModel").attr("data-ta_id",ta_id);
             $("#RejectResponseModel").attr("data-ta_id",ta_id);
@@ -952,7 +960,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                 </div>
                                 <div>
                                     <h6>${department} (${rank})</h6>
-                                    <p>Requested for Hire ${NoOfVacnacy} ${position}</p>
+                                    <p><strong>${createdBy} (${creatorRank})</strong> Requested for Hire ${NoOfVacnacy} ${position}</p>
                                 </div>
 
                     </div>`;
@@ -1173,6 +1181,10 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         $(document).on("click", ".jobAD-modal", function () {
             $("#jobAD-modal").modal("show");
 
+            // Set position name in modal
+            let positionName = $(this).data("position");
+            $("#jobAdPositionName").text(positionName);
+
             // Fetch data attributes
             let applicationUrlShow = $(this).data("applicationurlshow");
             let applicantLink = $(this).data("applicant_link");
@@ -1180,7 +1192,31 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             let jobLink = $(this).data("link");
             let childId = $(this).data("ta_childid");
             let expiryDate = $(this).data("expirydate");
-            let sourceLinks = $(this).data("source_links"); // This is the new data attribute
+            let sourceLinks = $(this).data("source_links");
+            let allJobImages = $(this).data("alljobimages") || [];
+
+            // Build carousel images
+            let carouselInner = $("#jobAdCarouselInner");
+            carouselInner.empty();
+            if (allJobImages.length > 0) {
+                $.each(allJobImages, function(i, imgUrl) {
+                    let activeClass = i === 0 ? 'active' : '';
+                    carouselInner.append('<div class="carousel-item ' + activeClass + '"><img src="' + imgUrl + '" alt="Job Advertisement" style="max-width:100%;"></div>');
+                });
+                // Show/hide arrows based on image count
+                if (allJobImages.length > 1) {
+                    $("#jobAdPrevBtn, #jobAdNextBtn").show();
+                } else {
+                    $("#jobAdPrevBtn, #jobAdNextBtn").hide();
+                }
+                // Set download link to first image
+                $(".DowloadAdvertisement").attr("data-hrefLink", allJobImages[0]);
+            } else {
+                carouselInner.append('<div class="carousel-item active"><img src="' + jobAdv + '" alt="Job Advertisement" style="max-width:100%;"></div>');
+                $("#jobAdPrevBtn, #jobAdNextBtn").hide();
+                $(".DowloadAdvertisement").attr("data-hrefLink", jobAdv);
+            }
+
             $(".JdSumit").show();
             // Set values in the modal
             $(".ta_child_id").val(childId);
@@ -1212,8 +1248,6 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             }
 
             $(".link_Job").val(applicantLink).addClass("link_Job_");
-            $("#JobAdvertisementImage").attr("src", jobAdv);
-            $(".DowloadAdvertisement").attr("data-hrefLink", jobAdv);
 
             // Handle Source Links
             let sourceLinksList = $("#sourceLinksList");
@@ -1242,6 +1276,12 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
              {
                 e.preventDefault();
             }
+        });
+
+        // Update download link when carousel slides
+        $('#jobAdCarousel').on('slid.bs.carousel', function () {
+            var activeImg = $(this).find('.carousel-item.active img').attr('src');
+            $(".DowloadAdvertisement").attr("data-hrefLink", activeImg);
         });
 
         $(document).on("click", ".DowloadAdvertisement", function() {
@@ -1547,42 +1587,6 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     });
 
-$(document).on("change", "#ResortPosition", function () {
-    let PositionId = $(this).val();
-    $.ajax({
-        url: "{{ route('resort.ta.GePositionWiseTopAppliants') }}",
-        type: "POST",
-        data: {
-            PositionId: PositionId,
-            _token: "{{ csrf_token() }}"
-        },
-        success: function (response) {
-            let string1 = '';
-
-            // Check if response contains the applicant trends
-            if (response && response.applicantTrends) {
-                // Loop through the trends and construct rows
-                $.each(response.applicantTrends, function (i, v) {
-                    string1 += `
-                        <tr>
-                            <td><img src="${v.flag_url}" alt="flag" class="flag">${v.country}</td>
-                            <td>${v.latest_count}</td>
-                            <td><img src="${v.trend}" alt="icon"></td>
-                        </tr>`;
-                });
-
-
-                $("#topCountriesWiseCount").html(string1);
-            } else {
-
-            }
-        },
-        error: function (xhr, status, error) {
-            console.error("AJAX Error:", error);
-            alert("An error occurred while fetching data.");
-        }
-    });
-});
 
 </script>
 @endsection

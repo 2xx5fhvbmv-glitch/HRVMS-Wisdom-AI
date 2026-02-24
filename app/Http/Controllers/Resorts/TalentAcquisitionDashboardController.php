@@ -277,8 +277,18 @@ class TalentAcquisitionDashboardController extends Controller
                     ->get()
                     ->count();
 
-            // $positionId = $request->input('position_id'); // Fetch position filter from request
             $Resort_Position =  ResortPosition::where('Resort_id', $resort_id)->get();
+
+            // Top Countries - applicants grouped by country
+            $topCountries = DB::table('applicant_form_data')
+                ->join('countries', 'countries.id', '=', 'applicant_form_data.country')
+                ->join('vacancies', 'vacancies.id', '=', 'applicant_form_data.Parent_v_id')
+                ->where('vacancies.Resort_id', $resort_id)
+                ->selectRaw('countries.name as country, countries.flag_url, COUNT(applicant_form_data.id) as total_count')
+                ->groupBy('countries.name', 'countries.flag_url')
+                ->orderByDesc('total_count')
+                ->limit(10)
+                ->get();
 
             $HiringSource = HiringSource::where('Resort_id', $resort_id)
                         ->orderBy('id', 'desc')->get();
@@ -348,6 +358,7 @@ class TalentAcquisitionDashboardController extends Controller
                     'NewVacancies',
                     'talentPool',
                     'Resort_Position',
+                    'topCountries',
                     'HiringSource',
                     'EmailTamplete',
                     'approvalHistory'
@@ -438,33 +449,6 @@ class TalentAcquisitionDashboardController extends Controller
             ->orderByDesc('id')
             ->limit(6)
             ->get();
-
-            // Filter vacancies to only show positions with available slots
-            $currentYear = \Carbon\Carbon::now()->year;
-            $currentMonth = \Carbon\Carbon::now()->month;
-            $vacancies = $vacancies->filter(function ($vacancy) use ($resort_id, $currentYear, $currentMonth) {
-                $manningresponse = ManningResponse::where('resort_id', $resort_id)
-                    ->where('dept_id', $vacancy->department)
-                    ->where('year', $currentYear)
-                    ->first();
-
-                if (!$manningresponse) return true;
-
-                $pmd = PositionMonthlyData::where('manning_response_id', $manningresponse->id)
-                    ->where('position_id', $vacancy->position)
-                    ->where('month', $currentMonth)
-                    ->first();
-
-                if (!$pmd) return true;
-
-                $existingVacancies = Vacancies::where('Resort_id', $resort_id)
-                    ->where('position', $vacancy->position)
-                    ->whereNotIn('status', ['Closed', 'Cancelled', 'Draft'])
-                    ->sum('Total_position_required') ?? 0;
-
-                $available = max(0, ($pmd->vacantcount ?? 0) - $existingVacancies);
-                return $available > 0;
-            });
 
             // dd($vacancies);
 
@@ -612,6 +596,7 @@ class TalentAcquisitionDashboardController extends Controller
             ->selectRaw('countries.name as country, countries.flag_url, COUNT(applicant_form_data.id) as latest_count')
             ->join('countries', 'countries.id', '=', 'applicant_form_data.country')
             ->join('vacancies', 'vacancies.id', '=', 'applicant_form_data.Parent_v_id')
+            ->where('vacancies.Resort_id', $resortId)
             ->where('vacancies.Position', $PositionId)
             ->whereDate('applicant_form_data.created_at', '>=', now()->startOfMonth())
             ->groupBy('countries.name', 'countries.flag_url')
@@ -621,15 +606,16 @@ class TalentAcquisitionDashboardController extends Controller
             ->selectRaw('countries.name as country, COUNT(applicant_form_data.id) as previous_count')
             ->join('countries', 'countries.id', '=', 'applicant_form_data.country')
             ->join('vacancies', 'vacancies.id', '=', 'applicant_form_data.Parent_v_id')
+            ->where('vacancies.Resort_id', $resortId)
             ->where('vacancies.Position', $PositionId)
             ->whereDate('applicant_form_data.created_at', '<', now()->startOfMonth())
             ->groupBy('countries.name')
-            ->get();
+            ->pluck('previous_count', 'country');
         $applicantTrends = [];
         $string1='';
         foreach ($currentVacancyData as $current)
         {
-            $previousCount = $previousVacancyData[$current->country]->previous_count ?? 0;
+            $previousCount = $previousVacancyData[$current->country] ?? 0;
             $trend = $current->latest_count > $previousCount
                 ? URL::asset('resorts_assets/images/up-chart.svg')
                 : ($current->latest_count < $previousCount ? URL::asset('resorts_assets/images/down-chart.svg') : '');
