@@ -39,17 +39,20 @@
 
                         @php
                             // Fetch overtime data from employee_overtimes table
-                            $overtimeData = \App\Models\EmployeeOvertime::with('shift')
-                                ->where('Emp_id', $r->emp_id)
-                                ->where('resort_id', $resort_id)
-                                ->whereBetween('date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
-                                ->orderBy('date', 'asc')
-                                ->orderBy('start_time', 'asc')
-                                ->get();
+                             $overtimeData = DB::table('duty_roster_entries')
+                        ->where('Emp_id', $r->emp_id)
+                        ->where('resort_id', $resort_id)
+                        ->whereBetween('date', [
+                            $startOfMonth->format('Y-m-d'),
+                            $endOfMonth->format('Y-m-d')
+                        ])
+                        ->where('OverTime', '!=', '00:00')
+                        ->orderBy('date', 'asc')
+                        ->get();
                             
-                            // Group overtime by date
+                           // Group overtime by date
                             $overtimeByDate = $overtimeData->groupBy(function($item) {
-                                return $item->date->format('Y-m-d');
+                                return $item->date;
                             });
                             
                             $totalMonthWiseHours = 0;
@@ -57,11 +60,11 @@
                             $regularOtMonthly = 0;
                             
                             foreach($overtimeData as $ot) {
-                                $dayName = $ot->date->format('D');
-                                list($hours, $minutes) = explode(':', $ot->total_time ?? '0:0');
+                               $dayName = \Carbon\Carbon::parse($ot->date)->format('D');
+                                list($hours, $minutes) = explode(':', $ot->OverTime ?? '0:0');
                                 $totalOtHours = (int)$hours + ((int)$minutes / 60);
                                 
-                                if($dayName == "Fri" || (isset($publicHolidays) && in_array($ot->date->format('Y-m-d'), $publicHolidays))) {
+                                if($dayName == "Fri" || (isset($publicHolidays) && in_array($ot->date, $publicHolidays))) {
                                     $holidayOtMonthly += $totalOtHours;
                                 } else {
                                     $regularOtMonthly += $totalOtHours;
@@ -88,9 +91,9 @@
                                     list($hours, $minutes) = explode(':', $ot->total_time ?? '0:0');
                                     $dayTotalMinutes += (int)$hours * 60 + (int)$minutes;
                                     
-                                    if($ot->status == 'pending') $hasPending = true;
-                                    if($ot->status == 'rejected') $hasRejected = true;
-                                    if($ot->status == 'approved') $hasApproved = true;
+                                    if($ot->OTStatus == 'pending') $hasPending = true;
+                                    if($ot->OTStatus == 'rejected') $hasRejected = true;
+                                    if($ot->OTStatus == 'approved') $hasApproved = true;
                                 }
                                 
                                 $dayTotalHours = floor($dayTotalMinutes / 60);
@@ -108,22 +111,13 @@
                                 }
                             @endphp
 
-                            <td class="overtime-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }} @if($overtimeCount > 0) has-overtime {{ $statusColor }} @endif"
+                            <td class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }} @if($overtimeCount > 0) has-overtime {{ $statusColor }} @endif"
                                 data-date="{{ $date }}"
                                 data-emp-id="{{ $r->emp_id }}"
                                 style="cursor: pointer;"
-                                data-tooltip="{{ htmlspecialchars(json_encode($dayOvertimes->map(function($ot) {
-                                    return [
-                                        'id' => $ot->id,
-                                        'start_time' => $ot->start_time,
-                                        'end_time' => $ot->end_time,
-                                        'total_time' => $ot->total_time,
-                                        'status' => $ot->status,
-                                        'shift' => $ot->shift->ShiftName ?? ''
-                                    ];
-                                })->toArray())) }}">
+                                >
                                 @if($overtimeCount > 0)
-                                    <span class="overtime-total">{{ $dayTotalTime }}</span>
+                                    <span class="overtime-total">{{ $ot->OverTime }}</span>
                                 @else
                                     <span class="no-overtime">-</span>
                                 @endif

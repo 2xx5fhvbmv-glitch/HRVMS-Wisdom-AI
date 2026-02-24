@@ -24,60 +24,90 @@
                 </div>
             </div>
         </div>
-
+        <style>
+    /* Custom 5 column layout for large screens */
+    @media (min-width: 992px) {
+        .col-custom-5 {
+            flex: 0 0 20%;
+            max-width: 20%;
+        }
+    }
+</style>
         <div class="row g-3 g-xxl-4 card-heigth">
-            <div class="col-lg-3 col-sm-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">Total Employees</p>
-                            <strong id="TotalEmployees">{{ $EmployeesCount }}</strong>
+             <!-- Total Employees -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Total Employees</p>
+                                <strong id="TotalEmployees">{{ $EmployeesCount }}</strong>
+                            </div>
+                            <a href="{{ route('resort.timeandattendance.employee') }}">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a>
                         </div>
-                        <a href="{{ route('resort.timeandattendance.employee') }}">
-                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
-            </div>
-            <div class="col-lg-3 col-sm-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">Total Present</p>
-                            <strong id="totalPresentEmployee">{{ $totalPresentEmployee }}</strong>
+
+                <!-- Total Present -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Total Present</p>
+                                <strong id="totalPresentEmployee">{{ $totalPresentEmployee }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
-            </div>
-            <div class="col-lg-3 col-sm-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">On Leave</p>
-                            <strong id="totalLeaveEmployee">{{ $totalLeaveEmployee }}</strong>
+
+                <!-- On Leave -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">On Leave</p>
+                                <strong id="totalLeaveEmployee">{{ $totalLeaveEmployee }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
-            </div>
-            <div class="col-lg-3 col-sm-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">Absent</p>
-                            <strong id="totalAbsantEmployee">{{ $totalAbsantEmployee }}</strong>
+
+                <!-- Absent -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Absent</p>
+                                <strong id="totalAbsantEmployee">{{ $totalAbsantEmployee }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
-            </div>
+
+                <!-- 5th Box Example -->
+                <div class="col-custom-5 col-sm-6 col-12">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Unknown Status</p>
+                                <strong id="totalunknown_status_Employee">{{ $totalunknown_status_Employee ?? 0 }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
+                        </div>
+                    </div>
+                </div>
             <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.AttandanceRegister',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
@@ -161,7 +191,9 @@
                                 </div>
                                 <div class="flex-grow-1">
                                     <p class="mb-1">
-                                        <strong>{{ $todo->message }}</strong>
+@if($todo->action_type == "")
+    {{ 'Action missing' }}
+@endif                                        <strong>{{ $todo->message }}</strong>
                                     </p>
                                     <p class="mb-2 small">
                                         {{ $todo->EmployeeName }} - {{ $todo->ShiftName }}<br>
@@ -170,11 +202,18 @@
                                         @else
                                             Expected Check-Out: {{ $todo->ExpectedEndTime ?? $todo->EndTime }}
                                         @endif
+                                        for date {{ $todo->shift_date}}
                                     </p>
                                     <button type="button" 
                                         class="btn btn-sm {{ $todo->action_type == 'check_in' ? 'btn-danger' : 'btn-success' }} manual-check-action" 
                                         data-roster-id="{{ $todo->roster_id }}"
                                         data-action="{{ $todo->action_type }}"
+                                        data-date="{{ $todo->shift_date }}"
+                                        @if($todo->action_type == 'check_in')
+                                            data-time="{{ $todo->StartTime }}"
+                                        @else
+                                           data-time="{{ $todo->ExpectedEndTime ?? $todo->EndTime }}"
+                                        @endif
                                         data-employee-name="{{ $todo->EmployeeName }}">
                                         <i class="fa-solid {{ $todo->action_type == 'check_in' ? 'fa-sign-in-alt' : 'fa-sign-out-alt' }} me-1"></i>
                                         {{ $todo->action_type == 'check_in' ? 'Check-In' : 'Check-Out' }}
@@ -220,7 +259,7 @@
                 </div>
             </div>
             <div class="col-xl-3 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card ">
+                <div class="card">
                     <div class="card-title d-flex justify-content-between">
                         <h3>OT Hours</h3>
                     </div>
@@ -333,9 +372,11 @@
 
 <script>
 
-    let myAttendance;
-    const ctx = document.getElementById('myAttendance');
-    if (!ctx) {
+   
+let myAttendance;
+const ctx = document.getElementById('myAttendance');
+
+if (!ctx) {
     console.error('Attendance chart canvas not found');
 } else {
     const ctx2d = ctx.getContext('2d');
@@ -354,7 +395,8 @@
         labelsAttandance.push(`${month} ${year}`);
     }
 
-    const myAttendance = new Chart(ctx2d, {
+    // Initialize the chart
+    myAttendance = new Chart(ctx2d, {
         type: 'bar',
         data: {
             labels: labelsAttandance,
@@ -372,46 +414,35 @@
             responsive: true,
             maintainAspectRatio: true,
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
                 tooltip: {
-                    enabled: true,
                     callbacks: {
-                        label: function (tooltipItem) {
+                        label: function(tooltipItem) {
                             return `${tooltipItem.raw}%`;
                         }
                     }
                 }
             },
             scales: {
-                x: {
-                    grid: {
-                        display: false
-                    }
-                },
+                x: { grid: { display: false } },
                 y: {
                     beginAtZero: true,
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        stepSize: 20,
-                        callback: value => `${value}%`
-                    }
+                    grid: { display: false },
+                    ticks: { stepSize: 20, callback: value => `${value}%` }
                 }
             }
         }
     });
 }
-
     
     if (typeof myAttendance !== 'undefined') {
         GetAttandance();
-        $(".YearWiseDateattandance").on('change', function () {
+       
+    }
+    $(".YearWiseDateattandance").on('change', function () {
+          
             GetAttandance();
         });
-    }
     $("#DashboardDatePicker").on('change', function () {
 
         GetAttandance();
@@ -428,6 +459,8 @@
                         $("#totalPresentEmployee").html(response.data.totalPresentEmployee);
                         $("#totalAbsantEmployee").html(response.data.totalAbsantEmployee);
                         $("#totalLeaveEmployee").html(response.data.totalLeaveEmployee);
+                        $("#totalunknown_status_Employee").html(response.data.totalunknown_status_Employee);
+                        
                     }
                 },
                 error: function (xhr) {
@@ -436,11 +469,7 @@
             });
     });
     function GetAttandance()
-    {
-        if (typeof myAttendance === 'undefined') {
-            console.error('Attendance chart not initialized');
-            return;
-        }
+    {   
         
         let date  =  $("#DashboardDatePicker").val() ? $("#DashboardDatePicker").val().split('/').reverse().join('-') : new Date().toISOString().split('T')[0];
         let YearWiseDateattandance = $(".YearWiseDateattandance").val() || new Date().getFullYear();
@@ -583,6 +612,8 @@
                     $("#totalPresentEmployee").html(response.data.totalPresentEmployee);
                     $("#totalAbsantEmployee").html(response.data.totalAbsantEmployee);
                     $("#totalLeaveEmployee").html(response.data.totalLeaveEmployee);
+                    $("#totalunknown_status_Employee").html(response.data.totalunknown_status_Employee);
+
                 }
             },
             error: function (xhr) {
@@ -697,20 +728,31 @@
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const date = $(this).data('date');
         const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
         const button = $(this);
+         const time = $(this).data('time');
         
         Swal.fire({
             title: `Confirm ${actionText}`,
-            text: `Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?`,
+             html: `
+                <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
+                <input type="text" id="manualTime" class="swal2-input" required>
+            `,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: action === 'check_in' ? '#dc3545' : '#28a745',
             cancelButtonColor: '#6c757d',
             confirmButtonText: `Yes, ${actionText}`,
             cancelButtonText: 'Cancel',
+            didOpen: () => {
+                    if (time) {
+                        document.getElementById('manualTime').value = time;
+                    }
+                },
         }).then((result) => {
             if (result.isConfirmed) {
+               let selectedTime = document.getElementById('manualTime').value;
                 // Disable button during request
                 button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i>Processing...');
                 
@@ -720,7 +762,9 @@
                     data: {
                         _token: "{{ csrf_token() }}",
                         roster_id: rosterId,
-                        action: action
+                        action: action,
+                        date:date,
+                        time:selectedTime
                     },
                     success: function(response) {
                         if (response.success) {
@@ -733,7 +777,6 @@
                                 window.location.reload();
                             });
                         } else {
-                           
                             Swal.fire(
                                 'Error!',
                                 response.message || 'An error occurred.',
@@ -797,7 +840,6 @@
                             'An error occurred while processing the request.',
                             'error'
                         );
-                        
 
                         console.error(error);
                     }
