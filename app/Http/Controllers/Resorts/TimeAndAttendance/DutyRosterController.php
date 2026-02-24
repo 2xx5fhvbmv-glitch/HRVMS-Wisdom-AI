@@ -34,7 +34,6 @@ class DutyRosterController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(!$this->resort) return;
         $reporting_to = $this->resort->GetEmployee->id ?? null;
 
         $this->underEmp_id = Common::getSubordinates($reporting_to);
@@ -224,6 +223,72 @@ class DutyRosterController extends Controller
         // }
     }
 
+    /**
+     * Return dates (Y-m-d) on which selected employees already have a duty roster.
+     * Used by create-duty-roster to disable those dates in the date range picker.
+     */
+    public function RosterOccupiedDates(Request $request)
+    {
+        $empIds = $request->input('emp_ids', []);
+        if (!is_array($empIds)) {
+            $empIds = $empIds ? [$empIds] : [];
+        }
+        $empIds = array_filter(array_map('intval', $empIds));
+
+        $dates = [];
+        if (empty($empIds)) {
+            return response()->json(['dates' => $dates]);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $rosters = DutyRoster::where('resort_id', $resort_id)
+            ->whereIn('Emp_id', $empIds)
+            ->get(['Emp_id', 'ShiftDate']);
+
+        $today = new \DateTime();
+        $today->setTime(0, 0, 0); // Remove time part
+
+        $datesByEmployee = array_fill_keys(array_map('strval', $empIds), []);
+
+        foreach ($rosters as $roster) {
+            $shiftDate = trim($roster->ShiftDate ?? '');
+            if ($shiftDate === '') {
+                continue;
+            }
+            $parts = array_map('trim', explode(' - ', $shiftDate, 2));
+            if (count($parts) !== 2) {
+                continue;
+            }
+            $start = \DateTime::createFromFormat('m/d/Y', $parts[0]);
+            $end = \DateTime::createFromFormat('m/d/Y', $parts[1]);
+            if (!$start || !$end || $start > $end) {
+                continue;
+            }
+            $empIdKey = (string) $roster->Emp_id;
+            $current = clone $start;
+            $endInclusive = (clone $end)->modify('+1 day');
+            while ($current < $endInclusive) {
+                if ($current >= $today) {
+                    $d = $current->format('Y-m-d');
+                    $dates[] = $d;
+                    if (isset($datesByEmployee[$empIdKey]) && !in_array($d, $datesByEmployee[$empIdKey])) {
+                        $datesByEmployee[$empIdKey][] = $d;
+                    }
+                }
+                $current->modify('+1 day');
+            }
+        }
+
+        $dates = array_values(array_unique($dates));
+        sort($dates);
+        foreach (array_keys($datesByEmployee) as $k) {
+            $datesByEmployee[$k] = array_values(array_unique($datesByEmployee[$k]));
+            sort($datesByEmployee[$k]);
+        }
+
+        return response()->json(['dates' => $dates, 'dates_by_employee' => $datesByEmployee]);
+    }
+
     public function StoreDutyRoster(Request $request)
     {
         $Employees = $request->input('Emp_id', []); // Array of Employee IDs
@@ -285,6 +350,41 @@ class DutyRosterController extends Controller
                 ], 422);
             }
 
+            // Overtime is only applicable for SUP (5) and LINE WORKERS (6)
+            $overtimeEligibleRanks = [
+                array_search('SUP', config('settings.Position_Rank', [])),
+                array_search('LINE WORKERS', config('settings.Position_Rank', [])),
+            ];
+            $overtimeEligibleRanks = array_filter($overtimeEligibleRanks, function ($v) { return $v !== false; });
+
+            $ineligibleOvertimeEmployees = [];
+            foreach ($employeeOvertime as $empIdKey => $overtimeData) {
+                $overtimeHours = $overtimeData['overtime'] ?? '00:00';
+                $overtimeDays = $overtimeData['days'] ?? [];
+                $hasOvertime = ($overtimeHours !== '00:00' && $overtimeHours !== '') || !empty($overtimeDays);
+                if (!$hasOvertime) {
+                    continue;
+                }
+                $empId = is_numeric($empIdKey) ? (int) $empIdKey : (int) $empIdKey;
+                $emp = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                    ->where('employees.id', $empId)
+                    ->where('employees.resort_id', $resort_id)
+                    ->first(['employees.id', 'employees.rank', 't1.first_name', 't1.last_name']);
+                if (!$emp) {
+                    continue;
+                }
+                $rank = $emp->rank;
+                if (!in_array((int) $rank, $overtimeEligibleRanks, true)) {
+                    $ineligibleOvertimeEmployees[] = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? ''));
+                }
+            }
+            if (!empty($ineligibleOvertimeEmployees)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Overtime is applicable only for Line Workers and Supervisor roles. The selected employee(s) are not eligible.',
+                ], 422);
+            }
+
             // Filter out employees who already have a shift during the specified date range
             $employeesToProcess = [];
             $skippedEmployees = [];
@@ -295,9 +395,11 @@ class DutyRosterController extends Controller
                     ->exists();
 
                 if ($conflictingDates) {
-                    $employee = Employee::find($empId);
-                    $empName = $employee ? ($employee->first_name . ' ' . $employee->last_name) : 'Employee';
-                    $skippedEmployees[] = $empName;
+                    $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                        ->where('employees.id', $empId)
+                        ->first(['t1.first_name', 't1.last_name']);
+                    $empName = $employee ? trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) : 'Employee';
+                    $skippedEmployees[] = $empName ?: 'Employee';
                 } else {
                     $employeesToProcess[] = $empId;
                 }
@@ -596,7 +698,7 @@ class DutyRosterController extends Controller
 
         if (isset($searchTerm) && $searchTerm != '') {
             $Rosterdata1->where(function ($query) use ($searchTerm) {
-                $query->where('t1.first_name', 'like', '%' . $searchTerm . '%')
+                $query->where('employees.id', 'like', '%' . $searchTerm . '%')
                     ->orWhere('t1.last_name', 'like', '%' . $searchTerm . '%');
             });
         }
@@ -962,7 +1064,6 @@ class DutyRosterController extends Controller
         $Rank =  $this->resort->GetEmployee->rank ?? '';
         $resort_id   = $this->resort->resort_id;
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
-
         $Rosterdata = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
                                 ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
@@ -994,18 +1095,24 @@ class DutyRosterController extends Controller
         }
         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)
         ->where("resort_id",$this->resort->resort_id)->get();
-        if($this->resort->is_master_admin == 0){
-            $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")->where("Dept_id",$Dept_id)
-                            ->where("t1.resort_id",$this->resort->resort_id)
+         if($this->resort->is_master_admin == 0){
+            $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")->where("t1.resort_id",$this->resort->resort_id)
                             ->where("employees.rank","!=",$Rank)
+                            ->where("employees.status","Active")
+                             ->when($Rank != '3', function ($query) {
+                                        return $query->whereIn('employees.id', $this->underEmp_id);
+                                    })
                             ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
             }else{
-                $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
+
+                $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")->where("Dept_id",$Dept_id)
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 ->where("employees.status","Active")
+                                 ->when($Rank != '3', function ($query) {
+                                        return $query->whereIn('employees.id', $this->underEmp_id);
+                                    })
                                 ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
             }
-
         $ShiftSettings = ShiftSettings::where("resort_id", $this->resort->resort_id)->get(['id','ShiftName','TotalHours']);
 
         $startOfMonth = Carbon::now()->startOfMonth(); // Get the first day of the month
@@ -1026,12 +1133,19 @@ class DutyRosterController extends Controller
         $Poitions  =  $request->input('Poitions');
         $filterDate = $request->input('date');
         $sendclass = $request->input('sendclass');
+        $overtime_type = $request->input('overtime_type');
         $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank;
+        $month = $request->month;
+        $year  = $request->year;
+    
+        // If month/year not selected
+        if (empty($month)) $month = now()->month;
+        if (empty($year)) $year = now()->year;
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
+        if ($overtime_type == 'actual') {
 
-
-        $Rosterdata1 = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            $Rosterdata1 = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
                         ->join('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
                         ->leftjoin('duty_roster_entries as t4', 't4.roster_id', '=', 't3.id')
@@ -1048,6 +1162,39 @@ class DutyRosterController extends Controller
                         )
                         ->groupBy('employees.id')
                         ->where('t1.resort_id', $this->resort->resort_id);
+
+            }else{
+                $Rosterdata1 = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                        ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+                        ->join('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
+                        ->groupBy('employees.id')
+                        ->where('t1.resort_id', $this->resort->resort_id)
+                        ->join('duty_roster_entries as t4', function($join){
+                            $join->on('t4.roster_id', '=', 't3.id')
+                                 ->where('t4.resort_id', $this->resort->resort_id)
+                                 ->where('t4.OverTime', '!=', '00:00');
+                        })
+                        ->select(
+                            't3.id as duty_roster_id',
+                            't3.DayOfDate',
+                            't1.id as Parentid',
+                            't1.first_name',
+                            't1.last_name',
+                            't1.profile_picture',
+                            'employees.id as emp_id',
+                            't2.position_title',
+                            DB::raw("COALESCE(t4.OTStatus, 'pending') as status")
+                        )
+                        ->where("t1.resort_id",$this->resort->resort_id)
+                        ->where('t3.Year', $year)
+                        ->whereRaw("
+                            MONTH(STR_TO_DATE(SUBSTRING_INDEX(t3.ShiftDate, ' - ', 1), '%m/%d/%Y')) = ?
+                        ", [$month]);
+                    }
+                            
+
+
+        
 
                         if($employeeRankPosition['position'] != "HR" || $employeeRankPosition['rank'] != "EXCOM")
                         {
@@ -1067,36 +1214,39 @@ class DutyRosterController extends Controller
 
                     }
 
-                    if (isset($searchTerm)) {
+                   if (!empty($searchTerm)) {
                         $Rosterdata1->where(function ($query) use ($searchTerm) {
-                            $query->where('t1.first_name', 'like', '%' . $searchTerm . '%')
-                                ->orWhere('t1.last_name', 'like', '%' . $searchTerm . '%');
+                            $query->where('employees.id', $searchTerm);
                         });
                     }
 
                     $Rosterdata = $Rosterdata1->paginate(10);
 
+                    $year = (int) $year;
+                    $month = (int) $month;
+                    if ($month < 1 || $month > 12) {
+                        $month = now()->month;
+                    }
+                    if ($year < 2000 || $year > 2100) {
+                        $year = now()->year;
+                    }
+
                     if (!isset($filterDate))
                     {
-
-                        $year = now()->year; // Current year
-                        $month = now()->month; // Current month
-                        $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
-
-                        $startOfMonth = Carbon::now()->startOfMonth(); // Get the first day of the month
-                        $endOfMonth =Carbon::now()->endOfMonth(); // Get the last day of the month
-                        $WeekstartDate = Carbon::now()->startOfWeek();
-                        $WeekendDate = Carbon::now()->endOfWeek();
-
-
+                        $baseDate = Carbon::createFromDate($year, $month, 1);
+                        $totalDays = $baseDate->daysInMonth;
+                        $startOfMonth = $baseDate->copy()->startOfMonth();
+                        $endOfMonth = $baseDate->copy()->endOfMonth();
+                        $WeekstartDate = $startOfMonth->copy()->startOfWeek();
+                        $WeekendDate = $endOfMonth->copy()->endOfWeek();
                     }
                     else
                     {
                         $filterDate1 = Carbon::createFromFormat('d/m/Y', $filterDate);
-                        $year = $filterDate1->format('Y'); // Get the year
-                        $month = $filterDate1->format('m'); // Get the year
-                        $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
-                        $startOfMonth = $filterDate1->startOfMonth();
+                        $year = (int) $filterDate1->format('Y');
+                        $month = (int) $filterDate1->format('n');
+                        $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth;
+                        $startOfMonth = $filterDate1->copy()->startOfMonth();
                         $endOfMonth = $startOfMonth->copy()->endOfMonth();
                         $WeekstartDate = Carbon::createFromFormat('d/m/Y',$filterDate)->startOfWeek();
                         $WeekendDate = Carbon::createFromFormat('d/m/Y',$filterDate)->endOfWeek();
@@ -1116,10 +1266,15 @@ class DutyRosterController extends Controller
                     // Get public holidays (including Fridays)
                     $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
 
+
                     if(!$request->get('page'))
-                    {
+                    {  if ($overtime_type == 'actual') {
                         $view = view('resorts.renderfiles.OverTimeSearch', compact('Rosterdata','monthwiseheaders','resort_id','startOfMonth','endOfMonth','publicHolidays'))->render();
                         return response()->json(['success' => true, 'view' => $view], 200);
+                        }else{
+                            $view = view('resorts.renderfiles.OverTimeSearch2', compact('Rosterdata','monthwiseheaders','resort_id','startOfMonth','endOfMonth','publicHolidays'))->render();
+                        return response()->json(['success' => true, 'view' => $view], 200);
+                        }
                     }
                     else
                     {

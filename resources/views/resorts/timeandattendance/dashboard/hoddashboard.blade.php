@@ -24,60 +24,91 @@
                 </div>
             </div>
         </div>
+          <style>
+    /* Custom 5 column layout for large screens */
+    @media (min-width: 992px) {
+        .col-custom-5 {
+            flex: 0 0 20%;
+            max-width: 20%;
+        }
+    }
+</style>
 
         <div class="row g-3 g-xxl-4 card-heigth">
-            <div class="col-lg-3 col-sm-6  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">Total Employees</p>
-                            <strong>{{ $EmployeesCount }}</strong>
+             <!-- Total Employees -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Total Employees</p>
+                                <strong id="TotalEmployees">{{ $EmployeesCount }}</strong>
+                            </div>
+                            <a href="{{ route('resort.timeandattendance.employee') }}">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a>
                         </div>
-                        <a href="{{route('resort.timeandattendance.employee')}}">
-                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
-            </div>
-            <div class="col-lg-3 col-sm-6  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">Total Present</p>
-                            <strong id="totalPresentEmployee">{{ $totalPresentEmployee }}</strong>
+
+                <!-- Total Present -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Total Present</p>
+                                <strong id="totalPresentEmployee">{{ $totalPresentEmployee }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
                         </div>
-                        {{-- <a href="#">
-                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                        </a> --}}
                     </div>
                 </div>
-            </div>
-            <div class="col-lg-3 col-sm-6  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">On Leave</p>
-                            <strong id="totalLeaveEmployee">{{ $totalLeaveEmployee }}</strong>
+
+                <!-- On Leave -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">On Leave</p>
+                                <strong id="totalLeaveEmployee">{{ $totalLeaveEmployee }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
                         </div>
-                        {{-- <a href="#">
-                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                        </a> --}}
                     </div>
                 </div>
-            </div>
-            <div class="col-lg-3 col-sm-6  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card dashboard-boxcard timeAttend-boxcard">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="mb-0  fw-500">Absent</p>
-                            <strong id="totalAbsantEmployee">{{ $totalAbsantEmployee }}</strong>
+
+                <!-- Absent -->
+                <div class="col-custom-5 col-sm-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Absent</p>
+                                <strong id="totalAbsantEmployee">{{ $totalAbsantEmployee }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
                         </div>
-                        {{-- <a href="#">
-                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                        </a> --}}
                     </div>
                 </div>
-            </div>
+
+                <!-- 5th Box Example -->
+                <div class="col-custom-5 col-sm-6 col-12">
+                    <div class="card dashboard-boxcard timeAttend-boxcard h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-0 fw-500">Unknown Status</p>
+                                <strong id="totalunknown_status_Employee">{{ $totalunknown_status_Employee ?? 0 }}</strong>
+                            </div>
+                            <!-- <a href="#">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                            </a> -->
+                        </div>
+                    </div>
+                </div>
             <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.AttandanceRegister',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
@@ -139,15 +170,15 @@
 
                 </div>
             </div>
-            <div class="col-xl-3 col-lg-6 col-md-6">
+            <!-- <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card">
                     <div class="card-title d-flex justify-content-between">
                         <h3>AI Insight's</h3>
                     </div>
                 </div>
-            </div>
+            </div> -->
             <div class="col-xl-3 col-lg-6 col-md-6">
-                <div class="card " id="card-todoList">
+               <div class="card " style="height: 440px;">
                     <div class="card-title d-flex justify-content-between">
                         <h3>To Do List</h3>
                         <a href="{{ route('resort.timeandattendance.todolist') }}" class="a-link">View all</a>
@@ -160,8 +191,10 @@
                                     <img src="{{ $todo->profileImg }}" alt="image">
                                 </div>
                                 <div class="flex-grow-1">
-                                    <p class="mb-1 small">
-                                        <strong>{{ $todo->message }}</strong>
+                                    <p class="mb-1">
+@if($todo->action_type == "")
+    {{ 'Action missing' }}
+@endif                                        <strong>{{ $todo->message }}</strong>
                                     </p>
                                     <p class="mb-2 small">
                                         {{ $todo->EmployeeName }} - {{ $todo->ShiftName }}<br>
@@ -171,6 +204,9 @@
                                             Expected Check-Out: {{ $todo->ExpectedEndTime ?? $todo->EndTime }}
                                         @elseif($todo->action_type == 'overtime_pending')
                                             Date: {{ \Carbon\Carbon::parse($todo->date)->format('d/m/Y') }}
+                                        @endif
+                                        @if($todo->action_type == 'check_in' || $todo->action_type == 'check_out')
+                                            for date {{ $todo->shift_date }}
                                         @endif
                                     </p>
                                     @if($todo->action_type == 'overtime_pending')
@@ -186,6 +222,12 @@
                                             class="btn btn-sm {{ $todo->action_type == 'check_in' ? 'btn-danger' : 'btn-success' }} manual-check-action" 
                                             data-roster-id="{{ $todo->roster_id }}"
                                             data-action="{{ $todo->action_type }}"
+                                            data-date="{{ $todo->shift_date }}"
+                                            @if($todo->action_type == 'check_in')
+                                                data-time="{{ $todo->StartTime }}"
+                                            @else
+                                                data-time="{{ $todo->ExpectedEndTime ?? $todo->EndTime }}"
+                                            @endif
                                             data-employee-name="{{ $todo->EmployeeName }}">
                                             <i class="fa-solid {{ $todo->action_type == 'check_in' ? 'fa-sign-in-alt' : 'fa-sign-out-alt' }} me-1"></i>
                                             {{ $todo->action_type == 'check_in' ? 'Check-In' : 'Check-Out' }}
@@ -201,32 +243,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-lg-6 col-md-6  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.view')) == false) d-none @endif">
-
-                <div class="card">
-                    <div class="card-title d-flex justify-content-between">
-                        <h3>OT Hours</h3>
-                    </div>
-                    <canvas id="myOTHours" class="mb-2"></canvas>
-                    <div class="row g-2 ">
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-theme"></span>Normal OT
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-themeLightBlue"></span>Holiday OT
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="doughnut-label">
-                                <span class="bg-themeYellow"></span>Total OT Hours
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+           
             {{-- Done --}}
             <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.CreateDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif ">
                 <div class="card h-auto" id="card-duty">
@@ -256,6 +273,32 @@
                         </tbody>
                     </table>
 
+                </div>
+            </div>
+             <div class="col-xl-3 col-lg-6 col-md-6  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.view')) == false) d-none @endif">
+
+                <div class="card">
+                    <div class="card-title d-flex justify-content-between">
+                        <h3>OT Hours</h3>
+                    </div>
+                    <canvas id="myOTHours" class="mb-2"></canvas>
+                    <div class="row g-2 ">
+                        <div class="col-auto">
+                            <div class="doughnut-label">
+                                <span class="bg-theme"></span>Normal OT
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="doughnut-label">
+                                <span class="bg-themeLightBlue"></span>Holiday OT
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="doughnut-label">
+                                <span class="bg-themeYellow"></span>Total OT Hours
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -416,83 +459,60 @@
         const lastMonth = 11; // December (0-indexed in JavaScript)
         const currentYear = new Date().getFullYear();
 
-        for (let i = firstMonth; i <= lastMonth; i++) {
-            const month = new Date(currentYear, i);
-            labelsAttandance.push(month.toLocaleString('default', { month: 'short', year: 'numeric' }));
-        }
-        myAttendance = new Chart(ctx2d, {
-            type: 'bar',
-            data: {
-                labels: labelsAttandance, // Initialize with default month labels
-                datasets: [{
-                    label: 'Attendance Percentage',
-                    data: new Array(12).fill(0), // Initialize with zeros
-                    backgroundColor: '#014653',
-                    borderColor: '#014653',
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    barThickness: 25,
-                }]
-            },
+       // Generate labels like "Jan 26"
+    for (let i = firstMonth; i <= lastMonth; i++) {
+        const date = new Date(currentYear, i);
+        const month = date.toLocaleString('en-US', { month: 'short' });
+        const year = date.getFullYear().toString().slice(-2);
+
+        labelsAttandance.push(`${month} ${year}`);
+    }
+         // Initialize the chart
+    myAttendance = new Chart(ctx2d, {
+        type: 'bar',
+        data: {
+            labels: labelsAttandance,
+            datasets: [{
+                label: 'Attendance Percentage',
+                data: new Array(12).fill(0),
+                backgroundColor: '#014653',
+                borderColor: '#014653',
+                borderWidth: 1,
+                borderRadius: 6,
+                barThickness: 25
+            }]
+        },
         options: {
             responsive: true,
             maintainAspectRatio: true,
             plugins: {
-                legend: {
-                    display: false
-                },
-                layout: {
-                    padding: {
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        right: 0
-                    }
-                },
+                legend: { display: false },
                 tooltip: {
-                    enabled: true, // Enable tooltips
                     callbacks: {
-                        label: function (tooltipItem)
-                        {
-                            const value = tooltipItem.raw.toLocaleString();
-                            return `${value}%`;
+                        label: function(tooltipItem) {
+                            return `${tooltipItem.raw}%`;
                         }
                     }
                 }
             },
             scales: {
-                x: {
-                    beginAtZero: true, // Start x-axis at zero
-                    grid: {
-                        display: false // Hide grid lines on the x-axis
-                    },
-                    border: {
-                        display: true // Show the x-axis border
-                    }
-                },
+                x: { grid: { display: false } },
                 y: {
-                    beginAtZero: true, // Start y-axis at zero
-                    grid: {
-                        display: false // Hide grid lines on the y-axis
-                    }, 
-                    ticks: {
-                        stepSize: 20,
-                    },
-                    border: {
-                        display: true // Show the y-axis border
-                    },
+                    beginAtZero: true,
+                    grid: { display: false },
+                    ticks: { stepSize: 20, callback: value => `${value}%` }
                 }
             }
         }
     });
-    }
+}
     
     if (typeof myAttendance !== 'undefined') {
-        GetAttandance();
+        GetAttandance(); }
         $(".YearWiseDateattandance").on('change', function () {
             GetAttandance();
         });
-    }
+    
     $("#DashboardDatePicker").on('change', function () {
 
         GetAttandance();
@@ -508,6 +528,8 @@
                     $("#totalPresentEmployee").html(response.data.totalPresentEmployee);
                     $("#totalAbsantEmployee").html(response.data.totalAbsantEmployee);
                     $("#totalLeaveEmployee").html(response.data.totalLeaveEmployee);
+                    $("#totalunknown_status_Employee").html(response.data.totalunknown_status_Employee);
+
                 },
                 error: function (xhr) {
                     console.error("Failed to fetch chart data", xhr);
@@ -879,35 +901,48 @@
         });
     });
     
-    // Handle manual check-in/check-out actions
+    // Handle manual check-in/check-out actions (same flow as HR dashboard)
     $(document).on("click", ".manual-check-action", function() {
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const date = $(this).data('date');
+        const time = $(this).data('time');
         const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
         const button = $(this);
-        
+
         Swal.fire({
             title: `Confirm ${actionText}`,
-            text: `Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?`,
+            html: `
+                <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
+                <input type="text" id="manualTime" class="swal2-input" required>
+            `,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: action === 'check_in' ? '#dc3545' : '#28a745',
             cancelButtonColor: '#6c757d',
             confirmButtonText: `Yes, ${actionText}`,
             cancelButtonText: 'Cancel',
+            didOpen: () => {
+                if (time) {
+                    document.getElementById('manualTime').value = time;
+                }
+            },
         }).then((result) => {
             if (result.isConfirmed) {
+                let selectedTime = document.getElementById('manualTime').value;
                 // Disable button during request
                 button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i>Processing...');
-                
+
                 $.ajax({
                     url: "{{ route('resort.timeandattendance.ManualCheckInOut') }}",
                     type: 'POST',
                     data: {
                         _token: "{{ csrf_token() }}",
                         roster_id: rosterId,
-                        action: action
+                        action: action,
+                        date: date,
+                        time: selectedTime
                     },
                     success: function(response) {
                         if (response.success) {
@@ -916,7 +951,6 @@
                                 response.message,
                                 'success'
                             ).then(() => {
-                                // Reload the page to refresh the todo list
                                 window.location.reload();
                             });
                         } else {

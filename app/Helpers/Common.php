@@ -79,8 +79,26 @@ use App\Models\ResortBudgetCost;
 use App\Models\PaymentRequest;
 use App\Models\ResortPosition;
 use App\Models\Position;
+use App\Models\User;
+
 class Common
 {
+
+    public static function isHrAdmin(): bool
+	{
+		
+	    $user = auth()->guard('resort-admin')->user();
+
+	    if (!$user || !$user->GetEmployee) {
+	        return false;
+	    }
+
+	    $employee = $user->GetEmployee;
+
+	    return
+	        (int) $employee->main_rank === 3 &&
+	        (int) $employee->rank === 1;
+	}
 	public static function getWebsiteLogo()
 	{
 		$settings = Settings::first();
@@ -2739,11 +2757,22 @@ class Common
                             $overTime = $roster->OverTime ?? "00:00";
 
                             if ($endTime) {
-                                list($hours, $minutes) = explode(':', $overTime);
-                                $updatedEndTime = $endTime->copy()->addHours($hours)->addMinutes($minutes);
+
+                                $time = $overTime ?? '0:0';
+                            
+                                $parts = explode(':', $time);
+                            
+                                $hours = $parts[0] ?? 0;
+                                $minutes = $parts[1] ?? 0;
+                            
+                                $updatedEndTime = $endTime->copy()
+                                    ->addHours((int)$hours)
+                                    ->addMinutes((int)$minutes);
+                            
                             } else {
                                 $updatedEndTime = null;
                             }
+                            
 
                             // Convert to formatted time for display
                             $formattedUpdatedEndTime = $updatedEndTime ? $updatedEndTime->format('h:i A') : null;

@@ -247,7 +247,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('/employee/import', ['App\Http\Controllers\Resorts\EmployeeController','ImportEmployee'])->name('resort.Depat_Position_Emp_Import');
     Route::get( '/employee/export', 'EmployeeController@exportRelatedDepartment')->name('resort.export.Employee');
-
+    Route::get( '/attandanceHisotry/export/', ['App\Http\Controllers\Resorts\TimeAndAttendance\EmployeeController','attandanceHisotryExport'])->name('resort.export.attandanceHisotry');
     /* salary */
     Route::get('/salary-increment/get-increment-details', 'SalaryIncrementController@getIncrementDetails')->name('employee.salaryincrement.get');
     Route::post('/salary-increment/save', 'SalaryIncrementController@saveSalaryIncrement')->name('employee.salaryincrement.save');
@@ -447,6 +447,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/time-and-attendance/store-duty-roster', 'TimeAndAttendance\DutyRosterController@StoreDutyRoster')->name('resort.timeandattendance.StoreDutyRoster');
     Route::post('/time-and-attendance/update-duty-roster', 'TimeAndAttendance\DutyRosterController@UpdateDutyRoster')->name('resort.timeandattendance.UpdateDutyRoster');
     Route::get('/time-and-attendance/view-duty-roster', 'TimeAndAttendance\DutyRosterController@ViewDutyRoster')->name('resort.timeandattendance.ViewDutyRoster');
+    Route::get('/time-and-attendance/roster-occupied-dates', 'TimeAndAttendance\DutyRosterController@RosterOccupiedDates')->name('resort.timeandattendance.RosterOccupiedDates');
 
     Route::get('/time-and-attendance/dutyroster/dashboard-list', 'TimeandAttendanceDashboardController@HodDutyRosterdashboardTable')->name('resort.timeandattendance.DutyRosterdashboardTable');
     Route::get('/time-and-attendance/month/over-time-chart/{date}', 'TimeandAttendanceDashboardController@MonthOverTimeChart')->name('resort.timeandattendance.MonthOverTimeChart');
