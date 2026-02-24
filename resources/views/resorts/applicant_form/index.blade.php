@@ -367,7 +367,7 @@
                                             <textarea class="form-control" name="question_{{$questionnaireChild->id}}" id="txt-textarea-{{$key}}" placeholder="Type Here.." rows="2" required data-parsley-trigger="change"></textarea>
                                         @elseif(@$questionnaireChild->questionType == 'Radio')
                                             <ul class="nav flex-column">
-                                                @php $dataarray = json_decode($questionnaireChild->options, TRUE); @endphp
+                                                @php $dataarray = json_decode($questionnaireChild->options, TRUE) ?? []; @endphp
                                                 @foreach($dataarray as $keyj => $dataredio)
                                                     <li class="form-radio">
                                                         <input 
@@ -384,7 +384,7 @@
                                             </ul>
                                         @elseif(@$questionnaireChild->questionType == 'multiple')
                                             <ul class="nav flex-column">
-                                                @php $dataarray_multi = json_decode($questionnaireChild->options, TRUE); @endphp
+                                                @php $dataarray_multi = json_decode($questionnaireChild->options, TRUE) ?? []; @endphp
                                                 @foreach($dataarray_multi as $key => $datamulti)
                                                     <li class="form-check">
                                                         <input 
