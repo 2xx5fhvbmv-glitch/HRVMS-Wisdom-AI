@@ -28,7 +28,6 @@ class ConfigrationController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
-        if(!$this->resort) return;
     }
     public function index()
     {
@@ -184,7 +183,7 @@ class ConfigrationController extends Controller
         if(Common::checkRouteWisePermission('resort.upcomingholiday.list',config('settings.resort_permissions.view')) == false) {
             return abort(403, 'Unauthorized action.');
         }
-        $ResortHoliday = ResortHoliday::where('resort_id', $this->resort->resort_id)->get();
+        $ResortHoliday = ResortHoliday::where('resort_id', $this->resort->resort_id)->whereYear('PublicHolidaydate', date('Y'))->get();
 
         if ($request->ajax()) {
             return datatables()->of($ResortHoliday)

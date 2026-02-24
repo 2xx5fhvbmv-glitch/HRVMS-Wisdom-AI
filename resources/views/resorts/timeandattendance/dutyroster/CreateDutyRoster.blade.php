@@ -31,7 +31,7 @@
                                     <select class="form-select" name="Emp_id[]" id="Employee" multiple>
                                         @if($employees->isNotEmpty())
                                             @foreach ($employees as $e)
-                                                <option value="{{ $e->id }}">{{ ucfirst($e->first_name . ' ' . $e->last_name) }}</option>
+                                                <option value="{{ $e->id }}" data-rank="{{ $e->rank ?? '' }}">{{ ucfirst($e->first_name . ' ' . $e->last_name) }}</option>
                                             @endforeach
                                         @endif
                                     </select>
@@ -39,6 +39,9 @@
                             <div class="createduty-Append">
 
                             </div>
+                            <p id="rosterDisabledDatesMsg" class="small text-muted mt-2 mb-0 d-none" role="alert">
+                                <i class="fa fa-info-circle me-1"></i><span id="rosterDisabledDatesList"></span><br><span id="rosterDisabledDatesNote">The selected employee(s) already have scheduled shifts on these days.</span>
+                            </p>
                         </div>
                         <div class="col-lg-4 col-md-6 ">
                             <div class="card-themeSkyblue h-100 overflow-hidden">
@@ -129,7 +132,7 @@
                     </div>
 
                 </form>
-                    <div class="card bg mt-4">
+                    <!-- <div class="card bg mt-4">
                         <div class="card-header">
                             <div class="row g-md-3 g-2 align-items-center">
                                 <div class="col-xl-3 col-lg-5 col-md-8 col-sm-8 ">
@@ -513,7 +516,7 @@
 
                             </div>
                         </div>
-                    </div>
+                    </div> -->
 
                 </div>
             </div>
@@ -595,6 +598,8 @@
                         <select class="form-select" id="OvertimeEmployees" multiple>
                             <!-- Will be populated dynamically -->
                         </select>
+                        <small style="color: red;">
+        Note: Select only Line Worker and Supervisor.</small>
                     </div>
                     <div id="overtimeEmployeesList" class="mt-3">
                         <!-- Dynamic list of selected employees with overtime inputs and day selection -->
@@ -713,9 +718,15 @@
 @section('import-scripts')
 
 <script type="text/javascript">
-    // new DataTable('#example');
-
-
+    @php
+        $overtimeRanks = config('settings.Position_Rank', []);
+        $overtimeEligibleRanksArr = array_values(array_filter([
+            array_search('SUP', $overtimeRanks),
+            array_search('LINE WORKERS', $overtimeRanks),
+        ], function ($v) { return $v !== false; }));
+    @endphp
+    // Overtime eligible ranks (SUP, LINE WORKERS) - from config
+    var overtimeEligibleRanksConfig = @json($overtimeEligibleRanksArr);
 
     // tooltip
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
@@ -788,21 +799,55 @@
             todayHighlight: true  // Highlight today's date
         });
 
-        $("#hiddenInput").daterangepicker({
-            autoApply: true,
-            startDate: moment(),
-            endDate: moment().add(7, 'days'),
-            opens: 'right',
-            parentEl: '#datapicker',
-            alwaysShowCalendars: true,
-            linkedCalendars: false
+        // Dates that selected employee(s) already have duty roster - disable in calendar (per employee, not resort)
+        var rosterOccupiedDates = [];
+
+        function initDateRangePicker(occupiedDates) {
+            rosterOccupiedDates = occupiedDates || [];
+            var existingPicker = $("#hiddenInput").data('daterangepicker');
+            var today = moment().startOf('day');
+            var startDate = moment();
+            var endDate = moment().add(7, 'days');
+            if (existingPicker) {
+                startDate = existingPicker.startDate.clone();
+                endDate = existingPicker.endDate.clone();
+                try { existingPicker.remove(); } catch (e) {}
+                $("#hiddenInput").data('daterangepicker', null);
+            }
+            $("#hiddenInput").daterangepicker({
+                autoApply: true,
+                startDate: startDate,
+                endDate: endDate,
+                minDate: today,
+                opens: 'right',
+                parentEl: '#datapicker',
+                alwaysShowCalendars: true,
+                linkedCalendars: false,
+                isInvalidDate: function(date) {
+                    var dateStr = date.format('YYYY-MM-DD');
+                     // ✅ Disable past dates
+                    if (date.isBefore(today)) {
+                        return true;
+                    }
+                     // ✅ Disable occupied dates
+                    if (rosterOccupiedDates.indexOf(dateStr) !== -1) {
+                        return true;
+                    }
+                    // return rosterOccupiedDates.indexOf(dateStr) !== -1;
+                     return false;
+                }
             }, function (start, end) {
                 updateDateText(start, end);
-        });
-        $("#hiddenInput").data('daterangepicker').show();
+            });
+            $("#hiddenInput").data('daterangepicker').show();
+            updateDateText(startDate, endDate);
+            // Global message hidden; unavailable dates are shown below each employee block
+            $("#rosterDisabledDatesList").text('');
+            $("#rosterDisabledDatesMsg").addClass("d-none");
+        }
+        window.initDateRangePicker = initDateRangePicker;
 
-        // Initialize with default date range
-        updateDateText(moment(), moment().add(7, 'days'));
+        initDateRangePicker([]);
             function updateDateText(start, end) {
                 let startDate = start.format("YYYY-MM-DD").toString();
                 let endDate = end.format("YYYY-MM-DD").toString();
@@ -1082,7 +1127,10 @@
                                 positionClass: 'toast-bottom-right'
                             });
                             setTimeout(function() {
-                                window.location.reload();
+                                window.location.href = "{{ route('resort.timeandattendance.ViewDutyRoster') }}";
+
+
+                                // window.location.reload();
                             }, 3000);
                         } else {
                             toastr.error(response.message, "Error", {
@@ -1320,14 +1368,23 @@
             return false;
         }
 
-        // Populate overtime employees dropdown with selected employees
+        // Overtime is only for SUP and LINE WORKERS (from config)
+        let overtimeEligibleRanks = (typeof overtimeEligibleRanksConfig !== 'undefined' && Array.isArray(overtimeEligibleRanksConfig)) ? overtimeEligibleRanksConfig : [5, 6];
+
+        // Populate overtime employees dropdown with selected employees who are eligible (rank 5 or 6)
         let employeeOptions = '';
         let employeeData = {};
         let selectedEmployeeIds = [];
+        let skippedIneligible = 0;
 
         $('#Employee option:selected').each(function() {
             let empId = $(this).val();
             let empName = $(this).text();
+            let rank = parseInt($(this).data('rank'), 10);
+            if (overtimeEligibleRanks.indexOf(rank) === -1) {
+                skippedIneligible++;
+                return;
+            }
             employeeOptions += '<option value="' + empId + '">' + empName + '</option>';
             selectedEmployeeIds.push(empId);
 
@@ -1346,6 +1403,15 @@
                 };
             }
         });
+
+        if (skippedIneligible > 0 || selectedEmployeeIds.length === 0) {
+            toastr.warning("Overtime is applicable only for Line Workers and Supervisor roles. The selected employee(s) are not eligible.", "Notice", {
+                positionClass: 'toast-bottom-right'
+            });
+            if (selectedEmployeeIds.length === 0) {
+                return;
+            }
+        }
 
         // Set the dropdown options
         $('#OvertimeEmployees').html(employeeOptions);
@@ -1641,6 +1707,38 @@
 
     // Track which employees' leave info has been loaded
     let loadedEmployeeLeaves = {};
+    // Per-employee roster occupied dates (from RosterOccupiedDates API)
+    let rosterDatesByEmployee = {};
+
+    function formatRosterDateStr(ymd) {
+        var p = (ymd + '').split('-');
+        if (p.length !== 3) return ymd;
+        var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var d = parseInt(p[2], 10);
+        var m = monthNames[parseInt(p[1], 10) - 1] || p[1];
+        var y = p[0];
+        return d + ' ' + m + ' ' + y;
+    }
+
+    function injectRosterUnavailableMessages(empIds) {
+        if (!empIds || !empIds.length) return;
+        var maxShow = 4;
+        empIds.forEach(function(empId) {
+            var sid = String(empId);
+            var block = $(".createduty-Append").find('[data-emp-leave-id="' + sid + '"]');
+            block.nextAll('.roster-unavailable-msg').first().remove();
+            var dates = rosterDatesByEmployee[sid];
+            if (dates && dates.length > 0) {
+                var shown = dates.slice(0, maxShow).map(formatRosterDateStr);
+                var rest = dates.length - maxShow;
+                var listText = 'These dates are unavailable (' + shown.join(', ');
+                if (rest > 0) listText += ' and ' + rest + ' more';
+                listText += '): This employee already has scheduled shifts on these days.';
+                var msgEl = $('<p class="small text-muted mt-2 mb-0 roster-unavailable-msg" role="alert"><i class="fa fa-info-circle me-1"></i>' + listText + '</p>');
+                block.after(msgEl);
+            }
+        });
+    }
 
     $(document).on("change", "#Employee", function() {
         // Clear overtime data when employees change
@@ -1652,10 +1750,12 @@
         let selectedIds = $(this).val() || [];
         let currentLoadedIds = Object.keys(loadedEmployeeLeaves).map(id => String(id));
 
-        // Remove leave info for deselected employees
+        // Remove leave info for deselected employees (and their unavailable-dates message)
         currentLoadedIds.forEach(function(empId) {
             if(!selectedIds.includes(empId)) {
-                $(".createduty-Append").find('[data-emp-leave-id="' + empId + '"]').remove();
+                var block = $(".createduty-Append").find('[data-emp-leave-id="' + empId + '"]');
+                block.next('.roster-unavailable-msg').remove();
+                block.remove();
                 delete loadedEmployeeLeaves[empId];
             }
         });
@@ -1675,6 +1775,7 @@
                                 let leaveBlock = $('<div data-emp-leave-id="' + empId + '"></div>').html(response.view);
                                 $(".createduty-Append").append(leaveBlock);
                                 loadedEmployeeLeaves[empId] = true;
+                                injectRosterUnavailableMessages([empId]);
                             }
                         },
                         error: function() {
@@ -1683,9 +1784,33 @@
                     });
                 }
             });
+            // Fetch dates that selected employees already have roster - disable those in date range picker
+            $.ajax({
+                url: "{{ route('resort.timeandattendance.RosterOccupiedDates') }}",
+                type: "GET",
+                data: { emp_ids: selectedIds },
+                success: function (response) {
+                    rosterDatesByEmployee = response.dates_by_employee || {};
+                    if (response.dates && response.dates.length) {
+                        window.initDateRangePicker(response.dates);
+                    } else {
+                        window.initDateRangePicker([]);
+                    }
+                    injectRosterUnavailableMessages(selectedIds);
+                },
+                error: function(xhr) {
+                    console.error('RosterOccupiedDates error', xhr);
+                    rosterDatesByEmployee = {};
+                    window.initDateRangePicker([]);
+                }
+            });
         } else {
             $(".createduty-Append").html('');
             loadedEmployeeLeaves = {};
+            rosterDatesByEmployee = {};
+            if (typeof window.initDateRangePicker === 'function') {
+                window.initDateRangePicker([]);
+            }
         }
     });
     $(".btn-weekly").click(function () {

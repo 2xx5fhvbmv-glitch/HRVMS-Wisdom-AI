@@ -24,11 +24,11 @@
             <div>
                 <div class="card ">
                     <form id="OverTimeform" class="@if(Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.create')) == false) d-none @endif">
-                        <div class="row g-xl-4 g-3 mb-3 align-items-end">
-                            <div class="col-sm-3 col-md-3">
+                        <div class="row g-2 mb-3 align-items-end flex-nowrap overflow-auto">
+                            <div class="col col-xl-2 col-lg-2 col-md-3 col-sm-4">
                                 <label for="select-emp" class="form-label">SELECT EMPLOYEE</label>
-                                <select class="form-select" name="Emp_id" id="Employee">
-                                    <option></option> <!-- Leave this blank for the placeholder -->
+                                <select class="form-select" name="Emp_id" id="Employee" >
+                                    <option></option>
                                     @if($employees->isNotEmpty())
                                         @foreach ($employees as $e)
                                             <option value="{{ $e->id }}">{{ ucfirst($e->first_name . ' ' . $e->last_name) }}</option>
@@ -36,57 +36,66 @@
                                     @endif
                                 </select>
                             </div>
-
-                            <div class="col-sm-3 col-md-3">
-                                <input type="text" class="form-control datepicker" name="shiftdate" id="shiftdate" placeholder="Select Date">
-                            </div>
-                            <div class="col-sm-3 col-md-3">
-                                <select class="form-select select2t-none" id="Shift"aria-label="Default select example" name="Shift">
-                                    <option></option> <!-- Leave this blank for the placeholder -->
-                                    @if($ShiftSettings->isNotEmpty())
-                                        @foreach ($ShiftSettings as $s)
-                                                <?php
-                                                    $start = new DateTime('21:00');
-                                                    $end = new DateTime('07:00');
-                                                    if ($end < $start)
-                                                    {
-                                                        $end->modify('+1 day');
-                                                    }
-                                                    $interval = $start->diff($end);
-                                                    $totalHours = $interval->h + ($interval->days * 24);
-                                                    $totalMinutes = $interval->i;
-                                                    $TotalHours =  $totalHours . ":" . $totalMinutes;
-                                                ?>
-                                            <option value="{{ $s->id }}"  data-totalHrs ="{{ $TotalHours }}"> {{ ucfirst($s->ShiftName) }}</option>
-                                        @endforeach
-                                    @endif
+                            <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
+                                <label for="month" class="form-label">SELECT MONTH</label>
+                                <select class="form-select month" name="month" id="month">
+                                    <option value="">Select Month</option>
+                                    @foreach ([
+                                        1 => 'January', 2 => 'February', 3 => 'March',
+                                        4 => 'April', 5 => 'May', 6 => 'June',
+                                        7 => 'July', 8 => 'August', 9 => 'September',
+                                        10 => 'October', 11 => 'November', 12 => 'December'
+                                    ] as $key => $monthName)
+                                        <option value="{{ $key }}">{{ $monthName }}</option>
+                                    @endforeach
                                 </select>
                             </div>
-                            <div class="col-lg-3 col-md-3">
-                                <input type="text" class="form-control overtime" name="overtime" id="overtime"placeholder="Add Hours">
-
+                            <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
+                                <label for="year" class="form-label">SELECT YEAR</label>
+                                <select class="form-select year" name="year" id="year">
+                                    <option value="">Select Year</option>
+                                    @for ($y = now()->year; $y >= now()->year - 5; $y--)
+                                        <option value="{{ $y }}">{{ $y }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                            <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
+                                <label for="overtime_type" class="form-label">OVERTIME TYPE</label>
+                                <select class="form-select overtime_type" name="overtime_type" id="overtime_type">
+                                    <option value="actual">Actual Overtime</option>
+                                    <option value="preplanned">Pre-Planned Overtime</option>
+                                </select>
+                            </div>
+                            <!-- <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
+                                <label for="overtime" class="form-label">ADD HOURS</label>
+                                <input type="text" class="form-control overtime" name="overtime" id="overtime" placeholder="Add Hours">
+                            </div> -->
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-themeBlue btn-sm" id="clearOvertimeFilter" title="Clear filters and reload">
+                                    Clear filter
+                                </button>
                             </div>
                         </div>
-                        <div class="card-themeSkyblue text-end"><span class="fw-600" id="TotalHours" >Total OT Hours:0</span>
+                        <!-- <div class="card-themeSkyblue text-end"><span class="fw-600" id="TotalHours" >Total OT Hours:0</span> -->
                         <input type="hidden" name="TotalHoursInput" id="TotalHoursInput">
-                        </div>
+                        <!-- </div> -->
                         <hr class="mt-md-4 mt-3  mb-2">
-                        <div class="text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button></div>
+                        <div class="d-none"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button></div>
                     </form>
 
                     <div class="card bg mt-4">
                         <div class="card-header">
                             <div class="row g-md-3 g-2 align-items-center">
-                                <div class="col-xl-3 col-lg-5 col-md-8 col-sm-8 ">
+                                <!-- <div class="col-xl-3 col-lg-5 col-md-8 col-sm-8 ">
                                     <div class="input-group">
                                         <input type="search" class="form-control search" placeholder="Search" />
                                         <i class="fa-solid fa-search"></i>
                                     </div>
-                                </div>
+                                </div> -->
                                 {{-- <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                                     <input type="text" class="form-control " placeholder="Management">
                                 </div> --}}
-                                <div class="col-xl-2 col-md-4 col-sm-4 col-6">
+                                <!-- <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                                     <select class="form-select" name="Poitions" id="Poitions">
                                         <option ></option>
                                         @if($ResortPosition->isNotEmpty())
@@ -99,7 +108,7 @@
                                 </div>
                                 <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                                     <input type="text" class="form-control datepicker" id="DutyRosterCreateDatePickerFilter" placeholder="Select Duration">
-                                </div>
+                                </div> -->
                             </div>
                         </div>
                         <div class="appendData">
@@ -120,7 +129,7 @@
                                                 @endif
                                                 <th>Holiday OT</th>
                                                 <th>Regular OT</th>
-                                                <th>Summary</th>
+                                                <th>Total OT</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -568,12 +577,32 @@
         $(document).on('keyup', '.search', function() {
             updateFilterWiseTable();
         });
+        $('#Employee').on('change', function() {
+              updateFilterWiseTable();
+            });
+
         $(document).on('change', '#Poitions', function() {
             updateFilterWiseTable();
         });
 
-        $(document).on('change', '#DutyRosterCreateDatePickerFilter', function() {
+        // $(document).on('change', '#DutyRosterCreateDatePickerFilter', function() {
+        //     updateFilterWiseTable();
+        // });
+        $(document).on('change', '#overtime_type', function()
+        {
             updateFilterWiseTable();
+        });
+
+        $(document).on('change', '#year', function() {
+            updateFilterWiseTable();
+        });
+        $(document).on('change', '#month', function()
+        {
+            updateFilterWiseTable();
+        });
+
+        $('#clearOvertimeFilter').on('click', function() {
+            window.location.href = "{{ route('resort.timeandattendance.OverTime') }}";
         });
 
         document.getElementById('DutyRosterCreateDatePickerFilter').addEventListener('input', function () {
@@ -668,15 +697,20 @@
         }
 
         function updateFilterWiseTable()
-        {
-            var search = $(".search").val();
+        {   
+            // var search = $('#Employee option:selected').text();
+            var search = $('#Employee').val();
+
             var Poitions = $("#Poitions").val();
-            var DatePickerFilter = $("#DutyRosterCreateDatePickerFilter").val();
+            // var DatePickerFilter = $("#DutyRosterCreateDatePickerFilter").val();
+            var overtime_type = $("#overtime_type").val();
+            var month = $("#month").val();
+            var year = $("#year").val();
 
             $.ajax({
                     url: "{{ route('resort.timeandattendance.OverTimeFilter') }}",
                     type: "get",
-                    data: {"_token":"{{ csrf_token() }}","search":search,"Poitions":Poitions,"date":DatePickerFilter},
+                    data: {"_token":"{{ csrf_token() }}","search":search,"Poitions":Poitions,"overtime_type":overtime_type,"year":year,"month":month},
                     success: function (response) {
                         if (response.success)
                         {

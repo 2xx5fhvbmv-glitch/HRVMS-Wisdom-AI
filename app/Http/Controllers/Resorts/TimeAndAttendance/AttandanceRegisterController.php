@@ -27,11 +27,10 @@ class AttandanceRegisterController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(!$this->resort) return;
         $reporting_to = $this->resort->GetEmployee->id ?? null;
         $this->underEmp_id = Common::getSubordinates($reporting_to);
 
-
+        
     }
 
     /**
@@ -78,6 +77,7 @@ class AttandanceRegisterController extends Controller
 
         //    ResortBenifitGridChild::updateorcreate([
         //    ]);
+       $Rank =  $this->resort->GetEmployee->rank ?? '';
 
         $ResortDepartment =  ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
 
@@ -115,6 +115,9 @@ class AttandanceRegisterController extends Controller
                             ->groupBy('employees.id')
                             ->where("t1.resort_id", $this->resort->resort_id);
 
+                              if($Rank != '3'){
+                $attandanceregister->whereIn('employees.id', $this->underEmp_id);
+            }
                         // Get the paginated results before mapping
                         $paginatedResults = $attandanceregister->paginate(10);
 
@@ -305,9 +308,11 @@ class AttandanceRegisterController extends Controller
 
 
         $search = $request->search;
-        $Poitions = $request->Poitions;
+        $department = $request->department;
         $date = $request->date;
-
+        // $month = $request->month;
+        // $year = $request->year;
+        $Rank =  $this->resort->GetEmployee->rank ?? '';
         $sendclass = $request->sendclass;
         $WeekstartDate = Carbon::now()->startOfWeek(); //Week start Start date
         $WeekendDate = Carbon::now()->endOfWeek();
@@ -346,8 +351,12 @@ class AttandanceRegisterController extends Controller
                             )
                             ->groupBy('employees.id')
 
+
                             // ->whereIn('employees.id', $this->underEmp_id)
                             ->where('t1.resort_id', $this->resort->resort_id);
+                            if($Rank != '3'){
+                $attandanceregister->whereIn('employees.id', $this->underEmp_id);
+            }
 
                         // Apply search filter
                         if (!empty($search)) {
@@ -358,48 +367,43 @@ class AttandanceRegisterController extends Controller
                             });
                         }
 
-                        // Apply position filter
-                        if (!empty($Poitions)) {
-                            $attandanceregister->where('employees.Position_id', $Poitions);
+                        // Apply department filter
+                        if (!empty($department)) {
+                            $attandanceregister->where('employees.Dept_id', $department);
                         }
-                        if (isset($date))
-                        {
+                        // if (isset($date))
+                        // {
 
-                            $filterDate1 = Carbon::createFromFormat('d/m/Y', $date);
-                            $attandanceregister->whereBetween('t4.date', [ $filterDate1->copy()->startOfMonth()->format('Y-m-d'), $filterDate1->copy()->endOfMonth()->format('Y-m-d')]);
+                        //     $filterDate1 = Carbon::createFromFormat('d/m/Y', $date);
+                        //     $attandanceregister->whereBetween('t4.date', [ $filterDate1->copy()->startOfMonth()->format('Y-m-d'), $filterDate1->copy()->endOfMonth()->format('Y-m-d')]);
+                        // }
+
+                        $attandanceregister = $attandanceregister->paginate(10);
+
+                        $month = $request->month; // may be null
+                        $year  = $request->year;  // may be null
+
+                        // Handle cases
+                        if (empty($month)) {
+                            // No month selected → use current month/year
+                            $year  = now()->year;
+                            $month = now()->month;
+                        } elseif (empty($year)) {
+                            // Month selected but year missing → use current year
+                            $year = now()->year;
                         }
 
-                        $attandanceregister = $attandanceregister->paginate(1);
+                        // Base date for calculations
+                        $baseDate = Carbon::createFromDate($year, $month, 1);
 
+                        // Month info
+                        $totalDays    = $baseDate->daysInMonth;
+                        $startOfMonth = $baseDate->copy()->startOfMonth();
+                        $endOfMonth   = $baseDate->copy()->endOfMonth();
 
-                        if (!isset($date))
-                        {
-
-                            $year = now()->year; // Current year
-                            $month = now()->month; // Current month
-                            $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
-
-                            $startOfMonth = Carbon::now()->startOfMonth(); // Get the first day of the month
-                            $endOfMonth =Carbon::now()->endOfMonth(); // Get the last day of the month
-                            $WeekstartDate = Carbon::now()->startOfWeek();
-                            $WeekendDate = Carbon::now()->endOfWeek();
-
-                        }
-                        else
-                        {
-
-                            $filterDate1 = Carbon::createFromFormat('d/m/Y', $date);
-
-                            $year = $filterDate1->format('Y'); // Get the year
-                            $month = $filterDate1->format('m'); // Get the year
-                            $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
-
-                            $startOfMonth = $filterDate1->startOfMonth();
-                            $endOfMonth = $startOfMonth->copy()->endOfMonth();
-                            $WeekstartDate = Carbon::createFromFormat('d/m/Y',$date)->startOfWeek();
-                            $WeekendDate = Carbon::createFromFormat('d/m/Y',$date)->endOfWeek();
-
-                        }
+                        // Week info (first week of the month)
+                        $WeekstartDate = $baseDate->copy()->startOfWeek();
+                        $WeekendDate   = $baseDate->copy()->endOfWeek();
 
                         // Transform the paginated results
                         $attandanceregister->getCollection()->transform(function ($item) {
