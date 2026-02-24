@@ -31,7 +31,7 @@
                                 </div>
                                 <div>
                                     <h4>{{$employee->name }} <span class="badge badge-themeNew">{{ $employee->Emp_Code }}</span></h4>
-                                    <p>{{$employee->Position }}</p>
+                                    <p>{{$employee->Position }} ( {{$employee->department }})</p>
                                 </div>
                             </div>
                         </div>
@@ -41,8 +41,16 @@
                                 <div class="dateRangeAb" id="datapicker">
                                     <div>
                                         <!-- Hidden input field to attach the calendar to -->
-                                        <input type="text" class="form-control" name="hiddenInput" id="hiddenInput">
-                                    </div>
+                                            @php
+                                                use Carbon\Carbon;
+
+                                                $firstDay = Carbon::now()->startOfMonth()->format('d/m/Y');
+                                                $lastDay = Carbon::now()->format('d/m/Y'); // Today (default: 1st of month to today)
+                                                $currentMonthRange = $firstDay . '-' . $lastDay;
+                                            @endphp
+
+                                            <input type="text" class="form-control" name="hiddenInput" id="hiddenInput" value="{{ $currentMonthRange }}">
+                                                                                </div>
                                     <p id="startDate" class="d-none">Start Date:</p>
                                     <p id="endDate" class="d-none">End Date:</p>
                                 </div>
@@ -139,7 +147,7 @@
                                 <div class="col">
                                     <h3>Leave Balance</h3>
                                 </div>
-                                <div class="col-auto"><span class="badge badge-themeNew">Total:{{ $TotalSum }}</span></div>
+                                <!-- <div class="col-auto"><span class="badge badge-themeNew">Total:{{ $TotalSum }}</span></div> -->
                             </div>
                         </div>
                         <div class="row  gx-xl-5  gx-4">
@@ -187,6 +195,7 @@
                                         <th>Shift</th>
                                         <th>Check in Time</th>
                                         <th>Check Out Time</th>
+                                        <th>Total Hours</th>
                                         <th>Over Time</th>
                                         <th>Status</th>
                                         <th>Action</th>
@@ -226,7 +235,7 @@
                                                         <p>+{{ (isset($item->OverTime) && $item->OverTime  != '-' ) ? $item->OverTime: '00:00' }}<span class="badge badge-themeWarning">OT</span></p>
                                                     </div>
                                             </div>
-                                            <div>
+                                            <div style="height: 100px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
                                                 <div class="label">Notes</div>
                                                 <p>{{ isset($item->note) ?  $item->note  : "No notes found.." }}</p>
                                             </div>
@@ -333,8 +342,8 @@
 
         $("#hiddenInput").daterangepicker({
             autoApply: true,
-            startDate: moment(),
-            endDate: moment().add(7, 'days'),
+            startDate: moment().startOf('month'),
+            endDate: moment(),
             opens: 'right',
             parentEl: '#datapicker',
             alwaysShowCalendars: true,
@@ -382,6 +391,7 @@
 
                 var emp_id = "{{base64_encode($employee->emp_id) }}";
 
+                var showGridView = $("#tablePrint .btn-grid").hasClass("active");
 
                $.ajax({
                    url: "{{ route('resort.timeandattendance.EmpDetailsFilters') }}",
@@ -394,6 +404,17 @@
                    success: function(response) 
                    {
                         $("#tablePrint").html(response.html);
+                        if (showGridView) {
+                            $("#tablePrint .btn-grid").addClass("active");
+                            $("#tablePrint .btn-list").removeClass("active");
+                            $("#tablePrint .grid-main").removeClass("d-none").addClass("d-block");
+                            $("#tablePrint .list-main").addClass("d-none").removeClass("d-block");
+                        } else {
+                            $("#tablePrint .btn-list").addClass("active");
+                            $("#tablePrint .btn-grid").removeClass("active");
+                            $("#tablePrint .list-main").removeClass("d-none").addClass("d-block");
+                            $("#tablePrint .grid-main").addClass("d-none").removeClass("d-block");
+                        }
                    },
                    error: function(xhr, status, error) {
                        // Handle errors
@@ -416,24 +437,20 @@
 
     }
 
-         $(".btn-grid").click(function () {
+         $(document).on('click', '#tablePrint .btn-grid', function () {
                 $(this).addClass("active");
-                $(".grid-main").addClass("d-block");
-                $(".grid-main").removeClass("d-none");
-                $(".btn-list").removeClass("active");
-                $(".list-main").addClass("d-none");
-                $(".list-main").removeClass("d-block");
-                // DatatableGrid()
+                $("#tablePrint .grid-main").addClass("d-block").removeClass("d-none");
+                $("#tablePrint .btn-list").removeClass("active");
+                $("#tablePrint .list-main").addClass("d-none").removeClass("d-block");
             });
-            $(".btn-list").click(function () {
+            $(document).on('click', '#tablePrint .btn-list', function () {
                 $(this).addClass("active");
-                $(".list-main").addClass("d-block");
-                $(".list-main").removeClass("d-none");
-                $(".btn-grid").removeClass("active");
-                $(".grid-main").addClass("d-none");
-                $(".grid-main").addClass("d-block");
-                $('.table-ta-employeeslist').DataTable().ajax.reload();
-                // ApplicantProgress();
+                $("#tablePrint .list-main").addClass("d-block").removeClass("d-none");
+                $("#tablePrint .btn-grid").removeClass("active");
+                $("#tablePrint .grid-main").addClass("d-none").removeClass("d-block");
+                if ($.fn.DataTable && $.fn.DataTable.isDataTable('#EmployeeDetails')) {
+                    $('#EmployeeDetails').DataTable().ajax.reload();
+                }
             });
         $(document).on("click", ".LocationHistoryData", function()
         {
@@ -616,6 +633,7 @@
                             { data: 'Shift', name: 'Shift', className: 'text-nowrap' },
                             { data: 'CheckInTime', name: 'CheckInTime', className: 'text-nowrap'},
                             { data: 'CheckOutTime', name: 'CheckOutTime', className: 'text-nowrap'},
+                            { data: 'TotalHours', name: 'TotalHours', className: 'text-nowrap'},
                             { data: 'OverTime', name: 'OverTime', className: 'text-nowrap'},
                             { data: 'Status', name: 'Status', className: 'text-nowrap'},
                             { data: 'Action', name: 'Action', className: 'text-nowrap'},

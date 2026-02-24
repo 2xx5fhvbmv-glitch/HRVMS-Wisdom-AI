@@ -29,7 +29,6 @@ class EmployeeController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(!$this->resort) return;
         if(isset($this->resort->GetEmployee))
         {
             $reporting_to = $this->resort->GetEmployee->id;
@@ -146,7 +145,7 @@ class EmployeeController extends Controller
     public function SearchEmployeegird(Request $request)
     {
         $search = $request->search;
-        $Poitions = $request->Poitions;
+        $department = $request->department;
         $Rank =  $this->resort->GetEmployee->rank;
         $Dept_id = $this->resort->GetEmployee->Dept_id;
         $currentDate = Carbon::now();
@@ -236,8 +235,8 @@ class EmployeeController extends Controller
             });
         }
 
-        if ($Poitions) {
-            $employees->where('employees.Position_id', $Poitions);
+        if ($department) {
+            $employees->where('employees.Dept_id', $department);
         }
 
         // Paginate results
@@ -290,7 +289,7 @@ class EmployeeController extends Controller
         if($request->ajax())
         {
             $search = $request->searchTerm;
-            $position = $request->position;
+            $department = $request->department;
             $Rank =  $this->resort->GetEmployee->rank;
             $Dept_id = $this->resort->GetEmployee->Dept_id;
             $currentDate = Carbon::now();
@@ -384,8 +383,8 @@ class EmployeeController extends Controller
                 });
             }
 
-            if ($position) {
-                $employees->where('employees.Position_id', $position);
+            if ($department) {
+                $employees->where('employees.Dept_id', $department);
             }
 
             $employees = $employees->get()->map(function ($employee) use ($currentMonthDays)
@@ -467,7 +466,7 @@ class EmployeeController extends Controller
         $Rank =  $this->resort->GetEmployee->rank;
         $currentMonthDays = Carbon::now()->daysInMonth;
         $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
-        $monthEndingDate = Carbon::now()->endOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
+        $monthEndingDate = Carbon::now()->format('Y-m-d'); // Today (default range: 1st of month to today)
         $currentDate = Carbon::now();
         $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
@@ -490,6 +489,7 @@ class EmployeeController extends Controller
                 'employees.religion',
                 't2.position_title',
                 't2.code as PositionCode',
+                'employees.Dept_id',
                 DB::raw("
                     (SELECT COUNT(*)
                     FROM parent_attendaces pa
@@ -566,6 +566,7 @@ class EmployeeController extends Controller
                 "),
             )
             ->first();
+            $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
             if ($employee)
             {
@@ -582,9 +583,10 @@ class EmployeeController extends Controller
                 $employee->TotalOverTime = $employee->TotalOverTime ?? 0;
                 $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
                 $employee->CompletedDayoff = $employee->DayOffCount;
+                $employee->department = $department;
                 if (($currentMonthDays - $employee->DayOffCount) > 0)
                 {
-                    $employee->onTimePercentage = number_format($employee->PresentCount / ($currentMonthDays - $employee->DayOffCount) * 100);
+                    $employee->onTimePercentage = number_format($employee->OnTimeCount / ($currentMonthDays - $employee->DayOffCount) * 100);
                 }
                 else
                 {
@@ -690,8 +692,12 @@ class EmployeeController extends Controller
             // Transform the data after pagination
             $AttendanceHistroy->setCollection(
                 $AttendanceHistroy->getCollection()->map(function($h) use($currentMonthDays) {
-                    $h->date = Carbon::parse($h->date)->format('d/m/Y');
+                    $h->date = Carbon::parse($h->date)->format('d M Y');;
                     $h->shift = ucfirst($h->ShiftName);
+                    $h->DayWiseTotalHours = $h->DayWiseTotalHours ?? '0:00';
+                    $h->OverTime = $h->OverTime ?? '0:00';
+                    
+
 
                     // Safely parse CheckingTime
                     if ($h->CheckingTime) {
@@ -946,6 +952,7 @@ class EmployeeController extends Controller
                     'employees.religion',
                     't2.position_title',
                     't2.code as PositionCode',
+                    'employees.Dept_id',
                     DB::raw("
                         (SELECT COUNT(*)
                         FROM parent_attendaces pa
@@ -1022,6 +1029,7 @@ class EmployeeController extends Controller
                     "),
                 )
                 ->first();
+                $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
                 if ($employee)
                 {
@@ -1038,6 +1046,7 @@ class EmployeeController extends Controller
                     $employee->TotalOverTime = $employee->TotalOverTime ?? 0;
                     $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
                     $employee->CompletedDayoff = $employee->DayOffCount;
+                    $employee->department = $department;
                     if (($currentMonthDays - $employee->DayOffCount) > 0)
                     {
                         $employee->onTimePercentage = number_format($employee->PresentCount / ($currentMonthDays - $employee->DayOffCount) * 100);
@@ -1085,37 +1094,34 @@ class EmployeeController extends Controller
                         ->first();
 
                 $TotalSum=0;
-                $leave_categories = ResortBenifitGridChild::select(
-                    'resort_benefit_grid_child.*',
-                    'lc.leave_type',
-                    'lc.color',
-                    'lc.leave_category',
-                    'lc.combine_with_other','lc.id as leave_cat_id'
-                )
-                ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
-                ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
-                ->where('lc.resort_id', $this->resort->resort_id)
-                ->where(function ($query) use ($religion) {
-                        $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
-                            ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
-                        if ($religion == 'muslim') {
-                            $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
-                        }
-                        if($religion =="")
-                        {
-                            $query->Where('resort_benefit_grid_child.eligible_emp_type', 'all');
-                        }
-                    })
-                ->get()
-                ->map(function ($i) use ($id,$TotalSum) {
+                 $leave_categories = ResortBenifitGridChild::select(
+                'resort_benefit_grid_child.*',
+                            'lc.leave_type',
+                            'lc.color',
+                            'lc.leave_category',
+                            'lc.combine_with_other','lc.id as leave_cat_id'
+                        )
+                        ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
+                        ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
+                        ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+                        ->where('lc.resort_id', $this->resort->resort_id)
+                        ->where(function ($query) use ($religion) {
+                                $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
+                                    ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
+                                if ($religion == 'muslim') {
+                                    $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
+                                }
 
+                            })
 
-                    $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
-                    $i->leave_category = isset($i->leave_category) && $i->leave_category != "" ? $i->leave_category : 0;
-                    $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
-                    return $i;
-                });
+                        ->groupBy('lc.id')
+                        ->get()
+                        ->map(function ($i) use ($id) {
+                            $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
+                            $i->leave_category = isset($i->leave_category) && $i->leave_category != "" ? $i->leave_category : 0;
+                            $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
+                            return $i;
+            });
                 $TotalSum = $leave_categories->sum('ThisYearOfused_days');
 
 
@@ -1125,13 +1131,13 @@ class EmployeeController extends Controller
                 $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                                         ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                                         ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
-                                        ->whereIn('parent_attendaces.Status', ['On-Time', 'Present', 'Late', 'DayOff', 'absent', 'ShortLeave', 'HalfDayLeave'])
+                                        ->whereIn('parent_attendaces.Status', ['On-Time', 'Present', 'Late', 'DayOff', 'Absent', 'ShortLeave', 'HalfDayLeave'])
                                         ->where('t1.id', $id)
                                         ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])  // Filter based on the selected month
                                         ->get(['t2.InTime_Location', 't2.OutTime_Location', 'parent_attendaces.note', 'parent_attendaces.date', 'ss.ShiftName', 'ss.StartTime', 'parent_attendaces.CheckingTime', 't2.id as Child_id', 'parent_attendaces.CheckingOutTime', 'parent_attendaces.OverTime', 'parent_attendaces.id as ParentAttd_id', 'parent_attendaces.Status', 'parent_attendaces.DayWiseTotalHours'])
                                         ->map(function($h) use($currentMonthDays) {
 
-                                            $h->date = Carbon::parse($h->date)->format('d/m/Y');
+                                            $h->date = Carbon::parse($h->date)->format('d M Y');;
                                             $h->shift = ucfirst($h->ShiftName);
 
                                             // Safely parse CheckingTime
@@ -1178,6 +1184,7 @@ class EmployeeController extends Controller
 
                                             $h->CheckInTimeOne = $h->CheckingTime;
                                             $h->CheckOutTimeOne = $h->CheckingOutTime;
+                                              $h->DayWiseTotalHours = $h->DayWiseTotalHours ?? '0:00';
                                             $h->OverTime = isset($h->OverTime) ? $h->OverTime : '-';
 
                                             if ($h->CheckingTime && $h->StartTime) {
@@ -1240,9 +1247,9 @@ class EmployeeController extends Controller
 
                                             return $h;
                                         });
-
+        // dd($AttendanceHistroy);
         $page_title="Employee Details Print";
-        return view ('resorts.timeandattendance.employee.employeedetailsprint',compact('TotalSum','leave_categories','page_title','employee','AttendanceHistroy'));
+        return view ('resorts.timeandattendance.employee.employeedetailsprint',compact('TotalSum','leave_categories','page_title','employee','AttendanceHistroy','monthStartingDate','monthEndingDate'));
     }
 
     public function AttandanceHisotry(Request $request,$id)
@@ -1256,17 +1263,35 @@ class EmployeeController extends Controller
             $AttendanceHistroy =  ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
-                ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','absent','ShortLeave','HalfDayLeave'])
+                ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','bsent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
                 ->where(function ($query) use ($previousDay, $previousMonthStart, $previousMonthEnd) {
                     // $query->where('parent_attendaces.date', $previousDay) // Records for the previous day
                     // dd($previousMonthStart, $previousMonthEnd);
                     $query->orWhereBetween('parent_attendaces.date', [$previousMonthStart,$previousMonthEnd]); // Records for the previous month
                 })
-                ->get(['t2.InTime_Location','t2.OutTime_Location','parent_attendaces.note','parent_attendaces.date','ss.ShiftName','ss.StartTime','parent_attendaces.CheckingTime','t2.id as Child_id','parent_attendaces.CheckingOutTime','parent_attendaces.OverTime','parent_attendaces.id as ParentAttd_id','parent_attendaces.Status','parent_attendaces.DayWiseTotalHours','parent_attendaces.created_at'])
+                ->get([
+                            't2.InTime_Location',
+                            't2.OutTime_Location',
+                            'parent_attendaces.note',
+                            'parent_attendaces.date',
+                            'ss.ShiftName',
+                            'parent_attendaces.DayWiseTotalHours',
+                            'parent_attendaces.OverTime',
+                            'ss.StartTime',
+                            'parent_attendaces.CheckingTime',
+                            't2.id as Child_id',
+                            'parent_attendaces.CheckingOutTime',
+                            'parent_attendaces.id as ParentAttd_id',
+                            'parent_attendaces.Status',
+                            'parent_attendaces.created_at'
+                        ])
+
                 ->map(function($h)use($currentMonthDays){
-                    $h->date = Carbon::parse($h->date)->format('d/m/Y');
+                    $h->date = Carbon::parse($h->date)->format('d M Y');;
+                    //  $h->date = Carbon::parse($h->date)->format('d M Y');;
                     $h->shift = ucfirst($h->ShiftName) ;
+                    
 
                     // Safely parse CheckingTime
                     if ($h->CheckingTime) {
@@ -1312,6 +1337,7 @@ class EmployeeController extends Controller
 
                     $h->CheckInTimeOne = $h->CheckingTime ;
                     $h->CheckOutTimeOne = $h->CheckingOutTime;
+                    $h->TotalHours =isset($h->DayWiseTotalHours) ?  $h->DayWiseTotalHours : '-';
                     $h->OverTime =isset($h->OverTime) ?  $h->OverTime : '-';
 
                     if ($h->CheckingTime && $h->StartTime)
@@ -1389,6 +1415,8 @@ class EmployeeController extends Controller
                     }
                     return $h;
                 });
+// dd($AttendanceHistroy->first()->toArray());
+
                 $edit_class = '';
                 if(Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.edit')) == false){
                     $edit_class ='d-none';
@@ -1405,6 +1433,9 @@ class EmployeeController extends Controller
                     })
                     ->addColumn('CheckOutTime', function ($row) {
                         return isset($row->CheckOutTime) ? $row->CheckOutTime : 0; // Default to 0
+                    })
+                    ->addColumn('TotalHours', function ($row) {
+                        return isset($row->TotalHours) ? $row->TotalHours : 0; // Default to 0
                     })
                     ->addColumn('OverTime', function ($row) {
                         return isset($row->OverTime) ? $row->OverTime : 0; // Default to 0
@@ -1426,7 +1457,7 @@ class EmployeeController extends Controller
                     ->addColumn('created_at', function ($row) {
                         return $row->created_at ?? '';
                     })
-                    ->rawColumns(['Date', 'Shift', 'CheckinTime', 'CheckOutTime', 'OverTime', 'Status', 'Action'])
+                    ->rawColumns(['Date', 'Shift', 'CheckinTime', 'CheckOutTime', 'TotalHours','OverTime', 'Status', 'Action'])
                     ->make(true);
         }
     }
@@ -1434,11 +1465,17 @@ class EmployeeController extends Controller
     public function EmpDetailsFilters(Request $request)
     {
         $dates = isset($request->hiddenInput) ? explode("-", $request->hiddenInput) : null;
-        $monthStartingDate = isset($dates[0])
-            ? Carbon::createFromFormat('d/m/Y', $dates[0])->format('Y-m-d') // Correct date format for the '03/01/2025' format
+        // $monthStartingDate = isset($dates[0])
+        //     ? Carbon::createFromFormat('d/m/Y', $dates[0])->format('Y-m-d') // Correct date format for the '03/01/2025' format
+        //     : Carbon::now()->startOfMonth()->format('Y-m-d'); // Default to the start of the month
+        // $monthEndingDate = isset($dates[1])
+        //     ? Carbon::createFromFormat('d/m/Y', $dates[1])->format('Y-m-d') // Correct date format for the '03/01/2025' format
+        //     : Carbon::now()->endOfMonth()->format('Y-m-d'); // Default to the end of the month
+            $monthStartingDate = isset($request->start_date)
+            ? Carbon::createFromFormat('d/m/Y', $request->start_date)->format('Y-m-d') // Correct date format for the '03/01/2025' format
             : Carbon::now()->startOfMonth()->format('Y-m-d'); // Default to the start of the month
-        $monthEndingDate = isset($dates[1])
-            ? Carbon::createFromFormat('d/m/Y', $dates[1])->format('Y-m-d') // Correct date format for the '03/01/2025' format
+        $monthEndingDate = isset($request->end_date)
+            ? Carbon::createFromFormat('d/m/Y', $request->end_date)->format('Y-m-d') // Correct date format for the '03/01/2025' format
             : Carbon::now()->endOfMonth()->format('Y-m-d'); // Default to the end of the month
         $id = base64_decode($request->emp_id);
         $page_title = "Employee Details";
@@ -1562,7 +1599,7 @@ class EmployeeController extends Controller
                 $employee->CompletedDayoff = $employee->DayOffCount;
                 if (($currentMonthDays - $employee->DayOffCount) > 0)
                 {
-                    $employee->onTimePercentage = number_format($employee->PresentCount / ($currentMonthDays - $employee->DayOffCount) * 100);
+                    $employee->onTimePercentage = number_format($employee->OnTimeCount / ($currentMonthDays - $employee->DayOffCount) * 100);
                 }
                 else
                 {
@@ -1646,10 +1683,11 @@ class EmployeeController extends Controller
                 ->whereIn('parent_attendaces.Status', ['Present','Absent'])
                 ->where('t1.id', $id)
                 ->orderBy('parent_attendaces.date', 'ASC')
-                ->where(function ($query) use ( $previousMonthStart, $previousMonthEnd) {
-                    // $query->orWhereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd]);
+                ->where(function ($query) use ( $monthStartingDate, $monthEndingDate) {
+                    $query->orWhereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate]);
                 })
                 ->paginate(10, [
+                    'parent_attendaces.id',
                     't2.InTime_Location',
                     't2.OutTime_Location',
                     'parent_attendaces.note',
@@ -1657,7 +1695,7 @@ class EmployeeController extends Controller
                     'ss.ShiftName',
                     'ss.StartTime',
                     'parent_attendaces.CheckingTime',
-                    't2.id as Child_id',
+                    't2.id as Chilmd_id',
                     'parent_attendaces.CheckingOutTime',
                     'parent_attendaces.OverTime',
                     'parent_attendaces.id as ParentAttd_id',
@@ -1665,11 +1703,15 @@ class EmployeeController extends Controller
                     'parent_attendaces.DayWiseTotalHours'
                 ]);
 
+
             // Transform the data after pagination
             $AttendanceHistroy->setCollection(
                 $AttendanceHistroy->getCollection()->map(function($h) use($currentMonthDays) {
-                    $h->date = Carbon::parse($h->date)->format('d/m/Y');
+                    // $h->date = Carbon::parse($h->date)->format('d M Y');;
+                                       $h->date = Carbon::parse($h->date)->format('d M Y');;
+
                     $h->shift = ucfirst($h->ShiftName);
+                   
 
                     // Safely parse CheckingTime
                     if ($h->CheckingTime) {
@@ -1712,10 +1754,30 @@ class EmployeeController extends Controller
                     } else {
                         $h->CheckOutTime = null;
                     }
+                    $edit_class = '';
+            if(Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.view')) == false){
+                $edit_class = 'd-none';
+            }
 
                     $h->CheckInTimeOne = $h->CheckingTime;
                     $h->CheckOutTimeOne = $h->CheckingOutTime;
+                    $h->totalhour = isset($h->DayWiseTotalHours) ? $h->DayWiseTotalHours : '-';
                     $h->OverTime = isset($h->OverTime) ? $h->OverTime : '-';
+                    $h->Action = '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData" 
+                                data-location="' . $h->InTime_Location . '" 
+                                data-id="' . $h->id . '">
+                                    <i class="fa-regular fa-location-dot"></i>
+                                </a>
+                                <a href="#" class="btn-lg-icon icon-bg-green edit-row-btn ' . $edit_class . '" 
+                                data-note="' . $h->note . '" 
+                                data-checkinTime="' . $h->CheckInTime . '" 
+                                data-checkouttime="' . $h->CheckOutTimeOne . '" 
+                                data-overtime="' . $h->OverTime . '" 
+                                data-id="' . base64_encode($h->Child_id) . '" 
+                                data-ParentAttd_id="' . base64_encode($h->ParentAttd_id) . '" 
+                                data-bs-toggle="modal">
+                                    <img src="' . asset('resorts_assets/images/edit.svg') . '" alt="Edit Icon">
+                                </a>';
 
                     if ($h->CheckingTime && $h->StartTime) {
                         try {
@@ -1786,4 +1848,115 @@ class EmployeeController extends Controller
         return response()->json(['html' => $view]);
 
     }
+
+
+public function attandanceHisotryExport(Request $request)
+{
+    $start = $request->start_date;
+    $end   = $request->end_date;
+    $id    = $request->id;
+
+    // ===============================
+    // 1️⃣ Single Merged Query
+    // ===============================
+
+    $AttendanceHistroy = ParentAttendace::from('parent_attendaces as pa')
+        ->join('employees as e', 'e.id', '=', 'pa.Emp_id')
+        ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+        ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
+        ->leftJoin('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
+        ->join('shift_settings as ss', 'ss.id', '=', 'pa.Shift_id')
+        ->where('e.id', $id)
+        ->whereBetween('pa.date', [$start, $end])
+        ->select(
+            'pa.date',
+            'pa.CheckingTime',
+            'pa.CheckingOutTime',
+            'pa.OverTime',
+            'pa.Status',
+            'ss.ShiftName',
+
+            // Employee details
+            'ra.first_name',
+            'ra.last_name',
+            'e.Emp_id as Emp_Code',
+            'rp.position_title',
+            'rd.name as department_name'
+        )
+        ->get();
+
+    if ($AttendanceHistroy->isEmpty()) {
+        return back()->with('error', 'No attendance records found.');
+    }
+
+    // ===============================
+    // 2️⃣ CSV Settings
+    // ===============================
+
+    $filename = "Attendance_Report_" . date('M_Y') . ".csv";
+
+    $headers = [
+        "Content-type"        => "text/csv",
+        "Content-Disposition" => "attachment; filename=$filename",
+        "Pragma"              => "no-cache",
+        "Cache-Control"       => "must-revalidate",
+        "Expires"             => "0"
+    ];
+
+    // ===============================
+    // 3️⃣ CSV Stream
+    // ===============================
+
+    $callback = function() use ($AttendanceHistroy) {
+
+        $file = fopen('php://output', 'w');
+
+        $firstRow = $AttendanceHistroy->first();
+        $employeeName = $firstRow->first_name . ' ' . $firstRow->last_name;
+
+        // Employee Info Section
+        fputcsv($file, ['Employee Name:', $employeeName]);
+        fputcsv($file, ['Employee Code:', $firstRow->Emp_Code ?? '-']);
+        fputcsv($file, ['Position:', $firstRow->position_title ?? '-']);
+        fputcsv($file, ['Department:', $firstRow->department_name ?? '-']);
+        fputcsv($file, []);
+
+        // Table Header
+        fputcsv($file, [
+            'Date',
+            'Shift',
+            'Check In Time',
+            'Check Out Time',
+            'Over Time',
+            'Status'
+        ]);
+
+        foreach ($AttendanceHistroy as $row) {
+
+            $date = Carbon::parse($row->date)->format('d M Y');
+
+            $checkIn = $row->CheckingTime 
+                ? Carbon::parse($row->CheckingTime)->format('h:i A') 
+                : '-';
+
+            $checkOut = $row->CheckingOutTime 
+                ? Carbon::parse($row->CheckingOutTime)->format('h:i A') 
+                : '-';
+
+            fputcsv($file, [
+                $date,
+                ucfirst($row->ShiftName),
+                $checkIn,
+                $checkOut,
+                $row->OverTime ?? '-',
+                $row->Status
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
+
 }

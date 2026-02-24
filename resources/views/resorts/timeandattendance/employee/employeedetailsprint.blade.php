@@ -28,7 +28,8 @@
                                 <div class="img-circle"><img src="{{   $employee->profile_picture}}" alt="user"></div>
                                 <div>
                                     <h4>{{$employee->name }} <span class="badge badge-themeNew">{{ $employee->Emp_Code }}</span></h4>
-                                    <p>{{$employee->Position }}</p>
+                                    <p>{{$employee->Position }} ( {{$employee->department }})</p>
+
                                 </div>
                             </div>
                         </div>
@@ -36,6 +37,18 @@
 
                         </div>
                         <div class="col-auto">
+                        <form method="GET" action="{{ route('resort.export.attandanceHisotry') }}">
+    
+                        <input type="hidden" name="start_date" value="{{ $monthStartingDate }}">
+                        <input type="hidden" name="end_date" value="{{ $monthEndingDate }}">
+                        <input type="hidden" name="id" value="{{ $employee->emp_id }}">
+
+                        <button type="submit" class="btn btn-themeSkyblue btn-sm">
+                            Export CSV
+                        </button>
+
+                    </form>
+
                             <a href="#" class="btn btn-themeSkyblue btn-sm" id="printButton">Print</a>
                         </div>
                     </div>
@@ -46,7 +59,7 @@
                             <div class="col">
                                 <h3>Leave Balance</h3>
                             </div>
-                            <div class="col-auto"><span class="badge badge-themeNew">Total:{{ $TotalSum }}</span></div>
+                            <!-- <div class="col-auto"><span class="badge badge-themeNew">Total:{{ $TotalSum }}</span></div> -->
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -105,6 +118,7 @@
                                     <th>Shift</th>
                                     <th>Check in Time</th>
                                     <th>Check Out Time</th>
+                                    <th>Total Hour</th>
                                     <th>Over Time</th>
                                     <th>Status</th>
                                 </tr>
@@ -117,6 +131,7 @@
                                             <td>{{ $item->shift }}</td>
                                             <td>{{ $item->CheckInTime }}</td>
                                             <td>{{ $item->CheckOutTime }}</td>
+                                            <td>{{ $item->DayWiseTotalHours }}</td>
                                             <td>{{ $item->OverTime }} </td>
                                             <td>{!! $item->Status !!}</td>
                                         </tr>

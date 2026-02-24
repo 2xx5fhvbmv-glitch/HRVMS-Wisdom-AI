@@ -145,7 +145,7 @@
                             <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
                             </div>
                         </div> -->
-                        <div class="card">
+                        <!-- <div class="card">
                             <div class="card-title">
                                 <h3>Color Theme</h3>
                             </div>
@@ -197,7 +197,7 @@
                             <div class="card-footer text-end">
                                 <button type="button" id="submit-themes" class="btn btn-themeBlue btn-sm">Submit</button>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
                     <div class="col-lg-6 ">
                         <div class="card mb-30">
@@ -356,7 +356,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="row align-items-center g-2 ">
+                            <!-- <div class="row align-items-center g-2 ">
                                 <div class="col-auto">
                                     <h6>Mobile Attendance</h6>
                                 </div>
@@ -367,7 +367,7 @@
                                         <label class="form-check-label" for="flexSwitchCheckDefault1"></label>
                                     </div>
                                 </div>
-                            </div>
+                            </div> -->
 
                         </div>
                     </div>
@@ -480,18 +480,32 @@
     <script type="text/javascript">
         $(document).ready(function() {
              // Custom validator for checking if one date is after another
-            window.Parsley.addValidator('dateAfter', {
-                validateString: function (value, selector) {
-                    let startDate = document.querySelector(selector).value;
-                    if (!startDate) return true; // skip if no start date
-                    let start = new Date(startDate.split("-").reverse().join("-"));
-                    let end = new Date(value.split("-").reverse().join("-"));
-                    return end > start;
-                },
-                messages: {
-                    en: 'End Date must be after Start Date.'
-                }
-            });
+             window.Parsley.addValidator('dateAfter', {
+    validateString: function (value, selector) {
+        let startDate = document.querySelector(selector)?.value;
+        if (!startDate || !value) return true;
+
+        function parseDate(dateStr) {
+            let [d, m, y] = dateStr.split('-');
+
+            // Convert 2-digit year → 4-digit year
+            if (y.length === 2) {
+                y = '20' + y;
+            }
+
+            return new Date(y, m - 1, d); // month is 0-based
+        }
+
+        let start = parseDate(startDate);
+        let end   = parseDate(value);
+
+        return end > start;
+    },
+    messages: {
+        en: 'End Date must be after Start Date.'
+    }
+});
+
 
             $("#fileUploadForm").parsley();
             $("#start_date , #end_date").datepicker({
