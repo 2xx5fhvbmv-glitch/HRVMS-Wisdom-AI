@@ -154,16 +154,8 @@ class ApplicantsController extends Controller
             ->addColumn('action', function ($row) {
                 $id = base64_encode($row->id);
 
-                return '
-                <div class="dropdown table-dropdown">
-                    <button class="btn btn-secondary dropdown-toggle dots-link" type="button" id="dropdownMenuButton'.$row->id.'" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fa-solid fa-ellipsis"></i>
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton'.$row->id.'">
-                        <li><a class="dropdown-item userApplicants-btn"  href="javascript:void(0)" data-id="'.$row->applicant_id.'">View</a></li>
-                        <li><a class="dropdown-item ApplicantsNotes" data-notes="'.$row->Notes.'"  data-id="'.$id.'" href="javascript:void(0)">Notes</a></li>
-                    </ul>
-                </div>';
+                return '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
+                        <a href="javascript:void(0)" class="btn btn-sm btn-theme ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>';
             })
             ->addColumn('details-control', function ($row) {
                 return '<a class="a-link collapsed" data-bs-toggle="collapse" data-bs-target="#collapseRow'.$row->id.'" aria-expanded="false" aria-controls="collapseRow'.$row->id.'">Interview Details</a>';

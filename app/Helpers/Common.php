@@ -5475,32 +5475,38 @@ class Common
                 return ['status' => false];
             }
             $main_folder = $resort->resort_id;
-            $s3 = Storage::disk('s3');
-
-            // Define the base path for talent acquisition
-            $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
-
-            $folderExists = $s3->exists($basePath . '/.gitkeep');
-
-            if (!$folderExists) {
-                $s3->put($basePath . '/.gitkeep', '');
-            }
-
-            // Store the original file object
-            $uploadedFile = $file_name;
 
             // Generate new filename
-            // Generate random unique filename
+            $uploadedFile = $file_name;
             $prefix = 'applicant_';
-            $randomPart = Str::random(8); // 8 characters of randomness
+            $randomPart = Str::random(8);
             $timestamp = time();
             $newFileName = $prefix . $timestamp . '_' . $randomPart . '.' . $uploadedFile->getClientOriginalExtension();
 
-            // Now upload the file to the folder
-            $filePath = $basePath . '/' . $newFileName;
-            $s3->put($filePath, file_get_contents($uploadedFile->getRealPath()));
+            $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
 
-            // Store file path in data array
+            $driver = config('filesystems.default', 'local');
+
+            if ($driver === 's3') {
+                $s3 = Storage::disk('s3');
+
+                $folderExists = $s3->exists($basePath . '/.gitkeep');
+                if (!$folderExists) {
+                    $s3->put($basePath . '/.gitkeep', '');
+                }
+
+                $filePath = $basePath . '/' . $newFileName;
+                $s3->put($filePath, file_get_contents($uploadedFile->getRealPath()));
+            } else {
+                $localPath = 'talent_acquisition/' . base64_encode($vacancy_id);
+                $fullDir = public_path($localPath);
+                if (!file_exists($fullDir)) {
+                    mkdir($fullDir, 0755, true);
+                }
+                $uploadedFile->move($fullDir, $newFileName);
+                $filePath = $localPath . '/' . $newFileName;
+            }
+
             $data['status'] = true;
             $data['path'] = $filePath;
             $data['filename'] = $newFileName;

@@ -1352,8 +1352,10 @@
                             }
                         },
                         { data: 'action', name: 'action', orderable: false, searchable: false }
-                    ]
-
+                    ],
+                    drawCallback: function() {
+                        $('[data-bs-toggle="tooltip"]').tooltip();
+                    }
                 });
         }
         function DatatableGrid()

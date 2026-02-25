@@ -1879,6 +1879,10 @@
                             toastr.success(response.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
+                            // Redirect after short delay so user can see success message
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 2000);
                         },
                         error: function(xhr) {
                             // Handle submission errors
