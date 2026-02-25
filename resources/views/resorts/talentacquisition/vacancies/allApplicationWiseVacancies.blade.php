@@ -109,6 +109,41 @@
         </div>
     </div>
 
+    {{-- View Job Advertisement Modal --}}
+    <div class="modal fade" id="viewJobAdModal" tabindex="-1" aria-labelledby="viewJobAdModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small modal-jobAD">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewJobAdModalLabel">Job Advertisement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Job Advertisement for <strong id="viewJobAdPosition"></strong></p>
+                    <div id="viewJobAdCarousel" class="carousel slide mb-sm-4 mb-3" data-bs-interval="false">
+                        <div class="carousel-inner text-center" id="viewJobAdCarouselInner">
+                        </div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#viewJobAdCarousel" data-bs-slide="prev" id="viewJobAdPrevBtn" style="display:none;">
+                            <span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 10px;"></span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#viewJobAdCarousel" data-bs-slide="next" id="viewJobAdNextBtn" style="display:none;">
+                            <span class="carousel-control-next-icon" aria-hidden="true" style="background-color: rgba(0,0,0,0.5); border-radius: 50%; padding: 10px;"></span>
+                        </button>
+                    </div>
+                    <div class="text-center mb-sm-4 mb-3">
+                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm viewJobAdDownload">Download</a>
+                    </div>
+                    <div class="mb-sm-3 mb-2" id="viewJobAdLinkContainer" style="display:none;">
+                        <h6>Job Advertisement Link:</h6>
+                        <a href="#" target="_blank" class="a-link" id="viewJobAdLink"></a>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray">Close</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="jobAD-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-small modal-jobAD">
             <div class="modal-content">
@@ -215,6 +250,70 @@ $(document).ready(function() {
 
     let formattedDate = parts[0] + "/" + parts[1] + "/" + parts[2];
         $('#link_Expiry_date').datepicker('setDate',ExpiryDate);
+    });
+
+    // View Job Advertisement Modal
+    $(document).on('click', '.viewJobAd', function() {
+        let positionName = $(this).attr('data-position');
+        let jobLink = $(this).attr('data-joblink') || '';
+        let allJobImages = [];
+        try {
+            allJobImages = JSON.parse($(this).attr('data-alljobimages')) || [];
+        } catch(e) {
+            allJobImages = [];
+        }
+
+        $("#viewJobAdPosition").text(positionName);
+
+        // Show/hide job ad link
+        if (jobLink && jobLink.trim() !== '') {
+            $("#viewJobAdLink").attr("href", jobLink).text(jobLink);
+            $("#viewJobAdLinkContainer").show();
+        } else {
+            $("#viewJobAdLinkContainer").hide();
+        }
+
+        let carouselInner = $("#viewJobAdCarouselInner");
+        carouselInner.empty();
+
+        if (allJobImages.length > 0) {
+            $.each(allJobImages, function(i, imgUrl) {
+                let activeClass = i === 0 ? 'active' : '';
+                carouselInner.append('<div class="carousel-item ' + activeClass + '"><img src="' + imgUrl + '" alt="Job Advertisement" style="max-width:100%;"></div>');
+            });
+            if (allJobImages.length > 1) {
+                $("#viewJobAdPrevBtn, #viewJobAdNextBtn").show();
+            } else {
+                $("#viewJobAdPrevBtn, #viewJobAdNextBtn").hide();
+            }
+            $(".viewJobAdDownload").attr("data-hrefLink", allJobImages[0]).show();
+        } else {
+            carouselInner.append('<div class="carousel-item active"><p class="text-muted py-4">No Job Advertisement images available.</p></div>');
+            $("#viewJobAdPrevBtn, #viewJobAdNextBtn").hide();
+            $(".viewJobAdDownload").hide();
+        }
+
+        $("#viewJobAdModal").modal('show');
+    });
+
+    // Update download link when carousel slides
+    $('#viewJobAdCarousel').on('slid.bs.carousel', function () {
+        var activeImg = $(this).find('.carousel-item.active img').attr('src');
+        $(".viewJobAdDownload").attr("data-hrefLink", activeImg);
+    });
+
+    // Download handler for View Job Ad modal
+    $(document).on('click', '.viewJobAdDownload', function() {
+        let imgUrl = $(this).attr('data-hrefLink');
+        if (imgUrl) {
+            let a = document.createElement('a');
+            a.href = imgUrl;
+            a.download = '';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     });
 
         $('#jobAD-form').validate({
