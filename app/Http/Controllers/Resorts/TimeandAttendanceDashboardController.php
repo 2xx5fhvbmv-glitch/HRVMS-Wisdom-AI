@@ -85,6 +85,13 @@ class TimeandAttendanceDashboardController extends Controller
             }
         }
 
+        // Check if user is GM (General Manager) - GM sees same scope as HR/EXCOM
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->GetEmployee);
+        $isGM = ($employeeRankPosition['position'] ?? '') === 'GM' || ($employeeRankPosition['rank'] ?? '') === 'GM';
+        if ($isGM) {
+            return true;
+        }
+
         // #region agent log
         @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:70','message'=>'canViewAllDepartments: Returning false','data'=>['result'=>false],'timestamp'=>time()*1000])."\n", FILE_APPEND);
         // #endregion
@@ -326,14 +333,20 @@ class TimeandAttendanceDashboardController extends Controller
             ->where('t1.resort_id', $this->resort->resort_id)
             ->whereNotNull('t3.CheckingTime')
             ->count();
-            $todayAbsentCount = DB::table('parent_attendaces as t3')
+            $absentQuery = DB::table('parent_attendaces as t3')
             ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
             ->join('employees', 't2.Emp_id', '=', 'employees.id')
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->where('t3.date', date('Y-m-d'))
             ->where('t1.resort_id', $this->resort->resort_id)
-            ->where('t3.status', '=', 'Absent' )
-            ->count();
+            ->where('t3.status', '=', 'Absent');
+            if (!$canViewAll && $Dept_id) {
+                $absentQuery->where('employees.Dept_id', $Dept_id);
+            }
+            if (!$canViewAll && !$isDeptHOD) {
+                $absentQuery->whereIn('employees.id', $this->underEmp_id);
+            }
+            $todayAbsentCount = $absentQuery->count();
         @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'TimeandAttendanceDashboardController.php:318','message'=>'HrDashobard present query check','data'=>['canViewAll'=>$canViewAll,'isDeptHOD'=>$isDeptHOD,'totalPresentEmployee'=>$totalPresentEmployee,'todayAttendanceRecords'=>$todayAttendanceCheck,'underEmpCount'=>count($this->underEmp_id)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
         // #endregion
         $totalPresentEmployee = $totalPresentEmployee ?? 0;
@@ -485,18 +498,23 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        $todayAbsentCount = DB::table('parent_attendaces as t3')
+        $absentQuery = DB::table('parent_attendaces as t3')
             ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
             ->join('employees', 't2.Emp_id', '=', 'employees.id')
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-            ->where('t3.date', date('Y-m-d'))
+            ->where('t3.date', $date)
             ->where('t1.resort_id', $this->resort->resort_id)
-            ->where('t3.status', '=', 'Absent' )
-            ->count();
+            ->where('t3.status', '=', 'Absent');
+        if (!$canViewAll && $Dept_id) {
+            $absentQuery->where('employees.Dept_id', $Dept_id);
+        }
+        if (!$canViewAll && !$isDeptHOD) {
+            $absentQuery->whereIn('employees.id', $this->underEmp_id);
+        }
+        $totalAbsantEmployee = $absentQuery->count();
 
-            $totalAbsantEmployee = $todayAbsentCount;
-        // Total unknown status employees = Total Employees - Present - On Leave - total absent
-        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        // Total unknown status = Total Employees - Present - On Leave - absent (same date and scope)
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $totalAbsantEmployee;
         $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
         return response()->json([
@@ -613,6 +631,7 @@ class TimeandAttendanceDashboardController extends Controller
                 $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
                 $item->Position = ucfirst($item->position_title ?? 'N/A');
                 $item->profileImg = Common::getResortUserPicture($item->Parentid);
+                $item->id = $item->emp_id;
                 return $item;
             });
 
@@ -938,6 +957,7 @@ class TimeandAttendanceDashboardController extends Controller
         $Rank =  $this->resort->GetEmployee->rank ?? null;
         $hod = $this->resort->GetEmployee->id ?? null;
         $canViewAll = $this->canViewAllDepartments();
+        $isDeptHOD = $this->isDepartmentHOD();
         $attendanceDataTodoList = $this->Tododata();
 
         // Get positions - all departments if can view all, otherwise only user's department
@@ -1009,18 +1029,23 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        $todayAbsentCount = DB::table('parent_attendaces as t3')
+        $absentQuery = DB::table('parent_attendaces as t3')
             ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
             ->join('employees', 't2.Emp_id', '=', 'employees.id')
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->where('t3.date', date('Y-m-d'))
             ->where('t1.resort_id', $this->resort->resort_id)
-            ->where('t3.status', '=', 'Absent' )
-            ->count();
+            ->where('t3.status', '=', 'Absent');
+        if (!$canViewAll && $Dept_id) {
+            $absentQuery->where('employees.Dept_id', $Dept_id);
+        }
+        if (!$canViewAll && !$isDeptHOD) {
+            $absentQuery->whereIn('employees.id', $this->underEmp_id);
+        }
+        $totalAbsantEmployee = $absentQuery->count();
 
-            $totalAbsantEmployee = $todayAbsentCount;
-        // Total unknown status employees = Total Employees - Present - On Leave - total absent
-        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        // Total unknown status = Total Employees - Present - On Leave - absent (same date and scope)
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $totalAbsantEmployee;
         $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
         return view('resorts.timeandattendance.dashboard.hoddashboard', compact('attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee', 'totalunknown_status_Employee'));
@@ -1032,6 +1057,7 @@ class TimeandAttendanceDashboardController extends Controller
         $Rank = $this->resort->GetEmployee->rank ?? null;
         $hod = $this->resort->GetEmployee->id ?? null;
         $canViewAll = $this->canViewAllDepartments();
+        $isDeptHOD = $this->isDepartmentHOD();
 
         // Employee count (only active employees)
         $EmployeesCountQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
@@ -1095,18 +1121,23 @@ class TimeandAttendanceDashboardController extends Controller
         $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct('employees.id')->count('employees.id');
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
 
-        $todayAbsentCount = DB::table('parent_attendaces as t3')
+        $absentQuery = DB::table('parent_attendaces as t3')
             ->join('duty_rosters as t2', 't3.roster_id', '=', 't2.id')
             ->join('employees', 't2.Emp_id', '=', 'employees.id')
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-            ->where('t3.date', date('Y-m-d'))
+            ->where('t3.date', $date)
             ->where('t1.resort_id', $this->resort->resort_id)
-            ->where('t3.status', '=', 'Absent' )
-            ->count();
+            ->where('t3.status', '=', 'Absent');
+        if (!$canViewAll && $Dept_id) {
+            $absentQuery->where('employees.Dept_id', $Dept_id);
+        }
+        if (!$canViewAll && !$isDeptHOD) {
+            $absentQuery->whereIn('employees.id', $this->underEmp_id);
+        }
+        $totalAbsantEmployee = $absentQuery->count();
 
-            $totalAbsantEmployee = $todayAbsentCount;
-        // Total unknown status employees = Total Employees - Present - On Leave - total absent
-        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $todayAbsentCount;
+        // Total unknown status = Total Employees - Present - On Leave - absent (same date and scope)
+        $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $totalAbsantEmployee;
         $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
         return response()->json([
