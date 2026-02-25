@@ -258,9 +258,9 @@ class ApplicantController extends Controller
                 $work_experience->work_country_name = $request->work_country_name[$key];
                 $work_experience->work_city = $request->work_city[$key];
                 $work_experience->total_work_exp = $request->total_experience[$key]; // Ensure parsing if needed
-                $work_experience->work_start_date = \Carbon\Carbon::createFromFormat('d/m/Y', $request->work_start_date[$key])->format('Y-m-d');
+                $work_experience->work_start_date = \Carbon\Carbon::parse($request->work_start_date[$key])->format('Y-m-d');
                 $work_experience->work_end_date = isset($request->work_end_date[$key])
-                    ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->work_end_date[$key])->format('Y-m-d')
+                    ? \Carbon\Carbon::parse($request->work_end_date[$key])->format('Y-m-d')
                     : null;
                 $work_experience->job_description_work = $request->job_description_work[$key];
                 $work_experience->currently_working = $request->currently_working[$key] ?? 0;
