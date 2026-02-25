@@ -1101,6 +1101,11 @@ class VacancyController extends Controller
 
 
 
+            // Fetch all job ad images for this resort (for carousel)
+            $allJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
+                return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
+            })->values()->toArray();
+
             $NewVacancies = Vacancies::join("resort_departments as t1", "t1.id", "=", "vacancies.department")
             ->join("resort_positions as t2", "t2.id", "=", "vacancies.position")
             ->join("t_anotification_parents as t3", "t3.V_id", "=", "vacancies.id")
@@ -1154,9 +1159,10 @@ class VacancyController extends Controller
             t5.link_Expiry_date,
             t6.Application_date,
             t5.id as application_id,
+            t5.link as jobAdLink,
             vacancies.Total_position_required
             ")
-            ->groupBy("vacancies.id", "t2.position_title", "t2.code", "t1.name", "t1.code", "t5.link_Expiry_date", "t6.Application_date", "t6.id", "vacancies.Total_position_required")
+            ->groupBy("vacancies.id", "t2.position_title", "t2.code", "t1.name", "t1.code", "t5.link_Expiry_date", "t6.Application_date", "t6.id", "vacancies.Total_position_required", "t5.link")
             ->get();
         $ResortDepartment = ResortDepartment::where('resort_id', $resort_id)->get();
 
@@ -1191,6 +1197,7 @@ class VacancyController extends Controller
             $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d-m-Y');
             $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
             $v->ApplicationId= $v->application_id;
+            $v->allJobAdImages = json_encode($allJobAdImages);
         }
 
         $config = config('settings.Position_Rank');
@@ -1207,12 +1214,11 @@ class VacancyController extends Controller
                   if (!$canSeeAction) {
                       return '';
                   }
-                  $editUrl = asset('resorts_assets/images/edit.svg');
-                  $deleteUrl = asset('resorts_assets/images/trash-red.svg');
 
                 $route = route("resort.ta.Applicants", base64_encode($row->vacancy_id));
                     return '<a href="'.$route.'" class="btn btn-sm btn-themeBlue me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm btn-theme ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>';
+                            <a href="javascript:void(0)" class="btn btn-sm btn-theme ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
+                            <a href="javascript:void(0)" class="btn btn-sm btn-info viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
 
                         })
                     ->addColumn('Position', function ($row) {
@@ -1336,6 +1342,7 @@ class VacancyController extends Controller
                             t5.link_Expiry_date,
                             t6.Application_date,
                             t5.id as application_id,
+                            t5.link as jobAdLink,
                             vacancies.Total_position_required as NoOfVacnacy,
                             t7.Jobadvimg
                         ")
@@ -1348,17 +1355,24 @@ class VacancyController extends Controller
                                     "t5.link_Expiry_date",
                                     "t6.Application_date",
                                     "t6.id",
+                                    "t5.link",
                                     "vacancies.Total_position_required",
                                     "t7.Jobadvimg"
                                 )->paginate(10);
 
 
-                    $NewVacancies->getCollection()->transform(function ($vacancy) {
+                    // Fetch all job ad images for this resort
+                    $gridAllJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
+                        return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
+                    })->values()->toArray();
+
+                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($gridAllJobAdImages) {
                         $vacancy->image = URL::asset(
                             config('settings.Resort_JobAdvertisement') . '/' .
                             Auth::guard('resort-admin')->user()->resort->resort_id . '/' .
                             $vacancy->Jobadvimg
                         );
+                        $vacancy->allJobAdImages = $gridAllJobAdImages;
                         return $vacancy;
                     });
             // Check if current user belongs to HR department
