@@ -1388,14 +1388,15 @@ class DutyRosterController extends Controller
         return response()->json(['success' => true, 'message' => 'Overtime saved successfully.']);
     }
 
-    public function ViewDutyRoster(){
+  public function ViewDutyRoster(){
         $Dept_id = $this->resort->GetEmployee->Dept_id ?? '';
         $Rank =  $this->resort->GetEmployee->rank ?? '';
         $employeeRank = Common::getEmployeeRank($this->resort->getEmployee);
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
+        $isGM = ($employeeRankPosition['position'] == 'GM') || (($employeeRankPosition['rank'] ?? '') == 'GM');
         if($this->resort->is_master_admin == 0){
-            if($employeeRank['isHR'] != true)
+            if($employeeRank['isHR'] != true && !$isGM)
             {
                 $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
 
@@ -1456,7 +1457,10 @@ class DutyRosterController extends Controller
                                     {
                                         if($employeeRankPosition['position'] != "EXCOM")
                                         {
-                                            $Rosterdata1->whereIn('employees.id', $this->underEmp_id);
+                                            if($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] ?? '') != "GM")
+                                            {
+                                                $Rosterdata1->whereIn('employees.id', $this->underEmp_id);
+                                            }
                                         }
                                     }
                                 }
@@ -1466,7 +1470,7 @@ class DutyRosterController extends Controller
                                 ->get();
 
         // Determine if user can see all departments
-        // User can see all departments if: HR, HOD, or EXCOM
+        // User can see all departments if: HR, HOD, EXCOM, or GM
         $canViewAllDepartments = false;
 
         if ($this->resort->is_master_admin == 1) {
@@ -1482,8 +1486,11 @@ class DutyRosterController extends Controller
             // Check if user is EXCOM (by rank or position)
             $isEXCOM = ($employeeRankPosition['rank'] == 'EXCOM') || ($employeeRankPosition['position'] == 'EXCOM');
 
-            // User can view all departments if they are HR, HOD, or EXCOM
-            $canViewAllDepartments = $isHR || $isHOD || $isEXCOM;
+            // Check if user is GM (by rank or position) - GM sees same scope as HR/EXCOM
+            $isGMForView = ($employeeRankPosition['position'] == 'GM') || (($employeeRankPosition['rank'] ?? '') == 'GM');
+
+            // User can view all departments if they are HR, HOD, EXCOM, or GM
+            $canViewAllDepartments = $isHR || $isHOD || $isEXCOM || $isGMForView;
         }
 
         // Group roster data by department and section
