@@ -1991,6 +1991,7 @@ return array(
     'Database\\Factories\\UserFactory' => $baseDir . '/database/factories/UserFactory.php',
     'Database\\Seeders\\AdminModulePermissionSeeder' => $baseDir . '/database/seeders/AdminModulePermissionSeeder.php',
     'Database\\Seeders\\AdminModuleSeeder' => $baseDir . '/database/seeders/AdminModuleSeeder.php',
+    'Database\\Seeders\\CountriesSeeder' => $baseDir . '/database/seeders/CountriesSeeder.php',
     'Database\\Seeders\\DatabaseSeeder' => $baseDir . '/database/seeders/DatabaseSeeder.php',
     'Database\\Seeders\\MasterModuleDataSeeder' => $baseDir . '/database/seeders/MasterModuleDataSeeder.php',
     'Database\\Seeders\\PermissionSeeder' => $baseDir . '/database/seeders/PermissionSeeder.php',

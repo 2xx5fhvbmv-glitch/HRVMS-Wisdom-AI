@@ -143,7 +143,15 @@
                                 <div class="col-md-6 ">
                                     <label for="txt-mobile-number" class="form-label">MOBILE
                                         NUMBER<span class="red-mark">*</span></label>
-                                    <input type="text" class="form-control" name="mobile_number" id="txt-mobile-number" placeholder="Mobile Number" required data-parsley-type="digits" required data-parsley-mobile_number data-parsley-trigger="change">
+                                    <div class="input-group">
+                                        <select class="form-select select2t-none" name="country_phone_code" id="country-phone-code" style="max-width: 120px;" required>
+                                            <option value="">Code</option>
+                                            @foreach($countries as $country)
+                                                <option value="+{{ $country->phonecode }}">{{ $country->shortname }} +{{ $country->phonecode }}</option>
+                                            @endforeach
+                                        </select>
+                                        <input type="text" class="form-control" name="mobile_number" id="txt-mobile-number" placeholder="Mobile Number" required data-parsley-type="digits" data-parsley-trigger="change">
+                                    </div>
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="txt-email-address" class="form-label">EMAIL
@@ -178,6 +186,15 @@
                                     data-parsley-validate-script-message="Script tags are not allowed.">
                                 </div>
                                 <div class="col-md-6 ">
+                                    <label for="city" class="form-label">CITY<span class="red-mark">*</span></label>
+                                    <input type="text" name="city" id="city" class="form-control alpha-only" placeholder="City" required data-parsley-trigger="change" data-parsley-validate-script
+                                    data-parsley-validate-script-message="Script tags are not allowed."/>
+                                </div>
+                                <div class="col-md-6 ">
+                                    <label for="state" class="form-label">STATE</label>
+                                    <input type="text" name="state" id="state" class="form-control alpha-only" placeholder="State"/>
+                                </div>
+                                <div class="col-md-6 ">
                                     <label for="select-country" class="form-label">COUNTRY<span class="red-mark">*</span></label>
                                     <select class="form-select select2t-none" id="select-country"
                                         aria-label="Default select example" name="country" data-parsley-required="true" data-parsley-errors-container="#country-error">
@@ -189,18 +206,8 @@
                                     <div id="country-error"></div>
                                 </div>
                                 <div class="col-md-6 ">
-                                    <label for="state" class="form-label">STATE<span class="red-mark">*</span></label>
-                                    <input type="text" name="state" id="state" class="form-control alpha-only" placeholder="State" required data-parsley-trigger="change" data-parsley-validate-script
-                                    data-parsley-validate-script-message="Script tags are not allowed."/>
-                                </div>
-                                <div class="col-md-6 ">
-                                    <label for="city" class="form-label">CITY<span class="red-mark">*</span></label>
-                                    <input type="text" name="city" id="city" class="form-control alpha-only" placeholder="City" required data-parsley-trigger="change" data-parsley-validate-script
-                                    data-parsley-validate-script-message="Script tags are not allowed."/>
-                                </div>
-                                <div class="col-md-6 ">
                                     <label for="select-pin-code" class="form-label">PIN CODE<span class="red-mark">*</span></label>
-                                    <input type="text" name="pin_code" value="" class="form-control" id="select-pin-code" placeholder="Pin Code" required data-parsley-trigger="change" data-parsley-pin_code/>
+                                    <input type="number" name="pin_code" value="" class="form-control" id="select-pin-code" placeholder="Pin Code" required data-parsley-trigger="change"/>
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="passport_no" class="form-label">PASSPORT NO<span class="red-mark">*</span></label>
@@ -611,49 +618,6 @@
         </div>
     </div>
 </div>
-<!-- Profile picture Crop modal -->
-<div id="uploadimageModal" class="modal" >
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title">Crop Image</h4>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                <div class="col-md-12 text-center">
-                <div id="profile_picture_preview"></div>
-                </div>
-
-            </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary crop-picture custom-btn" data-dismiss="modal">Crop</button>
-                <!-- <button type="button" class="btn btn-default" id="closemodalpass" data-dismiss="modal">Close</button> -->
-                <button type="button" data-bs-dismiss="modal" class="btn btn-default">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="uploadimageModal_fullImg" class="modal" role="dialog">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title">Crop Image</h4>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-12 text-center">
-                        <div id="profile_picture_preview_full_img"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary crop_picture_full_img custom-btn" data-dismiss="modal">Crop</button>
-                <button type="button" data-bs-dismiss="modal" class="btn btn-default">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection
 
 @section('import-css')
@@ -1039,79 +1003,26 @@
     
     document.head.insertAdjacentHTML('beforeend', validationStyles);
 
-    $image_crop_profile = $('#profile_picture_preview').croppie({
-        enableOrientation: true,
-        viewport: {
-            width:200,
-            height:200,
-            type:'circle' //square
-        },
-        boundary:{
-            width:300,
-            height:300
-        }
-    });
-
-    //for full length size photo
-    $image_crop = $('#profile_picture_preview_full_img').croppie({
-        enableOrientation: true,
-        viewport: {
-            width:200,
-            height:200,
-            type:'square' //square
-        },
-        boundary:{
-            width:300,
-            height:300
-        }
-    });
-
-    /**** on selecting passport size photo from file input, bind it with croppie preview ***/
+    // Passport-size photo preview
     $('#profile_picture').on('change', function(){
-        var reader = new FileReader();
-        reader.onload = function (event) {
-            $image_crop_profile.croppie('bind', {
-                url: event.target.result
-            }).then(function(){
-                console.log('jQuery bind complete');
-            });
+        if (this.files && this.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (event) {
+                $('#profilePicturePreview').attr("src", event.target.result);
+            }
+            reader.readAsDataURL(this.files[0]);
         }
-        reader.readAsDataURL(this.files[0]);
-        $('#uploadimageModal').modal('show');
     });
 
-    $('.crop-picture').click(function(event){
-        $image_crop_profile.croppie('result', {
-            type: 'canvas',
-            size: 'viewport'
-        }).then(function(response){
-            $('#profilePicturePreview').attr("src",response);
-            $('#uploadimageModal').modal('hide');
-        })
-    });
-
-    /**** on selecting full length photo from file input, bind it with croppie preview ***/
+    // Full-length photo preview
     $('#full_length_photos').on('change', function(){
-        var reader = new FileReader();
-        reader.onload = function (event) {
-            $image_crop.croppie('bind', {
-                url: event.target.result
-            }).then(function(){
-                console.log('jQuery bind complete');
-            });
+        if (this.files && this.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (event) {
+                $('#profilePreviewfullimg').attr("src", event.target.result);
+            }
+            reader.readAsDataURL(this.files[0]);
         }
-        reader.readAsDataURL(this.files[0]);
-        $('#uploadimageModal_fullImg').modal('show');
-    });
-
-    $('.crop_picture_full_img').click(function(event){
-        $image_crop.croppie('result', {
-            type: 'canvas',
-            size: 'viewport'
-        }).then(function(response){
-            $('#profilePreviewfullimg').attr("src",response);
-            $('#uploadimageModal_fullImg').modal('hide');
-        })
     });
 
     //step 2: work experiance add 
@@ -1662,38 +1573,17 @@
                     trigger: 'change'
                 });
 
-                // Custom Parsley validators
-                window.Parsley.addValidator('mobile_number', {
-                    validateString: function(value) {
-                        return /^[0-9]{10}$/.test(value);
-                    },
-                    messages: {
-                        en: 'Please enter a valid 10-digit mobile number.'
-                    }
-                });
 
                 window.Parsley.addValidator('passport_no', {
                     validateString: function(value) {
-                        // Adjust regex as needed for passport number format
-                        // This regex ensures:
-                        // - Starts with 1 or more uppercase letters (A-Z)
-                        // - Followed by 6 to 9 digits (0-9)
-                        return /^[A-Z]{1,2}[0-9]{6,9}$/.test(value);
+                        // Alphanumeric, 5-20 characters, supports all country formats
+                        return /^[A-Za-z0-9]{5,20}$/.test(value);
                     },
                     messages: {
-                        en: 'Please enter a valid passport number. It should start with 1-2 uppercase letters followed by 6-9 digits.'
+                        en: 'Please enter a valid passport number (5-20 alphanumeric characters).'
                     }
                 });
 
-                window.Parsley.addValidator('pin_code', {
-                    validateString: function(value) {
-                        // Assumes 6-digit PIN code (modify for specific country requirements)
-                        return /^\d{6}$/.test(value);
-                    },
-                    messages: {
-                        en: 'Please enter a valid 6-digit PIN code.'
-                    }
-                });
 
                 window.Parsley.addValidator('validateScript', {
                     validateString: function(value) {
