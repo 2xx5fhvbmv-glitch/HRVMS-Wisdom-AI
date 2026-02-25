@@ -161,6 +161,7 @@ class ApplicantController extends Controller
             $applicant->last_name = $request->last_name;
             $applicant->gender = $request->gender;
             $applicant->dob = $request->dob;
+            $applicant->country_phone_code = $request->country_phone_code;
             $applicant->mobile_number = $request->mobile_number;
             $applicant->email = $request->email;
             $applicant->marital_status = $request->marital_status;
