@@ -176,7 +176,7 @@
                     </div>
                 </div>
             </div> -->
-            <div class="col-xl-3 col-lg-6 col-md-6">
+            <div class="col-xl-3 col-lg-6 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.todolist',config('settings.resort_permissions.view')) == false) d-none @endif" id="hrdashboard-todo-section">
                 <div class="card " style="height: 440px;">
                     <div class="card-title d-flex justify-content-between">
                         <h3>To Do List</h3>
@@ -228,7 +228,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.CreateDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif ">
+            <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.ViewDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif ">
                 <div class="card h-auto" id="card-duty">
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
@@ -236,8 +236,8 @@
                                 <h3>Duty Roster</h3>
                             </div>
                             <div class="col-auto">
-                                <a href="{{route('resort.timeandattendance.ViewDutyRoster')}}" class="btn btn-themeSkyblue btn-sm me-2">View All Duty Roster</a>
-                                <a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn btn-themeSkyblue btn-sm">Create Duty Roster</a>
+                                <a href="{{route('resort.timeandattendance.ViewDutyRoster')}}" class="btn btn-themeSkyblue btn-sm me-2  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.ViewDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif">View All Duty Roster</a>
+                                <a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn btn-themeSkyblue btn-sm  @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.CreateDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif">Create Duty Roster</a>
                             </div>
                         </div>
                     </div>
