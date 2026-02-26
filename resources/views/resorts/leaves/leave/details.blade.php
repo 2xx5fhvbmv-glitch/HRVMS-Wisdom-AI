@@ -175,24 +175,31 @@
                                                 <th>Transportation:</th>
                                                 <td>{{$leaveDetail->transportation ?? "No Provided"}}</td>
                                             </tr>
+                                            <tr>
+                                                <th>Leave reason:</th>
+                                                <td>{{$leaveDetail->reason ?? "No Provided"}}</td>
+                                            </tr>
+                                             <tr>
+                                                <th>Departure date:</th>
+                                                <td>{{$leaveDetail->depature_date ?? "No Provided"}}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Arrival date:</th>
+                                                <td>{{$leaveDetail->arrival_date ?? "No Provided"}}</td>
+                                            </tr>
                                         </table>
                                     </div>
 
-                                    @php
-                                        $leaveStatus = App\Models\EmployeeLeaveStatus::where('leave_request_id', $leaveDetail->id)->where('status','Pending')->where('approver_id',$employee->id)->first();
-                                    @endphp
                                     <div class="col-12 mt-auto">
                                         <div class="card-footer">
                                             <div class="row align-items-center g-xxl-3 g-2">
-                                                @if($leaveStatus)
-                                                    
+                                                @if($leaveDetail->canApproveThisLeave ?? false)
                                                     <div class="col-auto"> 
                                                         <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
                                                     </div>
                                                     <div class="col-auto">
                                                         <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Reject</button>
                                                     </div>
-                                                    
                                                     <div class="col-auto"> 
                                                         <a href="#" class="a-linkTheme  @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" id="recommendDateBtn" data-leave-id="{{$leaveDetail->id}}">Recommend an alternative date</a>
                                                     </div>
