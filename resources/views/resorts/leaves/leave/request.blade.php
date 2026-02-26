@@ -143,8 +143,8 @@
                                             
                                             <div class="btn-block">
                                                 <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
-                                                @if($request->approval_status == 'Pending')
-                                                    <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}"   >Approve</button>
+                                                @if($request->can_approve ?? false)
+                                                    <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
                                                     <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
                                                 @endif
                                             </div>
@@ -194,12 +194,10 @@
                                             </div>
                                             <div class="btn-block">
                                                 <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
-                                                @if($request->approval_status == 'Pending')
+                                                @if($request->can_approve ?? false)
                                                     <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
                                                     <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
                                                 @endif
-                                                    <!-- <button class="btn btn-themeBlue btn-sm approve-btn" data-leave-id="{{ $request->id }}">Approve</button>
-                                                <button class="btn btn-danger btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button> -->
                                             </div>
                                         </div>
                                     </div>
@@ -522,16 +520,15 @@
                     data: 'action',
                     render: function(data, type, row , meta) {
                         var permission = meta.settings.json ? meta.settings.json.permission : '';
+                        var actionBtns = row.can_approve
+                            ? `<a href="#" class="correct-btn mx-1 approve-btn ${permission}" data-leave-id="${row.id}"><i class="fa-solid fa-check"></i></a>
+                               <a href="#" class="close-btn mx-1 reject-btn ${permission}" data-leave-id="${row.id}"><i class="fa-solid fa-xmark"></i></a>`
+                            : '';
                         return `
                             <a title="Leave Details" href="${row.routes}" class="eye-btn mx-1 ">
                                 <i class="fa-regular fa-eye"></i>
                             </a>
-                            <a href="#" class="correct-btn mx-1 approve-btn ${permission}" data-leave-id="${row.id}">
-                                    <i class="fa-solid fa-check"></i>
-                            </a>
-                            <a href="#" class="close-btn mx-1 reject-btn ${permission}" data-leave-id="${row.id}">
-                                <i class="fa-solid fa-xmark"></i>
-                            </a>
+                            ${actionBtns}
                         `;
                     }
                 },
