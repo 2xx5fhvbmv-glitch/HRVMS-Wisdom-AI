@@ -489,14 +489,16 @@
                     data: 'action',
                     render: function(data, type, row , meta) {
                         var permission = meta.settings.json ? meta.settings.json.permission : '';
+                        var canApprove = row.hasOwnProperty('can_approve') ? row.can_approve : true;
+                        var approveRejectClass = (permission + (canApprove ? '' : ' d-none')).trim();
                         return `
                             <a title="Leave Details" href="${row.routes}" class="eye-btn mx-1 ">
                                 <i class="fa-regular fa-eye"></i>
                             </a>
-                            <a href="#" class="correct-btn mx-1 approve-btn ${permission}" data-leave-id="${row.id}">
+                            <a href="#" class="correct-btn mx-1 approve-btn ${approveRejectClass}" data-leave-id="${row.id}">
                                     <i class="fa-solid fa-check"></i>
                             </a>
-                            <a href="#" class="close-btn mx-1 reject-btn ${permission}" data-leave-id="${row.id}">
+                            <a href="#" class="close-btn mx-1 reject-btn ${approveRejectClass}" data-leave-id="${row.id}">
                                 <i class="fa-solid fa-xmark"></i>
                             </a>
                         `;
