@@ -38,7 +38,6 @@ class LeaveController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
-        if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){
             $this->reporting_to = $this->resort->GetEmployee->id;
             $this->underEmp_id = Common::getSubordinates($this->reporting_to);
@@ -187,58 +186,75 @@ class LeaveController extends Controller
         return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations'));
     }
 
+    /**
+     * Leave approval flow (who can approve):
+     * - Line worker (6) / SUP (5): only reporting_to approves; if reporting_to is not HOD, HOD sees "just for info" (no approve).
+     * - MGR (4): reporting_to is HOD → HOD approves.
+     * - HOD (2): reporting_to is EXCOM → EXCOM approves.
+     * - EXCOM (1): reporting_to is GM → GM approves.
+     * - GM (8): HR (3) / EXCOM (1) / HOD (2) can approve (no single reporting_to).
+     */
     public function request()
     {
-        
         try {
             $page_title = 'Leave Requests';
             $resort_id = $this->resort->resort_id;
             $resort_departments = ResortDepartment::where('resort_id',$this->resort->resort_id)->where('status','active')->get();
 
-            // Retrieve the logged-in user's employee details
-            $loggedInEmployee = $this->resort->getEmployee;
-            $loggedInEmployeeId = $loggedInEmployee->id ?? null;
-            if (!$loggedInEmployee) {
+            // Retrieve the logged-in user's employee details (use GetEmployee to match details/handleLeaveAction)
+            $loggedInEmployee = $this->resort->GetEmployee ?? $this->resort->getEmployee;
+            $loggedInEmployeeId = $loggedInEmployee ? ($loggedInEmployee->id ?? null) : null;
+            if (!$loggedInEmployee || !$loggedInEmployeeId) {
                 abort(403, "Access Denied");
             }
             // dd($loggedInEmployeeId);
             $rank = config('settings.Position_Rank');
-            $current_rank = $this->resort->getEmployee->rank ?? null;
+            $current_rank = $loggedInEmployee->rank ?? null;
             $available_rank = $rank[$current_rank] ?? '';
+            $employeeRankPosition = Common::getEmployeeRankPosition($loggedInEmployee);
+            $isGM = ($employeeRankPosition['position'] ?? '') === 'GM' || ($employeeRankPosition['rank'] ?? '') === 'GM';
             $isHOD = ($available_rank === "HOD");
             $isHR = ($available_rank === "HR");
+            $isHRExcomOrGM = ($available_rank === "EXCOM") || $isGM;
+            $hodDeptId = $loggedInEmployee->Dept_id ?? null;
+
+            // Subquery: latest status row per leave (so we get one row per leave when we join)
+            $latestStatusDerived = '(SELECT ids.leave_request_id, ids.id AS sid, ids.status, ids.approver_id FROM employees_leaves_status ids INNER JOIN (SELECT leave_request_id, MAX(id) AS mid FROM employees_leaves_status GROUP BY leave_request_id) latest ON ids.leave_request_id = latest.leave_request_id AND ids.id = latest.mid)';
 
             $leave_requests_query = DB::table('employees_leaves as el')
-                // ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                 ->join('employees as e', 'e.id', '=', 'el.emp_id')
                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
-                ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id');
-                // ->where('el.status', 'Pending');
+                ->where('el.resort_id', $resort_id)
+                ->whereNull('el.flag');
 
-                if ($isHR) {
-                    $leave_requests_query->where('els.approver_id',$loggedInEmployeeId); // Only requests where the logged-in employee is the approver);
-
-                    // $leave_requests_query->where('e.id', '!=', $this->resort->getEmployee->id);// Exclude HR's own requests
-                        // ->whereNotIn('rp.rank', ['GM']); // Exclude higher hierarchy roles (e.g., GM, HOD)
+            if ($isHR || $isHRExcomOrGM) {
+                // HR / EXCOM / GM: whole resort – left join latest status (one row per leave, status optional)
+                $leave_requests_query->leftJoin(DB::raw($latestStatusDerived . ' AS els'), 'els.leave_request_id', '=', 'el.id');
+            } elseif ($isHOD) {
+                // HOD: department or reportees; exclude HOD's own leave (only show reportees' leaves for approval)
+                if ($hodDeptId) {
+                    $leave_requests_query->where('e.Dept_id', $hodDeptId);
+                } else {
+                    $leave_requests_query->where('e.reporting_to', $loggedInEmployeeId);
                 }
-
-                // Additional conditions for HOD
-                // if ($isHOD) {
-                //     // $leave_requests_query->whereIn('e.id', $this->underEmp_id); // Only employees under HOD
-                //     $leave_requests_query->where('e.reporting_to',$this->reporting_to ); // Only employees under HOD
-                // }
-                else{
-                    $leave_requests_query->where('els.approver_id',$loggedInEmployeeId); // Only requests where the logged-in employee is the approver);
-                }
+                $leave_requests_query->where('el.emp_id', '!=', $loggedInEmployeeId); // HOD does not see own leave in this list
+                $leave_requests_query->leftJoin(DB::raw($latestStatusDerived . ' AS els'), 'els.leave_request_id', '=', 'el.id');
+            } else {
+                // Others: only leaves where current user is approver – inner join status + latest
+                $leave_requests_query->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
+                    ->where('els.approver_id', $loggedInEmployeeId)
+                    ->whereRaw('els.id = (SELECT MAX(ids.id) FROM employees_leaves_status ids WHERE ids.leave_request_id = el.id)');
+            }
 
                 $leaveRequests = $leave_requests_query->select(
                     'el.*',
                     'e.Emp_id as employee_id',
                     'e.rank',
                     'e.Admin_Parent_id',
+                    'e.reporting_to as reporting_to',
                     'el.status as leave_status',
                     'ra.first_name as first_name',
                     'ra.last_name as last_name',
@@ -251,12 +267,13 @@ class LeaveController extends Controller
                     'lc.leave_category',
                     'lc.id as leave_category_main_id',
                     'el.flag',
-                    'els.status as approval_status',
-                    'els.approver_id as approver_id',
+                    'els.status AS approval_status',
+                    'els.approver_id AS approver_id',
                 )->paginate(10);
                     // dd($leaveRequests);
-                $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($resort_id) {
-                    // dd($leaveRequest);
+                // Leave approval flow: only applicant's reporting_to can approve; GM's leave can also be approved by HR/EXCOM/HOD. Line worker/SUP: if reporting_to is not HOD, HOD sees just for info (no approve).
+                $currentUserRank = trim((string)($loggedInEmployee->rank ?? ''));
+                $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($resort_id, $loggedInEmployeeId, $currentUserRank) {
                     $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
 
                     // Fetch employee grade and benefit grid
@@ -282,6 +299,15 @@ class LeaveController extends Controller
                         ->sum('total_days');
                     $leaveAllocation = $benefit_grid->allocated_days ?? 0;
                     $leaveRequest->available_balance = $leaveAllocation - $leavesTaken;
+
+                    // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
+                    $applicantReportingTo = $leaveRequest->reporting_to ?? $leaveRequest->applicant_reporting_to ?? null;
+                    $isReportingManager = $applicantReportingTo !== null && $applicantReportingTo !== '' && (int)$applicantReportingTo === (int)$loggedInEmployeeId;
+                    $applicantRankStr = trim((string)($leaveRequest->rank ?? ''));
+                    $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
+                    $statusVal = $leaveRequest->status ?? $leaveRequest->leave_status ?? '';
+                    $leaveIsPending = strtolower(trim((string)$statusVal)) === 'pending';
+                    $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover) && $leaveIsPending);
 
                     return $leaveRequest;
                 });
@@ -339,7 +365,22 @@ class LeaveController extends Controller
                     }
                 }
                 $finalLeaveRequests = $finalLeaveRequests->merge($separateLeaveRequests);
-                // dd($finalLeaveRequests);
+
+                // Ensure every item has can_approve for grid view (reporting_to or GM leave + HR/EXCOM/HOD). Use == so int/string match.
+                $currentUserRank = trim((string)($loggedInEmployee->rank ?? ''));
+                $finalLeaveRequests->each(function ($request) use ($loggedInEmployeeId, $currentUserRank) {
+                    $applicantReportingTo = $request->reporting_to ?? $request->applicant_reporting_to ?? null;
+                    if ($applicantReportingTo === null || $applicantReportingTo === '') {
+                        $isReportingManager = false;
+                    } else {
+                        $isReportingManager = (int)$applicantReportingTo === (int)$loggedInEmployeeId;
+                    }
+                    $applicantRankStr = trim((string)($request->rank ?? ''));
+                    $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
+                    $statusVal = $request->status ?? $request->leave_status ?? '';
+                    $leaveIsPending = strtolower(trim((string)$statusVal)) === 'pending';
+                    $request->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover) && $leaveIsPending);
+                });
 
                 return view('resorts.leaves.leave.request', compact('finalLeaveRequests', 'page_title','resort_departments'));
         } catch (\Exception $e) {
@@ -565,30 +606,34 @@ class LeaveController extends Controller
         $page_title = 'Leave Details';
         $resort_id = $this->resort->resort_id;
         $decodedId = base64_decode($leave_id);
-        $loggedInEmployee = $this->resort->getEmployee;
-        $employee = $this->resort->GetEmployee;
+        $employee = $this->resort->GetEmployee ?? $this->resort->getEmployee;
         
-        if (!$loggedInEmployee) 
+        if (!$employee) 
         {
             $page_title = 'Leave';
-            $msg = 'Plese Login details not found';
+            $msg = 'Please login with employee details.';
             return view('resorts.error',compact('page_title','msg'));
         }
         $leave_categories = LeaveCategory::where('resort_id',$resort_id)->get();
         $rank = config('settings.Position_Rank');
-        $current_rank = $loggedInEmployee->rank ?? null;
+        $current_rank = $employee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
         // Fetch the leave details for the specific leave ID
+        // leftJoin status + task_delegation so we get a row even when status/delegation is missing
         $leave_details_query = DB::table('employees_leaves as el')
-        ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
-        ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
-        ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-        ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-        ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
-        ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-        ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
+        ->leftJoin('employees_leaves_status as els', function ($join) {
+            $join->on('els.leave_request_id', '=', 'el.id')
+                 ->whereRaw('els.id = (SELECT MAX(id) FROM employees_leaves_status WHERE leave_request_id = el.id)');
+        })
+        ->join('employees as e', 'e.id', '=', 'el.emp_id')
+        ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+        ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation')
+        ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id')
+        ->leftJoin('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
+        ->leftJoin('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
         ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
-        ->where('el.id', $decodedId);
+        ->where('el.id', $decodedId)
+        ->where('el.resort_id', $resort_id);
         $leaveDetail = $leave_details_query->select(
             'el.*',
             'e.Emp_id as employee_id',
@@ -603,6 +648,7 @@ class LeaveController extends Controller
             'ra.profile_picture as employee_profile_picture',
             'rp.position_title as position',
             'rd.name as department',
+            'e.reporting_to as applicant_reporting_to',
             // Task delegation details
             'delegated_emp.Emp_id as task_delegation_emp_id',
             'ra_td.first_name as task_delegation_first_name',
@@ -695,7 +741,19 @@ class LeaveController extends Controller
             $grid->available_days = $grid->allocated_days - $usedDays;
             return $grid;
         });
-        return view('resorts.leaves.leave.details', compact('page_title', 'empID','available_rank','leaveDetail', 'leaveBalances','leaveUsage','leave_categories','employee'));
+
+        // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
+        $applicantReportingTo = $leaveDetail->applicant_reporting_to ?? $leaveDetail->reporting_to ?? null;
+        $reportingToStr = trim((string)($applicantReportingTo ?? ''));
+        $currentUserIdStr = trim((string)($employee->id ?? ''));
+        $currentUserRank = trim((string)($employee->rank ?? ''));
+        $applicantRankStr = trim((string)($leaveDetail->rank ?? ''));
+        $isReportingManager = $reportingToStr !== '' && $reportingToStr === $currentUserIdStr;
+        $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
+        $leaveIsPending = strtolower(trim($leaveDetail->status ?? '')) === 'pending';
+        $canApproveThisLeave = (bool)(($isReportingManager || $isGMLeaveApprover) && $leaveIsPending);
+
+        return view('resorts.leaves.leave.details', compact('page_title', 'empID', 'available_rank', 'leaveDetail', 'leaveBalances', 'leaveUsage', 'leave_categories', 'employee', 'canApproveThisLeave'));
     }
 
     public function getLeaveHistory(Request $request)
@@ -1159,8 +1217,10 @@ class LeaveController extends Controller
         $rank = config('settings.Position_Rank');
         $current_rank = $this->resort->getEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+        $isGM = ($employeeRankPosition['position'] ?? '') === 'GM' || ($employeeRankPosition['rank'] ?? '') === 'GM';
+        $canViewWholeResort = ($available_rank === 'HR') || ($available_rank === 'EXCOM') || $isGM;
 
-        // Determine if the user is an HOD
         $isHOD = ($available_rank === "HOD");
         $isMGR = ($available_rank === "MGR");
 
@@ -1179,13 +1239,13 @@ class LeaveController extends Controller
             ->whereDate('el.from_date', '<=', $date)
             ->whereDate('el.to_date', '>=', $date);
 
-        if ($isHOD) {
-            $employeesOnLeaveQuery->where('e.Dept_id', $this->resort->getEmployee->Dept_id);
-        }
-        if ($isMGR) {
-            // $employeesOnLeaveQuery->where('e.Position_id', $this->resort->getEmployee->Position_id);
-            $employeesOnLeaveQuery->where('e.reporting_to', $this->reporting_to );
-
+        if (!$canViewWholeResort) {
+            if ($isHOD) {
+                $employeesOnLeaveQuery->where('e.Dept_id', $this->resort->getEmployee->Dept_id);
+            }
+            if ($isMGR) {
+                $employeesOnLeaveQuery->where('e.reporting_to', $this->reporting_to);
+            }
         }
 
         // Fetch the results with pagination
@@ -1230,8 +1290,10 @@ class LeaveController extends Controller
         $rank = config('settings.Position_Rank');
         $current_rank = $this->resort->getEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+        $isGM = ($employeeRankPosition['position'] ?? '') === 'GM' || ($employeeRankPosition['rank'] ?? '') === 'GM';
+        $canViewWholeResort = ($available_rank === 'HR') || ($available_rank === 'EXCOM') || $isGM;
 
-        // Determine if the user is an HOD
         $isHOD = ($available_rank === "HOD");
         $isMGR = ($available_rank === "MGR");
 
@@ -1246,15 +1308,15 @@ class LeaveController extends Controller
             ->whereDate('el.from_date', '<=', $endDate)
             ->whereDate('el.to_date', '>=', $startDate);
 
+        if (!$canViewWholeResort) {
             if ($isHOD) {
                 $employeesOnLeaveQuery->where('e.Dept_id', $this->resort->getEmployee->Dept_id);
             }
             if ($isMGR) {
-                // $employeesOnLeaveQuery->where('e.Position_id', $this->resort->getEmployee->Position_id);
-                $employeesOnLeaveQuery->where('e.reporting_to', $this->reporting_to );
-
+                $employeesOnLeaveQuery->where('e.reporting_to', $this->reporting_to);
             }
-            $employeesOnLeave = $employeesOnLeaveQuery->select(
+        }
+        $employeesOnLeave = $employeesOnLeaveQuery->select(
                 'ra.first_name',
                 'ra.last_name',
                 'rp.position_title as position',
@@ -1394,6 +1456,21 @@ class LeaveController extends Controller
             ],403);
         }
 
+        // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
+        $applicant = Employee::find($leave->emp_id);
+        $applicantReportingToStr = trim((string)($applicant->reporting_to ?? ''));
+        $currentApproverIdStr = trim((string)$currentApproverId);
+        $applicantRankStr = trim((string)($applicant->rank ?? ''));
+        $currentUserRankNum = trim((string)($this->resort->GetEmployee->rank ?? ''));
+        $isReportingManager = $applicantReportingToStr !== '' && $applicantReportingToStr === $currentApproverIdStr;
+        $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRankNum, ['1', '2', '3'], true);
+        if (!$applicant || (!$isReportingManager && !$isGMLeaveApprover)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only the employee\'s direct manager (or HR/EXCOM/HOD for GM leave) can approve or reject this leave. You can view it only.',
+            ], 403);
+        }
+
         EmployeeLeaveStatus::where('leave_request_id' , $leave->id)->where('approver_id', $currentApproverId)->update([
             'leave_request_id' => $leave->id,
             'approver_id' => $currentApproverId,
@@ -1496,4 +1573,5 @@ class LeaveController extends Controller
 
         // return redirect()->back()->with('success', 'Emails sent to travel partners successfully.');
     }
+
 }
