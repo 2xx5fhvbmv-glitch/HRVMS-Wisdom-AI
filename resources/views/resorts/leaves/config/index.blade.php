@@ -116,7 +116,7 @@
                                 </form>
                             </div>
                         </div>
-                        <div class="col-12">
+                        <!-- <div class="col-12">
                             <div class="card">
                                 <div class="card-title">
                                     <h3>Occupancy Percentage</h3>
@@ -127,7 +127,6 @@
                                         <div class="col-sm-6">
                                             <div class="dateRangeAb"  id="datapicker">
                                                 <div>
-                                                    <!-- Hidden input field to attach the calendar to -->
                                                     <input type="text" class="form-control" name="hiddenInput" id="hiddenInput">
                                                 </div>
                                                 <p id="startDate" class="d-none">Start Date:</p>
@@ -144,7 +143,7 @@
                                     </div>
                                 </form>
                             </div>
-                        </div>
+                        </div> -->
                         <div class="col-12 ">
                             <div class="card">
                                 <div class="card-title">
