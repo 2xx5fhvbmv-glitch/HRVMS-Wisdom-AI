@@ -69,6 +69,12 @@ class EmployeeTravelPass extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    public function ResortTransportation()
+    {
+        return $this->belongsTo(ResortTransportation::class, 'transportation');
+    }
+
     public function DepartureResortTransportation()
     {
         return $this->belongsTo(ResortTransportation::class,'departure_mode');
