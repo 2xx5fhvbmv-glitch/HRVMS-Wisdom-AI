@@ -103,14 +103,18 @@
                 <form id="TimeSlotsForm">
                     @csrf
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Meeting Link</label>
+                            <input type="text" class="form-control" name="MeetingLink" placeholder="Enter Meeting Link (Google Meet, Zoom, etc.)">
+                        </div>
                         <label class="form-label mb-sm-4 mb-3">SELECT TIME SLOTS</label>
                         <div class="sendRequestTime-main">
                         </div>
-                        <input type="text" id="Resort_id" name="Resort_id">
-                        <input type="text" id="ApplicantID" name="ApplicantID">
-                        <input type="text" id="ApplicantStatus_id" name="ApplicantStatus_id">
-                        <input type="text" id="Calender_ta_id" name="ta_id">
-                        <input type="date"  id="TimeSlotsFormdate" name="TimeSlotsFormdate">
+                        <input type="hidden" id="Resort_id" name="Resort_id">
+                        <input type="hidden" id="ApplicantID" name="ApplicantID">
+                        <input type="hidden" id="ApplicantStatus_id" name="ApplicantStatus_id">
+                        <input type="hidden" id="Calender_ta_id" name="ta_id">
+                        <input type="date" style="display: none" id="TimeSlotsFormdate" name="TimeSlotsFormdate">
 
                     </div>
                     <div class="modal-footer justify-content-center">
@@ -249,7 +253,10 @@ $(document).ready(function() {
                 { data: 'Action', name: 'Action', className: 'text-nowrap' },
                 {data:'created_at', visible:false,searchable:false},
 
-            ]
+            ],
+            drawCallback: function() {
+                $('[data-bs-toggle="tooltip"]').tooltip();
+            }
     });
 
     $(function () {
@@ -396,33 +403,41 @@ $(document).ready(function() {
         },
     });
 }
-$(document).on("click", ".Timezone_checkBox", function() {
+// Multi-select time slots - click on row for Safari compatibility
+$(document).on("click", ".row_time:not(.disable)", function(e) {
+    if ($(e.target).is('input[type="hidden"]')) return;
 
-        $(".row_time").not($(this).closest(".row_time")).removeClass("active").find("input").prop("disabled", false);
+    var $row = $(this);
+    var $checkbox = $row.find(".Timezone_checkBox");
 
-            $(this).closest(".row_time").toggleClass("active");
-            let location = $(this).data('id');
+    // Toggle this row
+    $row.toggleClass("active");
+    $checkbox.prop("checked", $row.hasClass("active"));
 
-            if ($(this).closest(".row_time").hasClass("active")) {
-                $(".row_time").not($(this).closest(".row_time")).find("input").prop("disabled", true);
-                $('[name^="ApplicantInterviewtime"]').val('');
-                $('[name^="ResortInterviewtime"]').val('');
+    // Clear manual time fields when selecting slots
+    $('[name="MalidivanManualTime"]').val('');
+    $('[name="ApplicantManualTime"]').val('');
+    $('[name="MalidivanManualTime1"]').val('');
+    $('[name="ApplicantManualTime1"]').val('');
 
-                let ApplicantInterviewtime = $(this).data('applicantinterviewtime');
-                let ResortInterviewtime = $(this).data('resortinterviewtime');
+    // Collect all selected slot times
+    var resortTimes = [];
+    var applicantTimes = [];
+    $(".row_time.active .Timezone_checkBox").each(function() {
+        resortTimes.push($(this).data('resortinterviewtime'));
+        applicantTimes.push($(this).data('applicantinterviewtime'));
+    });
+    $("#ResortInterviewtime_collected").val(resortTimes.join(', '));
+    $("#ApplicantInterviewtime_collected").val(applicantTimes.join(', '));
+});
 
-                if (ApplicantInterviewtime) {
-                    $("#ApplicantInterviewtime_" + location).val(ApplicantInterviewtime);
-                }
-
-                if (ResortInterviewtime) {
-                    $("#ResortInterviewtime_" + location).val(ResortInterviewtime);
-                }
-            } else {
-                // Enable all rows if no row is active
-                $(".row_time").find("input").prop("disabled", false);
-            }
-        });
+// Clear selected slots when manual time is focused
+$(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTime"]', function () {
+    $(".row_time").removeClass("active");
+    $(".row_time .Timezone_checkBox").prop("checked", false);
+    $("#ResortInterviewtime_collected").val('');
+    $("#ApplicantInterviewtime_collected").val('');
+});
         $('#respond-HoldModel').on('shown.bs.modal', function () {
             $('#calendarModal').fullCalendar('render');
         });
@@ -559,25 +574,46 @@ $(document).on("click", ".Timezone_checkBox", function() {
 
         $('#TimeSlotsForm').validate({
             rules: {
-                SlotBook: {
-                    required: true,
+                "SlotBook[]": {
+                    required: function () {
+                        return (
+                            $('[name="MalidivanManualTime"]').val().trim() === "" &&
+                            $('[name="ApplicantManualTime"]').val().trim() === ""
+                        );
+                    },
                 },
-
+                MalidivanManualTime: {
+                    required: function () {
+                        return $('[name="SlotBook[]"]:checked').length === 0;
+                    },
+                },
+                ApplicantManualTime: {
+                    required: function () {
+                        return $('[name="SlotBook[]"]:checked').length === 0;
+                    },
+                },
             },
             messages: {
-                SlotBook: {
-                    required: "Please select a valid time slot  .",
-                }
+                "SlotBook[]": {
+                    required: "Please select a valid time slot or enter a manual time.",
+                },
+                MalidivanManualTime: {
+                    required: "Please enter Malidivan Manual Time or select a valid time slot.",
+                },
+                ApplicantManualTime: {
+                    required: "Please enter Applicant Manual Time or select a valid time slot.",
+                },
             },
             errorPlacement: function(error, element) {
                 if (element.hasClass("Timezone_checkBox")) {
-                    // Append error message after the .row_time element
-                    element.closest(".row_time").after(error);
+                    element.closest(".sendRequestTime-main").find(".block").after(error);
                 } else {
-                    error.insertAfter(element); // Default behavior
+                    error.insertAfter(element);
                 }
             },
             submitHandler: function(form) {
+                var $submitBtn = $(form).find('button[type="submit"]');
+                $submitBtn.prop('disabled', true).text('Submitting...');
                 var formData = new FormData(form);
 
                 $.ajax({
@@ -593,7 +629,6 @@ $(document).on("click", ".Timezone_checkBox", function() {
                                 positionClass: 'toast-bottom-right'
                             });
 
-
                             $("#sendRequest-modal").modal("hide");
                             $("#TimeSlots-modal").modal("hide");
                             $(".sendRequestTime-main").html(response.view);
@@ -606,6 +641,14 @@ $(document).on("click", ".Timezone_checkBox", function() {
                                 positionClass: 'toast-bottom-right'
                             });
                         }
+                    },
+                    error: function() {
+                        toastr.error("Something went wrong. Please try again.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function() {
+                        $submitBtn.prop('disabled', false).text('Submit');
                     }
                 });
             }
@@ -631,6 +674,8 @@ $(document).on("click", ".Timezone_checkBox", function() {
                 }
             },
             submitHandler: function(form) {
+                var $submitBtn = $(form).find('button[type="submit"]');
+                $submitBtn.prop('disabled', true).text('Submitting...');
                 var formData = new FormData(form);
                 $.ajax({
                     url: "{{ route('resort.ta.AddInterViewLink') }}",
@@ -645,11 +690,8 @@ $(document).on("click", ".Timezone_checkBox", function() {
                                         positionClass: 'toast-bottom-right'
                             });
 
-                            InterViewDate = response.InterviewDate;
-
                             $("#shareMeetLink-modal").modal("hide");
                             $('#SortlistedApplicants').DataTable().ajax.reload();
-
                         }
                         else
                         {
@@ -657,19 +699,76 @@ $(document).on("click", ".Timezone_checkBox", function() {
                                 positionClass: 'toast-bottom-right'
                             });
                         }
+                    },
+                    error: function() {
+                        toastr.error("Something went wrong. Please try again.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function() {
+                        $submitBtn.prop('disabled', false).text('Submit');
                     }
-                    // ,
-                    // error: function(response) {
-                    //     var errors = response.responseJSON;
-                    //     var errs = '';
-                    //     $.each(errors.errors, function(key, error) { // Adjust according to your response format
-                    //         console.log(error);
-                    //         errs += error + '<br>';
-                    //     });
-                    //     toastr.error(errs, { positionClass: 'toast-bottom-right' });
-                    // }
                 });
             }
+        });
+
+        // Download single file
+        $(document).on("click", ".DownloadFile", function () {
+            let fileId = $(this).data("id");
+            let fileFlag = $(this).data("flag");
+            $.ajax({
+                url: "{{ route('resort.ta.DownloadFile') }}",
+                type: "POST",
+                data: { id: fileId, flag: fileFlag },
+                success: function(response) {
+                    if (response.success) {
+                        let fileUrl = response.NewURLshow;
+                        let mimeType = response.mimeType.toLowerCase();
+                        let imageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                        if (imageTypes.includes(mimeType)) {
+                            window.open(fileUrl, '_blank');
+                        } else {
+                            window.location.href = fileUrl;
+                        }
+                    } else {
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                }
+            });
+        });
+
+        // Download All Files
+        $(document).on("click", ".DownloadAllFiles", function () {
+            let fileId = $(this).data("id");
+            let btn = $(this);
+            btn.prop('disabled', true).text('Downloading...');
+            $.ajax({
+                url: "{{ route('resort.ta.DownloadAllFiles') }}",
+                type: "POST",
+                data: { id: fileId },
+                success: function(response) {
+                    btn.prop('disabled', false).text('Download All');
+                    if (response.success) {
+                        response.files.forEach(function(file, index) {
+                            setTimeout(function() {
+                                let a = document.createElement('a');
+                                a.href = file.url;
+                                a.download = file.name;
+                                a.target = '_blank';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                            }, index * 500);
+                        });
+                    } else {
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    btn.prop('disabled', false).text('Download All');
+                    toastr.error("Something went wrong!", "Error", { positionClass: 'toast-bottom-right' });
+                }
+            });
         });
 </script>
 @endsection

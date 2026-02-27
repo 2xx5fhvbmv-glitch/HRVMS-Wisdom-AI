@@ -2062,7 +2062,7 @@ class Common
                                     WHERE Applicant_id = t9.id
                                 )')
                                 ->where('t10.status', '=', 'Sortlisted')
-                                ->where('t10.As_ApprovedBy', '=',3);
+                                ->where('t10.As_ApprovedBy', '!=', 0);
 
 
                 })
@@ -2086,7 +2086,16 @@ class Common
                 ->where('vacancies.status', '=', "Active")
                 ->where('t3.Approved_By', '=',Common::TaFinalApproval($resort_id))
                 ->where(function($q) {
-                    $q->whereNull('t8.link')->orWhere('t8.link', '');
+                    // No link yet (needs job advertisement) OR has HR-shortlisted applicant OR accepted invitation without meeting link
+                    $q->where(function($q2) {
+                        $q2->whereNull('t8.link')->orWhere('t8.link', '');
+                    })->orWhereNotNull('t10.id')
+                    ->orWhere(function($q3) {
+                        $q3->where('t11.Status', 'Slot Booked')
+                           ->where(function($q4) {
+                               $q4->whereNull('t11.MeetingLink')->orWhere('t11.MeetingLink', '');
+                           });
+                    });
                 })
                 ->latest('t3.created_at');
             if(!isset($take))
@@ -2125,6 +2134,8 @@ class Common
                                 't9.id As ApplicantID',
                                 't10.id as ApplicantStatus_id',
                                 't11.Status as InterviewLinkStatus',
+                                't11.MeetingLink as InterviewMeetingLink',
+                                't11.id as InterviewId',
                                 't10.status as ApplicationStatus',
                                 't10.As_ApprovedBy',
 								'jd.jobdescription as JobDescription'

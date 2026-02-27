@@ -27,18 +27,30 @@
                 </div>
             {{-- elseif($t->InterviewLinkStatus=="Active"  ||  $t->ApplicationStatus=="Sortlisted" || $t->As_ApprovedBy == 3 ) --}}
 
-            @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy == 3  &&  $t->InterviewLinkStatus == null )
+            @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy != 0  &&  $t->InterviewLinkStatus == null )
                 <div class="img-circle">
                     <img src="{{ $t->profileImg}}" alt="image">
                 </div>
                 <div>
-                    <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted f {{ $t->Position ?? '' }} </p>
+                    <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted for {{ $t->Position ?? '' }} </p>
                     <a
                     href="javascript:void(0)"
                     data-Resort_id="{{$t->Resort_id}}"
                     data-ApplicantID="{{base64_encode($t->ApplicantID)}}"
                     data-ApplicantStatus_id="{{base64_encode($t->ApplicantStatus_id)}}"
                     class="a-link SortlistedEmployee">Send Interview Request </a>
+                </div>
+
+            @elseif( $t->InterviewLinkStatus == 'Slot Booked' && empty($t->InterviewMeetingLink) )
+                <div class="img-circle">
+                    <img src="{{ $t->profileImg}}" alt="image">
+                </div>
+                <div>
+                    <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has accepted interview invitation for {{ $t->Position ?? '' }} </p>
+                    <a
+                    href="javascript:void(0)"
+                    data-interview_id="{{ base64_encode($t->InterviewId) }}"
+                    class="a-link AddMeetingLink">Add Meeting Link </a>
                 </div>
 
         @endif

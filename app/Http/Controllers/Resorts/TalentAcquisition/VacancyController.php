@@ -1101,6 +1101,15 @@ class VacancyController extends Controller
 
 
 
+            // Determine user role for department filtering
+            $employee = $this->resort->GetEmployee ?? null;
+            $userDeptId = $employee ? $employee->Dept_id : null;
+            $userDeptName = $userDeptId ? ResortDepartment::where('id', $userDeptId)->value('name') : '';
+            $employeeRank = $employee ? $employee->rank : null;
+            $isHrUser = stripos($userDeptName ?? '', 'Human Resources') !== false;
+            $isGM = (int)$employeeRank === 8;
+            $canSeeAllDepts = $isHrUser || $isGM;
+
             // Fetch all job ad images for this resort (for carousel)
             $allJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
                 return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
@@ -1114,8 +1123,12 @@ class VacancyController extends Controller
             ->leftjoin("applicant_form_data as t6", "t6.Parent_v_id", "=", "vacancies.id")
             ->where("vacancies.resort_id", $resort_id)
             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
-            ->where('t4.status','ForwardedToNext')
-;
+            ->where('t4.status','ForwardedToNext');
+
+            // Filter by department for non-HR/non-GM users
+            if (!$canSeeAllDepts && $userDeptId) {
+                $NewVacancies->where("vacancies.department", $userDeptId);
+            }
             if (!empty($searchTerm))
             {
                 $Department ='';
@@ -1155,34 +1168,30 @@ class VacancyController extends Controller
             t2.code AS PositionCode,
             t1.name AS Department,
             t1.code AS DepartmentCode,
-            COUNT(t6.id) AS NoOfApplication,
-            t5.link_Expiry_date,
-            t6.Application_date,
-            t5.id as application_id,
-            t5.link as jobAdLink,
+            COUNT(DISTINCT t6.id) AS NoOfApplication,
+            MAX(t5.link_Expiry_date) AS link_Expiry_date,
+            MAX(t6.Application_date) AS Application_date,
+            MAX(t5.id) as application_id,
+            MAX(t5.link) as jobAdLink,
             vacancies.Total_position_required
             ")
-            ->groupBy("vacancies.id", "t2.position_title", "t2.code", "t1.name", "t1.code", "t5.link_Expiry_date", "t6.Application_date", "t6.id", "vacancies.Total_position_required", "t5.link")
+            ->groupBy("vacancies.id", "t2.position_title", "t2.id", "t2.code", "t1.name", "t1.code", "vacancies.Total_position_required")
             ->get();
         $ResortDepartment = ResortDepartment::where('resort_id', $resort_id)->get();
 
-        // Check if current user belongs to HR department
-        $employee = $this->resort->GetEmployee ?? null;
-        $userDeptName = '';
-        if ($employee) {
-            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
-        }
-        $isHrUser = stripos($userDeptName, 'Human Resources') !== false;
-
-        // HR users: hide department filter, show only HR positions
-        // Non-HR users (GM, EXCOM): show department filter and all positions
-        if ($isHrUser) {
+        // GM: show department filter + all positions
+        // HR: no department filter, only HR positions
+        // Other departments: no department filter, only their department's positions
+        if ($isGM) {
+            $showDeptFilter = true;
+            $filterPositions = ResortPosition::where('resort_id', $resort_id)->get();
+        } elseif ($isHrUser) {
             $showDeptFilter = false;
             $hrDeptId = $ResortDepartment->first(function($d) { return stripos($d->name, 'Human Resources') !== false; });
             $filterPositions = $hrDeptId ? ResortPosition::where('dept_id', $hrDeptId->id)->get() : collect();
         } else {
-            $showDeptFilter = true;
-            $filterPositions = ResortPosition::where('resort_id', $resort_id)->get();
+            $showDeptFilter = false;
+            $filterPositions = $employee ? ResortPosition::where('dept_id', $employee->Dept_id)->get() : collect();
         }
         foreach($NewVacancies  as $v)
         {
@@ -1202,7 +1211,7 @@ class VacancyController extends Controller
 
         $config = config('settings.Position_Rank');
 
-        $canSeeAction = $isHrUser;
+        $canSeeAction = $isHrUser || $isGM;
 
         if($request->ajax())
         {
@@ -1625,11 +1634,18 @@ class VacancyController extends Controller
                         $applicantid = htmlspecialchars(base64_encode($row->Applicant_id), ENT_QUOTES, 'UTF-8');
                         $sendInterviewRequest = '';
 
-                        if ($row->InterviewStatus != "Slot Booked") {
+                        if (!in_array($row->InterviewStatus, ['Slot Booked', 'Invitation Sent'])) {
                             $sendInterviewRequest = '<li><a class="dropdown-item userApplicants-btn SortlistedEmployee"
                             data-resort_id="' . $this->resort->resort_id . '"
                             data-applicantstatus_id="'. $row->ApplicantStatus_id.'"
                             data-applicantid="' . base64_encode($row->Applicant_id) . '" href="#">Send Interview Request</a></li>';
+                        }
+
+                        $shareLink = '';
+                        if ($row->InterviewStatus == "Slot Booked") {
+                            $shareLink = '<li>
+                                <a class="dropdown-item ApplicantShareLink" data-Interview_id="' . base64_encode($row->Interview_id) . '" href="javascript:void(0)">Add Interview Link</a>
+                            </li>';
                         }
 
                         return '
@@ -1639,9 +1655,7 @@ class VacancyController extends Controller
                                 </button>
                                 <ul class="dropdown-menu " aria-labelledby="dropdownMenuButton' . $dropdownId . '">
                                     ' . $sendInterviewRequest . '
-                                    <li>
-                                        <a class="dropdown-item ApplicantShareLink"  data-Interview_id="' . base64_encode($row->Interview_id) . '" href="javascript:void(0)">Add Interview Link</a>
-                                    </li>
+                                    ' . $shareLink . '
                                 </ul>
                             </div>';
 
@@ -1668,24 +1682,39 @@ class VacancyController extends Controller
         $rank = $this->resort->GetEmployee->rank ?? '';
 
         $resort_id = $this->resort->resort_id;
+
+        // Check if user belongs to HR department — treat them as HR (rank 3) regardless of actual rank
+        $employee = $this->resort->GetEmployee ?? null;
+        $effectiveRank = $rank;
+        if ($employee) {
+            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+            if (stripos($userDeptName, 'Human Resources') !== false) {
+                $effectiveRank = 3;
+            }
+        }
+
         $SorlistedApplicants = Vacancies::join("applicant_form_data as t1", "t1.Parent_v_id", "=", "vacancies.id")
         ->join("countries as t2", "t2.id", "=", "t1.country")
-        ->join('applicant_wise_statuses as t4', function ($join)use($rank) {
+        ->join('applicant_wise_statuses as t4', function ($join)use($effectiveRank) {
             $join->on('t4.Applicant_id', '=', 't1.id')
                 ->whereRaw('t4.id = (
                     SELECT MAX(id)
                     FROM applicant_wise_statuses
                     WHERE Applicant_id = t1.id
                 )');
-                if($rank == 3)
+                if($effectiveRank == 3)
                 {
-                    $join->whereIn('t4.status', ['Sortlisted']);
+                    $join->whereIn('t4.status', ['Sortlisted', 'Sortlisted By Wisdom AI']);
                 }
-                elseif($rank == 2)
+                elseif($effectiveRank == 2)
                 {
                     $join->where('t4.status', '=', 'Round');
+                    $join->where('t4.As_ApprovedBy', '=', $effectiveRank);
                 }
-                $join->where('t4.As_ApprovedBy', '=', $rank);
+                else
+                {
+                    $join->where('t4.As_ApprovedBy', '=', $effectiveRank);
+                }
         })
         ->leftjoin('applicant_inter_view_details as t3', function ($join) {
             $join->on('t3.Applicant_id', '=', 't1.id')
@@ -1768,35 +1797,27 @@ class VacancyController extends Controller
 
 
                     ->addColumn('Action', function ($row) {
-                        $editUrl = asset('resorts_assets/images/edit.svg');
-                        $deleteUrl = asset('resorts_assets/images/trash-red.svg');
-                        $dropdownId = htmlspecialchars($row->Applicant_id, ENT_QUOTES, 'UTF-8');
-                        $notes = htmlspecialchars($row->Notes ?? '', ENT_QUOTES, 'UTF-8'); // Handle null `Notes`
-                        $applicantid = htmlspecialchars(base64_encode($row->Applicant_id), ENT_QUOTES, 'UTF-8');
                         $ApplicantStatus_id = htmlspecialchars(base64_encode($row->ApplicantStatus_id), ENT_QUOTES, 'UTF-8');
-                        $sendInterviewRequest = '';
+                        $sendInterviewBtn = '';
 
-                        if ($row->InterviewStatus == "Slot Booked") 
+                        if ($row->InterviewStatus == "Slot Booked")
                         {
-                            $sendInterviewRequest = '<li><a class="dropdown-item userApplicants-btn " target="_blank" href="'.$row->MeetingLink.'">Start Interview</a></li>';
+                            $sendInterviewBtn = '<a href="'.htmlspecialchars($row->MeetingLink, ENT_QUOTES, 'UTF-8').'" target="_blank" class="btn btn-sm btn-success me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Start Interview"><i class="fa-solid fa-video"></i></a>';
+                        }
+                        elseif ($row->InterviewStatus == "Invitation Sent")
+                        {
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Sent - Awaiting Response"><i class="fa-solid fa-clock"></i></a>';
+                        }
+                        elseif ($row->InterviewStatus == "Invitation Rejected")
+                        {
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-danger me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Declined by Candidate"><i class="fa-solid fa-xmark"></i></a>';
                         }
                         else
                         {
-                            $sendInterviewRequest = '<li><a class="dropdown-item userApplicants-btn" href="javascript:void(0)">No Slot Found</a></li>';
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-warning me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="No Slot Found"><i class="fa-solid fa-calendar-xmark"></i></a>';
                         }
 
-                        return '
-                            <div class="dropdown table-dropdown">
-                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button" id="dropdownMenuButton' . $dropdownId . '" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fa-solid fa-ellipsis"></i>
-                                </button>
-                                <ul class="dropdown-menu " aria-labelledby="dropdownMenuButton' . $ApplicantStatus_id . '">
-                                    ' . $sendInterviewRequest . '
-                                    <li><a class="dropdown-item userApplicants-btn"  href="javascript:void(0)" data-id="'.$ApplicantStatus_id.'">View</a></li> 
-                                </ul>
-                            </div>';
-
-                        return $string;
+                        return $sendInterviewBtn . '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue userApplicants-btn" data-id="'.$ApplicantStatus_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>';
                     })
 
                         ->rawColumns(['Applicants','Action', 'Stage', 'rank_name', 'Required'])
@@ -1839,6 +1860,7 @@ class VacancyController extends Controller
 
                             ->join("resort_positions as t5", "t5.id", "=", "vacancies.position")
                             ->where('t3.MeetingLink','!=',null)
+                            ->where('t3.Status', 'Slot Booked')
                             ->whereBetween('t3.InterViewDate', [Carbon::today(), Carbon::today()->addDays(7)]) // Upcoming 7 days
                             ->where('vacancies.Resort_id', $resort_id)
                             ->selectRaw('
@@ -1972,6 +1994,7 @@ class VacancyController extends Controller
 
                             ->join("resort_positions as t5", "t5.id", "=", "vacancies.position")
                             ->where('t3.MeetingLink','!=',null)
+                            ->where('t3.Status', 'Slot Booked')
                             ->whereBetween('t3.InterViewDate', [Carbon::today(), Carbon::today()->addDays(7)]) // Upcoming 7 days
                             ->where('vacancies.Resort_id', $resort_id)
                             ->selectRaw('
@@ -2151,13 +2174,27 @@ class VacancyController extends Controller
             $recipientEmail = $Final_response_data->Email;
             $templateId = $request->EmailTemplate;
 
-            $result = Common::sendTemplateEmail("TalentAcquisition",$templateId, $recipientEmail, $dynamic_data);
-            if ($result === true) {
-                return response()->json(['success' =>true,'Final_response_data'=>$FianlResponse, 'message' => 'Meeting Link  Added succefully'], 200);
-
-            } else {
-                return response()->json(['error' => $result], 500);
+            $emailWarning = '';
+            try {
+                $result = Common::sendTemplateEmail("TalentAcquisition",$templateId, $recipientEmail, $dynamic_data);
+                if ($result !== true) {
+                    $emailWarning = ' (Email could not be sent)';
+                    \Log::warning("Interview link email failed: " . $result);
+                }
+            } catch (\Exception $e) {
+                $emailWarning = ' (Email could not be sent)';
+                \Log::warning("Interview link email exception: " . $e->getMessage());
             }
+
+            // Get rank and Todo data for dashboard refresh
+            $rank = $this->resort->GetEmployee->rank ?? null;
+            $TodoDataview = null;
+            if ($rank) {
+                $TodoData = Common::GmApprovedVacancy($resort_id, $rank);
+                $TodoDataview = view('resorts.renderfiles.TaTodoList', compact('TodoData'))->render();
+            }
+
+            return response()->json(['success' =>true,'Final_response_data'=>$FianlResponse, 'TodoDataview' => $TodoDataview, 'message' => 'Meeting Link Added successfully!' . $emailWarning], 200);
             
          try
         {}

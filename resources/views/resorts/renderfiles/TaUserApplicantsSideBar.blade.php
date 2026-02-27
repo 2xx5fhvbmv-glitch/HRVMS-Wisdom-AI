@@ -128,7 +128,7 @@
                             </tr>
                             <tr>
                                 <th>DOB:</th>
-                                <td>{{ date('d/m/Y',strtotime($Applicant_form_data->dob)) }}</td>
+                                <td>{{ $Applicant_form_data->dob ? date('d/M/Y', strtotime($Applicant_form_data->dob)) : '-' }}</td>
                             </tr>
                             <tr>
                                 <th>Experience:</th>
@@ -207,7 +207,9 @@
                         </tbody>
                     </table>
                 </div>
-                {{-- <div class="text-center"><a href="#" class="a-link">Download All</a></div> --}}
+                <div class="text-center mt-3">
+                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm DownloadAllFiles" data-id="{{ base64_encode($Applicant_form_data->id) }}">Download All</a>
+                </div>
             </div>
             <div class="tab-pane fade" id="tabPane3" role="tabpanel" aria-labelledby="tab3" tabindex="0">
                 <div class="overflow-hidden">
@@ -259,10 +261,7 @@
                                 </div>
                                 <div class="accordion-item
                                       @foreach($ApplicantWiseStatusFinal as $status)
-                                            @if($status->status == "Sortlisted" &&  $status->As_ApprovedBy == 3||$status->status == "Round"  || $status->status == "Complete" &&  $status->As_ApprovedBy == 3
-                                                ||$status->status == "Sortlisted" || $status->status == "Complete"  &&  $status->As_ApprovedBy == 2
-                                                ||$status->status == "Round" || $status->status == "Complete"  &&  $status->As_ApprovedBy == 2
-                                                || $status->status == "Round"  || $status->status == "Complete"  &&  $status->As_ApprovedBy == 8 )
+                                            @if($status->status == "Round" || $status->status == "Complete")
                                                 active
                                             @endif
                                     @endforeach
@@ -555,10 +554,12 @@
                                 <th>Department:</th>
                                 <td>{{ $Applicant_form_data->DepartmentName}}</td>
                             </tr>
+                            @if($Applicant_form_data->InterViewDate)
                             <tr>
                                 <th>Interview Date & Time:</th>
-                                <td>{{ date('d/m/Y',strtotime($Applicant_form_data->InterViewDate)) }} -  <b>Applicant Time </b> :-{{ $Applicant_form_data->ApplicantInterviewtime}}  :   <b>Maldivan Time</b>:-{{ $Applicant_form_data->ResortInterviewtime}} </td>
+                                <td>{{ date('d/M/Y',strtotime($Applicant_form_data->InterViewDate)) }} -  <b>Applicant Time </b> :-{{ $Applicant_form_data->ApplicantInterviewtime}}  :   <b>Maldivan Time</b>:-{{ $Applicant_form_data->ResortInterviewtime}} </td>
                             </tr>
+                            @endif
                             @if($Applicant_form_data->MeetingLink)
                             <tr>
                                 <th>Interview link:</th>
@@ -624,7 +625,37 @@
                         <!-- <a target="_blank" href="{{ route('interview-assessment.viewResponse', ['formId' => $response->form_id, 'responseId' => $response->id]) }}" class="a-link mx-auto">{{ $availableRank }} Interview Assessment</a> -->
                     @endforeach
                 @endif
-                <div class="intUserApp-block">
+                @if(!empty($Applicant_form_data->notes) && (is_null($Applicant_form_data->notes_by) || $Applicant_form_data->notes_by == $currentUserId))
+                <div class="intUserApp-block mt-3">
+                    <h6>Notes:</h6>
+                    <p>{{ $Applicant_form_data->notes }}</p>
+                </div>
+                @endif
+
+                @php
+                    $hasComments = !empty($Applicant_form_data->Comments);
+                    $hasInterviewComments = $InterviewComments->contains(function($c) { return !empty($c->Comments); });
+                @endphp
+                @if($hasComments || $hasInterviewComments)
+                <div class="intUserApp-block mt-3">
+                    <h6>Comments:</h6>
+                    @if($hasComments)
+                    <div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;">
+                        <p class="mb-0">{{ $Applicant_form_data->Comments }}</p>
+                    </div>
+                    @endif
+                    @foreach($InterviewComments as $comment)
+                        @if(!empty($comment->Comments))
+                        <div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;">
+                            <span class="text-medium">{{ $comment->rank_name }}:</span>
+                            <p class="mb-0">{{ $comment->Comments }}</p>
+                        </div>
+                        @endif
+                    @endforeach
+                </div>
+                @endif
+
+                <div class="intUserApp-block mt-3">
                     <h6>Analyze Of AI:</h6>
                     <p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum
                         has been the industry's standard dummy text ever since the 1500s, when an unknown

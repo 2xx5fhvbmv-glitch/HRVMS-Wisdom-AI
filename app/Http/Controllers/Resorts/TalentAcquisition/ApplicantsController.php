@@ -29,6 +29,8 @@ use App\Models\TAnotificationParent;
 use App\Events\ResortNotificationEvent;
 use App\Models\ApplicantInterViewDetails;
 use App\Models\Applicant_form_job_assessment;
+use Illuminate\Support\Str;
+use App\Models\ApplicantOfferContract;
 use App\Models\InterviewAssessmentResponseForm;
 class ApplicantsController extends Controller
 {
@@ -74,12 +76,25 @@ class ApplicantsController extends Controller
                                     WHERE Applicant_id = applicant_form_data.id
                                 )');
                         })
-                        ->join('work_experience_applicant_form as t7', function ($join) {
-                            $join->on('t7.applicant_form_id', '=', 'applicant_form_data.id');
+                        ->leftJoin('work_experience_applicant_form as t7', function ($join) {
+                            $join->on('t7.applicant_form_id', '=', 'applicant_form_data.id')
+                                ->whereRaw('t7.id = (
+                                    SELECT MAX(id)
+                                    FROM work_experience_applicant_form
+                                    WHERE applicant_form_id = applicant_form_data.id
+                                )');
                         })
                         ->leftJoin('countries as t2', 't2.id', '=', 'applicant_form_data.country')
                         ->leftJoin('vacancies as t4', 't4.id', '=', 'applicant_form_data.Parent_v_id')
                         ->leftJoin('resort_positions as t5', 't5.id', '=', 't4.position')
+                        ->leftJoin('applicant_inter_view_details as t8', function ($join) {
+                            $join->on('t8.Applicant_id', '=', 'applicant_form_data.id')
+                                ->whereRaw('t8.id = (
+                                    SELECT MAX(id)
+                                    FROM applicant_inter_view_details
+                                    WHERE Applicant_id = applicant_form_data.id
+                                )');
+                        })
                         ->selectRaw('
                             applicant_form_data.id,
                             applicant_form_data.passport_no,
@@ -100,9 +115,10 @@ class ApplicantsController extends Controller
                             t1.status as ApplicantStatus,
                             t5.position_title,
                             t7.job_title,
-                            t1.id as applicant_status_id
+                            t1.id as applicant_status_id,
+                            t8.Status as InterviewStatus
                         ')
-                        ->whereIn('t1.status', ['Sortlisted By Wisdom AI', 'Sortlisted', 'Round', 'Selected', 'Complete'])
+                        ->whereIn('t1.status', ['Sortlisted By Wisdom AI', 'Sortlisted', 'Round', 'Selected', 'Complete', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'])
                         ->where('applicant_form_data.Parent_v_id', $id1)
                         ->where('applicant_form_data.resort_id', $resort_id)
                         ->orderBy('applicant_form_data.id', 'desc');
@@ -153,12 +169,49 @@ class ApplicantsController extends Controller
             return datatables()->of($Applicant_form_data)
             ->addColumn('action', function ($row) {
                 $id = base64_encode($row->id);
-
-                return '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
+                $actions = '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
                         <a href="javascript:void(0)" class="btn btn-sm btn-theme ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>';
+
+                // Show Selected/Rejected buttons when GM round is complete
+                if ($row->ApplicantStatus == 'Complete' && $row->As_ApprovedBy == 8) {
+                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-success selectCandidateBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Select"><i class="fa-solid fa-check"></i></a>';
+                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-danger rejectCandidateBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Reject"><i class="fa-solid fa-xmark"></i></a>';
+                }
+
+                // Show Send Offer Letter button when Selected
+                if ($row->ApplicantStatus == 'Selected') {
+                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-warning sendOfferLetterBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Send Offer Letter"><i class="fa-solid fa-file-contract"></i></a>';
+                }
+
+                // Show Send Contract button when Offer Letter Accepted
+                if ($row->ApplicantStatus == 'Offer Letter Accepted') {
+                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-info sendContractBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Send Contract"><i class="fa-solid fa-file-signature"></i></a>';
+                }
+
+                return $actions;
             })
             ->addColumn('details-control', function ($row) {
                 return '<a class="a-link collapsed" data-bs-toggle="collapse" data-bs-target="#collapseRow'.$row->id.'" aria-expanded="false" aria-controls="collapseRow'.$row->id.'">Interview Details</a>';
+            })
+            ->addColumn('InvitationStatus', function ($row) {
+                // Check applicant status first
+                if ($row->ApplicantStatus === 'Rejected') {
+                    return '<span class="badge bg-danger">Rejected</span>';
+                } elseif ($row->ApplicantStatus === 'Selected') {
+                    return '<span class="badge bg-success">Selected</span>';
+                }
+
+                $status = $row->InterviewStatus ?? null;
+                if ($status === 'Invitation Sent') {
+                    return '<span class="badge bg-info text-white">Invitation Sent</span>';
+                } elseif ($status === 'Slot Booked') {
+                    return '<span class="badge bg-success">Accepted</span>';
+                } elseif ($status === 'Invitation Rejected') {
+                    return '<span class="badge bg-danger">Declined</span>';
+                } elseif ($status === 'Slot Not Booked' || $status === 'Active') {
+                    return '<span class="badge bg-secondary">Pending</span>';
+                }
+                return '<span class="badge bg-light text-dark">-</span>';
             })
             ->addColumn('Stage', function ($row) {
 
@@ -191,9 +244,33 @@ class ApplicantsController extends Controller
                 {
                     $string ='<span class="badge badge-themeDanger">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
                 }
+                elseif($row->ApplicantStatus == 'Offer Letter Sent')
+                {
+                    $string ='<span class="badge bg-warning text-dark">Offer Letter Sent</span>';
+                }
+                elseif($row->ApplicantStatus == 'Offer Letter Accepted')
+                {
+                    $string ='<span class="badge bg-success">Offer Letter Accepted</span>';
+                }
+                elseif($row->ApplicantStatus == 'Offer Letter Rejected')
+                {
+                    $string ='<span class="badge bg-danger">Offer Letter Rejected</span>';
+                }
+                elseif($row->ApplicantStatus == 'Contract Sent')
+                {
+                    $string ='<span class="badge bg-info text-white">Contract Sent</span>';
+                }
+                elseif($row->ApplicantStatus == 'Contract Accepted')
+                {
+                    $string ='<span class="badge bg-success">Contract Accepted</span>';
+                }
+                elseif($row->ApplicantStatus == 'Contract Rejected')
+                {
+                    $string ='<span class="badge bg-danger">Contract Rejected</span>';
+                }
                 return $string;
             })
-            ->rawColumns(['action', 'details-control','Stage'])
+            ->rawColumns(['action', 'details-control', 'InvitationStatus', 'Stage'])
             ->make(true);
         }
     }
@@ -224,7 +301,7 @@ class ApplicantsController extends Controller
         {
 
             $Applicant_form_data = Applicant_form_data::find( $Applicant_id);
-            $Applicant_form_data ->update(['notes'=> $ApplicantNote]);
+            $Applicant_form_data ->update(['notes'=> $ApplicantNote, 'notes_by' => $this->resort->id]);
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -297,6 +374,7 @@ class ApplicantsController extends Controller
                         t1.id as ApplicantStatusID,
                         applicant_form_data.passport_photo,
                         applicant_form_data.notes,
+                        applicant_form_data.notes_by,
                         applicant_form_data.id as ApplicantID,
                         applicant_form_data.passport_img,
                         applicant_form_data.curriculum_vitae,
@@ -345,9 +423,9 @@ class ApplicantsController extends Controller
                                                         ->whereIn('status',['Complete','Round','Sortlisted'])
                                                         ->get(["Applicant_id", "As_ApprovedBy", "status"]);
             $HrSortlisted = ApplicantWiseStatus::where("Applicant_id", $Applicant_form_data->ApplicantID)
-                                                        ->orderBy('status', 'asc') // Sort by "status" in ascending order
-                                                        ->whereIn('status',['Complete','Round','Sortlisted'])
-                                                        ->where('As_ApprovedBy',3)
+                                                        ->orderBy('status', 'asc')
+                                                        ->where('status', 'Sortlisted')
+                                                        ->where('As_ApprovedBy', '!=', 0)
                                                         ->first(["Applicant_id", "As_ApprovedBy", "status"]);
 
             $CompliteWiseStatusFinal = ApplicantWiseStatus::where("Applicant_id", $Applicant_form_data->ApplicantID)
@@ -411,7 +489,8 @@ class ApplicantsController extends Controller
             }
 
 
-        $view =  view('resorts.renderfiles.TaUserApplicantsSideBar',compact('getFileapplicant','CurrentRankOFUser','ApplicantLanguage','InterviewComments','CurrentRank','HrSortlisted','completeRound','ApplicantWiseStatusFinal','Applicant_form_data','InterViewRound','SimpleQuestions','VideoQuestions','interview_assesment_response'))->render();
+        $currentUserId = $this->resort->id;
+        $view =  view('resorts.renderfiles.TaUserApplicantsSideBar',compact('currentUserId','getFileapplicant','CurrentRankOFUser','ApplicantLanguage','InterviewComments','CurrentRank','HrSortlisted','completeRound','ApplicantWiseStatusFinal','Applicant_form_data','InterViewRound','SimpleQuestions','VideoQuestions','interview_assesment_response'))->render();
         return response()->json([
             'success' => true,
             'view'=>$view,
@@ -726,9 +805,18 @@ class ApplicantsController extends Controller
         $Round = $request->Round;
         $InterviewType = $request->InterviewType;
 
-        // Get the booked interview slots for the resort and applicant date
-        $bookedSlots = ApplicantInterViewDetails::where('resort_id', $Applicant_form_data->resort_id)
-            ->where('InterViewDate', $InterviewDate) // Check today's date or adjust as necessary
+        // Get the booked interview slots for the current interviewer on this date
+        $interviewerId = $this->resort->id;
+        $resortId = $this->resort->resort_id;
+        $bookedSlots = ApplicantInterViewDetails::where('InterViewDate', $InterviewDate)
+            ->whereIn('Status', ['Invitation Sent', 'Slot Booked'])
+            ->where(function ($query) use ($interviewerId, $resortId) {
+                $query->where('interviewer_id', $interviewerId)
+                      ->orWhere(function ($q) use ($resortId) {
+                          $q->whereNull('interviewer_id')
+                            ->where('resort_id', $resortId);
+                      });
+            })
             ->get();
         // dd($bookedSlots);
 
@@ -768,6 +856,35 @@ class ApplicantsController extends Controller
                 return response()->json(['error' => 'Resort not found'], 404);
             }
 
+            $interviewerId = $this->resort->id;
+            $resortTime = $request->ResortInterviewtime ?? $request->MalidivanManualTime1;
+            $applicantTime = $request->ApplicantInterviewtime ?? $request->ApplicantManualTime1;
+            $interviewDate = Carbon::createFromFormat('Y-m-d', $request->TimeSlotsFormdate)->format('Y-m-d');
+
+            // Validate manual time against interviewer's existing bookings
+            if ($request->MalidivanManualTime1) {
+                $existingBookings = ApplicantInterViewDetails::where('InterViewDate', $interviewDate)
+                    ->whereIn('Status', ['Invitation Sent', 'Slot Booked'])
+                    ->where(function ($query) use ($interviewerId, $Resort_id) {
+                        $query->where('interviewer_id', $interviewerId)
+                              ->orWhere(function ($q) use ($Resort_id) {
+                                  $q->whereNull('interviewer_id')
+                                    ->where('resort_id', $Resort_id);
+                              });
+                    })
+                    ->get();
+
+                foreach ($existingBookings as $booking) {
+                    $bookedTimes = array_map('trim', explode(',', $booking->ResortInterviewtime));
+                    if (in_array($request->MalidivanManualTime1, $bookedTimes)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This time slot is already booked for another candidate.',
+                        ]);
+                    }
+                }
+            }
+
             // Update or create Applicant Interview Details
             $ApplicantInterViewDetails = ApplicantInterViewDetails::updateOrCreate(
                 [
@@ -776,11 +893,14 @@ class ApplicantsController extends Controller
                     'ApplicantStatus_id' => $ApplicantStatus_id
                 ],
                 [
-                    'Status' => 'Slot Booked',
-                    'ResortInterviewtime' => $request->ResortInterviewtime ?? $request->MalidivanManualTime1,
-                    'ApplicantInterviewtime' => $request->ApplicantInterviewtime ?? $request->ApplicantManualTime1,
-                    'InterViewDate' => Carbon::createFromFormat('Y-m-d', $request->TimeSlotsFormdate)->format('Y-m-d'),
+                    'Status' => 'Invitation Sent',
+                    'ResortInterviewtime' => $resortTime,
+                    'ApplicantInterviewtime' => $applicantTime,
+                    'InterViewDate' => $interviewDate,
                     'EmailTemplateId' => $request->EmailTemplate,
+                    'MeetingLink' => $request->MeetingLink,
+                    'interviewer_id' => $interviewerId,
+                    'invitation_token' => Str::uuid(),
                 ]
             );
 
@@ -868,7 +988,15 @@ class ApplicantsController extends Controller
                             <th>Applicant Time:</th>
                             <td>'.$Final_response_data->ApplicantInterviewtime.'</td>
                         </tr>';
+                        if($Final_response_data->MeetingLink) {
+                            $FianlResponse .= '<tr>
+                                <th>Meeting Link:</th>
+                                <td><a href="'.$Final_response_data->MeetingLink.'" target="_blank">'.$Final_response_data->MeetingLink.'</a></td>
+                            </tr>';
+                        }
                     }
+
+                    $invitationLink = route('resort.interview.invitation.show', $ApplicantInterViewDetails->invitation_token);
 
                     $dynamic_data = [
                         'candidate_name' => $Final_response_data->first_name . ' ' . $Final_response_data->last_name,
@@ -876,28 +1004,37 @@ class ApplicantsController extends Controller
                         'resort_name' => $resort_details->resort_name,
                         'interview_date' => Carbon::parse($InterViewDate)->format('d-m-Y'),
                         'interview_time' => $Final_response_data->ApplicantInterviewtime,
-                        'interview_link' => '',  // Can be added based on your logic
+                        'interview_link' => $invitationLink,
+                        'meeting_link' => $Final_response_data->MeetingLink ?? '',
                         'interview_type' =>  $InterviewType,
                         'interview_round'=> $Round,
+                        'accept_link' => $invitationLink,
+                        'reject_link' => $invitationLink,
+                        'department' => $Final_response_data->Department ?? '',
                     ];
 
                     // Send email using the BeyondTestApprovalEmail class
                     $recipientEmail = $Applicant_form_data->email;
                     $templateId = $request->EmailTemplate;
-                    $result = Common::sendTemplateEmail("TalentAcquisition", $templateId, $recipientEmail, $dynamic_data);
-
-
-                    if ($result === true) {
-                        return response()->json([
-                            'success' => true,
-                            'message' => 'Interview Slot Booked!',
-                            'InterViewDate' => $InterViewDate,
-                            'TodoDataview' => $TodoDataview,
-                            'Final_response_data' => $FianlResponse
-                        ]);
-                    } else {
-                        return response()->json(['error' => $result], 500);
+                    $emailWarning = '';
+                    try {
+                        $result = Common::sendTemplateEmail("TalentAcquisition", $templateId, $recipientEmail, $dynamic_data);
+                        if ($result !== true) {
+                            $emailWarning = ' (Email could not be sent)';
+                            \Log::warning("Interview email failed: " . $result);
+                        }
+                    } catch (\Exception $e) {
+                        $emailWarning = ' (Email could not be sent)';
+                        \Log::warning("Interview email exception: " . $e->getMessage());
                     }
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Interview Invitation Sent!' . $emailWarning,
+                        'InterViewDate' => $InterViewDate,
+                        'TodoDataview' => $TodoDataview,
+                        'Final_response_data' => $FianlResponse
+                    ]);
 
        DB::beginTransaction();
         try {  } catch (\Exception $e) {
@@ -988,7 +1125,7 @@ class ApplicantsController extends Controller
                 ->join('applicant_wise_statuses as t4', function ($join) {
                     $join->on('t4.Applicant_id', '=', 't1.id');
                 })
-                ->Join('applicant_inter_view_details as t3', function ($join) {
+                ->leftJoin('applicant_inter_view_details as t3', function ($join) {
                     $join->on('t3.Applicant_id', '=', 't1.id')
                         ->whereRaw('t3.id = (
                             SELECT MAX(id)
@@ -998,8 +1135,8 @@ class ApplicantsController extends Controller
                 })
                 ->join("resort_positions as t5", "t5.id", "=", "vacancies.position")
                 ->join("resort_departments as t6", "t6.id", "=", "t5.dept_id")
-                ->join("employees as emp", "emp.id", "=", "vacancies.reporting_to")
-                ->join("resort_admins as ra", "ra.id", "=", "emp.Admin_Parent_id")
+                ->leftJoin("employees as emp", "emp.id", "=", "vacancies.reporting_to")
+                ->leftJoin("resort_admins as ra", "ra.id", "=", "emp.Admin_Parent_id")
                 ->where('t1.id',$ApplicantID)
                 ->where('t4.id',$applicantstatusid)
                 ->selectRaw('
@@ -1031,24 +1168,33 @@ class ApplicantsController extends Controller
                 
                 // dd($Final_response_data);
                 
-                $InterViewDate = Carbon::parse($Final_response_data->InterViewDate)->format('d-m-Y');
+                $InterViewDate = $Final_response_data->InterViewDate
+                    ? Carbon::parse($Final_response_data->InterViewDate)->format('d-m-Y')
+                    : '-';
                 $dynamic_data = [
                     'candidate_name' => $Final_response_data->first_name . ' ' . $Final_response_data->last_name,
                     'position_title' => $Final_response_data->Position,
                     'resort_name' => $resort_details->resort_name,
-                    // 'interview_type' =>  $InterviewType,
                     'interview_round' =>   $interviewRound,
-                    'completion_date' => $InterViewDate,
-                    'department' => $Final_response_data->Department,
-                    'required_starting_date' => $Final_response_data->required_starting_date,
-                    'reporting_to' => $Final_response_data->AdminFirstName. ' ' .$Final_response_data->AdminFirstName,
+                    'completion_date' => Carbon::now()->format('d-m-Y'),
+                    'interview_date' => $InterViewDate,
+                    'department' => $Final_response_data->Department ?? '',
+                    'required_starting_date' => $Final_response_data->required_starting_date ?? '',
+                    'reporting_to' => trim(($Final_response_data->AdminFirstName ?? '') . ' ' . ($Final_response_data->AdminLastName ?? '')),
                 ];
                 // dd($dynamic_data);
 
                 // Send email using the BeyondTestApprovalEmail class
                 $recipientEmail = $Final_response_data->Email;
                 $templateId = $request->emailTemplateID;
-                $result = Common::sendTemplateEmail("TalentAcquisition",$templateId, $recipientEmail, $dynamic_data);
+                try {
+                    $result = Common::sendTemplateEmail("TalentAcquisition",$templateId, $recipientEmail, $dynamic_data);
+                    if ($result !== true) {
+                        \Log::warning("Status update email failed: " . $result);
+                    }
+                } catch (\Exception $emailEx) {
+                    \Log::warning("Status update email exception: " . $emailEx->getMessage());
+                }
             }
 
             return response()->json([
@@ -1164,7 +1310,8 @@ class ApplicantsController extends Controller
             })
             ->join("resort_positions as t5", "t5.id", "=", "vacancies.position")
             ->join("resort_departments as t6", "t6.id", "=", "t5.dept_id")
-            ->whereNotNull('t3.MeetingLink');
+            ->whereNotNull('t3.MeetingLink')
+            ->where('t3.Status', 'Slot Booked');
 
         if ($date) {
             $UplcomingApplicants1->where('t3.InterViewDate', $date);
@@ -1418,7 +1565,7 @@ class ApplicantsController extends Controller
                 }
 
             return datatables()->of($Applicant_form_data)
-            ->addColumn('action', function ($row) {
+            ->addColumn('action', function ($row) use ($reject_class, $delete_class) {
                 $id = base64_encode($row->id);
 
                 return '
@@ -1427,8 +1574,12 @@ class ApplicantsController extends Controller
                         <i class="fa-solid fa-ellipsis"></i>
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton'.$row->id.'">
-                        <li><a class="dropdown-item userApplicants-btn RejactionReason '.$reject_class.'"data-Rank="'.$row->As_ApprovedBy.'" data-applicant_status_id="'.$row->applicant_status_id.'" data-Comments="'.$row->Comments.'" href="javascript:void(0)" data-id="'.$row->applicant_id.'">Rejaction Reason</a></li>
-                        <li><a class="dropdown-item destoryApplicant '.$delete_class.'" data-location="'.$row->id.'" data-id="'.$row->id.'" href="javascript:void(0)">Delete</a></li>
+                        <li><a class="dropdown-item userApplicants-btn" href="javascript:void(0)" data-id="'.$row->applicant_id.'"><i class="fa-solid fa-eye me-2"></i>View Profile</a></li>
+                        <li><a class="dropdown-item RejactionReason '.$reject_class.'" data-Rank="'.$row->As_ApprovedBy.'" data-applicant_status_id="'.$row->applicant_status_id.'" data-Comments="'.$row->Comments.'" href="javascript:void(0)" data-id="'.$row->applicant_id.'"><i class="fa-solid fa-circle-info me-2"></i>Rejection Reason</a></li>
+                        <li><a class="dropdown-item sendConsentRequestBtn" data-id="'.$id.'" href="javascript:void(0)"><i class="fa-solid fa-file-shield me-2"></i>Send Consent Request</a></li>
+                        <li><a class="dropdown-item checkAvailabilityBtn" data-id="'.$id.'" href="javascript:void(0)"><i class="fa-solid fa-calendar-check me-2"></i>Check Availability</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger destoryApplicant '.$delete_class.'" data-location="'.$row->id.'" data-id="'.$row->id.'" href="javascript:void(0)"><i class="fa-solid fa-trash me-2"></i>Delete</a></li>
                     </ul>
                 </div>';
             })
@@ -1474,8 +1625,9 @@ class ApplicantsController extends Controller
         $rank = $this->resort->GetEmployee->rank ?? null;
         $employeeDeptId = $this->resort->GetEmployee->Dept_id ?? null;
         $ResortDepartment = ResortDepartment::where("resort_id", $resort_id)->get();
+        $EmailTamplete = TaEmailTemplate::where('Resort_id', $resort_id)->orderByDesc("id")->get();
 
-        return view("resorts.talentacquisition.Applicants.talentpool",compact('page_title','ResortDepartment','rank','employeeDeptId'));
+        return view("resorts.talentacquisition.Applicants.talentpool",compact('page_title','ResortDepartment','rank','employeeDeptId','EmailTamplete'));
 
     }
     public function getTalentPoolGridApplicant(Request $request)
@@ -1679,6 +1831,441 @@ class ApplicantsController extends Controller
                 'message' => 'File Not Found!',
             ]);
         }
- 
+
+    }
+
+    public function GetAllAwsFiles(Request $request)
+    {
+        $ApplicantID = base64_decode($request->id);
+        $fields = ['curriculum_vitae', 'passport_img', 'passport_photo', 'full_length_photo'];
+        $applicant = Applicant_form_data::where('id', $ApplicantID)->select($fields)->first();
+
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant Not Found!']);
+        }
+
+        $files = [];
+        foreach ($fields as $field) {
+            if (!empty($applicant->$field)) {
+                $result = Common::GetApplicantAWSFile($applicant->$field);
+                if ($result['success']) {
+                    $files[] = [
+                        'name' => $field,
+                        'url' => $result['NewURLshow'],
+                    ];
+                }
+            }
+        }
+
+        if (empty($files)) {
+            return response()->json(['success' => false, 'message' => 'No files found!']);
+        }
+
+        return response()->json(['success' => true, 'files' => $files]);
+    }
+
+    public function RejectedApplicants(Request $request)
+    {
+        $page_title = "Rejected Applications";
+        $EmailTamplete = TaEmailTemplate::where('Resort_id', $this->resort->resort_id)
+            ->orderByDesc("id")
+            ->get();
+        return view("resorts.talentacquisition.Applicants.rejected", compact('EmailTamplete', 'page_title'));
+    }
+
+    public function GetRejectedApplicants(Request $request)
+    {
+        if ($request->ajax()) {
+            $searchTerm = $request->get('searchTerm');
+            $config = config('settings.Position_Rank');
+            $resort_id = $this->resort->resort_id;
+
+            $query = Applicant_form_data::join('applicant_wise_statuses as t1', function ($join) {
+                    $join->on('t1.Applicant_id', '=', 'applicant_form_data.id')
+                        ->whereRaw('t1.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = applicant_form_data.id)');
+                })
+                ->leftJoin('countries as t2', 't2.id', '=', 'applicant_form_data.country')
+                ->leftJoin('vacancies as t4', 't4.id', '=', 'applicant_form_data.Parent_v_id')
+                ->leftJoin('resort_positions as t5', 't5.id', '=', 't4.position')
+                ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
+                ->selectRaw('
+                    applicant_form_data.id,
+                    applicant_form_data.first_name,
+                    applicant_form_data.last_name,
+                    applicant_form_data.email,
+                    applicant_form_data.passport_photo,
+                    t2.name as countryName,
+                    t5.position_title,
+                    t6.name as department,
+                    t1.status as ApplicantStatus,
+                    t1.Comments as rejection_reason,
+                    t1.updated_at as rejection_date,
+                    t1.id as applicant_status_id
+                ')
+                ->whereIn('t1.status', ['Rejected', 'Rejected By Wisdom AI'])
+                ->where('applicant_form_data.resort_id', $resort_id)
+                ->orderBy('t1.updated_at', 'desc');
+
+            if (!empty($searchTerm)) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->whereRaw("CONCAT(applicant_form_data.first_name, ' ', applicant_form_data.last_name) LIKE ?", ["%$searchTerm%"])
+                        ->orWhere('applicant_form_data.email', 'like', "%$searchTerm%")
+                        ->orWhere('t2.name', 'like', "%$searchTerm%")
+                        ->orWhere('t5.position_title', 'like', "%$searchTerm%")
+                        ->orWhere('t6.name', 'like', "%$searchTerm%");
+                });
+            }
+
+            $data = $query->get()->map(function ($item) {
+                $item->name = ucfirst($item->first_name . ' ' . $item->last_name);
+                $item->rejection_date = $item->rejection_date ? Carbon::parse($item->rejection_date)->format('d-m-Y') : '-';
+                $item->applicant_id = base64_encode($item->applicant_status_id);
+                if ($item->passport_photo) {
+                    $getFile = Common::GetApplicantAWSFile($item->passport_photo);
+                    $item->profileImg = $getFile['NewURLshow'];
+                } else {
+                    $item->profileImg = null;
+                }
+                return $item;
+            });
+
+            return datatables()->of($data)
+                ->addColumn('action', function ($row) {
+                    return '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="' . $row->applicant_id . '" data-bs-toggle="tooltip" title="View"><i class="fa-solid fa-eye"></i></a>';
+                })
+                ->rawColumns(['action'])
+                ->make(true);
+        }
+    }
+
+    public function ReviewReminders(Request $request)
+    {
+        $page_title = "Review Reminders";
+        return view("resorts.talentacquisition.Applicants.reviewreminders", compact('page_title'));
+    }
+
+    public function GetReviewReminders(Request $request)
+    {
+        if ($request->ajax()) {
+            $resort_id = $this->resort->resort_id;
+
+            $query = ApplicantInterViewDetails::join('applicant_form_data as t1', 't1.id', '=', 'applicant_inter_view_details.Applicant_id')
+                ->leftJoin('vacancies as t4', 't4.id', '=', 't1.Parent_v_id')
+                ->leftJoin('resort_positions as t5', 't5.id', '=', 't4.position')
+                ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
+                ->where('applicant_inter_view_details.Status', 'Slot Booked')
+                ->where('applicant_inter_view_details.InterViewDate', '>=', Carbon::today())
+                ->where('applicant_inter_view_details.InterViewDate', '<=', Carbon::today()->addDays(7))
+                ->where('applicant_inter_view_details.resort_id', $resort_id)
+                ->selectRaw('
+                    t1.id as applicant_id,
+                    t1.first_name,
+                    t1.last_name,
+                    t1.passport_photo,
+                    t5.position_title,
+                    t6.name as department,
+                    applicant_inter_view_details.InterViewDate,
+                    applicant_inter_view_details.ResortInterviewtime,
+                    applicant_inter_view_details.ApplicantInterviewtime,
+                    applicant_inter_view_details.MeetingLink,
+                    applicant_inter_view_details.id as interview_id
+                ')
+                ->orderBy('applicant_inter_view_details.InterViewDate', 'asc')
+                ->get()
+                ->map(function ($item) {
+                    $item->name = ucfirst($item->first_name . ' ' . $item->last_name);
+                    $item->interview_date = Carbon::parse($item->InterViewDate)->format('d-m-Y');
+                    $item->days_until = Carbon::today()->diffInDays(Carbon::parse($item->InterViewDate));
+                    if ($item->passport_photo) {
+                        $getFile = Common::GetApplicantAWSFile($item->passport_photo);
+                        $item->profileImg = $getFile['NewURLshow'];
+                    } else {
+                        $item->profileImg = null;
+                    }
+                    return $item;
+                });
+
+            return datatables()->of($query)
+                ->addColumn('meeting', function ($row) {
+                    if ($row->MeetingLink && $row->MeetingLink != '0') {
+                        return '<a href="' . $row->MeetingLink . '" target="_blank" class="btn btn-sm btn-themeBlue"><i class="fa-solid fa-video me-1"></i>Join</a>';
+                    }
+                    return '<span class="badge bg-secondary">No Link</span>';
+                })
+                ->addColumn('days', function ($row) {
+                    if ($row->days_until == 0) return '<span class="badge bg-danger">Today</span>';
+                    if ($row->days_until == 1) return '<span class="badge bg-warning text-dark">Tomorrow</span>';
+                    return '<span class="badge bg-info text-white">' . $row->days_until . ' days</span>';
+                })
+                ->rawColumns(['meeting', 'days'])
+                ->make(true);
+        }
+    }
+
+    public function sendOfferLetter(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'applicant_id' => 'required',
+            'email_template_id' => 'required',
+            'offer_letter' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $applicant_id = base64_decode($request->applicant_id);
+        $applicant_status_id = base64_decode($request->applicant_status_id);
+
+        $applicant = Applicant_form_data::find($applicant_id);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Upload file
+            $file = $request->file('offer_letter');
+            $filePath = $file->store('offer_letters/' . $resort_id, 'public');
+
+            // Create offer contract record
+            $token = Str::uuid()->toString();
+            $offerContract = ApplicantOfferContract::create([
+                'applicant_id' => $applicant_id,
+                'applicant_status_id' => $applicant_status_id,
+                'resort_id' => $resort_id,
+                'type' => 'offer_letter',
+                'file_path' => $filePath,
+                'status' => 'Sent',
+                'token' => $token,
+                'email_template_id' => $request->email_template_id,
+                'sent_by' => $this->resort->id,
+            ]);
+
+            // Update applicant status
+            ApplicantWiseStatus::updateOrCreate(
+                ['id' => $applicant_status_id],
+                ['status' => 'Offer Letter Sent', 'As_ApprovedBy' => 8]
+            );
+
+            // Send email
+            $resort = \App\Models\Resort::find($resort_id);
+            $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
+                ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
+                ->where('vacancies.id', $applicant->Parent_v_id)
+                ->selectRaw('t5.position_title, t6.name as department')
+                ->first();
+
+            $acceptUrl = route('resort.offer.letter.show', $token);
+            $dynamic_data = [
+                'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
+                'position_title' => $vacancy->position_title ?? '',
+                'department' => $vacancy->department ?? '',
+                'resort_name' => $resort->resort_name ?? '',
+                'accept_link' => $acceptUrl,
+                'reject_link' => $acceptUrl,
+                'offer_letter_link' => $acceptUrl,
+            ];
+
+            $result = Common::sendTemplateEmail("TalentAcquisition", $request->email_template_id, $applicant->email, $dynamic_data);
+            if ($result !== true) {
+                \Log::warning("Offer letter email failed: " . $result);
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Offer letter sent successfully!']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("sendOfferLetter error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to send offer letter.'], 500);
+        }
+    }
+
+    public function sendContract(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'applicant_id' => 'required',
+            'email_template_id' => 'required',
+            'contract_file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $applicant_id = base64_decode($request->applicant_id);
+        $applicant_status_id = base64_decode($request->applicant_status_id);
+
+        $applicant = Applicant_form_data::find($applicant_id);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            $file = $request->file('contract_file');
+            $filePath = $file->store('contracts/' . $resort_id, 'public');
+
+            $token = Str::uuid()->toString();
+            $contract = ApplicantOfferContract::create([
+                'applicant_id' => $applicant_id,
+                'applicant_status_id' => $applicant_status_id,
+                'resort_id' => $resort_id,
+                'type' => 'contract',
+                'file_path' => $filePath,
+                'status' => 'Sent',
+                'token' => $token,
+                'email_template_id' => $request->email_template_id,
+                'sent_by' => $this->resort->id,
+            ]);
+
+            ApplicantWiseStatus::updateOrCreate(
+                ['id' => $applicant_status_id],
+                ['status' => 'Contract Sent', 'As_ApprovedBy' => 8]
+            );
+
+            $resort = \App\Models\Resort::find($resort_id);
+            $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
+                ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
+                ->where('vacancies.id', $applicant->Parent_v_id)
+                ->selectRaw('t5.position_title, t6.name as department')
+                ->first();
+
+            $contractUrl = route('resort.contract.show', $token);
+            $dynamic_data = [
+                'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
+                'position_title' => $vacancy->position_title ?? '',
+                'department' => $vacancy->department ?? '',
+                'resort_name' => $resort->resort_name ?? '',
+                'accept_link' => $contractUrl,
+                'reject_link' => $contractUrl,
+                'contract_link' => $contractUrl,
+            ];
+
+            $result = Common::sendTemplateEmail("TalentAcquisition", $request->email_template_id, $applicant->email, $dynamic_data);
+            if ($result !== true) {
+                \Log::warning("Contract email failed: " . $result);
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Contract sent successfully!']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("sendContract error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to send contract.'], 500);
+        }
+    }
+
+    public function sendConsentRequest(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'applicant_id' => 'required',
+            'consent_expiry_date' => 'required|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $applicant_id = base64_decode($request->applicant_id);
+        $applicant = Applicant_form_data::find($applicant_id);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        $token = Str::uuid()->toString();
+        $applicant->update([
+            'consent_status' => 'pending',
+            'consent_expiry_date' => $request->consent_expiry_date,
+            'consent_token' => $token,
+        ]);
+
+        // Send consent email
+        $resort = \App\Models\Resort::find($this->resort->resort_id);
+        $consentUrl = route('resort.consent.show', $token);
+
+        $subject = "Data Retention Consent Request - " . ($resort->resort_name ?? '');
+        $body = "
+            <p>Dear " . ucfirst($applicant->first_name) . " " . ucfirst($applicant->last_name) . ",</p>
+            <p>We would like to retain your profile data in our talent pool until <strong>" . Carbon::parse($request->consent_expiry_date)->format('d M Y') . "</strong>.</p>
+            <p>Please review and submit your consent by clicking the link below:</p>
+            <p><a href='{$consentUrl}' style='display:inline-block;padding:12px 32px;background:#004552;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;'>Review Consent Request</a></p>
+            <p>Regards,<br>HR Team<br>" . ($resort->resort_name ?? '') . "</p>
+        ";
+
+        try {
+            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+        } catch (\Exception $e) {
+            \Log::warning("Consent email failed: " . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'message' => 'Consent request sent successfully!']);
+    }
+
+    public function checkAvailability(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'applicant_id' => 'required',
+            'email_template_id' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $applicant_id = base64_decode($request->applicant_id);
+        $applicant = Applicant_form_data::find($applicant_id);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        $resort = \App\Models\Resort::find($this->resort->resort_id);
+        $dynamic_data = [
+            'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
+            'resort_name' => $resort->resort_name ?? '',
+            'meeting_link' => $request->meeting_link ?? '',
+            'job_link' => $request->job_link ?? '',
+        ];
+
+        try {
+            $result = Common::sendTemplateEmail("TalentAcquisition", $request->email_template_id, $applicant->email, $dynamic_data);
+            if ($result !== true) {
+                \Log::warning("Check availability email failed: " . $result);
+            }
+        } catch (\Exception $e) {
+            \Log::warning("Check availability email exception: " . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'message' => 'Availability check email sent!']);
+    }
+
+    public function deleteTalentPoolApplicant(Request $request)
+    {
+        $applicant_id = base64_decode($request->applicant_id);
+        $applicant = Applicant_form_data::find($applicant_id);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        if ($applicant->resort_id != $this->resort->resort_id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+        }
+
+        DB::beginTransaction();
+        try {
+            ApplicantWiseStatus::where('Applicant_id', $applicant_id)->delete();
+            ApplicantInterViewDetails::where('Applicant_id', $applicant_id)->delete();
+            ApplicantOfferContract::where('applicant_id', $applicant_id)->delete();
+            $applicant->delete();
+
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Applicant deleted successfully!']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("Delete talent pool applicant error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to delete applicant.'], 500);
+        }
     }
 }

@@ -141,10 +141,40 @@ class ApplicantController extends Controller
 
             // Validation rules
             $validatedData = $request->validate([
+                'first_name' => 'required|string|max:100',
+                'last_name' => 'required|string|max:100',
+                'gender' => 'required',
+                'dob' => 'required|date_format:d/m/Y',
+                'country_phone_code' => 'required',
+                'mobile_number' => 'required|string|max:20',
+                'email' => 'required|email|max:150',
+                'marital_status' => 'required',
+                'number_of_children' => 'required|integer|min:0',
+                'address_line_one' => 'required|string|max:255',
+                'country' => 'required|integer|exists:countries,id',
+                'city' => 'required|string|max:100',
+                'pin_code' => 'required',
+                'passport_no' => 'required|string|max:50',
+                'passport_expiry_date' => 'required|date_format:d/m/Y',
+                'job_title' => 'required|array|min:1',
+                'job_title.*' => 'required|string|max:150',
+                'employer_name' => 'required|array|min:1',
+                'employer_name.*' => 'required|string|max:150',
+                'work_start_date' => 'required|array|min:1',
+                'work_start_date.*' => 'required|date_format:d/m/Y',
+                'job_description_work' => 'required|array|min:1',
+                'job_description_work.*' => 'required|string',
+                'institute_name' => 'required|array|min:1',
+                'institute_name.*' => 'required|string|max:150',
                 'terms_conditions' => 'required',
                 'select_months' => 'nullable|required_without:select_years|integer|between:1,12',
                 'select_years' => 'nullable|required_without:select_months|integer|between:1,5',
-                // Add other validation rules as needed
+                'curriculum_file' => 'required|file|max:5120',
+                'passport' => 'required|file|max:5120',
+                'profile_picture' => 'required|image|max:5120',
+                'full_length_photo' => 'required|image|max:5120',
+                'resort_id' => 'required|integer',
+                'vacancy_id' => 'required|integer',
             ]);
             $vacancy_id = $request->vacancy_id;
 
@@ -156,11 +186,11 @@ class ApplicantController extends Controller
             $applicant->Parent_v_id = $request->vacancy_id;
             $applicant->Application_date = now();
             $applicant->passport_no = $request->passport_no;
-            $applicant->passport_expiry_date = $request->passport_expiry_date;
+            $applicant->passport_expiry_date = $this->parseDate($request->passport_expiry_date);
             $applicant->first_name = $request->first_name;
             $applicant->last_name = $request->last_name;
             $applicant->gender = $request->gender;
-            $applicant->dob = $request->dob;
+            $applicant->dob = $this->parseDate($request->dob);
             $applicant->country_phone_code = $request->country_phone_code;
             $applicant->mobile_number = $request->mobile_number;
             $applicant->email = $request->email;
@@ -258,9 +288,9 @@ class ApplicantController extends Controller
                 $work_experience->work_country_name = $request->work_country_name[$key];
                 $work_experience->work_city = $request->work_city[$key];
                 $work_experience->total_work_exp = $request->total_experience[$key]; // Ensure parsing if needed
-                $work_experience->work_start_date = \Carbon\Carbon::parse($request->work_start_date[$key])->format('Y-m-d');
-                $work_experience->work_end_date = isset($request->work_end_date[$key])
-                    ? \Carbon\Carbon::parse($request->work_end_date[$key])->format('Y-m-d')
+                $work_experience->work_start_date = $this->parseDate($request->work_start_date[$key]);
+                $work_experience->work_end_date = isset($request->work_end_date[$key]) && $request->work_end_date[$key]
+                    ? $this->parseDate($request->work_end_date[$key])
                     : null;
                 $work_experience->job_description_work = $request->job_description_work[$key];
                 $work_experience->currently_working = $request->currently_working[$key] ?? 0;
@@ -288,6 +318,7 @@ class ApplicantController extends Controller
                 $education->educational_level = $request->educational_level[$key];
                 $education->country_educational = $request->country_educational[$key];
                 $education->city_educational = $request->city_educational[$key];
+                $education->pass_out_year = $request->pass_out_year[$key] ?? null;
                 $education->save();
             }
 
@@ -582,6 +613,29 @@ class ApplicantController extends Controller
     public function applicant_tempVideoremove(Request $request)
     {
     	$remove_data = Temp_language_video_store::find('1')->delete();
+    }
+
+    /**
+     * Parse date string from multiple possible formats to Y-m-d
+     */
+    private function parseDate($dateString)
+    {
+        if (!$dateString) return null;
+
+        $formats = ['d/m/Y', 'd-m-Y', 'Y-m-d', 'm/d/Y'];
+        foreach ($formats as $format) {
+            try {
+                return \Carbon\Carbon::createFromFormat($format, $dateString)->format('Y-m-d');
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+        // Last resort fallback
+        try {
+            return \Carbon\Carbon::parse($dateString)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
 }

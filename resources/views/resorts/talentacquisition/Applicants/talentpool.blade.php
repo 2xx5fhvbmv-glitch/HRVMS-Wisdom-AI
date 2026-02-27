@@ -97,35 +97,125 @@
 
         </div>
     </div>
-    @endsection
-    <div class="modal fade" id="Response-modal" tabindex="-1" aria-labelledby="exampleModalLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Reason </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id='RevertResponeForm'>
-                @csrf
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <input type="hidden" name="applicant_status_id" id="applicant_status_id">
-                        <textarea  class="form-control" readonly disabled id="Reason" name="Reason" placeholder="Reason">
 
-                        </textarea>
+    <div class="userApplicants-wrapper">
+    </div>
+
+    {{-- Rejection Reason Modal --}}
+    <div class="modal fade" id="Response-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rejection Reason</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id='RevertResponeForm'>
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <input type="hidden" name="applicant_status_id" id="applicant_status_id">
+                            <textarea class="form-control" readonly disabled id="Reason" name="Reason" placeholder="Reason"></textarea>
+                        </div>
+                        <input type="hidden" name="Interview_id" id="Interview_id">
                     </div>
-                    <div style="height:180px;"></div>
-                    <input type="hidden" name="Interview_id" id="Interview_id">
-                </div>
-                <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue RevertBack d-none">Revert Back</button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-themeBlue RevertBack d-none">Revert Back</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
+
+    {{-- Consent Request Modal --}}
+    <div class="modal fade" id="consentRequest-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Consent Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="consentRequestForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Data Retention Expiry Date</label>
+                            <input type="date" class="form-control" name="consent_expiry_date" required min="{{ date('Y-m-d') }}">
+                        </div>
+                        <p class="text-muted small">An email will be sent to the applicant requesting their consent to retain their profile data until the selected date.</p>
+                        <input type="hidden" name="applicant_id" id="consent_applicant_id">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-themeBlue">Send Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Check Availability Modal --}}
+    <div class="modal fade" id="checkAvailability-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Check Availability</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="checkAvailabilityForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Select Email Template</label>
+                            <select class="form-control" name="email_template_id" required>
+                                <option selected disabled value="">Select Email Template</option>
+                                @if(isset($EmailTamplete))
+                                @foreach ($EmailTamplete as $e)
+                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
+                                @endforeach
+                                @endif
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Meeting Link (Optional)</label>
+                            <input type="text" class="form-control" name="meeting_link" placeholder="Enter Meeting Link">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Job Link (Optional)</label>
+                            <input type="text" class="form-control" name="job_link" placeholder="Enter Job Posting Link">
+                        </div>
+                        <input type="hidden" name="applicant_id" id="availability_applicant_id">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-themeBlue">Send Email</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- File Viewer Modal --}}
+    <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Download File</h5>
+                    <a href="" class="btn btn-sm btn-primary downloadLink" target="_blank">Download</a>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="ratio ratio-21x9" id="ViewModeOfFiles"></div>
+                </div>
+                <div class="modal-footer">
+                    <a href="javascript:void(0)" id="document-dismiss" class="btn btn-themeGray ms-auto">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@endsection
+
 @section('import-css')
 @endsection
 
@@ -501,6 +591,189 @@
                                 }
                         });
     }
+
+    // Sidebar - View Profile
+    const $userApplicantsWrapper = $(".userApplicants-wrapper");
+    $(document).on("click", ".userApplicants-btn", function (e) {
+        e.stopPropagation();
+        let id = $(this).data("id");
+        let url = "{{ route('resort.ta.TaUserApplicantsSideBar', ':id') }}";
+        url = url.replace(':id', id);
+        $.ajax({
+            url: url,
+            type: "GET",
+            success: function(response) {
+                if (response.success) {
+                    $(".userApplicants-wrapper").html(response.view);
+                }
+            },
+            error: function() {
+                toastr.error('Something went wrong.', { positionClass: 'toast-bottom-right' });
+            }
+        });
+        $userApplicantsWrapper.toggleClass("end-0");
+    });
+
+    $(document).on("click", ".closeSlider", function (e) {
+        e.preventDefault();
+        $userApplicantsWrapper.toggleClass("end-0");
+    });
+
+    $(document).on("click", "#document-dismiss", function () {
+        $("#bdVisa-iframeModel-modal-lg").modal('hide');
+        $("#ViewModeOfFiles").empty();
+        $(".downloadLink").attr("href", "");
+        $(".userApplicants-wrapper").addClass("end-0");
+    });
+
+    // Download File in sidebar
+    $(document).on("click", ".DownloadFile", function () {
+        let fileId = $(this).data("id");
+        let fileFlag = $(this).data("flag");
+        $.ajax({
+            url: "{{ route('resort.ta.DownloadFile') }}",
+            type: "POST",
+            data: { id: fileId, flag: fileFlag },
+            success: function(response) {
+                if (response.success) {
+                    $("#ViewModeOfFiles").html('<div class="text-center"><p>Loading...</p></div>');
+                    $("#bdVisa-iframeModel-modal-lg").modal('show');
+                    let fileUrl = response.NewURLshow;
+                    $(".downloadLink").attr("href", fileUrl);
+                    let mimeType = response.mimeType.toLowerCase();
+                    let imageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                    let iframeTypes = ['video/mp4', 'application/pdf', 'text/plain'];
+                    if (imageTypes.includes(mimeType)) {
+                        $("#ViewModeOfFiles").html('<img src="'+fileUrl+'" class="popupimgFileModule" alt="Preview">');
+                    } else if (iframeTypes.includes(mimeType)) {
+                        $("#ViewModeOfFiles").html('<iframe style="width:100%;height:100%;" src="'+fileUrl+'" allowfullscreen></iframe>');
+                    } else {
+                        $("#bdVisa-iframeModel-modal-lg").modal('hide');
+                        window.location.href = fileUrl;
+                    }
+                }
+            }
+        });
+    });
+
+    // Download All Files
+    $(document).on("click", ".DownloadAllFiles", function () {
+        let fileId = $(this).data("id");
+        let btn = $(this);
+        btn.prop('disabled', true).text('Downloading...');
+        $.ajax({
+            url: "{{ route('resort.ta.DownloadAllFiles') }}",
+            type: "POST",
+            data: { id: fileId },
+            success: function(response) {
+                btn.prop('disabled', false).text('Download All');
+                if (response.success) {
+                    response.files.forEach(function(file, index) {
+                        setTimeout(function() {
+                            let a = document.createElement('a');
+                            a.href = file.url;
+                            a.download = file.name;
+                            a.target = '_blank';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                        }, index * 500);
+                    });
+                } else {
+                    toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function() {
+                btn.prop('disabled', false).text('Download All');
+                toastr.error("Something went wrong!", "Error", { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    // View/Hide Comments
+    $(document).on("click", ".userAppInt-vCommBtn", function () {
+        $(this).addClass("d-none").removeClass("d-block").siblings(".userAppInt-hCommBtn").addClass("d-block").removeClass("d-none");
+        $(this).closest("tr").find(".userAppInt-commBlock").addClass("d-block");
+    });
+    $(document).on("click", ".userAppInt-hCommBtn", function () {
+        $(this).addClass("d-none").removeClass("d-block").siblings(".userAppInt-vCommBtn").addClass("d-block").removeClass("d-none");
+        $(this).closest("tr").find(".userAppInt-commBlock").removeClass("d-block");
+    });
+
+    // Send Consent Request - open modal
+    $(document).on("click", ".sendConsentRequestBtn", function() {
+        var applicantId = $(this).data("id");
+        $("#consent_applicant_id").val(applicantId);
+        $("#consentRequest-modal").modal("show");
+    });
+
+    // Send Consent Request - submit
+    $('#consentRequestForm').on('submit', function(e) {
+        e.preventDefault();
+        var $submitBtn = $(this).find('button[type="submit"]');
+        $submitBtn.prop('disabled', true).text('Sending...');
+
+        $.ajax({
+            url: "{{ route('resort.ta.sendConsentRequest') }}",
+            type: "POST",
+            data: $(this).serialize(),
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    $("#consentRequest-modal").modal("hide");
+                    $('#consentRequestForm')[0].reset();
+                    DatatableList();
+                } else {
+                    toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function(xhr) {
+                var msg = 'Something went wrong.';
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+            },
+            complete: function() {
+                $submitBtn.prop('disabled', false).text('Send Request');
+            }
+        });
+    });
+
+    // Check Availability - open modal
+    $(document).on("click", ".checkAvailabilityBtn", function() {
+        var applicantId = $(this).data("id");
+        $("#availability_applicant_id").val(applicantId);
+        $("#checkAvailability-modal").modal("show");
+    });
+
+    // Check Availability - submit
+    $('#checkAvailabilityForm').on('submit', function(e) {
+        e.preventDefault();
+        var $submitBtn = $(this).find('button[type="submit"]');
+        $submitBtn.prop('disabled', true).text('Sending...');
+
+        $.ajax({
+            url: "{{ route('resort.ta.checkAvailability') }}",
+            type: "POST",
+            data: $(this).serialize(),
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    $("#checkAvailability-modal").modal("hide");
+                    $('#checkAvailabilityForm')[0].reset();
+                } else {
+                    toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function(xhr) {
+                var msg = 'Something went wrong.';
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+            },
+            complete: function() {
+                $submitBtn.prop('disabled', false).text('Send Email');
+            }
+        });
+    });
 
 </script>
 @endsection

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"TaEmailTemplate\" /Users/ankittisawer/Desktop/HRVMS-Wisdom-AI/app/Models/*.php)",
+      "Bash(grep -n \"create_application_link\" /Users/ankittisawer/Desktop/HRVMS-Wisdom-AI/database/migrations/*.php)",
+      "Bash(find \"/Users/ankittisawer/Desktop/HRVMS-Wisdom-AI/database/migrations\" -name \"*interview*\" -exec grep -l \"interviewer\\\\|Interviewer\" {} ;)"
+    ]
+  }
+}

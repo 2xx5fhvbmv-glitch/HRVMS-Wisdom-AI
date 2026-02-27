@@ -97,7 +97,9 @@ return [
 
 	'levels' => [
 		'Beginner',
+		'Intermediate',
 		'Advanced',
+		'Native',
 	],
 
    'countries' => [

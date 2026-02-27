@@ -427,8 +427,8 @@ $(document).ready(function() {
                         }
                 },
                 columns: [
-                    { data: 'Department', name: 'Department', className: 'text-nowrap' },
                     { data: 'Position', name: 'Position', className: 'text-nowrap' },
+                    { data: 'Department', name: 'Department', className: 'text-nowrap' },
                     {data:'NoOfVacnacy',name:'EmployeeType',className:'text-nowrap'},
                     { data: 'NoOfApplication', name: 'Question', className: 'text-nowrap' },
                     { data: 'ApplicationDate', name: 'action', className: 'text-nowrap'},
