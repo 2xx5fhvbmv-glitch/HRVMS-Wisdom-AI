@@ -15,7 +15,7 @@ class Education_applicant_form extends Model
 
     protected $fillable = [
         'applicant_form_id','institute_name','educational_level',
-        'country_educational','city_educational'
+        'country_educational','city_educational','pass_out_year'
     ];
 
 }

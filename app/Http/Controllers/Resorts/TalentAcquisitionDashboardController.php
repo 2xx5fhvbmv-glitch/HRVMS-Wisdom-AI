@@ -193,23 +193,41 @@ class TalentAcquisitionDashboardController extends Controller
                     $effectiveRank = 3;
                 }
             }
+            // Determine if user can see all departments or only their own
+            $employee = $this->globalUser->GetEmployee ?? null;
+            $userDeptId = $employee ? $employee->Dept_id : null;
+            $userDeptName = $userDeptId ? ResortDepartment::where('id', $userDeptId)->value('name') : '';
+            $isHrUser = stripos($userDeptName ?? '', 'Human Resources') !== false;
+            $isGM = (int)$rank === 8;
+            $canSeeAllDepts = $isHrUser || $isGM;
+
             $Vacancies = Common::GetTheFreshVacancies($resort_id,"Active",$effectiveRank);
             $resort_id_decode =  base64_encode($resort_id);
             $applicant_link = route('resort.applicantForm',$resort_id_decode);
             $applicationUrlshow = substr($applicant_link, 0, 30).'...';
             $TodoData = Common::GmApprovedVacancy($resort_id,$effectiveRank);
-            
+
             $NewVacancies = Vacancies::join("resort_departments as t1", "t1.id", "=", "vacancies.department")
                             ->join("resort_positions as t2", "t2.id", "=", "vacancies.position")
                             ->join("t_anotification_parents as t3", "t3.V_id", "=", "vacancies.id")
                             ->join("t_anotification_children as t4", "t4.Parent_ta_id", "=", "t3.id")
                             ->join("application_links as t5", "t5.ta_child_id", "=", "t4.id")
                             ->leftJoin("applicant_form_data as t6", "t6.Parent_v_id", "=", "vacancies.id")
+                            ->leftJoin("applicant_wise_statuses as t8", function($join) {
+                                $join->on("t8.Applicant_id", "=", "t6.id")
+                                    ->whereRaw("t8.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = t6.id)");
+                            })
                             ->join('job_advertisements as t7', 't7.Resort_id', '=', 'vacancies.Resort_id')
                             ->where("vacancies.resort_id", $resort_id)
                             ->where("t4.status", "ForwardedToNext")
-                            ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
-                            ->selectRaw("
+                            ->where("t4.Approved_By", Common::TaFinalApproval($resort_id));
+
+            // Filter by department for non-HR/non-GM users
+            if (!$canSeeAllDepts && $userDeptId) {
+                $NewVacancies->where("vacancies.department", $userDeptId);
+            }
+
+            $NewVacancies = $NewVacancies->selectRaw("
                                 vacancies.id AS vacancy_id,
                                 vacancies.position,
                                 t2.position_title AS positionTitle,
@@ -217,9 +235,9 @@ class TalentAcquisitionDashboardController extends Controller
                                 t2.code AS PositionCode,
                                 t1.name AS Department,
                                 t1.code AS DepartmentCode,
-                                COUNT(t6.id) AS NoOfApplication, -- Total applications per vacancy
-                                MAX(t5.link_Expiry_date) AS LinkExpiryDate, -- Latest link expiry date
-                                MAX(t6.Application_date) AS LatestApplicationDate, -- Latest application date
+                                COUNT(DISTINCT CASE WHEN t8.status IN ('Sortlisted By Wisdom AI', 'Sortlisted', 'Round', 'Selected', 'Complete', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected') THEN t6.id END) AS NoOfApplication,
+                                MAX(t5.link_Expiry_date) AS LinkExpiryDate,
+                                MAX(t6.Application_date) AS LatestApplicationDate,
                                 vacancies.Total_position_required as NoOfVacnacy,
                                 t7.Jobadvimg
                             ")
@@ -247,17 +265,27 @@ class TalentAcquisitionDashboardController extends Controller
                                 $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
                                 $v->ApplicationId= $v->application_id;
                             }
-            $talentPool  = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
-                            ->whereIn("t1.status", ["Rejected","Rejected By Wisdom AI"])
-                            ->latest('t1.created_at')
+            $talentPoolQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
+                            ->join('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
+                            ->whereIn("t1.status", ["Rejected","Rejected By Wisdom AI"]);
+            if (!$canSeeAllDepts && $userDeptId) {
+                $talentPoolQuery->where('v.department', $userDeptId);
+            }
+            $talentPool = $talentPoolQuery->latest('t1.created_at')
                             ->take('10')
-                            ->get(['applicant_form_data.id','email','passport_photo','first_name','last_name','Comments']);
+                            ->get(['applicant_form_data.id','applicant_form_data.email','applicant_form_data.passport_photo','applicant_form_data.first_name','applicant_form_data.last_name','t1.Comments']);
+
             $currentMonthStart = Carbon::now()->startOfMonth();
             $currentMonthEnd = Carbon::now()->endOfMonth();
-            $TotalApplicants = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
+
+            $totalApplicantsQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
+                        ->join('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
                         ->where('t1.status', "!=",'Selected')
-                        ->where('applicant_form_data.resort_id', $resort_id)
-                        ->select(DB::raw('COUNT(DISTINCT t1.Applicant_id) as total_applicants') )
+                        ->where('applicant_form_data.resort_id', $resort_id);
+            if (!$canSeeAllDepts && $userDeptId) {
+                $totalApplicantsQuery->where('v.department', $userDeptId);
+            }
+            $TotalApplicants = $totalApplicantsQuery->select(DB::raw('COUNT(DISTINCT t1.Applicant_id) as total_applicants'))
                         ->groupBy('t1.Applicant_id')
                         ->distinct()
                         ->get();
@@ -267,24 +295,42 @@ class TalentAcquisitionDashboardController extends Controller
             } else {
                 $TotalApplicants = 0;
             }
-            $Interviews = ApplicantInterViewDetails::where('resort_id', $resort_id)->count();
-            $Hired = DB::table('applicant_wise_statuses as t1')
+
+            $interviewsQuery = DB::table('applicant_inter_view_details as aid')
+                ->join('applicant_form_data as afd', 'afd.id', '=', 'aid.Applicant_id')
+                ->join('vacancies as v', 'v.id', '=', 'afd.Parent_v_id')
+                ->where('aid.resort_id', $resort_id);
+            if (!$canSeeAllDepts && $userDeptId) {
+                $interviewsQuery->where('v.department', $userDeptId);
+            }
+            $Interviews = $interviewsQuery->count();
+
+            $hiredQuery = DB::table('applicant_wise_statuses as t1')
                     ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
-                    ->where('t2.resort_id', $resort_id) // Reference resort_id from applicant_form_data
+                    ->join('vacancies as v', 'v.id', '=', 't2.Parent_v_id')
+                    ->where('t2.resort_id', $resort_id)
                     ->where("t1.As_ApprovedBy",8)
-                    ->where("t1.status","Selected")
-                    ->groupBy('t1.Applicant_id')
+                    ->where("t1.status","Selected");
+            if (!$canSeeAllDepts && $userDeptId) {
+                $hiredQuery->where('v.department', $userDeptId);
+            }
+            $Hired = $hiredQuery->groupBy('t1.Applicant_id')
                     ->get()
                     ->count();
 
-            $Resort_Position =  ResortPosition::where('Resort_id', $resort_id)->get();
+            $Resort_Position = $canSeeAllDepts
+                ? ResortPosition::where('Resort_id', $resort_id)->get()
+                : ($userDeptId ? ResortPosition::where('dept_id', $userDeptId)->get() : collect());
 
             // Top Countries - applicants grouped by country
-            $topCountries = DB::table('applicant_form_data')
+            $topCountriesQuery = DB::table('applicant_form_data')
                 ->join('countries', 'countries.id', '=', 'applicant_form_data.country')
                 ->join('vacancies', 'vacancies.id', '=', 'applicant_form_data.Parent_v_id')
-                ->where('vacancies.Resort_id', $resort_id)
-                ->selectRaw('countries.name as country, countries.flag_url, COUNT(applicant_form_data.id) as total_count')
+                ->where('vacancies.Resort_id', $resort_id);
+            if (!$canSeeAllDepts && $userDeptId) {
+                $topCountriesQuery->where('vacancies.department', $userDeptId);
+            }
+            $topCountries = $topCountriesQuery->selectRaw('countries.name as country, countries.flag_url, COUNT(applicant_form_data.id) as total_count')
                 ->groupBy('countries.name', 'countries.flag_url')
                 ->orderByDesc('total_count')
                 ->limit(10)

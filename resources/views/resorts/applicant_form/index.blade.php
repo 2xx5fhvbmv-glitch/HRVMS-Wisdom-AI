@@ -349,6 +349,10 @@
                                     <input type="text" name="city_educational[]" id="select-city1" class="form-control alpha-only" placeholder="City" data-parsley-required="true" data-parsley-trigger="change" data-parsley-validate-script
                                     data-parsley-validate-script-message="Script tags are not allowed."/>
                                 </div>
+                                <div class="col-md-6 ">
+                                    <label for="txt-pass-out-year" class="form-label">PASS OUT YEAR<span class="red-mark">*</span></label>
+                                    <input type="number" name="pass_out_year[]" class="form-control" id="txt-pass-out-year" placeholder="e.g. 2020" min="1950" max="2099" required>
+                                </div>
                             </div>
                         </div>
                         <hr class="hr-footer">
@@ -510,8 +514,8 @@
                                     data-parsley-validate-script-message="Script tags are not allowed." required>
                                 </div>
                                 <div class="col-md-6 ">
-                                    <label for="txt-reference" class="form-label">REFERENCE<span class="red-mark">*</span></label>
-                                    <input type="text" name="reference" class="form-control" id="txt-reference" placeholder="Reference" required data-parsley-validate-script
+                                    <label for="txt-reference" class="form-label">REFERENCE</label>
+                                    <input type="text" name="reference" class="form-control" id="txt-reference" placeholder="Reference" data-parsley-validate-script
                                     data-parsley-validate-script-message="Script tags are not allowed.">
                                 </div>
                                 <div class="col-md-6 ">
@@ -519,8 +523,11 @@
                                     <input type="number" min="0" name="notice_period" class="form-control" id="notice_period" placeholder="Notice Periods (In Days)" required>
                                 </div>
                                 <div class="col-md-6 ">
-                                    <label for="expected_salary" class="form-label">Salary Expectation<span class="red-mark">*</span></label>
-                                    <input type="text" min="0" name="expected_salary" class="form-control" id="expected_salary" placeholder="Salary Expectation" required>
+                                    <label for="expected_salary" class="form-label">Salary Expectation ($)<span class="red-mark">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="text" min="0" name="expected_salary" class="form-control" id="expected_salary" placeholder="Salary Expectation" required>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -691,8 +698,10 @@
             errorClass: 'is-invalid'
         });
 
-        $('.datepicker').datepicker({format: 'dd/mm/yyyy', autoclose: true}).on('changeDate', function () {
-            // Trigger Parsley validation when the date changes
+        $('.datepicker').not('.txt-start-date, .txt-end-date').datepicker({format: 'dd/mm/yyyy', autoclose: true}).on('changeDate', function () {
+            $(this).parsley().validate();
+        });
+        $('.txt-start-date, .txt-end-date').datepicker({format: 'dd/mm/yyyy', autoclose: true, endDate: 'today'}).on('changeDate', function () {
             $(this).parsley().validate();
         });
 
@@ -884,15 +893,24 @@
             $('#passport_expiry_date').datepicker({
                 format: 'dd/mm/yyyy',
                 autoclose: true,
+                startDate: 'today',
             }).on('changeDate', function() {
                 $(this).parsley().validate();
             });
 
-            $('.datepicker').datepicker({
+            $('.datepicker').not('#txt-bod, #passport_expiry_date, .txt-start-date, .txt-end-date').datepicker({
                 format: 'dd/mm/yyyy',
                 autoclose: true
             }).on('changeDate', function () {
-                $(this).parsley().validate(); // Trigger validation on date change
+                $(this).parsley().validate();
+            });
+
+            $('.txt-start-date, .txt-end-date').datepicker({
+                format: 'dd/mm/yyyy',
+                autoclose: true,
+                endDate: 'today'
+            }).on('changeDate', function () {
+                $(this).parsley().validate();
             });
         }
     }
@@ -1176,6 +1194,10 @@
                     <label for="select-city-${uniqueId}" class="form-label">CITY<span class="red-mark">*</span></label>
                     <input type="text" name="city_educational[]" id="select-city-${uniqueId}" class="form-control alpha-only" placeholder="City" data-parsley-required="true" data-parsley-trigger="change" data-parsley-validate-script
                     data-parsley-validate-script-message="Script tags are not allowed."/>
+                </div>
+                <div class="col-md-6">
+                    <label for="txt-pass-out-year-${uniqueId}" class="form-label">PASS OUT YEAR<span class="red-mark">*</span></label>
+                    <input type="number" name="pass_out_year[]" class="form-control" id="txt-pass-out-year-${uniqueId}" placeholder="e.g. 2020" min="1950" max="2099" required>
                 </div>
                 <div class="col-12 text-end">
                     <button type="button" class="btn btn-danger btn-sm mt-2 removeRowEducation" data-row-id="${uniqueId}">Remove</button>
@@ -1875,14 +1897,21 @@
                         },
                         success: function(response) {
                             console.log(response);
-                            // Handle successful submission
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                            // Redirect after short delay so user can see success message
-                            setTimeout(function() {
-                                window.location.reload();
-                            }, 2000);
+                            if(response.success) {
+                                // Show thank you message
+                                $('body').html(`
+                                    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f4f8;font-family:'Segoe UI',sans-serif;">
+                                        <div style="max-width:550px;text-align:center;background:#fff;border-radius:16px;padding:50px 40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+                                            <div style="width:80px;height:80px;background:#d1e7dd;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;">
+                                                <svg width="40" height="40" fill="#198754" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                                            </div>
+                                            <h2 style="color:#004552;font-size:26px;font-weight:700;margin:0 0 12px;">Thank You!</h2>
+                                            <p style="color:#555;font-size:16px;line-height:1.6;margin:0 0 8px;">Your application has been submitted successfully.</p>
+                                            <p style="color:#777;font-size:14px;line-height:1.6;margin:0;">We will review your application and get back to you shortly. Please check your email for further updates.</p>
+                                        </div>
+                                    </div>
+                                `);
+                            }
                         },
                         error: function(xhr) {
                             // Handle submission errors
@@ -1897,7 +1926,7 @@
                             }
 
                             // Show error alert
-                            toastr.success(errorMessage, "Error", {
+                            toastr.error(errorMessage, "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
 

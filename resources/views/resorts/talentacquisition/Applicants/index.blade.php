@@ -25,10 +25,10 @@
                         <a href="{{route('resort.ta.UpcomingApplicants')}}" class="btn btn-themeLightNew">Upcoming Interviews</a>
                     </div>
                     <div class="col-auto">
-                        <a href="#" class="btn btn-themeLightNew">Rejected Applications</a>
+                        <a href="{{ route('resort.ta.RejectedApplicants') }}" class="btn btn-themeLightNew">Rejected Applications</a>
                     </div>
                     <div class="col-auto">
-                        <a href="#" class="btn btn-themeLightNew">Review Reminders</a>
+                        <a href="{{ route('resort.ta.ReviewReminders') }}" class="btn btn-themeLightNew">Review Reminders</a>
                     </div>
                 </div>
             </div>
@@ -60,6 +60,7 @@
                                     <th>Contact</th>
                                     <th>Applied Date<i class="fa-solid fa-caret-down"></i></th>
                                     <th>Stage<i class="fa-solid fa-caret-down"></i></th>
+                                    <th>Invitation Status</th>
                                     <th></th>
                                     <th>Action</th>
                                 </tr>
@@ -204,6 +205,10 @@
                 <form id="TimeSlotsForm">
                     @csrf
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Meeting Link</label>
+                            <input type="text" class="form-control" name="MeetingLink" placeholder="Enter Meeting Link (Google Meet, Zoom, etc.)">
+                        </div>
                         <label class="form-label mb-sm-4 mb-3">SELECT TIME SLOTS</label>
                         <div class="sendRequestTime-main">
                         </div>
@@ -333,6 +338,173 @@
             </div>
         </div>
     </div>
+
+    {{-- Rejection Confirmation Modal --}}
+    <div class="modal fade" id="rejectCandidate-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reject Candidate</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="rejectCandidateForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                            Are you sure you want to reject this candidate?
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Select Email Template</label>
+                            <select class="form-control" name="emailTemplateID" required>
+                                <option selected disabled value="">Select Email Template</option>
+                                @if(isset($EmailTamplete))
+                                @foreach ($EmailTamplete as $e)
+                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
+                                @endforeach
+                                @endif
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Rejection Reason (Optional)</label>
+                            <textarea class="form-control" name="rejectionReason" rows="3" placeholder="Enter reason for rejection..."></textarea>
+                        </div>
+                        <input type="hidden" name="ApplicantID" id="reject_ApplicantID">
+                        <input type="hidden" name="applicantstatusid" id="reject_applicantstatusid">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-danger">Confirm Reject</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Selection Confirmation Modal --}}
+    <div class="modal fade" id="selectCandidate-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select Candidate</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="selectCandidateForm">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="alert alert-success">
+                            <i class="fa-solid fa-circle-check me-2"></i>
+                            Are you sure you want to select this candidate?
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Select Email Template</label>
+                            <select class="form-control" name="emailTemplateID" required>
+                                <option selected disabled value="">Select Email Template</option>
+                                @if(isset($EmailTamplete))
+                                @foreach ($EmailTamplete as $e)
+                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
+                                @endforeach
+                                @endif
+                            </select>
+                        </div>
+                        <input type="hidden" name="ApplicantID" id="select_ApplicantID">
+                        <input type="hidden" name="applicantstatusid" id="select_applicantstatusid">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-success">Confirm Select</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Offer Letter Modal --}}
+    <div class="modal fade" id="offerLetter-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Offer Letter</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="offerLetterForm" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Select Email Template</label>
+                            <select class="form-control" name="email_template_id" required>
+                                <option selected disabled value="">Select Email Template</option>
+                                @if(isset($EmailTamplete))
+                                @foreach ($EmailTamplete as $e)
+                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
+                                @endforeach
+                                @endif
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Upload Offer Letter (PDF)</label>
+                            <input type="file" class="form-control" name="offer_letter" accept=".pdf" required>
+                        </div>
+                        <div class="mb-3 d-none" id="viewOfferLetterWrapper">
+                            <a href="#" target="_blank" id="viewOfferLetterLink" class="btn btn-sm btn-outline-primary">
+                                <i class="fa-solid fa-eye me-1"></i>View Offer Letter
+                            </a>
+                        </div>
+                        <input type="hidden" name="applicant_id" id="offerLetter_ApplicantID">
+                        <input type="hidden" name="applicant_status_id" id="offerLetter_applicantstatusid">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-themeBlue">Send Offer Letter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Contract Modal --}}
+    <div class="modal fade" id="contract-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Send Contract</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="contractForm" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Select Email Template</label>
+                            <select class="form-control" name="email_template_id" required>
+                                <option selected disabled value="">Select Email Template</option>
+                                @if(isset($EmailTamplete))
+                                @foreach ($EmailTamplete as $e)
+                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
+                                @endforeach
+                                @endif
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Upload Contract (PDF)</label>
+                            <input type="file" class="form-control" name="contract_file" accept=".pdf" required>
+                        </div>
+                        <div class="mb-3 d-none" id="viewContractWrapper">
+                            <a href="#" target="_blank" id="viewContractLink" class="btn btn-sm btn-outline-primary">
+                                <i class="fa-solid fa-eye me-1"></i>View Contract
+                            </a>
+                        </div>
+                        <input type="hidden" name="applicant_id" id="contract_ApplicantID">
+                        <input type="hidden" name="applicant_status_id" id="contract_applicantstatusid">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-themeBlue">Send Contract</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 @endsection
 
 @section('import-css')
@@ -345,7 +517,7 @@
 .modal.show ~ .modal.show {
     z-index: 1062;
 }
-</style>    
+</style>
 @endsection
 
 @section('import-scripts')
@@ -390,17 +562,21 @@
                                     if (response.success)
                                     {
                                         let newTag = 'send Link';
-                                        if(response.data.InterviewStatus == 'Slot Not Booked')
+                                        if(response.data.InterviewStatus == 'Slot Not Booked' || response.data.InterviewStatus == 'Invitation Rejected')
                                         {
                                             newTag =`<a href="javascript:void(0)"
                                                 data-Resort_id="${response.data.Resort_id}"
                                                 data-ApplicantID="${response.data.ApplicantID}"
                                                 data-ApplicantStatus_id="${response.data.ApplicantStatus_id}"
-                                                class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Request</a>`;
+                                                class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                        }
+                                        else if(response.data.InterviewStatus == "Invitation Sent")
+                                        {
+                                            newTag =`<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                         }
                                         else if(response.data.InterviewStatus =="Slot Booked" && !isNaN(response.data.MeetingLink) )
                                         {
-                                       
+
                                             newTag =`<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
                                             data-round="${response.data.round}"
                                                 data-rank_name="${response.data.rank_name}"
@@ -439,7 +615,7 @@
                                                             <td><select class="form-control EmailTemplate" name='EmailTemplate'>
                                                                 <option selected disabled>Select Email Template </option>
                                                                     @foreach ($EmailTamplete as $e)
-                                                                        <option value="{{ $e->id}}">{{ $e->TempleteName }}</option>
+                                                                        <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                     @endforeach
                                                                     </select>
                                                             </td>
@@ -521,12 +697,15 @@
                                 if (response.success) {
                                     console.log(response);
                                     let newTag = 'send Link';
-                                    if(response.data.InterviewStatus == 'Slot Not Booked') {
+                                    if(response.data.InterviewStatus == 'Slot Not Booked' || response.data.InterviewStatus == 'Invitation Rejected') {
                                         newTag =`<a href="javascript:void(0)"
                                             data-Resort_id="${response.data.Resort_id}"
                                             data-ApplicantID="${response.data.ApplicantID}"
                                             data-ApplicantStatus_id="${response.data.ApplicantStatus_id}"
                                             class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Request</a>`;
+                                    }
+                                    else if(response.data.InterviewStatus == "Invitation Sent") {
+                                        newTag =`<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                     }
                                     else if(response.data.InterviewStatus =="Slot Booked" && !isNaN(response.data.MeetingLink)) {
                                         newTag =`<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
@@ -867,75 +1046,60 @@
                 }
             });
         }
-        $(document).on("focus", '[name^="MalidivanManualTime"], [name^="ApplicantManualTime"]', function () {
-            $(".row_time").removeClass("active").find("input").prop("disabled", false);
-            $('[name^="ApplicantInterviewtime"]').val('');
-            $('[name^="ResortInterviewtime"]').val('');
+        // Multi-select time slots - click on row for Safari compatibility
+        $(document).on("click", ".row_time:not(.disable)", function(e) {
+            if ($(e.target).is('input[type="hidden"]')) return;
+
+            var $row = $(this);
+            var $checkbox = $row.find(".Timezone_checkBox");
+
+            // Toggle this row
+            $row.toggleClass("active");
+            $checkbox.prop("checked", $row.hasClass("active"));
+
+            // Clear manual time fields when selecting slots
+            $('[name="MalidivanManualTime"]').val('');
+            $('[name="ApplicantManualTime"]').val('');
+            $('[name="MalidivanManualTime1"]').val('');
+            $('[name="ApplicantManualTime1"]').val('');
+
+            // Collect all selected slot times
+            var resortTimes = [];
+            var applicantTimes = [];
+            $(".row_time.active .Timezone_checkBox").each(function() {
+                resortTimes.push($(this).data('resortinterviewtime'));
+                applicantTimes.push($(this).data('applicantinterviewtime'));
+            });
+            $("#ResortInterviewtime_collected").val(resortTimes.join(', '));
+            $("#ApplicantInterviewtime_collected").val(applicantTimes.join(', '));
         });
+
+        // Clear selected slots when manual time is focused
+        $(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTime"]', function () {
+            $(".row_time").removeClass("active");
+            $(".row_time .Timezone_checkBox").prop("checked", false);
+            $("#ResortInterviewtime_collected").val('');
+            $("#ApplicantInterviewtime_collected").val('');
+        });
+
         $(document).on("change", '[name="MalidivanManualTime"]', function () {
-            const timeValue = $(this).val(); // Get the value of the time input
+            const timeValue = $(this).val();
             if (timeValue) {
-                const [hours, minutes] = timeValue.split(":"); // Split the time into hours and minutes
-                const period = hours >= 12 ? "PM" : "AM"; // Determine AM or PM
-                const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+                const [hours, minutes] = timeValue.split(":");
+                const period = hours >= 12 ? "PM" : "AM";
+                const formattedHours = hours % 12 || 12;
                 let MalidivanManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1); // Display in console
-            } else {
-                console.log("No time selected");
+                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1);
             }
         });
         $(document).on("change", '[name="ApplicantManualTime"]', function () {
-            const timeValue = $(this).val(); // Get the value of the time input
+            const timeValue = $(this).val();
             if (timeValue) {
-                const [hours, minutes] = timeValue.split(":"); // Split the time into hours and minutes
-                const period = hours >= 12 ? "PM" : "AM"; // Determine AM or PM
-                const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+                const [hours, minutes] = timeValue.split(":");
+                const period = hours >= 12 ? "PM" : "AM";
+                const formattedHours = hours % 12 || 12;
                 let ApplicantManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1); // Display in console
-            } else {
-                console.log("No time selected");
-            }
-        });
-
-        $(document).on("click", ".Timezone_checkBox", function () {
-            const $checkbox = $(this);
-            const $row = $checkbox.closest(".row_time");
-            const location = $checkbox.data("id");
-
-            // If this row is already active, unselect everything
-            if ($row.hasClass("active")) {
-                // Unselect this row
-                $row.removeClass("active");
-                $checkbox.prop("checked", false); // Optional: uncheck
-                $(".row_time").find("input").prop("disabled", false); // Enable all checkboxes
-                $('[name^="ApplicantInterviewtime"]').val('');
-                $('[name^="ResortInterviewtime"]').val('');
-                $('[name^="ManualTime"]').val('');
-            } else {
-                // Deactivate all rows
-                $(".row_time").removeClass("active");
-                $(".row_time input").prop("disabled", false);
-
-                // Activate the selected row
-                $row.addClass("active");
-                $(".row_time").not($row).find("input").prop("disabled", true);
-
-                // Clear all inputs
-                $('[name^="ApplicantInterviewtime"]').val('');
-                $('[name^="ResortInterviewtime"]').val('');
-                $('[name^="ManualTime"]').val('');
-
-                // Set new values
-                const ApplicantInterviewtime = $checkbox.data('applicantinterviewtime');
-                const ResortInterviewtime = $checkbox.data('resortinterviewtime');
-
-                if (ApplicantInterviewtime) {
-                    $("#ApplicantInterviewtime_" + location).val(ApplicantInterviewtime);
-                }
-
-                if (ResortInterviewtime) {
-                    $("#ResortInterviewtime_" + location).val(ResortInterviewtime);
-                }
+                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1);
             }
         });
         $('#respond-HoldModel').on('shown.bs.modal', function () {
@@ -992,13 +1156,31 @@
             });
         });
 
+        // Update action button when email template changes
+        $(document).on("change", ".EmailTemplate", function() {
+            var $row = $(this).closest("tr");
+            var $btn = $row.find(".SortlistedEmployee");
+            if (!$btn.length) return;
+
+            var templateName = $(this).find("option:selected").data("name") || '';
+            var isRejection = templateName.toLowerCase().indexOf('reject') !== -1;
+
+            if (isRejection) {
+                $btn.text('Send Rejection Email').removeClass('btn-themeSkyblue').addClass('btn-danger');
+            } else {
+                $btn.text('Send Interview Invitation').removeClass('btn-danger').addClass('btn-themeSkyblue');
+            }
+        });
+
         //SortListed Employee
         $(document).on("click", ".SortlistedEmployee", function()
         {
-            const EmailTemplate = $(this).closest("tr").find(".EmailTemplate").val();
-            const Interviewer = $(this).closest("tr").find(".Interviewer").val();
-            const Round = $(this).closest("tr").find(".Round").val();
-            const InterviewType = $(this).closest("tr").find(".InterviewType").val();
+            var $row = $(this).closest("tr");
+            const EmailTemplate = $row.find(".EmailTemplate").val();
+            const EmailTemplateName = $row.find(".EmailTemplate option:selected").data("name") || '';
+            const Interviewer = $row.find(".Interviewer").val();
+            const Round = $row.find(".Round").val();
+            const InterviewType = $row.find(".InterviewType").val();
 
             if (!EmailTemplate)
             {
@@ -1007,9 +1189,53 @@
                 });
                 return false;
             }
+
             let resort_id= $(this).data('resort_id');
             let ApplicantID= $(this).data('applicantid');
             let ApplicantStatus_id= $(this).data('applicantstatus_id');
+
+            // If rejection template selected, send rejection email directly
+            var isRejection = EmailTemplateName.toLowerCase().indexOf('reject') !== -1;
+            if (isRejection) {
+                var $btn = $(this);
+                $btn.prop('disabled', true).text('Sending...');
+                $.ajax({
+                    url: "{{ route('resort.ta.ApprovedOrSortApplicantWiseStatus') }}",
+                    type: "POST",
+                    data: {
+                        ApplicantID: ApplicantID,
+                        applicantstatusid: ApplicantStatus_id,
+                        Rank: "Rejected",
+                        Progress_Rank: "Rejected",
+                        interviewRound: Round || "HR",
+                        emailTemplateID: EmailTemplate,
+                        _token: "{{ csrf_token() }}"
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success("Rejection email sent successfully!", "Success", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                            datatablelist();
+                        } else {
+                            toastr.error(response.message || "Something went wrong.", "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    },
+                    error: function() {
+                        toastr.error("Something went wrong. Please try again.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('Send Rejection Email');
+                    }
+                });
+                return false;
+            }
+
+            // Normal flow — open time slots modal
             $("#Resort_id").val(resort_id);
             $("#ApplicantID").val(ApplicantID);
             $("#ApplicantStatus_id").val(ApplicantStatus_id);
@@ -1083,48 +1309,46 @@
 
         $('#TimeSlotsForm').validate({
             rules: {
-                        SlotBook: {
-                            required: function (element) {
-                                // Require SlotBook only if both ManualTime fields are empty
-                                return (
-                                    $('[name="MalidivanManualTime"]').val().trim() === "" &&
-                                    $('[name="ApplicantManualTime"]').val().trim() === ""
-                                );
-                            },
-                        },
-                        MalidivanManualTime: {
-                            required: function (element) {
-                                // Require ManualTime fields only if SlotBook is not selected
-                                return $('[name="SlotBook"]:checked').length === 0;
-                            },
-                        },
-                        ApplicantManualTime: {
-                            required: function (element) {
-                                // Same condition for the second ManualTime field
-                                return $('[name="SlotBook"]:checked').length === 0;
-                            },
-                        },
+                "SlotBook[]": {
+                    required: function () {
+                        return (
+                            $('[name="MalidivanManualTime"]').val().trim() === "" &&
+                            $('[name="ApplicantManualTime"]').val().trim() === ""
+                        );
                     },
-                    messages: {
-                        SlotBook: {
-                            required: "Please select a valid time slot or enter a manual time.",
-                        },
-                        MalidivanManualTime: {
-                            required: "Please enter Malidivan Manual Time or select a valid time slot.",
-                        },
-                        ApplicantManualTime: {
-                            required: "Please enter Applicant Manual Time or select a valid time slot.",
-                        },
+                },
+                MalidivanManualTime: {
+                    required: function () {
+                        return $('[name="SlotBook[]"]:checked').length === 0;
                     },
+                },
+                ApplicantManualTime: {
+                    required: function () {
+                        return $('[name="SlotBook[]"]:checked').length === 0;
+                    },
+                },
+            },
+            messages: {
+                "SlotBook[]": {
+                    required: "Please select a valid time slot or enter a manual time.",
+                },
+                MalidivanManualTime: {
+                    required: "Please enter Malidivan Manual Time or select a valid time slot.",
+                },
+                ApplicantManualTime: {
+                    required: "Please enter Applicant Manual Time or select a valid time slot.",
+                },
+            },
             errorPlacement: function(error, element) {
                 if (element.hasClass("Timezone_checkBox")) {
-                    // Append error message after the .row_time element
-                    element.closest(".row_time").after(error);
+                    element.closest(".sendRequestTime-main").find(".block").after(error);
                 } else {
-                    error.insertAfter(element); // Default behavior
+                    error.insertAfter(element);
                 }
             },
             submitHandler: function(form) {
+                var $submitBtn = $(form).find('button[type="submit"]');
+                $submitBtn.prop('disabled', true).text('Submitting...');
                 var formData = new FormData(form);
 
                 $.ajax({
@@ -1140,7 +1364,6 @@
                                 positionClass: 'toast-bottom-right'
                             });
 
-
                             $("#sendRequest-modal").modal("hide");
                             $("#TimeSlots-modal").modal("hide");
                             $(".sendRequestTime-main").html(response.view);
@@ -1153,6 +1376,14 @@
                                 positionClass: 'toast-bottom-right'
                             });
                         }
+                    },
+                    error: function() {
+                        toastr.error("Something went wrong. Please try again.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function() {
+                        $submitBtn.prop('disabled', false).text('Submit');
                     }
                 });
             }
@@ -1162,8 +1393,7 @@
             let Round = $(this).data("rank_name");
             let InterviewType = $(this).data("round");
             const EmailTemplate = $(this).closest("tr").find(".EmailTemplate").val();
-            $("#intDetail-modal").modal('show');
-   
+
             if (!EmailTemplate)
             {
                 toastr.error("Please select an Email Template before proceeding.", "Error", {
@@ -1172,17 +1402,12 @@
                 return false;
             }
 
-         
-
-            // Set values after the modal is fully initialized
-            $("#shareMeetLink-modal").modal("show").on('shown.bs.modal', function () {
-                $("#Interview_id").val(Interview_id);
-                $("#Round1").val(Round).trigger("change");
-                $("#InterviewType1").val(InterviewType).trigger("change");
-                $("#EmailTemplate1").val(EmailTemplate);
-            });
-
-            datatablelist();
+            // Set values and show only the Share Meeting Link modal
+            $("#Interview_id").val(Interview_id);
+            $("#Round1").val(Round).trigger("change");
+            $("#InterviewType1").val(InterviewType).trigger("change");
+            $("#EmailTemplate1").val(EmailTemplate);
+            $("#shareMeetLink-modal").modal("show");
         });
 
         $(document).on("click",".DownloadFile", function () {
@@ -1241,7 +1466,41 @@
             });
         });
 
-       
+        // Download All Files
+        $(document).on("click", ".DownloadAllFiles", function () {
+            let fileId = $(this).data("id");
+            let btn = $(this);
+            btn.prop('disabled', true).text('Downloading...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.DownloadAllFiles') }}",
+                type: "POST",
+                data: { id: fileId },
+                success: function(response) {
+                    btn.prop('disabled', false).text('Download All');
+                    if (response.success) {
+                        response.files.forEach(function(file, index) {
+                            setTimeout(function() {
+                                let a = document.createElement('a');
+                                a.href = file.url;
+                                a.download = file.name;
+                                a.target = '_blank';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                            }, index * 500);
+                        });
+                    } else {
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    btn.prop('disabled', false).text('Download All');
+                    toastr.error("Something went wrong!", "Error", { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+
         $('#shareMeetLinkForm').validate({
             rules: {
                 MeetingLink: {
@@ -1255,45 +1514,44 @@
                 }
             },
             submitHandler: function(form) {
+                var $submitBtn = $(form).find('button[type="submit"]');
+                $submitBtn.prop('disabled', true).text('Submitting...');
                 var formData = new FormData(form);
-                    $.ajax({
-                        url: "{{ route('resort.ta.AddInterViewLink') }}",
-                        type: "POST",
-                        data:formData,
-                        processData: false,
-                        contentType: false,
-                        success: function(response) {
-                            if (response.success)
-                            {
+                $.ajax({
+                    url: "{{ route('resort.ta.AddInterViewLink') }}",
+                    type: "POST",
+                    data:formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        if (response.success)
+                        {
+                            toastr.success(response.message, "Success", {
+                                        positionClass: 'toast-bottom-right'
+                            });
 
-                                toastr.success(response.message, "Success", {
-                                            positionClass: 'toast-bottom-right'
-                                });
+                            $("#reviewInview-modal").modal("show");
+                            $(".InterviewReviewData").html(response.Final_response_data);
 
-                                    $("#reviewInview-modal").modal("show");
-                                    $(".InterviewReviewData").html(response.Final_response_data);
-
-                                $("#shareMeetLink-modal").modal("hide");
-                                datatablelist();
-                            }
-                            else
-                            {
-                                toastr.error(response.message, "Error", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            }
+                            $("#shareMeetLink-modal").modal("hide");
+                            datatablelist();
                         }
-                        // ,
-                        // error: function(response) {
-                        //     var errors = response.responseJSON;
-                        //     var errs = '';
-                        //     $.each(errors.errors, function(key, error) { // Adjust according to your response format
-                        //         console.log(error);
-                        //         errs += error + '<br>';
-                        //     });
-                        //     toastr.error(errs, { positionClass: 'toast-bottom-right' });
-                        // }
-                    });
+                        else
+                        {
+                            toastr.error(response.message, "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    },
+                    error: function() {
+                        toastr.error("Something went wrong. Please try again.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function() {
+                        $submitBtn.prop('disabled', false).text('Submit');
+                    }
+                });
             }
         });
         function datatablelist()
@@ -1339,6 +1597,7 @@
                         { data: 'contact', name: 'contact' },
                         { data: 'Application_date', name: 'Application_date' },
                         { data: 'Stage', name: 'Stage'},
+                        { data: 'InvitationStatus', name: 'InvitationStatus', orderable: false, searchable: false },
                         {
                         data: 'details-control',
                             name: 'details-control',
@@ -1582,6 +1841,181 @@
                         errs += error + '<br>';
                     });
                     toastr.error(errs, { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+
+        // Reject Candidate - open modal
+        $(document).on("click", ".rejectCandidateBtn", function() {
+            var applicantId = $(this).data("id");
+            var applicantStatusId = $(this).data("applicantstatusid");
+            $("#reject_ApplicantID").val(applicantId);
+            $("#reject_applicantstatusid").val(applicantStatusId);
+            $("#rejectCandidate-modal").modal("show");
+        });
+
+        // Reject Candidate - form submit
+        $('#rejectCandidateForm').on('submit', function(e) {
+            e.preventDefault();
+            var $submitBtn = $(this).find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).text('Rejecting...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.ApprovedOrSortApplicantWiseStatus') }}",
+                type: "POST",
+                data: {
+                    ApplicantID: $('#reject_ApplicantID').val(),
+                    applicantstatusid: $('#reject_applicantstatusid').val(),
+                    Rank: "Rejected",
+                    interviewRound: "select",
+                    emailTemplateID: $(this).find('[name="emailTemplateID"]').val(),
+                    rejectionReason: $(this).find('[name="rejectionReason"]').val(),
+                    _token: "{{ csrf_token() }}"
+                },
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message || "Candidate rejected successfully!", "Success", { positionClass: 'toast-bottom-right' });
+                        $("#rejectCandidate-modal").modal("hide");
+                        $('.table-applicants').DataTable().ajax.reload();
+                    } else {
+                        toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    toastr.error("Something went wrong. Please try again.", "Error", { positionClass: 'toast-bottom-right' });
+                },
+                complete: function() {
+                    $submitBtn.prop('disabled', false).text('Confirm Reject');
+                }
+            });
+        });
+
+        // Select Candidate - open modal
+        $(document).on("click", ".selectCandidateBtn", function() {
+            var applicantId = $(this).data("id");
+            var applicantStatusId = $(this).data("applicantstatusid");
+            $("#select_ApplicantID").val(applicantId);
+            $("#select_applicantstatusid").val(applicantStatusId);
+            $("#selectCandidate-modal").modal("show");
+        });
+
+        // Select Candidate - form submit
+        $('#selectCandidateForm').on('submit', function(e) {
+            e.preventDefault();
+            var $submitBtn = $(this).find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).text('Selecting...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.ApprovedOrSortApplicantWiseStatus') }}",
+                type: "POST",
+                data: {
+                    ApplicantID: $('#select_ApplicantID').val(),
+                    applicantstatusid: $('#select_applicantstatusid').val(),
+                    Rank: "Selected",
+                    interviewRound: "select",
+                    emailTemplateID: $(this).find('[name="emailTemplateID"]').val(),
+                    _token: "{{ csrf_token() }}"
+                },
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message || "Candidate selected successfully!", "Success", { positionClass: 'toast-bottom-right' });
+                        $("#selectCandidate-modal").modal("hide");
+                        $('.table-applicants').DataTable().ajax.reload();
+                    } else {
+                        toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    toastr.error("Something went wrong. Please try again.", "Error", { positionClass: 'toast-bottom-right' });
+                },
+                complete: function() {
+                    $submitBtn.prop('disabled', false).text('Confirm Select');
+                }
+            });
+        });
+
+        // Send Offer Letter - open modal
+        $(document).on("click", ".sendOfferLetterBtn", function() {
+            var applicantId = $(this).data("id");
+            var applicantStatusId = $(this).data("applicantstatusid");
+            $("#offerLetter_ApplicantID").val(applicantId);
+            $("#offerLetter_applicantstatusid").val(applicantStatusId);
+            $("#offerLetter-modal").modal("show");
+        });
+
+        // Send Offer Letter - form submit
+        $('#offerLetterForm').on('submit', function(e) {
+            e.preventDefault();
+            var $submitBtn = $(this).find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).text('Sending...');
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: "{{ route('resort.ta.sendOfferLetter') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $("#offerLetter-modal").modal("hide");
+                        $('#offerLetterForm')[0].reset();
+                        $('.table-applicants').DataTable().ajax.reload();
+                    } else {
+                        toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function(xhr) {
+                    var msg = 'Something went wrong.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+                },
+                complete: function() {
+                    $submitBtn.prop('disabled', false).text('Send Offer Letter');
+                }
+            });
+        });
+
+        // Send Contract - open modal
+        $(document).on("click", ".sendContractBtn", function() {
+            var applicantId = $(this).data("id");
+            var applicantStatusId = $(this).data("applicantstatusid");
+            $("#contract_ApplicantID").val(applicantId);
+            $("#contract_applicantstatusid").val(applicantStatusId);
+            $("#contract-modal").modal("show");
+        });
+
+        // Send Contract - form submit
+        $('#contractForm').on('submit', function(e) {
+            e.preventDefault();
+            var $submitBtn = $(this).find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).text('Sending...');
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: "{{ route('resort.ta.sendContract') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $("#contract-modal").modal("hide");
+                        $('#contractForm')[0].reset();
+                        $('.table-applicants').DataTable().ajax.reload();
+                    } else {
+                        toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function(xhr) {
+                    var msg = 'Something went wrong.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+                },
+                complete: function() {
+                    $submitBtn.prop('disabled', false).text('Send Contract');
                 }
             });
         });

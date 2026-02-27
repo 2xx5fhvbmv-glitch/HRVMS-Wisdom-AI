@@ -17,7 +17,8 @@ class Applicant_form_data extends Model
     protected $fillable = [
         'Parent_v_id','resort_id','passport_no','passport_expiry_date','passport_img','Application_date','curriculum_vitae','passport_photo','full_length_photo',
         'first_name','last_name','gender','dob','mobile_number','country_phone_code','email','marital_status','number_of_children','address_line_one','address_line_two','country','state','city','pin_code','Joining_availability','reference','select_level','terms_conditions','data_retention_month','data_retention_year','notes'
-        ,'NotiesPeriod','SalaryExpectation','TimeZone','Scoring','AIRanking','Applicant_Source'
+        ,'NotiesPeriod','SalaryExpectation','TimeZone','Scoring','AIRanking','Applicant_Source',
+        'consent_status','consent_expiry_date','consent_token','consent_responded_at'
     ];
     public function GetVacancies()
     {
@@ -31,6 +32,11 @@ class Applicant_form_data extends Model
 
     public function ApplicantInterviewDetail(){
         return $this->hasMany(ApplicantInterViewDetails::class, 'Applicant_id', 'id');
+    }
+
+    public function offerContracts()
+    {
+        return $this->hasMany(ApplicantOfferContract::class, 'applicant_id', 'id');
     }
 
 }

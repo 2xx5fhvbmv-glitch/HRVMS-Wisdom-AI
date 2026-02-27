@@ -1,6 +1,7 @@
 /node_modules
 /public/hot
 /public/storage
+/public/talent_acquisition
 /storage/*.key
 /storage/framework/sessions
 /storage/framework/views

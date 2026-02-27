@@ -175,18 +175,30 @@
                                                         </div>
                                                     {{-- elseif($t->InterviewLinkStatus=="Active"  ||  $t->ApplicationStatus=="Sortlisted" || $t->As_ApprovedBy == 3 ) --}}
 
-                                                    @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy == 3  &&  $t->InterviewLinkStatus == null )
+                                                    @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy != 0  &&  $t->InterviewLinkStatus == null )
                                                         <div class="img-circle">
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>
                                                         <div>
-                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted f {{ $t->Position ?? '' }} </p>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted for {{ $t->Position ?? '' }} </p>
                                                             <a
                                                             href="javascript:void(0)"
                                                             data-Resort_id="{{$t->Resort_id}}"
                                                             data-ApplicantID="{{base64_encode($t->ApplicantID)}}"
                                                             data-ApplicantStatus_id="{{base64_encode($t->ApplicantStatus_id)}}"
                                                             class="a-link SortlistedEmployee">Send Interview Request </a>
+                                                        </div>
+
+                                                    @elseif( $t->InterviewLinkStatus == 'Slot Booked' && empty($t->InterviewMeetingLink) )
+                                                        <div class="img-circle">
+                                                            <img src="{{ $t->profileImg}}" alt="image">
+                                                        </div>
+                                                        <div>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has accepted interview invitation for {{ $t->Position ?? '' }} </p>
+                                                            <a
+                                                            href="javascript:void(0)"
+                                                            data-interview_id="{{ base64_encode($t->InterviewId) }}"
+                                                            class="a-link AddMeetingLink">Add Meeting Link </a>
                                                         </div>
 
                                                 @endif
@@ -578,6 +590,10 @@
                         @endforeach
                         @endif
                     </select>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Meeting Link</label>
+                        <input type="text" class="form-control" name="MeetingLink" placeholder="Enter Meeting Link (Google Meet, Zoom, etc.)">
+                    </div>
                     <label class="form-label mb-sm-4 mb-3">SELECT TIME SLOTS</label>
                     <div class="sendRequestTime-main">
                     </div>
@@ -621,6 +637,31 @@
                 <a href="javascript:void(0)"  data-bs-dismiss="modal"class="btn btn-theme" >Submit</a>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addMeetingLink-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-small">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Meeting Link</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addMeetingLinkForm">
+                @csrf
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Please provide the meeting link for interview</label>
+                        <input type="text" class="form-control" name="MeetingLink" placeholder="Meeting Link" required>
+                    </div>
+                    <input type="hidden" name="Interview_id" id="MeetingLink_Interview_id">
+                </div>
+                <div class="modal-footer">
+                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -1391,113 +1432,106 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             }
         });
 
-        $(document).on("focus", '[name^="MalidivanManualTime"], [name^="ApplicantManualTime"]', function () {
-            $(".row_time").removeClass("active").find("input").prop("disabled", false);
-            $('[name^="ApplicantInterviewtime"]').val('');
-            $('[name^="ResortInterviewtime"]').val('');
+        // Multi-select time slots - click on row for Safari compatibility
+        $(document).on("click", ".row_time:not(.disable)", function(e) {
+            if ($(e.target).is('input[type="hidden"]')) return;
+
+            var $row = $(this);
+            var $checkbox = $row.find(".Timezone_checkBox");
+
+            // Toggle this row
+            $row.toggleClass("active");
+            $checkbox.prop("checked", $row.hasClass("active"));
+
+            // Clear manual time fields when selecting slots
+            $('[name="MalidivanManualTime"]').val('');
+            $('[name="ApplicantManualTime"]').val('');
+            $('[name="MalidivanManualTime1"]').val('');
+            $('[name="ApplicantManualTime1"]').val('');
+
+            // Collect all selected slot times
+            var resortTimes = [];
+            var applicantTimes = [];
+            $(".row_time.active .Timezone_checkBox").each(function() {
+                resortTimes.push($(this).data('resortinterviewtime'));
+                applicantTimes.push($(this).data('applicantinterviewtime'));
+            });
+            $("#ResortInterviewtime_collected").val(resortTimes.join(', '));
+            $("#ApplicantInterviewtime_collected").val(applicantTimes.join(', '));
         });
+
+        // Clear selected slots when manual time is focused
+        $(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTime"]', function () {
+            $(".row_time").removeClass("active");
+            $(".row_time .Timezone_checkBox").prop("checked", false);
+            $("#ResortInterviewtime_collected").val('');
+            $("#ApplicantInterviewtime_collected").val('');
+        });
+
         $(document).on("change", '[name="MalidivanManualTime"]', function () {
-            const timeValue = $(this).val(); // Get the value of the time input
+            const timeValue = $(this).val();
             if (timeValue) {
-                const [hours, minutes] = timeValue.split(":"); // Split the time into hours and minutes
-                const period = hours >= 12 ? "PM" : "AM"; // Determine AM or PM
-                const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+                const [hours, minutes] = timeValue.split(":");
+                const period = hours >= 12 ? "PM" : "AM";
+                const formattedHours = hours % 12 || 12;
                 let MalidivanManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1); // Display in console
-            } else {
-                console.log("No time selected");
+                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1);
             }
         });
         $(document).on("change", '[name="ApplicantManualTime"]', function () {
-            const timeValue = $(this).val(); // Get the value of the time input
+            const timeValue = $(this).val();
             if (timeValue) {
-                const [hours, minutes] = timeValue.split(":"); // Split the time into hours and minutes
-                const period = hours >= 12 ? "PM" : "AM"; // Determine AM or PM
-                const formattedHours = hours % 12 || 12; // Convert to 12-hour format
+                const [hours, minutes] = timeValue.split(":");
+                const period = hours >= 12 ? "PM" : "AM";
+                const formattedHours = hours % 12 || 12;
                 let ApplicantManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1); // Display in console
-            } else {
-                console.log("No time selected");
-            }
-        });
-
-        $(document).on("click", ".Timezone_checkBox", function() {
-            // Remove 'Active' class and enable all other rows
-            $(".row_time").not($(this).closest(".row_time")).removeClass("active").find("input").prop("disabled", false);
-
-            // Toggle 'active' class on the clicked row
-            $(this).closest(".row_time").toggleClass("active");
-            let location = $(this).data('id');
-
-            if ($(this).closest(".row_time").hasClass("active")) {
-                // Disable other rows and clear all input values
-                $(".row_time").not($(this).closest(".row_time")).find("input").prop("disabled", true);
-                $('[name^="ApplicantInterviewtime"]').val('');
-                $('[name^="ResortInterviewtime"]').val('');
-
-                // Retrieve and set the data attributes for the selected row
-                let ApplicantInterviewtime = $(this).data('applicantinterviewtime');
-                let ResortInterviewtime = $(this).data('resortinterviewtime');
-
-                // Check if data attributes are undefined or null before setting
-                if (ApplicantInterviewtime) {
-                    $("#ApplicantInterviewtime_" + location).val(ApplicantInterviewtime);
-                }
-
-                if (ResortInterviewtime) {
-                    $("#ResortInterviewtime_" + location).val(ResortInterviewtime);
-                }
-            } else {
-                // Enable all rows if no row is active
-                $(".row_time").find("input").prop("disabled", false);
+                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1);
             }
         });
 
 
         $('#TimeSlotsForm').validate({
             rules: {
-                    SlotBook: {
-                        required: function (element) {
-                            // Require SlotBook only if both ManualTime fields are empty
-                            return (
-                                $('[name="MalidivanManualTime"]').val().trim() === "" &&
-                                $('[name="ApplicantManualTime"]').val().trim() === ""
-                            );
-                        },
-                    },
-                    MalidivanManualTime: {
-                        required: function (element) {
-                            // Require ManualTime fields only if SlotBook is not selected
-                            return $('[name="SlotBook"]:checked').length === 0;
-                        },
-                    },
-                    ApplicantManualTime: {
-                        required: function (element) {
-                            // Same condition for the second ManualTime field
-                            return $('[name="SlotBook"]:checked').length === 0;
-                        },
+                "SlotBook[]": {
+                    required: function () {
+                        return (
+                            $('[name="MalidivanManualTime"]').val().trim() === "" &&
+                            $('[name="ApplicantManualTime"]').val().trim() === ""
+                        );
                     },
                 },
-                messages: {
-                    SlotBook: {
-                        required: "Please select a valid time slot or enter a manual time.",
-                    },
-                    MalidivanManualTime: {
-                        required: "Please enter Malidivan Manual Time or select a valid time slot.",
-                    },
-                    ApplicantManualTime: {
-                        required: "Please enter Applicant Manual Time or select a valid time slot.",
+                MalidivanManualTime: {
+                    required: function () {
+                        return $('[name="SlotBook[]"]:checked').length === 0;
                     },
                 },
+                ApplicantManualTime: {
+                    required: function () {
+                        return $('[name="SlotBook[]"]:checked').length === 0;
+                    },
+                },
+            },
+            messages: {
+                "SlotBook[]": {
+                    required: "Please select a valid time slot or enter a manual time.",
+                },
+                MalidivanManualTime: {
+                    required: "Please enter Malidivan Manual Time or select a valid time slot.",
+                },
+                ApplicantManualTime: {
+                    required: "Please enter Applicant Manual Time or select a valid time slot.",
+                },
+            },
             errorPlacement: function(error, element) {
                 if (element.hasClass("Timezone_checkBox")) {
-                    // Append error message after the .row_time element
-                    element.closest(".row_time").after(error);
-                    } else {
-                        error.insertAfter(element); // Default behavior
-                    }
-                },
+                    element.closest(".sendRequestTime-main").find(".block").after(error);
+                } else {
+                    error.insertAfter(element);
+                }
+            },
                 submitHandler: function(form) {
+                    var $submitBtn = $(form).find('button[type="submit"]');
+                    $submitBtn.prop('disabled', true).text('Submitting...');
                     var formData = new FormData(form);
 
                     $.ajax({
@@ -1513,21 +1547,84 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                     positionClass: 'toast-bottom-right'
                                 });
 
-
                                 $("#sendRequest-modal").modal("hide");
                                 $("#TimeSlots-modal").modal("hide");
                                 $(".sendRequestTime-main").html(response.view);
                                 $("#todoList-main").html( response.TodoDataview);
-                                console.log(response,response.Final_response_data);
                                 $("#Final_response_data").html(response.Final_response_data);
                                 $("#sendRequestFinal-modal").modal("show");
-                                // datatablelist();
                             } else {
                                 toastr.error(response.message, "Error", {
                                     positionClass: 'toast-bottom-right'
                                 });
                             }
+                        },
+                        error: function() {
+                            toastr.error("Something went wrong. Please try again.", "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        },
+                        complete: function() {
+                            $submitBtn.prop('disabled', false).text('Submit');
                         }
+                });
+            }
+        });
+
+        // Add Meeting Link - click handler
+        $(document).on("click", ".AddMeetingLink", function() {
+            let interview_id = $(this).data("interview_id");
+            $("#MeetingLink_Interview_id").val(interview_id);
+            $("#addMeetingLink-modal").modal("show");
+        });
+
+        // Add Meeting Link - form submission
+        $('#addMeetingLinkForm').validate({
+            rules: {
+                MeetingLink: {
+                    required: true,
+                }
+            },
+            messages: {
+                MeetingLink: {
+                    required: "Please enter a Meeting Link.",
+                }
+            },
+            submitHandler: function(form) {
+                var $submitBtn = $(form).find('button[type="submit"]');
+                $submitBtn.prop('disabled', true).text('Submitting...');
+                var formData = new FormData(form);
+                $.ajax({
+                    url: "{{ route('resort.ta.AddInterViewLink') }}",
+                    type: "POST",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message, "Success", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                            $("#addMeetingLink-modal").modal("hide");
+                            if (response.TodoDataview) {
+                                $("#todoList-main").html(response.TodoDataview);
+                            } else {
+                                location.reload();
+                            }
+                        } else {
+                            toastr.error(response.message, "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    },
+                    error: function() {
+                        toastr.error("Something went wrong. Please try again.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function() {
+                        $submitBtn.prop('disabled', false).text('Submit');
+                    }
                 });
             }
         });

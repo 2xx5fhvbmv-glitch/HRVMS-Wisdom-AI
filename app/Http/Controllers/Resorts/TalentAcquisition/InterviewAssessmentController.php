@@ -200,7 +200,88 @@ class InterviewAssessmentController extends Controller
         $interviewer_id = $this->resort->id;
         $interviewee_id = $applicant_id;
 
-        return view('resorts.talentacquisition.interview-assessment.show',compact('form','interviewer_id','interviewee_id','page_title'));
+        // Get current user's rank name to filter form sections
+        $rankConfig = config('settings.Position_Rank');
+        $userRank = $this->rank;
+        $userRankName = $rankConfig[$userRank] ?? '';
+
+        // If user is in HR department, map their section to "HR" regardless of actual rank
+        $employee = $this->resort->GetEmployee ?? null;
+        if ($employee) {
+            $userDeptName = \App\Models\ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+            if (stripos($userDeptName, 'Human Resources') !== false) {
+                $userRankName = 'HR';
+            }
+        }
+
+        // Filter form structure to only show sections for this user's rank
+        $filteredStructure = [];
+        $otherSectionsData = [];
+
+        if ($form->isNotEmpty()) {
+            $fullStructure = json_decode(json_decode($form[0]->form_structure), true);
+
+            // Parse sections: h1 headers act as section dividers with rank names
+            $sections = [];
+            $currentSection = null;
+            foreach ($fullStructure as $field) {
+                if (($field['type'] ?? '') === 'header' && ($field['subtype'] ?? '') === 'h1') {
+                    $currentSection = trim(strip_tags($field['label'] ?? ''));
+                    $sections[$currentSection] = [];
+                }
+                if ($currentSection !== null) {
+                    $sections[$currentSection][] = $field;
+                }
+            }
+
+            // Build filtered structure for current user's rank
+            foreach ($sections as $sectionName => $sectionFields) {
+                if (strcasecmp($sectionName, $userRankName) === 0) {
+                    $filteredStructure = array_merge($filteredStructure, $sectionFields);
+                }
+            }
+
+            // Get existing responses from OTHER ranks for read-only display
+            $otherResponses = DB::table('interview_assessment_responses as iar')
+                ->join('resort_admins as ra', 'ra.id', '=', 'iar.interviewer_id')
+                ->leftJoin('employees as emp', 'emp.Admin_Parent_id', '=', 'ra.id')
+                ->leftJoin('resort_departments as rd', 'rd.id', '=', 'emp.Dept_id')
+                ->where('iar.form_id', $form[0]->id)
+                ->where('iar.interviewee_id', $applicant_id)
+                ->where('iar.interviewer_id', '!=', $interviewer_id)
+                ->select('iar.*', 'emp.rank as interviewer_rank', 'ra.first_name', 'ra.last_name', 'rd.name as dept_name')
+                ->get();
+
+            foreach ($otherResponses as $resp) {
+                $respRankName = isset($resp->interviewer_rank) ? ($rankConfig[$resp->interviewer_rank] ?? 'Unknown') : 'Unknown';
+                // If interviewer is in HR department, map to "HR" section
+                if (isset($resp->dept_name) && stripos($resp->dept_name, 'Human Resources') !== false) {
+                    $respRankName = 'HR';
+                }
+                $respSectionFields = $sections[$respRankName] ?? [];
+                if (!empty($respSectionFields)) {
+                    $otherSectionsData[] = [
+                        'rankName' => $respRankName,
+                        'interviewer_name' => trim(($resp->first_name ?? '') . ' ' . ($resp->last_name ?? '')),
+                        'fields' => $respSectionFields,
+                        'responses' => json_decode($resp->responses, true),
+                        'submitted_at' => $resp->created_at,
+                    ];
+                }
+            }
+
+            // Check if current user already submitted a response
+            $existingResponse = InterviewAssessmentResponseForm::where('form_id', $form[0]->id)
+                ->where('interviewee_id', $applicant_id)
+                ->where('interviewer_id', $interviewer_id)
+                ->first();
+        } else {
+            $existingResponse = null;
+        }
+
+        $existingResponseData = $existingResponse ? json_decode($existingResponse->responses, true) : null;
+
+        return view('resorts.talentacquisition.interview-assessment.show',compact('form','interviewer_id','interviewee_id','page_title','filteredStructure','existingResponseData','otherSectionsData','userRankName'));
     }
 
     public function saveResponse(Request $request, $formId)
@@ -212,18 +293,22 @@ class InterviewAssessmentController extends Controller
 
         try {
             // Fetch the authenticated user (interviewer)
-            $interviewer = $this->resort->id; // Get the logged-in user
+            $interviewer = $this->resort->id;
 
             // Ensure the interviewer has a signature
             if (!$this->resort->signature_img) {
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => 'Authorized signature is missing. Please upload it first from your profile page.'], 422);
+                }
                 return redirect()->back()->with('error', 'Authorized signature is missing. Please upload it first from your profile page.');
             }
+            $signature = $this->resort->signature_img;
 
             // Initialize an empty responses array
             $responses = [];
             foreach ($request->all() as $key => $value) {
                 if (in_array($key, ['_token', 'interviewer_id', 'interviewee_id'])) {
-                    continue; // Skip non-response fields
+                    continue;
                 }
                 if ($value !== null) {
                     $responses[$key] = $value;
@@ -232,24 +317,45 @@ class InterviewAssessmentController extends Controller
 
             // Check if responses are empty
             if (empty($responses)) {
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => 'No responses were submitted.'], 422);
+                }
                 return redirect()->back()->with('error', 'No responses were submitted.');
             }
 
-            // Save the response record
-            $response = InterviewAssessmentResponseForm::create([
-                'form_id' => $formId,
-                'interviewer_id' => $interviewer, // Use authenticated user's ID
-                'interviewee_id' => $validated['interviewee_id'],
-                'interviewer_signature' => $this->resort->signature_img,
-                'responses' => json_encode($responses),
-            ]);
+            // Check if this interviewer already submitted — update instead of creating duplicate
+            $existing = InterviewAssessmentResponseForm::where('form_id', $formId)
+                ->where('interviewer_id', $interviewer)
+                ->where('interviewee_id', $validated['interviewee_id'])
+                ->first();
 
-            // Redirect with a success message
-            return redirect()->back()->with('success', 'Response saved successfully!');
+            if ($existing) {
+                $existing->update([
+                    'interviewer_signature' => $signature,
+                    'responses' => json_encode($responses),
+                ]);
+                $message = 'Response updated successfully!';
+            } else {
+                InterviewAssessmentResponseForm::create([
+                    'form_id' => $formId,
+                    'interviewer_id' => $interviewer,
+                    'interviewee_id' => $validated['interviewee_id'],
+                    'interviewer_signature' => $signature,
+                    'responses' => json_encode($responses),
+                ]);
+                $message = 'Response saved successfully!';
+            }
+
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => $message]);
+            }
+            return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
-            // Log the error and return a failure response
             \Log::error('Error saving interview response: ' . $e->getMessage());
 
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Failed to save the response. Please try again.'], 500);
+            }
             return redirect()->back()->with('error', 'Failed to save the response. Please try again.');
         }
     }

@@ -30,6 +30,26 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
 
   Route::post('/get/talent-pool/applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getTalentPoolGridApplicant'])->name('resort.ta.getTalentPoolApplicant');
   Route::post('/revert-back', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RevertBack'])->name('resort.ta.RevertBack');
+
+  // Interview Invitation - Public (no auth)
+  Route::get('/interview-invitation/{token}', ['App\Http\Controllers\Resorts\InterviewInvitationController','show'])->name('resort.interview.invitation.show');
+  Route::post('/interview-invitation/{token}/accept', ['App\Http\Controllers\Resorts\InterviewInvitationController','accept'])->name('resort.interview.invitation.accept');
+  Route::post('/interview-invitation/{token}/reject', ['App\Http\Controllers\Resorts\InterviewInvitationController','reject'])->name('resort.interview.invitation.reject');
+
+  // Offer Letter - Public (no auth)
+  Route::get('/offer-letter/{token}', ['App\Http\Controllers\Resorts\OfferLetterResponseController','show'])->name('resort.offer.letter.show');
+  Route::post('/offer-letter/{token}/accept', ['App\Http\Controllers\Resorts\OfferLetterResponseController','accept'])->name('resort.offer.letter.accept');
+  Route::post('/offer-letter/{token}/reject', ['App\Http\Controllers\Resorts\OfferLetterResponseController','reject'])->name('resort.offer.letter.reject');
+
+  // Contract - Public (no auth)
+  Route::get('/contract/{token}', ['App\Http\Controllers\Resorts\ContractResponseController','show'])->name('resort.contract.show');
+  Route::post('/contract/{token}/accept', ['App\Http\Controllers\Resorts\ContractResponseController','accept'])->name('resort.contract.accept');
+  Route::post('/contract/{token}/reject', ['App\Http\Controllers\Resorts\ContractResponseController','reject'])->name('resort.contract.reject');
+
+  // Consent - Public (no auth)
+  Route::get('/consent/{token}', ['App\Http\Controllers\Resorts\ConsentResponseController','show'])->name('resort.consent.show');
+  Route::post('/consent/{token}/approve', ['App\Http\Controllers\Resorts\ConsentResponseController','approve'])->name('resort.consent.approve');
+  Route::post('/consent/{token}/reject', ['App\Http\Controllers\Resorts\ConsentResponseController','reject'])->name('resort.consent.reject');
 });
 
 /*** Admin Authenticated Routes ***/
@@ -385,6 +405,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/talent-acquisition/applicant-status', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantWiseStatus'])->name('resort.ta.ApplicantWiseStatus');
     Route::get('/talent-acquisition/user/applicant-side-bar/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','TaUserApplicantsSideBar'])->name('resort.ta.TaUserApplicantsSideBar');
     Route::post('/talent-acquisition/applicant-file-download', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAwsFiles'])->name('resort.ta.DownloadFile');
+    Route::post('/talent-acquisition/applicant-file-download-all', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAllAwsFiles'])->name('resort.ta.DownloadAllFiles');
 
 
     Route::post('/talent-acquisition/get-applicant-wise-grid-wise', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getApplicantWiseGridWise'])->name('resort.ta.getApplicantWiseGridWise');
@@ -397,6 +418,21 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/talent-acquisition/round-wise-form', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RoundWiseForm'])->name('resort.ta.RoundWiseForm');
     Route::post('/talent-acquisition/destroy-applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','destoryApplicant'])->name('resort.ta.destoryApplicant');
     Route::post('/talent-acquisition/get-date-click-wise-upcoming-interview', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetDateclickWiseUpcomingInterview'])->name('resort.ta.GetDateclickWiseUpcomingInterview');
+
+    // Offer Letter & Contract
+    Route::post('/talent-acquisition/send-offer-letter', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendOfferLetter'])->name('resort.ta.sendOfferLetter');
+    Route::post('/talent-acquisition/send-contract', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendContract'])->name('resort.ta.sendContract');
+
+    // Rejected Applications & Review Reminders
+    Route::get('/talent-acquisition/rejected-applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RejectedApplicants'])->name('resort.ta.RejectedApplicants');
+    Route::get('/talent-acquisition/rejected-applicants-list', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetRejectedApplicants'])->name('resort.ta.GetRejectedApplicants');
+    Route::get('/talent-acquisition/review-reminders', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ReviewReminders'])->name('resort.ta.ReviewReminders');
+    Route::get('/talent-acquisition/review-reminders-list', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetReviewReminders'])->name('resort.ta.GetReviewReminders');
+
+    // Talent Pool enhancements
+    Route::post('/talent-acquisition/send-consent-request', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendConsentRequest'])->name('resort.ta.sendConsentRequest');
+    Route::post('/talent-acquisition/check-availability', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','checkAvailability'])->name('resort.ta.checkAvailability');
+    Route::post('/talent-acquisition/delete-talent-pool-applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','deleteTalentPoolApplicant'])->name('resort.ta.deleteTalentPoolApplicant');
 
     // Email Tamplate start
 
