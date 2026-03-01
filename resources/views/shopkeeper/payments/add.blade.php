@@ -31,7 +31,7 @@
                                     @if($employees)
                                         <option value="">Select Employee</option>
                                         @foreach($employees as $emp)
-                                            <option value="{{$emp->id}}">{{$emp->Emp_id}} / {{$emp->resortAdmin->first_name}} {{$emp->resortAdmin->last_name}}</option>
+                                            <option value="{{$emp->id}}" data-emp-code="{{$emp->Emp_id}}" data-emp-name="{{$emp->resortAdmin->first_name}} {{$emp->resortAdmin->last_name}}">{{$emp->Emp_id}} / {{$emp->resortAdmin->first_name}} {{$emp->resortAdmin->last_name}}</option>
                                         @endforeach
                                     @endif
                                 </select>
@@ -45,7 +45,7 @@
                                     @if($products)
                                         <option value="">Select Product</option>
                                         @foreach($products as $prod)
-                                            <option value="{{$prod->id}}">{{$prod->name}}</option>
+                                            <option value="{{$prod->id}}" data-product-name="{{$prod->name}}" data-product-currency="{{$prod->currency_type ?? 'USD'}}">{{$prod->name}}</option>
                                         @endforeach
                                     @endif
                                 </select>
@@ -54,9 +54,13 @@
                                 <label for="quantity" class="form-label">QUANTITY</label>
                                 <input type="number" name="quantity" id="quantity" class="form-control" min="1" max="999999" placeholder="QUANTITY"/>
                             </div>
-                            <div class="col-xl-4 col-md-6">
+                            <div class="col-xl-3 col-md-6">
                                 <label for="price" class="form-label">PRICE</label>
                                 <input type="text" id="price" name="price" class="form-control" min="0" max="9999999" placeholder="PRICE" disabled>
+                            </div>
+                            <div class="col-xl-1 col-md-6">
+                                <label class="form-label">CURRENCY</label>
+                                <div id="product_currency_display" class="form-control-plaintext fw-semibold text-muted" style="min-height: 38px; line-height: 38px;">—</div>
                             </div>
                         </div>
                         <div class="col-xl-8 col-md-6" id="payment_QRCode">
@@ -64,7 +68,7 @@
                         </div>
                         <div class="d-none d-md-block" style="height: 426px;"></div>
                         <div class="card-footer text-end">
-                            <button type="submit" id="submitButton" class="btn btn-themeBlue btn-sm">Consent Sent</button>
+                            <button type="submit" id="submitButton" class="btn btn-themeBlue btn-sm">Consent Send</button>
                         </div>
                     </div>
                 </form>
@@ -79,8 +83,15 @@
 @section('import-scripts')
 <script type="text/javascript">
     let productPrice = 0; // Store selected product price
+    // Cached display values (Select2 can make option:selected / data() unreliable when building QR)
+    let cachedShopName = $('#shop_name').val() || '';
+    let cachedProductName = '';
+    let cachedProductCurrency = 'USD';
+    let cachedEmpCode = '';
+    let cachedEmpName = '';
 
     function generateQRCode(text, containerElement) {
+        if (!containerElement) return;
         try {
             containerElement.innerHTML = ''; // Clear existing QR
             new QRCode(containerElement, {
@@ -88,11 +99,18 @@
                 width: 128,
                 height: 128,
                 colorDark: "#000000",
-                colorLight: "#ffffff"
+                colorLight: "#ffffff",
+                correctLevel: (typeof QRCode !== 'undefined' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.L : 0
             });
         } catch (error) {
             console.error("QR Code Generation Failed:", error);
         }
+    }
+
+    function getSelectOptionData(selectId, value, dataAttr) {
+        if (!value) return '';
+        var opt = $('#' + selectId + ' option[value="' + value + '"]');
+        return opt.length ? (opt.attr('data-' + dataAttr) || opt.text() || '') : '';
     }
 
     function generateQRCodeForPayment() {
@@ -100,15 +118,39 @@
         let productId = $("#select_product").val();
         let quantity = $("#quantity").val();
         let price = $("#price").val();
-        let shopName = $('#shop_name').val();
+        let shopName = ($('#shop_name').val() || cachedShopName || '').toString().trim();
+
+        // Use cached display values; fallback to reading from option by value (works with Select2)
+        let empCode = cachedEmpCode || getSelectOptionData('select_emp', empId, 'emp-code');
+        let empName = cachedEmpName || getSelectOptionData('select_emp', empId, 'emp-name');
+        let productName = (cachedProductName || getSelectOptionData('select_product', productId, 'product-name')).toString().trim();
+        if (!productName && productId) {
+            productName = $("#select_product option[value='" + productId + "']").text() || '';
+        }
+        let currencyType = cachedProductCurrency || getSelectOptionData('select_product', productId, 'product-currency') || 'USD';
+
+        // Date of purchase (same moment QR is generated)
+        let now = new Date();
+        let purchaseDate = now.toISOString();
+        let purchase_date_display = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' +
+            String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
 
         if (empId && productId && quantity && price) {
             const qrData = {
-                employee_id: empId,
-                product_id: productId,
-                quantity: quantity,
-                price: price,
-                shopName: shopName
+                employee_id: parseInt(empId, 10),
+                product_id: parseInt(productId, 10),
+                quantity: parseInt(quantity, 10),
+                price: parseFloat(price) || parseFloat(String(price).replace(/[^0-9.-]/g, '')),
+                currency_type: currencyType,
+                currency: currencyType === 'MVR' ? 'MVR' : 'USD',
+                shop_name: shopName,
+                shopName: shopName,
+                product_name: productName,
+                employee_name: empName,
+                emp_code: empCode,
+                purchase_date: purchaseDate,
+                date_of_purchase: purchase_date_display,
+                dateOfPurchase: purchase_date_display
             };
             generateQRCode(JSON.stringify(qrData), document.getElementById("payment_QRCode"));
 
@@ -126,9 +168,21 @@
     }
 
     $(document).ready(function () {
-        // When product changes, fetch price
+        cachedShopName = ($('#shop_name').val() || '').toString().trim();
+
+        // When product changes, fetch price/currency and cache for QR
         $("#select_product").change(function () {
             let productId = $(this).val();
+            if (productId) {
+                var opt = $("#select_product option[value='" + productId + "']");
+                cachedProductName = (opt.attr('data-product-name') || opt.text() || '').toString().trim();
+                cachedProductCurrency = opt.attr('data-product-currency') || 'USD';
+                $("#product_currency_display").text(cachedProductCurrency === 'MVR' ? 'MVR' : 'Dollar');
+            } else {
+                cachedProductName = '';
+                cachedProductCurrency = 'USD';
+                $("#product_currency_display").text('—');
+            }
             if (!productId) {
                 $("#price").val("");
                 generateQRCodeForPayment();
@@ -142,8 +196,15 @@
                 success: function (response) {
                     if (response.success) {
                         productPrice = parseFloat(response.price);
-                        $("#quantity").trigger("input"); // Recalculate price
-                        $("#price").val(productPrice.toFixed(2)); // Set initial price
+                        if (response.currency_type) cachedProductCurrency = response.currency_type;
+                        $("#product_currency_display").text(response.currency_label || (cachedProductCurrency === 'MVR' ? 'MVR' : 'Dollar'));
+                        var qty = parseInt($("#quantity").val(), 10);
+                        if (!isNaN(qty) && qty > 0) {
+                            $("#price").val((productPrice * qty).toFixed(2));
+                        } else {
+                            $("#price").val(productPrice.toFixed(2));
+                        }
+                        $("#quantity").trigger("input"); // Re-run quantity logic and QR
                         generateQRCodeForPayment();
                     } else {
                         alert("Product price not found.");
@@ -158,9 +219,9 @@
 
         // When quantity is entered
         $("#quantity").on("input", function () {
-            let qty = parseInt($(this).val());
+            let qty = parseInt($(this).val(), 10);
             if (isNaN(qty) || qty <= 0) {
-                $("#price").val("");
+                $("#price").val(productPrice > 0 ? productPrice.toFixed(2) : "");
                 generateQRCodeForPayment();
                 return;
             }
@@ -169,14 +230,22 @@
             generateQRCodeForPayment();
         });
 
-        // Update QR when employee is selected
+        // Update QR when employee is selected (cache display values for QR)
         $("#select_emp").change(function () {
-            getEmpdetails(this.value); // existing logic
+            var val = $(this).val();
+            if (val) {
+                var opt = $("#select_emp option[value='" + val + "']");
+                cachedEmpCode = opt.attr('data-emp-code') || '';
+                cachedEmpName = opt.attr('data-emp-name') || '';
+            } else {
+                cachedEmpCode = '';
+                cachedEmpName = '';
+            }
+            getEmpdetails(val);
             generateQRCodeForPayment();
         });
 
-        // Update QR when product is changed
-        $("#select_product").change(generateQRCodeForPayment);
+        // QR is updated from product change handler above and quantity input below
 
         $('#addPayemnt').validate({
             rules: {

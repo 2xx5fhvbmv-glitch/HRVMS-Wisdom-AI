@@ -193,7 +193,7 @@
                                     <div class="col-12 mt-auto">
                                         <div class="card-footer">
                                             <div class="row align-items-center g-xxl-3 g-2">
-                                                @if($leaveDetail->canApproveThisLeave ?? false)
+                                                @if($canApproveThisLeave ?? false)
                                                     <div class="col-auto"> 
                                                         <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
                                                     </div>

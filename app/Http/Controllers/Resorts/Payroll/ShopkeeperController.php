@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Resorts\Payroll;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Shopkeeper;
+use App\Models\Payment;
 use App\Models\PayrollConfig;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use App\Helpers\Common;
+use App\Exports\ResortShopkeeperPaymentsExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Auth;
 use Config;
 use DB;
@@ -77,6 +80,10 @@ class ShopkeeperController extends Controller
             }
 
             return datatables()->of($tableData)
+            ->addColumn('view_more', function ($row) {
+                $url = route('resort.shopkeeper.payments', ['id' => $row->id]);
+                return '<a href="' . e($url) . '" class="btn btn-themeSkyblue btn-sm">View more</a>';
+            })
             ->addColumn('action', function ($row) use ($edit_class,$delete_class) {
                 return '
                     <div class="d-flex align-items-center">
@@ -189,5 +196,111 @@ class ShopkeeperController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Failed to delete shopkeeper.']);
         }
+    }
+
+    public function payments($id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
+        // Total is driven by date range in the list; show 0 until first AJAX load
+        $page_title = 'Payments - ' . $shopkeeper->name;
+        return view('resorts.payroll.shopkeeper.payments', compact('page_title', 'shopkeeper'));
+    }
+
+    public function paymentsList(Request $request, $id)
+    {
+        if (!$request->ajax()) {
+            return redirect()->route('shopkeepers.index');
+        }
+        $resort_id = $this->resort->resort_id;
+        $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
+
+        $searchTerm = $request->searchTerm;
+        $startDate = $request->start_date;
+        $endDate = $request->end_date;
+
+        // Only approved consent: Consented, Paid, Partial Paid (exclude Pending Consent, Rejected, Pending)
+        $tableData = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
+            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->join('products as p', 'p.id', '=', 'payments.product_id')
+            ->where('payments.shopkeeper_id', $shopkeeper->id)
+            ->whereIn('payments.status', ['Consented', 'Paid', 'Partial Paid']);
+
+        if ($searchTerm) {
+            $tableData->where(function ($query) use ($searchTerm) {
+                $query->where('p.price', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('p.name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('payments.quantity', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('ra.first_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('ra.last_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('payments.status', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+        if (!empty($startDate) && !empty($endDate)) {
+            $tableData->whereBetween('payments.purchased_date', [$startDate, $endDate]);
+        }
+
+        $totalAmount = (clone $tableData)->sum('payments.price');
+
+        $tableData = $tableData->orderBy('payments.updated_at', 'DESC')
+            ->select([
+                'payments.*',
+                'ra.first_name',
+                'ra.last_name',
+                'e.Emp_id',
+                'p.name as product_name',
+                'p.currency_type as product_currency_type',
+                'ra.profile_picture'
+            ])
+            ->get();
+
+        return datatables()->of($tableData)
+            ->with('total_amount', $totalAmount)
+            ->addColumn('currency_type', function ($row) {
+                $ct = $row->product_currency_type ?? 'USD';
+                return $ct === 'MVR' ? 'MVR' : 'Dollar';
+            })
+            ->addColumn('name', function ($row) {
+                $profile_pic = Common::getResortUserPicture($row->profile_picture);
+                if ($row->first_name && $row->last_name) {
+                    return '<div class="tableUser-block">
+                        <div class="img-circle">
+                            <img src="' . $profile_pic . '" alt="user">
+                        </div>
+                        <span>' . $row->first_name . ' ' . $row->last_name . '</span>
+                    </div>';
+                }
+                return '—';
+            })
+            ->addColumn('product', function ($row) {
+                return $row->product_name;
+            })
+            ->addColumn('status', function ($row) {
+                $statusClasses = [
+                    'Paid' => 'badge-success',
+                    'Partial Paid' => 'badge-info',
+                    'Pending Consent' => 'badge-warning',
+                    'Consented' => 'badge-themeSkyblueLight',
+                ];
+                $class = $statusClasses[$row->status] ?? 'badge-secondary';
+                return '<span class="badge ' . $class . '">' . $row->status . '</span>';
+            })
+            ->escapeColumns([])
+            ->make(true);
+    }
+
+    public function paymentsExport(Request $request, $id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
+
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $searchTerm = $request->query('search_term');
+
+        $export = new ResortShopkeeperPaymentsExport($shopkeeper->id, $startDate, $endDate, $searchTerm);
+        $filename = 'shopkeeper-payments-' . $shopkeeper->id . '-' . date('Y-m-d-His') . '.xlsx';
+
+        return Excel::download($export, $filename);
     }
 }

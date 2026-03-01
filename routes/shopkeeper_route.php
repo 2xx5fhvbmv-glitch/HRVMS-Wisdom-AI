@@ -47,6 +47,7 @@ Route::prefix('shopkeeper')->middleware(['auth:shopkeeper','revalidate'])->names
     Route::post('payments/store', 'PaymentController@store')->name('shopkeeper.payment.store');
     ROute::post('payments/send-consent', 'PaymentController@sendConsent')->name('shopkeeper.payment.sendConsent');
     Route::get('/get-product-price', 'PaymentController@getProductPrice')->name('getProductPrice');
+    Route::get('payments/qr-image/{id}', 'PaymentController@qrImage')->name('shopkeeper.payment.qr-image');
 
     Route::post('/payments/deduct', 'DashboardController@deductAmount')->name('payments.deduct');
 
