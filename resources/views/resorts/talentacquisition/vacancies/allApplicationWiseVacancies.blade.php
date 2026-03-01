@@ -87,7 +87,7 @@
                                     <th>Applicant</th>
                                     <th>Application Date</th>
                                     <th>Expiry Date</th>
-                                    @if($canSeeAction)<th>Action</th>@endif
+                                    <th>Action</th>
                                 </tr>
                             </thead>
 
@@ -433,9 +433,7 @@ $(document).ready(function() {
                     { data: 'NoOfApplication', name: 'Question', className: 'text-nowrap' },
                     { data: 'ApplicationDate', name: 'action', className: 'text-nowrap'},
                     { data: 'ExpiryDate', name: 'ReportingTo', className: 'text-nowrap'},
-                    @if($canSeeAction)
                     { data: 'action', name: 'action', orderable: false, searchable: false },
-                    @endif
                 ],
                 drawCallback: function() {
                     $('[data-bs-toggle="tooltip"]').tooltip();

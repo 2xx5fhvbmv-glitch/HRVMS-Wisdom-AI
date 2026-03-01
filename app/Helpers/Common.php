@@ -1986,6 +1986,22 @@ class Common
 
     }
 
+    public static function getInterviewRoundsForPosition($vacancyRank)
+    {
+        $positionRounds = config('settings.PositionInterviewRounds');
+        if ($vacancyRank && isset($positionRounds[(int)$vacancyRank])) {
+            return $positionRounds[(int)$vacancyRank];
+        }
+        return config('settings.InterViewRound');
+    }
+
+    public static function getFinalRoundRank($vacancyRank)
+    {
+        $rounds = self::getInterviewRoundsForPosition($vacancyRank);
+        $keys = array_keys($rounds);
+        return (int) end($keys);
+    }
+
     public static function GmApprovedVacancy($resort_id,$rank,$take="")
     {
 
@@ -2061,7 +2077,7 @@ class Common
                                     FROM applicant_wise_statuses
                                     WHERE Applicant_id = t9.id
                                 )')
-                                ->where('t10.status', '=', 'Sortlisted')
+                                ->whereIn('t10.status', ['Sortlisted', 'Complete'])
                                 ->where('t10.As_ApprovedBy', '!=', 0);
 
 
@@ -2138,7 +2154,8 @@ class Common
                                 't11.id as InterviewId',
                                 't10.status as ApplicationStatus',
                                 't10.As_ApprovedBy',
-								'jd.jobdescription as JobDescription'
+								'jd.jobdescription as JobDescription',
+                                'vacancies.rank as vacancy_rank'
 
                 ])
                 // ->map(function ($vacancy) use ($config,$resort_id,$resort_Location)
@@ -2216,6 +2233,66 @@ class Common
 					return $vacancy;
 				});
 				return $Vacancies;
+        }
+        elseif(in_array((int)$rank, [2, 8]))
+        {
+            // HOD (rank 2) or GM (rank 8) - show applicants awaiting their round action
+            $resort_Location = Auth::guard('resort-admin')->user()->resort->resort_id;
+            $employee = Auth::guard('resort-admin')->user()->GetEmployee;
+            $userDeptId = $employee ? $employee->Dept_id : null;
+
+            // For HOD: show applicants where HR (rank 3) round is Complete
+            // For GM: show applicants where HOD (rank 2) round is Complete
+            $previousRoundRank = ($rank == 2) ? 3 : 2;
+
+            $VacanciesQuery = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
+                ->join('resort_departments as t4', 't4.id', '=', 'vacancies.department')
+                ->join('applicant_form_data as t9', 't9.Parent_v_id', '=', 'vacancies.id')
+                ->join('applicant_wise_statuses as t10', function ($join) use ($previousRoundRank) {
+                    $join->on('t10.Applicant_id', '=', 't9.id')
+                        ->whereRaw('t10.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = t9.id)')
+                        ->where('t10.status', '=', 'Complete')
+                        ->where('t10.As_ApprovedBy', '=', $previousRoundRank);
+                })
+                ->where('vacancies.status', 'Active')
+                ->where('vacancies.Resort_id', $resort_id);
+
+            // HOD only sees their department's applicants
+            if ($rank == 2 && $userDeptId) {
+                $VacanciesQuery->where('vacancies.department', $userDeptId);
+            }
+
+            $Vacancies = $VacanciesQuery->latest('t10.created_at')
+                ->take(7)
+                ->get([
+                    'vacancies.id as V_id',
+                    't5.position_title as Position',
+                    't4.name as Department',
+                    'vacancies.Resort_id',
+                    't9.first_name',
+                    't9.last_name',
+                    't9.passport_photo',
+                    't9.id as ApplicantID',
+                    't10.id as ApplicantStatus_id',
+                    't10.status as ApplicationStatus',
+                    't10.As_ApprovedBy',
+                    'vacancies.rank as vacancy_rank'
+                ])
+                ->map(function ($vacancy) use ($config, $resort_Location) {
+                    $vacancy->rank_name = $config[$vacancy->As_ApprovedBy] ?? 'Unknown Rank';
+                    if ($vacancy->passport_photo) {
+                        $getFile = Common::GetApplicantAWSFile($vacancy->passport_photo);
+                        $vacancy->profileImg = $getFile['NewURLshow'] ?? URL::asset($vacancy->passport_photo);
+                    } else {
+                        $vacancy->profileImg = null;
+                    }
+                    // Set fields that the blade template checks but aren't relevant for HOD/GM
+                    $vacancy->InterviewLinkStatus = null;
+                    $vacancy->InterviewMeetingLink = null;
+                    return $vacancy;
+                });
+
+            return $Vacancies;
         }
         else
         {

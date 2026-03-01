@@ -1220,15 +1220,15 @@ class VacancyController extends Controller
               return datatables()->of($NewVacancies)
 
               ->addColumn('action', function ($row) use ($canSeeAction) {
-                  if (!$canSeeAction) {
-                      return '';
-                  }
-
                 $route = route("resort.ta.Applicants", base64_encode($row->vacancy_id));
-                    return '<a href="'.$route.'" class="btn btn-sm btn-themeBlue me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm btn-theme ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm btn-info viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                $actions = '<a href="'.$route.'" class="btn btn-sm btn-themeBlue me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>';
 
+                if ($canSeeAction) {
+                    $actions .= '<a href="javascript:void(0)" class="btn btn-sm btn-theme ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
+                            <a href="javascript:void(0)" class="btn btn-sm btn-info viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                }
+
+                return $actions;
                         })
                     ->addColumn('Position', function ($row) {
                         return $row->positionTitle.' '.'<span class="badge badge-themeLight">' . htmlspecialchars($row->PositonCode  , ENT_QUOTES, 'UTF-8') . '</span>';
@@ -1296,17 +1296,30 @@ class VacancyController extends Controller
         // }
         //     $NewVacancies = $NewVacancies->get();
 
+        // Determine user role for department filtering
+        $employee = $this->resort->GetEmployee ?? null;
+        $userDeptId = $employee ? $employee->Dept_id : null;
+        $userDeptName = $userDeptId ? ResortDepartment::where('id', $userDeptId)->value('name') : '';
+        $employeeRank = $employee ? $employee->rank : null;
+        $isHrUser = stripos($userDeptName ?? '', 'Human Resources') !== false;
+        $isGM = (int)$employeeRank === 8;
+        $canSeeAllDepts = $isHrUser || $isGM;
+
         $NewVacancies = Vacancies::join("resort_departments as t1", "t1.id", "=", "vacancies.department")
             ->join("resort_positions as t2", "t2.id", "=", "vacancies.position")
             ->join("t_anotification_parents as t3", "t3.V_id", "=", "vacancies.id")
             ->join("t_anotification_children as t4", "t4.Parent_ta_id", "=", "t3.id")
             ->join("application_links as t5", "t5.ta_child_id", "=", "t4.id")
             ->leftjoin("applicant_form_data as t6", "t6.Parent_v_id", "=", "vacancies.id")
-            ->join('job_advertisements as t7', 't7.Resort_id', '=', 'vacancies.Resort_id')
             ->where("vacancies.resort_id", $resort_id)
             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
-            ->where('t4.status','ForwardedToNext')
-;
+            ->where('t4.status','ForwardedToNext');
+
+            // Filter by department for non-HR/non-GM users
+            if (!$canSeeAllDepts && $userDeptId) {
+                $NewVacancies->where("vacancies.department", $userDeptId);
+            }
+
             if (!empty($searchTerm))
             {
                 $Department ='';
@@ -1335,10 +1348,7 @@ class VacancyController extends Controller
                 $NewVacancies->where("vacancies.position", $Postision);
             }
 
-
-
             // Add selected fields and fetch results
-          
         $NewVacancies = $NewVacancies->selectRaw("
                             vacancies.id AS vacancy_id,
                             vacancies.position,
@@ -1347,26 +1357,22 @@ class VacancyController extends Controller
                             t2.code AS PositionCode,
                             t1.name AS Department,
                             t1.code AS DepartmentCode,
-                            COUNT(t6.id) AS NoOfApplication,
-                            t5.link_Expiry_date,
-                            t6.Application_date,
-                            t5.id as application_id,
-                            t5.link as jobAdLink,
-                            vacancies.Total_position_required as NoOfVacnacy,
-                            t7.Jobadvimg
+                            COUNT(DISTINCT t6.id) AS NoOfApplication,
+                            MAX(t5.link_Expiry_date) AS link_Expiry_date,
+                            MAX(t6.Application_date) AS Application_date,
+                            MAX(t5.id) as application_id,
+                            MAX(t5.link) as jobAdLink,
+                            vacancies.Total_position_required as NoOfVacnacy
                         ")
                         ->groupBy(
                                     "vacancies.id",
+                                    "vacancies.position",
                                     "t2.position_title",
+                                    "t2.id",
                                     "t2.code",
                                     "t1.name",
                                     "t1.code",
-                                    "t5.link_Expiry_date",
-                                    "t6.Application_date",
-                                    "t6.id",
-                                    "t5.link",
-                                    "vacancies.Total_position_required",
-                                    "t7.Jobadvimg"
+                                    "vacancies.Total_position_required"
                                 )->paginate(10);
 
 
@@ -1375,22 +1381,13 @@ class VacancyController extends Controller
                         return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
                     })->values()->toArray();
 
-                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($gridAllJobAdImages) {
-                        $vacancy->image = URL::asset(
-                            config('settings.Resort_JobAdvertisement') . '/' .
-                            Auth::guard('resort-admin')->user()->resort->resort_id . '/' .
-                            $vacancy->Jobadvimg
-                        );
+                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($gridAllJobAdImages, $resort_id) {
+                        $vacancy->image = !empty($gridAllJobAdImages) ? $gridAllJobAdImages[0] : null;
                         $vacancy->allJobAdImages = $gridAllJobAdImages;
                         return $vacancy;
                     });
-            // Check if current user belongs to HR department
-            $canSeeAction = false;
-            $employee = $this->resort->GetEmployee ?? null;
-            if ($employee) {
-                $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name');
-                $canSeeAction = stripos($userDeptName, 'Human Resources') !== false;
-            }
+
+            $canSeeAction = $isHrUser || $isGM;
             $view = view('resorts.renderfiles.VacanciesGridView',compact('NewVacancies','canSeeAction'))->render();
                 $pagination =  $NewVacancies->links()->render();
 
@@ -2186,11 +2183,18 @@ class VacancyController extends Controller
                 \Log::warning("Interview link email exception: " . $e->getMessage());
             }
 
-            // Get rank and Todo data for dashboard refresh
+            // Get effective rank for Todo data (EXCOM in HR → rank 3, etc.)
             $rank = $this->resort->GetEmployee->rank ?? null;
+            $effectiveRank = $rank;
+            if ($rank && !in_array($rank, [3, 7, 8])) {
+                $empDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+                if (stripos($empDeptName ?? '', 'Human Resources') !== false) {
+                    $effectiveRank = 3;
+                }
+            }
             $TodoDataview = null;
-            if ($rank) {
-                $TodoData = Common::GmApprovedVacancy($resort_id, $rank);
+            if ($effectiveRank) {
+                $TodoData = Common::GmApprovedVacancy($resort_id, $effectiveRank);
                 $TodoDataview = view('resorts.renderfiles.TaTodoList', compact('TodoData'))->render();
             }
 

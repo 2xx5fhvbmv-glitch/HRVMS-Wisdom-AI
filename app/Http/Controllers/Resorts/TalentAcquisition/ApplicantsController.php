@@ -48,11 +48,14 @@ class ApplicantsController extends Controller
     public function VacnacyWiseApplicants(Request $request, $id)
     {
         $page_title="Applicants";
+        $currentUserRank = $this->resort->GetEmployee->rank ?? null;
+        $userDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id ?? 0)->value('name');
+        $isHrDepartment = stripos($userDeptName ?? '', 'Human Resources') !== false;
         $EmailTamplete = TaEmailTemplate::where('Resort_id',$this->resort->resort_id)
         ->orderByDesc("id")
         ->get();
 
-        return view("resorts.talentacquisition.Applicants.index",compact('EmailTamplete','page_title','id'));
+        return view("resorts.talentacquisition.Applicants.index",compact('EmailTamplete','page_title','id','currentUserRank','isHrDepartment'));
     }
 
     public function GetVacnacyWiseApplicants(Request $request)
@@ -116,7 +119,8 @@ class ApplicantsController extends Controller
                             t5.position_title,
                             t7.job_title,
                             t1.id as applicant_status_id,
-                            t8.Status as InterviewStatus
+                            t8.Status as InterviewStatus,
+                            t4.rank as vacancy_rank
                         ')
                         ->whereIn('t1.status', ['Sortlisted By Wisdom AI', 'Sortlisted', 'Round', 'Selected', 'Complete', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'])
                         ->where('applicant_form_data.Parent_v_id', $id1)
@@ -166,26 +170,34 @@ class ApplicantsController extends Controller
                             $applicant->applicant_id = base64_encode($applicant->applicant_status_id);
                             return $applicant;
                         });
+            $userDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id ?? 0)->value('name');
+            $isHrUser = stripos($userDeptName ?? '', 'Human Resources') !== false;
             return datatables()->of($Applicant_form_data)
-            ->addColumn('action', function ($row) {
+            ->addColumn('action', function ($row) use ($isHrUser) {
                 $id = base64_encode($row->id);
                 $actions = '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
                         <a href="javascript:void(0)" class="btn btn-sm btn-theme ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>';
 
-                // Show Selected/Rejected buttons when GM round is complete
-                if ($row->ApplicantStatus == 'Complete' && $row->As_ApprovedBy == 8) {
-                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-success selectCandidateBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Select"><i class="fa-solid fa-check"></i></a>';
-                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-danger rejectCandidateBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Reject"><i class="fa-solid fa-xmark"></i></a>';
+                // Show Selected/Rejected buttons when final round is complete (only for HR)
+                if ($isHrUser) {
+                    $finalRank = Common::getFinalRoundRank($row->vacancy_rank);
+                    if ($row->ApplicantStatus == 'Complete' && $row->As_ApprovedBy == $finalRank) {
+                        $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-success selectCandidateBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Select"><i class="fa-solid fa-check"></i></a>';
+                        $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-danger rejectCandidateBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Reject"><i class="fa-solid fa-xmark"></i></a>';
+                    }
                 }
 
-                // Show Send Offer Letter button when Selected
-                if ($row->ApplicantStatus == 'Selected') {
-                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-warning sendOfferLetterBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Send Offer Letter"><i class="fa-solid fa-file-contract"></i></a>';
-                }
+                // Only HR department users can send offer letters and contracts
+                if ($isHrUser) {
+                    // Show Send Offer Letter button when Selected
+                    if ($row->ApplicantStatus == 'Selected') {
+                        $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-warning sendOfferLetterBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Send Offer Letter"><i class="fa-solid fa-file-contract"></i></a>';
+                    }
 
-                // Show Send Contract button when Offer Letter Accepted
-                if ($row->ApplicantStatus == 'Offer Letter Accepted') {
-                    $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-info sendContractBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Send Contract"><i class="fa-solid fa-file-signature"></i></a>';
+                    // Show Send Contract button when Offer Letter Accepted
+                    if ($row->ApplicantStatus == 'Offer Letter Accepted') {
+                        $actions .= ' <a href="javascript:void(0)" class="btn btn-sm btn-info sendContractBtn" data-id="'.$id.'" data-applicantstatusid="'.$row->applicant_id.'" data-bs-toggle="tooltip" title="Send Contract"><i class="fa-solid fa-file-signature"></i></a>';
+                    }
                 }
 
                 return $actions;
@@ -220,25 +232,20 @@ class ApplicantsController extends Controller
                 {
                     $string ='<span class="badge badge-themeSkyblue">' .$row->ApplicantStatus.'</span>';
                 }
-                elseif($row->As_ApprovedBy == 3 &&  $row->ApplicantStatus  == 'Sortlisted')
+                elseif($row->As_ApprovedBy != 0 && $row->ApplicantStatus == 'Sortlisted')
                 {
                     $string ='<span class="badge badge-themeBlue">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
                 }
-                elseif($row->As_ApprovedBy == 3 &&  $row->ApplicantStatus  == 'Round' || $row->ApplicantStatus  == 'Complete')
+                elseif(in_array($row->ApplicantStatus, ['Round', 'Complete']))
                 {
-                     $string ='<span class="badge badge-themeBlue">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
+                    $badgeClass = 'badge-themeBlue';
+                    if ($row->As_ApprovedBy == 2) $badgeClass = 'badge-themePurple';
+                    elseif ($row->As_ApprovedBy == 8) $badgeClass = 'badge-themePink';
+                    $string ='<span class="badge '.$badgeClass.'">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
                 }
-                elseif($row->As_ApprovedBy ==2 &&  $row->ApplicantStatus  == 'Round' || $row->ApplicantStatus  == 'Complete')
+                elseif($row->ApplicantStatus == 'Selected')
                 {
-                    $string ='<span class="badge badge-themePurple">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
-                }
-                elseif($row->As_ApprovedBy == 8 &&  $row->ApplicantStatus  == 'Round' || $row->ApplicantStatus  == 'Complete')
-                {
-                     $string =' <span class="badge badge-themePink">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
-                }
-                elseif($row->As_ApprovedBy == 8 &&  $row->ApplicantStatus  == 'Selected' || $row->ApplicantStatus  == 'Complete')
-                {
-                         $string ='<span class="badge badge-themeSuccess">'. $row->rank_name .' '. $row->ApplicantStatus.'</span>';
+                    $string ='<span class="badge badge-themeSuccess">'. $row->ApplicantStatus.'</span>';
                 }
                 elseif( $row->ApplicantStatus  == 'Rejected')
                 {
@@ -339,13 +346,13 @@ class ApplicantsController extends Controller
                     ->leftJoin('vacancies as t6', 't6.id', '=', 'applicant_form_data.Parent_v_id')
                     ->leftJoin('resort_positions as t7', 't7.id', '=', 't6.position')
                     ->leftJoin('resort_departments as t8', 't8.id', '=', 't7.dept_id')
-                    ->leftJoin('applicant_inter_view_details as t9', function ($join) use ($id) {
-                        $join->on('t9.ApplicantStatus_id', '=', 't1.id');
-                            // ->whereRaw('t9.id = (
-                            //     SELECT MAX(id)
-                            //     FROM applicant_inter_view_details
-                            //     WHERE Applicant_id = t1.id
-                            // )')->where('t9.ApplicantStatus_id', base64_decode($id));
+                    ->leftJoin('applicant_inter_view_details as t9', function ($join) {
+                        $join->on('t9.Applicant_id', '=', 'applicant_form_data.id')
+                            ->whereRaw('t9.id = (
+                                SELECT MAX(id)
+                                FROM applicant_inter_view_details
+                                WHERE Applicant_id = applicant_form_data.id
+                            )');
                     })
                     ->selectRaw('
                         applicant_form_data.id,
@@ -380,6 +387,7 @@ class ApplicantsController extends Controller
                         applicant_form_data.curriculum_vitae,
                         applicant_form_data.full_length_photo,
                          applicant_form_data.Total_Experiance,
+                        t6.rank as vacancy_rank,
                         t8.name as DepartmentName,
                         t9.InterViewDate,
                         t9.ApplicantInterviewtime,
@@ -404,7 +412,8 @@ class ApplicantsController extends Controller
 
             $config = config('settings.Position_Rank');
 
-            $InterViewRound = config('settings.InterViewRound');
+            $InterViewRound = Common::getInterviewRoundsForPosition($Applicant_form_data->vacancy_rank);
+            $finalRoundRank = Common::getFinalRoundRank($Applicant_form_data->vacancy_rank);
             if($Applicant_form_data->passport_photo)
             {
                 $getFileapplicant = Common::GetApplicantAWSFile($Applicant_form_data->passport_photo);
@@ -423,8 +432,6 @@ class ApplicantsController extends Controller
                                                         ->whereIn('status',['Complete','Round','Sortlisted'])
                                                         ->get(["Applicant_id", "As_ApprovedBy", "status"]);
             $HrSortlisted = ApplicantWiseStatus::where("Applicant_id", $Applicant_form_data->ApplicantID)
-                                                        ->orderBy('status', 'asc')
-                                                        ->where('status', 'Sortlisted')
                                                         ->where('As_ApprovedBy', '!=', 0)
                                                         ->first(["Applicant_id", "As_ApprovedBy", "status"]);
 
@@ -438,7 +445,7 @@ class ApplicantsController extends Controller
                                                                 return $s;
                                                             });
             $completeRound=array();
-            $approved_keys=[2,3,8];
+            $approved_keys = array_keys($InterViewRound);
             foreach($CompliteWiseStatusFinal as $c)
             {
 
@@ -476,6 +483,8 @@ class ApplicantsController extends Controller
 
             $ApplicantLanguage = ApplicantLanguage::where('applicant_form_id', $Applicant_form_data->ApplicantID)->get(['language','level']);
             $CurrentRankOFUser = $this->resort->GetEmployee->rank;
+            $userDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+            $isHrDepartment = stripos($userDeptName ?? '', 'Human Resources') !== false;
 
             if($Applicant_form_data->passport_photo)
             {
@@ -490,7 +499,7 @@ class ApplicantsController extends Controller
 
 
         $currentUserId = $this->resort->id;
-        $view =  view('resorts.renderfiles.TaUserApplicantsSideBar',compact('currentUserId','getFileapplicant','CurrentRankOFUser','ApplicantLanguage','InterviewComments','CurrentRank','HrSortlisted','completeRound','ApplicantWiseStatusFinal','Applicant_form_data','InterViewRound','SimpleQuestions','VideoQuestions','interview_assesment_response'))->render();
+        $view =  view('resorts.renderfiles.TaUserApplicantsSideBar',compact('currentUserId','getFileapplicant','CurrentRankOFUser','isHrDepartment','ApplicantLanguage','InterviewComments','CurrentRank','HrSortlisted','completeRound','ApplicantWiseStatusFinal','Applicant_form_data','InterViewRound','SimpleQuestions','VideoQuestions','interview_assesment_response','finalRoundRank'))->render();
         return response()->json([
             'success' => true,
             'view'=>$view,
@@ -545,7 +554,8 @@ class ApplicantsController extends Controller
             t1.status as ApplicantStatus,
             t5.position_title,
             t7.job_title,
-            t1.id as applicant_status_id
+            t1.id as applicant_status_id,
+            t4.rank as vacancy_rank
 
         ')
         ->whereIn('t1.status', ['Sortlisted By Wisdom AI', 'Sortlisted', 'Round', 'Selected','Complete'])
@@ -596,7 +606,9 @@ class ApplicantsController extends Controller
         $pagination = $Applicant_form_data->links()->render();
 
 
-            $view = view("resorts.talentacquisition.Applicants.gridviwe",compact('pagination','Applicant_form_data'))->render();
+            $userDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id ?? 0)->value('name');
+            $isHrDepartment = stripos($userDeptName ?? '', 'Human Resources') !== false;
+            $view = view("resorts.talentacquisition.Applicants.gridviwe",compact('pagination','Applicant_form_data','isHrDepartment'))->render();
             return response()->json([
                 'success' => true,
                 'view'=>$view,
@@ -641,21 +653,19 @@ class ApplicantsController extends Controller
                 $StatusApplicantStatus = Vacancies::join("applicant_form_data as t1", "t1.Parent_v_id", "=", "vacancies.id")
                     ->join('applicant_wise_statuses as t4', function ($join) {
                         $join->on('t4.Applicant_id', '=', 't1.id')
-                            ->whereIn('t4.status',  ['Sortlisted','Round','Selected'])
-                            // ->where('t4.As_ApprovedBy', '=', 3)
                             ->whereRaw('t4.id = (
                                 SELECT MAX(id)
                                 FROM applicant_wise_statuses
                                 WHERE Applicant_id = t1.id
                             )');
                     })
-                    ->leftjoin('applicant_inter_view_details as t3', function ($join) use($applicant_id) {
+                    ->leftjoin('applicant_inter_view_details as t3', function ($join) {
                         $join->on('t3.Applicant_id', '=', 't1.id')
                             ->whereRaw('t3.id = (
                                 SELECT MAX(id)
                                 FROM applicant_inter_view_details
                                 WHERE Applicant_id = t1.id
-                            )')->where('t3.ApplicantStatus_id',$applicant_id);
+                            )');
                     })
                     ->leftjoin("resort_positions as t5", "t5.id", "=", "vacancies.position")
                     ->where('vacancies.Resort_id', $resort_id)
@@ -679,7 +689,8 @@ class ApplicantsController extends Controller
                         t5.position_title as Position,
                         t4.id as ApplicantStatus_id,
                         vacancies.Resort_id,
-                        t3.id as InterView_id
+                        t3.id as InterView_id,
+                        vacancies.rank as vacancy_rank
                     ')
                     ->first();
                 if ($StatusApplicantStatus) {
@@ -689,17 +700,28 @@ class ApplicantsController extends Controller
                     {
                        
                         $StatusApplicantStatus->rank_name = $config[$StatusApplicantStatus->As_ApprovedBy] ?? 'Unknown Rank';
+                        $StatusApplicantStatus->ApplicantStatus_raw = $StatusApplicantStatus->ApplicantStatus;
                         $StatusApplicantStatus->AppliedDate = Carbon::parse($StatusApplicantStatus->Application_date)->format('d-m-Y');
 
                         $StatusApplicantStatus->MalidivanTime = (isset($StatusApplicantStatus->ResortInterviewtime)) ?$StatusApplicantStatus->ResortInterviewtime: '-';
                         $StatusApplicantStatus->ApplicantTime = (isset($StatusApplicantStatus->ApplicantInterviewtime)) ?$StatusApplicantStatus->ApplicantInterviewtime :   '-';
                         $StatusApplicantStatus->InterviewStatus = $StatusApplicantStatus->InterviewStatus ?? 'Slot Not Booked';
+                        // Override interview status for completed/post-interview statuses
+                        $postInterviewStatuses = ['Complete', 'Selected', 'Rejected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'];
+                        if (in_array($StatusApplicantStatus->ApplicantStatus, $postInterviewStatuses)) {
+                            $StatusApplicantStatus->InterviewStatus = 'Completed';
+                        }
                         $StatusApplicantStatus->Date = (isset($StatusApplicantStatus->InterViewDate) && $StatusApplicantStatus->InterViewDate !="0000-00-00") ?  Carbon::parse($StatusApplicantStatus->InterViewDate)->format('d-m-Y') : '-';
                         // Badge logic
 
                         $badgeThemes = [
                             'Sortlisted' => 'badge-themeBlue',
                             'Round' => [
+                                2 => 'badge-themePurple',
+                                3 => 'badge-themeBlue',
+                                8 => 'badge-themePink'
+                            ],
+                            'Complete' => [
                                 2 => 'badge-themePurple',
                                 3 => 'badge-themeBlue',
                                 8 => 'badge-themePink'
@@ -749,8 +771,117 @@ class ApplicantsController extends Controller
                         $StatusApplicantStatus->ApplicantStatus_id = base64_encode($StatusApplicantStatus->ApplicantStatus_id);
                         $StatusApplicantStatus->Interview_id = base64_encode($StatusApplicantStatus->InterView_id);
 
+                        // Determine next round info when status is Complete
+                        $nextRound = null;
+                        if ($StatusApplicantStatus->ApplicantStatus_raw == 'Complete') {
+                            $posRounds = Common::getInterviewRoundsForPosition($StatusApplicantStatus->vacancy_rank);
+                            $roundKeysList = array_keys($posRounds);
+                            $currentIdx = array_search((int)$StatusApplicantStatus->As_ApprovedBy, $roundKeysList);
+                            if ($currentIdx !== false && $currentIdx < count($roundKeysList) - 1) {
+                                $nextKey = $roundKeysList[$currentIdx + 1];
+                                $nextName = $posRounds[$nextKey];
+                                $nextRoundType = 'Final Round';
+                                $nextInterviewer = $nextName;
+                                if ($nextName == 'HR') { $nextRoundType = 'Introductory Round'; $nextInterviewer = 'HR Manager'; }
+                                elseif ($nextName == 'HOD') { $nextRoundType = 'Technical Round'; $nextInterviewer = 'Head Of Department'; }
+                                elseif ($nextName == 'GM') { $nextRoundType = 'Final Round'; $nextInterviewer = 'General Manager'; }
+                                $nextRound = [
+                                    'rank_name' => $nextName,
+                                    'round' => $nextRoundType,
+                                    'Interviewer' => $nextInterviewer,
+                                    'Date' => '-',
+                                    'MalidivanTime' => '-',
+                                    'ApplicantTime' => '-',
+                                    'InterviewStatus' => 'Pending',
+                                    'Interview_id' => null,
+                                    'MeetingLink' => null,
+                                    'ApplicantStatus_id' => $StatusApplicantStatus->ApplicantStatus_id,
+                                ];
+
+                                // Check if a next round status already exists with interview data
+                                $nextStatus = ApplicantWiseStatus::where('Applicant_id', $StatusApplicantStatus->Applicant_id)
+                                    ->where('As_ApprovedBy', $nextKey)
+                                    ->whereIn('status', ['Sortlisted', 'Round', 'Complete'])
+                                    ->orderByDesc('id')
+                                    ->first();
+                                if ($nextStatus) {
+                                    $nextInterview = ApplicantInterViewDetails::where('Applicant_id', $StatusApplicantStatus->Applicant_id)
+                                        ->where('ApplicantStatus_id', $nextStatus->id)
+                                        ->orderByDesc('id')
+                                        ->first();
+                                    if ($nextInterview) {
+                                        $nextRound['Date'] = $nextInterview->InterViewDate ? Carbon::parse($nextInterview->InterViewDate)->format('d-m-Y') : '-';
+                                        $nextRound['MalidivanTime'] = $nextInterview->ResortInterviewtime ?? '-';
+                                        $nextRound['ApplicantTime'] = $nextInterview->ApplicantInterviewtime ?? '-';
+                                        $nextRound['InterviewStatus'] = $nextInterview->Status ?? 'Pending';
+                                        $nextRound['Interview_id'] = base64_encode($nextInterview->id);
+                                        $nextRound['MeetingLink'] = $nextInterview->MeetingLink;
+                                        $nextRound['ApplicantStatus_id'] = base64_encode($nextStatus->id);
+                                    } else {
+                                        $nextRound['ApplicantStatus_id'] = base64_encode($nextStatus->id);
+                                    }
+                                }
+                                // Handle corrupted data from old code: interview record was overwritten with next round data
+                                // If status is Complete but interview shows Invitation Sent/Slot Booked, move that data to next round
+                                elseif (in_array($StatusApplicantStatus->InterviewStatus, ['Invitation Sent', 'Slot Booked']) && $nextRound['InterviewStatus'] == 'Pending') {
+                                    $nextRound['Date'] = $StatusApplicantStatus->Date;
+                                    $nextRound['MalidivanTime'] = $StatusApplicantStatus->MalidivanTime;
+                                    $nextRound['ApplicantTime'] = $StatusApplicantStatus->ApplicantTime;
+                                    $nextRound['InterviewStatus'] = $StatusApplicantStatus->InterviewStatus;
+                                    $nextRound['Interview_id'] = $StatusApplicantStatus->Interview_id;
+                                    $nextRound['MeetingLink'] = $StatusApplicantStatus->MeetingLink;
+                                    // Clear the main row's interview data since it belongs to next round
+                                    $StatusApplicantStatus->Date = '-';
+                                    $StatusApplicantStatus->MalidivanTime = '-';
+                                    $StatusApplicantStatus->ApplicantTime = '-';
+                                    $StatusApplicantStatus->InterviewStatus = 'Completed';
+                                }
+                            }
+                        }
+
                     }
                 }
+
+                if (!$StatusApplicantStatus) {
+                    return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+                }
+
+                // Build past rounds (completed rounds before the current one)
+                $pastRounds = [];
+                $isPostInterview = in_array($StatusApplicantStatus->ApplicantStatus_raw, ['Selected', 'Rejected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']);
+                $posRoundsAll = Common::getInterviewRoundsForPosition($StatusApplicantStatus->vacancy_rank);
+                $allStatuses = ApplicantWiseStatus::where('Applicant_id', $StatusApplicantStatus->Applicant_id)
+                    ->whereIn('status', ['Complete', 'Round', 'Sortlisted'])
+                    ->orderBy('id')
+                    ->get();
+                foreach ($posRoundsAll as $rk => $rName) {
+                    // For post-interview statuses, include ALL rounds as past; otherwise stop before current round
+                    if (!$isPostInterview && (int)$rk == (int)$StatusApplicantStatus->As_ApprovedBy) break;
+                    // Prefer 'Complete' status over 'Sortlisted'/'Round' for past rounds
+                    $pastStatus = $allStatuses->where('As_ApprovedBy', $rk)->where('status', 'Complete')->first()
+                        ?? $allStatuses->where('As_ApprovedBy', $rk)->first();
+                    if (!$pastStatus) continue;
+                    $pastInterview = ApplicantInterViewDetails::where('Applicant_id', $StatusApplicantStatus->Applicant_id)
+                        ->where('ApplicantStatus_id', $pastStatus->id)
+                        ->orderByDesc('id')
+                        ->first();
+                    $roundType = 'Final Round';
+                    $interviewer = $rName;
+                    if ($rName == 'HR') { $roundType = 'Introductory Round'; $interviewer = 'HR Manager'; }
+                    elseif ($rName == 'HOD') { $roundType = 'Technical Round'; $interviewer = 'Head Of Department'; }
+                    elseif ($rName == 'GM') { $roundType = 'Final Round'; $interviewer = 'General Manager'; }
+                    $pastRounds[] = [
+                        'rank_name' => $rName,
+                        'round' => $roundType,
+                        'Interviewer' => $interviewer,
+                        'Date' => $pastInterview && $pastInterview->InterViewDate ? Carbon::parse($pastInterview->InterViewDate)->format('d-m-Y') : '-',
+                        'MalidivanTime' => $pastInterview->ResortInterviewtime ?? '-',
+                        'ApplicantTime' => $pastInterview->ApplicantInterviewtime ?? '-',
+                        'InterviewStatus' => $pastStatus->status == 'Complete' ? 'Completed' : ($pastInterview->Status ?? '-'),
+                        'status' => $pastStatus->status,
+                    ];
+                }
+
                 return response()->json([
                     'success' => true,
                     'data' => [
@@ -766,6 +897,8 @@ class ApplicantsController extends Controller
                         'ApplicantStatus_id' => $StatusApplicantStatus->ApplicantStatus_id,
                         'Interview_id'=>$StatusApplicantStatus->Interview_id,
                         'MeetingLink'=>$StatusApplicantStatus->MeetingLink,
+                        'nextRound' => $nextRound ?? null,
+                        'pastRounds' => $pastRounds,
                     ],
                 ]);
 
@@ -885,6 +1018,25 @@ class ApplicantsController extends Controller
                 }
             }
 
+            // If current status is "Complete", create a new Sortlisted status for the next round
+            $currentStatus = ApplicantWiseStatus::find($ApplicantStatus_id);
+            if ($currentStatus && $currentStatus->status == 'Complete') {
+                $applicantData = Applicant_form_data::find($ApplicantID);
+                $vacancy = $applicantData ? \App\Models\Vacancies::find($applicantData->Parent_v_id) : null;
+                $positionRounds = Common::getInterviewRoundsForPosition($vacancy ? $vacancy->rank : null);
+                $roundKeys = array_keys($positionRounds);
+                $currentIdx = array_search((int)$currentStatus->As_ApprovedBy, $roundKeys);
+                if ($currentIdx !== false && $currentIdx < count($roundKeys) - 1) {
+                    $nextRoundRank = $roundKeys[$currentIdx + 1];
+                    $newStatus = ApplicantWiseStatus::create([
+                        'Applicant_id' => $ApplicantID,
+                        'As_ApprovedBy' => $nextRoundRank,
+                        'status' => 'Sortlisted',
+                    ]);
+                    $ApplicantStatus_id = $newStatus->id;
+                }
+            }
+
             // Update or create Applicant Interview Details
             $ApplicantInterViewDetails = ApplicantInterViewDetails::updateOrCreate(
                 [
@@ -912,9 +1064,16 @@ class ApplicantsController extends Controller
 
             DB::commit();
 
-            // Get rank and Todo data
+            // Get effective rank for Todo data (EXCOM in HR → rank 3, etc.)
             $rank = $this->resort->GetEmployee->rank;
-            $TodoData = Common::GmApprovedVacancy($Resort_id, $rank);
+            $effectiveRank = $rank;
+            if (!in_array($rank, [3, 7, 8])) {
+                $empDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+                if (stripos($empDeptName ?? '', 'Human Resources') !== false) {
+                    $effectiveRank = 3;
+                }
+            }
+            $TodoData = Common::GmApprovedVacancy($Resort_id, $effectiveRank);
             $TodoDataview = view('resorts.renderfiles.TaTodoList', compact('TodoData'))->render();
 
             // fianl Response
@@ -1059,52 +1218,58 @@ class ApplicantsController extends Controller
         }
         $ApplicantID  =   base64_decode($request->ApplicantID);
         $applicantstatusid = $request->applicantstatusid;
+        // Handle both plain and base64-encoded status IDs
+        if (!is_numeric($applicantstatusid)) {
+            $applicantstatusid = base64_decode($applicantstatusid);
+        }
         $Rank =  $request->Rank;
 
 
         $Progress_Rank = $request->Progress_Rank;
         $interviewRound = $request->interviewRound;
 
-        if($interviewRound =="HOD Complete" || $interviewRound =="HOD Round")
-        {
-            $Approved_By =2;
-        }
-        elseif($interviewRound =="GM Complete" || $interviewRound =="GM Round" || $interviewRound =="select")
-        {
-            $Approved_By =8;
-        }
-        else
-        {
-            $Approved_By = $this->resort->GetEmployee->rank;
-        }
         $ApplicantWiseStatus = ApplicantWiseStatus::find($applicantstatusid);
+        if (!$ApplicantWiseStatus) {
+            return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+        }
 
-        if( $ApplicantWiseStatus->As_ApprovedBy==0)
-        {
-            $applicantstatusid=0;
+        // Get dynamic final round rank for this applicant's position
+        $applicant = Applicant_form_data::find($ApplicantID);
+        $vacancyRank = null;
+        if ($applicant && $applicant->Parent_v_id) {
+            $vacancy = \App\Models\Vacancies::find($applicant->Parent_v_id);
+            $vacancyRank = $vacancy ? $vacancy->rank : null;
         }
-        if($ApplicantWiseStatus->As_ApprovedBy == 3 && $ApplicantWiseStatus->status == "Round" || $ApplicantWiseStatus->status == "Sortlisted" )
-        {
+        $finalRoundRank = Common::getFinalRoundRank($vacancyRank);
+        $positionRounds = Common::getInterviewRoundsForPosition($vacancyRank);
+
+        // Determine Approved_By dynamically from interviewRound
+        if ($interviewRound == "HRShortlisted") {
+            $Approved_By = 3; // Always HR rank for HR shortlisting
+        } elseif ($interviewRound == "select") {
+            $Approved_By = $finalRoundRank;
+        } else {
+            // Extract round rank from "RoundName Round", "RoundName Complete", or just "RoundName" (JS strips " Complete")
+            $Approved_By = $this->resort->GetEmployee->rank; // fallback
+            foreach ($positionRounds as $rankKey => $roundName) {
+                if (str_starts_with($interviewRound, $roundName . ' ') || $interviewRound == $roundName) {
+                    $Approved_By = (int) $rankKey;
+                    break;
+                }
+            }
+        }
+
+        if ($ApplicantWiseStatus->As_ApprovedBy == 0) {
+            // AI shortlisted → create new record
+            $applicantstatusid = 0;
+        } elseif ($ApplicantWiseStatus->status == "Round" || $ApplicantWiseStatus->status == "Sortlisted") {
+            // In a round or just shortlisted → update existing
             $applicantstatusid;
-        }
-        elseif($ApplicantWiseStatus->As_ApprovedBy == 3 && $ApplicantWiseStatus->status == "Complete")
-        {
-            $applicantstatusid=0;
-        }
-        elseif($ApplicantWiseStatus->As_ApprovedBy == 2 && $ApplicantWiseStatus->status == "Round" )
-        {
-            $applicantstatusid;
-        }
-        elseif($ApplicantWiseStatus->As_ApprovedBy == 2 &&  $ApplicantWiseStatus->status == "Complete")
-        {
-            $applicantstatusid=0;
-        }
-        elseif($ApplicantWiseStatus->As_ApprovedBy == 8 && $ApplicantWiseStatus->status == "Round" )
-        {
-            $applicantstatusid;
-        }
-        elseif($ApplicantWiseStatus->As_ApprovedBy == 8 &&  $ApplicantWiseStatus->status == "Complete")
-        {
+        } elseif ($ApplicantWiseStatus->status == "Complete" && $ApplicantWiseStatus->As_ApprovedBy != $finalRoundRank) {
+            // Round complete but not final round → create new record for next round
+            $applicantstatusid = 0;
+        } elseif ($ApplicantWiseStatus->status == "Complete" && $ApplicantWiseStatus->As_ApprovedBy == $finalRoundRank) {
+            // Final round complete → update existing (will be set to Selected)
             $applicantstatusid;
         }
 
@@ -2006,7 +2171,6 @@ class ApplicantsController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
-            'email_template_id' => 'required',
             'offer_letter' => 'required|file|mimes:pdf|max:10240',
         ]);
 
@@ -2039,17 +2203,16 @@ class ApplicantsController extends Controller
                 'file_path' => $filePath,
                 'status' => 'Sent',
                 'token' => $token,
-                'email_template_id' => $request->email_template_id,
                 'sent_by' => $this->resort->id,
             ]);
 
             // Update applicant status
             ApplicantWiseStatus::updateOrCreate(
                 ['id' => $applicant_status_id],
-                ['status' => 'Offer Letter Sent', 'As_ApprovedBy' => 8]
+                ['status' => 'Offer Letter Sent']
             );
 
-            // Send email
+            // Send custom offer letter email
             $resort = \App\Models\Resort::find($resort_id);
             $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
                 ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
@@ -2057,28 +2220,33 @@ class ApplicantsController extends Controller
                 ->selectRaw('t5.position_title, t6.name as department')
                 ->first();
 
-            $acceptUrl = route('resort.offer.letter.show', $token);
-            $dynamic_data = [
-                'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
-                'position_title' => $vacancy->position_title ?? '',
-                'department' => $vacancy->department ?? '',
-                'resort_name' => $resort->resort_name ?? '',
-                'accept_link' => $acceptUrl,
-                'reject_link' => $acceptUrl,
-                'offer_letter_link' => $acceptUrl,
-            ];
+            $offerLetterLink = route('resort.offer.letter.show', $token);
+            $candidateName = $applicant->first_name . ' ' . $applicant->last_name;
+            $resortName = $resort->resort_name ?? '';
+            $positionTitle = $vacancy->position_title ?? '';
+            $department = $vacancy->department ?? '';
 
-            $result = Common::sendTemplateEmail("TalentAcquisition", $request->email_template_id, $applicant->email, $dynamic_data);
-            if ($result !== true) {
-                \Log::warning("Offer letter email failed: " . $result);
-            }
+            $subject = "Offer Letter – {$positionTitle} at {$resortName}";
+
+            // Send email with PDF attachment
+            $pdfPath = storage_path('app/public/' . $filePath);
+            \Illuminate\Support\Facades\Mail::send('emails.offerLetter', compact('candidateName', 'positionTitle', 'department', 'resortName', 'offerLetterLink'), function ($message) use ($applicant, $subject, $pdfPath) {
+                $message->to($applicant->email)
+                    ->subject($subject);
+                if (file_exists($pdfPath)) {
+                    $message->attach($pdfPath, [
+                        'as' => 'Offer_Letter.pdf',
+                        'mime' => 'application/pdf',
+                    ]);
+                }
+            });
 
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Offer letter sent successfully!']);
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::emergency("sendOfferLetter error: " . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to send offer letter.'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to send offer letter: ' . $e->getMessage()], 500);
         }
     }
 
@@ -2086,7 +2254,6 @@ class ApplicantsController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
-            'email_template_id' => 'required',
             'contract_file' => 'required|file|mimes:pdf|max:10240',
         ]);
 
@@ -2117,15 +2284,15 @@ class ApplicantsController extends Controller
                 'file_path' => $filePath,
                 'status' => 'Sent',
                 'token' => $token,
-                'email_template_id' => $request->email_template_id,
                 'sent_by' => $this->resort->id,
             ]);
 
             ApplicantWiseStatus::updateOrCreate(
                 ['id' => $applicant_status_id],
-                ['status' => 'Contract Sent', 'As_ApprovedBy' => 8]
+                ['status' => 'Contract Sent']
             );
 
+            // Send custom contract email
             $resort = \App\Models\Resort::find($resort_id);
             $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
                 ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
@@ -2133,28 +2300,33 @@ class ApplicantsController extends Controller
                 ->selectRaw('t5.position_title, t6.name as department')
                 ->first();
 
-            $contractUrl = route('resort.contract.show', $token);
-            $dynamic_data = [
-                'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
-                'position_title' => $vacancy->position_title ?? '',
-                'department' => $vacancy->department ?? '',
-                'resort_name' => $resort->resort_name ?? '',
-                'accept_link' => $contractUrl,
-                'reject_link' => $contractUrl,
-                'contract_link' => $contractUrl,
-            ];
+            $contractLink = route('resort.contract.show', $token);
+            $candidateName = $applicant->first_name . ' ' . $applicant->last_name;
+            $resortName = $resort->resort_name ?? '';
+            $positionTitle = $vacancy->position_title ?? '';
+            $department = $vacancy->department ?? '';
 
-            $result = Common::sendTemplateEmail("TalentAcquisition", $request->email_template_id, $applicant->email, $dynamic_data);
-            if ($result !== true) {
-                \Log::warning("Contract email failed: " . $result);
-            }
+            $subject = "Employment Contract – {$positionTitle} at {$resortName}";
+
+            // Send email with PDF attachment
+            $pdfPath = storage_path('app/public/' . $filePath);
+            \Illuminate\Support\Facades\Mail::send('emails.contract', compact('candidateName', 'positionTitle', 'department', 'resortName', 'contractLink'), function ($message) use ($applicant, $subject, $pdfPath) {
+                $message->to($applicant->email)
+                    ->subject($subject);
+                if (file_exists($pdfPath)) {
+                    $message->attach($pdfPath, [
+                        'as' => 'Employment_Contract.pdf',
+                        'mime' => 'application/pdf',
+                    ]);
+                }
+            });
 
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Contract sent successfully!']);
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::emergency("sendContract error: " . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to send contract.'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to send contract: ' . $e->getMessage()], 500);
         }
     }
 

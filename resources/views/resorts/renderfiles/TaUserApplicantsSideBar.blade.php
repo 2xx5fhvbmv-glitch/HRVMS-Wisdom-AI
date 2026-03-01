@@ -3,43 +3,33 @@
 
         @php
             $progress = 0;
+            $roundKeys = array_keys($InterViewRound);
+            $totalRounds = count($InterViewRound);
+            // Steps: AI Shortlisted(1) + HR Shortlisted(1) + per round: Round+Complete (2*N) + Selected(1)
+            $totalSteps = 2 + ($totalRounds * 2) + 1;
+            $currentStep = 0;
 
-            if($Applicant_form_data->As_ApprovedBy == 0)
-            {
-                $progress = 16.66; // Step 1 completed
+            if($Applicant_form_data->ApplicantStatus == 'Selected') {
+                $currentStep = $totalSteps;
+            } elseif($Applicant_form_data->As_ApprovedBy == 0) {
+                $currentStep = 1; // AI Shortlisted
+            } else {
+                $currentStep = 2; // HR Shortlisted at minimum
+                foreach ($roundKeys as $index => $rankCode) {
+                    $rankCode = (int) $rankCode;
+                    if ($Applicant_form_data->As_ApprovedBy == $rankCode && $Applicant_form_data->ApplicantStatus == 'Round') {
+                        $currentStep = 2 + ($index * 2) + 1;
+                        break;
+                    } elseif ($Applicant_form_data->As_ApprovedBy == $rankCode && $Applicant_form_data->ApplicantStatus == 'Complete') {
+                        $currentStep = 2 + ($index * 2) + 2;
+                        break;
+                    } elseif ($Applicant_form_data->As_ApprovedBy == $rankCode && $Applicant_form_data->ApplicantStatus == 'Sortlisted') {
+                        $currentStep = 2;
+                        break;
+                    }
+                }
             }
-            elseif ($Applicant_form_data->As_ApprovedBy == 3 && $Applicant_form_data->ApplicantStatus == 'Sortlisted' )
-            {
-                $progress = 33.32; // Step 2 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 3 && $Applicant_form_data->ApplicantStatus == 'Round')
-            {
-                $progress = 33.32; // Step 3 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 3 && $Applicant_form_data->ApplicantStatus == 'Complete')
-            {
-                $progress = 49.98; // Step 3 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 2 && $Applicant_form_data->ApplicantStatus == 'Round')
-            {
-                $progress =49.98; // Step 4 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 2 && $Applicant_form_data->ApplicantStatus == 'Complete')
-            {
-                $progress = 66.64; // Step 4 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 8 && $Applicant_form_data->ApplicantStatus == 'Round')
-            {
-                $progress = 66.64; // Step 5 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 8 && $Applicant_form_data->ApplicantStatus == 'Complete')
-            {
-                $progress = 83.30; // Step 5 completed
-            }
-            elseif ($Applicant_form_data->As_ApprovedBy == 8 && $Applicant_form_data->ApplicantStatus == 'Selected')
-            {
-                $progress = 100; // Step 6 completed
-            }
+            $progress = round(($currentStep / $totalSteps) * 100, 2);
         @endphp
         <div class="progress-container skyblue" data-progress="{{ $progress }}">
             <svg class="progress-circle" viewBox="0 0 120 120">
@@ -55,17 +45,17 @@
 
                 @if($Applicant_form_data->As_ApprovedBy == 0)
                     <span class="badge badge-themeSkyblue">{{ $Applicant_form_data->ApplicantStatus }}</span>
-                @elseif($Applicant_form_data->As_ApprovedBy == 3 &&  $Applicant_form_data->ApplicantStatus  == 'Sortlisted')
-                    <span class="badge badge-themeBlue">{{  $Applicant_form_data->rank_name }} {{ $Applicant_form_data->ApplicantStatus }}</span>
-                @elseif($Applicant_form_data->As_ApprovedBy == 3 &&  $Applicant_form_data->ApplicantStatus  == 'Round' || $Applicant_form_data->ApplicantStatus  == 'Complete' )
-                    <span class="badge badge-themeBlue">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
-
-                @elseif($Applicant_form_data->As_ApprovedBy ==2 &&  $Applicant_form_data->ApplicantStatus  == 'Round' || $Applicant_form_data->ApplicantStatus  == 'Complete')
-                    <span class="badge badge-themePurple">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
-                @elseif($Applicant_form_data->As_ApprovedBy == 8 &&  $Applicant_form_data->ApplicantStatus  == 'Round' || $Applicant_form_data->ApplicantStatus  == 'Complete')
-                    <span class="badge badge-themePink">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
-                @elseif($Applicant_form_data->As_ApprovedBy == 8 &&  $Applicant_form_data->ApplicantStatus  == 'Selected')
-                    <span class="badge badge-themeSuccess">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
+                @elseif($Applicant_form_data->As_ApprovedBy != 0 &&  $Applicant_form_data->ApplicantStatus  == 'Sortlisted')
+                    <span class="badge badge-themeBlue">HR {{ $Applicant_form_data->ApplicantStatus }}</span>
+                @elseif(in_array($Applicant_form_data->ApplicantStatus, ['Round', 'Complete']))
+                    @php
+                        $badgeClass = 'badge-themeBlue';
+                        if ($Applicant_form_data->As_ApprovedBy == 2) $badgeClass = 'badge-themePurple';
+                        elseif ($Applicant_form_data->As_ApprovedBy == 8) $badgeClass = 'badge-themePink';
+                    @endphp
+                    <span class="badge {{ $badgeClass }}">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
+                @elseif($Applicant_form_data->ApplicantStatus  == 'Selected')
+                    <span class="badge badge-themeSuccess">{{ $Applicant_form_data->ApplicantStatus }}</span>
                 @elseif( $Applicant_form_data->ApplicantStatus  == 'Rejected')
                     <span class="badge badge-themeDanger">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
                 @endif
@@ -227,7 +217,7 @@
                                     <div id="collapseOne" class="accordion-collapse collapse show"
                                         aria-labelledby="headingOne" data-bs-parent="#accordionExample">
                                         <div class="accordion-body">
-                                            @if($Applicant_form_data->ApplicantStatus =="Sortlisted By Wisdom AI" &&   $Applicant_form_data->As_ApprovedBy ==0)
+                                            @if($Applicant_form_data->ApplicantStatus =="Sortlisted By Wisdom AI" &&   $Applicant_form_data->As_ApprovedBy ==0 && $isHrDepartment)
                                                 <a href="javascritp:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
                                                     data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                     data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
@@ -282,87 +272,60 @@
                                                     <ol>
                                                         @php
                                                         $rank='';
-
-
                                                         $interviewer='';
-                                                            foreach ($InterViewRound as $k => $r)
-                                                            {
-                                                                foreach($completeRound as $k1=>$c)
-                                                                {
+                                                        $isApprovedByHR=false;
+                                                        $roundKeys = array_keys($InterViewRound);
 
-                                                                    if($k==$k1)
-                                                                    {
-                                                                        echo "<li>".$r."    Round </li>";
-
-                                                                    }
-                                                                }
-                                                                foreach ($ApplicantWiseStatusFinal as $a)
-                                                                {
-
-
-
-
-                                                                    if($a->As_ApprovedBy == 3  &&  $a->status=="Sortlisted" && $Applicant_form_data->ApplicantStatus =="Sortlisted")
-                                                                    {
-                                                                        $interviewer ="HR Round";
-                                                                        $isApprovedByHR=true;
-                                                                        $rank='Round';
-                                                                        break;
-                                                                    }
-                                                                    elseif($a->As_ApprovedBy == 3  &&  $a->status=="Round"  && $Applicant_form_data->ApplicantStatus =="Round" )
-                                                                    {
-                                                                        $interviewer ="HR Complete";
-                                                                        $isApprovedByHR=true;
-                                                                        $rank='Complete';
-                                                                        break;
-                                                                    }
-                                                                    elseif($a->As_ApprovedBy == 3 &&   $Applicant_form_data->As_ApprovedBy  == 3 &&  $a->status  == $Applicant_form_data->ApplicantStatus )
-                                                                    {
-                                                                        $interviewer ="HOD Round";
-                                                                        $isApprovedByHR=true;
-                                                                        $rank='Round';
-                                                                        break;
-                                                                    }
-                                                                    elseif($a->As_ApprovedBy == 2  &&  $a->status=="Round" && $Applicant_form_data->ApplicantStatus =="Round")
-                                                                    {
-                                                                        $interviewer ="HOD Complete";
-                                                                        $isApprovedByHR=true;
-                                                                        $rank='Complete';
-                                                                        break;
-                                                                    }
-                                                                    elseif($a->As_ApprovedBy == 2  &&   $Applicant_form_data->As_ApprovedBy  == 2 &&  $a->status  == $Applicant_form_data->ApplicantStatus)
-                                                                    {
-
-
-                                                                        $interviewer ="GM Round";
-                                                                        $rank='Round';
-                                                                        $isApprovedByHR=true;
-                                                                        break;
-                                                                    }
-
-                                                                    elseif($a->As_ApprovedBy == 8  &&  $a->status=="Round" && $Applicant_form_data->ApplicantStatus =="Round")
-                                                                    {
-                                                                        $interviewer ="GM Complete";
-                                                                        $rank='Complete';
-                                                                        $isApprovedByHR=true;
-                                                                        break;
-                                                                    }
-                                                                    elseif($a->As_ApprovedBy == 8  &&  $a->status=="Complete" && $Applicant_form_data->ApplicantStatus =="Complete")
-                                                                    {
-                                                                        $interviewer ="select";
-                                                                        $isApprovedByHR=true;
-                                                                        $rank='Selected';
-
-                                                                    }
-
-                                                                    else {
-                                                                        $isApprovedByHR=false;
-                                                                    }
+                                                        // Show complete rounds
+                                                        foreach ($InterViewRound as $k => $r) {
+                                                            foreach($completeRound as $k1=>$c) {
+                                                                if($k==$k1) {
+                                                                    echo "<li>".$r." Round </li>";
                                                                 }
                                                             }
+                                                        }
 
-                                                        $remainingRounds =array_diff($InterViewRound, $completeRound);
+                                                        // Determine current action button dynamically
+                                                        foreach ($ApplicantWiseStatusFinal as $a) {
+                                                            // HR Shortlisted -> first round
+                                                            if($a->As_ApprovedBy != 0 && $a->status=="Sortlisted" && $Applicant_form_data->ApplicantStatus =="Sortlisted") {
+                                                                $firstRoundName = $InterViewRound[$roundKeys[0]] ?? 'HR';
+                                                                $interviewer = $firstRoundName . " Round";
+                                                                $isApprovedByHR=true;
+                                                                $rank='Round';
+                                                                break;
+                                                            }
 
+                                                            // Dynamic round progression based on position
+                                                            foreach ($roundKeys as $index => $roundRankCode) {
+                                                                $roundName = $InterViewRound[$roundRankCode];
+                                                                $isLastRound = ($index == count($roundKeys) - 1);
+
+                                                                // Current round status is "Round" -> offer "Complete" button
+                                                                if($a->As_ApprovedBy == $roundRankCode && $a->status=="Round" && $Applicant_form_data->ApplicantStatus =="Round") {
+                                                                    $interviewer = $roundName . " Complete";
+                                                                    $isApprovedByHR=true;
+                                                                    $rank='Complete';
+                                                                    break 2;
+                                                                }
+                                                                // Current round is "Complete" -> offer next round or select
+                                                                elseif($a->As_ApprovedBy == $roundRankCode && $a->status=="Complete" && $Applicant_form_data->ApplicantStatus =="Complete" && $Applicant_form_data->As_ApprovedBy == $roundRankCode) {
+                                                                    if($isLastRound) {
+                                                                        $interviewer = "select";
+                                                                        $isApprovedByHR=true;
+                                                                        $rank='Selected';
+                                                                    } else {
+                                                                        $nextRoundName = $InterViewRound[$roundKeys[$index + 1]];
+                                                                        $interviewer = $nextRoundName . " Round";
+                                                                        $isApprovedByHR=true;
+                                                                        $rank='Round';
+                                                                    }
+                                                                    break 2;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        $remainingRounds = array_diff($InterViewRound, $completeRound);
                                                         @endphp
                                                     </ol>
                                                 </li>
@@ -380,88 +343,67 @@
                                                 @endif
                                             </ol>
                                             <?php
-                                                $CompleteArray=["GM Complete","HOD Complete","HR Complete","select"];
-                                                $RoundArray=["GM Round","HOD Round","HR Round"];
+                                                $CompleteArray = ["select"];
+                                                $RoundArray = [];
+                                                foreach ($InterViewRound as $rName) {
+                                                    $CompleteArray[] = $rName . " Complete";
+                                                    $RoundArray[] = $rName . " Round";
+                                                }
                                             ?>
                                             @if ($interviewer )
+                                                @php
+                                                    // Determine which round this button belongs to
+                                                    $buttonRoundRank = null;
+                                                    foreach ($InterViewRound as $rk => $rn) {
+                                                        if (str_starts_with($interviewer, $rn . ' ')) {
+                                                            $buttonRoundRank = (int) $rk;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if ($interviewer == "select") $buttonRoundRank = $finalRoundRank;
+                                                    // Only HR can select/reject; for other actions, HR can act on all rounds, others only on their own round
+                                                    $canAct = ($interviewer == "select") ? $isHrDepartment : ($isHrDepartment || $CurrentRankOFUser == $buttonRoundRank);
+                                                @endphp
 
-                                                @if(in_array($interviewer,$CompleteArray) && $Applicant_form_data->MeetingLink!="")
+                                                @if($canAct)
+                                                    @if(in_array($interviewer,$CompleteArray) && $Applicant_form_data->MeetingLink!="")
 
-                                                    <a href="#" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
-                                                        data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
-                                                        data-Progress_ApplicantStatusID="{{ $Applicant_form_data->ApplicantStatusID }}"
-                                                        data-Progress_As_ApprovedBy="{{ $CurrentRank }}"
-                                                        data-Progress_Rank="{{ $rank }}" data-interviewRound ="{{$interviewer }}"
+                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
+                                                            data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
+                                                            data-Progress_ApplicantStatusID="{{ $Applicant_form_data->ApplicantStatusID }}"
+                                                            data-Progress_As_ApprovedBy="{{ $CurrentRank }}"
+                                                            data-Progress_Rank="{{ $rank }}" data-interviewRound ="{{$interviewer }}"
+                                                            >
+                                                            {{ $interviewer }}
+                                                        </a>
 
-                                                        @if( ($interviewer=="GM Complete" || $interviewer=="GM Round" ) == true &&  $CurrentRankOFUser == 2)
-                                                            disabled
-                                                        @endif
-                                                        @if( ($interviewer=="HOD Complete" || $interviewer=="HOD Round" ) == true &&  $CurrentRankOFUser == 8)
-                                                            disabled
-                                                        @endif
-                                                        >
-
-                                                        {{ $interviewer }}
-                                                    </a>
-
-                                                    <a href="javascritp:void(0)"
-                                                        data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
-                                                        data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
-                                                        data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
-                                                        data-Progress_Rank="Rejected" data-interviewRound ="{{$interviewer }}"
-
-                                                        @if( ($interviewer=="GM Complete" || $interviewer=="GM Round" ) == true &&  $CurrentRankOFUser == 2)
-                                                            disabled
-                                                            class="btn btn-primary ApprovedOrSortListed btn-sm"
-                                                        @else
-                                                        class="btn btn-danger ApprovedOrSortListed btn-sm"
-                                                        @endif
-
-                                                        @if( ($interviewer=="HOD Complete" || $interviewer=="HOD Round" ) == true &&  $CurrentRankOFUser == 8)
-                                                        disabled
-                                                                class="btn btn-primary ApprovedOrSortListed btn-sm"
-                                                        @else
+                                                        <a href="javascript:void(0)"
+                                                            data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
+                                                            data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
+                                                            data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
+                                                            data-Progress_Rank="Rejected" data-interviewRound ="{{$interviewer }}"
                                                             class="btn btn-danger ApprovedOrSortListed btn-sm"
-                                                        @endif
-                                                        > Rejected
-                                                    </a>
-                                                @elseif(in_array($interviewer,$RoundArray))
-                                                    <a href="#" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
-                                                        data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
-                                                        data-Progress_ApplicantStatusID="{{ $Applicant_form_data->ApplicantStatusID }}"
-                                                        data-Progress_As_ApprovedBy="{{ $CurrentRank }}"
-                                                        data-Progress_Rank="{{ $rank }}" data-interviewRound ="{{$interviewer }}"
+                                                            > Rejected
+                                                        </a>
+                                                    @elseif(in_array($interviewer,$RoundArray))
+                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
+                                                            data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
+                                                            data-Progress_ApplicantStatusID="{{ $Applicant_form_data->ApplicantStatusID }}"
+                                                            data-Progress_As_ApprovedBy="{{ $CurrentRank }}"
+                                                            data-Progress_Rank="{{ $rank }}" data-interviewRound ="{{$interviewer }}"
+                                                            >{{ $interviewer }}</a>
 
-                                                        @if( ($interviewer=="GM Complete" || $interviewer=="GM Round" ) == true &&  $CurrentRankOFUser == 2)
-                                                            disabled
-                                                        @endif
-                                                        @if( ($interviewer=="HOD Complete" || $interviewer=="HOD Round" ) == true &&  $CurrentRankOFUser == 8)
-                                                            disabled
-                                                        @endif >{{ $interviewer }} </a>
-
-                                                    <a href="javascritp:void(0)"
-                                                        data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
-                                                        data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
-                                                        data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
-                                                        data-Progress_Rank="Rejected" data-interviewRound ="{{$interviewer }}"
-
-                                                        @if( ($interviewer=="GM Complete" || $interviewer=="GM Round" ) == true &&  $CurrentRankOFUser == 2)
-                                                            disabled
-                                                            class="btn btn-primary ApprovedOrSortListed btn-sm"
-                                                        @else
-                                                        class="btn btn-danger ApprovedOrSortListed btn-sm"
-                                                        @endif
-
-                                                        @if( ($interviewer=="HOD Complete" || $interviewer=="HOD Round" ) == true &&  $CurrentRankOFUser == 8)
-                                                        disabled
-                                                                class="btn btn-primary ApprovedOrSortListed btn-sm"
-                                                        @else
+                                                        <a href="javascript:void(0)"
+                                                            data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
+                                                            data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
+                                                            data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
+                                                            data-Progress_Rank="Rejected" data-interviewRound ="{{$interviewer }}"
                                                             class="btn btn-danger ApprovedOrSortListed btn-sm"
-                                                        @endif
-                                                        > Rejected
-                                                    </a>
-                                                @else
-                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue  btn-sm"> Please generate Interview Link</a>
+                                                            > Rejected
+                                                        </a>
+                                                    @else
+                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue  btn-sm"> Please generate Interview Link</a>
+                                                    @endif
                                                 @endif
                                             @endif
 
@@ -469,7 +411,7 @@
 
                                     </div>
                                 </div>
-                                <div class="accordion-item  @if($Applicant_form_data->ApplicantStatus == "Selected" &&  $Applicant_form_data->As_ApprovedBy == 8)active @endif ">
+                                <div class="accordion-item  @if($Applicant_form_data->ApplicantStatus == "Selected" &&  $Applicant_form_data->As_ApprovedBy == $finalRoundRank)active @endif ">
                                     <h2 class="accordion-header" id="headingFour">
                                         <button class="accordion-button collapsed" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#collapseFour"

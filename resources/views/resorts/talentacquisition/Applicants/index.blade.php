@@ -61,7 +61,9 @@
                                     <th>Applied Date<i class="fa-solid fa-caret-down"></i></th>
                                     <th>Stage<i class="fa-solid fa-caret-down"></i></th>
                                     <th>Invitation Status</th>
+                                    @if($isHrDepartment)
                                     <th></th>
+                                    @endif
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -286,6 +288,7 @@
             </div>
         </div>
     </div>
+    @if($isHrDepartment)
     <div class="modal fade" id="Email-template-selection-modal" tabindex="-1" aria-labelledby="exampleModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-small">
@@ -312,6 +315,7 @@
             </div>
         </div>
     </div>
+    @endif
     <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -430,25 +434,10 @@
                 <form id="offerLetterForm" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Select Email Template</label>
-                            <select class="form-control" name="email_template_id" required>
-                                <option selected disabled value="">Select Email Template</option>
-                                @if(isset($EmailTamplete))
-                                @foreach ($EmailTamplete as $e)
-                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
-                                @endforeach
-                                @endif
-                            </select>
-                        </div>
+                        <p class="text-muted mb-3">A custom email with the offer letter PDF and accept/decline link will be sent to the applicant.</p>
                         <div class="mb-3">
                             <label class="form-label">Upload Offer Letter (PDF)</label>
                             <input type="file" class="form-control" name="offer_letter" accept=".pdf" required>
-                        </div>
-                        <div class="mb-3 d-none" id="viewOfferLetterWrapper">
-                            <a href="#" target="_blank" id="viewOfferLetterLink" class="btn btn-sm btn-outline-primary">
-                                <i class="fa-solid fa-eye me-1"></i>View Offer Letter
-                            </a>
                         </div>
                         <input type="hidden" name="applicant_id" id="offerLetter_ApplicantID">
                         <input type="hidden" name="applicant_status_id" id="offerLetter_applicantstatusid">
@@ -473,25 +462,10 @@
                 <form id="contractForm" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Select Email Template</label>
-                            <select class="form-control" name="email_template_id" required>
-                                <option selected disabled value="">Select Email Template</option>
-                                @if(isset($EmailTamplete))
-                                @foreach ($EmailTamplete as $e)
-                                    <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
-                                @endforeach
-                                @endif
-                            </select>
-                        </div>
+                        <p class="text-muted mb-3">A custom email with the contract PDF and accept/decline link will be sent to the applicant.</p>
                         <div class="mb-3">
                             <label class="form-label">Upload Contract (PDF)</label>
                             <input type="file" class="form-control" name="contract_file" accept=".pdf" required>
-                        </div>
-                        <div class="mb-3 d-none" id="viewContractWrapper">
-                            <a href="#" target="_blank" id="viewContractLink" class="btn btn-sm btn-outline-primary">
-                                <i class="fa-solid fa-eye me-1"></i>View Contract
-                            </a>
                         </div>
                         <input type="hidden" name="applicant_id" id="contract_ApplicantID">
                         <input type="hidden" name="applicant_status_id" id="contract_applicantstatusid">
@@ -522,6 +496,7 @@
 
 @section('import-scripts')
     <script>
+        var isHrDepartment = @json($isHrDepartment);
         $(document).ready(function() {
             datatablelist();
             $('.table-applicants tbody').empty();
@@ -541,12 +516,7 @@
           
                     if( status != "Sortlisted By Wisdom AI")
                     {
-                        if(status == "Complete")
-                        {
-                            toastr.error('Please Wait For the next Responsed .', { positionClass: 'toast-bottom-right', timeOut: 5000 });
-                            return false;
-                        }
-                        else if(status == "Selected")
+                        if(status == "Selected")
                         {
                             toastr.error('This Applicant Already Selected By GM.', { positionClass: 'toast-bottom-right', timeOut: 5000 });
                         }
@@ -562,7 +532,12 @@
                                     if (response.success)
                                     {
                                         let newTag = 'send Link';
-                                        if(response.data.InterviewStatus == 'Slot Not Booked' || response.data.InterviewStatus == 'Invitation Rejected')
+                                        let postInterviewStatuses = ['Complete', 'Selected', 'Rejected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'];
+                                        if(postInterviewStatuses.includes(status))
+                                        {
+                                            newTag =`<span class="badge bg-success">Round Completed</span>`;
+                                        }
+                                        else if(response.data.InterviewStatus == 'Slot Not Booked' || response.data.InterviewStatus == 'Invitation Rejected')
                                         {
                                             newTag =`<a href="javascript:void(0)"
                                                 data-Resort_id="${response.data.Resort_id}"
@@ -594,6 +569,77 @@
                                         // <a href="#shareMeetLink-modal" data-bs-toggle="modal" class="btn btn-themeSkyblue btn-small">
                                         //                         Share Meeting Link
                                         //                     </a>
+                                        // Build next round row if Complete and has next round
+                                        let nextRoundRow = '';
+                                        if (status == "Complete" && response.data.nextRound) {
+                                            const nr = response.data.nextRound;
+                                            let nrAction = '';
+                                            let nrStatusBadge = `<span class="badge bg-secondary">Pending</span>`;
+                                            const nrApplicantStatusId = nr.ApplicantStatus_id || response.data.ApplicantStatus_id;
+
+                                            if (nr.InterviewStatus == 'Pending' || nr.InterviewStatus == 'Slot Not Booked' || nr.InterviewStatus == 'Invitation Rejected') {
+                                                nrAction = `<a href="javascript:void(0)"
+                                                    data-Resort_id="${response.data.Resort_id}"
+                                                    data-ApplicantID="${response.data.ApplicantID}"
+                                                    data-ApplicantStatus_id="${nrApplicantStatusId}"
+                                                    class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                            } else if (nr.InterviewStatus == 'Invitation Sent') {
+                                                nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
+                                                nrStatusBadge = `<span class="badge bg-info text-white">Invitation Sent</span>`;
+                                            } else if (nr.InterviewStatus == 'Slot Booked' && (!nr.MeetingLink || !isNaN(nr.MeetingLink))) {
+                                                nrAction = `<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
+                                                    data-round="${nr.round}"
+                                                    data-rank_name="${nr.rank_name}"
+                                                    data-interview_id="${nr.Interview_id}" href="javascript:void(0)">Add Interview Link</a>`;
+                                                nrStatusBadge = `<span class="badge bg-warning text-dark">Slot Booked</span>`;
+                                            } else if (nr.InterviewStatus == 'Slot Booked' && nr.MeetingLink) {
+                                                nrAction = `<a href="${nr.MeetingLink}" target="_blank" class="btn btn-themeSkyblue btn-small">Start Interview</a>`;
+                                                nrStatusBadge = `<span class="badge bg-success">Ready</span>`;
+                                            }
+
+                                            nextRoundRow = `<tr>
+                                                            <td><select class="form-control EmailTemplate EmailTemplate-next" name='EmailTemplate'>
+                                                                <option selected disabled>Select Email Template </option>
+                                                                    @foreach ($EmailTamplete as $e)
+                                                                        <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
+                                                                    @endforeach
+                                                                    </select>
+                                                            </td>
+                                                            <td>${nr.rank_name}</td>
+                                                            <td>${nr.round}</td>
+                                                            <td><input type="hidden" class="Round" name="Round" value="${nr.rank_name}">
+                                                            <input type="hidden" class="InterviewType" name="InterviewType" value="${nr.round}">
+                                                            <input type="hidden" class="Interviewer" name="Interviewer" value="${nr.Interviewer}">
+                                                                ${nr.Interviewer}</td>
+                                                            <td>${nr.Date}</td>
+                                                            <td>${nr.MalidivanTime}</td>
+                                                            <td>${nr.ApplicantTime}</td>
+                                                            <td>${nrStatusBadge}</td>
+                                                            <td>${nrAction}</td>
+                                                        </tr>`;
+                                        }
+
+                                        // Build past rounds rows
+                                        let pastRoundsRows = '';
+                                        if (response.data.pastRounds && response.data.pastRounds.length > 0) {
+                                            response.data.pastRounds.forEach(function(pr) {
+                                                let prStatusBadge = pr.status == 'Complete'
+                                                    ? `<span class="badge bg-success">Completed</span>`
+                                                    : `<span class="badge bg-secondary">${pr.InterviewStatus}</span>`;
+                                                pastRoundsRows += `<tr>
+                                                    <td>-</td>
+                                                    <td>${pr.rank_name}</td>
+                                                    <td>${pr.round}</td>
+                                                    <td>${pr.Interviewer}</td>
+                                                    <td>${pr.Date}</td>
+                                                    <td>${pr.MalidivanTime}</td>
+                                                    <td>${pr.ApplicantTime}</td>
+                                                    <td>${prStatusBadge}</td>
+                                                    <td><span class="badge bg-success">Round Completed</span></td>
+                                                </tr>`;
+                                            });
+                                        }
+
                                         const newRow =`
                                         <tr id="detailsRow${rowId}" class="details-row">
                                             <td colspan="10">
@@ -608,9 +654,9 @@
                                                             <th>Maldives Time</th>
                                                             <th>Applicant Time</th>
                                                             <th>Interview Status</th>
-
                                                             <th>Action</th>
                                                         </tr>
+                                                        ${pastRoundsRows}
                                                         <tr>
                                                             <td><select class="form-control EmailTemplate" name='EmailTemplate'>
                                                                 <option selected disabled>Select Email Template </option>
@@ -633,6 +679,7 @@
                                                                 ${newTag}
                                                             </td>
                                                         </tr>
+                                                        ${nextRoundRow}
                                                     </table>
                                                 </div>
                                             </td>
@@ -674,14 +721,7 @@
                 let status = $(this).data('status');
                 let applicant_id = $(this).data('applicant_id');
                 if(status != "Sortlisted By Wisdom AI") {
-                    if(status == "Complete") {
-                        toastr.error('Please Wait For the next Responsed .', { 
-                            positionClass: 'toast-bottom-right', 
-                            timeOut: 5000 
-                        });
-                        return false;
-                    }
-                    else if(status == "Selected") {
+                    if(status == "Selected") {
                         toastr.error('This Applicant Already Selected By GM.', { 
                             positionClass: 'toast-bottom-right',
                             timeOut: 5000 
@@ -697,7 +737,11 @@
                                 if (response.success) {
                                     console.log(response);
                                     let newTag = 'send Link';
-                                    if(response.data.InterviewStatus == 'Slot Not Booked' || response.data.InterviewStatus == 'Invitation Rejected') {
+                                    let postInterviewStatuses = ['Complete', 'Selected', 'Rejected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'];
+                                    if(postInterviewStatuses.includes(status)) {
+                                        newTag =`<span class="badge bg-success">Round Completed</span>`;
+                                    }
+                                    else if(response.data.InterviewStatus == 'Slot Not Booked' || response.data.InterviewStatus == 'Invitation Rejected') {
                                         newTag =`<a href="javascript:void(0)"
                                             data-Resort_id="${response.data.Resort_id}"
                                             data-ApplicantID="${response.data.ApplicantID}"
@@ -720,6 +764,77 @@
                                         data-interview_id="${response.data.Interview_id}" href="javascript:void(0)">Start Interview  </a>`;
                                     }
 
+                                    // Build next round row if Complete and has next round
+                                    let nextRoundRow = '';
+                                    if (status == "Complete" && response.data.nextRound) {
+                                        const nr = response.data.nextRound;
+                                        let nrAction = '';
+                                        let nrStatusBadge = `<span class="badge bg-secondary">Pending</span>`;
+                                        const nrApplicantStatusId = nr.ApplicantStatus_id || response.data.ApplicantStatus_id;
+
+                                        if (nr.InterviewStatus == 'Pending' || nr.InterviewStatus == 'Slot Not Booked' || nr.InterviewStatus == 'Invitation Rejected') {
+                                            nrAction = `<a href="javascript:void(0)"
+                                                data-Resort_id="${response.data.Resort_id}"
+                                                data-ApplicantID="${response.data.ApplicantID}"
+                                                data-ApplicantStatus_id="${nrApplicantStatusId}"
+                                                class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                        } else if (nr.InterviewStatus == 'Invitation Sent') {
+                                            nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
+                                            nrStatusBadge = `<span class="badge bg-info text-white">Invitation Sent</span>`;
+                                        } else if (nr.InterviewStatus == 'Slot Booked' && (!nr.MeetingLink || !isNaN(nr.MeetingLink))) {
+                                            nrAction = `<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
+                                                data-round="${nr.round}"
+                                                data-rank_name="${nr.rank_name}"
+                                                data-interview_id="${nr.Interview_id}" href="javascript:void(0)">Add Interview Link</a>`;
+                                            nrStatusBadge = `<span class="badge bg-warning text-dark">Slot Booked</span>`;
+                                        } else if (nr.InterviewStatus == 'Slot Booked' && nr.MeetingLink) {
+                                            nrAction = `<a href="${nr.MeetingLink}" target="_blank" class="btn btn-themeSkyblue btn-small">Start Interview</a>`;
+                                            nrStatusBadge = `<span class="badge bg-success">Ready</span>`;
+                                        }
+
+                                        nextRoundRow = `<tr>
+                                                        <td><select class="form-control EmailTemplate EmailTemplate-next" name='EmailTemplate'>
+                                                            <option selected disabled>Select Email Template </option>
+                                                                @foreach ($EmailTamplete as $e)
+                                                                    <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
+                                                                @endforeach
+                                                                </select>
+                                                        </td>
+                                                        <td>${nr.rank_name}</td>
+                                                        <td>${nr.round}</td>
+                                                        <td><input type="hidden" class="Round" name="Round" value="${nr.rank_name}">
+                                                        <input type="hidden" class="InterviewType" name="InterviewType" value="${nr.round}">
+                                                        <input type="hidden" class="Interviewer" name="Interviewer" value="${nr.Interviewer}">
+                                                            ${nr.Interviewer}</td>
+                                                        <td>${nr.Date}</td>
+                                                        <td>${nr.MalidivanTime}</td>
+                                                        <td>${nr.ApplicantTime}</td>
+                                                        <td>${nrStatusBadge}</td>
+                                                        <td>${nrAction}</td>
+                                                    </tr>`;
+                                    }
+
+                                    // Build past rounds rows for grid view
+                                    let pastRoundsRows = '';
+                                    if (response.data.pastRounds && response.data.pastRounds.length > 0) {
+                                        response.data.pastRounds.forEach(function(pr) {
+                                            let prStatusBadge = pr.status == 'Complete'
+                                                ? `<span class="badge bg-success">Completed</span>`
+                                                : `<span class="badge bg-secondary">${pr.InterviewStatus}</span>`;
+                                            pastRoundsRows += `<tr>
+                                                <td>-</td>
+                                                <td>${pr.rank_name}</td>
+                                                <td>${pr.round}</td>
+                                                <td>${pr.Interviewer}</td>
+                                                <td>${pr.Date}</td>
+                                                <td>${pr.MalidivanTime}</td>
+                                                <td>${pr.ApplicantTime}</td>
+                                                <td>${prStatusBadge}</td>
+                                                <td><span class="badge bg-success">Round Completed</span></td>
+                                            </tr>`;
+                                        });
+                                    }
+
                                     const newRow =`
                                     <tr id="detailsRow${rowId}" class="details-row">
                                         <td colspan="10">
@@ -736,11 +851,12 @@
                                                         <th>Interview Status</th>
                                                         <th>Action</th>
                                                     </tr>
+                                                    ${pastRoundsRows}
                                                     <tr>
                                                         <td><select class="form-control EmailTemplate" name='EmailTemplate'>
                                                             <option selected disabled>Select Email Template </option>
                                                                 @foreach ($EmailTamplete as $e)
-                                                                    <option value="{{ $e->id}}">{{ $e->TempleteName }}</option>
+                                                                    <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                 @endforeach
                                                                 </select>
                                                         </td>
@@ -758,6 +874,7 @@
                                                             ${newTag}
                                                         </td>
                                                     </tr>
+                                                    ${nextRoundRow}
                                                 </table>
                                             </div>
                                         </td>
@@ -1216,6 +1333,8 @@
                             toastr.success("Rejection email sent successfully!", "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
+                            $('tr.details-row').remove();
+                            $('td.details-control').closest('tr').removeClass('shown');
                             datatablelist();
                         } else {
                             toastr.error(response.message || "Something went wrong.", "Error", {
@@ -1370,6 +1489,9 @@
                             $("#todoList-main").html( response.TodoDataview);
                             $("#Final_response_data").html(response.Final_response_data);
                             $("#sendRequestFinal-modal").modal("show");
+                            // Remove all expanded details rows so stale data doesn't persist
+                            $('tr.details-row').remove();
+                            $('td.details-control').closest('tr').removeClass('shown');
                             datatablelist();
                         } else {
                             toastr.error(response.message, "Error", {
@@ -1534,6 +1656,9 @@
                             $(".InterviewReviewData").html(response.Final_response_data);
 
                             $("#shareMeetLink-modal").modal("hide");
+                            // Remove all expanded details rows so stale data doesn't persist
+                            $('tr.details-row').remove();
+                            $('td.details-control').closest('tr').removeClass('shown');
                             datatablelist();
                         }
                         else
@@ -1598,6 +1723,7 @@
                         { data: 'Application_date', name: 'Application_date' },
                         { data: 'Stage', name: 'Stage'},
                         { data: 'InvitationStatus', name: 'InvitationStatus', orderable: false, searchable: false },
+                        @if($isHrDepartment)
                         {
                         data: 'details-control',
                             name: 'details-control',
@@ -1610,6 +1736,7 @@
                                     </a>`;
                             }
                         },
+                        @endif
                         { data: 'action', name: 'action', orderable: false, searchable: false }
                     ],
                     drawCallback: function() {
@@ -1694,8 +1821,8 @@
             let interviewRound = $(this).attr("data-interviewRound");
             let applicantstatusid = $(this).attr("data-progress_applicantstatusid");
 
-            if (Rank === "Complete" || Rank === "Rejected" || Rank == "Selected") {
-                // Store them in hidden fields or temporary variables
+            if ((Rank === "Complete" || Rank === "Rejected" || Rank == "Selected") && isHrDepartment) {
+                // HR users: show email template selection modal
                 $("#EmailTemplateForm").data("ApplicantID", ApplicantID);
                 $("#EmailTemplateForm").data("Rank", Rank);
                 $("#EmailTemplateForm").data("interviewRound", interviewRound);
@@ -1704,7 +1831,7 @@
                 // Open the modal for email template selection
                 $("#Email-template-selection-modal").modal("show");
             } else {
-                // Directly make the AJAX call since no email needs to be sent
+                // Non-HR users or Round actions: directly update without email
                 makeAjaxRequest(interviewRound, ApplicantID, applicantstatusid, Rank, null);
             }
         });
@@ -1756,6 +1883,9 @@
                     if (response.success) {
                         $(".userApplicants-wrapper").html(response.view);
                         DatatableGrid();
+                        // Remove all expanded details rows so stale data doesn't persist
+                        $('tr.details-row').remove();
+                        $('td.details-control').closest('tr').removeClass('shown');
                         datatablelist();
                         $(".userApplicants-wrapper").removeClass("end-0");
                         toastr.success("Request Updated Successfully", "Success", {
