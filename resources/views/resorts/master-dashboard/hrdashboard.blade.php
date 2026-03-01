@@ -1667,18 +1667,42 @@
                                                                     </div>
                                                                 {{-- elseif($t->InterviewLinkStatus=="Active"  ||  $t->ApplicationStatus=="Sortlisted" || $t->As_ApprovedBy == 3 ) --}}
 
-                                                                @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy == 3  &&  $t->InterviewLinkStatus == null )
+                                                                @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy != 0  &&  $t->InterviewLinkStatus == null )
                                                                     <div class="img-circle">
                                                                         <img src="{{ $t->profileImg}}" alt="image">
                                                                     </div>
                                                                     <div>
-                                                                        <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted f {{ $t->Position ?? '' }} </p>
+                                                                        <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted for {{ $t->Position ?? '' }} </p>
                                                                         <a
                                                                         href="javascript:void(0)"
                                                                         data-Resort_id="{{$t->Resort_id}}"
                                                                         data-ApplicantID="{{base64_encode($t->ApplicantID)}}"
                                                                         data-ApplicantStatus_id="{{base64_encode($t->ApplicantStatus_id)}}"
                                                                         class="a-link SortlistedEmployee">Send Interview Request </a>
+                                                                    </div>
+
+                                                                @elseif( $t->ApplicationStatus == "Complete" && isset($t->ApplicantID) )
+                                                                    @php
+                                                                        $roundsForPos = \App\Helpers\Common::getInterviewRoundsForPosition($t->vacancy_rank ?? null);
+                                                                        $rkList = array_keys($roundsForPos);
+                                                                        $rkIndex = array_search((int)$t->As_ApprovedBy, $rkList);
+                                                                        $isLast = ($rkIndex === count($rkList) - 1);
+                                                                        $nxtRound = '';
+                                                                        if (!$isLast && $rkIndex !== false) {
+                                                                            $nxtRound = $roundsForPos[$rkList[$rkIndex + 1]] ?? '';
+                                                                        }
+                                                                        $doneRound = config('settings.Position_Rank')[$t->As_ApprovedBy] ?? 'Unknown';
+                                                                    @endphp
+                                                                    <div class="img-circle">
+                                                                        <img src="{{ $t->profileImg}}" alt="image">
+                                                                    </div>
+                                                                    <div>
+                                                                        @if($isLast)
+                                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $doneRound }} Round Completed for {{ $t->Position ?? '' }}, Ready for Selection</p>
+                                                                        @else
+                                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $doneRound }} Round Completed for {{ $t->Position ?? '' }}, Ready for {{ $nxtRound }} Round</p>
+                                                                        @endif
+                                                                        <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">View Applicant</a>
                                                                     </div>
 
                                                             @endif

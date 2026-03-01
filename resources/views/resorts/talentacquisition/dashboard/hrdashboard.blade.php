@@ -143,6 +143,13 @@
                             </div>
                             <div class="todoList-main" id="todoList-main">
                                 <div class="octodoList-blk">
+                                    @php
+                                        $employee = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
+                                        $todoUserDeptId = $employee ? $employee->Dept_id : null;
+                                        $todoUserDeptName = $todoUserDeptId ? \App\Models\ResortDepartment::where('id', $todoUserDeptId)->value('name') : '';
+                                        $isHrUser = stripos($todoUserDeptName ?? '', 'Human Resources') !== false;
+                                        $positionRankConfig = config('settings.Position_Rank');
+                                    @endphp
 
                                     @if(isset($TodoData) && $TodoData->isNotEmpty())
 
@@ -174,7 +181,6 @@
                                                         <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="ms-auto" title="View Applicants">
                                                             <i class="fa-solid fa-eye"></i>
                                                         </a>
-                                                    {{-- elseif($t->InterviewLinkStatus=="Active"  ||  $t->ApplicationStatus=="Sortlisted" || $t->As_ApprovedBy == 3 ) --}}
 
                                                     @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy != 0  &&  $t->InterviewLinkStatus == null )
                                                         <div class="img-circle">
@@ -190,7 +196,32 @@
                                                             class="a-link SortlistedEmployee">Send Interview Request </a>
                                                         </div>
 
-                                                    @elseif( $t->InterviewLinkStatus == 'Slot Booked' && empty($t->InterviewMeetingLink) )
+                                                    @elseif( $t->ApplicationStatus == "Complete" && isset($t->ApplicantID) )
+                                                        @php
+                                                            $roundsForPosition = \App\Helpers\Common::getInterviewRoundsForPosition($t->vacancy_rank ?? null);
+                                                            $roundKeysList = array_keys($roundsForPosition);
+                                                            $currentRoundIndex = array_search((int)$t->As_ApprovedBy, $roundKeysList);
+                                                            $isLastRound = ($currentRoundIndex === count($roundKeysList) - 1);
+                                                            $nextRoundName = '';
+                                                            if (!$isLastRound && $currentRoundIndex !== false) {
+                                                                $nextRoundKey = $roundKeysList[$currentRoundIndex + 1];
+                                                                $nextRoundName = $roundsForPosition[$nextRoundKey] ?? '';
+                                                            }
+                                                            $completedRoundName = $positionRankConfig[$t->As_ApprovedBy] ?? 'Unknown';
+                                                        @endphp
+                                                        <div class="img-circle">
+                                                            <img src="{{ $t->profileImg}}" alt="image">
+                                                        </div>
+                                                        <div>
+                                                            @if($isLastRound)
+                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $completedRoundName }} Round Completed for {{ $t->Position ?? '' }}, Ready for Selection</p>
+                                                            @else
+                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $completedRoundName }} Round Completed for {{ $t->Position ?? '' }}, Ready for {{ $nextRoundName }} Round</p>
+                                                            @endif
+                                                            <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">View Applicant</a>
+                                                        </div>
+
+                                                    @elseif( $isHrUser && $t->InterviewLinkStatus == 'Slot Booked' && empty($t->InterviewMeetingLink) )
                                                         <div class="img-circle">
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>

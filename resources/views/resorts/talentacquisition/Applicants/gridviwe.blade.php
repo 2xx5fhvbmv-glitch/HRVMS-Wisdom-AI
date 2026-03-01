@@ -2,57 +2,50 @@
     @foreach($Applicant_form_data as $a)
         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
             <div class="applicantsGrid-block">
+                @if($isHrDepartment)
                 <div class="dropdown table-dropdown ">
                     <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
                         id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
-                        <li><a class="dropdown-item gridview-link"  
-                        data-row-id="{{ $a->id }}" 
+                        <li><a class="dropdown-item gridview-link"
+                        data-row-id="{{ $a->id }}"
                         data-status="{{ $a->ApplicantStatus }}"
-                        data-applicant_id="{{ $a->applicant_id }}"                        
+                        data-applicant_id="{{ $a->applicant_id }}"
                         href="javascript:void(0)" >Interview Details</a></li>
                     </ul>
                 </div>
+                @endif
                 @php
                 $progress = 0;
-                if($a->As_ApprovedBy == 0)
-                {
-                    $progress = 16.66; // Step 1 completed
+                $gridRounds = \App\Helpers\Common::getInterviewRoundsForPosition($a->vacancy_rank ?? null);
+                $gridRoundKeys = array_keys($gridRounds);
+                $gridTotalRounds = count($gridRounds);
+                $gridTotalSteps = 2 + ($gridTotalRounds * 2) + 1;
+                $gridCurrentStep = 0;
+
+                if($a->ApplicantStatus == 'Selected') {
+                    $gridCurrentStep = $gridTotalSteps;
+                } elseif($a->As_ApprovedBy == 0) {
+                    $gridCurrentStep = 1;
+                } else {
+                    $gridCurrentStep = 2;
+                    foreach ($gridRoundKeys as $index => $rankCode) {
+                        $rankCode = (int) $rankCode;
+                        if ($a->As_ApprovedBy == $rankCode && $a->ApplicantStatus == 'Round') {
+                            $gridCurrentStep = 2 + ($index * 2) + 1;
+                            break;
+                        } elseif ($a->As_ApprovedBy == $rankCode && $a->ApplicantStatus == 'Complete') {
+                            $gridCurrentStep = 2 + ($index * 2) + 2;
+                            break;
+                        } elseif ($a->As_ApprovedBy == $rankCode && $a->ApplicantStatus == 'Sortlisted') {
+                            $gridCurrentStep = 2;
+                            break;
+                        }
+                    }
                 }
-                elseif ($a->As_ApprovedBy == 3 && $a->ApplicantStatus == 'Sortlisted' )
-                {
-                    $progress = 33.32; // Step 2 completed
-                }
-                elseif ($a->As_ApprovedBy == 3 && $a->ApplicantStatus == 'Round')
-                {
-                    $progress = 33.32; // Step 3 completed
-                }
-                elseif ($a->As_ApprovedBy == 3 && $a->ApplicantStatus == 'Complete')
-                {
-                    $progress = 49.98; // Step 3 completed
-                }
-                elseif ($a->As_ApprovedBy == 2 && $a->ApplicantStatus == 'Round')
-                {
-                    $progress =49.98; // Step 4 completed
-                }
-                elseif ($a->As_ApprovedBy == 2 && $a->ApplicantStatus == 'Complete')
-                {
-                    $progress = 66.64; // Step 4 completed
-                }
-                elseif ($a->As_ApprovedBy == 8 && $a->ApplicantStatus == 'Round')
-                {
-                    $progress = 66.64; // Step 5 completed
-                }
-                elseif ($a->As_ApprovedBy == 8 && $a->ApplicantStatus == 'Complete')
-                {
-                    $progress = 83.30; // Step 5 completed
-                }
-                elseif ($a->As_ApprovedBy == 8 && $a->ApplicantStatus == 'Selected')
-                {
-                    $progress = 100; // Step 6 completed
-                }
+                $progress = round(($gridCurrentStep / $gridTotalSteps) * 100, 2);
             @endphp
                 <!-- <a href="#" class="dotsV-link"><i class="fa-solid fa-ellipsis-vertical"></i></a> -->
                 <div class="progress-container skyblue" data-progress="{{ $progress  }}">
@@ -68,20 +61,17 @@
                 {{-- Status --}}
                     @if($a->As_ApprovedBy == 0)
                     <span class="badge badge-themeSkyblue">{{ $a->ApplicantStatus }}</span>
-                    @elseif($a->As_ApprovedBy == 3 &&  $a->ApplicantStatus  == 'Sortlisted')
+                    @elseif($a->As_ApprovedBy != 0 &&  $a->ApplicantStatus  == 'Sortlisted')
                         <span class="badge badge-themeBlue">{{  $a->rank_name }} {{ $a->ApplicantStatus }}</span>
-                        {{-- HR Approved --}}
-                    @elseif($a->As_ApprovedBy == 3 &&  $a->ApplicantStatus  == 'Round' || $a->ApplicantStatus  == 'Complete')
-                        <span class="badge badge-themeBlue">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
-
-                    @elseif($a->As_ApprovedBy ==2 &&  $a->ApplicantStatus  == 'Round' || $a->ApplicantStatus  == 'Complete')
-                        {{-- HOD --}}
-                        <span class="badge badge-themePurple">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
-
-                    @elseif($a->As_ApprovedBy == 8 &&  $a->ApplicantStatus  == 'Round' || $a->ApplicantStatus  == 'Complete')
-                        <span class="badge badge-themePink">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
-                    @elseif($a->As_ApprovedBy == 8 &&  $a->ApplicantStatus  == 'Selected')
-                        <span class="badge badge-themeSuccess">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
+                    @elseif(in_array($a->ApplicantStatus, ['Round', 'Complete']))
+                        @php
+                            $gridBadgeClass = 'badge-themeBlue';
+                            if ($a->As_ApprovedBy == 2) $gridBadgeClass = 'badge-themePurple';
+                            elseif ($a->As_ApprovedBy == 8) $gridBadgeClass = 'badge-themePink';
+                        @endphp
+                        <span class="badge {{ $gridBadgeClass }}">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
+                    @elseif($a->ApplicantStatus  == 'Selected')
+                        <span class="badge badge-themeSuccess">{{ $a->ApplicantStatus }}</span>
                     @elseif( $a->ApplicantStatus  == 'Rejected')
                         <span class="badge badge-themeDanger">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
                     @endif

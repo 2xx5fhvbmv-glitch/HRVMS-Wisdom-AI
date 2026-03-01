@@ -140,52 +140,49 @@ class ContractResponseController extends Controller
         $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
             ->leftJoin('resort_departments as t2', 't2.id', '=', 't1.dept_id')
             ->where('vacancies.id', $applicant->Parent_v_id)
-            ->selectRaw('t1.id as position_id, t2.id as dept_id, vacancies.reporting_to')
+            ->selectRaw('t1.id as position_id, t1.rank as position_rank, t2.id as dept_id, vacancies.reporting_to')
             ->first();
 
         // Generate password
         $plainPassword = Common::generateUniquePassword(8);
 
-        // Create ResortAdmin record
+        // Create ResortAdmin record (stores personal info: name, email, phone, address)
         $resortAdmin = ResortAdmin::create([
-            'email' => $applicant->email,
+            'resort_id' => $contract->resort_id,
             'first_name' => $applicant->first_name,
             'last_name' => $applicant->last_name,
+            'email' => $applicant->email,
+            'personal_phone' => $applicant->mobile_number,
+            'gender' => $applicant->gender,
             'password' => Hash::make($plainPassword),
-            'resort_id' => $contract->resort_id,
+            'address_line_1' => $applicant->address_line_one,
+            'address_line_2' => $applicant->address_line_two,
+            'city' => $applicant->city,
+            'state' => $applicant->state,
+            'country' => $applicant->country,
             'status' => 'Active',
         ]);
 
-        // Create Employee record
+        // Create Employee record (stores job info: department, position, dates)
         $employee = Employee::create([
             'Admin_Parent_id' => $resortAdmin->id,
             'resort_id' => $contract->resort_id,
-            'first_name' => $applicant->first_name,
-            'last_name' => $applicant->last_name,
-            'email' => $applicant->email,
-            'phone' => $applicant->mobile_number,
-            'country_phone_code' => $applicant->country_phone_code,
-            'nationality' => $applicant->country,
-            'passport_no' => $applicant->passport_no,
-            'passport_expiry_date' => $applicant->passport_expiry_date,
-            'dob' => $applicant->dob,
-            'gender' => $applicant->gender,
-            'marital_status' => $applicant->marital_status,
-            'address_line_one' => $applicant->address_line_one,
-            'address_line_two' => $applicant->address_line_two,
-            'country' => $applicant->country,
-            'state' => $applicant->state,
-            'city' => $applicant->city,
-            'pin_code' => $applicant->pin_code,
+            'title' => $applicant->gender == 'male' ? 'Mr.' : 'Ms.',
+            'is_employee' => 1,
             'Dept_id' => $vacancy->dept_id ?? null,
             'Position_id' => $vacancy->position_id ?? null,
-            'joining_date' => $applicant->Joining_availability,
+            'rank' => $vacancy->position_rank ?? null,
             'reporting_to' => $vacancy->reporting_to ?? null,
+            'nationality' => $applicant->country,
+            'dob' => $applicant->dob,
+            'marital_status' => $applicant->marital_status,
+            'passport_number' => $applicant->passport_no,
+            'joining_date' => $applicant->Joining_availability,
+            'present_address' => trim(($applicant->address_line_one ?? '') . ', ' . ($applicant->address_line_two ?? '') . ', ' . ($applicant->city ?? '') . ', ' . ($applicant->state ?? '') . ', ' . ($applicant->pin_code ?? '') . ', ' . ($applicant->country ?? ''), ', '),
             'status' => 'Active',
+            'created_by' => $contract->sent_by,
+            'modified_by' => $contract->sent_by,
         ]);
-
-        // Update ResortAdmin with employee link
-        $resortAdmin->update(['employee_id' => $employee->id]);
 
         // Copy education records
         $educations = DB::table('education_applicant_form')
@@ -193,14 +190,11 @@ class ContractResponseController extends Controller
             ->get();
 
         foreach ($educations as $edu) {
-            DB::table('employee_education')->insert([
+            DB::table('employees_education')->insert([
                 'employee_id' => $employee->id,
-                'degree' => $edu->degree ?? null,
-                'institution' => $edu->institution ?? null,
-                'field_of_study' => $edu->field_of_study ?? null,
-                'start_date' => $edu->start_date ?? null,
-                'end_date' => $edu->end_date ?? null,
-                'pass_out_year' => $edu->pass_out_year ?? null,
+                'education_level' => $edu->educational_level ?? null,
+                'institution_name' => $edu->institute_name ?? null,
+                'location' => trim(($edu->city_educational ?? '') . ', ' . ($edu->country_educational ?? ''), ', '),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -212,12 +206,12 @@ class ContractResponseController extends Controller
             ->get();
 
         foreach ($experiences as $exp) {
-            DB::table('employee_experiance')->insert([
+            DB::table('employees_experiance')->insert([
                 'employee_id' => $employee->id,
                 'job_title' => $exp->job_title ?? null,
-                'company_name' => $exp->company_name ?? null,
-                'work_start_date' => $exp->work_start_date ?? null,
-                'work_end_date' => $exp->work_end_date ?? null,
+                'company_name' => $exp->employer_name ?? null,
+                'duration' => $exp->total_work_exp ?? null,
+                'location' => trim(($exp->work_city ?? '') . ', ' . ($exp->work_country_name ?? ''), ', '),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -229,23 +223,10 @@ class ContractResponseController extends Controller
             ->get();
 
         foreach ($languages as $lang) {
-            DB::table('employee_language')->insert([
+            DB::table('employees_language')->insert([
                 'employee_id' => $employee->id,
                 'language' => $lang->language ?? null,
-                'proficiency' => $lang->proficiency ?? null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // Check if foreigner — create visa entry
-        $resortCountry = $resort->country ?? null;
-        if ($resortCountry && $applicant->country != $resortCountry) {
-            DB::table('visa_employee_expiry_data')->insert([
-                'employee_id' => $employee->id,
-                'resort_id' => $contract->resort_id,
-                'passport_no' => $applicant->passport_no,
-                'passport_expiry_date' => $applicant->passport_expiry_date,
+                'proficiency_level' => $lang->level ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

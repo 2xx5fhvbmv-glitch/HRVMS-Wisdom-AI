@@ -559,6 +559,17 @@ return [
         // '9' => 'GM Select',
 	],
 
+	'PositionInterviewRounds' => [
+		6 => ['3' => 'HR', '2' => 'HOD'],                // Line Worker: 2 rounds
+		5 => ['3' => 'HR', '2' => 'HOD'],                // Supervisor: 2 rounds
+		4 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // Manager: 3 rounds
+		2 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // HOD: 3 rounds
+		1 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // EXCOM: 3 rounds
+		8 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // GM: 3 rounds
+		7 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // Finance: 3 rounds
+		3 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // HR: 3 rounds
+	],
+
 	'eligibilty' => [
 		'8' => 'GM',
 		'1' => 'EXCOM',
