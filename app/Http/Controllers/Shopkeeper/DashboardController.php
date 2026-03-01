@@ -63,11 +63,22 @@ class DashboardController extends Controller
                     'ra.last_name',
                     'e.Emp_id',
                     'p.name as product_name',
+                    'p.currency_type as product_currency_type',
                     'ra.profile_picture',
                 ])
                 ->get(); 
         
             return datatables()->of($tableData)
+                ->addColumn('currency_type', function ($row) {
+                    $ct = $row->product_currency_type ?? 'USD';
+                    return $ct === 'MVR' ? 'MVR' : 'Dollar';
+                })
+                ->addColumn('qr_code', function ($row) {
+                    if ($row->status === 'Pending Consent' && !empty($row->qr_code)) {
+                        return '<button type="button" class="btn btn-sm btn-outline-secondary p-1 payment-qr-icon" data-payment-id="' . (int) $row->id . '" title="View QR Code"><i class="fa-solid fa-qrcode fa-lg"></i></button>';
+                    }
+                    return '—';
+                })
                 ->addColumn('name', function ($row) {
                     $profile_pic = Common::getResortUserPicture($row->profile_picture);
                     if ($row->first_name && $row->last_name) {
@@ -88,22 +99,25 @@ class DashboardController extends Controller
                         'Partial Paid' => 'badge-info',
                         'Pending Consent' => 'badge-warning',
                         'Consented' => 'badge-theme',
+                        'Rejected' => 'badge-danger',
                     ];
                     $class = $statusClasses[$row->status] ?? 'badge-secondary';
-                    return '<span class="badge ' . $class . '">' . $row->status . '</span>';
+                    $label = $row->status ?: '—';
+                    return '<span class="badge ' . $class . '">' . e($label) . '</span>';
                 })
                 ->addColumn('action', function ($row) {
                     switch ($row->status) {
                         case 'Pending Consent':
                             return '<button class="btn btn-warning btn-sm resend-consent" data-id="'.$row->id.'">Send Consent</button>';
                         case 'Consented':
-                            return '<button class="btn btn-primary btn-sm deduct-now" data-id="'.$row->id.'">Deduct Now</button>';
+                            // Approved by employee on app — no Deduct Now; deduction handled in payroll
+                            return '<span class="text-muted">Consented</span>';
                         case 'Partial Paid':
                             return '<button class="btn btn-info btn-sm continue-deduction" data-id="'.$row->id.'">Continue Deduction</button>';
                         case 'Paid':
                             return '<button class="btn btn-success btn-sm" disabled>Paid</button>';
                         case 'Rejected':
-                            return '<button class="btn btn-danger btn-sm" disabled>Rejected</button>';
+                            return '<button class="btn btn-warning btn-sm resend-consent" data-id="'.$row->id.'">Resend Consent</button>';
                         default:
                             return '<button class="btn btn-secondary btn-sm" disabled>Unknown</button>';
                     }

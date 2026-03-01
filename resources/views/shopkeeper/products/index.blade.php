@@ -37,7 +37,8 @@
                 <thead>
                     <tr>
                         <th>Product Name</th>
-                        <th>Price </th>
+                        <th>Price</th>
+                        <th>Currency</th>
                         <th>QR Code</th>
                         <th>Action</th>
                     </tr>
@@ -66,6 +67,10 @@
                         </tr>
                         <tr>
                             <th>Product Price:</th>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <th>Currency:</th>
                             <td></td>
                         </tr>
                     </table>
@@ -107,8 +112,9 @@
                 method: 'GET',
                 success: function (response) {
                     // Populate the modal with product details
-                    $('#view-modal').find('th:contains("Product Name:")').next().text(response.name);
-                    $('#view-modal').find('th:contains("Product Price:")').next().text(`$${response.price}`);
+                    $('#view-modal').find('th:contains("Product Name:")').parent().find('td').first().text(response.name);
+                    $('#view-modal').find('th:contains("Product Price:")').parent().find('td').first().text(response.price + ' ' + (response.currency_type === 'MVR' ? 'MVR' : 'USD'));
+                    $('#view-modal').find('th:contains("Currency:")').parent().find('td').first().text(response.currency_type === 'MVR' ? 'MVR' : 'Dollar');
 
                     // Set QR code in the modal
                     if (response.qr_code) {
@@ -180,14 +186,22 @@
             // Fetch current values from the table cells
             var currentName = $row.find("td:nth-child(1)").text().trim();
             var currentPrice = $row.find("td:nth-child(2)").text().trim();
+            var currentCurrency = $row.find("td:nth-child(3)").text().trim();
+            var currentCurrencyVal = (currentCurrency === 'MVR') ? 'MVR' : 'USD';
 
             // Replace current row with editable inputs
             var editRowHtml = `
                 <td>
-                    <input type="text" name="name" class="form-control" value="${currentName}" />
+                    <input type="text" name="name" class="form-control" value="${currentName.replace(/"/g, '&quot;')}" />
                 </td>
                 <td>
                     <input type="text" name="price" class="form-control" value="${currentPrice}" />
+                </td>
+                <td>
+                    <select name="currency_type" class="form-select form-control">
+                        <option value="USD" ${currentCurrencyVal === 'USD' ? 'selected' : ''}>Dollar</option>
+                        <option value="MVR" ${currentCurrencyVal === 'MVR' ? 'selected' : ''}>MVR</option>
+                    </select>
                 </td>
                 <td>
                     <div class="qr-code-container"></div>
@@ -200,7 +214,7 @@
             $row.html(editRowHtml);
 
             // Optionally regenerate a placeholder QR Code while editing
-            var placeholderText = `Editing: ${currentName} - $${currentPrice}`;
+            var placeholderText = `Editing: ${currentName} - ${currentCurrencyVal === 'MVR' ? 'MVR' : '$'}${currentPrice}`;
             var qrCodeContainer = $row.find('.qr-code-container')[0];
             generateQRCode(placeholderText, qrCodeContainer);
         });
@@ -215,9 +229,11 @@
             // Get updated values from the inputs
             var updatedName = $row.find("input[name='name']").val();
             var updatedPrice = $row.find("input[name='price']").val();
+            var updatedCurrency = $row.find("select[name='currency_type']").val();
 
-            // Generate updated QR Code (using the updated name and price)
-            var qrCodeText = `${updatedName} - $${updatedPrice}`;
+            // Generate updated QR Code (using the updated name, price and currency)
+            var currencySymbol = updatedCurrency === 'MVR' ? 'MVR ' : '$';
+            var qrCodeText = `${updatedName} - ${currencySymbol}${updatedPrice}`;
             var qrCodeContainer = $row.find('.qr-code-container')[0];
             generateQRCode(qrCodeText, qrCodeContainer);
 
@@ -232,20 +248,26 @@
                 data: {
                     name: updatedName,
                     price: updatedPrice,
+                    currency_type: updatedCurrency,
                     qr_code: qrCodeBase64,  // Send the QR code base64 string
                     _token: $('meta[name="csrf-token"]').attr('content')
                 },
                 success: function(response) {
                     if (response.success) {
                         // Replace the row with updated static data
+                        var currencyDisplay = updatedCurrency === 'MVR' ? 'MVR' : 'Dollar';
                         var updatedRowHtml = `
                             <td>${updatedName}</td>
                             <td>${updatedPrice}</td>
+                            <td>${currencyDisplay}</td>
                             <td>
                                 <div class="qr-code-container"></div>
                             </td>
                             <td>
                                 <div class="d-flex align-items-center">
+                                    <a href="#" class="btn-tableIcon btnIcon-orange" data-product-id="${productId}">
+                                        <i class="fa-regular fa-eye"></i>
+                                    </a>
                                     <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-product-id="${productId}">
                                         <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="" class="img-fluid" />
                                     </a>
@@ -313,7 +335,7 @@
             "iDisplayLength": 15,  // Set the initial number of records per page
             processing: true, // Show processing indicator
             serverSide: true, // Enable server-side processing
-            order:[[4, 'desc']],
+            order:[[5, 'desc']],
             ajax: {
                 url: "{{ route('shopkeeper.products.list') }}",
                 type: 'GET',
@@ -324,6 +346,7 @@
             columns: [
                 { data: 'name', name: 'name', className: 'text-nowrap' },
                 { data: 'price', name: 'price', className: 'text-nowrap' },
+                { data: 'currency_type', name: 'currency_type', className: 'text-nowrap' },
                 { 
                     data: 'qr_code', 
                     name: 'qr_code', 

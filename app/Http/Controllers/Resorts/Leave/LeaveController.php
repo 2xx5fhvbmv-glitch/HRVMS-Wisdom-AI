@@ -183,7 +183,8 @@ class LeaveController extends Controller
         $transportations = ResortTransportation::where('resort_id', $resort_id)
             ->pluck('transportation_option','id')
             ->toArray();
-        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations'));
+        $leaveFormValidation = config('settings.leave_form_validation', []);
+        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation'));
     }
 
     /**
@@ -234,13 +235,12 @@ class LeaveController extends Controller
                 // HR / EXCOM / GM: whole resort – left join latest status (one row per leave, status optional)
                 $leave_requests_query->leftJoin(DB::raw($latestStatusDerived . ' AS els'), 'els.leave_request_id', '=', 'el.id');
             } elseif ($isHOD) {
-                // HOD: department or reportees; exclude HOD's own leave (only show reportees' leaves for approval)
+                // HOD: department or reportees; include own leave in list
                 if ($hodDeptId) {
                     $leave_requests_query->where('e.Dept_id', $hodDeptId);
                 } else {
                     $leave_requests_query->where('e.reporting_to', $loggedInEmployeeId);
                 }
-                $leave_requests_query->where('el.emp_id', '!=', $loggedInEmployeeId); // HOD does not see own leave in this list
                 $leave_requests_query->leftJoin(DB::raw($latestStatusDerived . ' AS els'), 'els.leave_request_id', '=', 'el.id');
             } else {
                 // Others: only leaves where current user is approver – inner join status + latest
@@ -410,6 +410,7 @@ class LeaveController extends Controller
             $isHOD = ($available_rank === "HOD");
             $isHR = ($available_rank === "HR");
 
+            $loggedInEmployeeId = $loggedInEmployee->id ?? null;
             $query = DB::table('employees_leaves as el')
                 ->join('employees as e', 'e.id', '=', 'el.emp_id')
                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
@@ -419,10 +420,9 @@ class LeaveController extends Controller
                 ->where('el.status', 'Pending');
 
             if ($isHR) {
-                $query->where('e.id', '!=', $loggedInEmployee->id);
-                    // ->whereNotIn('rp.rank', ['GM']);
-            }else{
-                $query->where('e.reporting_to', $this->reporting_to );
+                // HR sees whole resort including own leave
+            } else {
+                $query->where('e.reporting_to', $this->reporting_to);
             }
 
             // if ($isHOD && isset($this->underEmp_id)) {
@@ -742,7 +742,7 @@ class LeaveController extends Controller
             return $grid;
         });
 
-        // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
+        // Can approve: (1) applicant's reporting_to, or (2) applicant is GM and current user is HR/EXCOM/HOD, or (3) current user has a Pending status row (their turn in the chain)
         $applicantReportingTo = $leaveDetail->applicant_reporting_to ?? $leaveDetail->reporting_to ?? null;
         $reportingToStr = trim((string)($applicantReportingTo ?? ''));
         $currentUserIdStr = trim((string)($employee->id ?? ''));
@@ -751,7 +751,11 @@ class LeaveController extends Controller
         $isReportingManager = $reportingToStr !== '' && $reportingToStr === $currentUserIdStr;
         $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
         $leaveIsPending = strtolower(trim($leaveDetail->status ?? '')) === 'pending';
-        $canApproveThisLeave = (bool)(($isReportingManager || $isGMLeaveApprover) && $leaveIsPending);
+        $currentUserHasPendingStatus = EmployeeLeaveStatus::where('leave_request_id', $decodedId)
+            ->where('status', 'Pending')
+            ->where('approver_id', $employee->id)
+            ->exists();
+        $canApproveThisLeave = (bool)(($isReportingManager || $isGMLeaveApprover || $currentUserHasPendingStatus) && $leaveIsPending);
 
         return view('resorts.leaves.leave.details', compact('page_title', 'empID', 'available_rank', 'leaveDetail', 'leaveBalances', 'leaveUsage', 'leave_categories', 'employee', 'canApproveThisLeave'));
     }
@@ -844,9 +848,50 @@ class LeaveController extends Controller
         $emp_id = $this->resort->GetEmployee->id;
         $rank = $this->resort->GetEmployee->rank;
 
+        // Resolve validation rules from first leave category (Mandatory/Optional/Hidden)
+        $categoryIds = $request->input('leave_category_id');
+        $categoryId = is_array($categoryIds) ? ($categoryIds[0] ?? null) : null;
+        $leaveTypeName = null;
+        if ($categoryId) {
+            $firstCategory = LeaveCategory::find($categoryId);
+            $leaveTypeName = $firstCategory ? trim($firstCategory->leave_type) : null;
+        }
+        $rules = $this->getLeaveFormValidationRules($leaveTypeName);
+
+        $validatorRules = [
+            'leave_category_id' => 'required|array',
+            'leave_category_id.*' => 'required|exists:leave_categories,id',
+            'from_date' => 'required|array',
+            'from_date.*' => 'required|date_format:d/m/Y',
+            'to_date' => 'required|array',
+            'to_date.*' => 'required|date_format:d/m/Y',
+        ];
+        if ($rules['reason'] === 'mandatory') {
+            $validatorRules['reason'] = 'required|string|max:2000';
+        } else {
+            $validatorRules['reason'] = 'nullable|string|max:2000';
+        }
+        if ($rules['task_delegation'] === 'mandatory') {
+            $validatorRules['task_delegation'] = 'required|exists:employees,id';
+        } else {
+            $validatorRules['task_delegation'] = 'nullable|exists:employees,id';
+        }
+        if ($rules['destination'] !== 'hidden') {
+            $validatorRules['destination'] = 'nullable|string|max:255';
+        }
+        $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png|max:5120';
+
+        $validator = Validator::make($request->all(), $validatorRules);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
         DB::beginTransaction();
         try {
-            // dd($request->all());
             // Define leave attachment path
             $leave_attachment = config('settings.leave_attachments');
             $dynamic_path = $leave_attachment . '/' . $emp_id;
@@ -1480,10 +1525,10 @@ class LeaveController extends Controller
         ]);
 
         if ($action == 'Approved') {
-
-            if( $lastStatus->approver_rank == 3)
-            {
-                $leave->status="Approved";
+            // Mark main leave as Approved when no approvers are left Pending (last in chain: HR, HOD, or EXCOM)
+            $pendingCount = EmployeeLeaveStatus::where('leave_request_id', $leave->id)->where('status', 'Pending')->count();
+            if ($pendingCount === 0) {
+                $leave->status = 'Approved';
                 $leave->save();
             }
             return response()->json([
@@ -1506,6 +1551,40 @@ class LeaveController extends Controller
                 'message' => 'Invalid action.',
             ],200);
         }
+    }
+
+    /**
+     * Get leave form field rules (mandatory, optional, hidden) for a leave type.
+     * Uses config('settings.leave_form_validation') keyed by leave type name (lowercase).
+     *
+     * @param string|null $leaveTypeName
+     * @return array
+     */
+    protected function getLeaveFormValidationRules($leaveTypeName)
+    {
+        $default = [
+            'reason' => 'mandatory',
+            'task_delegation' => 'optional',
+            'destination' => 'optional',
+            'transportation' => 'optional',
+            'departure_pass' => 'optional',
+            'attachment' => 'optional',
+        ];
+        if (empty($leaveTypeName)) {
+            return $default;
+        }
+        $key = strtolower(trim($leaveTypeName));
+        $config = config('settings.leave_form_validation', []);
+        if (isset($config[$key])) {
+            return array_merge($default, $config[$key]);
+        }
+        // Partial match (e.g. "Sick Leave" -> "sick leave")
+        foreach ($config as $configKey => $rules) {
+            if (stripos($key, $configKey) !== false || stripos($configKey, $key) !== false) {
+                return array_merge($default, $rules);
+            }
+        }
+        return $default;
     }
 
     public function recommendAlternativeDate(Request $request)
