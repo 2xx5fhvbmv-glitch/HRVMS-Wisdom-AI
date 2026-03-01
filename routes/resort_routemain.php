@@ -641,6 +641,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('payroll/shopkeepers/submit', 'Payroll\ShopkeeperController@store')->name('shopkeepers.save');
     Route::get('payroll/shopkeepers', 'Payroll\ShopkeeperController@index')->name('shopkeepers.index');
     Route::get('payroll/shopkeepers/list','Payroll\ShopkeeperController@list')->name('shopkeepers.list');
+    Route::get('payroll/shopkeepers/{id}/payments', 'Payroll\ShopkeeperController@payments')->name('resort.shopkeeper.payments');
+    Route::get('payroll/shopkeepers/{id}/payments/list', 'Payroll\ShopkeeperController@paymentsList')->name('resort.shopkeeper.payments.list');
+    Route::get('payroll/shopkeepers/{id}/payments/export', 'Payroll\ShopkeeperController@paymentsExport')->name('resort.shopkeeper.payments.export');
     Route::put('payroll/shopkeepers/inlineUpdate/{id}', 'Payroll\ShopkeeperController@inlineUpdate')->name('shopkeeper.inlineUpdate');
     Route::delete('payroll/shopkeepers/destroy/{id}', 'Payroll\ShopkeeperController@destroy')->name('shopkeeper.destroy');
      

@@ -62,6 +62,9 @@ class ConfigurationController extends Controller
             $tableData=  $tableData->get(); // Ensure you fetch the data
             // dd($tableData);
             return datatables()->of($tableData)
+                ->addColumn('currency_type', function ($row) {
+                    return $row->currency_type === 'MVR' ? 'MVR' : 'Dollar';
+                })
                 ->addColumn('qr_code', function ($row) {
                     $qr = $row->qr_code;
 
@@ -127,6 +130,7 @@ class ConfigurationController extends Controller
         return response()->json([
             'name' => $product->name,
             'price' => $product->price,
+            'currency_type' => $product->currency_type ?? 'USD',
             'qr_code' => $product->qr_code ? base64_encode($product->qr_code) : null, // Return Base64 QR code
         ]);
     }
@@ -136,6 +140,7 @@ class ConfigurationController extends Controller
         $validatedData = $request->validate([
             'products.*.product_name' => 'required|string|max:255',
             'products.*.product_price' => 'required|numeric',
+            'products.*.currency_type' => 'required|in:USD,MVR',
             'products.*.qr_code' => 'required|string',
         ]);
 
@@ -168,6 +173,7 @@ class ConfigurationController extends Controller
                 'shopkeeper_id' => $shopkeeper_id,
                 'name' => $product['product_name'],
                 'price' => $product['product_price'],
+                'currency_type' => $product['currency_type'] ?? 'USD',
                 'qr_code' => base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $product['qr_code'])),
             ]);
         }
@@ -203,12 +209,14 @@ class ConfigurationController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'price' => 'required|numeric',
+            'currency_type' => 'required|in:USD,MVR',
             'qr_code' => 'required|string', // Ensure QR code is passed
         ]);
 
         $product = Product::findOrFail($id);
         $product->name = $request->name;
         $product->price = $request->price;
+        $product->currency_type = $request->currency_type;
 
         // Save the QR code from the frontend (base64 string)
         $qrCodeBase64 = $request->qr_code;
@@ -282,9 +290,12 @@ class ConfigurationController extends Controller
         }
 
         $products = $import->rows->map(function ($row, $index) {
+            $currencyRaw = isset($row[2]) ? trim((string) $row[2]) : '';
+            $currencyType = (strtoupper($currencyRaw) === 'MVR') ? 'MVR' : 'USD';
             return [
                 'product_name' => $row[0] ?? '',
                 'product_price' => $row[1] ?? '',
+                'currency_type' => $currencyType,
             ];
         });
 
@@ -300,6 +311,7 @@ class ConfigurationController extends Controller
             'products' => 'required|array',
             'products.*.product_name' => 'required|string|max:255',
             'products.*.product_price' => 'required|numeric',
+            'products.*.currency_type' => 'nullable|in:USD,MVR',
             'products.*.qr_code' => 'required|string',
         ]);
 
@@ -316,9 +328,11 @@ class ConfigurationController extends Controller
                                       ->where('name', $product['product_name'])
                                       ->first();
                                       
+            $currencyType = $product['currency_type'] ?? 'USD';
             if ($existingProduct) {
                 // Update existing product
                 $existingProduct->price = $product['product_price'];
+                $existingProduct->currency_type = $currencyType;
                 $existingProduct->qr_code = $qrImage;
                 $existingProduct->save();
                 $updated++;
@@ -328,6 +342,7 @@ class ConfigurationController extends Controller
                     'shopkeeper_id' => $shopkeeper_id,
                     'name' => $product['product_name'],
                     'price' => $product['product_price'],
+                    'currency_type' => $currencyType,
                     'qr_code' => $qrImage,
                 ]);
                 $created++;

@@ -63,24 +63,14 @@
                                     <div id="newinput"></div>
                                 </div>
                                 <div class="row align-items-end g-4 mb-4">
-                                    <div class="col-md-12">
-                                        <label for="uploadFile" class="form-label">UPLOAD DOCUMENTS</label>
-                                        <div class="uploadFile-block">
-                                            <div class="uploadFile-btn">
-                                                <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
-                                                <input type="file" id="uploadFile" name="attachments">
-                                            </div>
-                                            <div class="uploadFile-text">PNG, JPEG, PDF, Word</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-12">
-                                        <label for="leaveReason" class="form-label">LEAVE REASON<span class="red-mark">*</span></label>
-                                        <textarea class="form-control" rows="3" name="reason" placeholder="Leave Reason" required data-parsley-errors-container="#reason-error"></textarea>
+                                    <div class="col-md-12" id="field-reason">
+                                        <label for="leaveReason" class="form-label">LEAVE REASON<span class="red-mark reason-required-mark">*</span></label>
+                                        <textarea class="form-control" rows="3" name="reason" id="leaveReason" placeholder="Leave Reason" data-parsley-errors-container="#reason-error"></textarea>
                                         <div id="reason-error"></div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="taskDel" class="form-label">TASK DELEGATION</label>
-                                        <select class="form-select select2t-none" name="task_delegation"  id="taskDel" data-parsley-errors-container="#task_delegation-error">
+                                    <div class="col-md-6" id="field-task_delegation">
+                                        <label for="taskDel" class="form-label">TASK DELEGATION<span class="red-mark task_delegation-required-mark d-none">*</span></label>
+                                        <select class="form-select select2t-none" name="task_delegation" id="taskDel" data-parsley-errors-container="#task_delegation-error">
                                             <option value="">Select Person</option>
                                             @if($delegations)
                                                 @foreach($delegations as $emp)
@@ -90,11 +80,11 @@
                                         </select>
                                         <div id="task_delegation-error"></div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-6" id="field-destination">
                                         <label for="destination" class="form-label">DESTINATION</label>
-                                        <input type="text" name="destination" placeholder="Destination" class="form-control"/>
+                                        <input type="text" name="destination" id="destination" placeholder="Destination" class="form-control"/>
                                     </div>
-                                    <div class="col-12">
+                                    <div class="col-12" id="field-transportation">
                                         <label class="form-label">TRANSPORTATION  </label>
                                         <div id="transportation-options">
                                             @if($transportations)
@@ -118,7 +108,7 @@
 
 
                                     
-                                    <div class="col-12">
+                                    <div class="col-12" id="field-departure_pass">
                                         <label class="form-label">DEPARTURE PASS </label>
                                         <div class="form-check form-check-inline">
                                             <input 
@@ -220,6 +210,16 @@
                                             </div>    
                                         </div>
                                     </div>
+                                    <div class="col-md-12" id="field-attachment">
+                                        <label for="uploadFile" class="form-label">UPLOAD DOCUMENTS<span class="red-mark attachment-required-mark d-none">*</span></label>
+                                        <div class="uploadFile-block">
+                                            <div class="uploadFile-btn">
+                                                <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                                <input type="file" id="uploadFile" name="attachments">
+                                            </div>
+                                            <div class="uploadFile-text">PNG, JPEG, PDF, Word</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="card-footer">
                                     <button type="submit" class="btn btn-themeBlue btn-sm float-end">Submit</button>
@@ -260,6 +260,71 @@
 @section('import-scripts')    
 <script> var functioncallyes = 0;  var cat_ids =[];</script>
 <script type="text/javascript">
+    var leaveFormValidation = @json($leaveFormValidation ?? []);
+    function applyLeaveCategoryValidation() {
+        var firstSelect = document.getElementById('leaveCat1');
+        if (!firstSelect || !leaveFormValidation || Object.keys(leaveFormValidation).length === 0) return;
+        var selectedOption = firstSelect.options[firstSelect.selectedIndex];
+        var leaveTypeText = selectedOption ? selectedOption.text.trim() : '';
+        var key = leaveTypeText.toLowerCase();
+        var rules = leaveFormValidation[key];
+        if (!rules) {
+            for (var k in leaveFormValidation) {
+                if (key.indexOf(k) !== -1 || k.indexOf(key) !== -1) {
+                    rules = leaveFormValidation[k];
+                    break;
+                }
+            }
+        }
+        if (!rules) {
+            rules = { reason: 'mandatory', task_delegation: 'optional', destination: 'optional', transportation: 'optional', departure_pass: 'optional', attachment: 'optional' };
+        }
+        var fields = ['reason', 'task_delegation', 'destination', 'transportation', 'departure_pass', 'attachment'];
+        fields.forEach(function(field) {
+            var rule = rules[field] || 'optional';
+            var $el = $('#field-' + field);
+            var $input = field === 'reason' ? $('#leaveReason') : field === 'task_delegation' ? $('#taskDel') : field === 'destination' ? $('#destination') : field === 'attachment' ? $('#uploadFile') : null;
+            if (rule === 'hidden') {
+                $el.addClass('d-none');
+                if ($input && $input.length) {
+                    $input.removeAttr('required').removeAttr('data-parsley-required');
+                    $input.val('').trigger('change');
+                }
+                $el.find('.reason-required-mark, .task_delegation-required-mark, .attachment-required-mark').addClass('d-none');
+            } else {
+                $el.removeClass('d-none');
+                var isMandatory = (rule === 'mandatory');
+                if (field === 'reason') {
+                    if (isMandatory) {
+                        $('#leaveReason').attr('required', 'required').attr('data-parsley-required', 'true');
+                        $el.find('.reason-required-mark').removeClass('d-none');
+                    } else {
+                        $('#leaveReason').removeAttr('required').removeAttr('data-parsley-required');
+                        $el.find('.reason-required-mark').addClass('d-none');
+                    }
+                } else if (field === 'task_delegation') {
+                    if (isMandatory) {
+                        $('#taskDel').attr('required', 'required').attr('data-parsley-required', 'true');
+                        $el.find('.task_delegation-required-mark').removeClass('d-none');
+                    } else {
+                        $('#taskDel').removeAttr('required').removeAttr('data-parsley-required');
+                        $el.find('.task_delegation-required-mark').addClass('d-none');
+                    }
+                } else if (field === 'attachment') {
+                    if (isMandatory) {
+                        $('#uploadFile').attr('required', 'required').attr('data-parsley-required', 'true');
+                        $el.find('.attachment-required-mark').removeClass('d-none');
+                    } else {
+                        $('#uploadFile').removeAttr('required').removeAttr('data-parsley-required');
+                        $el.find('.attachment-required-mark').addClass('d-none');
+                    }
+                }
+            }
+        });
+        if ($('#leave-apply').parsley()) {
+            $('#leave-apply').parsley().reset();
+        }
+    }
     $(document).ready(function () {
         // Ensure Parsley is loaded
         if (typeof $.fn.parsley !== 'function') {
@@ -311,6 +376,12 @@
         });
 
         $(".select2t-none").select2();
+
+        // Apply leave-category-based validation (Mandatory/Optional/Hidden) when first leave category changes
+        $(document).on('change', '#leaveCat1', function () {
+            applyLeaveCategoryValidation();
+        });
+        applyLeaveCategoryValidation();
 
         // Manually trigger Parsley validation when Select2 changes
         $(".select2t-none").on('change', function () {

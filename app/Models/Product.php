@@ -13,7 +13,7 @@ class Product extends Model
     protected $table = 'products';
     protected $fillable = [
         'shopkeeper_id',
-        'name','price','qr_code'
+        'name', 'price', 'currency_type', 'qr_code'
     ];
 
     public static function boot(){

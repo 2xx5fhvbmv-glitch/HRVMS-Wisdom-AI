@@ -69,12 +69,14 @@
                                     <th>ID</th>
                                     <th>Emp ID</th>
                                     <th>Name</th>
-                                    <th>Purchase Date </th>
+                                    <th>Purchase Date</th>
                                     <th>Product</th>
                                     <th>Quantity</th>
                                     <th>Price</th>
-                                    <th>Status </th>
-                                    <th>Action </th>
+                                    <th>Currency</th>
+                                    <th>Status</th>
+                                    <th>QR</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                         </table>
@@ -148,6 +150,22 @@
     </div>
     </div>
 
+    <!-- QR Code Modal -->
+    <div class="modal fade" id="payment-qr-modal" tabindex="-1" aria-labelledby="paymentQrModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="paymentQrModalLabel">Payment QR Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="text-muted small mb-2">Scan with mobile app for payment details</p>
+                    <img id="payment-qr-modal-img" src="" alt="QR Code" style="max-width: 280px; width: 100%; height: auto;">
+                </div>
+            </div>
+        </div>
+    </div>
+
 @endsection
     
 @section('import-css')
@@ -200,8 +218,16 @@
         deductionModal.show();
     });
 
-    $(document).on('click', '.resend-consent', function() {
-        var paymentID = $(this).data('id');
+        $(document).on('click', '.payment-qr-icon', function() {
+            var paymentId = $(this).data('payment-id');
+            var url = "{{ route('shopkeeper.payment.qr-image', '') }}/" + paymentId;
+            $('#payment-qr-modal-img').attr('src', url);
+            var qrModal = new bootstrap.Modal(document.getElementById('payment-qr-modal'));
+            qrModal.show();
+        });
+
+        $(document).on('click', '.resend-consent', function() {
+            var paymentID = $(this).data('id');
        
        $.ajax({
             url: "{{ route('shopkeeper.payment.sendConsent') }}",
@@ -266,7 +292,7 @@
             "iDisplayLength": 15,  // Set the initial number of records per page
             processing: true, // Show processing indicator
             serverSide: true, // Enable server-side processing
-            order:[[9, 'desc']], 
+            order:[[11, 'desc']], 
             ajax: {
                 url: "{{ route('dashboard.payment.list') }}",
                 type: 'GET',
@@ -290,9 +316,11 @@
                 { data: 'product', name: 'product', className: 'text-nowrap' },
                 { data: 'quantity', name: 'quantity', className: 'text-nowrap' },
                 { data: 'price', name: 'price', className: 'text-nowrap' },
-                { data: 'status', name: 'status'},
+                { data: 'currency_type', name: 'currency_type', className: 'text-nowrap' },
+                { data: 'status', name: 'status', render: function(data, type, row) { if (type === 'display' && data) { var $wrap = $('<div>').html(data); return $wrap[0]; } return data || '—'; } },
+                { data: 'qr_code', name: 'qr_code', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'action', name: 'action', orderable: false, searchable: false },
-                {data: 'created_at', visible: false, searchable: false},
+                { data: 'created_at', visible: false, searchable: false },
             ]
         });
     }

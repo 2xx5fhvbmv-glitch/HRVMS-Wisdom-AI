@@ -39,6 +39,11 @@
                                 <p id="endDate" class="d-none">End Date:</p>
                             </div>                        
                         </div>
+                        <div class="col-auto ms-md-auto">
+                            <button type="button" id="payment-download-btn" class="btn btn-themeSkyblue btn-sm">
+                                <i class="fa-solid fa-download me-1"></i> Download
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <!-- data-Table  -->
@@ -47,18 +52,36 @@
                         <tr>
                             <th>ID</th>
                             <th>Emp ID</th>
-                            <th>Name </th>
-                            <th>Purchase Date </th>
+                            <th>Name</th>
+                            <th>Purchase Date</th>
                             <th>Product</th>
                             <th>Quantity</th>
                             <th>Price</th>
+                            <th>Currency</th>
                             <th>Status</th>
+                            <th>QR</th>
                         </tr>
                     </thead>
                     <tbody>
             
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="modal fade" id="payment-qr-modal" tabindex="-1" aria-labelledby="paymentQrModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="paymentQrModalLabel">Payment QR Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="text-muted small mb-2">Scan with mobile app for payment details</p>
+                    <img id="payment-qr-modal-img" src="" alt="QR Code" style="max-width: 280px; width: 100%; height: auto;">
+                </div>
             </div>
         </div>
     </div>
@@ -108,6 +131,26 @@
         $(document).on('keyup', '.search', function() {
             PaymentHistory();
         });
+
+        $(document).on('click', '.payment-qr-icon', function() {
+            var paymentId = $(this).data('payment-id');
+            var url = "{{ route('shopkeeper.payment.qr-image', '') }}/" + paymentId;
+            $('#payment-qr-modal-img').attr('src', url);
+            var qrModal = new bootstrap.Modal(document.getElementById('payment-qr-modal'));
+            qrModal.show();
+        });
+
+        $('#payment-download-btn').on('click', function(e) {
+            e.preventDefault();
+            var dateRange = $('#hiddenInput').val();
+            var dates = dateRange.split(' - ');
+            var startDate = moment(dates[0], 'DD-MM-YYYY').format('YYYY-MM-DD');
+            var endDate = moment(dates[1], 'DD-MM-YYYY').format('YYYY-MM-DD');
+            var searchTerm = $('.search').val() || '';
+            var url = "{{ route('dashboard.payment.download') }}?start_date=" + encodeURIComponent(startDate) + "&end_date=" + encodeURIComponent(endDate);
+            if (searchTerm) url += "&search_term=" + encodeURIComponent(searchTerm);
+            window.location.href = url;
+        });
     });
     function PaymentHistory()
     {
@@ -135,7 +178,7 @@
             "iDisplayLength": 15,  // Set the initial number of records per page
             processing: true, // Show processing indicator
             serverSide: true, // Enable server-side processing
-            order:[[8, 'desc']], 
+            order:[[10, 'desc']], 
             ajax: {
                 url: "{{ route('shopkeeper.payment.list') }}",
                 type: 'GET',
@@ -153,7 +196,9 @@
                 { data: 'product', name: 'product', className: 'text-nowrap' },
                 { data: 'quantity', name: 'quantity', className: 'text-nowrap' },
                 { data: 'price', name: 'price', className: 'text-nowrap' },
-                { data: 'status', name: 'status', orderable: false, searchable: false },
+                { data: 'currency_type', name: 'currency_type', className: 'text-nowrap' },
+                { data: 'status', name: 'status', orderable: false, searchable: false, render: function(data, type, row) { if (type === 'display' && data) { var $wrap = $('<div>').html(data); return $wrap[0]; } return data || '—'; } },
+                { data: 'qr_code', name: 'qr_code', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'created_at', visible: false, searchable: false },
             ]
         });

@@ -14,6 +14,7 @@ use App\Models\ResortAdmin;
 use App\Models\EmployeeLeave;
 use App\Models\LeaveCategory;
 use App\Models\EmployeeLeaveStatus;
+use App\Models\ResortDepartment;
 
 
 class LeaveCalenadarController extends Controller
@@ -24,11 +25,10 @@ class LeaveCalenadarController extends Controller
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
-        if(!$this->resort) return;
-        if($this->resort->is_master_admin == 0){
-            $this->reporting_to = $this->resort->GetEmployee->id;
-            $this->underEmp_id = Common::getSubordinates($this->reporting_to);
-        }
+        if (!$this->resort) return;
+        $reporting_to = $this->resort->getEmployee?->id ?? $this->resort->id;
+        $this->reporting_to = $reporting_to;
+        $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
     public function index()
     {
@@ -45,12 +45,25 @@ class LeaveCalenadarController extends Controller
         $isHOD = ($available_rank === "HOD");
         $isHR = ($available_rank === "HR");
 
+        // Treat Human Resources HOD like HR (whole-resort visibility)
+        $hrDeptId = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->where('name', 'like', '%Human Resources%')
+            ->value('id');
+        $loggedInEmployeeId = $loggedInEmployee->id ?? null;
+        $isHRDeptHOD = $isHOD && $loggedInEmployee && $hrDeptId && (int)$loggedInEmployee->Dept_id === (int)$hrDeptId;
+        if ($isHRDeptHOD) {
+            $isHR = true;
+            $isHOD = false;
+        }
+
         $leave_requests_query = DB::table('employees_leaves as el')
             ->join('employees as e', 'e.id', '=', 'el.emp_id')
             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-            ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id');
+            ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
+            ->where('el.resort_id', $this->resort->resort_id)
+            ->whereNull('el.flag');
             
 
         // if ($isHR) {
@@ -59,9 +72,16 @@ class LeaveCalenadarController extends Controller
         // }
 
         if (!$isHR) {
-            // $leave_requests_query->whereIn('e.id', $this->underEmp_id);
-            $leave_requests_query->where('e.reporting_to', $this->reporting_to ); // Only employees under HOD
-            // Only employees under HOD
+            if ($isHOD) {
+                // Non-HR HOD: show only own department leaves (incl. self)
+                $leave_requests_query->where('e.Dept_id', $loggedInEmployee->Dept_id);
+            } else {
+                // Other ranks: show own leaves + subordinates' leaves
+                $leave_requests_query->where(function ($q) use ($loggedInEmployeeId) {
+                    $q->whereIn('e.id', $this->underEmp_id)
+                        ->orWhere('el.emp_id', $loggedInEmployeeId);
+                });
+            }
         }
         
 
@@ -116,12 +136,25 @@ class LeaveCalenadarController extends Controller
         $isHOD = ($available_rank === "HOD");
         $isHR = ($available_rank === "HR");
 
+        // Treat Human Resources HOD like HR (whole-resort visibility)
+        $hrDeptId = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->where('name', 'like', '%Human Resources%')
+            ->value('id');
+        $loggedInEmployeeId = $loggedInEmployee->id ?? null;
+        $isHRDeptHOD = $isHOD && $loggedInEmployee && $hrDeptId && (int)$loggedInEmployee->Dept_id === (int)$hrDeptId;
+        if ($isHRDeptHOD) {
+            $isHR = true;
+            $isHOD = false;
+        }
+
         $leave_requests_query = DB::table('employees_leaves as el')
             ->join('employees as e', 'e.id', '=', 'el.emp_id')
             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
-            ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id');
+            ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
+            ->where('el.resort_id', $this->resort->resort_id)
+            ->whereNull('el.flag');
             
 
         // if ($isHR) {
@@ -130,8 +163,16 @@ class LeaveCalenadarController extends Controller
         // }
 
         if (!$isHR) {
-            // $leave_requests_query->whereIn('e.id', $this->underEmp_id);
-            $leave_requests_query->where('e.reporting_to', $this->reporting_to ); // Only employees under HOD
+            if ($isHOD) {
+                // Non-HR HOD: show only own department leaves (incl. self)
+                $leave_requests_query->where('e.Dept_id', $loggedInEmployee->Dept_id);
+            } else {
+                // Other ranks: show own leaves + subordinates' leaves
+                $leave_requests_query->where(function ($q) use ($loggedInEmployeeId) {
+                    $q->whereIn('e.id', $this->underEmp_id)
+                        ->orWhere('el.emp_id', $loggedInEmployeeId);
+                });
+            }
         }
         // else{
         //     $leave_requests_query->where('e.reporting_to', $this->reporting_to );

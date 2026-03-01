@@ -65,13 +65,20 @@
                         <div class="prodConfig-main mb-md-4 mb-3">
                             <div class="prodConfig-block">
                                 <div class="row align-items-end g-md-4 g-2 product-row">
-                                    <div class="col-xl-4 col-md-4 col-sm-6">
+                                    <div class="col-xl-3 col-md-4 col-sm-6">
                                         <label class="form-label">PRODUCT NAME<span class="red-mark">*</span></label>
                                         <input type="text" class="form-control product_name" placeholder="PRODUCT NAME" name="product_name[]" required>
                                     </div>
-                                    <div class="col-xl-4 col-md-4 col-sm-6">
-                                        <label class="form-label">PRODUCT PRICE<span class="red-mark">*</span></label>
-                                        <input type="text" class="form-control product_price" placeholder="PRODUCT PRICE" name="product_price[]" required>
+                                    <div class="col-xl-2 col-md-4 col-sm-6">
+                                        <label class="form-label">PRICE<span class="red-mark">*</span></label>
+                                        <input type="text" class="form-control product_price" placeholder="PRICE" name="product_price[]" required>
+                                    </div>
+                                    <div class="col-xl-2 col-md-4 col-sm-6">
+                                        <label class="form-label">CURRENCY<span class="red-mark">*</span></label>
+                                        <select class="form-select product_currency" name="product_currency[]" required>
+                                            <option value="USD">Dollar</option>
+                                            <option value="MVR">MVR</option>
+                                        </select>
                                     </div>
                                     <div class="col">
                                         <label class="form-label">QR CODE<span class="red-mark">*</span></label><br>
@@ -183,6 +190,7 @@
                             productsData.push({
                                 product_name: product.product_name,
                                 product_price: product.product_price,
+                                currency_type: product.currency_type || 'USD',
                                 qr_code: qrBase64,
                             });
 
@@ -291,13 +299,20 @@
             const newRow = document.createElement('div');
             newRow.className = ' prodConfig-block ';
             newRow.innerHTML = `<div class="row align-items-end g-md-4 g-2 product-row">
-                <div class="col-xl-4 col-md-4 col-sm-6">
+                <div class="col-xl-3 col-md-4 col-sm-6">
                     <label class="form-label">PRODUCT NAME<span class="red-mark">*</span></label>
                     <input type="text" class="form-control product_name" placeholder="PRODUCT NAME" name="product_name[]" data-parsley-required="true">
                 </div>
-                <div class="col-xl-4 col-md-4 col-sm-6">
-                    <label class="form-label">PRODUCT PRICE<span class="red-mark">*</span></label>
-                    <input type="text" class="form-control product_price" placeholder="PRODUCT PRICE" name="product_price[]" data-parsley-required="true" data-parsley-type="number">
+                <div class="col-xl-2 col-md-4 col-sm-6">
+                    <label class="form-label">PRICE<span class="red-mark">*</span></label>
+                    <input type="text" class="form-control product_price" placeholder="PRICE" name="product_price[]" data-parsley-required="true" data-parsley-type="number">
+                </div>
+                <div class="col-xl-2 col-md-4 col-sm-6">
+                    <label class="form-label">CURRENCY<span class="red-mark">*</span></label>
+                    <select class="form-select product_currency" name="product_currency[]" data-parsley-required="true">
+                        <option value="USD">Dollar</option>
+                        <option value="MVR">MVR</option>
+                    </select>
                 </div>
                 <div class="col">
                     <label class="form-label">QR CODE<span class="red-mark">*</span></label><br>
@@ -346,6 +361,8 @@
             rows.forEach(row => {
                 const productName = row.querySelector('.product_name').value.trim();
                 const productPrice = row.querySelector('.product_price').value.trim();
+                const currencySelect = row.querySelector('.product_currency');
+                const currencyType = currencySelect ? currencySelect.value : 'USD';
                 const qrContainer = row.querySelector('.qr-code-container');
 
                 // Convert QR container to Base64 image
@@ -356,6 +373,7 @@
                     productsData.push({
                         product_name: productName,
                         product_price: productPrice,
+                        currency_type: currencyType,
                         qr_code: qrCodeBase64,
                     });
                 }

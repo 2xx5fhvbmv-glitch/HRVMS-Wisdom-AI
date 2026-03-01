@@ -552,6 +552,82 @@ return [
 		// '9' => 'Corporate Office' // To Do
 	],
 
+	// Leave apply form: per-category field rules (mandatory, optional, hidden)
+	'leave_form_validation' => [
+		'annual leave' => [
+			'reason' => 'mandatory',
+			'task_delegation' => 'mandatory',
+			'destination' => 'optional',
+			'transportation' => 'optional',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'emergency leave' => [
+			'reason' => 'mandatory',
+			'task_delegation' => 'optional',
+			'destination' => 'optional',
+			'transportation' => 'optional',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'maternity leave' => [
+			'reason' => 'mandatory',
+			'task_delegation' => 'optional',
+			'destination' => 'optional',
+			'transportation' => 'optional',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'paternity leave' => [
+			'reason' => 'mandatory',
+			'task_delegation' => 'optional',
+			'destination' => 'hidden',
+			'transportation' => 'hidden',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'birthday leave' => [
+			'reason' => 'optional',
+			'task_delegation' => 'optional',
+			'destination' => 'hidden',
+			'transportation' => 'hidden',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'sick leave' => [
+			'reason' => 'mandatory',
+			'task_delegation' => 'optional',
+			'destination' => 'optional',
+			'transportation' => 'optional',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'rest & relaxation leave' => [
+			'reason' => 'optional',
+			'task_delegation' => 'optional',
+			'destination' => 'optional',
+			'transportation' => 'optional',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'rest and relaxation leave' => [
+			'reason' => 'optional',
+			'task_delegation' => 'optional',
+			'destination' => 'optional',
+			'transportation' => 'optional',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+		'circumcision leave' => [
+			'reason' => 'mandatory',
+			'task_delegation' => 'optional',
+			'destination' => 'hidden',
+			'transportation' => 'hidden',
+			'departure_pass' => 'optional',
+			'attachment' => 'optional',
+		],
+	],
+
     'InterViewRound' => [
         '3' => 'HR',
         '2' => 'HOD',

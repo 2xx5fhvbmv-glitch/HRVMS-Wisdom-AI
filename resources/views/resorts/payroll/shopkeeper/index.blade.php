@@ -66,6 +66,7 @@
                                     <th class="text-nowrap">Name</th>
                                     <th class="text-nowrap">Email</th>
                                     <th class="text-nowrap">Contact</th>
+                                    <th class="text-nowrap">View more</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
                             </thead>
@@ -112,7 +113,7 @@
             pageLength: 10,
             processing: true,
             serverSide: true,
-            order:[[5, 'desc']],
+            order:[[6, 'desc']],
             ajax: {
             url: "{{ route('shopkeepers.list') }}",
             type: 'GET',
@@ -124,6 +125,7 @@
                 {data: 'name', name: 'name'},
                 {data: 'email', name: 'email'},
                 {data: 'contact_no', name: 'contact_no'},
+                {data: 'view_more', name: 'view_more', orderable: false, searchable: false},
                 {data: 'action', name: 'action', orderable: false, searchable: false},
                 {data: 'created_at', visible: false, searchable: false},
             ],
@@ -140,21 +142,23 @@
         var currentName = $row.find("td:nth-child(1)").text().trim();
         var currentEmail = $row.find("td:nth-child(2)").text().trim();
         var currentContact = $row.find("td:nth-child(3)").text().trim();
+        var viewMoreUrl = $row.find("td:nth-child(4) a").attr("href") || "{{ url('resort/payroll/shopkeepers') }}/" + shopkeeperId + "/payments";
 
         var editRowHtml = `
             <td class="py-1">
                 <div class="form-group">
-                    <input type="text" name="name" class="form-control" value="${currentName}" />
+                    <input type="text" name="name" class="form-control" value="${currentName.replace(/"/g, '&quot;')}" />
                 </div>
             </td>
             <td class="py-1">
                 <div class="form-group">
-                    <input type="text" name="email" class="form-control" value="${currentEmail}" />
+                    <input type="text" name="email" class="form-control" value="${currentEmail.replace(/"/g, '&quot;')}" />
                 </div>
             </td>
             <td class="py-1">
                 <input type="text" name="contact_no" class="form-control" value="${currentContact}" />
             </td>
+            <td class="py-1"></td>
             <td class="py-1">
                 <a href="#" class="btn btn-theme update-row-btn" data-shopkeeper-id="${shopkeeperId}">Submit</a>
             </td>
@@ -187,10 +191,14 @@
             success: function(response) {
                 if(response.success == true) { // Ensure response contains a success key
                     // Update the row with new values
+                    var viewMoreUrl = "{{ url('resort/payroll/shopkeepers') }}/" + shopkeeperId + "/payments";
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatedEmail}</td>
                         <td class="text-nowrap">${updatedContact}</td>
+                        <td class="text-nowrap">
+                            <a href="${viewMoreUrl}" class="btn btn-themeSkyblue btn-sm">View more</a>
+                        </td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
                                 <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-shopkeeper-id="${shopkeeperId}">

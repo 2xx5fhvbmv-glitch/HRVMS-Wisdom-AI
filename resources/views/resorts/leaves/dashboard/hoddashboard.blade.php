@@ -74,7 +74,6 @@
                             </div>
                         </div>
                     </div>
-
                     <div class="col-xl-3 col-md-6  @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card" id="card-onLeave">
                             <div class="card-title">
