@@ -45,7 +45,7 @@ class InterviewInvitationController extends Controller
         ]);
     }
 
-    public function accept($token)
+    public function accept(Request $request, $token)
     {
         $interview = ApplicantInterViewDetails::where('invitation_token', $token)->first();
 
@@ -69,7 +69,21 @@ class InterviewInvitationController extends Controller
                 ->with('error', 'This invitation is no longer valid.');
         }
 
-        $interview->update(['Status' => 'Slot Booked']);
+        $updateData = ['Status' => 'Slot Booked'];
+
+        // If applicant selected a specific time slot from multiple options
+        if ($request->has('selected_slot')) {
+            $resortTimes = array_map('trim', explode(',', $interview->ResortInterviewtime));
+            $applicantTimes = array_map('trim', explode(',', $interview->ApplicantInterviewtime));
+            $selectedIndex = (int) $request->selected_slot;
+
+            if (isset($resortTimes[$selectedIndex]) && isset($applicantTimes[$selectedIndex])) {
+                $updateData['ResortInterviewtime'] = $resortTimes[$selectedIndex];
+                $updateData['ApplicantInterviewtime'] = $applicantTimes[$selectedIndex];
+            }
+        }
+
+        $interview->update($updateData);
 
         // Send notification email to interviewer
         $this->notifyInterviewer($interview, 'accepted');

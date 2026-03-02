@@ -6664,6 +6664,137 @@ class Common
         return $createdEntries;
     }
 
+    /**
+     * Resolve all template placeholders for offer letter / contract
+     */
+    public static function resolveTemplatePlaceholders($applicantId, $resortId)
+    {
+        $applicant = \App\Models\Applicant_form_data::find($applicantId);
+        if (!$applicant) return [];
+
+        $resort = \App\Models\Resort::find($resortId);
+
+        // Vacancy + position + department
+        $vacancy = \App\Models\Vacancies::join('resort_positions as rp', 'rp.id', '=', 'vacancies.position')
+            ->leftJoin('resort_departments as rd', 'rd.id', '=', 'rp.dept_id')
+            ->where('vacancies.id', $applicant->Parent_v_id)
+            ->selectRaw('vacancies.*, rp.position_title, rp.rank as position_rank, rd.name as department_name')
+            ->first();
+
+        // Reporting manager info
+        $reportingManagerName = '';
+        $reportingManagerTitle = '';
+        if ($vacancy && $vacancy->reporting_to) {
+            $manager = \App\Models\Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                ->leftJoin('resort_positions as rp2', 'rp2.id', '=', 'employees.Position_id')
+                ->where('employees.id', $vacancy->reporting_to)
+                ->selectRaw("CONCAT(ra.first_name, ' ', ra.last_name) as manager_name, rp2.position_title as manager_title")
+                ->first();
+            if ($manager) {
+                $reportingManagerName = $manager->manager_name ?? '';
+                $reportingManagerTitle = $manager->manager_title ?? '';
+            }
+        }
+
+        // Extra fields from ta_template_extra_fields
+        $extraFields = \App\Models\TaTemplateExtraField::where('resort_id', $resortId)
+            ->pluck('field_value', 'field_key')
+            ->toArray();
+
+        // Resolve country ID to country name
+        $candidateCountryName = '';
+        if ($applicant->country) {
+            $countryRecord = \DB::table('countries')->where('id', $applicant->country)->first();
+            $candidateCountryName = $countryRecord->name ?? $applicant->country;
+        }
+
+        // Build candidate address
+        $addressParts = array_filter([
+            $applicant->address_line_one,
+            $applicant->address_line_two,
+            $applicant->city,
+            $applicant->state,
+            $applicant->pin_code,
+            $candidateCountryName,
+        ]);
+        $candidateAddress = implode(', ', $addressParts);
+
+        // Build company address
+        $companyAddressParts = array_filter([
+            $resort->address1 ?? '',
+            $resort->address2 ?? '',
+            $resort->city ?? '',
+            $resort->state ?? '',
+            $resort->zip ?? '',
+            $resort->country ?? '',
+        ]);
+        $companyAddress = implode(', ', $companyAddressParts);
+
+        $placeholders = [
+            // Personal Information
+            '{{candidate_full_name}}' => ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name),
+            '{{candidate_first_name}}' => ucfirst($applicant->first_name ?? ''),
+            '{{candidate_last_name}}' => ucfirst($applicant->last_name ?? ''),
+            '{{candidate_gender}}' => ucfirst($applicant->gender ?? ''),
+            '{{candidate_date_of_birth}}' => $applicant->dob ?? '',
+            '{{candidate_nationality}}' => $candidateCountryName,
+            '{{candidate_passport_number}}' => $applicant->passport_no ?? '',
+            '{{candidate_national_id_number}}' => $extraFields['candidate_national_id_number'] ?? '',
+            '{{candidate_address}}' => $candidateAddress,
+            '{{candidate_email}}' => $applicant->email ?? '',
+            '{{candidate_phone_number}}' => ($applicant->country_phone_code ?? '') . ' ' . ($applicant->mobile_number ?? ''),
+
+            // Job Details
+            '{{job_title}}' => $vacancy->position_title ?? '',
+            '{{department_name}}' => $vacancy->department_name ?? '',
+            '{{reporting_manager_name}}' => $reportingManagerName,
+            '{{reporting_manager_title}}' => $reportingManagerTitle,
+            '{{employment_type}}' => $vacancy->employee_type ?? '',
+            '{{work_location_name}}' => $resort->resort_name ?? '',
+            '{{work_location_address}}' => $companyAddress,
+            '{{probation_period_months}}' => $extraFields['probation_period_months'] ?? '',
+            '{{employment_start_date}}' => $vacancy->required_starting_date ?? '',
+            '{{contract_end_date}}' => $extraFields['contract_end_date'] ?? '',
+
+            // Company Details
+            '{{company_name}}' => $resort->resort_name ?? '',
+            '{{company_registration_number}}' => $extraFields['company_registration_number'] ?? '',
+            '{{company_address}}' => $companyAddress,
+
+            // Working Hours
+            '{{working_hours_per_day}}' => $extraFields['working_hours_per_day'] ?? '',
+            '{{working_days_per_week}}' => $extraFields['working_days_per_week'] ?? '',
+            '{{weekly_off_days}}' => $extraFields['weekly_off_days'] ?? '',
+            '{{overtime_rate}}' => $extraFields['overtime_rate'] ?? '',
+            '{{benefit_grid_list}}' => $extraFields['benefit_grid_list'] ?? '',
+            '{{termination_notice_period_days}}' => $extraFields['termination_notice_period_days'] ?? '',
+            '{{termination_notice_during_probation_days}}' => $extraFields['termination_notice_during_probation_days'] ?? '',
+
+            // Compensation
+            '{{basic_salary_amount}}' => $vacancy->propsed_salary ?? $vacancy->salary ?? '',
+            '{{currency}}' => $extraFields['currency'] ?? '',
+            '{{salary_frequency}}' => $extraFields['salary_frequency'] ?? 'Monthly',
+            '{{service_charge_eligible}}' => $extraFields['service_charge_eligible'] ?? '',
+            '{{estimated_service_charge_range}}' => $extraFields['estimated_service_charge_range'] ?? '',
+            '{{allowances_total}}' => $vacancy->allowance ?? '',
+            '{{gross_salary_amount}}' => $vacancy->salary ?? '',
+            '{{offer_issue_date}}' => now()->format('d/m/Y'),
+            '{{offer_expiry_date}}' => '',
+            '{{background_verification_required}}' => $extraFields['background_verification_required'] ?? '',
+            '{{medical_clearance_required}}' => $extraFields['medical_clearance_required'] ?? '',
+            '{{work_permit_required}}' => $extraFields['work_permit_required'] ?? '',
+            '{{documents_required_list}}' => $extraFields['documents_required_list'] ?? '',
+            '{{accommodation_provided}}' => ($vacancy->accomodation ?? '') == 'yes' ? 'Yes' : ($extraFields['accommodation_provided'] ?? ''),
+            '{{meals_provided}}' => ($vacancy->food ?? '') == 'yes' ? 'Yes' : ($extraFields['meals_provided'] ?? ''),
+            '{{uniform_provided}}' => $extraFields['uniform_provided'] ?? '',
+            '{{offer_acceptance_deadline}}' => '',
+            '{{candidate_signature_placeholder}}' => '____________________________',
+            '{{offer_signature_date}}' => '____________________________',
+        ];
+
+        return $placeholders;
+    }
+
 }
 
 ?>

@@ -186,6 +186,40 @@
 
                         </div>
 
+                        {{-- Offer Letter Templates --}}
+                        <div class="card mb-30 mt-4">
+                            <div class="card-title">
+                                <div class="row g-3 align-items-center justify-content-between">
+                                    <div class="col-auto">
+                                        <h3><i class="fa-solid fa-file-word me-2 text-primary"></i>Offer Letter Templates</h3>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="{{ route('resort.ta.offerLetterTemplates.index') }}" class="btn btn-theme">
+                                            <i class="fa-solid fa-arrow-right me-1"></i> Manage Templates
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-muted mb-0">Upload and manage multiple offer letter DOCX templates. One template is marked as default and used when sending to applicants.</p>
+                        </div>
+
+                        {{-- Contract Templates --}}
+                        <div class="card mb-30 mt-4">
+                            <div class="card-title">
+                                <div class="row g-3 align-items-center justify-content-between">
+                                    <div class="col-auto">
+                                        <h3><i class="fa-solid fa-file-contract me-2 text-primary"></i>Employment Contract Templates</h3>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="{{ route('resort.ta.contractTemplates.index') }}" class="btn btn-theme">
+                                            <i class="fa-solid fa-arrow-right me-1"></i> Manage Templates
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-muted mb-0">Upload and manage multiple employment contract DOCX templates. One template is marked as default and used when sending to applicants.</p>
+                        </div>
+
                     </div>
 
                     <div class="col-lg-6 ">
@@ -341,6 +375,138 @@
                                             </table>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            {{-- Organization Details for Templates --}}
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-title">
+                                        <div class="row g-3 align-items-center justify-content-between">
+                                            <div class="col-auto">
+                                                <h3>Organization Details for Templates</h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <form id="templateExtraFieldsForm">
+                                        @csrf
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-lg-6">
+                                                <label class="form-label">Company Registration Number</label>
+                                                <input type="text" name="company_registration_number" class="form-control" value="{{ $templateExtraFields['company_registration_number'] ?? '' }}" placeholder="e.g. C-12345">
+                                            </div>
+                                            <div class="col-lg-6">
+                                                <label class="form-label">Currency</label>
+                                                <select name="currency" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="MVR" {{ ($templateExtraFields['currency'] ?? '') == 'MVR' ? 'selected' : '' }}>MVR</option>
+                                                    <option value="USD" {{ ($templateExtraFields['currency'] ?? '') == 'USD' ? 'selected' : '' }}>USD</option>
+                                                    <option value="EUR" {{ ($templateExtraFields['currency'] ?? '') == 'EUR' ? 'selected' : '' }}>EUR</option>
+                                                    <option value="GBP" {{ ($templateExtraFields['currency'] ?? '') == 'GBP' ? 'selected' : '' }}>GBP</option>
+                                                    <option value="INR" {{ ($templateExtraFields['currency'] ?? '') == 'INR' ? 'selected' : '' }}>INR</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Working Hours/Day</label>
+                                                <input type="text" name="working_hours_per_day" class="form-control" value="{{ $templateExtraFields['working_hours_per_day'] ?? '' }}" placeholder="e.g. 8">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Working Days/Week</label>
+                                                <input type="text" name="working_days_per_week" class="form-control" value="{{ $templateExtraFields['working_days_per_week'] ?? '' }}" placeholder="e.g. 6">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Weekly Off Days</label>
+                                                <input type="text" name="weekly_off_days" class="form-control" value="{{ $templateExtraFields['weekly_off_days'] ?? '' }}" placeholder="e.g. Friday">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Overtime Rate</label>
+                                                <input type="text" name="overtime_rate" class="form-control" value="{{ $templateExtraFields['overtime_rate'] ?? '' }}" placeholder="e.g. 1.5x">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Notice Period (Days)</label>
+                                                <input type="text" name="termination_notice_period_days" class="form-control" value="{{ $templateExtraFields['termination_notice_period_days'] ?? '' }}" placeholder="e.g. 30">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Probation Notice (Days)</label>
+                                                <input type="text" name="termination_notice_during_probation_days" class="form-control" value="{{ $templateExtraFields['termination_notice_during_probation_days'] ?? '' }}" placeholder="e.g. 7">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Probation Period (Months)</label>
+                                                <input type="text" name="probation_period_months" class="form-control" value="{{ $templateExtraFields['probation_period_months'] ?? '' }}" placeholder="e.g. 3">
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Salary Frequency</label>
+                                                <select name="salary_frequency" class="form-select">
+                                                    <option value="Monthly" {{ ($templateExtraFields['salary_frequency'] ?? '') == 'Monthly' ? 'selected' : '' }}>Monthly</option>
+                                                    <option value="Bi-weekly" {{ ($templateExtraFields['salary_frequency'] ?? '') == 'Bi-weekly' ? 'selected' : '' }}>Bi-weekly</option>
+                                                    <option value="Weekly" {{ ($templateExtraFields['salary_frequency'] ?? '') == 'Weekly' ? 'selected' : '' }}>Weekly</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Service Charge Eligible</label>
+                                                <select name="service_charge_eligible" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['service_charge_eligible'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['service_charge_eligible'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Accommodation Provided</label>
+                                                <select name="accommodation_provided" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['accommodation_provided'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['accommodation_provided'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Meals Provided</label>
+                                                <select name="meals_provided" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['meals_provided'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['meals_provided'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Uniform Provided</label>
+                                                <select name="uniform_provided" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['uniform_provided'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['uniform_provided'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Background Verification</label>
+                                                <select name="background_verification_required" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['background_verification_required'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['background_verification_required'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Medical Clearance</label>
+                                                <select name="medical_clearance_required" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['medical_clearance_required'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['medical_clearance_required'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <label class="form-label">Work Permit Required</label>
+                                                <select name="work_permit_required" class="form-select">
+                                                    <option value="">Select</option>
+                                                    <option value="Yes" {{ ($templateExtraFields['work_permit_required'] ?? '') == 'Yes' ? 'selected' : '' }}>Yes</option>
+                                                    <option value="No" {{ ($templateExtraFields['work_permit_required'] ?? '') == 'No' ? 'selected' : '' }}>No</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-12">
+                                                <label class="form-label">Documents Required List</label>
+                                                <textarea name="documents_required_list" class="form-control" rows="2" placeholder="e.g. Passport copy, Medical certificate, Police clearance">{{ $templateExtraFields['documents_required_list'] ?? '' }}</textarea>
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="submit" class="btn btn-themeSkyblue mt-2">Save Organization Details</button>
+                                            </div>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
 
@@ -1052,6 +1218,29 @@ $(document).ready(function()
             }
         });
     });
+
+
+    // Organization Extra Fields Form
+    $('#templateExtraFieldsForm').on('submit', function(e) {
+        e.preventDefault();
+        var $btn = $(this).find('button[type="submit"]');
+        if($btn.prop('disabled')) return false;
+        $btn.prop('disabled', true).text('Saving...');
+        $.ajax({
+            url: "{{ route('resort.ta.templateExtraFields.storeOrUpdate') }}",
+            type: "POST",
+            data: $(this).serialize(),
+            success: function(response) {
+                if(response.success) toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                else toastr.error(response.message || "Failed to save.", "Error", { positionClass: 'toast-bottom-right' });
+            },
+            error: function(xhr) {
+                toastr.error(xhr.responseJSON?.message || "An error occurred.", "Error", { positionClass: 'toast-bottom-right' });
+            },
+            complete: function() { $btn.prop('disabled', false).text('Save Organization Details'); }
+        });
+    });
+
  });
 
 document.addEventListener('DOMContentLoaded', function () {

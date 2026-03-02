@@ -55,7 +55,12 @@ class ApplicantsController extends Controller
         ->orderByDesc("id")
         ->get();
 
-        return view("resorts.talentacquisition.Applicants.index",compact('EmailTamplete','page_title','id','currentUserRank','isHrDepartment'));
+        $offerLetterTemplates = \App\Models\TaDocumentTemplate::where('resort_id', $this->resort->resort_id)
+            ->where('type', 'offer_letter')->orderByDesc('is_default')->orderByDesc('id')->get();
+        $contractTemplates = \App\Models\TaDocumentTemplate::where('resort_id', $this->resort->resort_id)
+            ->where('type', 'contract')->orderByDesc('is_default')->orderByDesc('id')->get();
+
+        return view("resorts.talentacquisition.Applicants.index",compact('EmailTamplete','page_title','id','currentUserRank','isHrDepartment','offerLetterTemplates','contractTemplates'));
     }
 
     public function GetVacnacyWiseApplicants(Request $request)
@@ -2167,11 +2172,50 @@ class ApplicantsController extends Controller
         }
     }
 
+    /**
+     * Generate a filled PDF from a DOCX template by replacing placeholders.
+     * Uses PhpWord TemplateProcessor → HTML Writer → DomPDF.
+     */
+    private function generatePdfFromDocxTemplate($docxPath, $placeholders)
+    {
+        // PhpWord TemplateProcessor to replace placeholders in DOCX
+        $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($docxPath);
+
+        // Replace each {{placeholder}} — TemplateProcessor uses ${} by default, so we set custom delimiters
+        $templateProcessor->setMacroOpeningChars('{{');
+        $templateProcessor->setMacroClosingChars('}}');
+
+        foreach ($placeholders as $key => $value) {
+            // Strip {{ and }} from key for setValue
+            $cleanKey = str_replace(['{{', '}}'], '', $key);
+            $templateProcessor->setValue($cleanKey, $value ?? '');
+        }
+
+        // Save filled DOCX to temp file
+        $tempDocx = tempnam(sys_get_temp_dir(), 'docx_') . '.docx';
+        $templateProcessor->saveAs($tempDocx);
+
+        // Convert filled DOCX to HTML via PhpWord
+        $phpWord = \PhpOffice\PhpWord\IOFactory::load($tempDocx);
+        $htmlWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML');
+        $tempHtml = tempnam(sys_get_temp_dir(), 'html_') . '.html';
+        $htmlWriter->save($tempHtml);
+        $htmlContent = file_get_contents($tempHtml);
+
+        // Generate PDF from HTML via DomPDF
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($htmlContent)->setPaper('a4');
+
+        // Cleanup temp files
+        @unlink($tempDocx);
+        @unlink($tempHtml);
+
+        return $pdf;
+    }
+
     public function sendOfferLetter(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
-            'offer_letter' => 'required|file|mimes:pdf|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -2189,13 +2233,55 @@ class ApplicantsController extends Controller
 
         DB::beginTransaction();
         try {
-            // Upload file
-            $file = $request->file('offer_letter');
-            $filePath = $file->store('offer_letters/' . $resort_id, 'public');
+            $filePath = null;
+            $pdfPath = null;
+            $templateId = null;
+
+            // Get template: use selected template_id if provided, otherwise fall back to default
+            if ($request->template_id) {
+                $template = \App\Models\TaDocumentTemplate::where('id', $request->template_id)
+                    ->where('resort_id', $resort_id)->where('type', 'offer_letter')->first();
+            } else {
+                $template = \App\Models\TaDocumentTemplate::where('resort_id', $resort_id)
+                    ->where('type', 'offer_letter')->where('is_default', true)->first();
+            }
+
+            if ($template && $template->file_path && !$request->hasFile('offer_letter')) {
+                // DOCX template mode: replace placeholders and generate PDF
+                $docxFullPath = storage_path('app/public/' . $template->file_path);
+                if (!file_exists($docxFullPath)) {
+                    return response()->json(['success' => false, 'message' => 'Template file not found. Please re-upload in Configuration.'], 404);
+                }
+
+                $placeholders = Common::resolveTemplatePlaceholders($applicant_id, $resort_id);
+                $pdf = $this->generatePdfFromDocxTemplate($docxFullPath, $placeholders);
+
+                $fileName = 'offer_letter_' . time() . '_' . $applicant_id . '.pdf';
+                $storagePath = 'offer_letters/' . $resort_id;
+                if (!file_exists(storage_path('app/public/' . $storagePath))) {
+                    mkdir(storage_path('app/public/' . $storagePath), 0755, true);
+                }
+                $filePath = $storagePath . '/' . $fileName;
+                file_put_contents(storage_path('app/public/' . $filePath), $pdf->output());
+                $pdfPath = storage_path('app/public/' . $filePath);
+                $templateId = $template->id;
+
+                // Also resolve email subject placeholders
+                if ($template->subject) {
+                    $emailSubject = strtr($template->subject, $placeholders);
+                }
+            } elseif ($request->hasFile('offer_letter')) {
+                // Manual PDF upload fallback
+                $file = $request->file('offer_letter');
+                $filePath = $file->store('offer_letters/' . $resort_id, 'public');
+                $pdfPath = storage_path('app/public/' . $filePath);
+            } else {
+                return response()->json(['success' => false, 'message' => 'No template configured and no file uploaded. Please configure a template in TA Configuration or upload a PDF.'], 422);
+            }
 
             // Create offer contract record
             $token = Str::uuid()->toString();
-            $offerContract = ApplicantOfferContract::create([
+            ApplicantOfferContract::create([
                 'applicant_id' => $applicant_id,
                 'applicant_status_id' => $applicant_status_id,
                 'resort_id' => $resort_id,
@@ -2204,6 +2290,7 @@ class ApplicantsController extends Controller
                 'status' => 'Sent',
                 'token' => $token,
                 'sent_by' => $this->resort->id,
+                'ta_document_template_id' => $templateId,
             ]);
 
             // Update applicant status
@@ -2212,7 +2299,7 @@ class ApplicantsController extends Controller
                 ['status' => 'Offer Letter Sent']
             );
 
-            // Send custom offer letter email
+            // Send email
             $resort = \App\Models\Resort::find($resort_id);
             $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
                 ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
@@ -2226,14 +2313,12 @@ class ApplicantsController extends Controller
             $positionTitle = $vacancy->position_title ?? '';
             $department = $vacancy->department ?? '';
 
-            $subject = "Offer Letter – {$positionTitle} at {$resortName}";
+            $subject = $emailSubject ?? $request->email_subject ?? "Offer Letter – {$positionTitle} at {$resortName}";
 
-            // Send email with PDF attachment
-            $pdfPath = storage_path('app/public/' . $filePath);
             \Illuminate\Support\Facades\Mail::send('emails.offerLetter', compact('candidateName', 'positionTitle', 'department', 'resortName', 'offerLetterLink'), function ($message) use ($applicant, $subject, $pdfPath) {
                 $message->to($applicant->email)
                     ->subject($subject);
-                if (file_exists($pdfPath)) {
+                if ($pdfPath && file_exists($pdfPath)) {
                     $message->attach($pdfPath, [
                         'as' => 'Offer_Letter.pdf',
                         'mime' => 'application/pdf',
@@ -2254,7 +2339,6 @@ class ApplicantsController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'applicant_id' => 'required',
-            'contract_file' => 'required|file|mimes:pdf|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -2272,11 +2356,53 @@ class ApplicantsController extends Controller
 
         DB::beginTransaction();
         try {
-            $file = $request->file('contract_file');
-            $filePath = $file->store('contracts/' . $resort_id, 'public');
+            $filePath = null;
+            $pdfPath = null;
+            $templateId = null;
+
+            // Get template: use selected template_id if provided, otherwise fall back to default
+            if ($request->template_id) {
+                $template = \App\Models\TaDocumentTemplate::where('id', $request->template_id)
+                    ->where('resort_id', $resort_id)->where('type', 'contract')->first();
+            } else {
+                $template = \App\Models\TaDocumentTemplate::where('resort_id', $resort_id)
+                    ->where('type', 'contract')->where('is_default', true)->first();
+            }
+
+            if ($template && $template->file_path && !$request->hasFile('contract_file')) {
+                // DOCX template mode
+                $docxFullPath = storage_path('app/public/' . $template->file_path);
+                if (!file_exists($docxFullPath)) {
+                    return response()->json(['success' => false, 'message' => 'Template file not found. Please re-upload in Configuration.'], 404);
+                }
+
+                $placeholders = Common::resolveTemplatePlaceholders($applicant_id, $resort_id);
+                $pdf = $this->generatePdfFromDocxTemplate($docxFullPath, $placeholders);
+
+                $fileName = 'contract_' . time() . '_' . $applicant_id . '.pdf';
+                $storagePath = 'contracts/' . $resort_id;
+                if (!file_exists(storage_path('app/public/' . $storagePath))) {
+                    mkdir(storage_path('app/public/' . $storagePath), 0755, true);
+                }
+                $filePath = $storagePath . '/' . $fileName;
+                file_put_contents(storage_path('app/public/' . $filePath), $pdf->output());
+                $pdfPath = storage_path('app/public/' . $filePath);
+                $templateId = $template->id;
+
+                if ($template->subject) {
+                    $emailSubject = strtr($template->subject, $placeholders);
+                }
+            } elseif ($request->hasFile('contract_file')) {
+                // Manual PDF upload fallback
+                $file = $request->file('contract_file');
+                $filePath = $file->store('contracts/' . $resort_id, 'public');
+                $pdfPath = storage_path('app/public/' . $filePath);
+            } else {
+                return response()->json(['success' => false, 'message' => 'No template configured and no file uploaded. Please configure a template in TA Configuration or upload a PDF.'], 422);
+            }
 
             $token = Str::uuid()->toString();
-            $contract = ApplicantOfferContract::create([
+            ApplicantOfferContract::create([
                 'applicant_id' => $applicant_id,
                 'applicant_status_id' => $applicant_status_id,
                 'resort_id' => $resort_id,
@@ -2285,6 +2411,7 @@ class ApplicantsController extends Controller
                 'status' => 'Sent',
                 'token' => $token,
                 'sent_by' => $this->resort->id,
+                'ta_document_template_id' => $templateId,
             ]);
 
             ApplicantWiseStatus::updateOrCreate(
@@ -2292,7 +2419,7 @@ class ApplicantsController extends Controller
                 ['status' => 'Contract Sent']
             );
 
-            // Send custom contract email
+            // Send email
             $resort = \App\Models\Resort::find($resort_id);
             $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
                 ->leftJoin('resort_departments as t6', 't6.id', '=', 't5.dept_id')
@@ -2306,14 +2433,12 @@ class ApplicantsController extends Controller
             $positionTitle = $vacancy->position_title ?? '';
             $department = $vacancy->department ?? '';
 
-            $subject = "Employment Contract – {$positionTitle} at {$resortName}";
+            $subject = $emailSubject ?? $request->email_subject ?? "Employment Contract – {$positionTitle} at {$resortName}";
 
-            // Send email with PDF attachment
-            $pdfPath = storage_path('app/public/' . $filePath);
             \Illuminate\Support\Facades\Mail::send('emails.contract', compact('candidateName', 'positionTitle', 'department', 'resortName', 'contractLink'), function ($message) use ($applicant, $subject, $pdfPath) {
                 $message->to($applicant->email)
                     ->subject($subject);
-                if (file_exists($pdfPath)) {
+                if ($pdfPath && file_exists($pdfPath)) {
                     $message->attach($pdfPath, [
                         'as' => 'Employment_Contract.pdf',
                         'mime' => 'application/pdf',

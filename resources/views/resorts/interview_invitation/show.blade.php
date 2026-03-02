@@ -29,6 +29,8 @@
         .action-buttons { display: flex; gap: 12px; justify-content: center; margin-top: 24px; }
         .decline-form { display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
         .decline-form.show { display: block; }
+        .time-slot-option:hover { border-color: #004552 !important; background: #f8fffe; }
+        .time-slot-option:has(input:checked) { border-color: #004552 !important; background: #e8f5f2; }
     </style>
 </head>
 <body>
@@ -100,32 +102,103 @@
                 <span class="detail-label">Interview Date</span>
                 <span class="detail-value">{{ \Carbon\Carbon::parse($interview->InterViewDate)->format('d M Y') }}</span>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">Resort Time</span>
-                <span class="detail-value">{{ $interview->ResortInterviewtime }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Your Local Time</span>
-                <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
-            </div>
 
-            @if($interview->MeetingLink && $interview->MeetingLink != '0')
-            <div class="detail-row">
-                <span class="detail-label">Meeting Link</span>
-                <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
-            </div>
-            @endif
+            @php
+                $resortTimes = array_map('trim', explode(',', $interview->ResortInterviewtime));
+                $applicantTimes = array_map('trim', explode(',', $interview->ApplicantInterviewtime));
+                $hasMultipleSlots = count($resortTimes) > 1 && $status === 'Invitation Sent';
+            @endphp
 
-            {{-- Action Buttons (only if Invitation Sent) --}}
-            @if($status === 'Invitation Sent')
-                <div class="action-buttons">
-                    <form action="{{ route('resort.interview.invitation.accept', $token) }}" method="POST">
-                        @csrf
-                        <button type="submit" class="btn-accept">Accept Interview</button>
-                    </form>
-                    <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
+            @if($hasMultipleSlots)
+                {{-- Multiple time slots: show as selectable options --}}
+                <div class="mt-3 mb-2">
+                    <p class="fw-semibold mb-2" style="font-size:14px;color:#333;">Please select your preferred time slot:</p>
+                </div>
+                <form action="{{ route('resort.interview.invitation.accept', $token) }}" method="POST" id="acceptForm">
+                    @csrf
+                    @foreach($resortTimes as $index => $resortTime)
+                        <label class="time-slot-option @if($index === 0) @endif" style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:8px;border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;transition:all 0.2s;">
+                            <input type="radio" name="selected_slot" value="{{ $index }}" style="width:18px;height:18px;accent-color:#004552;" {{ $index === 0 ? 'checked' : '' }}>
+                            <div style="flex:1;">
+                                <div style="font-size:14px;font-weight:600;color:#333;">{{ $applicantTimes[$index] ?? $resortTime }} <span style="font-weight:400;color:#888;">(Your Time)</span></div>
+                                <div style="font-size:12px;color:#666;">Resort Time: {{ $resortTime }}</div>
+                            </div>
+                        </label>
+                    @endforeach
+
+                    @if($interview->MeetingLink && $interview->MeetingLink != '0')
+                    <div class="detail-row">
+                        <span class="detail-label">Meeting Link</span>
+                        <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
+                    </div>
+                    @endif
+
+                    <div class="action-buttons">
+                        <button type="submit" class="btn-accept">Accept Selected Time</button>
+                        <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
+                    </div>
+                </form>
+            @else
+                {{-- Single time slot: show as before --}}
+                <div class="detail-row">
+                    <span class="detail-label">Resort Time</span>
+                    <span class="detail-value">{{ $interview->ResortInterviewtime }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Your Local Time</span>
+                    <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
                 </div>
 
+                @if($interview->MeetingLink && $interview->MeetingLink != '0')
+                <div class="detail-row">
+                    <span class="detail-label">Meeting Link</span>
+                    <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
+                </div>
+                @endif
+
+                @if($status === 'Invitation Sent')
+                    <div class="action-buttons">
+                        <form action="{{ route('resort.interview.invitation.accept', $token) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="btn-accept">Accept Interview</button>
+                        </form>
+                        <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
+                    </div>
+                @endif
+            @endif
+
+            {{-- Show accepted time if already booked --}}
+            @if($status === 'Slot Booked')
+                <div class="detail-row">
+                    <span class="detail-label">Resort Time</span>
+                    <span class="detail-value">{{ $interview->ResortInterviewtime }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Your Local Time</span>
+                    <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
+                </div>
+                @if($interview->MeetingLink && $interview->MeetingLink != '0')
+                <div class="detail-row">
+                    <span class="detail-label">Meeting Link</span>
+                    <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
+                </div>
+                @endif
+            @endif
+
+            {{-- Show times if rejected --}}
+            @if($status === 'Invitation Rejected')
+                <div class="detail-row">
+                    <span class="detail-label">Resort Time</span>
+                    <span class="detail-value">{{ $interview->ResortInterviewtime }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Your Local Time</span>
+                    <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
+                </div>
+            @endif
+
+            {{-- Decline Form (shown for both single and multi-slot) --}}
+            @if($status === 'Invitation Sent')
                 <div class="decline-form" id="declineForm">
                     <form action="{{ route('resort.interview.invitation.reject', $token) }}" method="POST">
                         @csrf
