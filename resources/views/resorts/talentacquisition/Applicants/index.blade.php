@@ -434,10 +434,38 @@
                 <form id="offerLetterForm" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body">
-                        <p class="text-muted mb-3">A custom email with the offer letter PDF and accept/decline link will be sent to the applicant.</p>
-                        <div class="mb-3">
-                            <label class="form-label">Upload Offer Letter (PDF)</label>
-                            <input type="file" class="form-control" name="offer_letter" accept=".pdf" required>
+                        @if(isset($offerLetterTemplates) && $offerLetterTemplates->count() > 0)
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Select Template</label>
+                                <select name="template_id" class="form-select" id="offerLetterTemplateSelect">
+                                    @foreach($offerLetterTemplates as $tpl)
+                                        <option value="{{ $tpl->id }}" {{ $tpl->is_default ? 'selected' : '' }}>
+                                            {{ $tpl->name }}{{ $tpl->is_default ? ' (Default)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <p class="text-muted mb-3" style="font-size:13px;">
+                                <i class="fa-solid fa-file-word me-1"></i>
+                                The offer letter will be auto-generated from the selected DOCX template with all placeholders filled in.
+                            </p>
+                        @else
+                            <p class="text-warning mb-3">
+                                <i class="fa-solid fa-exclamation-triangle me-1"></i>
+                                No templates uploaded yet. <a href="{{ route('resort.ta.offerLetterTemplates.index') }}">Upload one</a> or upload a PDF manually below.
+                            </p>
+                        @endif
+                        {{-- Manual PDF upload fallback --}}
+                        <div id="offerLetterUploadSection" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Upload Offer Letter (PDF)</label>
+                                <input type="file" class="form-control" name="offer_letter" accept=".pdf">
+                            </div>
+                        </div>
+                        <div>
+                            <a href="javascript:void(0)" id="toggleOfferLetterUpload" class="text-muted small">
+                                <i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually
+                            </a>
                         </div>
                         <input type="hidden" name="applicant_id" id="offerLetter_ApplicantID">
                         <input type="hidden" name="applicant_status_id" id="offerLetter_applicantstatusid">
@@ -462,10 +490,38 @@
                 <form id="contractForm" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body">
-                        <p class="text-muted mb-3">A custom email with the contract PDF and accept/decline link will be sent to the applicant.</p>
-                        <div class="mb-3">
-                            <label class="form-label">Upload Contract (PDF)</label>
-                            <input type="file" class="form-control" name="contract_file" accept=".pdf" required>
+                        @if(isset($contractTemplates) && $contractTemplates->count() > 0)
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Select Template</label>
+                                <select name="template_id" class="form-select" id="contractTemplateSelect">
+                                    @foreach($contractTemplates as $tpl)
+                                        <option value="{{ $tpl->id }}" {{ $tpl->is_default ? 'selected' : '' }}>
+                                            {{ $tpl->name }}{{ $tpl->is_default ? ' (Default)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <p class="text-muted mb-3" style="font-size:13px;">
+                                <i class="fa-solid fa-file-word me-1"></i>
+                                The contract will be auto-generated from the selected DOCX template with all placeholders filled in.
+                            </p>
+                        @else
+                            <p class="text-warning mb-3">
+                                <i class="fa-solid fa-exclamation-triangle me-1"></i>
+                                No templates uploaded yet. <a href="{{ route('resort.ta.contractTemplates.index') }}">Upload one</a> or upload a PDF manually below.
+                            </p>
+                        @endif
+                        {{-- Manual PDF upload fallback --}}
+                        <div id="contractUploadSection" style="display:none;">
+                            <div class="mb-3">
+                                <label class="form-label">Upload Contract (PDF)</label>
+                                <input type="file" class="form-control" name="contract_file" accept=".pdf">
+                            </div>
+                        </div>
+                        <div>
+                            <a href="javascript:void(0)" id="toggleContractUpload" class="text-muted small">
+                                <i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually
+                            </a>
                         </div>
                         <input type="hidden" name="applicant_id" id="contract_ApplicantID">
                         <input type="hidden" name="applicant_status_id" id="contract_applicantstatusid">
@@ -2064,12 +2120,27 @@
             });
         });
 
+        // ===== OFFER LETTER MODAL =====
+
+        // Toggle manual PDF upload section
+        $('#toggleOfferLetterUpload').on('click', function() {
+            $('#offerLetterUploadSection').toggle();
+            var isVisible = $('#offerLetterUploadSection').is(':visible');
+            $(this).html(isVisible
+                ? '<i class="fa-solid fa-times me-1"></i> Cancel manual upload'
+                : '<i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually');
+        });
+
         // Send Offer Letter - open modal
         $(document).on("click", ".sendOfferLetterBtn", function() {
             var applicantId = $(this).data("id");
             var applicantStatusId = $(this).data("applicantstatusid");
             $("#offerLetter_ApplicantID").val(applicantId);
             $("#offerLetter_applicantstatusid").val(applicantStatusId);
+            // Reset form state
+            $('#offerLetterForm')[0].reset();
+            $('#offerLetterUploadSection').hide();
+            $('#toggleOfferLetterUpload').html('<i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually');
             $("#offerLetter-modal").modal("show");
         });
 
@@ -2078,6 +2149,7 @@
             e.preventDefault();
             var $submitBtn = $(this).find('button[type="submit"]');
             $submitBtn.prop('disabled', true).text('Sending...');
+
             var formData = new FormData(this);
 
             $.ajax({
@@ -2107,12 +2179,27 @@
             });
         });
 
+        // ===== CONTRACT MODAL =====
+
+        // Toggle manual PDF upload section
+        $('#toggleContractUpload').on('click', function() {
+            $('#contractUploadSection').toggle();
+            var isVisible = $('#contractUploadSection').is(':visible');
+            $(this).html(isVisible
+                ? '<i class="fa-solid fa-times me-1"></i> Cancel manual upload'
+                : '<i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually');
+        });
+
         // Send Contract - open modal
         $(document).on("click", ".sendContractBtn", function() {
             var applicantId = $(this).data("id");
             var applicantStatusId = $(this).data("applicantstatusid");
             $("#contract_ApplicantID").val(applicantId);
             $("#contract_applicantstatusid").val(applicantStatusId);
+            // Reset form state
+            $('#contractForm')[0].reset();
+            $('#contractUploadSection').hide();
+            $('#toggleContractUpload').html('<i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually');
             $("#contract-modal").modal("show");
         });
 
@@ -2121,6 +2208,7 @@
             e.preventDefault();
             var $submitBtn = $(this).find('button[type="submit"]');
             $submitBtn.prop('disabled', true).text('Sending...');
+
             var formData = new FormData(this);
 
             $.ajax({

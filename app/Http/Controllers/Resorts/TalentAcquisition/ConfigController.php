@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Validator;
 use DB;
 use App\Models\Employee;
+use App\Models\TaTemplateExtraField;
 
 class ConfigController extends Controller
 {
@@ -49,8 +50,9 @@ class ConfigController extends Controller
             $resort_divisions = ResortDivision::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
             $termsAndCondition = TermsAndCondition::where('Resort_id', Auth::guard('resort-admin')->user()->resort_id)->first();
 
+            $templateExtraFields = TaTemplateExtraField::where('resort_id', $this->resort->resort_id)->pluck('field_value', 'field_key');
 
-            return view('resorts.talentacquisition.config.index',compact('page_title','termsAndCondition','configset','resort_divisions','TicketAgent'));
+            return view('resorts.talentacquisition.config.index',compact('page_title','termsAndCondition','configset','resort_divisions','TicketAgent','templateExtraFields'));
         }
         catch( \Exception $e )
         {
@@ -58,7 +60,8 @@ class ConfigController extends Controller
             \Log::emergency("Line: ".$e->getLine());
             \Log::emergency("Message: ".$e->getMessage());
 
-            return view('resorts.talentacquisition.config.index',compact('resort_divisions','TicketAgent'));
+            $templateExtraFields = collect();
+            return view('resorts.talentacquisition.config.index',compact('resort_divisions','TicketAgent','templateExtraFields'));
         }
     }
 
@@ -587,5 +590,25 @@ class ConfigController extends Controller
             'success' => true,
             'message' => 'Final Approval saved successfully',
         ]);
+    }
+
+    public function storeOrUpdateExtraFields(Request $request)
+    {
+        try {
+            $fields = $request->except('_token');
+            $resortId = $this->resort->resort_id;
+
+            foreach ($fields as $key => $value) {
+                TaTemplateExtraField::updateOrCreate(
+                    ['resort_id' => $resortId, 'field_key' => $key],
+                    ['field_value' => $value]
+                );
+            }
+
+            return response()->json(['success' => true, 'message' => 'Organization details saved successfully!']);
+        } catch (\Exception $e) {
+            \Log::emergency("storeOrUpdateExtraFields error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to save organization details.'], 500);
+        }
     }
 }

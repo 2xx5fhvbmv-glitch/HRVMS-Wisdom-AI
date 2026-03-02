@@ -3,6 +3,8 @@
 /public/storage
 /public/talent_acquisition
 /storage/*.key
+/storage/app/public/offer_letters/
+/storage/app/public/contracts/
 /storage/framework/sessions
 /storage/framework/views
 /storage/framework/cache

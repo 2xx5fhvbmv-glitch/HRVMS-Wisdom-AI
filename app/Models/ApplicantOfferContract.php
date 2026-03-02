@@ -23,6 +23,8 @@ class ApplicantOfferContract extends Model
         'email_template_id',
         'sent_by',
         'responded_at',
+        'ta_document_template_id',
+        'generated_html',
     ];
 
     protected $casts = [

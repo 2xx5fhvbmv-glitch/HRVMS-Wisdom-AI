@@ -371,6 +371,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('talent-acquisition/terms-and-conditions/store', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','storeOrUpdateTC'])->name('resort.ta.termscondition.storeOrUpdate');
 
+    // Extra Fields Configuration
+    Route::post('talent-acquisition/template-extra-fields/store', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','storeOrUpdateExtraFields'])->name('resort.ta.templateExtraFields.storeOrUpdate');
+
     Route::post('/talent-acquisition/job-description', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','store'])->name('resort.ta.jobdescription.store');
 
     Route::get( '/talent-acquisition/get/job-description', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','index'])->name('resort.ta.jobdescription.index');
@@ -422,6 +425,15 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // Offer Letter & Contract
     Route::post('/talent-acquisition/send-offer-letter', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendOfferLetter'])->name('resort.ta.sendOfferLetter');
     Route::post('/talent-acquisition/send-contract', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','sendContract'])->name('resort.ta.sendContract');
+
+    // Document Templates (Offer Letter & Contract) — CRUD pages
+    Route::get('/talent-acquisition/offer-letter-templates', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','index'])->name('resort.ta.offerLetterTemplates.index')->defaults('type', 'offer_letter');
+    Route::get('/talent-acquisition/offer-letter-templates/list', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','getList'])->name('resort.ta.offerLetterTemplates.list')->defaults('type', 'offer_letter');
+    Route::get('/talent-acquisition/contract-templates', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','index'])->name('resort.ta.contractTemplates.index')->defaults('type', 'contract');
+    Route::get('/talent-acquisition/contract-templates/list', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','getList'])->name('resort.ta.contractTemplates.list')->defaults('type', 'contract');
+    Route::post('/talent-acquisition/document-template/store', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','store'])->name('resort.ta.documentTemplate.store');
+    Route::put('/talent-acquisition/document-template/set-default/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','setDefault'])->name('resort.ta.documentTemplate.setDefault');
+    Route::delete('/talent-acquisition/document-template/destroy/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\TaDocumentTemplateController','destroy'])->name('resort.ta.documentTemplate.destroy');
 
     // Rejected Applications & Review Reminders
     Route::get('/talent-acquisition/rejected-applicants', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RejectedApplicants'])->name('resort.ta.RejectedApplicants');
