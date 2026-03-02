@@ -80,10 +80,10 @@
                         </div>
                         <div class="col-auto ms-auto">
                             <div class="view-toggle-group">
-                                <a href="javascript:void(0)" class="btn btn-icon-toggle btn-normal active" title="Normal View">
+                                <a href="javascript:void(0)" class="btn btn-icon-toggle btn-normal {{ request('view', 'normal') !== 'detailed' ? 'active' : '' }}" title="Normal View">
                                     <i class="fa-regular fa-calendar"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn btn-icon-toggle btn-detailed" title="Detailed List View">
+                                <a href="javascript:void(0)" class="btn btn-icon-toggle btn-detailed {{ request('view') === 'detailed' ? 'active' : '' }}" title="Detailed List View">
                                     <i class="fa-regular fa-list"></i>
                                 </a>
                             </div>
@@ -92,8 +92,9 @@
                     </div>
                 </div>
                 <div class="filtertaleData">
+                    <div id="attendance-register-views">
                     <!-- Normal View - Calendar Grid -->
-                    <div class="view-normal-container">
+                    <div class="view-normal-container {{ request('view') === 'detailed' ? 'd-none' : '' }}">
                         <div class="attendance-calendar-header mb-3">
                             <div class="row align-items-center">
                                 {{-- <div class="col-auto">
@@ -310,13 +311,13 @@
 
                         <div class="pagination-custom mt-4">
                             <nav aria-label="Page navigation example">
-                                {!! $attandanceregister->appends(['view' => request('view', 'normal')])->links('pagination::bootstrap-4') !!}
+                                {!! $attandanceregister->appends(array_merge(request()->except('page'), ['view' => request('view', 'normal')]))->links('pagination::bootstrap-4') !!}
                             </nav>
                         </div>
                     </div>
 
                     <!-- Detailed List View -->
-                    <div class="view-detailed-container d-none">
+                    <div class="view-detailed-container {{ request('view') === 'detailed' ? '' : 'd-none' }}">
                         <div class="employee-list-view">
                             @if($attandanceregister->isNotEmpty())
                                 @foreach ($attandanceregister as $a)
@@ -469,10 +470,11 @@
 
                             <div class="pagination-custom mt-4">
                                 <nav aria-label="Page navigation example">
-                                    {!! $attandanceregister->appends(['view' => request('view', 'detailed')])->links('pagination::bootstrap-4') !!}
+                                    {!! $attandanceregister->appends(array_merge(request()->except('page'), ['view' => 'detailed']))->links('pagination::bootstrap-4') !!}
                                 </nav>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -1135,20 +1137,20 @@
             }, 500);
     });
 
-    // Normal/Detailed View Toggle
-    $(".btn-normal").click(function () {
+    // Normal/Detailed View Toggle (use #attendance-register-views so it works before and after AJAX filter)
+    $(document).on("click", ".btn-normal", function () {
         $(this).addClass("active");
         $(".btn-detailed").removeClass("active");
-        $(".view-normal-container").removeClass("d-none");
-        $(".view-detailed-container").addClass("d-none");
+        $("#attendance-register-views .view-normal-container").removeClass("d-none");
+        $("#attendance-register-views .view-detailed-container").addClass("d-none");
         initAttendanceTooltips();
     });
 
-    $(".btn-detailed").click(function () {
+    $(document).on("click", ".btn-detailed", function () {
         $(this).addClass("active");
         $(".btn-normal").removeClass("active");
-        $(".view-detailed-container").removeClass("d-none");
-        $(".view-normal-container").addClass("d-none");
+        $("#attendance-register-views .view-detailed-container").removeClass("d-none");
+        $("#attendance-register-views .view-normal-container").addClass("d-none");
     });
 
     // Initialize attendance tooltips for Normal View

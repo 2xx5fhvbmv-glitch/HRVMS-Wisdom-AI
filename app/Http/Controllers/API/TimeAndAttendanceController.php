@@ -823,7 +823,8 @@ class TimeAndAttendanceController extends Controller
             }
 
             if($rosterData && $dutyRosterEntry){
-                $roster_id                                      =   $rosterData->id;
+                // Use roster_id from the entry for this date so dashboard and todo list match (same table/join)
+                $roster_id                                      =   $dutyRosterEntry->roster_id;
                 // Use shift_id from duty roster entry if available, otherwise from roster template
                 $shift_id                                       =   $dutyRosterEntry->Shift_id ?? $rosterData->Shift_id;
                 $shiftData                                      =   ShiftSettings::where('resort_id', $user->resort_id)->where('id', $shift_id)->first();

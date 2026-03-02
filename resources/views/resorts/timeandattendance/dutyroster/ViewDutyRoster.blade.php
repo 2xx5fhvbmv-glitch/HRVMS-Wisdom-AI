@@ -158,6 +158,12 @@
                                                                                                                         </div>
                                                                                                                     </div>
                                                                                                                 @elseif($shiftData)
+                                                                                                                    @if($shiftData->Status == 'DayOff')
+                                                                                                                        {{-- Day Off: show on whole column, no shift --}}
+                                                                                                                        <div class="createDuty-tableBlock dayoff-cell">
+                                                                                                                            <div class="createDuty-dayoff">Day Off</div>
+                                                                                                                        </div>
+                                                                                                                    @else
                                                                                                                     {{-- Display Roster Entry --}}
                                                                                                                     <div class="createDuty-tableBlock {{ $shiftData->ShiftNameColor ?? '' }}">
                                                                                                                         <div class="d-flex">
@@ -176,9 +182,30 @@
                                                                                                                             <div class="badge">{{ $toatalHoursForDay }} hrs</div>
                                                                                                                         </div>
                                                                                                                         <div class="d-flex ot-details">
-                                                                                                                            @if ($shiftData && isset($shiftData->OverTime) && $shiftData->OverTime != '00:00' && $shiftData->OverTime != '0')
+                                                                                                                            @php
+                                                                                                                                // Sanitize overtime for display and modal
+                                                                                                                                $rawOverTime = $shiftData->OverTime ?? '00:00';
+                                                                                                                                // Treat null/zero/empty as no overtime
+                                                                                                                                if ($rawOverTime === null || $rawOverTime === '' || $rawOverTime === '0' || $rawOverTime === 0 || $rawOverTime === '0:00' || $rawOverTime === '00:0') {
+                                                                                                                                    $rawOverTime = '00:00';
+                                                                                                                                }
+                                                                                                                                // Normalize to HH:MM
+                                                                                                                                if (strpos($rawOverTime, ':') === false) {
+                                                                                                                                    $h = (int) $rawOverTime;
+                                                                                                                                    $rawOverTime = str_pad($h, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                                                }
+                                                                                                                                // Clamp unrealistic big overtime (>= 12 hours) to 00:00
+                                                                                                                                [$oH, $oM] = array_map('intval', explode(':', $rawOverTime));
+                                                                                                                                $oMinutes = $oH * 60 + $oM;
+                                                                                                                                if ($oMinutes >= 12 * 60) {
+                                                                                                                                    $rawOverTime = '00:00';
+                                                                                                                                }
+
+                                                                                                                                $displayOverTime = $rawOverTime;
+                                                                                                                            @endphp
+                                                                                                                            @if ($displayOverTime !== '00:00')
                                                                                                                                 @php
-                                                                                                                                    $otParts = explode(':', $shiftData->OverTime);
+                                                                                                                                    $otParts = explode(':', $displayOverTime);
                                                                                                                                     $otHours = isset($otParts[0]) ? (int)$otParts[0] : 0;
                                                                                                                                     $otMinutes = isset($otParts[1]) ? (int)$otParts[1] : 0;
                                                                                                                                     $otDisplay = $otHours > 0 ? $otHours . ' hr' : '';
@@ -192,22 +219,19 @@
                                                                                                                                 <p>OT: 0 hr</p>
                                                                                                                             @endif
                                                                                                                             <p>
-                                                                                                                                @if($shiftData->Status != 'DayOff')
-                                                                                                                                    <button class="editIcon-btn editdutyRoster"
-                                                                                                                                            data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
-                                                                                                                                            data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
-                                                                                                                                            data-OverTime="{{ $shiftData->OverTime ?? 0 }}"
-                                                                                                                                            data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
-                                                                                                                                            data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
-                                                                                                                                            data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">
-                                                                                                                                        <i class="fa fa-edit"></i>
-                                                                                                                                    </button>
-                                                                                                                                @else
-                                                                                                                                    DayOff
-                                                                                                                                @endif
+                                                                                                                                <button class="editIcon-btn editdutyRoster"
+                                                                                                                                        data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
+                                                                                                                                        data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
+                                                                                                                                        data-OverTime="{{ $displayOverTime }}"
+                                                                                                                                        data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
+                                                                                                                                        data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
+                                                                                                                                        data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">
+                                                                                                                                    <i class="fa fa-edit"></i>
+                                                                                                                                </button>
                                                                                                                             </p>
                                                                                                                         </div>
                                                                                                                     </div>
+                                                                                                                    @endif
                                                                                                                 @else
                                                                                                                     {{-- No Leave and No Roster Entry --}}
                                                                                                                     <div class="createDuty-tableBlock">
@@ -328,6 +352,12 @@
                                                                                                 </div>
                                                                                             </div>
                                                                                         @elseif($shiftData)
+                                                                                            @if($shiftData->Status == 'DayOff')
+                                                                                                {{-- Day Off: show on whole column, no shift --}}
+                                                                                                <div class="createDuty-tableBlock dayoff-cell">
+                                                                                                    <div class="createDuty-dayoff">Day Off</div>
+                                                                                                </div>
+                                                                                            @else
                                                                                             {{-- Display Roster Entry --}}
                                                                                             <div class="createDuty-tableBlock {{ $shiftData->ShiftNameColor ?? '' }}">
                                                                                                 <div class="d-flex">
@@ -346,9 +376,26 @@
                                                                                                     <div class="badge">{{ $toatalHoursForDay }} hrs</div>
                                                                                                 </div>
                                                                                                 <div class="d-flex ot-details">
-                                                                                                    @if ($shiftData && isset($shiftData->OverTime) && $shiftData->OverTime != '00:00' && $shiftData->OverTime != '0')
+                                                                                                    @php
+                                                                                                        // Sanitize overtime for display and modal
+                                                                                                        $rawOverTime2 = $shiftData->OverTime ?? '00:00';
+                                                                                                        if ($rawOverTime2 === null || $rawOverTime2 === '' || $rawOverTime2 === '0' || $rawOverTime2 === 0 || $rawOverTime2 === '0:00' || $rawOverTime2 === '00:0') {
+                                                                                                            $rawOverTime2 = '00:00';
+                                                                                                        }
+                                                                                                        if (strpos($rawOverTime2, ':') === false) {
+                                                                                                            $h2 = (int) $rawOverTime2;
+                                                                                                            $rawOverTime2 = str_pad($h2, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                        }
+                                                                                                        [$oH2, $oM2] = array_map('intval', explode(':', $rawOverTime2));
+                                                                                                        $oMinutes2 = $oH2 * 60 + $oM2;
+                                                                                                        if ($oMinutes2 >= 12 * 60) {
+                                                                                                            $rawOverTime2 = '00:00';
+                                                                                                        }
+                                                                                                        $displayOverTime2 = $rawOverTime2;
+                                                                                                    @endphp
+                                                                                                    @if ($displayOverTime2 !== '00:00')
                                                                                                         @php
-                                                                                                            $otParts = explode(':', $shiftData->OverTime);
+                                                                                                            $otParts = explode(':', $displayOverTime2);
                                                                                                             $otHours = isset($otParts[0]) ? (int)$otParts[0] : 0;
                                                                                                             $otMinutes = isset($otParts[1]) ? (int)$otParts[1] : 0;
                                                                                                             $otDisplay = $otHours > 0 ? $otHours . ' hr' : '';
@@ -362,22 +409,19 @@
                                                                                                         <p>OT: 0 hr</p>
                                                                                                     @endif
                                                                                                     <p>
-                                                                                                        @if($shiftData->Status != 'DayOff')
-                                                                                                            <button class="editIcon-btn editdutyRoster"
-                                                                                                                    data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
-                                                                                                                    data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
-                                                                                                                    data-OverTime="{{ $shiftData->OverTime ?? 0 }}"
-                                                                                                                    data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
-                                                                                                                    data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
-                                                                                                                    data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">
-                                                                                                                <i class="fa fa-edit"></i>
-                                                                                                            </button>
-                                                                                                        @else
-                                                                                                            DayOff
-                                                                                                        @endif
+                                                                                                        <button class="editIcon-btn editdutyRoster"
+                                                                                                                data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
+                                                                                                                data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
+                                                                                                                data-OverTime="{{ $displayOverTime2 }}"
+                                                                                                                data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
+                                                                                                                data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
+                                                                                                                data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">
+                                                                                                            <i class="fa fa-edit"></i>
+                                                                                                        </button>
                                                                                                     </p>
                                                                                                 </div>
                                                                                             </div>
+                                                                                            @endif
                                                                                         @else
                                                                                             {{-- No Leave and No Roster Entry --}}
                                                                                             <div class="createDuty-tableBlock">
@@ -475,6 +519,18 @@
 
 @section('import-css')
 <style>
+    /* Day Off cell: show "Day Off" for whole column, no shift details */
+    .createDuty-tableBlock.dayoff-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60px;
+    }
+    .createDuty-dayoff {
+        font-weight: 600;
+        color: #6c757d;
+    }
+
     /* Flatpickr custom styling for selected dates in multiple mode */
     .flatpickr-day.selected,
     .flatpickr-day.selected:hover,
@@ -706,17 +762,36 @@
                 });
             }
 
-            // Convert overtime to proper format if needed
-            // Handle cases where overtime might be "0", "00:00", or empty
-            if (!overtime || overtime === '0' || overtime === 0) {
+            // Normalize and validate overtime value coming from the cell
+            // Handle cases where overtime might be "0", "00:00", "0:00", or empty
+            if (!overtime || overtime === '0' || overtime === 0 || overtime === '0:00' || overtime === '00:0') {
                 overtime = '00:00';
             }
 
-            // Ensure format is HH:MM (24-hour)
+            // Normalize DayWiseTotalHours to HH:MM for comparison
+            let normalizedDayHours = DayWiseTotalHours || '';
+            if (normalizedDayHours && normalizedDayHours.indexOf(':') === -1) {
+                let dh = parseInt(normalizedDayHours) || 0;
+                normalizedDayHours = String(dh).padStart(2, '0') + ':00';
+            }
+
+            // Ensure overtime is in HH:MM (24-hour) so we can compare as minutes
             if (overtime && overtime.indexOf(':') === -1) {
-                // If it's just a number, convert to HH:MM
                 let hours = parseInt(overtime) || 0;
                 overtime = String(hours).padStart(2, '0') + ':00';
+            }
+
+            // If stored overtime looks invalidly large compared to shift hours, treat it as "no overtime"
+            if (normalizedDayHours && overtime) {
+                const [sH, sM] = normalizedDayHours.split(':').map(v => parseInt(v) || 0);
+                const [oH, oM] = overtime.split(':').map(v => parseInt(v) || 0);
+                const shiftMinutes = sH * 60 + sM;
+                const overtimeMinutes = oH * 60 + oM;
+
+                // If overtime is equal to or greater than shift minutes (e.g., 20:00 vs 08:00), reset to 00:00
+                if (shiftMinutes > 0 && overtimeMinutes >= shiftMinutes) {
+                    overtime = '00:00';
+                }
             }
 
             $("#ShiftOverTime").val(overtime);

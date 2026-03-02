@@ -95,7 +95,7 @@
                             <div class="empDetail-block">
                                 <div>
                                     <h6>Total Hours Worked</h6>
-                                    <strong>{{ $employee->TotalHoursWorked }}</strong>
+                                    <strong>{{ $employee->TotalHoursWorked ?? '00:00' }}</strong>
                                 </div>
                                 <div>
                                     {{-- <a href="#">
@@ -108,7 +108,7 @@
                             <div class="empDetail-block">
                                 <div>
                                     <h6>OT Hours</h6>
-                                    <strong>{{ $employee->TotalOverTime }}</strong>
+                                    <strong>{{ $employee->TotalOverTime ?? '00:00' }}</strong>
                                 </div>
                                 <div>
                                     {{-- <a href="#">
@@ -121,8 +121,8 @@
                             <div class="empDetail-block empDetailPro-block">
                                 <div>
                                     <div class="progress progress-custom progress-themeskyblue">
-                                        <div class="progress-bar" role="progressbar" style="width: {{$employee->onTimePercentage }}" aria-valuemin="0" aria-valuemax="100">
-                                            {{ $employee->onTimePercentage }}%
+                                        <div class="progress-bar" role="progressbar" style="width: {{ $employee->onTimePercentage ?? 0 }}%" aria-valuemin="0" aria-valuemax="100">
+                                            {{ $employee->onTimePercentage ?? 0 }}%
 
                                         </div>
 
@@ -131,8 +131,8 @@
                                 </div>
                                 <div>
                                     <div class="progress progress-custom progress-themeDanger">
-                                        <div class="progress-bar" role="progressbar" style="width: {{ $employee->LatePercentage}}" aria-valuemin="0" aria-valuemax="100">
-                                            {{$employee->LatePercentage }}%
+                                        <div class="progress-bar" role="progressbar" style="width: {{ $employee->LatePercentage ?? 0 }}%" aria-valuemin="0" aria-valuemax="100">
+                                            {{ $employee->LatePercentage ?? 0 }}%
 
                                         </div>
                                     </div>
@@ -397,6 +397,7 @@
                    url: "{{ route('resort.timeandattendance.EmpDetailsFilters') }}",
                    method: 'POST',
                    data: {
+                       _token: "{{ csrf_token() }}",
                        start_date: startDate,
                        end_date: endDate,
                        emp_id: emp_id
@@ -415,6 +416,7 @@
                             $("#tablePrint .list-main").removeClass("d-none").addClass("d-block");
                             $("#tablePrint .grid-main").addClass("d-none").removeClass("d-block");
                         }
+                        employeedetails();
                    },
                    error: function(xhr, status, error) {
                        // Handle errors
@@ -611,7 +613,9 @@
 
             var url = urlTemplate.replace('__emp_id__', emp_id);
 
-                    $('#EmployeeDetails tbody').empty();
+            if ($.fn.DataTable && $.fn.DataTable.isDataTable('#EmployeeDetails')) {
+                $('#EmployeeDetails').DataTable().destroy();
+            }
 
             var HolidayList =   $('#EmployeeDetails').DataTable({
                         searching: false,
@@ -627,6 +631,17 @@
                         ajax: {
                             url: url,
                             type: 'GET',
+                            data: function (d) {
+                                var range = $("#hiddenInput").val();
+                                if (range && range.indexOf('-') !== -1) {
+                                    var parts = range.split('-');
+                                    if (parts.length >= 2) {
+                                        d.start_date = parts[0].trim();
+                                        d.end_date = parts[1].trim();
+                                    }
+                                }
+                                return d;
+                            }
                         },
                         columns: [
                             { data: 'Date', name: 'Date', className: 'text-nowrap' },
