@@ -1,3 +1,5 @@
+<div id="attendance-register-views">
+<div class="view-normal-container @if($sendclass == 'Normal') d-block @else d-none @endif">
 <div class="weekly-main @if($sendclass =="Weekly") d-block @else d-none @endif " >
    
     <!-- <div class="attendance-bg">
@@ -253,7 +255,7 @@
         </nav>
     </div>
 </div>
-<div class="monthly-main  @if($sendclass !="Weekly") d-block @else d-none @endif"">
+<div class="monthly-main @if($sendclass == 'Normal') d-block @else d-none @endif">
 
     <!-- <div class="attendance-bg">
         <div class="row justify-content-center gx-md-4 g-2">
@@ -458,9 +460,11 @@
                                         @endif
                                     </tbody>
                                 </table>
-        <nav aria-label="Page navigation example">
-            {!! $attandanceregister->appends(['view' => request('view', 'monthly')])->links('pagination::bootstrap-4') !!}
-        </nav>
+        <div class="pagination-custom mt-4">
+            <nav aria-label="Page navigation example">
+                {!! $attandanceregister->appends(array_merge(request()->except('page'), ['view' => 'normal']))->links('pagination::bootstrap-4') !!}
+            </nav>
+        </div>
     </div>
 </div>
 </div>
@@ -498,23 +502,101 @@
                             <div class="col-auto">
                                 <div class="employee-avatar">
                                     <img src="{{ $a->profileImg }}" alt="{{ $a->EmployeeName }}">
+                                    <span class="status-dot"></span>
                                 </div>
                             </div>
                             <div class="col">
                                 <h6 class="mb-0">{{ $a->EmployeeName }}</h6>
-                                <small class="text-muted"><i class="fa-regular fa-briefcase me-1"></i>{{ $a->Position }}</small>
+                                <small class="text-muted">
+                                    <i class="fa-regular fa-briefcase me-1"></i>{{ $a->Position }}
+                                </small>
                             </div>
                             <div class="col-auto">
-                                <span class="stat-badge stat-present">{{ $presentCount }} Present</span>
-                                <span class="stat-badge stat-absent">{{ $absentCount }} Absent</span>
-                                <span class="stat-badge stat-leave">{{ $leaveCount }} Leave</span>
-                                <span class="stat-badge stat-ot">{{ round($totalOtHours) }}h OT</span>
+                                <div class="employee-stats-summary">
+                                    <span class="stat-badge stat-present">
+                                        <i class="fa-regular fa-user-check me-1"></i>{{ $presentCount }} Present
+                                    </span>
+                                    <span class="stat-badge stat-absent">
+                                        <i class="fa-regular fa-user-xmark me-1"></i>{{ $absentCount }} Absent
+                                    </span>
+                                    <span class="stat-badge stat-leave">
+                                        <i class="fa-regular fa-calendar me-1"></i>{{ $leaveCount }} Leave
+                                    </span>
+                                    <span class="stat-badge stat-ot">
+                                        <i class="fa-regular fa-clock me-1"></i>{{ round($totalOtHours) }}h OT Hours
+                                    </span>
+                                </div>
                             </div>
-                            <div class="col-auto"><i class="fa-regular fa-chevron-down toggle-icon"></i></div>
+                            <div class="col-auto">
+                                <i class="fa-regular fa-chevron-down toggle-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="employee-card-details d-none" id="employee-details-{{ $a->emp_id }}">
+                        <div class="attendance-timeline">
+                            <div class="timeline-scroll">
+                                @foreach ($monthwiseheaders as $h)
+                                    @php
+                                        $date = isset($h['newdate']) ? \Carbon\Carbon::createFromFormat('d-m-Y', $h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
+                                        $isPublicHoliday = isset($publicHolidays) && in_array($date, $publicHolidays);
+                                        $shiftData = $RosterInternalDataMonth->firstWhere('date', $date);
+                                        $overtimeForDate = null;
+                                        if ($overtimeData->has($a->emp_id)) {
+                                            $empOvertime = $overtimeData->get($a->emp_id);
+                                            if ($empOvertime->has($date)) {
+                                                $overtimeForDate = $empOvertime->get($date);
+                                            }
+                                        }
+                                    @endphp
+                                    <div class="timeline-day {{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                        @if($shiftData && $shiftData->Status == "Present" && !empty($shiftData->CheckingTime))
+                                            <div class="day-label d-flex justify-content-between">
+                                                {{ $h['dayname'] }} {{ $h['day'] }}
+                                                <span class="workday-dot"></span>
+                                            </div>
+                                            <div class="day-content">
+                                                <div class="time-entry">
+                                                    <span class="time-label">In</span>
+                                                    <span class="time-value">{{ $shiftData->CheckingTime ?? '--:--' }}</span>
+                                                </div>
+                                                <div class="time-entry">
+                                                    <span class="time-label">Out</span>
+                                                    <span class="time-value">{{ $shiftData->CheckingOutTime ?? '--:--' }}</span>
+                                                </div>
+                                                @if($overtimeForDate && $overtimeForDate->total_time && $overtimeForDate->total_time != "0:0" && $overtimeForDate->total_time != "00:00")
+                                                    <div class="ot-badge">
+                                                        <i class="fa-regular fa-clock me-1"></i>+{{ $overtimeForDate->total_time }} OT
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @elseif($shiftData && $shiftData->Status == "Present")
+                                            <div class="day-label">{{ $h['dayname'] }} {{ $h['day'] }}</div>
+                                            <div class="day-content"><small class="text-warning">Incomplete (no check-in)</small></div>
+                                        @elseif($shiftData && $shiftData->Status == "Absent")
+                                            <div class="day-label">{{ $h['dayname'] }} {{ $h['day'] }}</div>
+                                            <div class="day-content absent-content">Absent</div>
+                                        @elseif($shiftData && $shiftData->LeaveFirstName != null)
+                                            <div class="day-label">{{ $h['dayname'] }} {{ $h['day'] }}</div>
+                                            <div class="day-content leave-content" style="background-color: {{ $shiftData->LeaveColor ?? '#FFC107' }}20; border-left-color: {{ $shiftData->LeaveColor ?? '#FFC107' }}">
+                                                {{ $shiftData->LeaveFirstName }}
+                                            </div>
+                                        @else
+                                            <div class="day-label">{{ $h['dayname'] }} {{ $h['day'] }}</div>
+                                            <div class="day-content empty-content">-</div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
                 </div>
             @endforeach
         @endif
+        <div class="pagination-custom mt-4">
+            <nav aria-label="Page navigation example">
+                {!! $attandanceregister->appends(array_merge(request()->except('page'), ['view' => 'detailed']))->links('pagination::bootstrap-4') !!}
+            </nav>
+        </div>
     </div>
+</div>
 </div>

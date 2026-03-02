@@ -39,62 +39,51 @@ class TimeandAttendanceDashboardController extends Controller
     }
 
     /**
-     * Check if user can view all departments
-     * HR HOD (rank 2 in HR department) and HRX Com (rank 1/EXCOM) can see all departments
-     * Regular HR (rank 3) can only see their own department
+     * Check if user can view all departments for Time & Attendance.
+     *
+     * Rule (aligned with CRM but tightened for TA):
+     * - Only HR department (Human Resources/HR) and Executive Office (code EO_1)
+     *   GM / EXCOM / HOD can see the whole resort.
+     * - All other departments (even their GM/EXCOM/HOD) are restricted to
+     *   their own department.
      */
     protected function canViewAllDepartments()
     {
         if (!isset($this->resort->GetEmployee)) {
-            // #region agent log
-            $logPath = base_path('.cursor/debug.log');
-            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:46','message'=>'canViewAllDepartments: No GetEmployee','data'=>[],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-            // #endregion
             return false;
         }
 
         $employee = $this->resort->GetEmployee;
-        $rank = $employee->rank ?? null;
-        $dept_id = $employee->Dept_id ?? null;
+        $rank     = $employee->rank ?? null;
+        $deptId   = $employee->Dept_id ?? null;
 
-        // #region agent log
-        $logPath = base_path('.cursor/debug.log');
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:54','message'=>'canViewAllDepartments: Checking rank','data'=>['rank'=>$rank,'dept_id'=>$dept_id],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
+        // Load department to detect HR / Executive Office
+        $department = $deptId
+            ? ResortDepartment::where('id', $deptId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first(['name', 'code'])
+            : null;
 
-        // Check if user is HRX Com (rank 1/EXCOM)
-        // Handle both string and integer rank values
-        if ($rank == 1 || $rank === 1 || $rank === '1') {
-            // #region agent log
-            @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:57','message'=>'canViewAllDepartments: EXCOM detected','data'=>['result'=>true,'rank'=>$rank,'rankType'=>gettype($rank)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-            // #endregion
-            return true;
-        }
+        $deptName = strtolower(trim($department->name ?? ''));
+        $deptCode = $department->code ?? '';
 
-        // Check if user is HR HOD (rank 2 in HR department)
-        if ($rank == 2 && $dept_id) {
-            $department = ResortDepartment::find($dept_id);
-            if ($department) {
-                $deptName = strtolower(trim($department->name));
-                if (in_array($deptName, ['human resources', 'hr'])) {
-                    // #region agent log
-                    @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:66','message'=>'canViewAllDepartments: HR HOD detected','data'=>['result'=>true,'deptName'=>$deptName],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-                    // #endregion
-                    return true;
-                }
-            }
-        }
+        $isHRDept = in_array($deptName, ['human resources', 'hr']);
+        $isEODept = ($deptCode === 'EO_1') || (strpos($deptName, 'executive office') !== false);
 
-        // Check if user is GM (General Manager) - GM sees same scope as HR/EXCOM
+        // Position/rank info (for GM / EXCOM etc.)
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->GetEmployee);
-        $isGM = ($employeeRankPosition['position'] ?? '') === 'GM' || ($employeeRankPosition['rank'] ?? '') === 'GM';
-        if ($isGM) {
+        $positionName         = $employeeRankPosition['position'] ?? '';
+        $rankName             = $employeeRankPosition['rank'] ?? '';
+
+        $isGM    = ($positionName === 'GM') || ($rankName === 'GM');
+        $isEXCOM = ($positionName === 'EXCOM') || ($rankName === 'EXCOM') || $rank == 1 || $rank === '1';
+        $isHOD   = ($rank == 2 || $rank === '2');
+
+        // Only HR / Executive Office senior roles can see ALL departments
+        if (($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD)) {
             return true;
         }
 
-        // #region agent log
-        @file_put_contents($logPath, json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'A','location'=>'TimeandAttendanceDashboardController.php:70','message'=>'canViewAllDepartments: Returning false','data'=>['result'=>false],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
         return false;
     }
 
@@ -1585,6 +1574,30 @@ class TimeandAttendanceDashboardController extends Controller
 
     }
 
+    /**
+     * Check if a parent_attendaces record has a real check-in time (not empty/zero).
+     */
+    private function attendanceHasCheckIn($attendance)
+    {
+        if (!$attendance) {
+            return false;
+        }
+        $t = trim((string) ($attendance->CheckingTime ?? ''));
+        return $t !== '' && $t !== '00:00' && $t !== '00:00:00' && $t !== '0000-00-00 00:00:00';
+    }
+
+    /**
+     * Check if a parent_attendaces record has a real check-out time (not empty/zero).
+     */
+    private function attendanceHasCheckOut($attendance)
+    {
+        if (!$attendance) {
+            return false;
+        }
+        $t = trim((string) ($attendance->CheckingOutTime ?? ''));
+        return $t !== '' && $t !== '00:00' && $t !== '00:00:00' && $t !== '0000-00-00 00:00:00';
+    }
+
    public function Tododata()
 {
     $Rank = $this->resort->GetEmployee->rank ?? null;
@@ -1671,23 +1684,26 @@ class TimeandAttendanceDashboardController extends Controller
         $checkInDeadline = $shiftStartTime->copy()->addMinutes($gracePeriodMinutes);
         $checkOutDeadline = $expectedEndTime->copy()->addMinutes($gracePeriodMinutes);
 
-        $attendance = ParentAttendace::where('roster_id', $roster->roster_id)->whereDate('date', $rosterDate)->first();
+        // Same as HR dashboard: present = parent_attendaces with roster_id + date and CheckingTime set.
+        // Look up by roster_id + date (dashboard uses this join).
+        $attendance = ParentAttendace::where('roster_id', $roster->roster_id)
+            ->where('date', $rosterDate->format('Y-m-d'))
+            ->first();
 
+        // Legacy: if no record by roster_id, check by Emp_id+date (old API may have used different roster_id)
+        if (!$attendance) {
+            $attendance = ParentAttendace::where('Emp_id', $roster->employee_id)
+                ->where('date', $rosterDate->format('Y-m-d'))
+                ->orderByDesc('updated_at')
+                ->first();
+        }
+
+        $hasAttendance = !is_null($attendance);
+        $hasCheckIn  = $this->attendanceHasCheckIn($attendance);
+        $hasCheckOut = $this->attendanceHasCheckOut($attendance);
 
       $actionType = null;
         $message = '';
-
-        $hasAttendance = !is_null($attendance);
-
-        $hasCheckIn = $hasAttendance &&
-                    !empty($attendance->CheckingTime) &&
-                    $attendance->CheckingTime != '00:00:00' &&
-                    $attendance->CheckingTime != '0000-00-00 00:00:00';
-
-        $hasCheckOut = $hasAttendance &&
-                    !empty($attendance->CheckingOutTime) &&
-                    $attendance->CheckingOutTime != '00:00:00' &&
-                    $attendance->CheckingOutTime != '0000-00-00 00:00:00';
 
 
         /**
@@ -1714,11 +1730,20 @@ class TimeandAttendanceDashboardController extends Controller
 
         /**
          * 3️⃣ Pending OT
+         * Treat anything that is NOT explicitly Approved/Rejected as pending,
+         * as long as there is a non‑zero overtime value.
          */
-        elseif ($hasCheckIn && $hasCheckOut && $attendance->OTStatus === 'Pending') {
+        elseif ($hasCheckIn && $hasCheckOut) {
+            $otStatus  = $attendance->OTStatus ?? null;
+            $overTime  = trim((string) ($attendance->OverTime ?? ''));
+            $hasOT     = $overTime !== '' && !in_array($overTime, ['0', '00:00', '00:00:00', '0:00'], true);
+            $isApproved = in_array($otStatus, ['Approved', 'approved'], true);
+            $isRejected = in_array($otStatus, ['Rejected', 'rejected'], true);
 
-            $actionType = 'pending_ot';
-            $message = 'Pending OT Approval';
+            if ($hasOT && !$isApproved && !$isRejected) {
+                $actionType = 'overtime_pending';
+                $message    = 'Pending OT Approval';
+            }
         }
 
 
@@ -1775,10 +1800,38 @@ class TimeandAttendanceDashboardController extends Controller
 
     public function Todolist(Request $request)
     {
+        // Base todo data (unfiltered)
         $attendanceDataTodoList = $this->Tododata();
 
         if($request->ajax())
         {
+            // Apply simple in-memory filters based on search and (optional) position
+            $searchTerm = trim((string) $request->get('searchTerm', ''));
+            $position   = trim((string) $request->get('position', ''));
+
+            if ($searchTerm !== '') {
+                $lowerSearch = mb_strtolower($searchTerm);
+                $attendanceDataTodoList = $attendanceDataTodoList->filter(function ($row) use ($lowerSearch) {
+                    $name    = mb_strtolower($row->EmployeeName ?? '');
+                    $empCode = mb_strtolower($row->Emp_id ?? '');
+                    $shift   = mb_strtolower($row->ShiftName ?? '');
+
+                    return strpos($name, $lowerSearch) !== false
+                        || strpos($empCode, $lowerSearch) !== false
+                        || strpos($shift, $lowerSearch) !== false;
+                });
+            }
+
+            if ($position !== '') {
+                $attendanceDataTodoList = $attendanceDataTodoList->filter(function ($row) use ($position) {
+                    // If you later add real position data into $row, adjust this comparison accordingly
+                    return isset($row->ShiftName) && (string) $row->ShiftName === (string) $position;
+                });
+            }
+
+            // Re-index collection after filtering
+            $attendanceDataTodoList = $attendanceDataTodoList->values();
+
             return datatables()->of($attendanceDataTodoList)
             ->addColumn('Applicant', function ($row) {
                 $profilePicture = $row->profileImg ? $row->profileImg : 'assets/images/default-user.svg';
@@ -1878,13 +1931,20 @@ class TimeandAttendanceDashboardController extends Controller
                 return response()->json(['success' => false, 'message' => 'Shift settings not found.']);
             }
 
-            // Get or create attendance record
+            // Get or create attendance record (match by roster_id+date, or Emp_id+date so we find API-created records)
             $attendance = ParentAttendace::where('roster_id', $rosterId)
                 ->where('date', $today)
                 ->first();
 
+            if (!$attendance && !empty($dutyRoster->Emp_id)) {
+                $attendance = ParentAttendace::where('Emp_id', $dutyRoster->Emp_id)
+                    ->where('date', $today)
+                    ->first();
+            }
+
             if ($action === 'check_in') {
-                if ($attendance && $attendance->CheckingTime) {
+                $alreadyCheckedIn = $attendance && ($t = trim((string) ($attendance->CheckingTime ?? ''))) && $t !== '00:00' && $t !== '00:00:00';
+                if ($alreadyCheckedIn) {
                     return response()->json(['success' => false, 'message' => 'Employee has already checked in.']);
                 }
                $StartTime = $request->time? Carbon::parse($request->time)->format('H:i'): Carbon::parse($shiftSettings->StartTime)->format('H:i');
@@ -1921,11 +1981,13 @@ class TimeandAttendanceDashboardController extends Controller
                 return response()->json(['success' => true, 'message' => 'Check-in recorded successfully.']);
 
             } elseif ($action === 'check_out') {
-                if (!$attendance || !$attendance->CheckingTime) {
+                $hasCheckIn = $attendance && ($t = trim((string) ($attendance->CheckingTime ?? ''))) && $t !== '00:00' && $t !== '00:00:00';
+                if (!$hasCheckIn) {
                     return response()->json(['success' => false, 'message' => 'Employee must check in before checking out.']);
                 }
 
-                if ($attendance->CheckingOutTime) {
+                $checkOutStr = trim((string) ($attendance->CheckingOutTime ?? ''));
+                if ($checkOutStr !== '' && $checkOutStr !== '00:00' && $checkOutStr !== '00:00:00') {
                     return response()->json(['success' => false, 'message' => 'Employee has already checked out.']);
                 }
                 $EndTime = $request->time? Carbon::parse($request->time)->format('H:i'): Carbon::parse($shiftSettings->EndTime)->format('H:i');

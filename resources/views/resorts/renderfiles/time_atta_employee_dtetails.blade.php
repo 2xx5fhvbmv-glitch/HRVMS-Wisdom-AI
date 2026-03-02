@@ -29,7 +29,7 @@
             <div class="empDetail-block">
                 <div>
                     <h6>Total Hours Worked</h6>
-                    <strong>{{ $employee->TotalHoursWorked }}</strong>
+                    <strong>{{ $employee->TotalHoursWorked ?? '00:00' }}</strong>
                 </div>
                 <div>
                     {{-- <a href="#">
@@ -42,7 +42,7 @@
             <div class="empDetail-block">
                 <div>
                     <h6>OT Hours</h6>
-                    <strong>{{ $employee->TotalOverTime }}</strong>
+                    <strong>{{ $employee->TotalOverTime ?? '00:00' }}</strong>
                 </div>
                 <div>
                     {{-- <a href="#">
@@ -55,8 +55,8 @@
             <div class="empDetail-block empDetailPro-block">
                 <div>
                     <div class="progress progress-custom progress-themeskyblue">
-                        <div class="progress-bar" role="progressbar" style="width: {{$employee->onTimePercentage }}" aria-valuemin="0" aria-valuemax="100">
-                            {{ $employee->onTimePercentage }}%
+                        <div class="progress-bar" role="progressbar" style="width: {{ $employee->onTimePercentage ?? 0 }}%" aria-valuemin="0" aria-valuemax="100">
+                            {{ $employee->onTimePercentage ?? 0 }}%
 
                         </div>
 
@@ -65,8 +65,8 @@
                 </div>
                 <div>
                     <div class="progress progress-custom progress-themeDanger">
-                        <div class="progress-bar" role="progressbar" style="width: {{ $employee->LatePercentage}}" aria-valuemin="0" aria-valuemax="100">
-                            {{$employee->LatePercentage }}%
+                        <div class="progress-bar" role="progressbar" style="width: {{ $employee->LatePercentage ?? 0 }}%" aria-valuemin="0" aria-valuemax="100">
+                            {{ $employee->LatePercentage ?? 0 }}%
 
                         </div>
                     </div>
@@ -128,6 +128,7 @@
                         <th>Shift</th>
                         <th>Check in Time</th>
                         <th>Check Out Time</th>
+                        <th>Total Hours</th>
                         <th>Over Time</th>
                         <th>Status</th>
                         <th>Action</th>

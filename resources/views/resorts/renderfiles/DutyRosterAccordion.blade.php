@@ -152,15 +152,43 @@
                                                                                                 <div class="badge">{{ $toatalHoursForDay }} hrs</div>
                                                                                             </div>
                                                                                             <div class="d-flex ot-details">
-                                                                                                @if ($shiftData)
-                                                                                                    <p>OT: {{ $shiftData->OverTime ?? 0 }} hr</p>
+                                                                                                @php
+                                                                                                    $rawOverTime = $shiftData->OverTime ?? '00:00';
+                                                                                                    if ($rawOverTime === null || $rawOverTime === '' || $rawOverTime === '0' || $rawOverTime === 0 || $rawOverTime === '0:00' || $rawOverTime === '00:0') {
+                                                                                                        $rawOverTime = '00:00';
+                                                                                                    }
+                                                                                                    if (strpos($rawOverTime, ':') === false) {
+                                                                                                        $h = (int) $rawOverTime;
+                                                                                                        $rawOverTime = str_pad($h, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                    }
+                                                                                                    [$oH, $oM] = array_map('intval', explode(':', $rawOverTime));
+                                                                                                    $oMinutes = $oH * 60 + $oM;
+                                                                                                    if ($oMinutes >= 12 * 60) {
+                                                                                                        $rawOverTime = '00:00';
+                                                                                                    }
+                                                                                                    $displayOverTime = $rawOverTime;
+                                                                                                @endphp
+                                                                                                @if ($displayOverTime !== '00:00')
+                                                                                                    @php
+                                                                                                        $otParts = explode(':', $displayOverTime);
+                                                                                                        $otHours = isset($otParts[0]) ? (int)$otParts[0] : 0;
+                                                                                                        $otMinutes = isset($otParts[1]) ? (int)$otParts[1] : 0;
+                                                                                                        $otDisplay = $otHours > 0 ? $otHours . ' hr' : '';
+                                                                                                        if ($otMinutes > 0) {
+                                                                                                            $otDisplay .= ($otDisplay ? ' ' : '') . $otMinutes . ' min';
+                                                                                                        }
+                                                                                                        $otDisplay = $otDisplay ?: '0 hr';
+                                                                                                    @endphp
+                                                                                                    <p>OT: {{ $otDisplay }}</p>
+                                                                                                @else
+                                                                                                    <p>OT: 0 hr</p>
                                                                                                 @endif
                                                                                                 <p>
                                                                                                     @if($shiftData->Status != 'DayOff')
                                                                                                         <button class="editIcon-btn editdutyRoster"
                                                                                                                 data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
                                                                                                                 data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
-                                                                                                                data-OverTime="{{ $shiftData->OverTime ?? 0 }}"
+                                                                                                                data-OverTime="{{ $displayOverTime }}"
                                                                                                                 data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
                                                                                                                 data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
                                                                                                                 data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">

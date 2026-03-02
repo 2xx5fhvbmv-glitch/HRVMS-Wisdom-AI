@@ -441,26 +441,39 @@
         });
     });
 
-    // Handle manual check-in/check-out actions
+    // Handle manual check-in/check-out actions (same as dashboard: modal with time input)
     $(document).on("click", ".manual-check-action", function() {
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const date = $(this).data('date');
+        const time = $(this).data('time');
         const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
         const button = $(this);
         const row = button.closest('tr');
 
         Swal.fire({
             title: `Confirm ${actionText}`,
-            text: `Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?`,
+            html: `
+                <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
+                <label class="mt-2 d-block">Time</label>
+                <input type="text" id="manualTime" class="swal2-input" placeholder="e.g. 09:00 AM" required>
+            `,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: action === 'check_in' ? '#dc3545' : '#28a745',
             cancelButtonColor: '#6c757d',
             confirmButtonText: `Yes, ${actionText}`,
             cancelButtonText: 'Cancel',
+            didOpen: () => {
+                const timeInput = document.getElementById('manualTime');
+                if (timeInput && time) {
+                    timeInput.value = time;
+                }
+            },
         }).then((result) => {
             if (result.isConfirmed) {
+                const selectedTime = (document.getElementById('manualTime') && document.getElementById('manualTime').value) ? document.getElementById('manualTime').value : time;
                 // Disable button during request
                 button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i>Processing...');
 
@@ -470,7 +483,9 @@
                     data: {
                         _token: "{{ csrf_token() }}",
                         roster_id: rosterId,
-                        action: action
+                        action: action,
+                        date: date,
+                        time: selectedTime
                     },
                     success: function(response) {
                         if (response.success) {

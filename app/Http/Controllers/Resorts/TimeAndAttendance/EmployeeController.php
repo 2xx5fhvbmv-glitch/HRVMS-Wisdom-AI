@@ -88,7 +88,7 @@ class EmployeeController extends Controller
                     WHERE dr.emp_id = employees.id
                     AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                     AND pa.CheckingTime IS NOT NULL
-                    AND pa.CheckingOutTime IS NOT NULL
+                    AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as PresentCount
                 "),
@@ -193,7 +193,7 @@ class EmployeeController extends Controller
                  WHERE dr.emp_id = employees.id
                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                    AND pa.CheckingTime IS NOT NULL
-                   AND pa.CheckingOutTime IS NOT NULL
+                   AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                 ) as PresentCount
             "),
@@ -339,7 +339,7 @@ class EmployeeController extends Controller
                      WHERE dr.emp_id = employees.id
                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                        AND pa.CheckingTime IS NOT NULL
-                       AND pa.CheckingOutTime IS NOT NULL
+                       AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as PresentCount
                 "),
@@ -497,7 +497,7 @@ class EmployeeController extends Controller
                     WHERE dr.emp_id = employees.id
                     AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                     AND pa.CheckingTime IS NOT NULL
-                    AND pa.CheckingOutTime IS NOT NULL
+                    AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as PresentCount
                 "),
@@ -515,10 +515,10 @@ class EmployeeController extends Controller
                 DB::raw("
                     (SELECT COUNT(*)
                     FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    JOIN shift_settings ss ON ss.id = dr.Shift_id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'On-Time')
+                    JOIN shift_settings ss ON pa.Shift_id = ss.id
+                    WHERE pa.Emp_id = employees.id
+                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.CheckingTime <= ADDTIME(ss.StartTime, '00:10:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as OnTimeCount
@@ -526,30 +526,28 @@ class EmployeeController extends Controller
                 DB::raw("
                     (SELECT COUNT(*)
                     FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    JOIN shift_settings ss ON ss.id = dr.Shift_id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'Late')
+                    JOIN shift_settings ss ON pa.Shift_id = ss.id
+                    WHERE pa.Emp_id = employees.id
+                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.CheckingTime > ADDTIME(ss.StartTime, '00:10:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as LateCount
                 "),
                 DB::raw("
                     (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(SUM(TIME_TO_SEC(pa.DayWiseTotalHours))), '%H:%i') as TotalHoursWorked
-                        FROM duty_rosters dr
-                        JOIN parent_attendaces pa ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
+                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.DayWiseTotalHours)), 0)), '%H:%i')
+                        FROM parent_attendaces pa
+                        WHERE pa.Emp_id = employees.id
                         AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as TotalHoursWorked
                 "),
                 DB::raw("
                     (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(SUM(TIME_TO_SEC(pa.OverTime))), '%H:%i') as TotalOverTime
-                        FROM duty_rosters dr
-                        JOIN parent_attendaces pa ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
+                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.OverTime)), 0)), '%H:%i')
+                        FROM parent_attendaces pa
+                        WHERE pa.Emp_id = employees.id
                         AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as TotalOverTime
@@ -579,26 +577,20 @@ class EmployeeController extends Controller
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
                 $employee->CompletedWorkingDays = $employee->PresentCount;
-                $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? 0;
-                $employee->TotalOverTime = $employee->TotalOverTime ?? 0;
+                $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
+                $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
                 $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
                 $employee->CompletedDayoff = $employee->DayOffCount;
                 $employee->department = $department;
-                if (($currentMonthDays - $employee->DayOffCount) > 0)
+                if (isset($employee->PresentCount) && $employee->PresentCount > 0)
                 {
-                    $employee->onTimePercentage = number_format($employee->OnTimeCount / ($currentMonthDays - $employee->DayOffCount) * 100);
+                    $employee->onTimePercentage = number_format($employee->OnTimeCount / $employee->PresentCount * 100);
+                    $employee->LatePercentage = number_format($employee->LateCount / $employee->PresentCount * 100);
                 }
                 else
                 {
                     $employee->onTimePercentage = 0;
-                }
-                if (($currentMonthDays - $employee->LateCount) > 0)
-                {
-                    $employee->LatePercentage= number_format(($employee->LateCount / ($currentMonthDays - $employee->DayOffCount)) * 100);
-                }
-                else
-                {
-                    $employee->LatePercentage=  0;
+                    $employee->LatePercentage = 0;
                 }
             }
             $religion = $employee->religion;
@@ -667,12 +659,10 @@ class EmployeeController extends Controller
             $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
-                ->whereIn('parent_attendaces.Status', ['Present','Absent'])
+                ->whereIn('parent_attendaces.Status', ['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
                 ->orderBy('parent_attendaces.date', 'ASC')
-                ->where(function ($query) use ( $previousMonthStart, $previousMonthEnd) {
-                    // $query->orWhereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd]);
-                })
+                ->whereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd])
                 ->paginate(10, [
                     't2.InTime_Location',
                     't2.OutTime_Location',
@@ -960,7 +950,7 @@ class EmployeeController extends Controller
                         WHERE dr.emp_id = employees.id
                         AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                         AND pa.CheckingTime IS NOT NULL
-                        AND pa.CheckingOutTime IS NOT NULL
+                        AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                         ) as PresentCount
                     "),
@@ -978,10 +968,10 @@ class EmployeeController extends Controller
                     DB::raw("
                         (SELECT COUNT(*)
                         FROM parent_attendaces pa
-                        JOIN duty_rosters dr ON pa.roster_id = dr.id
-                        JOIN shift_settings ss ON ss.id = dr.Shift_id
-                        WHERE dr.emp_id = employees.id
-                        AND pa.Status IN ('Present', 'On-Time')
+                        JOIN shift_settings ss ON pa.Shift_id = ss.id
+                        WHERE pa.Emp_id = employees.id
+                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                        AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                         AND pa.CheckingTime <= ADDTIME(ss.StartTime, '00:10:00')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                         ) as OnTimeCount
@@ -989,30 +979,28 @@ class EmployeeController extends Controller
                     DB::raw("
                         (SELECT COUNT(*)
                         FROM parent_attendaces pa
-                        JOIN duty_rosters dr ON pa.roster_id = dr.id
-                        JOIN shift_settings ss ON ss.id = dr.Shift_id
-                        WHERE dr.emp_id = employees.id
-                        AND pa.Status IN ('Present', 'Late')
+                        JOIN shift_settings ss ON pa.Shift_id = ss.id
+                        WHERE pa.Emp_id = employees.id
+                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                        AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                         AND pa.CheckingTime > ADDTIME(ss.StartTime, '00:10:00')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                         ) as LateCount
                     "),
                     DB::raw("
                         (
-                            SELECT TIME_FORMAT(SEC_TO_TIME(SUM(TIME_TO_SEC(pa.DayWiseTotalHours))), '%H:%i') as TotalHoursWorked
-                            FROM duty_rosters dr
-                            JOIN parent_attendaces pa ON pa.roster_id = dr.id
-                            WHERE dr.emp_id = employees.id
+                            SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.DayWiseTotalHours)), 0)), '%H:%i')
+                            FROM parent_attendaces pa
+                            WHERE pa.Emp_id = employees.id
                             AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                             AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                         ) as TotalHoursWorked
                     "),
                     DB::raw("
                         (
-                            SELECT TIME_FORMAT(SEC_TO_TIME(SUM(TIME_TO_SEC(pa.OverTime))), '%H:%i') as TotalOverTime
-                            FROM duty_rosters dr
-                            JOIN parent_attendaces pa ON pa.roster_id = dr.id
-                            WHERE dr.emp_id = employees.id
+                            SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.OverTime)), 0)), '%H:%i')
+                            FROM parent_attendaces pa
+                            WHERE pa.Emp_id = employees.id
                             AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                             AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                         ) as TotalOverTime
@@ -1042,26 +1030,20 @@ class EmployeeController extends Controller
                     $employee->Present = $employee->PresentCount;
                     $employee->Dayoff = $employee->DayOffCount;
                     $employee->CompletedWorkingDays = $employee->PresentCount;
-                    $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? 0;
-                    $employee->TotalOverTime = $employee->TotalOverTime ?? 0;
+                    $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
+                    $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
                     $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
                     $employee->CompletedDayoff = $employee->DayOffCount;
                     $employee->department = $department;
-                    if (($currentMonthDays - $employee->DayOffCount) > 0)
+                    if (isset($employee->PresentCount) && $employee->PresentCount > 0)
                     {
-                        $employee->onTimePercentage = number_format($employee->PresentCount / ($currentMonthDays - $employee->DayOffCount) * 100);
+                        $employee->onTimePercentage = number_format($employee->OnTimeCount / $employee->PresentCount * 100);
+                        $employee->LatePercentage = number_format($employee->LateCount / $employee->PresentCount * 100);
                     }
                     else
                     {
                         $employee->onTimePercentage = 0;
-                    }
-                    if (($currentMonthDays - $employee->LateCount) > 0)
-                    {
-                        $employee->LatePercentage= number_format(($employee->LateCount / ($currentMonthDays - $employee->DayOffCount)) * 100);
-                    }
-                    else
-                    {
-                        $employee->LatePercentage=  0;
+                        $employee->LatePercentage = 0;
                     }
                 }
                 $religion = $employee->religion;
@@ -1257,19 +1239,23 @@ class EmployeeController extends Controller
         if($request->ajax())
         {
             $currentMonthDays = Carbon::now()->daysInMonth;
-            $previousDay = Carbon::yesterday()->toDateString(); // Format: 'YYYY-MM-DD'
             $previousMonthStart = Carbon::now()->startOfMonth()->toDateString();
             $previousMonthEnd = Carbon::now()->today()->toDateString();
+            // Use filter dates when provided (e.g. from employee details date range)
+            if ($request->filled('start_date') && $request->filled('end_date')) {
+                try {
+                    $previousMonthStart = Carbon::createFromFormat('d/m/Y', trim($request->start_date))->format('Y-m-d');
+                    $previousMonthEnd = Carbon::createFromFormat('d/m/Y', trim($request->end_date))->format('Y-m-d');
+                } catch (\Exception $e) {
+                    // keep defaults on parse error
+                }
+            }
             $AttendanceHistroy =  ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
-                ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','bsent','ShortLeave','HalfDayLeave'])
+                ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
-                ->where(function ($query) use ($previousDay, $previousMonthStart, $previousMonthEnd) {
-                    // $query->where('parent_attendaces.date', $previousDay) // Records for the previous day
-                    // dd($previousMonthStart, $previousMonthEnd);
-                    $query->orWhereBetween('parent_attendaces.date', [$previousMonthStart,$previousMonthEnd]); // Records for the previous month
-                })
+                ->whereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd])
                 ->get([
                             't2.InTime_Location',
                             't2.OutTime_Location',
@@ -1512,7 +1498,7 @@ class EmployeeController extends Controller
                     WHERE dr.emp_id = employees.id
                     AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                     AND pa.CheckingTime IS NOT NULL
-                    AND pa.CheckingOutTime IS NOT NULL
+                    AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as PresentCount
                 "),
@@ -1530,10 +1516,10 @@ class EmployeeController extends Controller
                 DB::raw("
                     (SELECT COUNT(*)
                     FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    JOIN shift_settings ss ON ss.id = dr.Shift_id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'On-Time')
+                    JOIN shift_settings ss ON pa.Shift_id = ss.id
+                    WHERE pa.Emp_id = employees.id
+                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.CheckingTime <= ADDTIME(ss.StartTime, '00:10:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as OnTimeCount
@@ -1541,30 +1527,28 @@ class EmployeeController extends Controller
                 DB::raw("
                     (SELECT COUNT(*)
                     FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    JOIN shift_settings ss ON ss.id = dr.Shift_id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'Late')
+                    JOIN shift_settings ss ON pa.Shift_id = ss.id
+                    WHERE pa.Emp_id = employees.id
+                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
                     AND pa.CheckingTime > ADDTIME(ss.StartTime, '00:10:00')
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as LateCount
                 "),
                 DB::raw("
                     (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(SUM(TIME_TO_SEC(pa.DayWiseTotalHours))), '%H:%i') as TotalHoursWorked
-                        FROM duty_rosters dr
-                        JOIN parent_attendaces pa ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
+                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.DayWiseTotalHours)), 0)), '%H:%i')
+                        FROM parent_attendaces pa
+                        WHERE pa.Emp_id = employees.id
                         AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as TotalHoursWorked
                 "),
                 DB::raw("
                     (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(SUM(TIME_TO_SEC(pa.OverTime))), '%H:%i') as TotalOverTime
-                        FROM duty_rosters dr
-                        JOIN parent_attendaces pa ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
+                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.OverTime)), 0)), '%H:%i')
+                        FROM parent_attendaces pa
+                        WHERE pa.Emp_id = employees.id
                         AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
                         AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                     ) as TotalOverTime
@@ -1593,25 +1577,19 @@ class EmployeeController extends Controller
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
                 $employee->CompletedWorkingDays = $employee->PresentCount;
-                $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? 0;
-                $employee->TotalOverTime = $employee->TotalOverTime ?? 0;
+                $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
+                $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
                 $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
                 $employee->CompletedDayoff = $employee->DayOffCount;
-                if (($currentMonthDays - $employee->DayOffCount) > 0)
+                if (isset($employee->PresentCount) && $employee->PresentCount > 0)
                 {
-                    $employee->onTimePercentage = number_format($employee->OnTimeCount / ($currentMonthDays - $employee->DayOffCount) * 100);
+                    $employee->onTimePercentage = number_format($employee->OnTimeCount / $employee->PresentCount * 100);
+                    $employee->LatePercentage = number_format($employee->LateCount / $employee->PresentCount * 100);
                 }
                 else
                 {
                     $employee->onTimePercentage = 0;
-                }
-                if (($currentMonthDays - $employee->LateCount) > 0)
-                {
-                    $employee->LatePercentage= number_format(($employee->LateCount / ($currentMonthDays - $employee->DayOffCount)) * 100);
-                }
-                else
-                {
-                    $employee->LatePercentage=  0;
+                    $employee->LatePercentage = 0;
                 }
             }
             $religion = $employee->religion;
@@ -1680,12 +1658,10 @@ class EmployeeController extends Controller
             $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
-                ->whereIn('parent_attendaces.Status', ['Present','Absent'])
+                ->whereIn('parent_attendaces.Status', ['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
                 ->orderBy('parent_attendaces.date', 'ASC')
-                ->where(function ($query) use ( $monthStartingDate, $monthEndingDate) {
-                    $query->orWhereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate]);
-                })
+                ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])
                 ->paginate(10, [
                     'parent_attendaces.id',
                     't2.InTime_Location',
