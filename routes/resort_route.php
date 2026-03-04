@@ -420,6 +420,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/get-applicant-wise-notes/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getApplicantWiseNotes'])->name('resort.ta.getApplicantWiseNotes');
     Route::get('/talent-acquisition/sortlisted-applicants/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','SortlistedApplicants'])->name('resort.ta.SortlistedApplicants');
     Route::post('/talent-acquisition/interview-request', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','InterviewRequest'])->name('resort.ta.InterviewRequest');
+    Route::post('/talent-acquisition/send-interview-email', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','SendInterviewEmail'])->name('resort.ta.SendInterviewEmail');
+    Route::post('/talent-acquisition/delete-pending-interview', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','DeletePendingInterview'])->name('resort.ta.DeletePendingInterview');
 
     Route::post('/talent-acquisition/get-slots', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantTimeZoneget'])->name('resort.ta.ApplicantTimeZoneget');
     Route::post('/talent-acquisition/approved-or-sort-applicant-wise-status', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApprovedOrSortApplicantWiseStatus'])->name('resort.ta.ApprovedOrSortApplicantWiseStatus');

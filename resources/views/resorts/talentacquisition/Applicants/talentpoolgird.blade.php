@@ -17,7 +17,15 @@
             <div class="img-circle"><img src="{{ URL::asset($a->passport_photo) }}" alt="image"></div>
             <h6>{{ ucfirst($a->first_name) }} {{ ucfirst($a->last_name) }}</h6>
             <p>{{ ucfirst($a->position_title) }}</p>
-            <a href="javascript:void(0)" class="a-link text-success checkAvailabilityBtn" data-id="{{ base64_encode($a->id) }}">Check Availability</a>
+            @if($a->availability_status === 'available')
+                <span class="badge bg-success">Available to Reach</span>
+            @elseif($a->availability_status === 'unavailable')
+                <span class="badge bg-danger">Not Available</span>
+            @elseif($a->availability_status === 'pending')
+                <span class="badge bg-warning text-dark">Pending Response</span>
+            @else
+                <a href="javascript:void(0)" class="a-link text-success checkAvailabilityBtn" data-id="{{ base64_encode($a->id) }}">Check Availability</a>
+            @endif
             <div class="bg">
                 <div>
                     <p>AI Ranking</p>
