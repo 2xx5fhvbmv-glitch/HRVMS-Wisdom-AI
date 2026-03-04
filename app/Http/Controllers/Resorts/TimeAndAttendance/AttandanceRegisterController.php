@@ -450,21 +450,17 @@ class AttandanceRegisterController extends Controller
                             });
                     }
 
-                if(!$request->get('page'))
-                {
+                // AJAX (filter or pagination): always return partial so page does not reload
+                if ($request->ajax()) {
                     $view = view('resorts.renderfiles.ResigterRosterSearch',compact('LeaveCategory','sendclass','monthwiseheaders','headers',
                                                         'attandanceregister','resort_id','WeekstartDate','WeekendDate','startOfMonth','endOfMonth','publicHolidays','overtimeData'))->render();
                     return response()->json(['success'=>true,'view' => $view]);
                 }
-                else{
-                    $page_title = 'Attandance Register';
-
-
-                    $ResortDepartment =      ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
-                    return view('resorts.timeandattendance.attandanceregister.index',compact('LeaveCategory','sendclass','monthwiseheaders','headers',
-                                                        'attandanceregister','resort_id','WeekstartDate','WeekendDate','startOfMonth','endOfMonth','page_title','ResortDepartment','publicHolidays','overtimeData'));
-
-                }
+                // Non-AJAX (e.g. opened pagination link in new tab): return full page
+                $page_title = 'Attandance Register';
+                $ResortDepartment = ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
+                return view('resorts.timeandattendance.attandanceregister.index',compact('LeaveCategory','sendclass','monthwiseheaders','headers',
+                                                    'attandanceregister','resort_id','WeekstartDate','WeekendDate','startOfMonth','endOfMonth','page_title','ResortDepartment','publicHolidays','overtimeData'));
 
 
     }

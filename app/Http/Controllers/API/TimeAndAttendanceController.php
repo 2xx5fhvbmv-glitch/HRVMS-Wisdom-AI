@@ -1443,7 +1443,7 @@ class TimeAndAttendanceController extends Controller
                                                                                 't1.last_name',
                                                                                 't1.profile_picture',
                                                                                 'e.id as emp_id',
-                                                                                DB::raw("COUNT(DISTINCT CASE WHEN t4.Status = 'Present' THEN t4.date END) as present_days"),
+                                                                                DB::raw("COUNT(DISTINCT CASE WHEN t4.Status = 'Present' AND t4.CheckingTime IS NOT NULL AND TRIM(IFNULL(t4.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00') THEN t4.date END) as present_days"),
                                                                                 DB::raw("COUNT(DISTINCT CASE WHEN t4.Status = 'Absent' THEN t4.date END) as absent_days")
                                                                             )
                                                                             ->groupBy('e.Dept_id', 'e.id');
@@ -2105,14 +2105,17 @@ class TimeAndAttendanceController extends Controller
                 $totalOtHours = 0;
 
                 if ($todayAttendance) {
-                    if ($todayAttendance->Status == "Present") {
+                    if ($todayAttendance->Status == "Present" && !empty($todayAttendance->CheckingTime) && trim($todayAttendance->CheckingTime ?? '') !== '' && !in_array(trim($todayAttendance->CheckingTime ?? ''), ['00:00', '00:00:00'])) {
                         $presentCount = 1;
                         if (!empty($todayAttendance->OverTime) && $todayAttendance->OverTime != "-" && $todayAttendance->OverTime != "00:00") {
                             list($Othours, $Otminutes) = explode(':', $todayAttendance->OverTime ?? '0:0');
                             $totalOtHours = (int)$Othours + ((int)$Otminutes / 60);
                         }
                     } elseif ($todayAttendance->Status == "Absent") {
-                        $absentCount = 1;
+                        $hasCheckIn = !empty($todayAttendance->CheckingTime) && trim($todayAttendance->CheckingTime ?? '') !== '' && !in_array(trim($todayAttendance->CheckingTime ?? ''), ['00:00', '00:00:00']);
+                        if (!$hasCheckIn) {
+                            $absentCount = 1;
+                        }
                     }
                 }
 
@@ -2165,25 +2168,31 @@ class TimeAndAttendanceController extends Controller
                     "Monthwise"
                 );
 
-                // Calculate summary statistics for month
-                $presentCount = 0;
-                $absentCount = 0;
-                $leaveCount = 0;
+                // Calculate summary statistics for month (per-day: unique dates; present only when has check-in)
+                $presentDates = [];
+                $absentDates = [];
+                $leaveDates = [];
                 $totalOtHours = 0;
 
                 foreach ($RosterInternalDataMonth as $shiftData) {
-                    if ($shiftData->Status == "Present") {
-                        $presentCount++;
+                    $d = isset($shiftData->date) ? (is_object($shiftData->date) ? $shiftData->date->format('Y-m-d') : $shiftData->date) : null;
+                    if (!$d) continue;
+                    $hasCheckIn = !empty($shiftData->CheckingTime) && trim($shiftData->CheckingTime ?? '') !== '' && !in_array(trim($shiftData->CheckingTime ?? ''), ['00:00', '00:00:00']);
+                    if ($shiftData->Status == "Present" && $hasCheckIn) {
+                        $presentDates[$d] = true;
                         if (!empty($shiftData->OverTime) && $shiftData->OverTime != "-" && $shiftData->OverTime != "00:00") {
                             list($Othours, $Otminutes) = explode(':', $shiftData->OverTime ?? '0:0');
                             $totalOtHours += (int)$Othours + ((int)$Otminutes / 60);
                         }
-                    } elseif ($shiftData->Status == "Absent") {
-                        $absentCount++;
+                    } elseif ($shiftData->Status == "Absent" && !$hasCheckIn) {
+                        $absentDates[$d] = true;
                     } elseif (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData) && !empty($shiftData->LeaveData)) {
-                        $leaveCount++;
+                        $leaveDates[$d] = true;
                     }
                 }
+                $presentCount = count($presentDates);
+                $absentCount = count($absentDates);
+                $leaveCount = count($leaveDates);
 
                 return [
                     'Parentid' => $item->Parentid,

@@ -567,6 +567,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::get('/leave/details/{leave_id}', 'Leave\LeaveController@details')->name('leave.details');
     Route::get('/leave/leave-histroy', 'Leave\LeaveController@getLeaveHistory')->name('leave.history');
+    Route::get('/leave/history/detail', 'Leave\LeaveController@getLeaveHistoryDetail')->name('leave.history.detail');
     Route::get('/leave-history/download-pdf/{empID}', 'Leave\LeaveController@downloadPdf')->name('leave.history.download-pdf');
     Route::post('/leave/application/store','Leave\LeaveController@store')->name('leave-applications.store');
 
@@ -587,6 +588,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/leaves/calendar-leaves', 'Leave\LeaveCalenadarController@getLeaves')->name('calendar.leaves.get');
 
     Route::get('/leaves/boarding-pass-requests', 'Leave\BoardingPassController@index')->name('resort.boardingpass.list');
+    Route::get('/leaves/boarding-pass-detail', 'Leave\BoardingPassController@getBoardingPassDetail')->name('resort.boardingpass.detail');
     Route::get('/leaves/boarding-pass-application', 'Leave\BoardingPassController@apply')->name('resort.boardingpass.apply');
     Route::post('/leaves/boarding-pass-submit', 'Leave\BoardingPassController@store')->name('resort.boardingpass.store');
     Route::post('/leaves/handle-pass-action', 'Leave\BoardingPassController@handlePassAction')->name('pass.handleAction');
@@ -595,6 +597,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/leaves/boarding/status-update', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('resort.BoardingStatusUpdate');
 
 
+    Route::get('/leave/template/download', 'Leave\ConfigController@downloadLeaveTemplate')->name('leave.template.download');
     Route::post('/leave/export', 'Leave\ConfigController@exportLeave')->name('leave.export');
     Route::post('/leave/import', 'Leave\ConfigController@ImportLeave')->name('leave.import');
 
