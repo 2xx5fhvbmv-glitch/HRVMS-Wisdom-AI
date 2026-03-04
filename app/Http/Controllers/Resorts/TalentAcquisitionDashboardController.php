@@ -124,9 +124,8 @@ class TalentAcquisitionDashboardController extends Controller
             $Interviews = ApplicantInterViewDetails::where('resort_id', $resort_id)->count();
             $Hired = DB::table('applicant_wise_statuses as t1')
                     ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
-                    ->where('t2.resort_id', $resort_id) // Reference resort_id from applicant_form_data
-                    ->where("t1.As_ApprovedBy",8)
-                    ->where("t1.status","Selected")
+                    ->where('t2.resort_id', $resort_id)
+                    ->where("t1.status","Contract Accepted")
                     ->groupBy('t1.Applicant_id')
                     ->get()
                     ->count();
@@ -309,8 +308,7 @@ class TalentAcquisitionDashboardController extends Controller
                     ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
                     ->join('vacancies as v', 'v.id', '=', 't2.Parent_v_id')
                     ->where('t2.resort_id', $resort_id)
-                    ->where("t1.As_ApprovedBy",8)
-                    ->where("t1.status","Selected");
+                    ->where("t1.status","Contract Accepted");
             if (!$canSeeAllDepts && $userDeptId) {
                 $hiredQuery->where('v.department', $userDeptId);
             }
@@ -685,6 +683,7 @@ class TalentAcquisitionDashboardController extends Controller
     public function topHiringSources(Request $request)
     {
         $currentYear =$request->YearWiseTopSource;
+        $resort_id = $this->globalUser->resort_id;
 
         // Get all months for the current year in "M Y" format
         $months = collect(range(1, 12))->map(function ($month) use ($currentYear) {
@@ -694,6 +693,7 @@ class TalentAcquisitionDashboardController extends Controller
         // Fetch applicant data with month and year
         $applicantData = DB::table('applicant_form_data')
             ->join('hiring_sources', 'applicant_form_data.Applicant_Source', '=', 'hiring_sources.id')
+            ->where('applicant_form_data.resort_id', $resort_id)
             ->selectRaw('
                 DATE_FORMAT(applicant_form_data.created_at, "%b %Y") as month_year,
                 hiring_sources.source_name as source_name,

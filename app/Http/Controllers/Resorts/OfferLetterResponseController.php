@@ -8,6 +8,7 @@ use App\Models\Applicant_form_data;
 use App\Models\ApplicantWiseStatus;
 use App\Models\Vacancies;
 use App\Models\Resort;
+use App\Jobs\TaEmailSent;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -75,6 +76,9 @@ class OfferLetterResponseController extends Controller
         ApplicantWiseStatus::where('id', $offer->applicant_status_id)
             ->update(['status' => 'Offer Letter Accepted']);
 
+        // Send offer letter email with download link
+        $this->sendOfferLetterEmail($offer);
+
         return redirect()->route('resort.offer.letter.show', $token)
             ->with('success', 'Offer letter accepted successfully! You will receive your contract shortly.');
     }
@@ -111,5 +115,41 @@ class OfferLetterResponseController extends Controller
 
         return redirect()->route('resort.offer.letter.show', $token)
             ->with('success', 'Offer letter has been declined.');
+    }
+
+    private function sendOfferLetterEmail($offer)
+    {
+        try {
+            $applicant = Applicant_form_data::find($offer->applicant_id);
+            if (!$applicant || !$applicant->email) return;
+
+            $resort = Resort::find($offer->resort_id);
+            $candidateName = ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name);
+            $resortName = $resort->resort_name ?? '';
+            $downloadLink = asset('storage/' . $offer->file_path);
+
+            $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
+                ->where('vacancies.id', $applicant->Parent_v_id ?? 0)
+                ->value('t1.position_title');
+
+            $subject = "Your Offer Letter - {$resortName}";
+            $body = "
+                <p>Dear {$candidateName},</p>
+                <p>Thank you for accepting the offer. Please find your offer letter below.</p>
+                <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Position</td><td style='padding:8px;border:1px solid #ddd;'>" . ($vacancy ?? '-') . "</td></tr>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Resort</td><td style='padding:8px;border:1px solid #ddd;'>{$resortName}</td></tr>
+                </table>
+                <p><a href='{$downloadLink}' target='_blank' style='display:inline-block;padding:12px 24px;background:#004552;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;'>Download Offer Letter</a></p>
+                <p>&nbsp;</p>
+                <p>Regards,</p>
+                <p>HR Team</p>
+                <p>{$resortName}</p>
+            ";
+
+            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+        } catch (\Exception $e) {
+            \Log::warning("Failed to send offer letter email: " . $e->getMessage());
+        }
     }
 }

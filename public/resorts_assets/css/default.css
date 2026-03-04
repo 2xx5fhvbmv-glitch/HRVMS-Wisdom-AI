@@ -3812,6 +3812,10 @@ border-color: #ddd; */
     --progressStroke: #8DC9C9;
 }
 
+.progress-container.danger {
+    --progressStroke: #dc3545;
+}
+
 .progress-container.SkyblueLightNew {
     --progressStroke: #53CAFF;
 }
@@ -4231,6 +4235,28 @@ border-color: #ddd; */
 
 .userApplicants-accordion .accordion-item.active::after {
     background: #014653;
+}
+
+.userApplicants-accordion .accordion-item.rejected {
+    border-color: #dc3545;
+}
+
+.userApplicants-accordion .accordion-item.rejected span {
+    opacity: 1;
+}
+
+.userApplicants-accordion .accordion-item.rejected::before {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+.userApplicants-accordion .accordion-item.rejected::after {
+    background: #dc3545;
+}
+
+.userApplicants-accordion .accordion-item.rejected .accordion-button {
+    color: #dc3545;
+    font-weight: 600;
 }
 
 .userApplicants-accordion .accordion-button {

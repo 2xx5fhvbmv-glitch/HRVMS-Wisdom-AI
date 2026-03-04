@@ -306,6 +306,10 @@
                             <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
                         @endforeach
                     </select>
+                    <div class="mb-3 mt-3" id="rejectionReasonGroup" style="display:none;">
+                        <label class="form-label">Rejection Reason<span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="rejectionReason" id="rejectionReasonText" rows="3" placeholder="Enter reason for rejection..." required></textarea>
+                    </div>
                     </div>
                     <div class="modal-footer">
                         <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
@@ -1248,7 +1252,7 @@
         });
 
         // Clear selected slots when manual time is focused
-        $(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTime"]', function () {
+        $(document).on("focus", '[name="MalidivanManualTime"]', function () {
             $(".row_time").removeClass("active");
             $(".row_time .Timezone_checkBox").prop("checked", false);
             $("#ResortInterviewtime_collected").val('');
@@ -1258,21 +1262,28 @@
         $(document).on("change", '[name="MalidivanManualTime"]', function () {
             const timeValue = $(this).val();
             if (timeValue) {
+                const resortTz = $('#resortTimezone').val();
+                const applicantTz = $('#applicantTimezone').val();
+
+                // Format resort time to 12h
                 const [hours, minutes] = timeValue.split(":");
                 const period = hours >= 12 ? "PM" : "AM";
                 const formattedHours = hours % 12 || 12;
-                let MalidivanManualTime1 = formattedHours +":"+minutes+" "+period;
+                let MalidivanManualTime1 = formattedHours + ":" + minutes + " " + period;
                 $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1);
-            }
-        });
-        $(document).on("change", '[name="ApplicantManualTime"]', function () {
-            const timeValue = $(this).val();
-            if (timeValue) {
-                const [hours, minutes] = timeValue.split(":");
-                const period = hours >= 12 ? "PM" : "AM";
-                const formattedHours = hours % 12 || 12;
-                let ApplicantManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1);
+
+                // Auto-convert to applicant timezone using moment-timezone
+                var resortMoment = moment.tz(timeValue, 'HH:mm', resortTz);
+                var applicantMoment = resortMoment.clone().tz(applicantTz);
+                var applicantTime24 = applicantMoment.format('HH:mm');
+                var applicantTime12 = applicantMoment.format('h:mm A');
+
+                $('[name="ApplicantManualTime"]').val(applicantTime24);
+                $('[name="ApplicantManualTime1"]').val(applicantTime12);
+            } else {
+                $('[name="ApplicantManualTime"]').val('');
+                $('[name="ApplicantManualTime1"]').val('');
+                $('[name="MalidivanManualTime1"]').val('');
             }
         });
         $('#respond-HoldModel').on('shown.bs.modal', function () {
@@ -1484,34 +1495,29 @@
 
         $('#TimeSlotsForm').validate({
             rules: {
+                MeetingLink: {
+                    required: true,
+                },
                 "SlotBook[]": {
                     required: function () {
-                        return (
-                            $('[name="MalidivanManualTime"]').val().trim() === "" &&
-                            $('[name="ApplicantManualTime"]').val().trim() === ""
-                        );
+                        return $('[name="MalidivanManualTime"]').val().trim() === "";
                     },
                 },
                 MalidivanManualTime: {
-                    required: function () {
-                        return $('[name="SlotBook[]"]:checked').length === 0;
-                    },
-                },
-                ApplicantManualTime: {
                     required: function () {
                         return $('[name="SlotBook[]"]:checked').length === 0;
                     },
                 },
             },
             messages: {
+                MeetingLink: {
+                    required: "Please enter a Meeting Link.",
+                },
                 "SlotBook[]": {
                     required: "Please select a valid time slot or enter a manual time.",
                 },
                 MalidivanManualTime: {
-                    required: "Please enter Malidivan Manual Time or select a valid time slot.",
-                },
-                ApplicantManualTime: {
-                    required: "Please enter Applicant Manual Time or select a valid time slot.",
+                    required: "Please enter your time or select a valid time slot.",
                 },
             },
             errorPlacement: function(error, element) {
@@ -1884,6 +1890,16 @@
                 $("#EmailTemplateForm").data("interviewRound", interviewRound);
                 $("#EmailTemplateForm").data("applicantstatusid", applicantstatusid);
 
+                // Show/hide rejection reason field based on Rank
+                if (Rank === "Rejected") {
+                    $("#rejectionReasonGroup").show();
+                    $("#rejectionReasonText").prop("required", true);
+                } else {
+                    $("#rejectionReasonGroup").hide();
+                    $("#rejectionReasonText").prop("required", false);
+                }
+                $("#rejectionReasonText").val("");
+
                 // Open the modal for email template selection
                 $("#Email-template-selection-modal").modal("show");
             } else {
@@ -1909,15 +1925,17 @@
                 return;
             }
 
+            let rejectionReason = Rank === "Rejected" ? $("#rejectionReasonText").val() : null;
+
             // Make the AJAX request with the email template ID
-            makeAjaxRequest(interviewRound, ApplicantID, applicantstatusid, Rank, emailTemplateID);
+            makeAjaxRequest(interviewRound, ApplicantID, applicantstatusid, Rank, emailTemplateID, rejectionReason);
 
             // Close the modal
             $("#Email-template-selection-modal").modal("hide");
         });
 
         // Function to make the AJAX request
-        function makeAjaxRequest(interviewRound, ApplicantID, applicantstatusid, Rank, emailTemplateID) {
+        function makeAjaxRequest(interviewRound, ApplicantID, applicantstatusid, Rank, emailTemplateID, rejectionReason) {
             // Remove ' Rank' and anything after it from interviewRound
             if (Rank && interviewRound.includes(" Complete")) {
                 // console.log(interviewRound);
@@ -1933,6 +1951,7 @@
                     applicantstatusid: applicantstatusid,
                     Rank: Rank,
                     emailTemplateID: emailTemplateID, // Can be null if no template is used
+                    rejectionReason: rejectionReason || null,
                     _token: "{{ csrf_token() }}",
                 },
                 success: function (response) {

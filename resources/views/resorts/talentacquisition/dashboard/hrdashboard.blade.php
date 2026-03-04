@@ -182,6 +182,15 @@
                                                             <i class="fa-solid fa-eye"></i>
                                                         </a>
 
+                                                    @elseif( $t->ApplicationStatus=="Sortlisted By Wisdom AI" && isset($t->ApplicantID) )
+                                                        <div class="img-circle">
+                                                            <img src="{{ $t->profileImg}}" alt="image">
+                                                        </div>
+                                                        <div>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has applied for {{ $t->Position ?? '' }} - Needs HR Review</p>
+                                                            <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">Review Applicant</a>
+                                                        </div>
+
                                                     @elseif( $t->ApplicationStatus=="Sortlisted" &&  $t->As_ApprovedBy != 0  &&  $t->InterviewLinkStatus == null )
                                                         <div class="img-circle">
                                                             <img src="{{ $t->profileImg}}" alt="image">
@@ -423,6 +432,23 @@
                 </div>
             </div>
 
+            <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card h-auto">
+                    <div class="mb-4 overflow-hidden">
+                        <div id="calendar"></div>
+                    </div>
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-3">
+                            <div class="col">
+                                <h3>Upcoming Interviews</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="upinterviews">
+                    </div>
+                </div>
+            </div>
+
             @if(isset($approvalHistory) && $approvalHistory->count() > 0)
             <div class="col-xl-8 col-lg-6">
                 <div class="card h-auto">
@@ -466,23 +492,6 @@
             </div>
             @endif
 
-            <div class="col-xl-4 col-lg-6   @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card h-auto">
-                    <div class="mb-4 overflow-hidden">
-                        <div id="calendar"></div>
-                    </div>
-                    <div class="card-title">
-                        <div class="row justify-content-between align-items-center g-3">
-                            <div class="col">
-                                <h3>Upcoming Interviews</h3>
-                            </div>
-                            
-                        </div>
-                    </div>
-                    <div id="upinterviews">
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -1545,7 +1554,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         });
 
         // Clear selected slots when manual time is focused
-        $(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTime"]', function () {
+        $(document).on("focus", '[name="MalidivanManualTime"]', function () {
             $(".row_time").removeClass("active");
             $(".row_time .Timezone_checkBox").prop("checked", false);
             $("#ResortInterviewtime_collected").val('');
@@ -1555,55 +1564,54 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         $(document).on("change", '[name="MalidivanManualTime"]', function () {
             const timeValue = $(this).val();
             if (timeValue) {
-                const [hours, minutes] = timeValue.split(":");
-                const period = hours >= 12 ? "PM" : "AM";
-                const formattedHours = hours % 12 || 12;
-                let MalidivanManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1);
-            }
-        });
-        $(document).on("change", '[name="ApplicantManualTime"]', function () {
-            const timeValue = $(this).val();
-            if (timeValue) {
-                const [hours, minutes] = timeValue.split(":");
-                const period = hours >= 12 ? "PM" : "AM";
-                const formattedHours = hours % 12 || 12;
-                let ApplicantManualTime1 = formattedHours +":"+minutes+" "+period;
-                $('[name="ApplicantManualTime1"]').val(ApplicantManualTime1);
-            }
-        });
+                const resortTz = $('#resortTimezone').val();
+                const applicantTz = $('#applicantTimezone').val();
 
+                const [hours, minutes] = timeValue.split(":");
+                const period = hours >= 12 ? "PM" : "AM";
+                const formattedHours = hours % 12 || 12;
+                let MalidivanManualTime1 = formattedHours + ":" + minutes + " " + period;
+                $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1);
+
+                var resortMoment = moment.tz(timeValue, 'HH:mm', resortTz);
+                var applicantMoment = resortMoment.clone().tz(applicantTz);
+                var applicantTime24 = applicantMoment.format('HH:mm');
+                var applicantTime12 = applicantMoment.format('h:mm A');
+
+                $('[name="ApplicantManualTime"]').val(applicantTime24);
+                $('[name="ApplicantManualTime1"]').val(applicantTime12);
+            } else {
+                $('[name="ApplicantManualTime"]').val('');
+                $('[name="ApplicantManualTime1"]').val('');
+                $('[name="MalidivanManualTime1"]').val('');
+            }
+        });
 
         $('#TimeSlotsForm').validate({
             rules: {
+                MeetingLink: {
+                    required: true,
+                },
                 "SlotBook[]": {
                     required: function () {
-                        return (
-                            $('[name="MalidivanManualTime"]').val().trim() === "" &&
-                            $('[name="ApplicantManualTime"]').val().trim() === ""
-                        );
+                        return $('[name="MalidivanManualTime"]').val().trim() === "";
                     },
                 },
                 MalidivanManualTime: {
-                    required: function () {
-                        return $('[name="SlotBook[]"]:checked').length === 0;
-                    },
-                },
-                ApplicantManualTime: {
                     required: function () {
                         return $('[name="SlotBook[]"]:checked').length === 0;
                     },
                 },
             },
             messages: {
+                MeetingLink: {
+                    required: "Please enter a Meeting Link.",
+                },
                 "SlotBook[]": {
                     required: "Please select a valid time slot or enter a manual time.",
                 },
                 MalidivanManualTime: {
-                    required: "Please enter Malidivan Manual Time or select a valid time slot.",
-                },
-                ApplicantManualTime: {
-                    required: "Please enter Applicant Manual Time or select a valid time slot.",
+                    required: "Please enter your time or select a valid time slot.",
                 },
             },
             errorPlacement: function(error, element) {

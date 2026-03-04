@@ -9,7 +9,16 @@
             $totalSteps = 2 + ($totalRounds * 2) + 1;
             $currentStep = 0;
 
-            if($Applicant_form_data->ApplicantStatus == 'Selected') {
+            if(in_array($Applicant_form_data->ApplicantStatus, ['Rejected', 'Rejected By Wisdom AI'])) {
+                if($Applicant_form_data->As_ApprovedBy == 0) {
+                    $currentStep = 1;
+                } elseif(isset($InterViewRound) && array_key_exists($Applicant_form_data->As_ApprovedBy, $InterViewRound)) {
+                    $roundIndex = array_search($Applicant_form_data->As_ApprovedBy, $roundKeys);
+                    $currentStep = 2 + ($roundIndex * 2) + 1;
+                } else {
+                    $currentStep = 2;
+                }
+            } elseif($Applicant_form_data->ApplicantStatus == 'Selected' || in_array($Applicant_form_data->ApplicantStatus, ['Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'])) {
                 $currentStep = $totalSteps;
             } elseif($Applicant_form_data->As_ApprovedBy == 0) {
                 $currentStep = 1; // AI Shortlisted
@@ -31,7 +40,7 @@
             }
             $progress = round(($currentStep / $totalSteps) * 100, 2);
         @endphp
-        <div class="progress-container skyblue" data-progress="{{ $progress }}">
+        <div class="progress-container {{ in_array($Applicant_form_data->ApplicantStatus, ['Rejected', 'Rejected By Wisdom AI']) ? 'danger' : 'skyblue' }}" data-progress="{{ $progress }}">
             <svg class="progress-circle" viewBox="0 0 120 120">
                 <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                 <circle class="progress" cx="60" cy="60" r="54"></circle>
@@ -56,6 +65,13 @@
                     <span class="badge {{ $badgeClass }}">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
                 @elseif($Applicant_form_data->ApplicantStatus  == 'Selected')
                     <span class="badge badge-themeSuccess">{{ $Applicant_form_data->ApplicantStatus }}</span>
+                @elseif(in_array($Applicant_form_data->ApplicantStatus, ['Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']))
+                    @php
+                        $badgeStyle = 'badge-themeSuccess';
+                        if(str_contains($Applicant_form_data->ApplicantStatus, 'Rejected')) $badgeStyle = 'badge-themeDanger';
+                        elseif(str_contains($Applicant_form_data->ApplicantStatus, 'Sent')) $badgeStyle = 'badge-themeBlue';
+                    @endphp
+                    <span class="badge {{ $badgeStyle }}">{{ $Applicant_form_data->ApplicantStatus }}</span>
                 @elseif( $Applicant_form_data->ApplicantStatus  == 'Rejected')
                     <span class="badge badge-themeDanger">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
                 @endif
@@ -168,6 +184,25 @@
                                     @endif
                                 </td>
                             </tr>
+                            @if(isset($WorkExperiences) && $WorkExperiences->isNotEmpty())
+                            <tr>
+                                <th colspan="2" style="padding-top: 16px; font-size: 15px; color: #004552;">Work Experience</th>
+                            </tr>
+                            @foreach ($WorkExperiences as $exp)
+                            <tr>
+                                <th>{{ $exp->job_title ?? 'N/A' }} <br><small style="font-weight:normal;color:#888;">{{ $exp->employer_name ?? '' }}</small></th>
+                                <td>
+                                    @if($exp->work_start_date || $exp->work_end_date)
+                                        <small><b>Period:</b> {{ $exp->work_start_date ?? '' }} - {{ $exp->currently_working ? 'Present' : ($exp->work_end_date ?? '') }}</small><br>
+                                    @endif
+                                    @if($exp->job_description_work)
+                                        <b>Job Description:</b><br>
+                                        {!! nl2br(e($exp->job_description_work)) !!}
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                            @endif
                         </tbody>
                     </table>
                 </div>
@@ -205,26 +240,39 @@
                 <div class="overflow-hidden">
                     <div class="row g-lg-4 g-3 mb-lg-4 mb-3">
                         <div class="col-lg-8 col-md-7">
+                            @php
+                                $isRejected = in_array($Applicant_form_data->ApplicantStatus, ['Rejected', 'Rejected By Wisdom AI']);
+                                $rejectedStage = null;
+                                if ($isRejected) {
+                                    if ($Applicant_form_data->As_ApprovedBy == 0) {
+                                        $rejectedStage = 'ai';
+                                    } elseif (isset($InterViewRound) && array_key_exists($Applicant_form_data->As_ApprovedBy, $InterViewRound)) {
+                                        $rejectedStage = 'interview';
+                                    } else {
+                                        $rejectedStage = 'hr';
+                                    }
+                                }
+                            @endphp
                             <div class="userApplicants-accordion" id="accordionExample">
-                                <div class="accordion-item active" >
+                                <div class="accordion-item {{ $isRejected && $rejectedStage == 'ai' ? 'rejected' : 'active' }}" >
                                     <h2 class="accordion-header" id="headingOne">
                                         <button class="accordion-button" type="button" data-bs-toggle="collapse"
                                             data-bs-target="#collapseOne" aria-expanded="true"
                                             aria-controls="collapseOne">
-                                            Shortlisted by Wisdom AI
+                                            {{ $isRejected && $rejectedStage == 'ai' ? 'Rejected' : 'Shortlisted by Wisdom AI' }}
                                         </button>
                                     </h2>
                                     <div id="collapseOne" class="accordion-collapse collapse show"
                                         aria-labelledby="headingOne" data-bs-parent="#accordionExample">
                                         <div class="accordion-body">
                                             @if($Applicant_form_data->ApplicantStatus =="Sortlisted By Wisdom AI" &&   $Applicant_form_data->As_ApprovedBy ==0 && $isHrDepartment)
-                                                <a href="javascritp:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
+                                                <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
                                                     data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                     data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
                                                     data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
                                                     data-Progress_Rank="Sortlisted" data-interviewRound="HRShortlisted" > HR Shortlisted
                                                 </a>
-                                                <a href="javascritp:void(0)" class="btn btn-danger ApprovedOrSortListed btn-sm"
+                                                <a href="javascript:void(0)" class="btn btn-danger ApprovedOrSortListed btn-sm"
                                                     data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                     data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
                                                     data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
@@ -234,12 +282,12 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="accordion-item @if(isset($HrSortlisted)) active @endif ">
+                                <div class="accordion-item @if($isRejected && $rejectedStage == 'hr') rejected @elseif($isRejected && $rejectedStage == 'interview') active @elseif(isset($HrSortlisted)) active @endif ">
                                     <h2 class="accordion-header" id="headingTwo">
                                         <button class="accordion-button collapsed" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#collapseTwo"
                                             aria-expanded="false" aria-controls="collapseTwo">
-                                            HR Shortlisted
+                                            {{ $isRejected && $rejectedStage == 'hr' ? 'Rejected' : 'HR Shortlisted' }}
                                         </button>
                                     </h2>
                                     <div id="collapseTwo" class="accordion-collapse collapse"
@@ -250,17 +298,21 @@
                                     </div>
                                 </div>
                                 <div class="accordion-item
-                                      @foreach($ApplicantWiseStatusFinal as $status)
-                                            @if($status->status == "Round" || $status->status == "Complete")
+                                    @if($isRejected && $rejectedStage == 'interview')
+                                        rejected
+                                    @else
+                                        @foreach($ApplicantWiseStatusFinal as $status)
+                                            @if(in_array($status->status, ['Round', 'Complete', 'Selected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']))
                                                 active
                                             @endif
-                                    @endforeach
+                                        @endforeach
+                                    @endif
                                 ">
                                     <h2 class="accordion-header" id="headingThree">
                                         <button class="accordion-button collapsed" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#collapseThree"
                                             aria-expanded="false" aria-controls="collapseThree">
-                                            Interview
+                                            {{ $isRejected && $rejectedStage == 'interview' ? 'Rejected' : 'Interview' }}
                                         </button>
                                     </h2>
                                     <div id="collapseThree" class="accordion-collapse collapse"
@@ -287,10 +339,10 @@
 
                                                         // Determine current action button dynamically
                                                         foreach ($ApplicantWiseStatusFinal as $a) {
-                                                            // HR Shortlisted -> first round
+                                                            // Shortlisted -> show the round matching As_ApprovedBy
                                                             if($a->As_ApprovedBy != 0 && $a->status=="Sortlisted" && $Applicant_form_data->ApplicantStatus =="Sortlisted") {
-                                                                $firstRoundName = $InterViewRound[$roundKeys[0]] ?? 'HR';
-                                                                $interviewer = $firstRoundName . " Round";
+                                                                $currentRoundName = $InterViewRound[$a->As_ApprovedBy] ?? $InterViewRound[$roundKeys[0]] ?? 'HR';
+                                                                $interviewer = $currentRoundName . " Round";
                                                                 $isApprovedByHR=true;
                                                                 $rank='Round';
                                                                 break;
@@ -411,7 +463,7 @@
 
                                     </div>
                                 </div>
-                                <div class="accordion-item  @if($Applicant_form_data->ApplicantStatus == "Selected" &&  $Applicant_form_data->As_ApprovedBy == $finalRoundRank)active @endif ">
+                                <div class="accordion-item  @if(in_array($Applicant_form_data->ApplicantStatus, ['Selected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']))active @endif ">
                                     <h2 class="accordion-header" id="headingFour">
                                         <button class="accordion-button collapsed" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#collapseFour"
@@ -505,7 +557,13 @@
                             @if($Applicant_form_data->MeetingLink)
                             <tr>
                                 <th>Interview link:</th>
-                                <td><a href="{{ $Applicant_form_data->MeetingLink}}" class="a-link">{{ $Applicant_form_data->MeetingLink}}</a></td>
+                                <td>
+                                    @if($isHrDepartment)
+                                        <a href="{{ $Applicant_form_data->MeetingLink}}" class="a-link">{{ $Applicant_form_data->MeetingLink}}</a>
+                                    @else
+                                        <span class="text-muted"><i class="fa-solid fa-lock me-1"></i>Available after your round is scheduled</span>
+                                    @endif
+                                </td>
                             </tr>
                             @endif
                             @if($InterviewComments->isNotEmpty())
@@ -516,7 +574,7 @@
                                         <div class="tableUser-block mt-2">
                                             <div class="img-circle"><img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="user">
                                             </div>
-                                            <span class="userApplicants-btn">John Doe</span>
+                                            <span class="userApplicants-btn">{{ ucfirst($interview->interviewer_first_name ?? '') }} {{ ucfirst($interview->interviewer_last_name ?? '') }}</span>
                                             <div class="ms-2"><img src="{{ URL::asset('resorts_assets/images/thumbs-up.svg')}}" alt="icon">
                                             </div>
                                             <div class="ms-auto">
@@ -526,16 +584,28 @@
                                             </div>
                                         </div>
                                         <div class="userAppInt-commBlock">{{ $interview->Comments}} </div>
-                                        @if( $interview->status=="Round" || $interview->As_ApprovedBy==3 && $interview->status=="Complete")
+                                        @if( $interview->status=="Round" || $interview->status=="Sortlisted" || $interview->As_ApprovedBy==3 && $interview->status=="Complete")
                                         <div class="mb-2">
                                             <span class="text-medium">Scheduled Interview:</span>
                                             {{ $interview->InterViewDate}} -
                                             {{ $interview->ApplicantInterviewtime}}
                                         </div>
-                                        <div class="mb-2">
-                                            <a href="{{ $interview->MeetingLink}}" target="_blank" class="a-link">  {{ $interview->MeetingLink}}</a>
-                                        </div>
-                                        <a href="{{ $interview->MeetingLink}}" target="_blank" class="btn btn-themeSkyblue btn-sm">Join The Interview</a>
+                                        @if($interview->MeetingLink && $interview->MeetingLink != '0')
+                                            @if($isHrDepartment || $interview->As_ApprovedBy == $CurrentRank)
+                                                <div class="mb-2">
+                                                    <a href="{{ $interview->MeetingLink}}" target="_blank" class="a-link">{{ $interview->MeetingLink}}</a>
+                                                </div>
+                                                <a href="{{ $interview->MeetingLink}}" target="_blank" class="btn btn-themeSkyblue btn-sm">Join The Interview</a>
+                                            @else
+                                                <div class="mb-2">
+                                                    <span class="text-muted"><i class="fa-solid fa-lock me-1"></i>Meeting link not available for your round</span>
+                                                </div>
+                                            @endif
+                                        @else
+                                            <div class="mb-2">
+                                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Meeting link pending from HR</span>
+                                            </div>
+                                        @endif
                                         @endif
                                     </td>
                                 </tr>

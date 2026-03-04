@@ -85,8 +85,14 @@ class InterviewInvitationController extends Controller
 
         $interview->update($updateData);
 
+        // Refresh interview data after update
+        $interview->refresh();
+
         // Send notification email to interviewer
         $this->notifyInterviewer($interview, 'accepted');
+
+        // Send meeting link email to candidate
+        $this->sendMeetingLinkToCandidate($interview);
 
         return redirect()->route('resort.interview.invitation.show', $token)
             ->with('success', 'Interview invitation accepted successfully!');
@@ -178,6 +184,55 @@ class InterviewInvitationController extends Controller
             TaEmailSent::dispatch($interviewer->email, $subject, ['mainbody' => $body]);
         } catch (\Exception $e) {
             \Log::warning("Failed to notify interviewer: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send meeting link email to candidate after they accept the invitation
+     */
+    private function sendMeetingLinkToCandidate($interview)
+    {
+        try {
+            $applicant = Applicant_form_data::find($interview->Applicant_id);
+            if (!$applicant || !$applicant->email) {
+                return;
+            }
+
+            $resort = Resort::find($interview->resort_id);
+            $candidateName = ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name);
+            $interviewDate = Carbon::parse($interview->InterViewDate)->format('d M Y');
+            $resortName = $resort->resort_name ?? '';
+            $meetingLink = $interview->MeetingLink;
+
+            $meetingLinkHtml = '';
+            if ($meetingLink && $meetingLink != '0') {
+                $meetingLinkHtml = "<tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Meeting Link</td><td style='padding:8px;border:1px solid #ddd;'><a href='{$meetingLink}' target='_blank'>{$meetingLink}</a></td></tr>";
+            }
+
+            $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
+                ->where('vacancies.id', $applicant->Parent_v_id ?? 0)
+                ->value('t1.position_title');
+
+            $subject = "Interview Confirmed - {$resortName}";
+            $body = "
+                <p>Dear {$candidateName},</p>
+                <p>Thank you for accepting the interview invitation. Your interview has been confirmed.</p>
+                <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Position</td><td style='padding:8px;border:1px solid #ddd;'>" . ($vacancy ?? '-') . "</td></tr>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Interview Date</td><td style='padding:8px;border:1px solid #ddd;'>{$interviewDate}</td></tr>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Your Time</td><td style='padding:8px;border:1px solid #ddd;'>{$interview->ApplicantInterviewtime}</td></tr>
+                    {$meetingLinkHtml}
+                </table>
+                <p>Please join the meeting at the scheduled time using the link above.</p>
+                <p>&nbsp;</p>
+                <p>Regards,</p>
+                <p>HR Team</p>
+                <p>{$resortName}</p>
+            ";
+
+            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+        } catch (\Exception $e) {
+            \Log::warning("Failed to send meeting link to candidate: " . $e->getMessage());
         }
     }
 }

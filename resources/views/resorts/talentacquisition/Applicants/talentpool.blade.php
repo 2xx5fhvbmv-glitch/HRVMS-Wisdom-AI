@@ -140,7 +140,7 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Data Retention Expiry Date</label>
-                            <input type="date" class="form-control" name="consent_expiry_date" required min="{{ date('Y-m-d') }}">
+                            <input type="text" class="form-control" name="consent_expiry_date" id="consent_expiry_date" placeholder="DD/MM/YYYY" required readonly>
                         </div>
                         <p class="text-muted small">An email will be sent to the applicant requesting their consent to retain their profile data until the selected date.</p>
                         <input type="hidden" name="applicant_id" id="consent_applicant_id">
@@ -222,6 +222,12 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
+
+        $('#consent_expiry_date').datepicker({
+            format: 'dd/mm/yyyy',
+            autoclose: true,
+            startDate: 'today',
+        });
 
         $('.search').on('keyup', function() {
 
@@ -713,10 +719,19 @@
         var $submitBtn = $(this).find('button[type="submit"]');
         $submitBtn.prop('disabled', true).text('Sending...');
 
+        // Convert dd/mm/yyyy to yyyy-mm-dd for backend
+        var formData = $(this).serializeArray();
+        formData.forEach(function(field) {
+            if (field.name === 'consent_expiry_date' && field.value) {
+                var parts = field.value.split('/');
+                field.value = parts[2] + '-' + parts[1] + '-' + parts[0];
+            }
+        });
+
         $.ajax({
             url: "{{ route('resort.ta.sendConsentRequest') }}",
             type: "POST",
-            data: $(this).serialize(),
+            data: formData,
             success: function(response) {
                 if (response.success) {
                     toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });

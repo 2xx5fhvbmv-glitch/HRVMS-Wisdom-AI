@@ -50,6 +50,11 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
   Route::get('/consent/{token}', ['App\Http\Controllers\Resorts\ConsentResponseController','show'])->name('resort.consent.show');
   Route::post('/consent/{token}/approve', ['App\Http\Controllers\Resorts\ConsentResponseController','approve'])->name('resort.consent.approve');
   Route::post('/consent/{token}/reject', ['App\Http\Controllers\Resorts\ConsentResponseController','reject'])->name('resort.consent.reject');
+
+  // Availability - Public (no auth)
+  Route::get('/availability/{token}', ['App\Http\Controllers\Resorts\AvailabilityResponseController','show'])->name('resort.availability.show');
+  Route::post('/availability/{token}/available', ['App\Http\Controllers\Resorts\AvailabilityResponseController','available'])->name('resort.availability.available');
+  Route::post('/availability/{token}/unavailable', ['App\Http\Controllers\Resorts\AvailabilityResponseController','unavailable'])->name('resort.availability.unavailable');
 });
 
 /*** Admin Authenticated Routes ***/

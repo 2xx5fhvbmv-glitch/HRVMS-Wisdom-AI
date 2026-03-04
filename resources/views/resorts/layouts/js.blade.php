@@ -18,6 +18,7 @@
 <script src="{{ URL::asset('resorts_assets/js/bootstrap-datepicker.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/select2.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/moment.min.js')}}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.45/moment-timezone-with-data.min.js"></script>
 <script src="{{ URL::asset('resorts_assets/js/fullcalendar.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/daterangepicker.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/OrgChart.js')}}"></script>

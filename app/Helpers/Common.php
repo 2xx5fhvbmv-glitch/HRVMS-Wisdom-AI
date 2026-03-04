@@ -2077,8 +2077,7 @@ class Common
                                     FROM applicant_wise_statuses
                                     WHERE Applicant_id = t9.id
                                 )')
-                                ->whereIn('t10.status', ['Sortlisted', 'Complete'])
-                                ->where('t10.As_ApprovedBy', '!=', 0);
+                                ->whereIn('t10.status', ['Sortlisted By Wisdom AI', 'Sortlisted', 'Complete']);
 
 
                 })
