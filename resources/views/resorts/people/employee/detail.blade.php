@@ -263,7 +263,7 @@
                                                             <tr>
                                                                 <th>Religion:</th>
                                                                 <td>
-                                                                    <span class="view-mode">{{$employee->religion == 0 ? "Non-Muslim" : "Muslim"}}</span>
+                                                                    <span class="view-mode">{{ ($employee->religion === null || $employee->religion === '') ? "N/A" : ($employee->religion === '0' ? "Non-Muslim" : "Muslim") }}</span>
                                                                     <select name="religion" class="form-select edit-mode d-none" required>
                                                                         <option value="">Select Religion</option>
                                                                         <option {{$employee->religion == 1 ? "Selected" : ""}} value="1">Muslim</option>
@@ -722,7 +722,7 @@
                                                             <tr>
                                                                 <th>Joining date:</th>
                                                                  <td>
-                                                                    @if(!empty($employee->joining_date) && strtotime($employee->joining_date))
+                                                                    @if(!empty($employee->joining_date) && $employee->joining_date !== '0000-00-00' && strtotime($employee->joining_date) && strtotime($employee->joining_date) > 0)
                                                                         <span class="view-mode">
                                                                             {{ \Carbon\Carbon::parse($employee->joining_date)->format('d M Y') }}
                                                                             ({{ \Carbon\Carbon::parse($employee->joining_date)->age }} years)

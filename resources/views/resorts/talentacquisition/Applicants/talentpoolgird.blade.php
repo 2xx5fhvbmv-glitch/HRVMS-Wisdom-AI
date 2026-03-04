@@ -17,7 +17,7 @@
             <div class="img-circle"><img src="{{ URL::asset($a->passport_photo) }}" alt="image"></div>
             <h6>{{ ucfirst($a->first_name) }} {{ ucfirst($a->last_name) }}</h6>
             <p>{{ ucfirst($a->position_title) }}</p>
-            <a href="#" class="a-link text-success">Check Availability</a>
+            <a href="javascript:void(0)" class="a-link text-success checkAvailabilityBtn" data-id="{{ base64_encode($a->id) }}">Check Availability</a>
             <div class="bg">
                 <div>
                     <p>AI Ranking</p>
@@ -42,14 +42,22 @@
                     </tr>
                     <tr>
                         <th>Consent Expiry Date:</th>
-                        <td>{{ $a->data_retention_month }} M/{{ $a->data_retention_year }} Y</td>
+                        <td>
+                            @if($a->consent_expiry_date && $a->consent_status === 'approved')
+                                {{ \Carbon\Carbon::parse($a->consent_expiry_date)->format('d-m-Y') }}
+                            @elseif($a->consent_expiry_date && $a->consent_status === 'pending')
+                                {{ \Carbon\Carbon::parse($a->consent_expiry_date)->format('d-m-Y') }} <span class="badge bg-warning text-dark">Pending</span>
+                            @else
+                                {{ $a->data_retention_month }} M/{{ $a->data_retention_year }} Y
+                            @endif
+                        </td>
                     </tr>
 
                 </tbody>
             </table>
 
             <div>
-                <a href="mailto:{{ $a->email }}" class="btn btn-themeSkyblue btn-sm">Consent Request</a>
+                <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendConsentRequestBtn" data-id="{{ base64_encode($a->id) }}">Consent Request</a>
             </div>
         </div>
     </div>

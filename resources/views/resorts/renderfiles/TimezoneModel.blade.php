@@ -59,14 +59,18 @@
 <p>or</p>
 <div class="row">
     <div class="col-md-6">
-        <input type="hidden" class="form-control" name="MalidivanManualTime1" placeholder="Malidivan Add Manual Time" />
-        <input type="time" class="form-control" name="MalidivanManualTime" placeholder="Malidivan Add Manual Time" />
+        <label class="form-label mb-1">Your Time</label>
+        <input type="hidden" class="form-control" name="MalidivanManualTime1" />
+        <input type="time" class="form-control" name="MalidivanManualTime" />
     </div>
     <div class="col-md-6">
-        <input type="hidden" class="form-control" name="ApplicantManualTime1" placeholder="Malidivan Add Manual Time" />
-        <input type="time" class="form-control" name="ApplicantManualTime" placeholder="Applicant Add Manual Time" />
+        <label class="form-label mb-1">Applicant's Time</label>
+        <input type="hidden" class="form-control" name="ApplicantManualTime1" />
+        <input type="time" class="form-control" name="ApplicantManualTime" readonly style="background-color: #e9ecef;" />
     </div>
 </div>
+<input type="hidden" id="resortTimezone" value="{{ $ResortTimeZone }}">
+<input type="hidden" id="applicantTimezone" value="{{ $applicantTimeZone }}">
 
 <input type="hidden" name="Round" value="{{$Round}}">
 <input type="hidden" name="InterviewType" value="{{$InterviewType}}">

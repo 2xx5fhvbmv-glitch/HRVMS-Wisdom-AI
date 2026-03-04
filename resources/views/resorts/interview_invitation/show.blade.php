@@ -126,13 +126,6 @@
                         </label>
                     @endforeach
 
-                    @if($interview->MeetingLink && $interview->MeetingLink != '0')
-                    <div class="detail-row">
-                        <span class="detail-label">Meeting Link</span>
-                        <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
-                    </div>
-                    @endif
-
                     <div class="action-buttons">
                         <button type="submit" class="btn-accept">Accept Selected Time</button>
                         <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
@@ -149,13 +142,6 @@
                     <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
                 </div>
 
-                @if($interview->MeetingLink && $interview->MeetingLink != '0')
-                <div class="detail-row">
-                    <span class="detail-label">Meeting Link</span>
-                    <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
-                </div>
-                @endif
-
                 @if($status === 'Invitation Sent')
                     <div class="action-buttons">
                         <form action="{{ route('resort.interview.invitation.accept', $token) }}" method="POST">
@@ -165,36 +151,6 @@
                         <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
                     </div>
                 @endif
-            @endif
-
-            {{-- Show accepted time if already booked --}}
-            @if($status === 'Slot Booked')
-                <div class="detail-row">
-                    <span class="detail-label">Resort Time</span>
-                    <span class="detail-value">{{ $interview->ResortInterviewtime }}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Your Local Time</span>
-                    <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
-                </div>
-                @if($interview->MeetingLink && $interview->MeetingLink != '0')
-                <div class="detail-row">
-                    <span class="detail-label">Meeting Link</span>
-                    <span class="detail-value"><a href="{{ $interview->MeetingLink }}" target="_blank">Join Meeting</a></span>
-                </div>
-                @endif
-            @endif
-
-            {{-- Show times if rejected --}}
-            @if($status === 'Invitation Rejected')
-                <div class="detail-row">
-                    <span class="detail-label">Resort Time</span>
-                    <span class="detail-value">{{ $interview->ResortInterviewtime }}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Your Local Time</span>
-                    <span class="detail-value">{{ $interview->ApplicantInterviewtime }}</span>
-                </div>
             @endif
 
             {{-- Decline Form (shown for both single and multi-slot) --}}

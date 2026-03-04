@@ -432,11 +432,37 @@ $(document).on("click", ".row_time:not(.disable)", function(e) {
 });
 
 // Clear selected slots when manual time is focused
-$(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTime"]', function () {
+$(document).on("focus", '[name="MalidivanManualTime"]', function () {
     $(".row_time").removeClass("active");
     $(".row_time .Timezone_checkBox").prop("checked", false);
     $("#ResortInterviewtime_collected").val('');
     $("#ApplicantInterviewtime_collected").val('');
+});
+
+$(document).on("change", '[name="MalidivanManualTime"]', function () {
+    const timeValue = $(this).val();
+    if (timeValue) {
+        const resortTz = $('#resortTimezone').val();
+        const applicantTz = $('#applicantTimezone').val();
+
+        const [hours, minutes] = timeValue.split(":");
+        const period = hours >= 12 ? "PM" : "AM";
+        const formattedHours = hours % 12 || 12;
+        let MalidivanManualTime1 = formattedHours + ":" + minutes + " " + period;
+        $('[name="MalidivanManualTime1"]').val(MalidivanManualTime1);
+
+        var resortMoment = moment.tz(timeValue, 'HH:mm', resortTz);
+        var applicantMoment = resortMoment.clone().tz(applicantTz);
+        var applicantTime24 = applicantMoment.format('HH:mm');
+        var applicantTime12 = applicantMoment.format('h:mm A');
+
+        $('[name="ApplicantManualTime"]').val(applicantTime24);
+        $('[name="ApplicantManualTime1"]').val(applicantTime12);
+    } else {
+        $('[name="ApplicantManualTime"]').val('');
+        $('[name="ApplicantManualTime1"]').val('');
+        $('[name="MalidivanManualTime1"]').val('');
+    }
 });
         $('#respond-HoldModel').on('shown.bs.modal', function () {
             $('#calendarModal').fullCalendar('render');
@@ -574,34 +600,29 @@ $(document).on("focus", '[name="MalidivanManualTime"], [name="ApplicantManualTim
 
         $('#TimeSlotsForm').validate({
             rules: {
+                MeetingLink: {
+                    required: true,
+                },
                 "SlotBook[]": {
                     required: function () {
-                        return (
-                            $('[name="MalidivanManualTime"]').val().trim() === "" &&
-                            $('[name="ApplicantManualTime"]').val().trim() === ""
-                        );
+                        return $('[name="MalidivanManualTime"]').val().trim() === "";
                     },
                 },
                 MalidivanManualTime: {
-                    required: function () {
-                        return $('[name="SlotBook[]"]:checked').length === 0;
-                    },
-                },
-                ApplicantManualTime: {
                     required: function () {
                         return $('[name="SlotBook[]"]:checked').length === 0;
                     },
                 },
             },
             messages: {
+                MeetingLink: {
+                    required: "Please enter a Meeting Link.",
+                },
                 "SlotBook[]": {
                     required: "Please select a valid time slot or enter a manual time.",
                 },
                 MalidivanManualTime: {
-                    required: "Please enter Malidivan Manual Time or select a valid time slot.",
-                },
-                ApplicantManualTime: {
-                    required: "Please enter Applicant Manual Time or select a valid time slot.",
+                    required: "Please enter your time or select a valid time slot.",
                 },
             },
             errorPlacement: function(error, element) {

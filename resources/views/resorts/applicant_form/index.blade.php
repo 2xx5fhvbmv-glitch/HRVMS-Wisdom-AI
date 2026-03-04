@@ -215,7 +215,7 @@
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="passport_expiry_date" class="form-label">PASSPORT EXPIRY DATE<span class="red-mark">*</span></label>
-                                    <input type="text" name="passport_expiry_date" class="form-control datepicker" id="passport_expiry_date" placeholder="Passport Expiry Date" required data-parsley-trigger="change"/>
+                                    <input type="text" name="passport_expiry_date" class="form-control datepicker" id="passport_expiry_date" placeholder="Passport Expiry Date" required data-parsley-trigger="change" readonly data-parsley-futuredate="true"/>
                                 </div>
                             </div>
                         </div>
@@ -272,13 +272,13 @@
                                     <label for="txt-start-date" class="form-label">START DATE<span class="red-mark">*</span></label>
                                     <input type="text" class="form-control datepicker txt-start-date" id="txt-start-date"
                                         placeholder="DD/MM/YYYY" name="work_start_date[]" data-parsley-required="true"
-                                        data-parsley-trigger="change" data-parsley-date-format="dd/mm/yyyy">
+                                        data-parsley-trigger="change" data-parsley-date-format="dd/mm/yyyy" readonly data-parsley-pastdate="true">
                                 </div>
                                 <div class="col-lg-3 col-md-6">
                                     <label for="txt-end-date" class="form-label">END DATE<span class="red-mark">*</span></label>
                                     <input type="text" class="form-control datepicker txt-end-date Enddate_0" id="txt-end-date"
                                         placeholder="DD/MM/YYYY" name="work_end_date[]" disabled
-                                        data-parsley-date-format="dd/mm/yyyy" data-parsley-trigger="change"  data-parsley-endgreaterthanstart="#txt-start-date" >
+                                        data-parsley-date-format="dd/mm/yyyy" data-parsley-trigger="change"  data-parsley-endgreaterthanstart="#txt-start-date" readonly data-parsley-pastdate="true">
                                 </div>
                                 <div class="col-lg-6">
                                     <label for="txt-job-description" class="form-label">JOB DESCRIPTION</label>
@@ -1081,11 +1081,11 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <label for="txt-start-date-${uniqueId}" class="form-label">START DATE<span class="red-mark">*</span></label>
-                    <input type="text" class="form-control datepicker txt-start-date" id="txt-start-date-${uniqueId}" placeholder="DD/MM/YYYY" name="work_start_date[]" data-parsley-required="true" data-parsley-trigger="change">
+                    <input type="text" class="form-control datepicker txt-start-date" id="txt-start-date-${uniqueId}" placeholder="DD/MM/YYYY" name="work_start_date[]" data-parsley-required="true" data-parsley-trigger="change" readonly data-parsley-pastdate="true">
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <label for="txt-end-date-${uniqueId}" class="form-label">END DATE</label>
-                    <input type="text" class="form-control datepicker txt-end-date" id="txt-end-date-${uniqueId}" placeholder="DD/MM/YYYY" name="work_end_date[]" data-parsley-endgreaterthanstart="#txt-start-date-${uniqueId}">
+                    <input type="text" class="form-control datepicker txt-end-date" id="txt-end-date-${uniqueId}" placeholder="DD/MM/YYYY" name="work_end_date[]" data-parsley-endgreaterthanstart="#txt-start-date-${uniqueId}" readonly data-parsley-pastdate="true">
                 </div>
                 <div class="col-lg-6">
                     <label for="txt-job-description-${uniqueId}" class="form-label">JOB DESCRIPTION</label>
@@ -1645,6 +1645,30 @@
                     },
                     messages: {
                         en: 'Invalid email address'
+                    }
+                });
+
+                window.Parsley.addValidator('futuredate', {
+                    validateString: function (value) {
+                        const date = moment(value, 'DD/MM/YYYY', true);
+                        if (!date.isValid()) return true;
+                        var today = moment().startOf('day');
+                        return date.isAfter(today) || date.isSame(today, 'day');
+                    },
+                    messages: {
+                        en: 'Date must be today or a future date.'
+                    }
+                });
+
+                window.Parsley.addValidator('pastdate', {
+                    validateString: function (value) {
+                        const date = moment(value, 'DD/MM/YYYY', true);
+                        if (!date.isValid()) return true;
+                        var today = moment().startOf('day');
+                        return date.isBefore(today) || date.isSame(today, 'day');
+                    },
+                    messages: {
+                        en: 'Date must be today or a past date.'
                     }
                 });
 

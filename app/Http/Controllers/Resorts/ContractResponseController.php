@@ -11,6 +11,7 @@ use App\Models\Resort;
 use App\Models\ResortAdmin;
 use App\Models\Employee;
 use App\Helpers\Common;
+use App\Jobs\TaEmailSent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -84,6 +85,9 @@ class ContractResponseController extends Controller
             // Auto-create employee
             $this->createEmployeeFromApplicant($contract);
 
+            // Send contract email with download link
+            $this->sendContractEmail($contract);
+
             DB::commit();
 
             return redirect()->route('resort.contract.show', $token)
@@ -140,8 +144,54 @@ class ContractResponseController extends Controller
         $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
             ->leftJoin('resort_departments as t2', 't2.id', '=', 't1.dept_id')
             ->where('vacancies.id', $applicant->Parent_v_id)
-            ->selectRaw('t1.id as position_id, t1.rank as position_rank, t2.id as dept_id, vacancies.reporting_to')
+            ->selectRaw('t1.id as position_id, t1.Rank as position_rank, t2.id as dept_id, t2.division_id, vacancies.reporting_to')
             ->first();
+
+        // Generate Employee ID (DR-{next number})
+        $maxEmpNum = DB::table('employees')
+            ->where('resort_id', $contract->resort_id)
+            ->where('Emp_id', 'like', 'DR-%')
+            ->selectRaw("MAX(CAST(SUBSTRING(Emp_id, 4) AS UNSIGNED)) as max_num")
+            ->value('max_num');
+        $empId = 'DR-' . (($maxEmpNum ?? 0) + 1);
+
+        // Look up country name for nationality
+        $countryName = DB::table('countries')->where('id', $applicant->country)->value('name');
+
+        // Validate joining date
+        $joiningDate = null;
+        if ($applicant->Joining_availability) {
+            try {
+                $joiningDate = Carbon::parse($applicant->Joining_availability)->format('Y-m-d');
+                if ($joiningDate === '0000-00-00' || $joiningDate === '-0001-11-30') {
+                    $joiningDate = null;
+                }
+            } catch (\Exception $e) {
+                $joiningDate = null;
+            }
+        }
+
+        // Get basic salary and allowances from budget/existing employees
+        $vacantBudget = DB::table('resort_vacant_budget_costs')
+            ->where('position_id', $vacancy->position_id ?? 0)
+            ->where('resort_id', $contract->resort_id)
+            ->first();
+        $basicSalary = ($vacantBudget && $vacantBudget->basic_salary > 0) ? $vacantBudget->basic_salary : null;
+        $salaryCurrency = 'USD';
+
+        // If vacant budget has no salary, check existing employees in same position
+        $referenceEmployee = null;
+        if (!$basicSalary) {
+            $referenceEmployee = Employee::where('Position_id', $vacancy->position_id ?? 0)
+                ->where('resort_id', $contract->resort_id)
+                ->where('status', 'Active')
+                ->where('basic_salary', '>', 0)
+                ->first();
+            if ($referenceEmployee) {
+                $basicSalary = $referenceEmployee->basic_salary;
+                $salaryCurrency = $referenceEmployee->basic_salary_currency ?? 'USD';
+            }
+        }
 
         // Generate password
         $plainPassword = Common::generateUniquePassword(8);
@@ -159,7 +209,10 @@ class ContractResponseController extends Controller
             'address_line_2' => $applicant->address_line_two,
             'city' => $applicant->city,
             'state' => $applicant->state,
-            'country' => $applicant->country,
+            'country' => $countryName ?? $applicant->country,
+            'type' => 'sub',
+            'is_employee' => 1,
+            'is_master_admin' => 0,
             'status' => 'Active',
         ]);
 
@@ -167,18 +220,23 @@ class ContractResponseController extends Controller
         $employee = Employee::create([
             'Admin_Parent_id' => $resortAdmin->id,
             'resort_id' => $contract->resort_id,
+            'Emp_id' => $empId,
             'title' => $applicant->gender == 'male' ? 'Mr.' : 'Ms.',
             'is_employee' => 1,
             'Dept_id' => $vacancy->dept_id ?? null,
             'Position_id' => $vacancy->position_id ?? null,
+            'division_id' => $vacancy->division_id ?? null,
             'rank' => $vacancy->position_rank ?? null,
             'reporting_to' => $vacancy->reporting_to ?? null,
-            'nationality' => $applicant->country,
+            'benefit_grid_level' => $vacancy->position_rank ?? null,
+            'nationality' => $countryName ?? $applicant->country,
             'dob' => $applicant->dob,
             'marital_status' => $applicant->marital_status,
             'passport_number' => $applicant->passport_no,
-            'joining_date' => $applicant->Joining_availability,
-            'present_address' => trim(($applicant->address_line_one ?? '') . ', ' . ($applicant->address_line_two ?? '') . ', ' . ($applicant->city ?? '') . ', ' . ($applicant->state ?? '') . ', ' . ($applicant->pin_code ?? '') . ', ' . ($applicant->country ?? ''), ', '),
+            'joining_date' => $joiningDate,
+            'basic_salary' => $basicSalary,
+            'basic_salary_currency' => $salaryCurrency,
+            'present_address' => trim(($applicant->address_line_one ?? '') . ', ' . ($applicant->address_line_two ?? '') . ', ' . ($applicant->city ?? '') . ', ' . ($applicant->state ?? '') . ', ' . ($applicant->pin_code ?? '') . ', ' . ($countryName ?? ''), ', '),
             'status' => 'Active',
             'created_by' => $contract->sent_by,
             'modified_by' => $contract->sent_by,
@@ -232,8 +290,136 @@ class ContractResponseController extends Controller
             ]);
         }
 
+        // Transfer budget data from vacant position to employee
+        $budgetTransferred = false;
+        if ($vacantBudget) {
+            $allVacantConfigs = DB::table('resort_vacant_budget_cost_configurations')
+                ->where('vacant_budget_cost_id', $vacantBudget->id)
+                ->get();
+
+            if ($allVacantConfigs->isNotEmpty()) {
+                $budgetTransferred = true;
+                // Copy all vacant budget configs to employee budget configs
+                foreach ($allVacantConfigs as $config) {
+                    DB::table('resort_employee_budget_cost_configurations')->insert([
+                        'employee_id' => $employee->id,
+                        'resort_budget_cost_id' => $config->resort_budget_cost_id,
+                        'value' => $config->value,
+                        'currency' => $config->currency ?? 'USD',
+                        'hours' => $config->hours ?? 0,
+                        'department_id' => $config->department_id,
+                        'position_id' => $config->position_id,
+                        'resort_id' => $config->resort_id,
+                        'year' => $config->year,
+                        'month' => $config->month,
+                        'basic_salary' => $basicSalary,
+                        'current_salary' => $vacantBudget->current_salary ?? 0,
+                        'created_by' => $contract->sent_by,
+                        'modified_by' => $contract->sent_by,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                // Create employee allowance records from current month's budget configs
+                $currentMonthConfigs = $allVacantConfigs->where('month', Carbon::now()->month);
+                foreach ($currentMonthConfigs as $config) {
+                    DB::table('employees_allowance')->insert([
+                        'employee_id' => $employee->id,
+                        'allowance_id' => $config->resort_budget_cost_id,
+                        'amount' => $config->value,
+                        'amount_unit' => $config->currency ?? 'USD',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        // If no budget configs found, copy from existing employee in same position
+        if (!$budgetTransferred && $referenceEmployee) {
+            // Copy budget cost configurations
+            $refConfigs = DB::table('resort_employee_budget_cost_configurations')
+                ->where('employee_id', $referenceEmployee->id)
+                ->where('year', Carbon::now()->year)
+                ->get();
+
+            foreach ($refConfigs as $config) {
+                DB::table('resort_employee_budget_cost_configurations')->insert([
+                    'employee_id' => $employee->id,
+                    'resort_budget_cost_id' => $config->resort_budget_cost_id,
+                    'value' => $config->value,
+                    'currency' => $config->currency ?? 'USD',
+                    'hours' => $config->hours ?? 0,
+                    'department_id' => $config->department_id,
+                    'position_id' => $config->position_id,
+                    'resort_id' => $config->resort_id,
+                    'year' => $config->year,
+                    'month' => $config->month,
+                    'basic_salary' => $basicSalary,
+                    'current_salary' => $basicSalary,
+                    'created_by' => $contract->sent_by,
+                    'modified_by' => $contract->sent_by,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Copy allowances from reference employee
+            $refAllowances = DB::table('employees_allowance')
+                ->where('employee_id', $referenceEmployee->id)
+                ->get();
+
+            foreach ($refAllowances as $allowance) {
+                DB::table('employees_allowance')->insert([
+                    'employee_id' => $employee->id,
+                    'allowance_id' => $allowance->allowance_id,
+                    'amount' => $allowance->amount,
+                    'amount_unit' => $allowance->amount_unit,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
         // Send welcome email with credentials
         $this->sendWelcomeEmail($applicant, $resort, $plainPassword);
+    }
+
+    private function sendContractEmail($contract)
+    {
+        try {
+            $applicant = Applicant_form_data::find($contract->applicant_id);
+            if (!$applicant || !$applicant->email) return;
+
+            $resort = Resort::find($contract->resort_id);
+            $candidateName = ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name);
+            $resortName = $resort->resort_name ?? '';
+            $downloadLink = asset('storage/' . $contract->file_path);
+
+            $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
+                ->where('vacancies.id', $applicant->Parent_v_id ?? 0)
+                ->value('t1.position_title');
+
+            $subject = "Your Employment Contract - {$resortName}";
+            $body = "
+                <p>Dear {$candidateName},</p>
+                <p>Thank you for accepting the contract. Please find your employment contract below.</p>
+                <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Position</td><td style='padding:8px;border:1px solid #ddd;'>" . ($vacancy ?? '-') . "</td></tr>
+                    <tr><td style='padding:8px;border:1px solid #ddd;font-weight:600;'>Resort</td><td style='padding:8px;border:1px solid #ddd;'>{$resortName}</td></tr>
+                </table>
+                <p><a href='{$downloadLink}' target='_blank' style='display:inline-block;padding:12px 24px;background:#004552;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;'>Download Contract</a></p>
+                <p>&nbsp;</p>
+                <p>Regards,</p>
+                <p>HR Team</p>
+                <p>{$resortName}</p>
+            ";
+
+            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+        } catch (\Exception $e) {
+            \Log::warning("Failed to send contract email: " . $e->getMessage());
+        }
     }
 
     private function sendWelcomeEmail($applicant, $resort, $password)
