@@ -42,7 +42,15 @@ class FinalSettlementService
             ->whereBetween('date', [$payrollStart, $lastDay])
             ->get();
 
-        $daysWorked = $attendance->where('Status', 'Present')->count();
+        // Present = has check-in; count unique days (multiple shifts same day count once)
+        $presentWithCheckIn = $attendance->filter(function ($r) {
+            $t = $r->CheckingTime ?? '';
+            $t = is_object($t) ? (string) $t : trim((string) $t);
+            return $r->Status === 'Present' && $t !== '' && !in_array($t, ['00:00', '00:00:00']);
+        });
+        $daysWorked = $presentWithCheckIn->pluck('date')->map(function ($d) {
+            return is_object($d) ? $d->format('Y-m-d') : $d;
+        })->unique()->count();
         $totalDays = $payrollEnd->diffInDays($payrollStart) + 1;
 
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();

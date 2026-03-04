@@ -326,22 +326,33 @@
                                             @foreach ($attandanceregister as $a)
                                                 @php
                                                     $RosterInternalDataMonth = Common::GetAttandanceRegister($resort_id, $a->duty_roster_id, $a->emp_id, $WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth, "Monthwise");
-                                                    $presentCountRow = 0;
-                                                    $absentCountRow = 0;
-                                                    $dayOffCountRow = 0;
+                                                    $presentDates = [];
+                                                    $absentDates = [];
+                                                    $dayOffDates = [];
                                                     foreach ($RosterInternalDataMonth as $sd) {
+                                                        if (!isset($sd->date)) continue;
+                                                        $d = is_object($sd->date) ? $sd->date->format('Y-m-d') : $sd->date;
+                                                        $hasCheckIn = !empty($sd->CheckingTime) && trim($sd->CheckingTime ?? '') !== '' && !in_array(trim($sd->CheckingTime ?? ''), ['00:00', '00:00:00']);
                                                         if (isset($sd->Status)) {
-                                                            if ($sd->Status == 'Present' && !empty($sd->CheckingTime)) $presentCountRow++;
-                                                            elseif ($sd->Status == 'Absent') $absentCountRow++;
-                                                            elseif ($sd->Status == 'DayOff') $dayOffCountRow++;
+                                                            if ($sd->Status == 'Present' && $hasCheckIn) $presentDates[$d] = true;
+                                                            elseif ($sd->Status == 'Absent' && !$hasCheckIn) $absentDates[$d] = true;
+                                                            elseif ($sd->Status == 'DayOff') $dayOffDates[$d] = true;
                                                         }
                                                     }
+                                                    $presentCountRow = count($presentDates);
+                                                    $absentCountRow = count($absentDates);
+                                                    $dayOffCountRow = count($dayOffDates);
                                                 @endphp
                                                 <tr>
                                                     <td class="employee-col">
-                                                        <div class="employee-info">
-                                                            <strong>{{ $a->EmployeeName }}</strong>
-                                                            <small class="text-muted d-block">{{ $a->Position }}</small>
+                                                        <div class="employee-info d-flex align-items-center gap-2">
+                                                            <div class="img-circle flex-shrink-0">
+                                                                <img src="{{ $a->profileImg ?? asset(config('settings.default_picture', 'admin_assets/files/user-image.png')) }}" alt="{{ $a->EmployeeName }}">
+                                                            </div>
+                                                            <div>
+                                                                <strong>{{ $a->EmployeeName }}</strong>
+                                                                <small class="text-muted d-block">{{ $a->Position }}</small>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     @foreach ($monthwiseheaders as $h)
@@ -486,15 +497,24 @@
                             $totalOtHours += (int)$Othours + ((int)$Otminutes / 60);
                         }
                     }
+                    $presentDates = [];
+                    $absentDates = [];
+                    $leaveDates = [];
                     foreach ($RosterInternalDataMonth as $shiftData) {
-                        if ($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
-                            $presentCount++;
-                        } elseif ($shiftData->Status == "Absent") {
-                            $absentCount++;
+                        $d = isset($shiftData->date) ? (is_object($shiftData->date) ? $shiftData->date->format('Y-m-d') : $shiftData->date) : null;
+                        if (!$d) continue;
+                        $hasCheckIn = !empty($shiftData->CheckingTime) && trim($shiftData->CheckingTime ?? '') !== '' && !in_array(trim($shiftData->CheckingTime ?? ''), ['00:00', '00:00:00']);
+                        if ($shiftData->Status == "Present" && $hasCheckIn) {
+                            $presentDates[$d] = true;
+                        } elseif ($shiftData->Status == "Absent" && !$hasCheckIn) {
+                            $absentDates[$d] = true;
                         } elseif (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData) && !empty($shiftData->LeaveData)) {
-                            $leaveCount++;
+                            $leaveDates[$d] = true;
                         }
                     }
+                    $presentCount = count($presentDates);
+                    $absentCount = count($absentDates);
+                    $leaveCount = count($leaveDates);
                 @endphp
                 <div class="employee-card mb-3" data-employee-id="{{ $a->emp_id }}">
                     <div class="employee-card-header" onclick="toggleEmployeeDetails({{ $a->emp_id }})">

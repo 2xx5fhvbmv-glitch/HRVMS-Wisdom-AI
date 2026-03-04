@@ -164,7 +164,8 @@
                                         <h3 class="text-nowrap">Leave Requests</h3>
                                     </div>
                                     <div class="col-auto">
-                                        <!-- <div class="form-group">
+                                        @if($show_department_filter ?? false)
+                                        <div class="form-group">
                                             <select id="department-filter" class="form-select select2t-none" aria-label="Default select example">
                                                 <option value="">All Departments</option>
                                                 @if($resort_departments)
@@ -173,7 +174,8 @@
                                                     @endforeach
                                                 @endif
                                             </select>
-                                        </div> -->
+                                        </div>
+                                        @endif
                                     </div>
                                     <div class="col-auto"><a href="{{route('leave.request')}}" class="a-link">View All</a></div>
                                 </div>
@@ -199,7 +201,7 @@
                         </div>
                     </div>
 
-                    <div class="col-lg-6">
+                    <div class="col-lg-4" style="max-height: 450px;">
                         <div class="card card-wiINsight">
                             <div class="card-title">
                                 <h3>AI Insight's</h3>
@@ -217,7 +219,6 @@
                                     </div>
                                     <div>
                                         <a href="#" class="a-linkTheme">View Details</a>
-                                        <a href="#" class="a-link">Request Leave</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -249,8 +250,60 @@
                             </div>
                         </div>
                     </div>
+                    <div class="col-xl-4" style="max-height: 450px;">
+                        <div class="card">
+                            <div class="card-title">
+                                <div class="row g-1">
+                                    <div class="col">
+                                        <h3>Upcoming Birthdays</h3>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="{{route('resort.upcomingBirthdays.list')}}" class="a-link">View all</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="leaveUser-main">
+                                <div class="leaveUser-bgBlock">
+                                    <h6>Today</h6>
+                                </div>
+                                @if($todayBirthdays)
+                                    @foreach($todayBirthdays as $employee)
+                                        <div class="leaveUser-block">
+                                            <div class="img-circle">
+                                                <img src="{{ $employee->profile_picture }}" alt="image">
+                                            </div>
+                                            <div>
+                                                <h6>{{ $employee->resortAdmin->first_name }} {{ $employee->resortAdmin->last_name }}</h6>
+                                                <p>{{ $employee->position->position_title }}</p>
+                                                <div class="d-flex">
+                                                    <a href="#" class="a-linkTheme">Send Message</a>
+                                                    <a href="#" class="a-link notify-birthday" data-employee-id="{{ $employee->id }}">Notify All Employees</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                @endif
+                                <div class="leaveUser-bgBlock">
+                                    <h6>Tomorrow</h6>
+                                </div>
+                                @if($tomorrowBirthdays)
+                                    @foreach($tomorrowBirthdays as $employee)
+                                        <div class="leaveUser-block">
+                                            <div class="img-circle">
+                                                <img src="{{ $employee->profile_picture }}" alt="image">
+                                            </div>
+                                            <div>
+                                                <h6>{{ $employee->resortAdmin->first_name }} {{ $employee->resortAdmin->last_name }}</h6>
+                                                <p>{{ $employee->position->position_title }}</p>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
 
-                    <div class="col-lg-6">
+                    <div class="col-lg-4" style="max-height: 450px;">
                         <div class="card card-upcomingLeve">
                             <div class="card-title">
                                 <div class="row g-1">
@@ -422,8 +475,8 @@
             processing: true,
             serverSide: true,
             ajax: function(data, callback, settings) {
-                // Get the department filter value
-                var departmentId = $('#department-filter').val();
+                // Get the department filter value (empty when filter is not shown)
+                var departmentId = ($('#department-filter').length ? $('#department-filter').val() : '') || '';
 
                 $.ajax({
                     url: "{{ route('leave-requests.get') }}",
@@ -506,9 +559,9 @@
             ],
         });
 
-        // Trigger table reload when department filter changes
-        $('#department-filter').on('change', function() {
-            table.ajax.reload(); // Reload the DataTable with the new department filter
+        // Trigger table reload when department filter changes (only if filter exists)
+        $(document).on('change', '#department-filter', function() {
+            table.ajax.reload();
         });
 
         let currentLeaveId = null; // To track the leave ID being rejected

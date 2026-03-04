@@ -1,85 +1,47 @@
 <html>
 <head>
-    <title>Pdf</title>
+    <meta charset="utf-8">
+    <title>Leave History PDF</title>
     <style>
-        @font-face {
-            font-family: Poppins;
-            src: url('../fonts/Poppins-Bold.eot');
-            src: url('../fonts/Poppins-Bold.eot?#iefix') format('embedded-opentype'), url('../fonts/Poppins-Bold.woff2') format('woff2'), url('../fonts/Poppins-Bold.woff') format('woff'), url('../fonts/Poppins-Bold.ttf') format('truetype'), url('../fonts/Poppins-Bold.svg#Poppins-Bold') format('svg');
-            font-weight: 700;
-            font-style: normal;
-            font-display: swap
-        }
-
-        @font-face {
-            font-family: Poppins;
-            src: url('../fonts/Poppins-SemiBold.eot');
-            src: url('../fonts/Poppins-SemiBold.eot?#iefix') format('embedded-opentype'), url('../fonts/Poppins-SemiBold.woff2') format('woff2'), url('../fonts/Poppins-SemiBold.woff') format('woff'), url('../fonts/Poppins-SemiBold.ttf') format('truetype'), url('../fonts/Poppins-SemiBold.svg#Poppins-SemiBold') format('svg');
-            font-weight: 600;
-            font-style: normal;
-            font-display: swap
-        }
-
-        @font-face {
-            font-family: Poppins;
-            src: url('../fonts/Poppins-Regular.eot');
-            src: url('../fonts/Poppins-Regular.eot?#iefix') format('embedded-opentype'), url('../fonts/Poppins-Regular.woff2') format('woff2'), url('../fonts/Poppins-Regular.woff') format('woff'), url('../fonts/Poppins-Regular.ttf') format('truetype'), url('../fonts/Poppins-Regular.svg#Poppins-Regular') format('svg');
-            font-weight: 400;
-            font-style: normal;
-            font-display: swap
-        }
-
-        @font-face {
-            font-family: Poppins;
-            src: url('../fonts/Poppins-Medium.eot');
-            src: url('../fonts/Poppins-Medium.eot?#iefix') format('embedded-opentype'), url('../fonts/Poppins-Medium.woff2') format('woff2'), url('../fonts/Poppins-Medium.woff') format('woff'), url('../fonts/Poppins-Medium.ttf') format('truetype'), url('../fonts/Poppins-Medium.svg#Poppins-Medium') format('svg');
-            font-weight: 500;
-            font-style: normal;
-            font-display: swap
-        }
-
-        @font-face {
-            font-family: Poppins;
-            src: url('../fonts/Poppins-Light.eot');
-            src: url('../fonts/Poppins-Light.eot?#iefix') format('embedded-opentype'), url('../fonts/Poppins-Light.woff2') format('woff2'), url('../fonts/Poppins-Light.woff') format('woff'), url('../fonts/Poppins-Light.ttf') format('truetype'), url('../fonts/Poppins-Light.svg#Poppins-Light') format('svg');
-            font-weight: 300;
-            font-style: normal;
-            font-display: swap
-        }
-
-        table {
-            font-size: 14px;
-            font-weight: 400;
-            border-collapse: collapse;
-        }
-
-        body {
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: DejaVu Sans, sans-serif; font-size: 11px; }
         .pdf-container {
-            width: 210mm;
-            margin: 50px auto;
-            padding: 0;
-            background-color: white;
-            border: 1px solid #dcdcdc;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 190mm;
+            margin: 0 auto;
+            padding: 10mm 8mm;
+            background-color: #fff;
         }
         .card-header {
-            padding: 0 0 20px;
-            margin-bottom: 30px;
-            background: transparent;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
             border-bottom: 1px solid #E7E7E7;
         }
-        .empDetails-user .img-circle {
-            width: 100px;
-            height: 100px;
-            min-width: 100px;
-            margin-right: 20px;
+        .empDetails-user { display: flex; align-items: center; }
+        .img-circle {
+            width: 70px;
+            height: 70px;
+            min-width: 70px;
+            margin-right: 12px;
             border-radius: 50%;
             overflow: hidden;
+            background: #e9ecef;
         }
+        .img-circle img { width: 100%; height: 100%; object-fit: cover; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
+        table th, table td {
+            border: 1px solid #E7E7E7;
+            padding: 6px 5px;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .balance-table th { width: 22%; }
+        .balance-table th:nth-child(2), .balance-table th:nth-child(4) { width: 28%; }
+        .history-table th:nth-child(1) { width: 18%; }  /* Category */
+        .history-table th:nth-child(2), .history-table td:nth-child(2) { width: 28%; }  /* Reason */
+        .history-table th:nth-child(3), .history-table th:nth-child(4) { width: 12%; }
+        .history-table th:nth-child(5), .history-table th:nth-child(6) { width: 10%; }
     </style>
 </head>
 <body>
@@ -88,13 +50,17 @@
             <div class="row g-md-3 g-2 align-items-center">
                 <div class="col-lg">
                     <div class="empDetails-user" style="display: flex;align-items: center;margin-left:5px 5px">
-                        <div class="img-circle">
-                            <img style="width:100px;height:100px;" src="{{$leaveUsage[0]->profile_picture}}" alt="user">
+                        <div class="img-circle" style="background:#e9ecef;">
+                            @if(!empty($employeeHeader->profile_picture))
+                            <img style="width:100px;height:100px;" src="{{ $employeeHeader->profile_picture }}" alt="user">
+                            @else
+                            <div style="width:100px;height:100px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6c757d;">Photo</div>
+                            @endif
                         </div>
                         <div>
-                            <h4 style="font-weight: 600;margin-bottom: 5px;">{{$leaveUsage[0]->first_name}} {{$leaveUsage[0]->last_name}}</h4>
-                            <p class="badge badge-themeNew">{{$leaveUsage[0]->Emp_Code }}</p>
-                            <p>{{$leaveUsage[0]->position_title }}</p>
+                            <h4 style="font-weight: 600;margin-bottom: 5px;">{{ $employeeHeader->first_name ?? '' }} {{ $employeeHeader->last_name ?? '' }}</h4>
+                            <p class="badge badge-themeNew">{{ $employeeHeader->Emp_Code ?? '—' }}</p>
+                            <p>{{ $employeeHeader->position_title ?? '—' }}</p>
                         </div>
                     </div>
                 </div>
@@ -120,34 +86,26 @@
                 </div>
             </div>
            
-            <table style="width: 100%;font-family: 'Poppins', sans-serif; border-spacing: 0;background-color: hsla(190, 98%, 16%, 0.05);">
+            <table class="balance-table" style="background-color: #f8f9fa;">
                 <thead>
                     <tr>
-                        <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Leave Type</th>
-                        <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Used / Allocated Days</th>
-                        <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Leave Type</th>
-                        <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Used / Allocated Days</th>
+                        <th>Leave Type</th>
+                        <th>Used / Allocated Days</th>
+                        <th>Leave Type</th>
+                        <th>Used / Allocated Days</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @if($leaveBalances)
+                    @if($leaveBalances && $leaveBalances->isNotEmpty())
                         @foreach($leaveBalances as $index => $child)
-                            <!-- Start a new row for every two items -->
-                            @if($index % 2 == 0)
-                                <tr>
-                            @endif
-                            
-                            <!-- First leave type and allocated days -->
-                            <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $child->leave_type ?? 'N/A' }}</th>
-                            <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $child->used_days }} / {{ $child->allocated_days }}</td>
-
-                            <!-- If we reach the second item, close the row -->
-                            @if($index % 2 == 1 || $index == count($leaveBalances) - 1)
-                                </tr>
-                            @endif
+                            @if($index % 2 == 0)<tr>@endif
+                            <td>{{ $child->leave_type ?? 'N/A' }}</td>
+                            <td>{{ $child->used_days }} / {{ $child->allocated_days }}</td>
+                            @if($index % 2 == 1 || $index == $leaveBalances->count() - 1)</tr>@endif
                         @endforeach
+                    @else
+                        <tr><td colspan="4" style="text-align:center;">No balance data</td></tr>
                     @endif
-                    
                 </tbody>
             </table> 
         </div>
@@ -161,42 +119,36 @@
             </div>
         </div>
         
-        <table style="width: 100%;font-family: 'Poppins', sans-serif; border-spacing: 0;background-color: hsla(190, 98%, 16%, 0.05);">
+        <table class="history-table" style="background-color: #f8f9fa;">
             <thead>
                 <tr>
-                    <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Leave Category</th>
-                    <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Reason</th>
-                    <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">From</th>
-                    <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">To</th>
-                    <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Total Days</th>
-                    <th style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">Status</th>
+                    <th>Leave Category</th>
+                    <th>Reason</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Total Days</th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
                 @if($leaveUsage->isNotEmpty())
                     @foreach ($leaveUsage as $leave)
+                        @if(isset($leave->leave_category))
                         <tr>
-                            <td style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $leave->leave_category }}</td>
-                            <td style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $leave->reason }}</td>
-                            <td style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $leave->from_date }}</td>
-                            <td style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $leave->to_date }}</td>
-                            <td style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $leave->total_days }}</td>
-                            <td style="border-bottom: 1px solid #E7E7E7;padding:10px 10px 10px 4px;">{{ $leave->status }}</td>
+                            <td>{{ $leave->leave_category ?? '—' }}</td>
+                            <td>{{ Str::limit($leave->reason ?? '—', 80) }}</td>
+                            <td>{{ $leave->from_date ?? '—' }}</td>
+                            <td>{{ $leave->to_date ?? '—' }}</td>
+                            <td>{{ $leave->total_days ?? '—' }}</td>
+                            <td>{{ $leave->status ?? '—' }}</td>
                         </tr>
+                        @endif
                     @endforeach
                 @else
-                    <tr>
-                        <td colspan="7" style="text-align: center"> No Records Found.. </td>
-                    </tr>
+                    <tr><td colspan="6" style="text-align:center;">No records found</td></tr>
                 @endif
             </tbody>
         </table>
-        
-    </div> 
+    </div>
 </body>
-<script>
-    window.onload = function () {
-        window.print();
-    }
-</script>
 </html>

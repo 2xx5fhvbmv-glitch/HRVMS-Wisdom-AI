@@ -361,7 +361,16 @@ class DutyRosterController extends Controller
             foreach ($employeeOvertime as $empIdKey => $overtimeData) {
                 $overtimeHours = $overtimeData['overtime'] ?? '00:00';
                 $overtimeDays = $overtimeData['days'] ?? [];
+                $hoursByDate = $overtimeData['hoursByDate'] ?? [];
                 $hasOvertime = ($overtimeHours !== '00:00' && $overtimeHours !== '') || !empty($overtimeDays);
+                if (! $hasOvertime && ! empty($hoursByDate)) {
+                    foreach ($hoursByDate as $v) {
+                        if ($v !== '00:00' && $v !== '' && $v !== null) {
+                            $hasOvertime = true;
+                            break;
+                        }
+                    }
+                }
                 if (!$hasOvertime) {
                     continue;
                 }
@@ -427,20 +436,16 @@ class DutyRosterController extends Controller
                 ]);
                 if(isset($DutyRoster))
                 {
-                    // Get overtime for this employee - handle both string and integer keys
+                    // Get overtime for this employee - support hoursByDate (per-date OT) or legacy overtime + days
                     $employeeOvertimeHours = '00:00';
                     $employeeOvertimeDays = [];
+                    $employeeOvertimeHoursByDate = [];
 
-                    // Try to find overtime data - check both string and integer keys
-                    if(isset($employeeOvertime[$Employee])) {
-                        $employeeOvertimeHours = $employeeOvertime[$Employee]['overtime'] ?? '00:00';
-                        $employeeOvertimeDays = $employeeOvertime[$Employee]['days'] ?? [];
-                    } elseif(isset($employeeOvertime[(string)$Employee])) {
-                        $employeeOvertimeHours = $employeeOvertime[(string)$Employee]['overtime'] ?? '00:00';
-                        $employeeOvertimeDays = $employeeOvertime[(string)$Employee]['days'] ?? [];
-                    } elseif(isset($employeeOvertime[(int)$Employee])) {
-                        $employeeOvertimeHours = $employeeOvertime[(int)$Employee]['overtime'] ?? '00:00';
-                        $employeeOvertimeDays = $employeeOvertime[(int)$Employee]['days'] ?? [];
+                    $empOt = $employeeOvertime[$Employee] ?? $employeeOvertime[(string) $Employee] ?? $employeeOvertime[(int) $Employee] ?? null;
+                    if ($empOt) {
+                        $employeeOvertimeHours = $empOt['overtime'] ?? '00:00';
+                        $employeeOvertimeDays = $empOt['days'] ?? [];
+                        $employeeOvertimeHoursByDate = $empOt['hoursByDate'] ?? [];
                     }
 
                     if ($DefaultShiftTime == "All")
@@ -474,10 +479,11 @@ class DutyRosterController extends Controller
                             $isDayOff = in_array($currentDateFormatted, $dayOffDatesArray);
                             $status = $isDayOff ? "DayOff" : '';
 
-                            // Check if this date has overtime for this employee
-                            // Overtime should NOT be added on DayOff days
+                            // Overtime per date: use hoursByDate if set, else legacy (single overtime + days)
                             if ($isDayOff) {
-                                $overtimeForThisDay = '00:00'; // No overtime on DayOff
+                                $overtimeForThisDay = '00:00';
+                            } elseif (! empty($employeeOvertimeHoursByDate) && isset($employeeOvertimeHoursByDate[$currentDateFormatted])) {
+                                $overtimeForThisDay = $employeeOvertimeHoursByDate[$currentDateFormatted] ?? '00:00';
                             } else {
                                 $hasOvertime = in_array($currentDateFormatted, $employeeOvertimeDays);
                                 $overtimeForThisDay = $hasOvertime ? $employeeOvertimeHours : '00:00';
@@ -513,12 +519,18 @@ class DutyRosterController extends Controller
 
                         // Skip creating roster entry if employee has approved leave on this date
                         if (!$leave) {
+                            $singleDateOvertime = '00:00';
+                            if (! empty($employeeOvertimeHoursByDate) && isset($employeeOvertimeHoursByDate[$singleDate])) {
+                                $singleDateOvertime = $employeeOvertimeHoursByDate[$singleDate];
+                            } elseif (isset($employeeOvertimeDays[0]) && in_array($singleDate, $employeeOvertimeDays)) {
+                                $singleDateOvertime = $employeeOvertimeHours;
+                            }
                             DutyRosterEntry::create([
                                 "roster_id" => $DutyRoster->id,
                                 "Shift_id" => $DutyRoster->Shift_id,
                                 "resort_id" => $resort_id,
                                 "Emp_id" => $DutyRoster->Emp_id,
-                                "OverTime" => isset($employeeOvertimeDays[0]) ? $employeeOvertimeHours : '00:00',
+                                "OverTime" => $singleDateOvertime,
                                 "DayWiseTotalHours" => $TotalHours,
                                 'date' => $singleDate,
                                 'CheckingTime'=>$shitTime->StartTime,
@@ -528,12 +540,21 @@ class DutyRosterController extends Controller
                         }
                     }
 
-                    // Check compliance for overtime
+                    // Check compliance for overtime (any OT from single value or hoursByDate)
+                    $hasAnyOvertime = ($employeeOvertimeHours !== '00:00' && $employeeOvertimeHours !== '');
+                    if (! $hasAnyOvertime && ! empty($employeeOvertimeHoursByDate)) {
+                        foreach ($employeeOvertimeHoursByDate as $otVal) {
+                            if ($otVal !== '00:00' && $otVal !== '' && $otVal !== null) {
+                                $hasAnyOvertime = true;
+                                break;
+                            }
+                        }
+                    }
                     $CheckEmployees = Employee::with(['resortAdmin','position','department','EmployeeAttandance'])->where('id',$Employee)->where('resort_id', $this->resort->resort_id)->first();
 
                     if($CheckEmployees)
                     {
-                        if( $CheckEmployees->entitled_overtime  =="no" &&  $employeeOvertimeHours != "00:00")
+                        if( $CheckEmployees->entitled_overtime  =="no" && $hasAnyOvertime)
                         {
 
                                 Compliance::firstOrCreate([

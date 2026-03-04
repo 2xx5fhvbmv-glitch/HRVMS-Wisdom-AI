@@ -176,26 +176,30 @@ class ConfigController extends Controller
 
     public function submitTransportationOptions(Request $request)
     {
-        $transportationOptions = $request->input('transportation_options'); // Get selected options
+        $resort_id = $this->resort->resort_id;
+        $transportationOptions = $request->input('transportation_options');
 
-        if ($transportationOptions) {
-            // You can save these options to the database or process them as needed
-            // Example: Store the selected options for a specific resort
-            foreach ($transportationOptions as $option) {
-                // Use updateOrCreate to create or update the record
-                ResortTransportation::updateOrCreate(
-                    [
-                        'resort_id' => $this->resort->resort_id, // Unique identifier attributes
-                        'transportation_option' => $option,
-                    ],
-                    [] // Additional values to update, if needed
-                );
+        // Normalize to array (unchecked = not sent, so we get null; allow empty array to clear all)
+        $selected = is_array($transportationOptions) ? array_values(array_filter($transportationOptions)) : [];
+
+        // Remove any saved options for this resort that are no longer selected
+        ResortTransportation::where('resort_id', $resort_id)->delete();
+
+        // Save selected options
+        foreach ($selected as $option) {
+            $option = is_string($option) ? trim($option) : $option;
+            if ($option !== '') {
+                ResortTransportation::create([
+                    'resort_id' => $resort_id,
+                    'transportation_option' => $option,
+                ]);
             }
-
-            return redirect()->back()->with('success', 'Transportation options updated successfully.');
         }
 
-        return redirect()->back()->with('error', 'No transportation options selected.');
+        $message = count($selected) > 0
+            ? 'Transportation options updated successfully.'
+            : 'Transportation options cleared.';
+        return redirect()->back()->with('success', $message);
     }
 
     public function storeOccupancy(Request $request)
@@ -228,41 +232,68 @@ class ConfigController extends Controller
         return response()->json(['success' => true, 'msg' => 'Occupancy percentages saved successfully.']);
     }
 
-    public function exportLeave(Request $request){
-        $resort_id = $this->resort->resort_id;
+    public function exportLeave(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|string|regex:/^\d{2}-\d{2}-\d{4}$/',
+            'end_date'   => 'required|string|regex:/^\d{2}-\d{2}-\d{4}$/',
+        ], [
+            'start_date.required' => 'Start date is required.',
+            'end_date.required'   => 'End date is required.',
+            'start_date.regex'   => 'Start date must be in dd-mm-yyyy format.',
+            'end_date.regex'     => 'End date must be in dd-mm-yyyy format.',
+        ]);
 
-        $division = $request->input('division');
-        $department = $request->input('department');
-        $section = $request->input('section');
-        $position = $request->input('position');
-    
-        return Excel::download(new EmployeeLeaveExport($resort_id,$division, $department, $section, $position), 'EmployeesLeaves.xlsx');
+        $resort_id = $this->resort->resort_id;
+        $start_date = \Carbon\Carbon::createFromFormat('d-m-Y', $request->start_date)->format('Y-m-d');
+        $end_date   = \Carbon\Carbon::createFromFormat('d-m-Y', $request->end_date)->format('Y-m-d');
+
+        if ($start_date > $end_date) {
+            return back()->withErrors(['end_date' => 'End date must be on or after start date.']);
+        }
+
+        return Excel::download(
+            new EmployeeLeaveExport($resort_id, null, null, null, null, $start_date, $end_date),
+            'EmployeesLeaves.xlsx'
+        );
+    }
+
+    public function downloadLeaveTemplate()
+    {
+        $resort_id = $this->resort->resort_id;
+        return Excel::download(
+            new EmployeeLeaveExport($resort_id, null, null, null, null, null, null),
+            'Leave_Import_Template.xlsx'
+        );
     }
 
     public function ImportLeave(Request $request)
     {
-        $UploadImportleave = $request->UploadImportleave;
         $validator = \Validator::make($request->all(), [
-                'UploadImportleave' => 'required|file|mimes:csv,xlsx,xls,ods,xlt,xltx,xltm',
+            'UploadImportleave' => [
+                'required',
+                'file',
+                'mimes:xlsx',
+                'mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ],
-            [
-                'UploadImportleave.required' => 'Please select a file to upload.',
-                'UploadImportleave.file' => 'The uploaded file must be a valid file.',
-                'UploadImportleave.mimes' => 'The uploaded file must be a file of type: csv, xlsx, xls, ods, xlt, xltx, xltm.',
-            ]
-        );
+        ], [
+            'UploadImportleave.required' => 'Please select a file to upload.',
+            'UploadImportleave.file'     => 'The uploaded file must be a valid file.',
+            'UploadImportleave.mimes'    => 'Only Excel (.xlsx) files are allowed. Please upload an xlsx file.',
+            'UploadImportleave.mimetypes'=> 'Only Excel (.xlsx) files are allowed. Please upload an xlsx file.',
+        ]);
 
         if ($validator->fails()) {
-            return response()->json(['success'=>false, 'msg' => $validator->errors()->first('UploadImportleave')]);
+            return response()->json(['success' => false, 'message' => $validator->errors()->first('UploadImportleave')]);
         }
 
         $filePath = $request->file('UploadImportleave')->store('imports');
-        
-        $check =  ImportLeavesJob::dispatch($filePath, auth('resort-admin')->user()->resort_id);
-        
-        $response['success'] = true;
 
-        $response['msg'] ="Employee Leaves Imported successfully";
-        return response()->json($response);
+        ImportLeavesJob::dispatch($filePath, auth('resort-admin')->user()->resort_id);
+
+        return response()->json([
+            'success'  => true,
+            'message'  => 'Leave import has been queued. Data will be saved shortly.',
+        ]);
     }
 }
