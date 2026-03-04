@@ -94,24 +94,19 @@
 
             @if($contract->file_path)
             <div class="text-center mt-3">
-                @if($status === 'Accepted')
-                    <a href="{{ asset('storage/' . $contract->file_path) }}" target="_blank" class="download-link">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-                        Download Contract
-                    </a>
-                @else
-                    <span class="download-link" style="opacity:0.5;cursor:not-allowed;pointer-events:none;">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-                        Download Contract
-                    </span>
-                    <p class="text-muted mt-2" style="font-size:13px;">Download will be available after you accept the contract.</p>
+                <a href="{{ asset('storage/' . $contract->file_path) }}" target="_blank" class="download-link">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                    Download Contract
+                </a>
+                @if($status === 'Sent')
+                    <p class="text-muted mt-2" style="font-size:13px;">Please read the contract before accepting or declining.</p>
                 @endif
             </div>
             @endif
 
             @if($status === 'Sent')
                 <div class="action-buttons">
-                    <form action="{{ route('resort.contract.accept', $token) }}" method="POST">
+                    <form action="{{ route('resort.contract.accept', $token) }}" method="POST" class="loader-form">
                         @csrf
                         <button type="submit" class="btn-accept">Accept Contract</button>
                     </form>
@@ -119,7 +114,7 @@
                 </div>
 
                 <div class="decline-form" id="declineForm">
-                    <form action="{{ route('resort.contract.reject', $token) }}" method="POST">
+                    <form action="{{ route('resort.contract.reject', $token) }}" method="POST" class="loader-form">
                         @csrf
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Reason for declining (optional)</label>
@@ -145,6 +140,15 @@
 <script>
     document.getElementById('showDeclineForm')?.addEventListener('click', function() {
         document.getElementById('declineForm').classList.toggle('show');
+    });
+
+    document.querySelectorAll('.loader-form').forEach(function(form) {
+        form.addEventListener('submit', function() {
+            var btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            var originalText = btn.textContent;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Processing...';
+        });
     });
 </script>
 </body>

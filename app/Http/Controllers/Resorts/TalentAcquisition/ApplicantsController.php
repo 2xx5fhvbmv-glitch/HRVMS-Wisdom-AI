@@ -228,7 +228,9 @@ class ApplicantsController extends Controller
                 }
 
                 $status = $row->InterviewStatus ?? null;
-                if ($status === 'Invitation Sent') {
+                if ($status === 'Pending Review') {
+                    return '<span class="badge bg-warning text-dark">Pending Review</span>';
+                } elseif ($status === 'Invitation Sent') {
                     return '<span class="badge bg-info text-white">Invitation Sent</span>';
                 } elseif ($status === 'Slot Booked') {
                     return '<span class="badge bg-success">Accepted</span>';
@@ -717,6 +719,7 @@ class ApplicantsController extends Controller
                         t4.id as ApplicantStatus_id,
                         vacancies.Resort_id,
                         t3.id as InterView_id,
+                        t3.EmailTemplateId,
                         vacancies.rank as vacancy_rank
                     ')
                     ->first();
@@ -897,6 +900,10 @@ class ApplicantsController extends Controller
                     if ($rName == 'HR') { $roundType = 'Introductory Round'; $interviewer = 'HR Manager'; }
                     elseif ($rName == 'HOD') { $roundType = 'Technical Round'; $interviewer = 'Head Of Department'; }
                     elseif ($rName == 'GM') { $roundType = 'Final Round'; $interviewer = 'General Manager'; }
+                    $templateName = '-';
+                    if ($pastInterview && $pastInterview->EmailTemplateId) {
+                        $templateName = DB::table('ta_email_templates')->where('id', $pastInterview->EmailTemplateId)->value('TempleteName') ?? '-';
+                    }
                     $pastRounds[] = [
                         'rank_name' => $rName,
                         'round' => $roundType,
@@ -906,7 +913,14 @@ class ApplicantsController extends Controller
                         'ApplicantTime' => $pastInterview->ApplicantInterviewtime ?? '-',
                         'InterviewStatus' => $pastStatus->status == 'Complete' ? 'Completed' : ($pastInterview->Status ?? '-'),
                         'status' => $pastStatus->status,
+                        'emailTemplate' => $templateName,
                     ];
+                }
+
+                // Lookup email template name for current round
+                $currentEmailTemplate = '-';
+                if ($StatusApplicantStatus->EmailTemplateId) {
+                    $currentEmailTemplate = DB::table('ta_email_templates')->where('id', $StatusApplicantStatus->EmailTemplateId)->value('TempleteName') ?? '-';
                 }
 
                 return response()->json([
@@ -924,6 +938,8 @@ class ApplicantsController extends Controller
                         'ApplicantStatus_id' => $StatusApplicantStatus->ApplicantStatus_id,
                         'Interview_id'=>$StatusApplicantStatus->Interview_id,
                         'MeetingLink'=>$StatusApplicantStatus->MeetingLink,
+                        'EmailTemplateId' => $StatusApplicantStatus->EmailTemplateId,
+                        'emailTemplate' => $currentEmailTemplate,
                         'nextRound' => $nextRound ?? null,
                         'pastRounds' => $pastRounds,
                     ],
@@ -969,7 +985,7 @@ class ApplicantsController extends Controller
         $interviewerId = $this->resort->id;
         $resortId = $this->resort->resort_id;
         $bookedSlots = ApplicantInterViewDetails::where('InterViewDate', $InterviewDate)
-            ->whereIn('Status', ['Invitation Sent', 'Slot Booked'])
+            ->whereIn('Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
             ->where(function ($query) use ($interviewerId, $resortId) {
                 $query->where('interviewer_id', $interviewerId)
                       ->orWhere(function ($q) use ($resortId) {
@@ -1024,7 +1040,7 @@ class ApplicantsController extends Controller
             // Validate manual time against interviewer's existing bookings
             if ($request->MalidivanManualTime1) {
                 $existingBookings = ApplicantInterViewDetails::where('InterViewDate', $interviewDate)
-                    ->whereIn('Status', ['Invitation Sent', 'Slot Booked'])
+                    ->whereIn('Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
                     ->where(function ($query) use ($interviewerId, $Resort_id) {
                         $query->where('interviewer_id', $interviewerId)
                               ->orWhere(function ($q) use ($Resort_id) {
@@ -1093,7 +1109,7 @@ class ApplicantsController extends Controller
                     'ApplicantStatus_id' => $ApplicantStatus_id
                 ],
                 [
-                    'Status' => 'Invitation Sent',
+                    'Status' => 'Pending Review',
                     'ResortInterviewtime' => $resortTime,
                     'ApplicantInterviewtime' => $applicantTime,
                     'InterViewDate' => $interviewDate,
@@ -1203,44 +1219,14 @@ class ApplicantsController extends Controller
                         }
                     }
 
-                    $invitationLink = route('resort.interview.invitation.show', $ApplicantInterViewDetails->invitation_token);
-
-                    $dynamic_data = [
-                        'candidate_name' => $Final_response_data->first_name . ' ' . $Final_response_data->last_name,
-                        'position_title' => $Final_response_data->Position,
-                        'resort_name' => $resort_details->resort_name,
-                        'interview_date' => Carbon::parse($InterViewDate)->format('d-m-Y'),
-                        'interview_time' => $Final_response_data->ApplicantInterviewtime,
-                        'interview_link' => $invitationLink,
-                        'meeting_link' => $Final_response_data->MeetingLink ?? '',
-                        'interview_type' =>  $InterviewType,
-                        'interview_round'=> $Round,
-                        'accept_link' => $invitationLink,
-                        'reject_link' => $invitationLink,
-                        'department' => $Final_response_data->Department ?? '',
-                    ];
-
-                    // Send email using the BeyondTestApprovalEmail class
-                    $recipientEmail = $Applicant_form_data->email;
-                    $templateId = $request->EmailTemplate;
-                    $emailWarning = '';
-                    try {
-                        $result = Common::sendTemplateEmail("TalentAcquisition", $templateId, $recipientEmail, $dynamic_data);
-                        if ($result !== true) {
-                            $emailWarning = ' (Email could not be sent)';
-                            \Log::warning("Interview email failed: " . $result);
-                        }
-                    } catch (\Exception $e) {
-                        $emailWarning = ' (Email could not be sent)';
-                        \Log::warning("Interview email exception: " . $e->getMessage());
-                    }
-
                     return response()->json([
                         'success' => true,
-                        'message' => 'Interview Invitation Sent!' . $emailWarning,
+                        'message' => 'Please review the details before sending.',
                         'InterViewDate' => $InterViewDate,
                         'TodoDataview' => $TodoDataview,
-                        'Final_response_data' => $FianlResponse
+                        'Final_response_data' => $FianlResponse,
+                        'interview_id' => base64_encode($ApplicantInterViewDetails->id),
+                        'email_template_id' => $request->EmailTemplate,
                     ]);
 
        DB::beginTransaction();
@@ -1251,6 +1237,89 @@ class ApplicantsController extends Controller
             \Log::emergency("Message: " . $e->getMessage());
             return response()->json(['error' => 'Failed to upload data'], 500);
         }
+    }
+
+    public function SendInterviewEmail(Request $request)
+    {
+        $interviewId = base64_decode($request->interview_id);
+        $templateId = $request->email_template_id;
+
+        $interview = ApplicantInterViewDetails::find($interviewId);
+        if (!$interview) {
+            return response()->json(['success' => false, 'message' => 'Interview record not found.']);
+        }
+
+        $applicant = Applicant_form_data::find($interview->Applicant_id);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.']);
+        }
+
+        $resort = Resort::find($interview->resort_id);
+        $vacancy = Vacancies::join('resort_positions as t5', 't5.id', '=', 'vacancies.position')
+            ->join('resort_departments as t6', 't6.id', '=', 't5.dept_id')
+            ->where('vacancies.id', $applicant->Parent_v_id)
+            ->selectRaw('t5.position_title as Position, t6.name as Department')
+            ->first();
+
+        $invitationLink = route('resort.interview.invitation.show', $interview->invitation_token);
+
+        $dynamic_data = [
+            'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
+            'position_title' => $vacancy->Position ?? '',
+            'resort_name' => $resort->resort_name ?? '',
+            'interview_date' => Carbon::parse($interview->InterViewDate)->format('d-m-Y'),
+            'interview_time' => $interview->ApplicantInterviewtime,
+            'interview_link' => $invitationLink,
+            'meeting_link' => $interview->MeetingLink ?? '',
+            'interview_type' => 'Introductory',
+            'interview_round' => 'HR',
+            'accept_link' => $invitationLink,
+            'reject_link' => $invitationLink,
+            'department' => $vacancy->Department ?? '',
+        ];
+
+        $emailWarning = '';
+        try {
+            $result = Common::sendTemplateEmail("TalentAcquisition", $templateId, $applicant->email, $dynamic_data);
+            if ($result !== true) {
+                $emailWarning = ' (Email could not be sent)';
+                \Log::warning("Interview email failed: " . $result);
+            }
+        } catch (\Exception $e) {
+            $emailWarning = ' (Email could not be sent)';
+            \Log::warning("Interview email exception: " . $e->getMessage());
+        }
+
+        // Update status to 'Invitation Sent' after email is confirmed
+        $interview->update(['Status' => 'Invitation Sent']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Interview Invitation Sent!' . $emailWarning,
+        ]);
+    }
+
+    public function DeletePendingInterview(Request $request)
+    {
+        $interviewId = base64_decode($request->interview_id);
+        $interview = ApplicantInterViewDetails::find($interviewId);
+
+        if (!$interview) {
+            return response()->json(['success' => false, 'message' => 'Interview record not found.']);
+        }
+
+        // Only allow deleting Pending Review interviews
+        if ($interview->Status !== 'Pending Review') {
+            return response()->json(['success' => false, 'message' => 'Cannot delete — invitation already sent.']);
+        }
+
+        // Delete the interview record
+        $interview->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Slot information deleted. You can book a new slot.',
+        ]);
     }
 
     public function ApprovedOrSortApplicantWiseStatus(Request $request)
@@ -1506,6 +1575,15 @@ class ApplicantsController extends Controller
         $config = config('settings.Position_Rank');
         $loggedInRank = $this->resort->GetEmployee->rank ?? null;
 
+        // Check if user is in HR department (EXCOM in HR should see all like HR)
+        $effectiveRank = $loggedInRank;
+        if (!in_array($loggedInRank, [3, 7, 8])) {
+            $empDeptName = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id)->value('name');
+            if (stripos($empDeptName ?? '', 'Human Resources') !== false) {
+                $effectiveRank = 3;
+            }
+        }
+
         $UplcomingApplicants1 = Vacancies::join("applicant_form_data as t1", "t1.Parent_v_id", "=", "vacancies.id")
             ->join("countries as t2", "t2.id", "=", "t1.country")
             ->join('applicant_wise_statuses as t4', function ($join) {
@@ -1530,8 +1608,8 @@ class ApplicantsController extends Controller
             ->whereNotNull('t3.MeetingLink')
             ->where('t3.Status', 'Slot Booked');
 
-        // HR (rank 3) sees all interviews, others only see their own round
-        if ($loggedInRank != 3) {
+        // HR (rank 3) and GM (rank 8) see all interviews, others only see their own round
+        if ($effectiveRank != 3 && $effectiveRank != 8) {
             $UplcomingApplicants1->where('t4.As_ApprovedBy', $loggedInRank);
             // HOD (rank 2) only sees their own department
             if ($loggedInRank == 2) {
@@ -1613,10 +1691,19 @@ class ApplicantsController extends Controller
 
         $string ='';
         $dates =[];
+        $today = Carbon::now()->format('Y-m-d');
         if($UplcomingApplicants->isNotEmpty())
         {
             foreach( $UplcomingApplicants as $u)
             {
+                  // Always add date for calendar dot
+                  array_push($dates, $u->RealInterViewDate);
+
+                  // On initial load (no specific date clicked), only show today and future interviews
+                  if (!$date && $u->RealInterViewDate < $today) {
+                      continue;
+                  }
+
                   if($u->passport_photo)
                     {
                     $getFileapplicant = Common::GetApplicantAWSFile($u->passport_photo);
@@ -1643,14 +1730,12 @@ class ApplicantsController extends Controller
                                     <div class="time">'.$u->ResortInterviewtime.'</div>
                                 </div>
                             </div></a>';
-
-                            array_push($dates, $u->RealInterViewDate);
             }
         }
-        else
-        {
 
-            $string .='<div class="upInterviews-block">
+        if(empty($string))
+        {
+            $string ='<div class="upInterviews-block">
                                 <div style="text-align: left;" >
                                     No Record Found
                                 </div>
@@ -1725,7 +1810,8 @@ class ApplicantsController extends Controller
                 t1.Comments,
                 applicant_form_data.created_at,
                 applicant_form_data.consent_expiry_date,
-                applicant_form_data.consent_status
+                applicant_form_data.consent_status,
+                applicant_form_data.availability_status
             ')
             ->whereIn('t1.status', ['Rejected', 'Rejected By Wisdom AI'])
             ->where('applicant_form_data.resort_id', $resort_id)
@@ -1852,7 +1938,17 @@ class ApplicantsController extends Controller
                 }
                 return $string;
             })
-            ->rawColumns(['action', 'details-control','Stage'])
+            ->addColumn('Availability', function ($row) {
+                if ($row->availability_status === 'available') {
+                    return '<span class="badge bg-success">Available to Reach</span>';
+                } elseif ($row->availability_status === 'unavailable') {
+                    return '<span class="badge bg-danger">Not Available</span>';
+                } elseif ($row->availability_status === 'pending') {
+                    return '<span class="badge bg-warning text-dark">Pending Response</span>';
+                }
+                return '<span class="badge bg-secondary">Not Checked</span>';
+            })
+            ->rawColumns(['action', 'details-control','Stage','Availability'])
             ->make(true);
         }
         $rank = $this->resort->GetEmployee->rank ?? null;
@@ -1926,7 +2022,8 @@ class ApplicantsController extends Controller
             applicant_form_data.full_length_photo,
             t1.Comments,
             applicant_form_data.consent_expiry_date,
-            applicant_form_data.consent_status
+            applicant_form_data.consent_status,
+            applicant_form_data.availability_status
         ')
         ->whereIn('t1.status', ['Rejected','Rejected By Wisdom AI'])
         ->where('applicant_form_data.resort_id', $resort_id)
@@ -2253,22 +2350,93 @@ class ApplicantsController extends Controller
         foreach ($placeholders as $key => $value) {
             // Strip {{ and }} from key for setValue
             $cleanKey = str_replace(['{{', '}}'], '', $key);
-            $templateProcessor->setValue($cleanKey, $value ?? '');
+            // Escape XML special characters to prevent DOCX XML corruption
+            $safeValue = htmlspecialchars($value ?? '', ENT_XML1 | ENT_QUOTES, 'UTF-8');
+            $templateProcessor->setValue($cleanKey, $safeValue);
         }
 
         // Save filled DOCX to temp file
         $tempDocx = tempnam(sys_get_temp_dir(), 'docx_') . '.docx';
         $templateProcessor->saveAs($tempDocx);
 
-        // Convert filled DOCX to HTML via PhpWord
+        // Load the original DOCX (before placeholder replacement) to get page setup
+        // This avoids XML parsing issues from replaced content
+        $originalPhpWord = \PhpOffice\PhpWord\IOFactory::load($docxPath);
+        $sections = $originalPhpWord->getSections();
+        $marginTopMm = 25; // defaults: ~1 inch
+        $marginBottomMm = 25;
+        $marginLeftMm = 32; // ~1.25 inch
+        $marginRightMm = 32;
+        if (!empty($sections) && $sections[0]) {
+            $style = $sections[0]->getStyle();
+            if ($style) {
+                $marginTopMm = round(($style->getMarginTop() ?? 1440) / 1440 * 25.4);
+                $marginBottomMm = round(($style->getMarginBottom() ?? 1440) / 1440 * 25.4);
+                $marginLeftMm = round(($style->getMarginLeft() ?? 1800) / 1440 * 25.4);
+                $marginRightMm = round(($style->getMarginRight() ?? 1800) / 1440 * 25.4);
+            }
+        }
+
+        // Load filled DOCX and convert to HTML
         $phpWord = \PhpOffice\PhpWord\IOFactory::load($tempDocx);
         $htmlWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML');
         $tempHtml = tempnam(sys_get_temp_dir(), 'html_') . '.html';
         $htmlWriter->save($tempHtml);
         $htmlContent = file_get_contents($tempHtml);
 
-        // Generate PDF from HTML via DomPDF
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($htmlContent)->setPaper('a4');
+        // Inject CSS to preserve formatting — PhpWord's default HTML has incorrect table borders and no page margins
+        $customCSS = "<style>
+            @page {
+                margin: {$marginTopMm}mm {$marginRightMm}mm {$marginBottomMm}mm {$marginLeftMm}mm;
+            }
+            body {
+                font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
+                font-size: 11pt;
+                line-height: 1.5;
+                color: #000;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+            table {
+                border: none !important;
+                border-collapse: collapse;
+                width: 100%;
+                page-break-inside: auto;
+            }
+            td {
+                border: none !important;
+                padding: 4pt 6pt;
+                vertical-align: top;
+            }
+            tr {
+                page-break-inside: avoid;
+            }
+            p {
+                margin: 2pt 0 6pt 0;
+            }
+            h1 {
+                font-size: 16pt;
+                color: #000;
+                margin: 12pt 0 8pt 0;
+            }
+            img {
+                max-width: 100%;
+                height: auto;
+            }
+        </style>";
+
+        // Insert custom CSS before closing </head> to override PhpWord defaults
+        if (strpos($htmlContent, '</head>') !== false) {
+            $htmlContent = str_replace('</head>', $customCSS . '</head>', $htmlContent);
+        } else {
+            $htmlContent = $customCSS . $htmlContent;
+        }
+
+        // Generate PDF from HTML via DomPDF with proper settings
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($htmlContent)
+            ->setPaper('a4')
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('defaultFont', 'DejaVu Sans');
 
         // Cleanup temp files
         @unlink($tempDocx);

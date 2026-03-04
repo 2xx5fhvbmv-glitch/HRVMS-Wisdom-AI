@@ -1631,7 +1631,7 @@ class VacancyController extends Controller
                         $applicantid = htmlspecialchars(base64_encode($row->Applicant_id), ENT_QUOTES, 'UTF-8');
                         $sendInterviewRequest = '';
 
-                        if (!in_array($row->InterviewStatus, ['Slot Booked', 'Invitation Sent'])) {
+                        if (!in_array($row->InterviewStatus, ['Slot Booked', 'Invitation Sent', 'Pending Review'])) {
                             $sendInterviewRequest = '<li><a class="dropdown-item userApplicants-btn SortlistedEmployee"
                             data-resort_id="' . $this->resort->resort_id . '"
                             data-applicantstatus_id="'. $row->ApplicantStatus_id.'"
@@ -1801,6 +1801,10 @@ class VacancyController extends Controller
                         {
                             $sendInterviewBtn = '<a href="'.htmlspecialchars($row->MeetingLink, ENT_QUOTES, 'UTF-8').'" target="_blank" class="btn btn-sm btn-success me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Start Interview"><i class="fa-solid fa-video"></i></a>';
                         }
+                        elseif ($row->InterviewStatus == "Pending Review")
+                        {
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-warning me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Pending Review - Email Not Sent Yet"><i class="fa-solid fa-hourglass-half"></i></a>';
+                        }
                         elseif ($row->InterviewStatus == "Invitation Sent")
                         {
                             $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Sent - Awaiting Response"><i class="fa-solid fa-clock"></i></a>';
@@ -1834,9 +1838,20 @@ class VacancyController extends Controller
                 $rank = $this->resort->GetEmployee->rank;
 
                 $resort_id = $this->resort->resort_id;
+
+                // Check if user belongs to HR department — treat them as HR (rank 3) regardless of actual rank
+                $employee = $this->resort->GetEmployee ?? null;
+                $effectiveRank = $rank;
+                if ($employee) {
+                    $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+                    if (stripos($userDeptName, 'Human Resources') !== false) {
+                        $effectiveRank = 3;
+                    }
+                }
+
                         $UplcomingApplicants = Vacancies::join("applicant_form_data as t1", "t1.Parent_v_id", "=", "vacancies.id")
                             ->join("countries as t2", "t2.id", "=", "t1.country")
-                            ->join('applicant_wise_statuses as t4', function ($join) {
+                            ->join('applicant_wise_statuses as t4', function ($join) use($effectiveRank) {
                                 $join->on('t4.Applicant_id', '=', 't1.id')
                                     ->whereRaw('t4.id = (
                                         SELECT MAX(id)
@@ -1844,7 +1859,11 @@ class VacancyController extends Controller
                                         WHERE Applicant_id = t1.id
                                     )')
                                     ->whereIn('t4.status', ['Sortlisted','Complete','Round']);
-                                    // ->where('t4.As_ApprovedBy', '=', 3);
+
+                                // HR sees all, others only see their own round
+                                if ($effectiveRank != 3) {
+                                    $join->where('t4.As_ApprovedBy', '=', $effectiveRank);
+                                }
                             })
                             ->join('applicant_inter_view_details as t3', function ($join) {
                                 $join->on('t3.Applicant_id', '=', 't1.id')
@@ -1867,6 +1886,7 @@ class VacancyController extends Controller
                                 t1.first_name,
                                 t1.last_name,
                                 t1.gender,
+                                t1.created_at,
                                 t1.mobile_number as Contact,
                                 t1.email as Email,
                                 t2.name AS Nationality,

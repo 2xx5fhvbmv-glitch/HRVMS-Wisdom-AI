@@ -663,12 +663,11 @@
 </div>
 
 <div class="modal fade" id="sendRequestFinal-modal" tabindex="-1" aria-labelledby="exampleModalLabel"
-    aria-hidden="true">
+    aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-small">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="staticBackdropLabel">Review Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pb-0">
                 <div class="table-responsive">
@@ -678,12 +677,32 @@
                         </tbody>
                     </table>
                 </div>
+                <input type="hidden" id="review_interview_id" value="">
+                <input type="hidden" id="review_email_template_id" value="">
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="javascript:void(0)"  data-bs-dismiss="modal"class="btn btn-theme" >Submit</a>
+                <a href="javascript:void(0)" id="cancelPendingInterview" class="btn btn-themeGray ms-auto">Cancel</a>
+                <a href="javascript:void(0)" id="confirmSendInterviewEmail" class="btn btn-theme">Submit</a>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="confirmCancelSlot-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-small">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Interview Slot</h5>
+            </div>
+            <div class="modal-body">
+                <p>If you cancel, all saved slot information will be deleted and you will need to book a slot again.</p>
+                <p><strong>Are you sure?</strong></p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <a href="javascript:void(0)" id="cancelSlotNo" class="btn btn-themeGray ms-auto">No, Go Back</a>
+                <a href="javascript:void(0)" id="cancelSlotYes" class="btn btn-danger">Yes, Delete Slot</a>
+            </div>
         </div>
     </div>
 </div>
@@ -1635,15 +1654,12 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
                         success: function(response) {
                             if (response.success) {
-                                toastr.success(response.message, "Success", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-
                                 $("#sendRequest-modal").modal("hide");
                                 $("#TimeSlots-modal").modal("hide");
-                                $(".sendRequestTime-main").html(response.view);
-                                $("#todoList-main").html( response.TodoDataview);
+                                $("#todoList-main").html(response.TodoDataview);
                                 $("#Final_response_data").html(response.Final_response_data);
+                                $("#review_interview_id").val(response.interview_id);
+                                $("#review_email_template_id").val(response.email_template_id);
                                 $("#sendRequestFinal-modal").modal("show");
                             } else {
                                 toastr.error(response.message, "Error", {
@@ -1661,6 +1677,95 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         }
                 });
             }
+        });
+
+        // Review modal - Confirm and send interview email
+        $(document).on("click", "#confirmSendInterviewEmail", function() {
+            var $btn = $(this);
+            $btn.addClass('disabled').text('Sending...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.SendInterviewEmail') }}",
+                type: "POST",
+                data: {
+                    interview_id: $("#review_interview_id").val(),
+                    email_template_id: $("#review_email_template_id").val(),
+                    "_token": "{{ csrf_token() }}"
+                },
+                success: function(response) {
+                    $("#sendRequestFinal-modal").modal("hide");
+                    if (response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    } else {
+                        toastr.error(response.message, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function() {
+                    $("#sendRequestFinal-modal").modal("hide");
+                    toastr.error("Something went wrong. Please try again.", "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                complete: function() {
+                    $btn.removeClass('disabled').text('Submit');
+                }
+            });
+        });
+
+        // Review modal - Cancel button opens confirmation modal
+        $(document).on("click", "#cancelPendingInterview", function() {
+            $("#sendRequestFinal-modal").modal("hide");
+            setTimeout(function() {
+                $("#confirmCancelSlot-modal").modal("show");
+            }, 300);
+        });
+
+        // Cancel confirmation - No, go back to review modal
+        $(document).on("click", "#cancelSlotNo", function() {
+            $("#confirmCancelSlot-modal").modal("hide");
+            setTimeout(function() {
+                $("#sendRequestFinal-modal").modal("show");
+            }, 300);
+        });
+
+        // Cancel confirmation - Yes, delete slot data
+        $(document).on("click", "#cancelSlotYes", function() {
+            var $btn = $(this);
+            $btn.addClass('disabled').text('Deleting...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.DeletePendingInterview') }}",
+                type: "POST",
+                data: {
+                    interview_id: $("#review_interview_id").val(),
+                    "_token": "{{ csrf_token() }}"
+                },
+                success: function(response) {
+                    $("#confirmCancelSlot-modal").modal("hide");
+                    if (response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    } else {
+                        toastr.error(response.message, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function() {
+                    $("#confirmCancelSlot-modal").modal("hide");
+                    toastr.error("Something went wrong.", "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                complete: function() {
+                    $btn.removeClass('disabled').text('Yes, Delete Slot');
+                }
+            });
         });
 
         // Add Meeting Link - click handler

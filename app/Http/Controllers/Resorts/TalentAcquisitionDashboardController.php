@@ -517,17 +517,27 @@ class TalentAcquisitionDashboardController extends Controller
             }
             $Interviews = $InterviewsQuery->count();
 
+            // Apply effectiveRank pattern so HR-department HODs are treated as rank 3
+            $employee = $this->globalUser->GetEmployee ?? null;
+            $effectiveRank = $userRank;
+            if ($employee) {
+                $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+                if (stripos($userDeptName, 'Human Resources') !== false) {
+                    $effectiveRank = 3;
+                }
+            }
+
             $HiredQuery = DB::table('applicant_wise_statuses as t1')
                 ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
-                ->join('vacancies as t3', 't3.id', '=', 't2.Parent_v_id') // Correct alias for vacancies
+                ->join('vacancies as t3', 't3.id', '=', 't2.Parent_v_id')
                 ->where('t2.resort_id', $resort_id)
-                ->where('t1.As_ApprovedBy', 8)
-                ->where('t1.status', 'Selected');
-            if (!$showAllDepts) {
+                ->where('t1.status', 'Contract Accepted');
+            if (!$showAllDepts && $effectiveRank != 3) {
                 $HiredQuery->where('t3.department', $Dept_id);
             }
-            $Hired = $HiredQuery->distinct()
-                ->count('t1.Applicant_id'); // Count distinct Applicant_id
+            $Hired = $HiredQuery->groupBy('t1.Applicant_id')
+                ->get()
+                ->count();
 
                 $UpcomingApplicantsQuery = Vacancies::join("applicant_form_data as t1", "t1.Parent_v_id", "=", "vacancies.id")
                 ->join("countries as t2", "t2.id", "=", "t1.country")

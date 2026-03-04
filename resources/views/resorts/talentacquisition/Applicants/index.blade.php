@@ -235,12 +235,11 @@
         </div>
     </div>
     <div class="modal fade" id="sendRequestFinal-modal" tabindex="-1" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
+        aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered modal-small">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="staticBackdropLabel">Review Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body pb-0">
                     <div class="table-responsive">
@@ -250,12 +249,31 @@
                             </tbody>
                         </table>
                     </div>
+                    <input type="hidden" id="review_interview_id" value="">
+                    <input type="hidden" id="review_email_template_id" value="">
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="javascript:void(0)"  data-bs-dismiss="modal" class="btn btn-theme" >Submit</a>
+                    <a href="javascript:void(0)" id="cancelPendingInterview" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" id="confirmSendInterviewEmail" class="btn btn-theme">Submit</a>
                 </div>
 
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="confirmCancelSlot-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-small">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cancel Interview Slot</h5>
+                </div>
+                <div class="modal-body">
+                    <p>If you cancel, all saved slot information will be deleted and you will need to book a slot again.</p>
+                    <p><strong>Are you sure?</strong></p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <a href="javascript:void(0)" id="cancelSlotNo" class="btn btn-themeGray ms-auto">No, Go Back</a>
+                    <a href="javascript:void(0)" id="cancelSlotYes" class="btn btn-danger">Yes, Delete Slot</a>
+                </div>
             </div>
         </div>
     </div>
@@ -605,6 +623,14 @@
                                                 data-ApplicantStatus_id="${response.data.ApplicantStatus_id}"
                                                 class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
                                         }
+                                        else if(response.data.InterviewStatus == "Pending Review")
+                                        {
+                                            newTag =`<a href="javascript:void(0)"
+                                                class="btn btn-warning btn-small confirmPendingReview"
+                                                data-interview_id="${response.data.Interview_id}"
+                                                data-email_template_id="${response.data.EmailTemplateId || ''}"
+                                                >Confirm & Send</a>`;
+                                        }
                                         else if(response.data.InterviewStatus == "Invitation Sent")
                                         {
                                             newTag =`<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
@@ -687,7 +713,7 @@
                                                     ? `<span class="badge bg-success">Completed</span>`
                                                     : `<span class="badge bg-secondary">${pr.InterviewStatus}</span>`;
                                                 pastRoundsRows += `<tr>
-                                                    <td>-</td>
+                                                    <td>${pr.emailTemplate || '-'}</td>
                                                     <td>${pr.rank_name}</td>
                                                     <td>${pr.round}</td>
                                                     <td>${pr.Interviewer}</td>
@@ -718,12 +744,14 @@
                                                         </tr>
                                                         ${pastRoundsRows}
                                                         <tr>
-                                                            <td><select class="form-control EmailTemplate" name='EmailTemplate'>
+                                                            <td>${['Completed','Pending Review','Invitation Sent','Slot Booked'].includes(response.data.InterviewStatus) && response.data.emailTemplate && response.data.emailTemplate !== '-'
+                                                                ? response.data.emailTemplate
+                                                                : `<select class="form-control EmailTemplate" name='EmailTemplate'>
                                                                 <option selected disabled>Select Email Template </option>
                                                                     @foreach ($EmailTamplete as $e)
                                                                         <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                     @endforeach
-                                                                    </select>
+                                                                    </select>`}
                                                             </td>
                                                             <td>${response.data.rank_name}</td>
                                                             <td>${response.data.round}</td>
@@ -808,6 +836,13 @@
                                             data-ApplicantStatus_id="${response.data.ApplicantStatus_id}"
                                             class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Request</a>`;
                                     }
+                                    else if(response.data.InterviewStatus == "Pending Review") {
+                                        newTag =`<a href="javascript:void(0)"
+                                            class="btn btn-warning btn-small confirmPendingReview"
+                                            data-interview_id="${response.data.Interview_id}"
+                                            data-email_template_id="${response.data.EmailTemplateId || ''}"
+                                            >Confirm & Send</a>`;
+                                    }
                                     else if(response.data.InterviewStatus == "Invitation Sent") {
                                         newTag =`<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                     }
@@ -882,7 +917,7 @@
                                                 ? `<span class="badge bg-success">Completed</span>`
                                                 : `<span class="badge bg-secondary">${pr.InterviewStatus}</span>`;
                                             pastRoundsRows += `<tr>
-                                                <td>-</td>
+                                                <td>${pr.emailTemplate || '-'}</td>
                                                 <td>${pr.rank_name}</td>
                                                 <td>${pr.round}</td>
                                                 <td>${pr.Interviewer}</td>
@@ -913,12 +948,14 @@
                                                     </tr>
                                                     ${pastRoundsRows}
                                                     <tr>
-                                                        <td><select class="form-control EmailTemplate" name='EmailTemplate'>
+                                                        <td>${['Completed','Pending Review','Invitation Sent','Slot Booked'].includes(response.data.InterviewStatus) && response.data.emailTemplate && response.data.emailTemplate !== '-'
+                                                            ? response.data.emailTemplate
+                                                            : `<select class="form-control EmailTemplate" name='EmailTemplate'>
                                                             <option selected disabled>Select Email Template </option>
                                                                 @foreach ($EmailTamplete as $e)
                                                                     <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                 @endforeach
-                                                                </select>
+                                                                </select>`}
                                                         </td>
                                                         <td>${response.data.rank_name}</td>
                                                         <td>${response.data.round}</td>
@@ -1547,9 +1584,10 @@
 
                             $("#sendRequest-modal").modal("hide");
                             $("#TimeSlots-modal").modal("hide");
-                            $(".sendRequestTime-main").html(response.view);
                             $("#todoList-main").html( response.TodoDataview);
                             $("#Final_response_data").html(response.Final_response_data);
+                            $("#review_interview_id").val(response.interview_id);
+                            $("#review_email_template_id").val(response.email_template_id);
                             $("#sendRequestFinal-modal").modal("show");
                             // Remove all expanded details rows so stale data doesn't persist
                             $('tr.details-row').remove();
@@ -1572,6 +1610,101 @@
                 });
             }
         });
+        // Confirm & Send - for Pending Review interviews (open review modal)
+        $(document).on("click", ".confirmPendingReview", function() {
+            var interviewId = $(this).data('interview_id');
+            var emailTemplateId = $(this).data('email_template_id');
+            $("#review_interview_id").val(interviewId);
+            $("#review_email_template_id").val(emailTemplateId);
+            $("#sendRequestFinal-modal").modal("show");
+        });
+
+        // Review modal - Confirm and send interview email
+        $(document).on("click", "#confirmSendInterviewEmail", function() {
+            var $btn = $(this);
+            $btn.addClass('disabled').text('Sending...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.SendInterviewEmail') }}",
+                type: "POST",
+                data: {
+                    interview_id: $("#review_interview_id").val(),
+                    email_template_id: $("#review_email_template_id").val(),
+                    "_token": "{{ csrf_token() }}"
+                },
+                success: function(response) {
+                    $("#sendRequestFinal-modal").modal("hide");
+                    if (response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        // Refresh the table
+                        $('tr.details-row').remove();
+                        $('td.details-control').closest('tr').removeClass('shown');
+                        datatablelist();
+                    } else {
+                        toastr.error(response.message, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function() {
+                    $("#sendRequestFinal-modal").modal("hide");
+                    toastr.error("Something went wrong.", "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                complete: function() {
+                    $btn.removeClass('disabled').text('Submit');
+                }
+            });
+        });
+
+        // Review modal - Cancel: show confirmation modal
+        $(document).on("click", "#cancelPendingInterview", function() {
+            $("#sendRequestFinal-modal").modal("hide");
+            $("#confirmCancelSlot-modal").modal("show");
+        });
+
+        // Confirmation modal - No, Go Back: return to review modal
+        $(document).on("click", "#cancelSlotNo", function() {
+            $("#confirmCancelSlot-modal").modal("hide");
+            $("#sendRequestFinal-modal").modal("show");
+        });
+
+        // Confirmation modal - Yes, Delete Slot: delete and close
+        $(document).on("click", "#cancelSlotYes", function() {
+            $.ajax({
+                url: "{{ route('resort.ta.DeletePendingInterview') }}",
+                type: "POST",
+                data: {
+                    interview_id: $("#review_interview_id").val(),
+                    "_token": "{{ csrf_token() }}"
+                },
+                success: function(response) {
+                    $("#confirmCancelSlot-modal").modal("hide");
+                    if (response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        $('tr.details-row').remove();
+                        $('td.details-control').closest('tr').removeClass('shown');
+                        datatablelist();
+                    } else {
+                        toastr.error(response.message, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function() {
+                    $("#confirmCancelSlot-modal").modal("hide");
+                    toastr.error("Something went wrong.", "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+            });
+        });
+
         $(document).on("click", ".ApplicantShareLink", function () {
             let Interview_id = $(this).data("interview_id");
             let Round = $(this).data("rank_name");

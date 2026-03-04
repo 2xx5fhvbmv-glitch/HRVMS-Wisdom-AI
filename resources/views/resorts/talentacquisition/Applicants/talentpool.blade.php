@@ -75,6 +75,7 @@
                                     <th>Contact</th>
                                     <th>Applied Date<i class="fa-solid fa-caret-down"></i></th>
                                     <th>Stage<i class="fa-solid fa-caret-down"></i></th>
+                                    <th>Availability</th>
                                     <th>Consent Expiry Date</th>
                                     <th>Action</th>
                                 </tr>
@@ -521,7 +522,7 @@
                     iDisplayLength: 6,
                     processing: true,
                     serverSide: true,
-                    order:[[12, 'desc']],
+                    order:[[13, 'desc']],
                     ajax: {
                         url: "{{ route('resort.ta.TalentPool')}}",
                         type: 'GET',
@@ -550,6 +551,7 @@
                         { data: 'contact', name: 'contact' },
                         { data: 'Application_date', name: 'Application_date' },
                         { data: 'Stage', name: 'Stage'},
+                        { data: 'Availability', name: 'Availability'},
                         { data: 'ConsentExpiryDate', name: 'ConsentExpiryDate'},
                         { data: 'action', name: 'action', orderable: false, searchable: false },
                         {data:'created_at', visible:false,searchable:false},
