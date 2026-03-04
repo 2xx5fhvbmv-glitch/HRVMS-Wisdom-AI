@@ -51,64 +51,57 @@ class DashboardController extends Controller
         ->orderBy('PublicHolidaydate', 'asc')
         ->get();
 
-        $rank = config('settings.Position_Rank');
-        $current_rank = $this->resort->getEmployee->rank ?? null;
-        $available_rank = $rank[$current_rank] ?? '';
-        $isHOD = ($available_rank === "HOD");
-        $isHR = ($available_rank === "HR");
-
-        // Treat Human Resources HOD like HR (EXCOM-level visibility for leave module)
-        $hrDeptId = ResortDepartment::where('resort_id', $this->resort->resort_id)
-            ->where('name', 'Human Resources')
-            ->value('id');
+        $hrDeptId = ResortDepartment::where('resort_id', $this->resort->resort_id)->where('name', 'Human Resources')->value('id');
         $loggedInEmployee = $this->resort->getEmployee ?? $this->resort->GetEmployee ?? null;
         $loggedInEmployeeId = $loggedInEmployee->id ?? null;
-        $isHRDeptHOD = $isHOD && $loggedInEmployee && $hrDeptId && (int)$loggedInEmployee->Dept_id === (int)$hrDeptId;
-        if ($isHRDeptHOD) {
-            $isHR = true;
-            $isHOD = false;
-        }
-        if( $isHR ){
+        $userDeptId = $loggedInEmployee->Dept_id ?? null;
+        $isFromHRDepartment = $hrDeptId && $userDeptId && (int) $userDeptId === (int) $hrDeptId;
+
+        if ($isFromHRDepartment) {
             $total_applied_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->count();
+                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->count();
             $total_approved_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Approved')->count();
+                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->where('status', 'Approved')->count();
             $total_pending_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Pending')->count();
+                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->where('status', 'Pending')->count();
             $total_rejected_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Rejected')->count();
-        }
-        else{
+                ->where('el.resort_id', $this->resort->resort_id)->where('flag', null)->where('status', 'Rejected')->count();
+        } else {
             $total_applied_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')->where('flag',null)
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('el.resort_id', $this->resort->resort_id)->count();
+                ->join('employees as e', 'e.id', '=', 'el.emp_id')->where('flag', null)
+                ->where('el.resort_id', $this->resort->resort_id)
+                ->when($userDeptId, function ($q) use ($userDeptId, $loggedInEmployeeId) {
+                    $q->where(function ($q2) use ($userDeptId, $loggedInEmployeeId) {
+                        $q2->where('e.Dept_id', $userDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
+                    });
+                })
+                ->when(!$userDeptId, function ($q) use ($loggedInEmployeeId) {
+                    $q->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
+                })
+                ->count();
 
-            $total_approved_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('flag',null)
-            ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Approved')->count();
-
-            $total_pending_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('flag',null)
-            ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Pending')->count();
-
-            $total_rejected_leaves = DB::table('employees_leaves as el')
-            ->join('employees as e', 'e.id', '=', 'el.emp_id')
-            ->where(function ($q) use ($loggedInEmployeeId) {
-                $q->where('e.reporting_to',$this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
-            })
-            ->where('flag',null)
-            ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Rejected')->count();
+            $baseNonHR = function ($status = null) use ($userDeptId, $loggedInEmployeeId) {
+                $q = DB::table('employees_leaves as el')
+                    ->join('employees as e', 'e.id', '=', 'el.emp_id')
+                    ->where('flag', null)
+                    ->where('el.resort_id', $this->resort->resort_id);
+                if ($userDeptId) {
+                    $q->where(function ($q2) use ($userDeptId, $loggedInEmployeeId) {
+                        $q2->where('e.Dept_id', $userDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
+                    });
+                } else {
+                    $q->where(function ($q2) use ($loggedInEmployeeId) {
+                        $q2->where('e.reporting_to', $this->reporting_to)->orWhere('el.emp_id', $loggedInEmployeeId);
+                    });
+                }
+                if ($status) {
+                    $q->where('el.status', $status);
+                }
+                return $q->count();
+            };
+            $total_approved_leaves = $baseNonHR('Approved');
+            $total_pending_leaves = $baseNonHR('Pending');
+            $total_rejected_leaves = $baseNonHR('Rejected');
         }
 
         // Get today's and tomorrow's month-day (dob is stored as Y-m-d, so compare using m-d)
@@ -138,7 +131,8 @@ class DashboardController extends Controller
             return substr($employee->dob, 5, 5) === $tomorrowMd;
         });
 
-        return view('resorts.leaves.dashboard.admin-dashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves'));
+        $show_department_filter = $isFromHRDepartment;
+        return view('resorts.leaves.dashboard.admin-dashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves','show_department_filter'));
     }
 
     public function HR_Dashobard()
@@ -171,6 +165,9 @@ class DashboardController extends Controller
             $isHR = true;
             $isHOD = false;
         }
+        $userDeptId = $loggedInEmployee->Dept_id ?? null;
+        $isFromHRDepartment = $hrDeptId && $userDeptId && (int)$userDeptId === (int)$hrDeptId;
+        $show_department_filter = $isFromHRDepartment;
 
         $canViewWholeResort = $isHR || $isHRExcom || $isGM;
         if( $canViewWholeResort ){
@@ -247,7 +244,7 @@ class DashboardController extends Controller
             return substr($employee->dob, 5, 5) === $tomorrowMd;
         });
 
-        return view('resorts.leaves.dashboard.hrdashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves'));
+        return view('resorts.leaves.dashboard.hrdashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves','show_department_filter'));
     }
 
     public function hod_dashboard()
@@ -264,18 +261,26 @@ class DashboardController extends Controller
             ->orderBy('PublicHolidaydate', 'asc')
             ->get();
 
-        // HOD sees leave for their department (or direct reportees), including own leave
+        // Only HR department sees whole resort; other departments see only their department
+        $hrDeptId = ResortDepartment::where('resort_id', $this->resort->resort_id)->where('name', 'Human Resources')->value('id');
+        $isFromHRDepartment = $hrDeptId && $hodDeptId && (int) $hodDeptId === (int) $hrDeptId;
+
         $baseLeaveQuery = DB::table('employees_leaves as el')
             ->join('employees as e', 'e.id', '=', 'el.emp_id')
             ->where('el.resort_id', $this->resort->resort_id)
-            ->whereNull('el.flag')
-            ->where(function ($q) use ($hodDeptId, $loggedInEmployeeId) {
-                if ($hodDeptId) {
-                    $q->where('e.Dept_id', $hodDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
-                } else {
-                    $q->where('e.reporting_to', $loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
-                }
+            ->whereNull('el.flag');
+
+        if ($isFromHRDepartment) {
+            // HR department: whole resort
+        } elseif ($hodDeptId) {
+            $baseLeaveQuery->where(function ($q) use ($hodDeptId, $loggedInEmployeeId) {
+                $q->where('e.Dept_id', $hodDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
             });
+        } else {
+            $baseLeaveQuery->where(function ($q) use ($loggedInEmployeeId) {
+                $q->where('e.reporting_to', $loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
+            });
+        }
 
         $total_applied_leaves = (clone $baseLeaveQuery)->count();
 
@@ -285,7 +290,32 @@ class DashboardController extends Controller
 
         $total_rejected_leaves = (clone $baseLeaveQuery)->where('el.status', 'Rejected')->count();
 
-        return view('resorts.leaves.dashboard.hoddashboard', compact('page_title', 'upcomingHolidays', 'resort_departments', 'total_applied_leaves', 'total_approved_leaves', 'total_pending_leaves', 'total_rejected_leaves'));
+        $show_department_filter = $isFromHRDepartment;
+
+        // Today's and tomorrow's birthdays (same as HR dashboard)
+        $todayMd = Carbon::today()->format('m-d');
+        $tomorrowMd = Carbon::tomorrow()->format('m-d');
+        $upcomingBirthdays = Employee::with(['resortAdmin', 'position'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->whereNotNull('dob')
+            ->where('dob', '!=', '')
+            ->where(function ($q) use ($todayMd, $tomorrowMd) {
+                $q->whereRaw('SUBSTRING(dob, 6, 5) = ?', [$todayMd])
+                    ->orWhereRaw('SUBSTRING(dob, 6, 5) = ?', [$tomorrowMd]);
+            })
+            ->get();
+        $upcomingBirthdays = $upcomingBirthdays->map(function ($employee) {
+            $employee->profile_picture = Common::getResortUserPicture($employee->Admin_Parent_id);
+            return $employee;
+        });
+        $todayBirthdays = $upcomingBirthdays->filter(function ($employee) use ($todayMd) {
+            return substr($employee->dob, 5, 5) === $todayMd;
+        });
+        $tomorrowBirthdays = $upcomingBirthdays->filter(function ($employee) use ($tomorrowMd) {
+            return substr($employee->dob, 5, 5) === $tomorrowMd;
+        });
+
+        return view('resorts.leaves.dashboard.hoddashboard', compact('page_title', 'upcomingHolidays', 'todayBirthdays', 'tomorrowBirthdays', 'resort_departments', 'total_applied_leaves', 'total_approved_leaves', 'total_pending_leaves', 'total_rejected_leaves', 'show_department_filter'));
     }
 
     public function get_upcomimg_holidays(Request $request){
@@ -297,13 +327,27 @@ class DashboardController extends Controller
         ->get();
 
         if ($request->ajax()) {
-            $upcomingHolidays = ResortHoliday::where('resort_id', $resort_id)
+            $query = ResortHoliday::where('resort_id', $resort_id)
                 ->where('PublicHolidaydate', '>=', Carbon::now()->toDateString())
-                ->whereRaw('YEAR(PublicHolidaydate) >= ?', [Carbon::now()->year])
-                ->orderBy('PublicHolidaydate', 'asc')
-                ->get();
-        
-            return datatables()->of($upcomingHolidays)
+                ->whereRaw('YEAR(PublicHolidaydate) >= ?', [Carbon::now()->year]);
+
+            return datatables()->of($query)
+                ->order(function ($q) use ($request) {
+                    if ($request->has('order') && $request->has('columns')) {
+                        $order = $request->input('order')[0];
+                        $colIndex = (int) $order['column'];
+                        $dir = strtolower($order['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+                        if ($colIndex === 0 || $colIndex === 1) {
+                            $q->orderBy('PublicHolidaydate', $dir);
+                        } elseif ($colIndex === 2) {
+                            $q->orderBy('PublicHolidayName', $dir);
+                        } else {
+                            $q->orderBy('PublicHolidaydate', 'asc');
+                        }
+                    } else {
+                        $q->orderBy('PublicHolidaydate', 'asc');
+                    }
+                })
                 ->editColumn('PublicHolidaydate', function ($row) {
                     return $row->PublicHolidaydate ? Carbon::parse($row->PublicHolidaydate)->format('d M Y')  : '--';
                 })
@@ -540,6 +584,9 @@ class DashboardController extends Controller
         $department_id = $request->get('department_id', '');
         $position_id = $request->get('position_id', '');
         $search = $request->get('search', '');
+        $filterYear = (int) ($request->get('year') ?: Carbon::now()->year);
+        $yearStart = Carbon::createFromDate($filterYear, 1, 1)->format('Y-m-d');
+        $yearEnd = Carbon::createFromDate($filterYear, 12, 31)->format('Y-m-d');
         $rank = config('settings.Position_Rank');
         $current_rank = $this->resort->getEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
@@ -559,7 +606,10 @@ class DashboardController extends Controller
             $isHOD = false;
         }
 
-        $canViewWholeResort = $isHR || $isHRExcom || $isGM;
+        // HR department, EXCOM and GM see all departments; others see only their own
+        $userDeptId = $loggedInEmployee->Dept_id ?? null;
+        $isFromHRDepartment = $hrDeptId && $userDeptId && (int) $userDeptId === (int) $hrDeptId;
+        $canViewWholeResort = $isFromHRDepartment || $isHRExcom || $isGM;
         $hodDeptId = $loggedInEmployee->Dept_id ?? null;
 
         $permission = Common::checkRouteWisePermission('leave.request', config('settings.resort_permissions.edit')) ? '' : 'd-none';
@@ -573,7 +623,10 @@ class DashboardController extends Controller
                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->where('el.resort_id', $resort_id)
-                ->where('el.flag', null);
+                ->where('el.flag', null)
+                ->where(function ($q) use ($yearStart, $yearEnd) {
+                    $q->where('el.from_date', '<=', $yearEnd)->where('el.to_date', '>=', $yearStart);
+                });
         } elseif ($isHOD) {
             // HOD: see department leaves (or direct reportees), include own leave in list
             $leave_requests_query = DB::table('employees_leaves as el')
@@ -583,7 +636,10 @@ class DashboardController extends Controller
                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->where('el.resort_id', $resort_id)
-                ->where('el.flag', null);
+                ->where('el.flag', null)
+                ->where(function ($q) use ($yearStart, $yearEnd) {
+                    $q->where('el.from_date', '<=', $yearEnd)->where('el.to_date', '>=', $yearStart);
+                });
             if ($hodDeptId) {
                 $leave_requests_query->where(function ($q) use ($hodDeptId, $loggedInEmployeeId) {
                     $q->where('e.Dept_id', $hodDeptId)->orWhere('el.emp_id', $loggedInEmployeeId);
@@ -594,10 +650,17 @@ class DashboardController extends Controller
                 });
             }
         } else {
-            // Leaves where current user is applicant OR has a Pending approver row; then query without els join to get one row per leave
+            // Leaves where current user is applicant OR has a Pending approver row; only same department (other depts see only their data)
             $leaveIds = DB::table('employees_leaves as el')
+                ->join('employees as e', 'e.id', '=', 'el.emp_id')
                 ->where('el.resort_id', $resort_id)
                 ->whereNull('el.flag')
+                ->where(function ($q) use ($yearStart, $yearEnd) {
+                    $q->where('el.from_date', '<=', $yearEnd)->where('el.to_date', '>=', $yearStart);
+                })
+                ->when($userDeptId, function ($q) use ($userDeptId) {
+                    $q->where('e.Dept_id', $userDeptId);
+                })
                 ->where(function ($q) use ($loggedInEmployeeId) {
                     $q->where('el.emp_id', $loggedInEmployeeId)
                         ->orWhereIn('el.id', function ($sub) use ($loggedInEmployeeId) {
@@ -620,10 +683,14 @@ class DashboardController extends Controller
                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                 ->where('el.resort_id', $resort_id)
                 ->where('el.flag', null)
+                ->where(function ($q) use ($yearStart, $yearEnd) {
+                    $q->where('el.from_date', '<=', $yearEnd)->where('el.to_date', '>=', $yearStart);
+                })
                 ->whereIn('el.id', $leaveIds ?: [0]);
         }
 
-        if (!empty($department_id)) {
+        // Department filter: only allow if user can view whole resort or is filtering within their own department
+        if (!empty($department_id) && ($canViewWholeResort || (int) $department_id === (int) $userDeptId)) {
             $leave_requests_query->where('e.Dept_id', $department_id);
         }
         if ($position_id) {
@@ -641,7 +708,7 @@ class DashboardController extends Controller
 
         $selectColumns = [
             'el.*',
-            'el.Emp_id as employee_id',
+            'e.Emp_id as employee_id',
             'e.Admin_Parent_id',
             'e.reporting_to as reporting_to',
             'e.rank as applicant_rank',
@@ -678,9 +745,20 @@ class DashboardController extends Controller
             ->get()
             ->groupBy('leave_request_id');
 
+        // Build approver_id => role label from employees.rank so "Approved by HOD" shows correctly (even when approver_rank on status row is wrong/null)
+        $approverIds = collect($statusesGrouped)->flatten(1)->pluck('approver_id')->filter()->unique()->values()->all();
+        $approverIdToLabel = [];
+        if (!empty($approverIds)) {
+            $approverRanks = Employee::whereIn('id', $approverIds)->pluck('rank', 'id');
+            foreach ($approverRanks as $empId => $r) {
+                $k = $r !== null && $r !== '' ? (string) $r : null;
+                $approverIdToLabel[(int) $empId] = ($k !== null && array_key_exists($k, $rank)) ? $rank[$k] : 'designated approver';
+            }
+        }
+
         $loggedInRankStr = trim((string)($loggedInEmployee->rank ?? ''));
         // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
-        $leave_requests = $leave_requests->map(function ($leaveRequest) use ($statusesGrouped, $rank, $loggedInEmployeeId, $loggedInRankStr) {
+        $leave_requests = $leave_requests->map(function ($leaveRequest) use ($statusesGrouped, $rank, $loggedInEmployeeId, $loggedInRankStr, $approverIdToLabel) {
             $leaveRequest->from_date = Carbon::parse($leaveRequest->from_date)->format('d M');
             $leaveRequest->to_date = Carbon::parse($leaveRequest->to_date)->format('d M');
             $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
@@ -692,26 +770,36 @@ class DashboardController extends Controller
             // Status Logic
             $statuses = $statusesGrouped[$leaveRequest->id] ?? collect();
 
+            // Helper: get role label for an approver (prefer approver_id -> Employee.rank, fallback to status row approver_rank)
+            $getApproverLabel = function ($statusRow) use ($rank, $approverIdToLabel) {
+                $approverIdInt = (int) ($statusRow->approver_id ?? 0);
+                if ($approverIdInt && isset($approverIdToLabel[$approverIdInt])) {
+                    return $approverIdToLabel[$approverIdInt];
+                }
+                $rk = $statusRow->approver_rank !== null && $statusRow->approver_rank !== '' ? (string) $statusRow->approver_rank : null;
+                return ($rk !== null && array_key_exists($rk, $rank)) ? $rank[$rk] : 'designated approver';
+            };
+
             // Check rejection
             $rejected = $statuses->firstWhere('status', 'Rejected');
             $isPending = false;
             $isFullyApproved = false;
             if ($rejected) {
-                $rejectedBy = $rank[$rejected->approver_rank] ?? $rejected->approver_rank;
+                $rejectedBy = $getApproverLabel($rejected);
                 $leaveRequest->status_text = "Rejected by {$rejectedBy}";
             } else {
-                // Check last approved
-                $lastApproved = $statuses->where('status', 'Approved')->last();
-                $approvedRanks = $statuses->where('status', 'Approved')->pluck('approver_rank')->map(function ($r) {
-                    return strtoupper($r);
-                })->unique()->toArray();
+                // Check last approved (by id, so the most recent approval)
+                $lastApproved = $statuses->where('status', 'Approved')->sortByDesc('id')->first();
+                $approvedRanks = $statuses->where('status', 'Approved')->map(function ($s) use ($getApproverLabel) {
+                    return $getApproverLabel($s);
+                })->unique()->filter()->values()->toArray();
 
                 $required = ['HOD', 'GM', 'HR'];
-                if (!array_diff($required, $approvedRanks)) {
+                if (count(array_intersect($required, $approvedRanks)) === count($required)) {
                     $leaveRequest->status_text = "Approved";
                     $isFullyApproved = true;
                 } elseif ($lastApproved) {
-                    $approvedBy = $rank[$lastApproved->approver_rank] ?? $lastApproved->approver_rank;
+                    $approvedBy = $getApproverLabel($lastApproved);
                     $leaveRequest->status_text = "Approved by {$approvedBy}";
                 } else {
                     $leaveRequest->status_text = "Pending";
@@ -719,7 +807,7 @@ class DashboardController extends Controller
                 }
             }
 
-            // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
+            // Can approve: only applicant's reporting_to (from employee profile; can be changed in profile settings) or GM leave: HR/EXCOM/HOD
             $reportingToStr = trim((string)($leaveRequest->reporting_to ?? ''));
             $loggedInIdStr = trim((string)$loggedInEmployeeId);
             $applicantRankStr = trim((string)($leaveRequest->applicant_rank ?? ''));
@@ -771,16 +859,14 @@ class DashboardController extends Controller
         $available_rank = $rank[$current_rank] ?? '';
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
         $isGM = ($employeeRankPosition['position'] ?? '') === 'GM' || ($employeeRankPosition['rank'] ?? '') === 'GM';
-        $isHOD = ($available_rank === 'HOD');
         $hodDeptId = $loggedInEmployee->Dept_id ?? null;
 
-        // Human Resources HOD sees whole-resort chart (same as HR/EXCOM)
+        // Only HR department sees whole resort; other departments see only their data
         $hrDeptId = ResortDepartment::where('resort_id', $this->resort->resort_id)
             ->where('name', 'Human Resources')
             ->value('id');
-        $isHRDeptHOD = $isHOD && $hodDeptId && $hrDeptId && (int)$hodDeptId === (int)$hrDeptId;
-
-        $canViewWholeResort = ($available_rank === "HR") || ($available_rank === "EXCOM") || $isGM || $isHRDeptHOD;
+        $isFromHRDepartment = $hrDeptId && $hodDeptId && (int) $hodDeptId === (int) $hrDeptId;
+        $canViewWholeResort = $isFromHRDepartment;
 
         if ($canViewWholeResort) {
             // Whole resort: one row per leave, correct SUM(total_days); exclude own leave
@@ -791,14 +877,18 @@ class DashboardController extends Controller
                 ->whereBetween('el.from_date', [$startDate, $endDate])
                 ->where('el.emp_id', '!=', $loggedInEmployeeId);
         } else {
-            // HOD / others: leaves where current user was an approver (distinct leave IDs to avoid duplicate rows)
+            // Other departments: only their department's leaves (where user was approver)
             $leaveIds = DB::table('employees_leaves as el')
+                ->join('employees as e', 'e.id', '=', 'el.emp_id')
                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                 ->where('el.status', "Approved")
                 ->where('el.resort_id', $this->resort->resort_id)
                 ->whereBetween('el.from_date', [$startDate, $endDate])
                 ->where('el.emp_id', '!=', $loggedInEmployeeId)
                 ->where('els.approver_id', $loggedInEmployeeId)
+                ->when($hodDeptId, function ($q) use ($hodDeptId) {
+                    $q->where('e.Dept_id', $hodDeptId);
+                })
                 ->distinct()
                 ->pluck('el.id');
 
@@ -812,7 +902,6 @@ class DashboardController extends Controller
             if ($leaveIds->isNotEmpty()) {
                 $leavesDataQuery->whereIn('el.id', $leaveIds->toArray());
             } else {
-                // No leaves where user was approver – return empty result (avoid full table scan)
                 $leavesDataQuery->whereRaw('1 = 0');
             }
         }

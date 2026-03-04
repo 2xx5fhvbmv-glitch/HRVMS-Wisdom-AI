@@ -16,21 +16,23 @@ class EmployeeLeaveExport implements WithMultipleSheets
 {
     use Exportable;
 
-    public $resort_id, $division, $department, $section, $position;
+    public $resort_id, $division, $department, $section, $position, $start_date, $end_date;
 
-    public function __construct($resort_id, $division, $department, $section, $position)
+    public function __construct($resort_id, $division, $department, $section, $position, $start_date = null, $end_date = null)
     {
         $this->resort_id = $resort_id;
         $this->division = $division;
         $this->department = $department;
         $this->section = $section;
         $this->position = $position;
+        $this->start_date = $start_date;
+        $this->end_date = $end_date;
     }
 
     public function sheets(): array
     {
         return [
-            'LeaveData' => new LeaveSheet($this->resort_id, $this->division, $this->department, $this->section, $this->position),
+            'LeaveData' => new LeaveSheet($this->resort_id, $this->division, $this->department, $this->section, $this->position, $this->start_date, $this->end_date),
         ];
     }
 }

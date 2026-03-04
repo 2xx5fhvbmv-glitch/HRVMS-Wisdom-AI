@@ -73,7 +73,7 @@ class EmployeeController extends Controller
                     ) as LeaveCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
                     AND pa.Status = 'Absent'
@@ -83,7 +83,7 @@ class EmployeeController extends Controller
                     ) as AbsentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
                     AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
@@ -93,7 +93,7 @@ class EmployeeController extends Controller
                     ) as PresentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
                     AND pa.Status = 'DayOff'
@@ -178,7 +178,7 @@ class EmployeeController extends Controller
                 ) as LeaveCount
             "),
             DB::raw("
-                (SELECT COUNT(*) FROM parent_attendaces pa
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                  JOIN duty_rosters dr ON pa.roster_id = dr.id
                  WHERE dr.emp_id = employees.id
                    AND pa.Status = 'Absent'
@@ -188,7 +188,7 @@ class EmployeeController extends Controller
                 ) as AbsentCount
             "),
             DB::raw("
-                (SELECT COUNT(*) FROM parent_attendaces pa
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                  JOIN duty_rosters dr ON pa.roster_id = dr.id
                  WHERE dr.emp_id = employees.id
                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
@@ -198,7 +198,7 @@ class EmployeeController extends Controller
                 ) as PresentCount
             "),
             DB::raw("
-                (SELECT COUNT(*) FROM parent_attendaces pa
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                  JOIN duty_rosters dr ON pa.roster_id = dr.id
                  WHERE dr.emp_id = employees.id
                    AND pa.Status = 'DayOff'
@@ -324,7 +324,7 @@ class EmployeeController extends Controller
                     ) as LeaveCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                      JOIN duty_rosters dr ON pa.roster_id = dr.id
                      WHERE dr.emp_id = employees.id
                        AND pa.Status = 'Absent'
@@ -334,7 +334,7 @@ class EmployeeController extends Controller
                     ) as AbsentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                      JOIN duty_rosters dr ON pa.roster_id = dr.id
                      WHERE dr.emp_id = employees.id
                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
@@ -344,7 +344,7 @@ class EmployeeController extends Controller
                     ) as PresentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                      JOIN duty_rosters dr ON pa.roster_id = dr.id
                      WHERE dr.emp_id = employees.id
                        AND pa.Status = 'DayOff'
@@ -491,7 +491,7 @@ class EmployeeController extends Controller
                 't2.code as PositionCode',
                 'employees.Dept_id',
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
@@ -502,7 +502,7 @@ class EmployeeController extends Controller
                     ) as PresentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
@@ -513,7 +513,7 @@ class EmployeeController extends Controller
                     ) as AbsentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN shift_settings ss ON pa.Shift_id = ss.id
                     WHERE pa.Emp_id = employees.id
@@ -524,7 +524,7 @@ class EmployeeController extends Controller
                     ) as OnTimeCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN shift_settings ss ON pa.Shift_id = ss.id
                     WHERE pa.Emp_id = employees.id
@@ -553,7 +553,7 @@ class EmployeeController extends Controller
                     ) as TotalOverTime
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
                     AND pa.Status = 'DayOff'
@@ -944,7 +944,7 @@ class EmployeeController extends Controller
                     't2.code as PositionCode',
                     'employees.Dept_id',
                     DB::raw("
-                        (SELECT COUNT(*)
+                        (SELECT COUNT(DISTINCT pa.date)
                         FROM parent_attendaces pa
                         JOIN duty_rosters dr ON pa.roster_id = dr.id
                         WHERE dr.emp_id = employees.id
@@ -955,7 +955,7 @@ class EmployeeController extends Controller
                         ) as PresentCount
                     "),
                     DB::raw("
-                        (SELECT COUNT(*)
+                        (SELECT COUNT(DISTINCT pa.date)
                         FROM parent_attendaces pa
                         JOIN duty_rosters dr ON pa.roster_id = dr.id
                         WHERE dr.emp_id = employees.id
@@ -966,7 +966,7 @@ class EmployeeController extends Controller
                         ) as AbsentCount
                     "),
                     DB::raw("
-                        (SELECT COUNT(*)
+                        (SELECT COUNT(DISTINCT pa.date)
                         FROM parent_attendaces pa
                         JOIN shift_settings ss ON pa.Shift_id = ss.id
                         WHERE pa.Emp_id = employees.id
@@ -977,7 +977,7 @@ class EmployeeController extends Controller
                         ) as OnTimeCount
                     "),
                     DB::raw("
-                        (SELECT COUNT(*)
+                        (SELECT COUNT(DISTINCT pa.date)
                         FROM parent_attendaces pa
                         JOIN shift_settings ss ON pa.Shift_id = ss.id
                         WHERE pa.Emp_id = employees.id
@@ -1006,7 +1006,7 @@ class EmployeeController extends Controller
                         ) as TotalOverTime
                     "),
                     DB::raw("
-                        (SELECT COUNT(*) FROM parent_attendaces pa
+                        (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                         JOIN duty_rosters dr ON pa.roster_id = dr.id
                         WHERE dr.emp_id = employees.id
                         AND pa.Status = 'DayOff'
@@ -1492,7 +1492,7 @@ class EmployeeController extends Controller
                 't2.position_title',
                 't2.code as PositionCode',
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
@@ -1503,7 +1503,7 @@ class EmployeeController extends Controller
                     ) as PresentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
@@ -1514,7 +1514,7 @@ class EmployeeController extends Controller
                     ) as AbsentCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN shift_settings ss ON pa.Shift_id = ss.id
                     WHERE pa.Emp_id = employees.id
@@ -1525,7 +1525,7 @@ class EmployeeController extends Controller
                     ) as OnTimeCount
                 "),
                 DB::raw("
-                    (SELECT COUNT(*)
+                    (SELECT COUNT(DISTINCT pa.date)
                     FROM parent_attendaces pa
                     JOIN shift_settings ss ON pa.Shift_id = ss.id
                     WHERE pa.Emp_id = employees.id
@@ -1554,7 +1554,7 @@ class EmployeeController extends Controller
                     ) as TotalOverTime
                 "),
                 DB::raw("
-                    (SELECT COUNT(*) FROM parent_attendaces pa
+                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
                     JOIN duty_rosters dr ON pa.roster_id = dr.id
                     WHERE dr.emp_id = employees.id
                     AND pa.Status = 'DayOff'

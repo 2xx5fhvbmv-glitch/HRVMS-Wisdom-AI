@@ -78,42 +78,87 @@
 
 @section('import-scripts')
 <script type="text/javascript">
-    // new DataTable('#example');
     $(document).ready(function () {
-        // full-calendar   
+        var calendarLeavesUrl = '{{ route("calendar.leaves.get") }}';
+
+        function renderSidebarFromEvents(events) {
+            var $sidebar = $('#calsidebar');
+            $sidebar.empty();
+            if (!events || events.length === 0) {
+                $sidebar.html('<p class="text-muted small mb-0">No leaves in this period.</p>');
+                return;
+            }
+            var badgeClass = function(status) {
+                if (status === 'Approved') return 'badge-themeSuccess';
+                if (status === 'Rejected') return 'badge-themeDanger';
+                if (status === 'Pending') return 'badge-themeWarning';
+                return 'badge-secondary';
+            };
+            events.forEach(function(event) {
+                var startFmt = event.start ? moment(event.start).format('D MMM') : '';
+                var endFmt = event.end ? moment(event.end).subtract(1, 'day').format('D MMM') : '';
+                var dateRange = (event.start && event.end && event.start.substring(0,10) === event.end.substring(0,10)) ? startFmt : (startFmt + ' to ' + endFmt);
+                var bgStyle = 'color:' + (event.textColor || '') + ';background:' + (event.backgroundColor || '');
+                var blockHtml = '<div class="leaveUser-bgBlock" style="' + bgStyle + '"><h6>' + (event.title || '') + '</h6></div>' +
+                    '<div class="leaveUser-block">' +
+                    '<div class="img-circle"><img src="' + (event.profile_picture || '') + '" alt=""></div>' +
+                    '<div><h6>' + (event.employee_name || '') + '</h6><p>' + (event.position || '') + '</p>' +
+                    '<span class="badge badge-themeNew1"><i class="fa-regular fa-calendar"></i> ' + dateRange + '</span></div>' +
+                    '<div><span class="badge ' + badgeClass(event.status) + '">' + (event.status || '') + '</span><span class="fw-500">' + (event.total_days || 0) + ' Days</span></div></div>';
+                $sidebar.append(blockHtml);
+            });
+        }
+
+        function fetchAndUpdateSidebar(start, end) {
+            if (!start || !end) return;
+            var startStr = typeof start === 'string' ? start : (start.format ? start.format('YYYY-MM-DD') : '');
+            var endStr = typeof end === 'string' ? end : (end.format ? end.format('YYYY-MM-DD') : '');
+            $.ajax({
+                url: calendarLeavesUrl,
+                data: { start: startStr, end: endStr },
+                dataType: 'json',
+                success: function(data) {
+                    renderSidebarFromEvents(data);
+                },
+                error: function() {
+                    $('#calsidebar').html('<p class="text-muted small mb-0">Unable to load leave list.</p>');
+                }
+            });
+        }
+
         $('#calendar').fullCalendar({
             header: {
                 left: 'prev,next',
                 center: 'title',
                 right: 'month,basicWeek,basicDay'
             },
-            defaultDate: new Date(), // Set to the current date
+            defaultView: 'month',
+            defaultDate: new Date(),
             navLinks: true,
-            editable: false, // Make events non-editable
-            eventLimit: true, // Allow "more" link when too many events
-            events: '{{route("calendar.leaves.get")}}', // Laravel route to fetch events
+            editable: false,
+            eventLimit: true,
+            // Use URL string so FullCalendar automatically sends start & end query params
+            events: calendarLeavesUrl,
             eventRender: function(event, element) {
-                element.attr('title', event.title); // Add tooltip
+                element.attr('title', event.title || '');
+            },
+            viewRender: function(view) {
+                var start = view.start;
+                var end = view.end;
+                if (start && end) {
+                    var startStr = start.format ? start.format('YYYY-MM-DD') : (start.toString ? start.toString().substring(0, 10) : '');
+                    var endStr = end.format ? end.format('YYYY-MM-DD') : (end.toString ? end.toString().substring(0, 10) : '');
+                    if (startStr && endStr) fetchAndUpdateSidebar(startStr, endStr);
+                }
             }
         });
 
-
-        //    equal heigth js 
         function equalizeHeights() {
-            // Get the elements
-            const block1 = document.getElementById('calendar');
-            const block2 = document.getElementById('calsidebar');
-
-            // Get the height of block1
-            const block1Height = block1.offsetHeight;
-
-            // Set the height of block2 to match block1's height
-            block2.style.height = block1Height + 'px';
+            var block1 = document.getElementById('calendar');
+            var block2 = document.getElementById('calsidebar');
+            if (block1 && block2) block2.style.height = block1.offsetHeight + 'px';
         }
-
-        window.onload = equalizeHeights; // Initial height adjustment
-
-        // Adjust heights on window resize
+        window.onload = equalizeHeights;
         window.onresize = equalizeHeights;
     });
 </script>

@@ -83,138 +83,210 @@
                         @endforeach
                     @endif
                 </div>
-                <div class="card bg leaveReq-card mb-4">
-                    <div class="card-title ">
-                        <h3>Leave Request</h3>
+                <div class="card leave-details-card mb-4 shadow-sm border-0 overflow-hidden">
+                    <div class="card-header bg-transparent border-bottom py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <h3 class="mb-0 fw-semibold">Leave Request</h3>
+                        @php
+                            $statusVal = $leaveDetail->status ?? $leaveDetail->leave_status ?? 'Pending';
+                            $statusClass = strtolower($statusVal) === 'approved' ? 'bg-success' : (strtolower($statusVal) === 'rejected' ? 'bg-danger' : 'bg-warning text-dark');
+                        @endphp
+                        <span class="badge {{ $statusClass }} px-3 py-2">{{ $statusVal }}</span>
                     </div>
-                    <div class="bg-white mb-4">
-                        <div class="row g-4">
-                            <div class="col">
-                                <div class="row g-3 h-100 mt-lg-0">
-                                    <div class="col-md-auto">
-                                        <div class="bg-themeGrayLight appleaveReq-block">
-                                            <i>Applied On: {{ \Carbon\Carbon::parse($leaveDetail->created_at)->format('d M, Y') }}</i>
-                                            <div class="d-flex align-items-center justify-content-center">
-                                                <div class="date-block">
-                                                    {{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('M') }}
-                                                    <h5>{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('d') }}</h5>
-                                                    {{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('D') }}
-                                                </div>
-                                               
-                                                @if(isset($leaveDetail->combinedLeave))
-                                                    <div>
-                                                        <img src="{{ URL::asset('resorts_assets/images/arrow.svg')}}" alt="">{{ $leaveDetail->total_days + $leaveDetail->combinedLeave->total_days}} days
-                                                    </div>
-                                                    <div class="date-block">
-                                                    {{ \Carbon\Carbon::parse($leaveDetail->combinedLeave->to_date)->format('M') }}
-                                                        <h5>{{ \Carbon\Carbon::parse($leaveDetail->combinedLeave->to_date)->format('d') }}</h5>
-                                                        {{ \Carbon\Carbon::parse($leaveDetail->combinedLeave->to_date)->format('D') }}
-                                                    </div>
-                                                @else
-                                                    <div>
-                                                        <img src="{{ URL::asset('resorts_assets/images/arrow.svg')}}" alt="">{{ $leaveDetail->total_days }} days
-                                                    </div>
-                                                    <div class="date-block">
-                                                    {{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('M') }}
-                                                        <h5>{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('d') }}</h5>
-                                                        {{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('D') }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
+                    <div class="card-body p-4">
+                        {{-- Leave overview --}}
+                        <div class="leave-overview-card rounded-3 p-4 mb-4">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                                <span class="text-muted small">Applied on {{ \Carbon\Carbon::parse($leaveDetail->created_at)->format('d M, Y') }}</span>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 py-2">
+                                <div class="leave-date-box text-center rounded-2 px-3 py-2">
+                                    <div class="text-uppercase small text-muted">{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('M') }}</div>
+                                    <div class="fs-4 fw-bold">{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('d') }}</div>
+                                    <div class="small">{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('D') }}</div>
+                                </div>
+                                @if(isset($leaveDetail->combinedLeave))
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ URL::asset('resorts_assets/images/arrow.svg')}}" alt="" class="mx-1">
+                                        <span class="fw-semibold">{{ $leaveDetail->total_days + $leaveDetail->combinedLeave->total_days }} days</span>
                                     </div>
-                                    @if(isset($leaveDetail->combinedLeave))
-                                        <div class="col">
-                                            <span class="badge mb-2 border-0" style="color:{{$leaveDetail->color}}; background:{{$leaveDetail->color}}1F;">
-                                                {{ $leaveDetail->leave_type ?? 'N/A' }}
-                                            </span>
-                                            <span class="badge mb-2 border-0" style="color:{{$leaveDetail->combinedLeave->color}}; background:{{$leaveDetail->combinedLeave->color}}1F;">
-                                                {{ $leaveDetail->combinedLeave->leave_type ?? 'N/A' }}
-                                            </span>
-                                            <p>{{ $leaveDetail->reason ?? 'No reason provided' }}</p>
-                                        </div>
+                                    <div class="leave-date-box text-center rounded-2 px-3 py-2">
+                                        <div class="text-uppercase small text-muted">{{ \Carbon\Carbon::parse($leaveDetail->combinedLeave->to_date)->format('M') }}</div>
+                                        <div class="fs-4 fw-bold">{{ \Carbon\Carbon::parse($leaveDetail->combinedLeave->to_date)->format('d') }}</div>
+                                        <div class="small">{{ \Carbon\Carbon::parse($leaveDetail->combinedLeave->to_date)->format('D') }}</div>
+                                    </div>
+                                @else
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ URL::asset('resorts_assets/images/arrow.svg')}}" alt="" class="mx-1">
+                                        <span class="fw-semibold">{{ $leaveDetail->total_days }} days</span>
+                                    </div>
+                                    <div class="leave-date-box text-center rounded-2 px-3 py-2">
+                                        <div class="text-uppercase small text-muted">{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('M') }}</div>
+                                        <div class="fs-4 fw-bold">{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('d') }}</div>
+                                        <div class="small">{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('D') }}</div>
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="mt-3 pt-3 border-top">
+                                @if(isset($leaveDetail->combinedLeave))
+                                    <span class="badge border-0 me-1 mb-1" style="color:{{$leaveDetail->color}}; background:{{$leaveDetail->color}}22;">{{ $leaveDetail->leave_type ?? 'N/A' }}</span>
+                                    <span class="badge border-0 mb-1" style="color:{{$leaveDetail->combinedLeave->color}}; background:{{$leaveDetail->combinedLeave->color}}22;">{{ $leaveDetail->combinedLeave->leave_type ?? 'N/A' }}</span>
+                                @else
+                                    <span class="badge border-0 mb-1" style="color:{{$leaveDetail->color}}; background:{{$leaveDetail->color}}22;">{{ $leaveDetail->leave_type ?? 'N/A' }}</span>
+                                @endif
+                                <p class="mb-0 mt-2 text-secondary">{{ $leaveDetail->reason ?? 'No reason provided' }}</p>
+                            </div>
+                        </div>
+
+                        {{-- Form details grid (col-6) --}}
+                        <h6 class="text-uppercase letter-spacing text-muted mb-3">Application details</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Attachment</div>
+                                    @if ($leaveDetail->attachments)
+                                        <a href="{{ URL::asset($leaveDetail->attachments) }}" target="_blank" class="detail-value d-inline-flex align-items-center gap-2">
+                                            <img src="{{ URL::asset('resorts_assets/images/pdf1.svg') }}" alt="" width="20">
+                                            <span class="a-link">View attachment</span>
+                                        </a>
                                     @else
-                                        <div class="col">
-                                            <span class="badge mb-2 border-0" style="color:{{$leaveDetail->color}}; background:{{$leaveDetail->color}}1F;">
-                                                {{ $leaveDetail->leave_type ?? 'N/A' }}
-                                            </span>
-                                            <p>{{ $leaveDetail->reason ?? 'No reason provided' }}</p>
-                                        </div>
+                                        <span class="detail-value text-muted">No attachment</span>
                                     @endif
-                                    <div class="col-12">
-                                        <table class="table-lableNew w-100 mb-4">
-                                            <tr>
-                                                <th>Attachment:</th>
-                                                <td>
-                                                    @if ($leaveDetail->attachments)
-                                                        <a href="{{ URL::asset($leaveDetail->attachments) }}" target="_blank">
-                                                            <img src="{{ URL::asset('resorts_assets/images/pdf1.svg') }}" alt="icon" class="me-2">
-                                                        </a>
-                                                        <a href="{{ URL::asset($leaveDetail->attachments) }}" class="a-link" target="_blank">View</a>
-                                                    @else
-                                                        No attachment available
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <th>Task delegation:</th>
-                                                <td>
-                                                    <div class="tableUser-block">
-                                                        <div class="img-circle">
-                                                            <img src="{{ $leaveDetail->task_delegation_profile_picture ? $leaveDetail->task_delegation_profile_picture : URL::asset('resorts_assets/images/user-2.svg') }}" alt="user">
-                                                        </div>
-                                                        <span class="userApplicants-btn">{{$leaveDetail->task_delegation_first_name}} {{$leaveDetail->task_delegation_last_name}}</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <th>Destination:</th>
-                                                <td>{{$leaveDetail->destination}}</td>
-                                            </tr>
-                                            <tr>
-                                                <th>Transportation:</th>
-                                                <td>{{$leaveDetail->transportation ?? "No Provided"}}</td>
-                                            </tr>
-                                            <tr>
-                                                <th>Leave reason:</th>
-                                                <td>{{$leaveDetail->reason ?? "No Provided"}}</td>
-                                            </tr>
-                                             <tr>
-                                                <th>Departure date:</th>
-                                                <td>{{$leaveDetail->depature_date ?? "No Provided"}}</td>
-                                            </tr>
-                                            <tr>
-                                                <th>Arrival date:</th>
-                                                <td>{{$leaveDetail->arrival_date ?? "No Provided"}}</td>
-                                            </tr>
-                                        </table>
-                                    </div>
-
-                                    <div class="col-12 mt-auto">
-                                        <div class="card-footer">
-                                            <div class="row align-items-center g-xxl-3 g-2">
-                                                @if($canApproveThisLeave ?? false)
-                                                    <div class="col-auto"> 
-                                                        <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Reject</button>
-                                                    </div>
-                                                    <div class="col-auto"> 
-                                                        <a href="#" class="a-linkTheme  @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" id="recommendDateBtn" data-leave-id="{{$leaveDetail->id}}">Recommend an alternative date</a>
-                                                    </div>
-                                                @endif
-
-                                                @if($available_rank == "HR")
-                                                    <div class="col-auto ms-auto">
-                                                        <button href="#" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn btn-themeSkyblue btn-sm">Send Email To Travel Partner</button>
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Task delegation</div>
+                                    <div class="detail-value d-inline-flex align-items-center gap-2">
+                                        <img src="{{ $leaveDetail->task_delegation_profile_picture ? $leaveDetail->task_delegation_profile_picture : URL::asset('resorts_assets/images/user-2.svg') }}" alt="" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;">
+                                        <span>{{ $leaveDetail->task_delegation_first_name ?? '—' }} {{ $leaveDetail->task_delegation_last_name ?? '' }}</span>
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Destination</div>
+                                    <span class="detail-value">{{ $leaveDetail->destination ?: '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Transportation</div>
+                                    <span class="detail-value">{{ $leaveDetail->transportation_label ?? ($leaveDetail->transportation ? '—' : '—') }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Leave reason</div>
+                                    <span class="detail-value">{{ $leaveDetail->reason ?? '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Departure date</div>
+                                    <span class="detail-value">{{ $leaveDetail->departure_date ? \Carbon\Carbon::parse($leaveDetail->departure_date)->format('d M, Y') : '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Arrival date</div>
+                                    <span class="detail-value">{{ $leaveDetail->arrival_date ? \Carbon\Carbon::parse($leaveDetail->arrival_date)->format('d M, Y') : '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">From date</div>
+                                    <span class="detail-value">{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('d M, Y') }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">To date</div>
+                                    <span class="detail-value">{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('d M, Y') }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item rounded-2 p-3 h-100">
+                                    <div class="detail-label">Total days</div>
+                                    <span class="detail-value fw-semibold">{{ $leaveDetail->total_days }} day(s)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if(isset($departurePass) && $departurePass)
+                        <div class="mt-4 pt-4 border-top">
+                            <h6 class="text-uppercase letter-spacing text-muted mb-3">Departure pass</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="detail-item rounded-2 p-3 h-100">
+                                        <div class="detail-label">Departure date</div>
+                                        <span class="detail-value">{{ $departurePass->departure_date ? \Carbon\Carbon::parse($departurePass->departure_date)->format('d M, Y') : '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="detail-item rounded-2 p-3 h-100">
+                                        <div class="detail-label">Departure time</div>
+                                        <span class="detail-value">{{ $departurePass->departure_time ?? '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="detail-item rounded-2 p-3 h-100">
+                                        <div class="detail-label">Arrival date</div>
+                                        <span class="detail-value">{{ $departurePass->arrival_date ? \Carbon\Carbon::parse($departurePass->arrival_date)->format('d M, Y') : '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="detail-item rounded-2 p-3 h-100">
+                                        <div class="detail-label">Arrival time</div>
+                                        <span class="detail-value">{{ $departurePass->arrival_time ?? '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="detail-item rounded-2 p-3 h-100">
+                                        <div class="detail-label">Transportation</div>
+                                        <span class="detail-value">{{ $departurePass->transportation_label ?? '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="detail-item rounded-2 p-3 h-100">
+                                        <div class="detail-label">Status</div>
+                                        @php
+                                            $passStatus = $departurePass->status ?? 'Pending';
+                                            $passStatusClass = strtolower($passStatus) === 'approved' ? 'bg-success' : (strtolower($passStatus) === 'rejected' ? 'bg-danger' : 'bg-warning text-dark');
+                                        @endphp
+                                        <span class="badge {{ $passStatusClass }}">{{ $passStatus }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="detail-item rounded-2 p-3">
+                                        <div class="detail-label">Reason</div>
+                                        <span class="detail-value">{{ $departurePass->reason ?? $departurePass->departure_reason ?? $departurePass->arrival_reason ?? '—' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+
+                    @if($canApproveThisLeave ?? false)
+                    <div class="card-footer bg-light border-top py-3">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
+                            <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Reject</button>
+                            <a href="#" class="btn btn-link btn-sm text-decoration-none" id="recommendDateBtn" data-leave-id="{{$leaveDetail->id}}">Recommend alternative date</a>
+                            @if($available_rank == "HR")
+                                <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn btn-themeSkyblue btn-sm ms-auto">Send Email To Travel Partner</button>
+                            @endif
+                        </div>
+                    </div>
+                    @elseif($available_rank == "HR")
+                    <div class="card-footer bg-light border-top py-3">
+                        <div class="d-flex justify-content-end">
+                            <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn btn-themeSkyblue btn-sm">Send Email To Travel Partner</button>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+                <!-- </div> old structure -->
                             <!-- <div class="col-lg-auto">
                                 <div class="leaveReqTicket-main">
                                     <div class="ratio cover">
@@ -280,9 +352,6 @@
                                     </div>
                                 </div>
                             </div> -->
-                        </div>
-                    </div>
-                </div>
                 <div class="card-header">
                     <div class="row g-md-3 g-2 align-items-center">
                         <div class="col">
@@ -314,6 +383,7 @@
                             <th>Total Days</th>
                             <th>Attachment</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -369,9 +439,121 @@
             </div>
         </div>
     </div>
+
+    {{-- Leave History View Detail Modal --}}
+    <div class="modal fade" id="leaveHistoryDetailModal" tabindex="-1" aria-labelledby="leaveHistoryDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-semibold" id="leaveHistoryDetailModalLabel">Leave Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-0" id="leaveHistoryDetailModalBody">
+                    <div class="text-center py-4" id="leaveHistoryDetailLoading">
+                        <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                    </div>
+                    <div id="leaveHistoryDetailContent" class="d-none">
+                        <div class="mb-3">
+                            <small class="text-uppercase text-muted d-block">Leave application status</small>
+                            <span id="modalLeaveStatus" class="badge bg-warning text-dark">Pending</span>
+                        </div>
+                        <div class="d-flex justify-content-center gap-3 mb-4">
+                            <div class="border rounded-2 p-3 text-center" style="min-width:80px;">
+                                <div class="fw-bold fs-5" id="modalFromDay">—</div>
+                                <small class="text-muted">From</small>
+                            </div>
+                            <div class="border rounded-2 p-3 text-center" style="min-width:80px;">
+                                <div class="fw-bold fs-5" id="modalToDay">—</div>
+                                <small class="text-muted">To</small>
+                            </div>
+                        </div>
+                        <h6 class="text-uppercase letter-spacing text-muted mb-2">Application details</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Leave category</span><div class="detail-value" id="modalLeaveCategory">—</div></div></div>
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Reporting to</span><div class="detail-value" id="modalReportingTo">—</div></div></div>
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Reason for leave</span><div class="detail-value" id="modalReason">—</div></div></div>
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Leave from date</span><div class="detail-value" id="modalFromDate">—</div></div></div>
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Leave to date</span><div class="detail-value" id="modalToDate">—</div></div></div>
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Total days</span><div class="detail-value" id="modalTotalDays">—</div></div></div>
+                            <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Attachment</span><div class="detail-value" id="modalAttachment">—</div></div></div>
+                        </div>
+                        <div id="modalDeparturePassSection" class="d-none">
+                            <h6 class="text-uppercase letter-spacing text-muted mb-2">Departure pass</h6>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Departure date</span><div class="detail-value" id="modalDepDate">—</div></div></div>
+                                <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Departure time</span><div class="detail-value" id="modalDepTime">—</div></div></div>
+                                <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Arrival date</span><div class="detail-value" id="modalArrDate">—</div></div></div>
+                                <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Arrival time</span><div class="detail-value" id="modalArrTime">—</div></div></div>
+                                <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Reason</span><div class="detail-value" id="modalDepReason">—</div></div></div>
+                                <div class="col-md-6"><div class="detail-item rounded-2 p-2"><span class="detail-label">Status</span><div class="detail-value" id="modalDepStatus">—</div></div></div>
+                            </div>
+                        </div>
+                        <div class="detail-item rounded-2 p-2" id="modalRemarksWrap">
+                            <span class="detail-label">Remarks</span>
+                            <div class="detail-value" id="modalRemarks">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('import-css')
+<style>
+    .leave-details-card .leave-overview-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f5 100%);
+        border: 1px solid rgba(0,0,0,.06);
+    }
+    .leave-details-card .leave-date-box {
+        background: #fff;
+        border: 1px solid rgba(0,0,0,.08);
+        min-width: 70px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .leave-details-card .detail-item {
+        background: #f8f9fa;
+        border: 1px solid rgba(0,0,0,.06);
+        transition: background .15s ease, border-color .15s ease;
+    }
+    .leave-details-card .detail-item:hover {
+        background: #f1f3f5;
+        border-color: rgba(0,0,0,.08);
+    }
+    .leave-details-card .detail-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6c757d;
+        margin-bottom: 0.35rem;
+    }
+    .leave-details-card .detail-value {
+        font-size: 0.9375rem;
+        color: #212529;
+    }
+    .leave-details-card     .letter-spacing {
+        letter-spacing: 0.05em;
+    }
+    #leaveHistoryDetailModal .detail-item {
+        background: #f8f9fa;
+        transition: background 0.2s;
+    }
+    #leaveHistoryDetailModal .detail-item:hover {
+        background: #eef0f2;
+    }
+    #leaveHistoryDetailModal .detail-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6c757d;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    #leaveHistoryDetailModal .detail-value {
+        font-weight: 500;
+        color: #212529;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -400,53 +582,73 @@
                     data: {
                         leave_catId: leave_catId,
                         empID: empID,
-                        start: data.start, // Starting record for pagination
-                        length: data.length, // Number of records to fetch
-                        draw: data.draw // DataTables draw counter
+                        start: data.start,
+                        length: data.length,
+                        draw: data.draw
                     },
                     success: function (response) {
+                        var draw = (response && response.draw != null) ? response.draw : data.draw;
+                        var recordsTotal = (response && response.recordsTotal != null) ? response.recordsTotal : 0;
+                        var recordsFiltered = (response && response.recordsFiltered != null) ? response.recordsFiltered : 0;
+                        var dataRows = (response && Array.isArray(response.data)) ? response.data : [];
                         callback({
-                            draw: response.draw,
-                            recordsTotal: response.recordsTotal,
-                            recordsFiltered: response.recordsFiltered,
-                            data: response.data
+                            draw: draw,
+                            recordsTotal: recordsTotal,
+                            recordsFiltered: recordsFiltered,
+                            data: dataRows
                         });
                     },
-                    error: function () {
-                        console.error('Error fetching data from server.');
+                    error: function (xhr) {
+                        callback({
+                            draw: data.draw,
+                            recordsTotal: 0,
+                            recordsFiltered: 0,
+                            data: []
+                        });
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Failed to load leave history.';
+                        if (typeof toastr !== 'undefined') {
+                            toastr.error(msg);
+                        } else {
+                            console.error(msg);
+                        }
                     }
                 });
             },
             columns: [
-                { data: 'leave_category', name: 'leave_category' },
-                { data: 'reason', name: 'reason' },
-                { data: 'from_date', name: 'from_date' },
-                { data: 'to_date', name: 'to_date' },
-                { data: 'total_days', name: 'total_days' },
+                { data: 'leave_category', name: 'leave_category', defaultContent: '—' },
+                { data: 'reason', name: 'reason', defaultContent: '—' },
+                { data: 'from_date', name: 'from_date', defaultContent: '—' },
+                { data: 'to_date', name: 'to_date', defaultContent: '—' },
+                { data: 'total_days', name: 'total_days', defaultContent: '—' },
                 {
                     data: 'attachments',
+                    defaultContent: 'No Attachment',
                     render: function (data) {
-                        return data
-                            ? `<a href="${data}" target="_blank"><img src="/resorts_assets/images/pdf1.svg" alt="attachment"></a>`
-                            : 'No Attachment';
+                        if (!data) return 'No Attachment';
+                        var url = typeof data === 'string' ? data : (data.url || '');
+                        return url ? '<a href="' + url + '" target="_blank"><img src="/resorts_assets/images/pdf1.svg" alt="attachment"></a>' : 'No Attachment';
                     }
                 },
                 {
                     data: 'status',
-                    render: function(data, type, row) {
-                        let statusClass = 'badge-secondary'; // Default class
-
-                        // Check for specific keywords in the status text and assign the appropriate class
-                        if (row.status_text.includes('Approved')) {
-                            statusClass = 'badge-themeSuccess'; // Green for approved
-                        } else if (row.status_text.includes('Rejected')) {
-                            statusClass = 'badge-themeDanger'; // Red for rejected
-                        } else if (row.status_text.includes('Pending')) {
-                            statusClass = 'badge-themeWarning'; // Yellow for pending
-                        }
-
-                        // Render the badge with the dynamic class and status text
-                        return `<span class="badge ${statusClass}">${row.status_text}</span>`;
+                    defaultContent: 'Pending',
+                    render: function (data, type, row) {
+                        var statusText = (row && row.status_text != null) ? String(row.status_text) : 'Pending';
+                        var statusClass = 'badge-secondary';
+                        if (statusText.indexOf('Approved') !== -1) statusClass = 'badge-themeSuccess';
+                        else if (statusText.indexOf('Rejected') !== -1) statusClass = 'badge-themeDanger';
+                        else if (statusText.indexOf('Pending') !== -1) statusClass = 'badge-themeWarning';
+                        return '<span class="badge ' + statusClass + '">' + statusText + '</span>';
+                    }
+                },
+                {
+                    data: 'id',
+                    orderable: false,
+                    searchable: false,
+                    defaultContent: '',
+                    render: function (data) {
+                        var id = (data != null && data !== '') ? String(data) : '';
+                        return '<a href="#" class="btn btn-sm btn-link p-0 view-history-detail" data-leave-id="' + id + '" title="View"><i class="fa-regular fa-eye"></i></a>';
                     }
                 }
             ]
@@ -455,6 +657,93 @@
         // Refresh table on category filter change
         $('#category-filter').on('change', function () {
             $('#table-leaveHistory').DataTable().ajax.reload();
+        });
+
+        // Leave History: View detail modal
+        $(document).on('click', '.view-history-detail', function (e) {
+            e.preventDefault();
+            var leaveId = parseInt($(this).attr('data-leave-id') || $(this).data('leave-id') || 0, 10);
+            var empID = parseInt($('#empID').val() || $('#empID').attr('value') || 0, 10);
+            if (!leaveId || !empID) {
+                if (typeof toastr !== 'undefined') toastr.error('Missing leave or employee.');
+                return;
+            }
+            var $modal = $('#leaveHistoryDetailModal');
+            var modalEl = document.getElementById('leaveHistoryDetailModal');
+            var $loading = $('#leaveHistoryDetailLoading');
+            var $content = $('#leaveHistoryDetailContent');
+            $loading.removeClass('d-none');
+            $content.addClass('d-none');
+            try {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal && modalEl) {
+                    var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    bsModal.show();
+                } else if ($modal.length && typeof $modal.modal === 'function') {
+                    $modal.modal('show');
+                } else {
+                    $modal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
+                    $('body').addClass('modal-open');
+                }
+            } catch (err) {
+                $modal.addClass('show').css('display', 'block').attr('aria-hidden', 'false');
+                $('body').addClass('modal-open');
+            }
+            $.ajax({
+                url: '{{ route("leave.history.detail") }}',
+                type: 'GET',
+                dataType: 'json',
+                data: { leave_id: leaveId, empID: empID },
+                success: function (res) {
+                    $loading.addClass('d-none');
+                    if (!res.success || !res.leave) {
+                        $content.find('.detail-value').text('—');
+                        $('#modalLeaveStatus').text('Error loading details');
+                        $content.removeClass('d-none');
+                        return;
+                    }
+                    var L = res.leave;
+                    var statusClass = (L.status_label || '').toLowerCase() === 'approved' ? 'bg-success' : ((L.status_label || '').toLowerCase() === 'rejected' ? 'bg-danger' : 'bg-warning text-dark');
+                    $('#modalLeaveStatus').attr('class', 'badge ' + statusClass).text(L.status_label || 'Pending');
+                    $('#modalFromDay').text(L.from_date ? L.from_date_formatted || L.from_date : '—');
+                    $('#modalToDay').text(L.to_date ? L.to_date_formatted || L.to_date : '—');
+                    $('#modalLeaveCategory').text(L.leave_category || '—');
+                    $('#modalReportingTo').text(L.reporting_to_name || '—');
+                    $('#modalReason').text(L.reason || '—');
+                    $('#modalFromDate').text(L.from_date_formatted || '—');
+                    $('#modalToDate').text(L.to_date_formatted || '—');
+                    $('#modalTotalDays').text(L.total_days != null ? L.total_days + ' day(s)' : '—');
+                    if (L.attachments) {
+                        $('#modalAttachment').html('<a href="' + L.attachments + '" target="_blank"><img src="/resorts_assets/images/pdf1.svg" alt="attachment"></a>');
+                    } else {
+                        $('#modalAttachment').text('No Attachment');
+                    }
+                    var dp = res.departure_pass;
+                    if (dp) {
+                        $('#modalDeparturePassSection').removeClass('d-none');
+                        $('#modalDepDate').text(dp.departure_date_formatted || '—');
+                        $('#modalDepTime').text(dp.departure_time || '—');
+                        $('#modalArrDate').text(dp.arrival_date_formatted || '—');
+                        $('#modalArrTime').text(dp.arrival_time || '—');
+                        $('#modalDepReason').text(dp.reason_text || '—');
+                        var passBadge = dp.pass_status ? '<span class="badge bg-warning text-dark">' + dp.pass_status + '</span>' : '—';
+                        $('#modalDepStatus').html(passBadge);
+                    } else {
+                        $('#modalDeparturePassSection').addClass('d-none');
+                    }
+                    $('#modalRemarks').text(L.destination || '—');
+                    $content.removeClass('d-none');
+                },
+                error: function (xhr) {
+                    $loading.addClass('d-none');
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Failed to load leave details.';
+                    $('#modalLeaveStatus').attr('class', 'badge bg-danger').text('Error');
+                    $('#modalFromDay,#modalToDay,#modalLeaveCategory,#modalReportingTo,#modalReason,#modalFromDate,#modalToDate,#modalTotalDays,#modalRemarks').text('—');
+                    $('#modalAttachment').text('—');
+                    $('#modalDeparturePassSection').addClass('d-none');
+                    $content.removeClass('d-none');
+                    if (typeof toastr !== 'undefined') toastr.error(msg); else alert(msg);
+                }
+            });
         });
 
         let currentLeaveId = null; // To track the leave ID being rejected

@@ -54,14 +54,15 @@ $(document).ready(function() {
         pageLength: 6,
         processing: true,
         serverSide: true,
+        order: [[0, 'asc']],
         ajax: {
             url: '{{ route("resort.upcomingholiday.list") }}',
             type: 'GET',
         },
         columns: [
-            { data: 'PublicHolidaydate', name: 'PublicHolidaydate', className: 'text-nowrap' },
-            { data: 'day', name: 'day', className: 'text-nowrap' },
-            { data: 'PublicHolidayName', name: 'PublicHolidayName', className: 'text-nowrap' },
+            { data: 'PublicHolidaydate', name: 'PublicHolidaydate', className: 'text-nowrap', orderable: true },
+            { data: 'day', name: 'day', className: 'text-nowrap', orderable: true },
+            { data: 'PublicHolidayName', name: 'PublicHolidayName', className: 'text-nowrap', orderable: true },
         ],
         error: function (xhr, error, code) {
             console.error('Error:', error);

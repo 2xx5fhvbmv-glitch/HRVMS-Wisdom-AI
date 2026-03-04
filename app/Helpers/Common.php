@@ -1295,45 +1295,66 @@ class Common
 
     public static function getResortUserPicture($userId ,$type = 0)
 	{
-        if (Auth::guard('resort-admin')->check() && request()->route()->getPrefix() === '/resort' || Auth::guard('api')->check())
-        {
-            $admin = ResortAdmin::with('resort')->find($userId);
-            if($type == 1)
-            {
-                $profilePicturePath =  $aws = Self::GetApplicantAWSFile($admin->signature_img);
+        $defaultPicture = url(config('settings.default_picture'));
 
-                if ($aws['success'] == true)
-                {
-                    $profilePicture = $aws['NewURLshow'];
-                } else {
-                    $profilePicture = url(config('settings.default_picture'));
-                }
-            }
-            else
-            {
-                if( isset($admin->profile_picture) &&  $admin->profile_picture)
-                {
-                    $aws = Self::GetApplicantAWSFile($admin->profile_picture);
-                    if ($aws['success'] == true)
-                    {
-                        $profilePicture = $aws['NewURLshow'];
-                    }
-                    else
-                    {
-                        $profilePicture = url(config('settings.default_picture'));
-                    }
-                }
-                else
-                {
-                    $profilePicture = url(config('settings.default_picture'));
-                }
-            }
+        if (!$userId) {
+            return $defaultPicture;
         }
-        else
-        {
-            $profilePicture = url(config('settings.default_picture'));
+
+        $routePrefix = null;
+        try {
+            if (request()->route()) {
+                $routePrefix = request()->route()->getPrefix();
+            }
+        } catch (\Throwable $e) {
+            // Ignore when route is not available
         }
-        return $profilePicture;
+        $prefixMatch = $routePrefix === 'resort' || $routePrefix === '/resort';
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check();
+
+        if (!$isResortContext) {
+            return $defaultPicture;
+        }
+
+        $admin = ResortAdmin::with('resort')->find($userId);
+        if (!$admin) {
+            return $defaultPicture;
+        }
+
+        if ($type == 1) {
+            if (empty($admin->signature_img)) {
+                return $defaultPicture;
+            }
+            $aws = Self::GetApplicantAWSFile($admin->signature_img);
+            if ($aws['success'] == true) {
+                return $aws['NewURLshow'];
+            }
+            return $defaultPicture;
+        }
+
+        if (empty($admin->profile_picture)) {
+            return $defaultPicture;
+        }
+
+        $aws = Self::GetApplicantAWSFile($admin->profile_picture);
+        if ($aws['success'] == true) {
+            return $aws['NewURLshow'];
+        }
+
+        // Fallback: treat profile_picture as public path (e.g. uploads/resortprofile/filename.jpg)
+        $path = $admin->profile_picture;
+        if (strpos($path, 'http') === 0) {
+            return $path;
+        }
+        $path = ltrim($path, '/');
+        if (file_exists(public_path($path))) {
+            return asset($path);
+        }
+        if (file_exists(public_path(config('settings.ResortProfile_folder', 'uploads/resortprofile') . '/' . basename($path)))) {
+            return asset(config('settings.ResortProfile_folder', 'uploads/resortprofile') . '/' . basename($path));
+        }
+
+        return $defaultPicture;
 	}
 
     public static function CheckResortPermissions($module_id,$pageid,$Permission_id)
@@ -2364,14 +2385,14 @@ class Common
         if($flag =="weekly")
         {
 
-            $DutyRoster = DutyRoster::join('duty_roster_entries as t2','t2.Emp_id',"=","duty_rosters.Emp_id")
+            $DutyRoster = DutyRoster::join('duty_roster_entries as t2', 't2.Emp_id', '=', 'duty_rosters.Emp_id')
              ->join('shift_settings as t1','t1.id',"=","t2.Shift_id")
              ->whereBetween('t2.date',[$WeekstartDate, $WeekendDate])
              ->where('t1.resort_id','=',$resort_id)
              ->where('duty_rosters.id','=',$duty_roster_id)
             //  ->where('duty_rosters.Year','=',date('Y'))
              ->orderBy('t2.date','asc')
-             ->get(['t2.Status','t2.id as Attd_id','t2.date','t2.Shift_id','duty_rosters.DayOfDate','t1.ShiftName','OverTime','t1.StartTime','t1.EndTime','t2.DayWiseTotalHours'])
+             ->get(['t2.Status','t2.id as Attd_id','t2.date','t2.Shift_id','t2.roster_id','duty_rosters.DayOfDate','t1.ShiftName','t2.OverTime','t1.StartTime','t1.EndTime','t2.DayWiseTotalHours'])
              ->map(function ($roster)  {
                  if($roster->ShiftName =="First Shift")
                  {
@@ -2417,8 +2438,8 @@ class Common
                     ->where('duty_rosters.id', '=', $duty_roster_id)
                     ->orderBy('t2.date', 'asc')
                     ->get([
-                        't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date', 't2.Shift_id', 'duty_rosters.DayOfDate',
-                        't1.ShiftName', 'OverTime', 't1.StartTime', 't1.EndTime', 't2.DayWiseTotalHours'
+                        't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date', 't2.Shift_id', 't2.roster_id', 'duty_rosters.DayOfDate',
+                        't1.ShiftName', 't2.OverTime', 't1.StartTime', 't1.EndTime', 't2.DayWiseTotalHours'
                     ])
                     ->map(function ($roster)    use ($LeaveCategory,$resort_id) {
 
@@ -2894,16 +2915,18 @@ class Common
                                 $roster->msg = "Continue";
                             }
 
-                            // Get leave data
+                            // Get leave data (use Y-m-d for date column comparison)
+                            $startStr = $startOfMonth->format('Y-m-d');
+                            $endStr = $endOfMonth->format('Y-m-d');
                             $Leavevcategory = LeaveCategory::join('employees_leaves as t1', 't1.leave_category_id', '=', 'leave_categories.id')
                                                 ->where('t1.Emp_id', $roster->Emp_id)
                                                 ->where('leave_categories.resort_id', $resort_id)
-                                                ->where(function ($query) use ($startOfMonth, $endOfMonth) {
-                                                    $query->whereBetween('t1.from_date', [$startOfMonth, $endOfMonth]) // Leave starts in the month
-                                                        ->orWhereBetween('t1.to_date', [$startOfMonth, $endOfMonth])   // Leave ends in the month
-                                                        ->orWhere(function ($query) use ($startOfMonth, $endOfMonth) { // Leave spans the entire month
-                                                            $query->where('t1.from_date', '<', $startOfMonth)
-                                                                ->where('t1.to_date', '>', $endOfMonth);
+                                                ->where(function ($query) use ($startStr, $endStr) {
+                                                    $query->whereBetween('t1.from_date', [$startStr, $endStr])
+                                                        ->orWhereBetween('t1.to_date', [$startStr, $endStr])
+                                                        ->orWhere(function ($query) use ($startStr, $endStr) {
+                                                            $query->where('t1.from_date', '<', $startStr)
+                                                                ->where('t1.to_date', '>', $endStr);
                                                         });
                                                 })
                                                 ->where('t1.status', 'Approved')

@@ -93,6 +93,72 @@
 		</div>
 	</div>
 </div>
+
+    {{-- View Boarding Pass Detail Modal --}}
+    <div class="modal fade" id="boardingPassViewModal" tabindex="-1" aria-labelledby="boardingPassViewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="boardingPassViewModalLabel">Boarding Pass Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="boardingPassViewContent">
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Employee ID</div>
+                            <div class="col-7" id="view-emp-id">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Employee Name</div>
+                            <div class="col-7" id="view-employee-name">—</div>
+                        </div>
+                        <hr class="my-3">
+                        <h6 class="text-muted mb-2">Departure</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Date</div>
+                            <div class="col-7" id="view-departure-date">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Time</div>
+                            <div class="col-7" id="view-departure-time">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Transportation</div>
+                            <div class="col-7" id="view-departure-transportation">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Reason</div>
+                            <div class="col-7" id="view-departure-reason">—</div>
+                        </div>
+                        <hr class="my-3">
+                        <h6 class="text-muted mb-2">Arrival</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Date</div>
+                            <div class="col-7" id="view-arrival-date">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Time</div>
+                            <div class="col-7" id="view-arrival-time">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Transportation</div>
+                            <div class="col-7" id="view-arrival-transportation">—</div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Reason</div>
+                            <div class="col-7" id="view-arrival-reason">—</div>
+                        </div>
+                        <hr class="my-3">
+                        <div class="row g-2 mb-2">
+                            <div class="col-5 text-muted">Status</div>
+                            <div class="col-7"><span id="view-status" class="badge">—</span></div>
+                        </div>
+                    </div>
+                    <div id="boardingPassViewError" class="alert alert-danger d-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('import-css')
@@ -232,6 +298,66 @@ $(document).ready(function () {
            
            GetApprovedBoradingPasses();
        });
+
+        $(document).on("click", ".view-boarding-pass-detail", function (e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var $row = $btn.closest("tr");
+            // Column order: EmpID(0), EmployeeName(1), Transportation(2), ArrivalDate(3), ArrivalTime(4), DepartureDate(5), DepartureTime(6), Status(7), Action(8)
+            var rowArrivalTime = $row.find("td:eq(4)").text().trim();
+            var rowDepartureTime = $row.find("td:eq(6)").text().trim();
+            var rowTransportation = $row.find("td:eq(2)").text().trim();
+            var id = $btn.attr("data-pass-id") || $btn.data("pass-id");
+            if (!id) return;
+            var url = "{{ route('resort.boardingpass.detail') }}?id=" + encodeURIComponent(id);
+            $("#boardingPassViewError").addClass("d-none").text("");
+            $("#boardingPassViewContent").show();
+            $.ajax({
+                url: url,
+                type: "GET",
+                dataType: "json",
+                success: function (res) {
+                    if (res && res.success && res.data) {
+                        var d = res.data;
+                        $("#view-emp-id").text(d.emp_id != null ? d.emp_id : "—");
+                        $("#view-employee-name").text(d.employee_name != null ? d.employee_name : "—");
+                        $("#view-departure-date").text(d.departure_date != null ? d.departure_date : "—");
+                        $("#view-departure-time").text((d.departure_time && d.departure_time !== "—") ? d.departure_time : (rowDepartureTime || "—"));
+                        $("#view-departure-transportation").text((d.departure_transportation && d.departure_transportation !== "—") ? d.departure_transportation : (rowTransportation && rowTransportation !== "-" ? rowTransportation : "—"));
+                        $("#view-departure-reason").text(d.departure_reason != null ? d.departure_reason : "—");
+                        $("#view-arrival-date").text(d.arrival_date != null ? d.arrival_date : "—");
+                        $("#view-arrival-time").text((d.arrival_time && d.arrival_time !== "—") ? d.arrival_time : (rowArrivalTime || "—"));
+                        $("#view-arrival-transportation").text((d.arrival_transportation && d.arrival_transportation !== "—") ? d.arrival_transportation : (rowTransportation && rowTransportation !== "-" ? rowTransportation : "—"));
+                        $("#view-arrival-reason").text(d.arrival_reason != null ? d.arrival_reason : "—");
+                        var badgeClass = (d.status == "Approved") ? "badge-success" : ((d.status == "Rejected") ? "badge-danger" : "badge-warning");
+                        $("#view-status").attr("class", "badge " + badgeClass).text(d.status != null ? d.status : "—");
+                    } else {
+                        $("#boardingPassViewError").removeClass("d-none").text((res && res.message) ? res.message : "Failed to load details.");
+                    }
+                    var modalEl = document.getElementById("boardingPassViewModal");
+                    if (modalEl && typeof bootstrap !== "undefined") {
+                        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.show();
+                    } else {
+                        $("#boardingPassViewModal").modal("show");
+                    }
+                },
+                error: function (xhr) {
+                    var msg = "An error occurred while loading details.";
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    else if (xhr.status === 404) msg = "Boarding pass not found.";
+                    else if (xhr.status === 500) msg = "Server error. Please try again.";
+                    $("#boardingPassViewError").removeClass("d-none").text(msg);
+                    $("#boardingPassViewContent").hide();
+                    var modalEl = document.getElementById("boardingPassViewModal");
+                    if (modalEl && typeof bootstrap !== "undefined") {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    } else {
+                        $("#boardingPassViewModal").modal("show");
+                    }
+                }
+            });
+        });
         function BoardingPassStatusUpdate(flag,id,a_time,d_time,reason)
         {
          

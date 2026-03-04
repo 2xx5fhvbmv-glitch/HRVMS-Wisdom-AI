@@ -158,6 +158,7 @@ class BoardingPassController extends Controller
         
                 // Action buttons logic based on the approval flow
                 ->addColumn('Action', function ($row) use ($edit_class) {
+                    $viewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-link p-0 view-boarding-pass-detail" data-pass-id="'.base64_encode($row->id).'" title="View"><i class="fa-regular fa-eye"></i></a> ';
                     // Get specific rank statuses
                     $rank3Status = collect($row->employeeTravelPassStatusData)
                         ->where('approver_rank', 3)
@@ -171,31 +172,31 @@ class BoardingPassController extends Controller
                     
                     // Show process completed if rank 4 is approved
                     if ($rank4Status && $rank4Status->status == 'Approved') {
-                        return '<span class="badge badge-success">The pass process is complete.</span>';
+                        return $viewBtn.'<span class="badge badge-success">The pass process is complete.</span>';
                     }
                     
                     // For rank 3 pending/approved AND rank 4 pending - allow edit action
                     if ($rank3Status && in_array($rank3Status->status, ['Approved']) && 
                         $rank4Status && $rank4Status->status == 'Pending') {
-                        return '<button class="btn btn-themeBlue btn-sm edit-row-btn '.$edit_class.'" data-flag="Approved" data-arrival_time="'.$row->arrival_time.'" data-departure_time="'.$row->departure_time.'" data-id="'.base64_encode($row->id).'">Edit</button>';
+                        return $viewBtn.'<button class="btn btn-themeBlue btn-sm edit-row-btn '.$edit_class.'" data-flag="Approved" data-arrival_time="'.$row->arrival_time.'" data-departure_time="'.$row->departure_time.'" data-id="'.base64_encode($row->id).'">Edit</button>';
                     }
 
 
                     
                     // If rank 3 is pending, show only Approve and Reject buttons
                     if ($rank3Status && $rank3Status->status == 'Pending') {
-                        return '<a href="javascript:void(0)" class="btn btn-sm btn-theme update-row-btn_agent '.$edit_class.' " data-flag="Approved" data-id="'.base64_encode($row->id).'">Approve</a>
+                        return $viewBtn.'<a href="javascript:void(0)" class="btn btn-sm btn-theme update-row-btn_agent '.$edit_class.' " data-flag="Approved" data-id="'.base64_encode($row->id).'">Approve</a>
                         <button class="btn btn-danger btn-sm SendPass '.$edit_class.'" data-flag="Rejected" data-id="'.base64_encode($row->id).'" >Reject</button>';
                     }
                     
                     // If rank 3 is approved but rank 4 is not pending, show only message
                     if ($rank3Status && $rank3Status->status == 'Approved' && 
                         (!$rank4Status || $rank4Status->status != 'Pending')) {
-                        return '<span class="badge badge-warning">Waiting for next approval step.</span>';
+                        return $viewBtn.'<span class="badge badge-warning">Waiting for next approval step.</span>';
                     }
                     
                     // For all other states, show appropriate message
-                    return '<span class="badge badge-warning">Waiting for proper approval sequence.</span>';
+                    return $viewBtn.'<span class="badge badge-warning">Waiting for proper approval sequence.</span>';
                 })
                 ->rawColumns(['EmpId','EmployeeName','Transportation','ArrivalDate','ArrivalTime','DepartureDate','DepartureTime','Status','Action'])
                 ->make(true);
@@ -312,5 +313,162 @@ class BoardingPassController extends Controller
             ], 200);
         }
 
+    }
+
+    /**
+     * Get boarding pass detail for view modal (all data filled by employee).
+     */
+    public function getBoardingPassDetail(Request $request)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
+        }
+        $resort_id = $this->resort->resort_id;
+        $id = $request->query('id');
+        if ($id === null || $id === '') {
+            return response()->json(['success' => false, 'message' => 'Invalid pass.'], 400);
+        }
+        $decoded = is_numeric($id) ? $id : base64_decode($id, true);
+        $passId = $decoded !== false ? (int) $decoded : 0;
+        if (!$passId) {
+            return response()->json(['success' => false, 'message' => 'Invalid pass.'], 400);
+        }
+        // Load with same relations as index so we get identical data
+        $pass = EmployeeTravelPass::with([
+            'employee.resortAdmin',
+            'ResortTransportation',
+            'DepartureResortTransportation',
+            'ArrivalResortTransportation',
+        ])->where('id', $passId)->where('resort_id', $resort_id)->first();
+        if (!$pass) {
+            return response()->json(['success' => false, 'message' => 'Boarding pass not found.'], 404);
+        }
+
+        // Read times directly from DB so we never miss them (same record the DataTable shows)
+        $rawRow = DB::table('employee_travel_passes')
+            ->where('id', $passId)
+            ->where('resort_id', $resort_id)
+            ->select('arrival_time', 'departure_time', 'departure_date', 'arrival_date', 'departure_reason', 'arrival_reason', 'transportation')
+            ->first();
+        $depTimeRaw = $rawRow ? ($rawRow->departure_time ?? $pass->departure_time) : $pass->departure_time;
+        $arrTimeRaw = $rawRow ? ($rawRow->arrival_time ?? $pass->arrival_time) : $pass->arrival_time;
+
+        $employee = $pass->employee;
+        $empName = $employee && $employee->resortAdmin
+            ? trim($employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name)
+            : '—';
+        $empId = $employee ? ($employee->Emp_id ?? '—') : '—';
+
+        // Use same formatting as index DataTable so modal matches table
+        $depDate = $pass->departure_date ? date('d-m-Y', strtotime($pass->departure_date)) : '—';
+        $arrDate = $pass->arrival_date ? date('d-m-Y', strtotime($pass->arrival_date)) : '—';
+        $depTime = $this->formatTimeLikeIndex($depTimeRaw);
+        $arrTime = $this->formatTimeLikeIndex($arrTimeRaw);
+        $depTransport = isset($pass->ResortTransportation) && $pass->ResortTransportation
+            ? $pass->ResortTransportation->transportation_option
+            : $this->getTransportLabel($pass, 'departure');
+        if (trim((string) $depTransport) === '') {
+            $depTransport = '—';
+        }
+        $arrTransport = isset($pass->ResortTransportation) && $pass->ResortTransportation
+            ? $pass->ResortTransportation->transportation_option
+            : $this->getTransportLabel($pass, 'arrival');
+        if (trim((string) $arrTransport) === '') {
+            $arrTransport = '—';
+        }
+        $depReasonRaw = trim((string) ($pass->departure_reason ?? ''));
+        $arrReasonRaw = trim((string) ($pass->arrival_reason ?? ''));
+        $depReason = $depReasonRaw !== '' ? $pass->departure_reason : ($arrReasonRaw !== '' ? $pass->arrival_reason : '—');
+        $arrReason = $arrReasonRaw !== '' ? $pass->arrival_reason : ($depReasonRaw !== '' ? $pass->departure_reason : '—');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'employee_name' => $empName,
+                'emp_id' => $empId,
+                'departure_date' => $depDate,
+                'departure_time' => $depTime,
+                'departure_transportation' => $depTransport,
+                'departure_reason' => $depReason,
+                'arrival_date' => $arrDate,
+                'arrival_time' => $arrTime,
+                'arrival_transportation' => $arrTransport,
+                'arrival_reason' => $arrReason,
+                'status' => $pass->status ?? '—',
+            ],
+        ]);
+    }
+
+    /**
+     * Get transportation label for departure or arrival (uses mode relation or main transportation).
+     */
+    private function getTransportLabel(EmployeeTravelPass $pass, string $type): string
+    {
+        if ($type === 'departure') {
+            $relation = $pass->DepartureResortTransportation;
+        } else {
+            $relation = $pass->ArrivalResortTransportation;
+        }
+        if ($relation && trim((string) ($relation->transportation_option ?? '')) !== '') {
+            return $relation->transportation_option;
+        }
+        $main = $pass->ResortTransportation;
+        if ($main && trim((string) ($main->transportation_option ?? '')) !== '') {
+            return $main->transportation_option;
+        }
+        return '—';
+    }
+
+    /**
+     * Format date for detail modal (d-m-Y).
+     */
+    private function formatDateForDetail($value)
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+        try {
+            return Carbon::parse($value)->format('d-m-Y');
+        } catch (\Exception $e) {
+            return is_string($value) ? $value : '—';
+        }
+    }
+
+    /**
+     * Format time exactly like index DataTable (h:i A) so modal matches table.
+     */
+    private function formatTimeLikeIndex($value)
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return '—';
+        }
+        $raw = trim((string) $value);
+        try {
+            if (preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $raw)) {
+                return Carbon::createFromFormat(strlen($raw) > 5 ? 'H:i:s' : 'H:i', $raw)->format('h:i A');
+            }
+            return Carbon::parse($value)->format('h:i A');
+        } catch (\Throwable $e) {
+            return $raw ?: '—';
+        }
+    }
+
+    /**
+     * Format time for detail modal (h:i A).
+     */
+    private function formatTimeForDetail($value)
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return '—';
+        }
+        $raw = is_string($value) ? trim($value) : (string) $value;
+        try {
+            if (preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $raw)) {
+                return Carbon::createFromFormat(strlen($raw) > 5 ? 'H:i:s' : 'H:i', $raw)->format('h:i A');
+            }
+            return Carbon::parse($value)->format('h:i A');
+        } catch (\Exception $e) {
+            return $raw ?: '—';
+        }
     }
 }

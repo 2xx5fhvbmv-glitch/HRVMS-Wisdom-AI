@@ -160,6 +160,7 @@
                             <div class="col">
                                 <h3 class="text-nowrap">Leave Requests</h3>
                             </div>
+                            @if($show_department_filter ?? true)
                             <div class="col-auto">
                                 <div class="form-group">
                                     <select id="department-filter" class="form-select select2t-none" aria-label="Default select example">
@@ -172,6 +173,7 @@
                                     </select>
                                 </div>
                             </div>
+                            @endif
                             <div class="col-auto"><a href="{{route('leave.request')}}" class="a-link">View All</a></div>
                         </div>
                     </div>
@@ -197,7 +199,7 @@
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.upcomingholiday.list',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-4 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.upcomingholiday.list',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card card-upcomingLeve">
                     <div class="card-title">
                         <div class="row g-1">
@@ -225,7 +227,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-md-6">
+            <div class="col-xl-4 col-md-6">
                 <div class="card card-upcomingBirthLeve">
                     <div class="card-title">
                         <div class="row g-1">
@@ -277,6 +279,55 @@
                     </div>
                 </div>
             </div>
+            <div class="col-lg-4 col-md-6">
+                        <div class="card card-wiINsight">
+                            <div class="card-title">
+                                <h3>AI Insight's</h3>
+                            </div>
+                            <div class="leaveUser-main">
+                                <div class="leaveUser-block">
+                                    <div class="img">
+                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg')}}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>Low occupancy for upcoming 3 months</h6>
+                                        <P>You can send 55 Employees on vacation leave this time so Resort can save
+                                            around
+                                            $1000</P>
+                                    </div>
+                                    <div>
+                                        <a href="#" class="a-linkTheme">View Details</a>
+                                    </div>
+                                </div>
+                                <div class="leaveUser-block">
+                                    <div class="img">
+                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg')}}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>AI Forecasted Peak Leave Periods</h6>
+                                        <P>01 Jan to 30 March is peak leave period</P>
+                                    </div>
+                                    <div>
+                                        <a href="#" class="a-linkTheme">View Details</a>
+                                    </div>
+                                </div>
+                                <div class="leaveUser-block">
+                                    <div class="img">
+                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg')}}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>Employee Leave Behavior Analysis</h6>
+                                        <p>Lorem Ipsum is simply dummy text of the printing and typesetting industry.
+                                            Lorem
+                                            Ipsum has been the industry.</p>
+                                    </div>
+                                    <div>
+                                        <a href="#" class="a-linkTheme">View Details</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
         </div>
     </div>
 </div>
@@ -425,7 +476,7 @@
         ordering: true, 
         ajax: function(data, callback, settings) {
             // Get the department filter value
-            var departmentId = $('#department-filter').val();
+            var departmentId = ($('#department-filter').length ? $('#department-filter').val() : '') || '';
         
             // Extract ordering information
             var order = {};

@@ -23,25 +23,41 @@
             <div class="card">
                 <div class="card-header">
                     <div class="row g-md-3 g-2 align-items-center">
+                        
                         <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
                             <div class="input-group">
                                 <input type="search" id="search-box" class="form-control search" placeholder="Search" />
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
+                        @if($show_department_filter ?? true)
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
                             <select id="department-filter" class="form-select select2t-none Department "name="department" aria-label="Default select example">
-                                <option value="">All Departments</option>
-                                @if($resort_departments)
+                                <option value="" selected>All Departments</option>
+                                @if($resort_departments ?? null)
                                     @foreach($resort_departments as $dept)
-                                        <option value="{{$dept->id}}">{{$dept->name}}</option>
+                                        <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                                     @endforeach
                                 @endif
                             </select>
                         </div>
+                        @endif
+                        @if($show_department_filter ?? true)
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select id="position-filter" class="form-select select2t-none mb-2 Position" name="position" aria-label="Default select example">
                                 <option selected value="">Select Position</option>
+                            </select>
+                        </div>
+                        @endif
+                        <div class="col-xl-2 col-md-4 col-sm-4 col-6">
+                            <select id="year-filter" class="form-select select2t-none" aria-label="Year">
+                                @if(isset($filter_years) && is_array($filter_years))
+                                    @foreach($filter_years as $y)
+                                        <option value="{{ $y }}" @if(isset($filter_year) && (int)$filter_year === (int)$y) selected @endif>{{ $y }}</option>
+                                    @endforeach
+                                @else
+                                    <option value="{{ date('Y') }}" selected>{{ date('Y') }}</option>
+                                @endif
                             </select>
                         </div>
 
@@ -385,7 +401,7 @@
             datatablelist();  // Apply datatable list after filters are updated
         });
 
-        $(document).on('change', '#position-filter, #department-filter', function() {
+        $(document).on('change', '#position-filter, #department-filter, #year-filter', function() {
             applyFilters();
             datatablelist();  // Apply datatable list after filters are updated
         });
@@ -393,8 +409,12 @@
 
     function applyFilters() {
         let search = document.querySelector('#search-box').value;
-        let department = document.querySelector('#department-filter').value;
-        let position = document.querySelector('#position-filter').value;
+        let departmentEl = document.querySelector('#department-filter');
+        let department = departmentEl ? departmentEl.value : '';
+        let positionEl = document.querySelector('#position-filter');
+        let position = positionEl ? positionEl.value : '';
+        let yearEl = document.querySelector('#year-filter');
+        let year = yearEl ? yearEl.value : '{{ date("Y") }}';
 
         $.ajax({
             url: "{{ route('leave.filter.grid') }}",
@@ -403,7 +423,8 @@
                 "_token": "{{ csrf_token() }}",
                 "search": search,
                 "position": position,
-                "department": department
+                "department": department,
+                "year": year
             },
             success: function (response) {
                 // Update grid view
@@ -450,10 +471,11 @@
             processing: true,
             serverSide: true,
             ajax: function(data, callback, settings) {
-                // Get the department filter value
-                var departmentId = $('#department-filter').val();
-                var positionId = $('#position-filter').val();
+                // Get the department filter value (empty when filter is not shown)
+                var departmentId = ($('#department-filter').length ? $('#department-filter').val() : '') || '';
+                var positionId = ($('#position-filter').length ? $('#position-filter').val() : '') || '';
                 var search = $('#search-box').val();
+                var year = ($('#year-filter').length ? $('#year-filter').val() : '') || '{{ date("Y") }}';
 
                 $.ajax({
                     url: "{{ route('leave-requests.get') }}",
@@ -462,6 +484,7 @@
                         department_id: departmentId,
                         position_id: positionId,
                         search: search,
+                        year: year,
                         start: settings.start, // For pagination
                         length: settings.length, // For pagination
                     },

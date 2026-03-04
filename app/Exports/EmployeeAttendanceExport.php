@@ -2,7 +2,9 @@
 namespace App\Exports;
 
 use App\Models\ShiftSettings;
+use App\Models\ParentAttendace;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -11,6 +13,8 @@ use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use App\Models\Employee;
 use App\Models\LeaveCategory;
 use App\Models\ResortBenifitGridChild;
+use Carbon\Carbon;
+
 class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEvents
 {
     public $resort;
@@ -26,57 +30,120 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
 
     public function headings(): array
     {
-        return ['Date', 'Employee ID', 'Name','Shift' ,'Check-In Time', 'Check-Out Time', 'Overtime','Status','Rank','LeaveType'];
+        return ['Date', 'Employee ID', 'Name', 'Shift', 'Check-In Time', 'Check-Out Time', 'Overtime', 'Status', 'Rank', 'LeaveType'];
+    }
 
+    /** Parse date from request (supports d/m/Y and d-m-Y) */
+    protected function parseDate($dateStr)
+    {
+        if (empty($dateStr)) {
+            return null;
+        }
+        $dateStr = trim($dateStr);
+        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'm/d/Y'] as $format) {
+            try {
+                $d = Carbon::createFromFormat($format, $dateStr);
+                if ($d) {
+                    return $d;
+                }
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+        try {
+            return Carbon::parse($dateStr);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     public function collection()
     {
+        $startCarbon = $this->parseDate($this->startDate);
+        $endCarbon = $this->parseDate($this->endDate);
+        if (!$startCarbon || !$endCarbon || $startCarbon->gt($endCarbon)) {
+            return collect();
+        }
+
+        $startStr = $startCarbon->format('Y-m-d');
+        $endStr = $endCarbon->format('Y-m-d');
+
         $employees = Employee::with('resortAdmin')
             ->where('resort_id', $this->resort->resort_id)
             ->get();
 
-        // Fetch shift data
-        $shifts = ShiftSettings::where('resort_id', $this->resort->resort_id)->get();
+        // Fetch actual attendance for date range: Emp_id, date, CheckingTime, CheckingOutTime, Status, OverTime, ShiftName
+        $attendanceRows = DB::table('parent_attendaces as pa')
+            ->leftJoin('shift_settings as ss', 'ss.id', '=', 'pa.Shift_id')
+            ->where('pa.resort_id', $this->resort->resort_id)
+            ->whereBetween('pa.date', [$startStr, $endStr])
+            ->select(
+                'pa.Emp_id',
+                'pa.date',
+                'pa.CheckingTime as check_in',
+                'pa.CheckingOutTime as check_out',
+                'pa.Status as status',
+                'pa.OverTime as overtime',
+                DB::raw('ss.ShiftName as shift_name')
+            )
+            ->get();
+
+        $attendanceByKey = [];
+        foreach ($attendanceRows as $row) {
+            $dateFormatted = Carbon::parse($row->date)->format('Y-m-d');
+            $key = $row->Emp_id . '|' . $dateFormatted;
+            if (!isset($attendanceByKey[$key])) {
+                $attendanceByKey[$key] = $row;
+            } else {
+                $attendanceByKey[$key]->check_in = $attendanceByKey[$key]->check_in ?: $row->check_in;
+                $attendanceByKey[$key]->check_out = $attendanceByKey[$key]->check_out ?: $row->check_out;
+                $attendanceByKey[$key]->overtime = $attendanceByKey[$key]->overtime ?: $row->overtime;
+                $attendanceByKey[$key]->status = $attendanceByKey[$key]->status ?: $row->status;
+                $attendanceByKey[$key]->shift_name = $attendanceByKey[$key]->shift_name ?: $row->shift_name;
+            }
+        }
 
         $dates = collect();
-        $currentDate = \Carbon\Carbon::createFromFormat('d/m/Y', $this->startDate);
-        $endDate = \Carbon\Carbon::createFromFormat('d/m/Y', $this->endDate);
-
-        // Generate date range dynamically
-        while ($currentDate->lte($endDate)) {
-            $dates->push($currentDate->format('d-m-Y'));
+        $currentDate = $startCarbon->copy();
+        while ($currentDate->lte($endCarbon)) {
+            $dates->push($currentDate->format('Y-m-d'));
             $currentDate->addDay();
         }
 
-        // Map employees to date range with shift info
         $result = collect();
-        foreach ($dates as $date) {
+        $ConfigRanks = config('settings.eligibilty', []);
+
+        foreach ($dates as $dateYmd) {
+            $dateDisplay = Carbon::parse($dateYmd)->format('d-m-Y');
             foreach ($employees as $employee) {
                 $resortAdmin = $employee->resortAdmin()->first();
+                $empName = $resortAdmin ? trim($resortAdmin->first_name . ' ' . $resortAdmin->last_name) : 'No Name';
 
-                // Fetch the shift for this date (Assume shift is assigned daily)
-                $shift = $shifts->first(); // Assuming a default shift or a shift selection mechanism
-                $gender = $employee->resortAdmin->gender;
-                $religion = $employee->religion;
+                $key = $employee->id . '|' . $dateYmd;
+                $att = $attendanceByKey[$key] ?? null;
+
+                $shiftName = $att->shift_name ?? '';
+                $checkIn = $att->check_in ?? '';
+                $checkOut = $att->check_out ?? '';
+                $overtime = $att->overtime ?? '';
+                $status = $att->status ?? '';
+
+                $gender = $resortAdmin ? ($resortAdmin->gender ?? null) : null;
+                $religion = $employee->religion ?? '';
                 $rank = $employee->rank;
-                $ConfigRanks = config('settings.eligibilty');
-
                 if ($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8) {
-                    $emp_grade = "1";
+                    $emp_grade = '1';
                 } elseif ($rank == 4) {
-                    $emp_grade = "4";
+                    $emp_grade = '4';
                 } elseif ($rank == 2) {
-                    $emp_grade = "2";
+                    $emp_grade = '2';
                 } elseif ($rank == 5) {
-                    $emp_grade = "5";
+                    $emp_grade = '5';
                 } else {
-                    $emp_grade = "6";
+                    $emp_grade = '6';
                 }
 
-
                 $leave_categories = ResortBenifitGridChild::join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                    ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
                     ->where('resort_benefit_grid_child.rank', $emp_grade)
                     ->where('lc.resort_id', $this->resort->resort_id)
                     ->where(function ($query) use ($religion, $gender) {
@@ -85,26 +152,26 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
                         if ($religion == 'muslim') {
                             $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
                         }
-                        if ($religion == "") {
-                            $query->Where('resort_benefit_grid_child.eligible_emp_type', 'all');
+                        if ($religion == '') {
+                            $query->where('resort_benefit_grid_child.eligible_emp_type', 'all');
                         }
                     })
-                    ->pluck('leave_type')->toArray(); // Use pluck to get leave types
-
-                // Ensure leave categories are set
+                    ->pluck('leave_type')->toArray();
                 $leave_types = implode(',', $leave_categories);
 
+                $rankLabel = isset($ConfigRanks[$emp_grade]) ? $ConfigRanks[$emp_grade] : null;
+
                 $result->push([
-                    'date' => "'$date",
+                    'date' => "'" . $dateDisplay,
                     'emp_id' => $employee->Emp_id,
-                    'name' => $resortAdmin ? $resortAdmin->first_name . " " . $resortAdmin->last_name : 'No Name',
-                    'shift' => '',  // Add shift name
-                    'check_in_time' => null,
-                    'check_out_time' => null,
-                    'overtime' => null,
-                    'Status' => null,
-                    'Rank'=>isset($ConfigRanks[$emp_grade]) ? $ConfigRanks[$emp_grade] :null,
-                    // 'LeaveType' =>null,  // Add leave types to result
+                    'name' => $empName,
+                    'shift' => $shiftName,
+                    'check_in_time' => $checkIn,
+                    'check_out_time' => $checkOut,
+                    'overtime' => $overtime,
+                    'Status' => $status,
+                    'Rank' => $rankLabel,
+                    'LeaveType' => $leave_types,
                 ]);
             }
         }

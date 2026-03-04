@@ -23,12 +23,12 @@
             </div>
 
 
-            <div class="card">
+            <div class="card" data-register-base-url="{{ route('resort.timeandattendance.AttandanceRegister') }}">
                 <div class="card-header">
                     <div class="row g-md-3 g-2 align-items-center">
                         <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
                             <div class="input-group">
-                                <input type="search" class="form-control search" placeholder="Search" />
+                                <input type="search" class="form-control search" placeholder="Search" value="{{ request('search') }}" />
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
@@ -38,7 +38,7 @@
                             <select class="form-select Department" id="department" name="department">
                                 <option ></option>
                                 @foreach ($ResortDepartment as $r)
-                                    <option value="{{$r->id}}">{{$r->name}}</option>
+                                    <option value="{{$r->id}}" {{ request('department') != '' && (string)$r->id === (string)request('department') ? 'selected' : '' }}>{{$r->name}}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -54,7 +54,8 @@
                                     7 => 'July', 8 => 'August', 9 => 'September',
                                     10 => 'October', 11 => 'November', 12 => 'December'
                                 ] as $key => $month)
-                                    <option value="{{ $key }}">{{ $month }}</option>
+                                    @php $monthSelected = (request('month') !== null && request('month') !== '' && (int)request('month') === (int)$key) || ((request('month') === null || request('month') === '') && (int)$key === (int)now()->month); @endphp
+                                    <option value="{{ $key }}" {{ $monthSelected ? 'selected' : '' }}>{{ $month }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -63,7 +64,8 @@
                             <select class="form-select year" name="year" id="year">
                                 <option value="">Select Year</option>
                                 @for ($y = now()->year; $y >= now()->year - 5; $y--)
-                                    <option value="{{ $y }}">{{ $y }}</option>
+                                    @php $yearSelected = (request('year') !== null && request('year') !== '' && (int)request('year') === (int)$y) || ((request('year') === null || request('year') === '') && (int)$y === (int)now()->year); @endphp
+                                    <option value="{{ $y }}" {{ $yearSelected ? 'selected' : '' }}>{{ $y }}</option>
                                 @endfor
                             </select>
                         </div>
@@ -92,7 +94,7 @@
                     </div>
                 </div>
                 <div class="filtertaleData">
-                    <div id="attendance-register-views">
+                    <div id="attendance-register-views" data-initial-view="{{ request('view', 'normal') }}">
                     <!-- Normal View - Calendar Grid -->
                     <div class="view-normal-container {{ request('view') === 'detailed' ? 'd-none' : '' }}">
                         <div class="attendance-calendar-header mb-3">
@@ -168,22 +170,33 @@
                                             @foreach ($attandanceregister as $a)
                                                 @php
                                                     $RosterInternalDataMonth = Common::GetAttandanceRegister($resort_id, $a->duty_roster_id, $a->emp_id, $WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth, "Monthwise");
-                                                    $presentCountRow = 0;
-                                                    $absentCountRow = 0;
-                                                    $dayOffCountRow = 0;
+                                                    $presentDates = [];
+                                                    $absentDates = [];
+                                                    $dayOffDates = [];
                                                     foreach ($RosterInternalDataMonth as $sd) {
+                                                        if (!isset($sd->date)) continue;
+                                                        $d = is_object($sd->date) ? $sd->date->format('Y-m-d') : $sd->date;
+                                                        $hasCheckIn = !empty($sd->CheckingTime) && trim($sd->CheckingTime ?? '') !== '' && !in_array(trim($sd->CheckingTime ?? ''), ['00:00', '00:00:00']);
                                                         if (isset($sd->Status)) {
-                                                            if ($sd->Status == 'Present' && !empty($sd->CheckingTime)) $presentCountRow++;
-                                                            elseif ($sd->Status == 'Absent') $absentCountRow++;
-                                                            elseif ($sd->Status == 'DayOff') $dayOffCountRow++;
+                                                            if ($sd->Status == 'Present' && $hasCheckIn) $presentDates[$d] = true;
+                                                            elseif ($sd->Status == 'Absent' && !$hasCheckIn) $absentDates[$d] = true;
+                                                            elseif ($sd->Status == 'DayOff') $dayOffDates[$d] = true;
                                                         }
                                                     }
+                                                    $presentCountRow = count($presentDates);
+                                                    $absentCountRow = count($absentDates);
+                                                    $dayOffCountRow = count($dayOffDates);
                                                 @endphp
                                                 <tr>
                                                     <td class="employee-col">
-                                                        <div class="employee-info">
-                                                            <strong>{{ $a->EmployeeName }}</strong>
-                                                            <small class="text-muted d-block">{{ $a->Position }}</small>
+                                                        <div class="employee-info d-flex align-items-center gap-2">
+                                                            <div class="img-circle flex-shrink-0">
+                                                                <img src="{{ $a->profileImg ?? asset(config('settings.default_picture', 'admin_assets/files/user-image.png')) }}" alt="{{ $a->EmployeeName }}">
+                                                            </div>
+                                                            <div>
+                                                                <strong>{{ $a->EmployeeName }}</strong>
+                                                                <small class="text-muted d-block">{{ $a->Position }}</small>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     @foreach ($monthwiseheaders as $h)
@@ -324,13 +337,12 @@
                                     @php
                                         $RosterInternalDataMonth = Common::GetAttandanceRegister($resort_id, $a->duty_roster_id, $a->emp_id, $WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth, "Monthwise");
 
-                                        // Calculate summary statistics
-                                        $presentCount = 0;
-                                        $absentCount = 0;
-                                        $leaveCount = 0;
+                                        // Calculate summary statistics (per-day: unique dates, so multiple shifts same day count once)
+                                        $presentDates = [];
+                                        $absentDates = [];
+                                        $leaveDates = [];
                                         $totalOtHours = 0;
 
-                                        // Calculate total OT hours from employee_overtimes table
                                         if ($overtimeData->has($a->emp_id)) {
                                             $empOvertime = $overtimeData->get($a->emp_id);
                                             foreach ($empOvertime as $otEntry) {
@@ -340,14 +352,20 @@
                                         }
 
                                         foreach ($RosterInternalDataMonth as $shiftData) {
-                                            if ($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
-                                                $presentCount++;
-                                            } elseif ($shiftData->Status == "Absent") {
-                                                $absentCount++;
+                                            $d = isset($shiftData->date) ? (is_object($shiftData->date) ? $shiftData->date->format('Y-m-d') : $shiftData->date) : null;
+                                            if (!$d) continue;
+                                            $hasCheckIn = !empty($shiftData->CheckingTime) && trim($shiftData->CheckingTime ?? '') !== '' && !in_array(trim($shiftData->CheckingTime ?? ''), ['00:00', '00:00:00']);
+                                            if ($shiftData->Status == "Present" && $hasCheckIn) {
+                                                $presentDates[$d] = true;
+                                            } elseif ($shiftData->Status == "Absent" && !$hasCheckIn) {
+                                                $absentDates[$d] = true;
                                             } elseif (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData) && !empty($shiftData->LeaveData)) {
-                                                $leaveCount++;
+                                                $leaveDates[$d] = true;
                                             }
                                         }
+                                        $presentCount = count($presentDates);
+                                        $absentCount = count($absentDates);
+                                        $leaveCount = count($leaveDates);
 
                                         // Calculate leave type counts
                                         $employeeLeaveStats = [];
@@ -1127,14 +1145,43 @@
             $(".Department").select2({
                 placeholder: "Select Department"
             });
-            // Initialize: Show Normal view by default
-            $(".view-normal-container").removeClass("d-none");
-            $(".view-detailed-container").addClass("d-none");
-
+            // Respect server-rendered view (e.g. from pagination URL view=detailed)
+            var initialView = $("#attendance-register-views").data("initial-view") || "normal";
+            if (initialView === "detailed") {
+                $(".btn-detailed").addClass("active");
+                $(".btn-normal").removeClass("active");
+                $("#attendance-register-views .view-detailed-container").removeClass("d-none");
+                $("#attendance-register-views .view-normal-container").addClass("d-none");
+            } else {
+                $(".btn-normal").addClass("active");
+                $(".btn-detailed").removeClass("active");
+                $("#attendance-register-views .view-normal-container").removeClass("d-none");
+                $("#attendance-register-views .view-detailed-container").addClass("d-none");
+            }
             // Initialize tooltips for Normal View
             setTimeout(function() {
                 initAttendanceTooltips();
             }, 500);
+
+            // Restore filters from URL only; no URL params = current month (blade default)
+            var searchParams = new URLSearchParams(window.location.search);
+            var hasUrlParams = searchParams.has('month') || searchParams.has('year') || searchParams.has('search') || searchParams.has('department') || searchParams.has('page') || searchParams.has('view');
+            if (hasUrlParams) {
+                // Set form from URL so filters are visible
+                if (searchParams.has('search')) $(".search").val(searchParams.get('search'));
+                if (searchParams.has('month')) $("#month").val(searchParams.get('month'));
+                if (searchParams.has('year')) $("#year").val(searchParams.get('year'));
+                if (searchParams.has('department')) { $("#department").val(searchParams.get('department')).trigger('change'); }
+                if (searchParams.get('view') === 'detailed') {
+                    $(".btn-detailed").addClass("active");
+                    $(".btn-normal").removeClass("active");
+                    $("#attendance-register-views .view-detailed-container").removeClass("d-none");
+                    $("#attendance-register-views .view-normal-container").addClass("d-none");
+                }
+                var pageFromUrl = searchParams.get('page') || 1;
+                updateRegisterFilterWiseTable(pageFromUrl);
+            }
+            // No URL params: form has current month/year from blade default; Index() data is current month
     });
 
     // Normal/Detailed View Toggle (use #attendance-register-views so it works before and after AJAX filter)
@@ -1316,6 +1363,16 @@
     $(document).on('change', '.Department', function() {
         updateRegisterFilterWiseTable();
     });
+
+    // Pagination: load page via AJAX so filters and view are preserved (no full page reload)
+    $(document).on('click', '.filtertaleData .pagination-custom a[href*="register-roster-search"], .filtertaleData .pagination a[href*="register-roster-search"]', function(e) {
+        var href = $(this).attr('href');
+        if (!href || href === '#' || href === 'javascript:void(0)') return;
+        e.preventDefault();
+        var match = href.match(/[?&]page=(\d+)/);
+        var page = match ? match[1] : 1;
+        updateRegisterFilterWiseTable(page);
+    });
     $(document).on("click", ".LocationHistoryData", function()
     {
         let location1 = $(this).attr('data-location');
@@ -1469,7 +1526,7 @@
                 this.value = `${parts[2]}-${parts[1]}-${parts[0]}`; // Converts to DD-MM-YYYY
             }
         });
-        function updateRegisterFilterWiseTable()
+        function updateRegisterFilterWiseTable(page)
         {
             var search = $(".search").val();
             var department = $("#department").val();
@@ -1480,10 +1537,32 @@
             let isDetailedView = $(".btn-detailed").hasClass("active");
             let sendclass = isDetailedView ? 'Detailed' : 'Normal';
 
+            var ajaxData = {"_token":"{{ csrf_token() }}","search":search,"department":department,"date":DatePickerFilter,"monthly":true,"sendclass":sendclass,"month":month,"year":year};
+            if (page != null && page !== '' && page !== undefined) {
+                ajaxData.page = page;
+            }
+
+            // Update URL and sessionStorage so filters persist on reload
+            var urlParams = {};
+            if (search) urlParams.search = search;
+            if (department) urlParams.department = department;
+            if (month) urlParams.month = month;
+            if (year) urlParams.year = year;
+            urlParams.view = sendclass.toLowerCase();
+            urlParams.page = (page != null && page !== '' && page !== undefined) ? page : 1;
+            var baseUrl = $(".card").data("register-base-url") || window.location.pathname;
+            var newUrl = baseUrl + (Object.keys(urlParams).length ? '?' + $.param(urlParams) : '');
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', newUrl);
+            }
+            try {
+                sessionStorage.setItem('attendanceRegisterFilters', JSON.stringify({ search: search || '', department: department || '', month: month || '', year: year || '', view: urlParams.view, page: urlParams.page }));
+            } catch (e) {}
+
             $.ajax({
                 url: "{{ route('resort.timeandattendance.ResigterRosterSearch') }}",
                 type: "get",
-                data: {"_token":"{{ csrf_token() }}","search":search,"department":department,"date":DatePickerFilter,"monthly":true,"sendclass":sendclass,"month":month,"year":year},
+                data: ajaxData,
                 success: function (response)
                 {
                     if (response.success)
@@ -1528,6 +1607,7 @@
         $("#department").val('').trigger('change');
         $("#month").val('').trigger('change');
         $("#year").val('').trigger('change');
+        try { sessionStorage.removeItem('attendanceRegisterFilters'); } catch (e) {}
         updateRegisterFilterWiseTable();
     });
     </script>

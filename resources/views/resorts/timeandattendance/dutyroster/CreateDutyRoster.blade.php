@@ -584,12 +584,12 @@
         </div>
     </div>
 
-    <!-- Add Overtime Modal -->
+    <!-- Add Overtime Modal - Manage OT hours per date for each employee -->
     <div class="modal fade" id="addOvertimeModal" tabindex="-1" aria-labelledby="addOvertimeModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addOvertimeModalLabel">Add Overtime for Employees</h5>
+                    <h5 class="modal-title" id="addOvertimeModalLabel">Manage Overtime by Date</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -598,11 +598,11 @@
                         <select class="form-select" id="OvertimeEmployees" multiple>
                             <!-- Will be populated dynamically -->
                         </select>
-                        <small style="color: red;">
-        Note: Select only Line Worker and Supervisor.</small>
+                        <small class="text-danger">Note: Select only Line Worker and Supervisor.</small>
                     </div>
-                    <div id="overtimeEmployeesList" class="mt-3">
-                        <!-- Dynamic list of selected employees with overtime inputs and day selection -->
+                    <p class="text-muted small mb-2">Enter OT hours for each day in the selected date range. Leave as 00:00 for no overtime on that day.</p>
+                    <div id="overtimeEmployeesList" class="mt-3 overflow-auto">
+                        <!-- Dynamic: per-employee rows with per-date OT inputs -->
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1313,7 +1313,7 @@
                 }
         });
     });
-    // Store overtime data for employees - structure: {empId: {overtime: '00:00', days: ['2024-01-09', '2024-01-10']}}
+    // Overtime by date: { empId: { hoursByDate: { 'Y-m-d': 'HH:MM', ... } } }
     let employeeOvertimeData = {};
     let availableDates = []; // Store available dates from date range
 
@@ -1339,6 +1339,16 @@
             currentDate.setDate(currentDate.getDate() + 1);
         }
         return dates;
+    }
+
+    function normalizeOvertime(val) {
+        if(!val || val === '00:00') return '00:00';
+        var parts = String(val).split(':');
+        if(parts.length >= 2) {
+            var h = parseInt(parts[0], 10) || 0, m = parseInt(parts[1], 10) || 0;
+            return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+        }
+        return '00:00';
     }
 
     $('.addOvertime-modal').on('click', function() {
@@ -1388,20 +1398,18 @@
             employeeOptions += '<option value="' + empId + '">' + empName + '</option>';
             selectedEmployeeIds.push(empId);
 
-            // Initialize employee data with existing overtime or defaults
-            if(employeeOvertimeData[empId]) {
-                employeeData[empId] = {
-                    name: empName,
-                    overtime: employeeOvertimeData[empId].overtime || '00:00',
-                    days: employeeOvertimeData[empId].days || []
-                };
-            } else {
-                employeeData[empId] = {
-                    name: empName,
-                    overtime: '00:00',
-                    days: []
-                };
-            }
+            var hoursByDate = {};
+            availableDates.forEach(function(d) {
+                var dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                if (employeeOvertimeData[empId] && employeeOvertimeData[empId].hoursByDate && employeeOvertimeData[empId].hoursByDate[dateStr] !== undefined) {
+                    hoursByDate[dateStr] = employeeOvertimeData[empId].hoursByDate[dateStr];
+                } else if (employeeOvertimeData[empId] && employeeOvertimeData[empId].days && employeeOvertimeData[empId].days.indexOf(dateStr) !== -1 && employeeOvertimeData[empId].overtime) {
+                    hoursByDate[dateStr] = employeeOvertimeData[empId].overtime;
+                } else {
+                    hoursByDate[dateStr] = '00:00';
+                }
+            });
+            employeeData[empId] = { name: empName, hoursByDate: hoursByDate };
         });
 
         if (skippedIneligible > 0 || selectedEmployeeIds.length === 0) {
@@ -1428,261 +1436,141 @@
         $('#addOvertimeModal').modal('show');
     });
 
-    // Function to update overtime employees list with day selection
+    // Build modal: table with one row per employee, one column per date with OT input
     function updateOvertimeEmployeesList(employeeData) {
-        let html = '';
-        for(let empId in employeeData) {
-            html += '<div class="card mb-3 overtime-emp-row" data-emp-id="' + empId + '">';
-            html += '<div class="card-body">';
-            html += '<div class="row align-items-center mb-3">';
-            html += '<div class="col-md-4">';
-            html += '<label class="form-label fw-bold">' + employeeData[empId].name + '</label>';
-            html += '</div>';
-            html += '<div class="col-md-4">';
-            html += '<label class="form-label">Overtime Hours</label>';
-            html += '<input type="text" class="form-control employee-overtime-input" data-emp-id="' + empId + '" value="' + employeeData[empId].overtime + '" placeholder="00:00">';
-            html += '</div>';
-            html += '<div class="col-md-4 text-end">';
-            html += '<button type="button" class="btn btn-sm btn-danger remove-overtime-emp" data-emp-id="' + empId + '"><i class="fa fa-times"></i> Remove</button>';
-            html += '</div>';
-            html += '</div>';
+        var dateStrings = [];
+        availableDates.forEach(function(d) {
+            dateStrings.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+        });
 
-            // Day selection checkboxes
-            html += '<div class="row">';
-            html += '<div class="col-12">';
-            html += '<label class="form-label">Select Days for Overtime:</label>';
-            html += '<div class="d-flex flex-wrap gap-2">';
+        var html = '<div class="table-responsive"><table class="table table-bordered table-sm mb-0 overtime-by-date-table">';
+        html += '<thead><tr><th class="bg-light" style="min-width:160px">Employee</th>';
+        dateStrings.forEach(function(dateStr) {
+            var d = new Date(dateStr + 'T12:00:00');
+            var label = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) + ' <small>(' + d.toLocaleDateString('en-US', { weekday: 'short' }) + ')</small>';
+            html += '<th class="text-center bg-light" style="min-width:90px">' + label + '</th>';
+        });
+        html += '<th class="bg-light text-center" style="width:80px">Action</th></tr></thead><tbody>';
 
-            availableDates.forEach(function(date) {
-                // Format date in local timezone (not UTC) to match display
-                let year = date.getFullYear();
-                let month = String(date.getMonth() + 1).padStart(2, '0');
-                let day = String(date.getDate()).padStart(2, '0');
-                let dateStr = `${year}-${month}-${day}`;
-
-                let dateFormatted = date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-                let dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-                let isChecked = employeeData[empId].days.includes(dateStr) ? 'checked' : '';
-
-                html += '<div class="form-check">';
-                html += '<input class="form-check-input overtime-day-checkbox" type="checkbox" data-emp-id="' + empId + '" data-date="' + dateStr + '" id="day_' + empId + '_' + dateStr + '" ' + isChecked + '>';
-                html += '<label class="form-check-label" for="day_' + empId + '_' + dateStr + '">';
-                html += dateFormatted + ' (' + dayName + ')';
-                html += '</label>';
-                html += '</div>';
+        for (var empId in employeeData) {
+            var name = employeeData[empId].name;
+            var hoursByDate = employeeData[empId].hoursByDate || {};
+            html += '<tr class="overtime-emp-row" data-emp-id="' + empId + '">';
+            html += '<td class="align-middle"><strong>' + name + '</strong></td>';
+            dateStrings.forEach(function(dateStr) {
+                var val = hoursByDate[dateStr] !== undefined ? hoursByDate[dateStr] : '00:00';
+                html += '<td class="p-1"><input type="text" class="form-control form-control-sm overtime-date-input" data-emp-id="' + empId + '" data-date="' + dateStr + '" value="' + val + '" placeholder="00:00" maxlength="5"></td>';
             });
-
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
+            html += '<td class="align-middle text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-overtime-emp" data-emp-id="' + empId + '"><i class="fa fa-times"></i></button></td>';
+            html += '</tr>';
         }
+        html += '</tbody></table></div>';
         $('#overtimeEmployeesList').html(html);
 
-        // Initialize flatpickr for overtime inputs
-        $('.employee-overtime-input').each(function() {
-            let $input = $(this);
-            let currentValue = $input.val() || '00:00';
-
-            // Destroy existing flatpickr if any
+        $('.overtime-date-input').each(function() {
+            var $input = $(this);
+            var currentValue = $input.val() || '00:00';
             if ($input.data("flatpickr")) {
-                $input[0]._flatpickr.destroy();
+                try { $input[0]._flatpickr.destroy(); } catch(e) {}
             }
-
-            // Initialize flatpickr
-            let fp = flatpickr(this, {
+            var fp = flatpickr(this, {
                 enableTime: true,
                 noCalendar: true,
                 dateFormat: "H:i",
                 time_24hr: true,
-                minuteIncrement: 1,
+                minuteIncrement: 5,
                 defaultDate: currentValue,
-                onChange: function(selectedDates, dateStr, instance) {
-                    // Update calculation when overtime changes
-                    setTimeout(function() {
-                        calculateAllTotals();
-                    }, 100);
-                }
+                onChange: function() { setTimeout(calculateAllTotals, 100); }
             });
-
-            // Set the value if it exists
-            if(currentValue && currentValue !== '00:00') {
+            if (currentValue && currentValue !== '00:00') {
                 try {
-                    let [hours, minutes] = currentValue.split(':');
-                    let date = new Date();
-                    date.setHours(parseInt(hours) || 0);
-                    date.setMinutes(parseInt(minutes) || 0);
-                    fp.setDate(date, false);
-                } catch(e) {
-                    console.log('Error setting flatpickr date:', e);
-                }
+                    var parts = currentValue.split(':');
+                    var d = new Date();
+                    d.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+                    fp.setDate(d, false);
+                } catch(e) {}
             }
-        });
-
-        // Add change handler for day checkboxes (remove old handlers first)
-        $('.overtime-day-checkbox').off('change').on('change', function() {
-            setTimeout(function() {
-                calculateAllTotals();
-            }, 100);
         });
     }
 
-    // Handle overtime employees selection change
     $(document).on('change', '#OvertimeEmployees', function() {
-        let selected = $(this).val() || [];
-        let currentData = {};
-
-        // Get existing data including selected days for currently visible rows
+        var selected = $(this).val() || [];
+        var currentData = {};
         $('.overtime-emp-row').each(function() {
-            let empId = $(this).data('emp-id');
-            // Only keep data for employees that are still selected
-            if(selected.includes(empId)) {
-                let overtime = $(this).find('.employee-overtime-input').val() || '00:00';
-                let selectedDays = [];
-                $(this).find('.overtime-day-checkbox:checked').each(function() {
-                    selectedDays.push($(this).data('date'));
-                });
-
-                currentData[empId] = {
-                    name: $('#OvertimeEmployees option[value="' + empId + '"]').text(),
-                    overtime: overtime,
-                    days: selectedDays
-                };
-            }
+            var empId = $(this).data('emp-id');
+            if (!selected.includes(empId)) return;
+            var hoursByDate = {};
+            $(this).find('.overtime-date-input').each(function() {
+                var dateStr = $(this).data('date');
+                var v = $(this).val();
+                if ($(this).data('flatpickr') && $(this)[0]._flatpickr && $(this)[0]._flatpickr.selectedDates.length) {
+                    var d = $(this)[0]._flatpickr.selectedDates[0];
+                    v = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                }
+                hoursByDate[dateStr] = normalizeOvertime(v);
+            });
+            currentData[empId] = { name: $('#OvertimeEmployees option[value="' + empId + '"]').text(), hoursByDate: hoursByDate };
         });
-
-        // Add newly selected employees that don't have existing data
         selected.forEach(function(empId) {
             if (!currentData[empId]) {
-                // Check if this employee has saved overtime data
-                if(employeeOvertimeData[empId]) {
-                    currentData[empId] = {
-                        name: $('#OvertimeEmployees option[value="' + empId + '"]').text(),
-                        overtime: employeeOvertimeData[empId].overtime || '00:00',
-                        days: employeeOvertimeData[empId].days || []
-                    };
-                } else {
-                    currentData[empId] = {
-                        name: $('#OvertimeEmployees option[value="' + empId + '"]').text(),
-                        overtime: '00:00',
-                        days: []
-                    };
-                }
+                var hoursByDate = {};
+                availableDates.forEach(function(d) {
+                    var dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    hoursByDate[dateStr] = (employeeOvertimeData[empId] && employeeOvertimeData[empId].hoursByDate && employeeOvertimeData[empId].hoursByDate[dateStr]) ? employeeOvertimeData[empId].hoursByDate[dateStr] : '00:00';
+                });
+                currentData[empId] = { name: $('#OvertimeEmployees option[value="' + empId + '"]').text(), hoursByDate: hoursByDate };
             }
         });
-
-        // Update the list - this will show only selected employees and remove deselected ones
         updateOvertimeEmployeesList(currentData);
     });
 
-    // Remove employee from overtime list
     $(document).on('click', '.remove-overtime-emp', function() {
-        let empId = $(this).data('emp-id');
-        // Remove from dropdown selection
+        var empId = $(this).data('emp-id');
         $('#OvertimeEmployees option[value="' + empId + '"]').prop('selected', false);
-        // Remove from saved overtime data
         delete employeeOvertimeData[empId];
-        // Trigger change to update the list
+        $(this).closest('.overtime-emp-row').remove();
         $('#OvertimeEmployees').trigger('change');
-        // Recalculate totals
         calculateAllTotals();
     });
 
-    // Save overtime data with selected days
     $('#saveOvertimeBtn').on('click', function() {
-        // Get currently selected employees from dropdown
-        let selectedEmployees = $('#OvertimeEmployees').val() || [];
-
-        // Convert employee IDs to strings for consistency
-        selectedEmployees = selectedEmployees.map(function(id) {
-            return String(id);
-        });
-
-        // Clear all overtime data first
+        var selectedEmployees = ($('#OvertimeEmployees').val() || []).map(function(id) { return String(id); });
         employeeOvertimeData = {};
 
-        // Only save data for employees that are currently visible (selected in dropdown)
         $('.overtime-emp-row').each(function() {
-            let empId = String($(this).data('emp-id')); // Ensure string format
-
-            // Only process if this employee is selected in the dropdown
-            if(selectedEmployees.includes(empId)) {
-                let overtimeInput = $(this).find('.employee-overtime-input');
-                let overtime = overtimeInput.val() || '00:00';
-
-                // If flatpickr is initialized, get the formatted value
-                if(overtimeInput.data('flatpickr')) {
-                    let fp = overtimeInput[0]._flatpickr;
-                    if(fp.selectedDates.length > 0) {
-                        let date = fp.selectedDates[0];
-                        let hours = date.getHours().toString().padStart(2, '0');
-                        let minutes = date.getMinutes().toString().padStart(2, '0');
-                        overtime = hours + ':' + minutes;
-                    }
+            var empId = String($(this).data('emp-id'));
+            if (!selectedEmployees.includes(empId)) return;
+            var hoursByDate = {};
+            $(this).find('.overtime-date-input').each(function() {
+                var dateStr = $(this).data('date');
+                var v = $(this).val() || '00:00';
+                if ($(this).data('flatpickr') && $(this)[0]._flatpickr && $(this)[0]._flatpickr.selectedDates.length > 0) {
+                    var d = $(this)[0]._flatpickr.selectedDates[0];
+                    v = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
                 }
-
-                // Ensure format is HH:MM
-                if(!/^\d{2}:\d{2}$/.test(overtime)) {
-                    // Try to parse different formats
-                    let parts = overtime.split(':');
-                    if(parts.length === 2) {
-                        overtime = parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
-                    } else {
-                        overtime = '00:00';
-                    }
-                }
-
-                let selectedDays = [];
-                $(this).find('.overtime-day-checkbox:checked').each(function() {
-                    selectedDays.push($(this).data('date'));
-                });
-
-                // Save overtime data - save even if overtime is 00:00 as long as days are selected
-                // Or save if overtime is set
-                if(overtime !== '00:00' || selectedDays.length > 0) {
-                    employeeOvertimeData[empId] = {
-                        overtime: overtime,
-                        days: selectedDays
-                    };
-                }
-            }
+                hoursByDate[dateStr] = normalizeOvertime(v);
+            });
+            employeeOvertimeData[empId] = { hoursByDate: hoursByDate };
         });
 
-        // Remove overtime data for employees that are no longer selected
-        for(let empId in employeeOvertimeData) {
-            if(!selectedEmployees.includes(String(empId))) {
-                delete employeeOvertimeData[empId];
-            }
-        }
-
-        // Update summary
         updateOvertimeSummary();
-
-        // Recalculate totals after saving
         calculateAllTotals();
-
         $('#addOvertimeModal').modal('hide');
-
-        // Show success message
-        toastr.success("Overtime data saved successfully", "Success", {
-            positionClass: 'toast-bottom-right'
-        });
+        toastr.success("Overtime by date saved successfully", "Success", { positionClass: 'toast-bottom-right' });
     });
 
-    // Update overtime summary display
     function updateOvertimeSummary() {
-        let summary = '';
+        var summary = '';
         if (Object.keys(employeeOvertimeData).length > 0) {
-            summary = '<div class="alert alert-info"><strong>Overtime Assigned:</strong><ul class="mb-0">';
-            for(let empId in employeeOvertimeData) {
-                let empName = $('#Employee option[value="' + empId + '"]').text();
-                let overtimeInfo = employeeOvertimeData[empId];
-                let daysText = '';
-                if(overtimeInfo.days && overtimeInfo.days.length > 0) {
-                    daysText = ' (Days: ' + overtimeInfo.days.length + ')';
-                }
-                summary += '<li>' + empName + ': ' + overtimeInfo.overtime + daysText + '</li>';
+            summary = '<div class="alert alert-info"><strong>Overtime by date:</strong><ul class="mb-0">';
+            for (var empId in employeeOvertimeData) {
+                var empName = $('#Employee option[value="' + empId + '"]').text();
+                var hoursByDate = employeeOvertimeData[empId].hoursByDate || {};
+                var daysWithOT = Object.keys(hoursByDate).filter(function(d) {
+                    var v = hoursByDate[d];
+                    return v && v !== '00:00' && v !== '';
+                });
+                summary += '<li>' + empName + ': ' + (daysWithOT.length ? daysWithOT.length + ' day(s) with OT' : 'No OT') + '</li>';
             }
             summary += '</ul></div>';
         }
@@ -1983,31 +1871,33 @@
             console.log('Day off count:', dayOffCount, 'Deduction minutes:', dayOffDeductionMinutes);
             console.log('Net shift minutes:', netShiftTotalMinutes);
 
-            // Calculate overtime total - only for selected days per employee
+            // Calculate overtime total from hoursByDate (per-date OT); exclude day-off dates
             let overtimeTotalMinutes = 0;
-            for(let empId in employeeOvertimeData) {
+            for (let empId in employeeOvertimeData) {
                 let overtimeInfo = employeeOvertimeData[empId];
-                if(!overtimeInfo || !overtimeInfo.overtime) continue;
-
-                let overtime = overtimeInfo.overtime || '00:00';
-                let [otHours, otMinutes] = overtime.split(':');
-                otHours = parseInt(otHours) || 0;
-                otMinutes = parseInt(otMinutes) || 0;
-
-                // Count only the days selected for this employee's overtime
-                let overtimeDays = overtimeInfo.days || [];
-                let overtimeDaysCount = overtimeDays.length;
-
-                // Subtract overtime days that fall on day off dates
-                if(dayOffDates.length > 0) {
-                    overtimeDays.forEach(function(dateStr) {
-                        if(dayOffDates.includes(dateStr)) {
-                            overtimeDaysCount--;
-                        }
+                if (!overtimeInfo) continue;
+                let hoursByDate = overtimeInfo.hoursByDate || {};
+                // Legacy: support old format (overtime + days)
+                if (!hoursByDate || Object.keys(hoursByDate).length === 0) {
+                    let ot = overtimeInfo.overtime || '00:00';
+                    let days = overtimeInfo.days || [];
+                    if (ot === '00:00' || days.length === 0) continue;
+                    let [oh, om] = ot.split(':');
+                    oh = parseInt(oh, 10) || 0;
+                    om = parseInt(om, 10) || 0;
+                    days.forEach(function(dateStr) {
+                        if (dayOffDates.indexOf(dateStr) === -1) overtimeTotalMinutes += oh * 60 + om;
                     });
+                    continue;
                 }
-
-                overtimeTotalMinutes += (otHours * 60 + otMinutes) * overtimeDaysCount;
+                for (let dateStr in hoursByDate) {
+                    if (dayOffDates.indexOf(dateStr) !== -1) continue;
+                    let v = hoursByDate[dateStr];
+                    if (!v || v === '00:00') continue;
+                    let parts = v.split(':');
+                    let oh = parseInt(parts[0], 10) || 0, om = parseInt(parts[1], 10) || 0;
+                    overtimeTotalMinutes += oh * 60 + om;
+                }
             }
 
             // Calculate final total: Net Shift Hours + Overtime Hours

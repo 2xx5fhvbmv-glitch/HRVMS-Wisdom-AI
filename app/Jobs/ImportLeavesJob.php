@@ -24,12 +24,17 @@ class ImportLeavesJob implements ShouldQueue
 
     public function handle()
     {
+        $fullPath = storage_path('app/' . $this->file);
+        if (!file_exists($fullPath)) {
+            \Log::error('Leave import file not found.', ['path' => $fullPath]);
+            return;
+        }
         try {
-            Excel::import(new ImportLeaves($this->resort_id), $this->file);
+            Excel::import(new ImportLeaves($this->resort_id), $fullPath);
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             \Log::error('Validation errors during leave import.', ['errors' => $e->failures()]);
         } catch (\Exception $e) {
-            \Log::error('General error during leave import.', ['message' => $e->getMessage()]);
+            \Log::error('General error during leave import.', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         }
     }
 }

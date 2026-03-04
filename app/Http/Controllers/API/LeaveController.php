@@ -1718,10 +1718,10 @@ class LeaveController extends Controller
                         $currentYearStart   = Carbon::now()->startOfYear()->format('Y-m-d');
                         $currentYearEnd     = Carbon::now()->endOfYear()->format('Y-m-d');
 
+                        // Only approved leaves deduct from balance
                         $leavesTaken        = DB::table('employees_leaves')
                             ->where('emp_id', $leaveDetail->emp_id)
-                            ->whereNotIn('status', ['Pending'])
-
+                            ->where('status', 'Approved')
                             ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
                                 $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
                                     ->orWhereBetween('to_date', [$currentYearStart, $currentYearEnd]);

@@ -111,7 +111,10 @@
                                                                                                         @php
                                                                                                             $formattedDate = \Carbon\Carbon::parse($h['date'])->format('Y-m-d');
                                                                                                             $isPublicHoliday = isset($publicHolidays) && in_array($formattedDate, $publicHolidays);
-                                                                                                            $shiftData = $RosterInternalDataMonth->firstWhere('date', $formattedDate);
+                                                                                                            $entriesForDate = $RosterInternalDataMonth->where('date', $formattedDate);
+                                                                                                            $shiftData = $entriesForDate->first(fn($e) => isset($e->roster_id) && (int)$e->roster_id === (int)$r->duty_roster_id)
+                                                                                                                ?? $entriesForDate->first(fn($e) => !empty(trim((string)($e->OverTime ?? ''))) && !in_array(trim($e->OverTime ?? ''), ['00:00', '0:00', '0'], true))
+                                                                                                                ?? $entriesForDate->first();
 
                                                                                                             // Check for leave on this date
                                                                                                             $employeeLeave = \App\Models\EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
@@ -305,7 +308,10 @@
                                                                                 @php
                                                                                     $formattedDate = \Carbon\Carbon::parse($h['date'])->format('Y-m-d');
                                                                                     $isPublicHoliday = isset($publicHolidays) && in_array($formattedDate, $publicHolidays);
-                                                                                    $shiftData = $RosterInternalDataMonth->firstWhere('date', $formattedDate);
+                                                                                    $entriesForDate = $RosterInternalDataMonth->where('date', $formattedDate);
+                                                                                    $shiftData = $entriesForDate->first(fn($e) => isset($e->roster_id) && (int)$e->roster_id === (int)$r->duty_roster_id)
+                                                                                        ?? $entriesForDate->first(fn($e) => !empty(trim((string)($e->OverTime ?? ''))) && !in_array(trim($e->OverTime ?? ''), ['00:00', '0:00', '0'], true))
+                                                                                        ?? $entriesForDate->first();
 
                                                                                     // Check for leave on this date
                                                                                     $employeeLeave = \App\Models\EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')

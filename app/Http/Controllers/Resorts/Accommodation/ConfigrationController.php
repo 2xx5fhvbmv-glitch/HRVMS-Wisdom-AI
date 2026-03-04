@@ -30,14 +30,16 @@ use App\Imports\ImportQuickAssignment;
 class ConfigrationController extends Controller
 {
 
-    protected $resort;
+   protected $resort; 
+   protected $globalUser;
     protected $underEmp_id=[];
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){
-            $reporting_to = $this->globalUser->GetEmployee->id;
+            $this->globalUser = $this->resort;
+            $reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : null;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
     }

@@ -160,6 +160,7 @@
                             <div class="col">
                                 <h3 class="text-nowrap">Leave Requests</h3>
                             </div>
+                            @if($show_department_filter ?? true)
                             <div class="col-auto">
                                 <div class="form-group">
                                     <select id="department-filter" class="form-select select2t-none" aria-label="Default select example">
@@ -172,6 +173,7 @@
                                     </select>
                                 </div>
                             </div>
+                            @endif
                             <div class="col-auto"><a href="{{route('leave.request')}}" class="a-link">View All</a></div>
                         </div>
                     </div>
@@ -470,7 +472,7 @@
         serverSide: true,
         ajax: function(data, callback, settings) {
             // Get the department filter value
-            var departmentId = $('#department-filter').val();
+            var departmentId = ($('#department-filter').length ? $('#department-filter').val() : '') || '';
 
             $.ajax({
                 url: "{{ route('leave-requests.get') }}",

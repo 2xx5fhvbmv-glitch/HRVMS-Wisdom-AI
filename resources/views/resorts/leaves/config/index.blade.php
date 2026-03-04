@@ -26,63 +26,51 @@
                 <div class="col-xxl-6 col-lg-6 ">
                     <div class="row g-4">
                         <div class="col-12">
-                            <div class="card">
+                            <div class="card mb-30">
                                 <div class="card-title">
-                                    <h3>Upload Past Attendance Data</h3>
+                                    <h3>Leave Data</h3>
                                 </div>
-                                <form method="POST" action="{{ route('leave.export') }}" class="mb-4">
-                                    @csrf
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-12">
-                                            <select class="form-select select2t-none mb-2 ResortDivision" id="division" name="division" aria-label="Default select example">
-                                                <option  selected >Select Division</option>
-                                                @if($resort_divisions->isNotEmpty())
-                                                    @foreach($resort_divisions as $resort_division)
-                                                        <option value="{{ $resort_division->id }}">{{ $resort_division->name }}</option>
-                                                    @endforeach
-                                                @endif
-                                            </select>
+                                <div class="card-body">
+                                    <h5 class="mb-3">Export Leave</h5>
+                                    <form id="exportLeaveForm" method="POST" action="{{ route('leave.export') }}" class="mb-4">
+                                        @csrf
+                                        <div class="row g-3 align-items-center">
+                                            <div class="col-md-4">
+                                                <label for="leave_start_date" class="form-label">START DATE:</label>
+                                                <input type="text" id="leave_start_date" name="start_date" class="form-control datepicker" placeholder="dd-mm-yyyy" value="{{ old('start_date') }}" required>
+                                                @error('start_date')<span class="text-danger small">{{ $message }}</span>@enderror
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label for="leave_end_date" class="form-label">END DATE:</label>
+                                                <input type="text" id="leave_end_date" name="end_date" class="form-control datepicker" placeholder="dd-mm-yyyy" value="{{ old('end_date') }}" required>
+                                                @error('end_date')<span class="text-danger small">{{ $message }}</span>@enderror
+                                            </div>
+                                            <div class="col-md-4 d-flex align-items-end">
+                                                <button type="submit" class="btn btn-themeBlue">Export Employees</button>
+                                            </div>
                                         </div>
-                                        <div class="col-12">
-                                            <select class="form-select select2t-none mb-2 Department" id="department" name="department" aria-label="Default select example">
-                                                <option selected value="">Select Department</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-12">
-                                            <select class="form-select select2t-none mb-2 Section" id="section" name="section" aria-label="Default select example">
-                                                <option selected value="">Select Section</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-12">
-                                            <select class="form-select select2t-none mb-2 Position" id="position" name="position" aria-label="Default select example">
-                                                <option selected value="">Select Position</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="submit" class="btn btn-themeBlue">Export Employees</button>
-                                    </div>
-                                </form>
+                                    </form>
 
-                                <!-- File Upload Section -->
-                                <form id="ImportLeaveDataForm">
-                                    @csrf
-                                    <div class="col-auto">
-                                        <div class="uploadFile-btn me-0">
-                                            <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm"
-                                                onclick="document.getElementById('UploadImportleave').click();">
-                                                Upload File
-                                            </a>
-                                            <input type="file" id="UploadImportleave" name="UploadImportleave"
-                                                accept=".csv,.xls,.xlsx,.ods,.xlsb,.xlt,.xltx,.xltm" style="opacity: 0; position: absolute; z-index: -1;"
-                                                onchange="displayImportFileName()">
-                                            <div id="fileNameImportFile" style="margin-top: 10px; color: #333;"></div>
+                                    <hr>
+                                    <h5 class="mb-3">Import Leave</h5>
+                                    <div class="row g-3 align-items-center">
+                                        <div class="col-md-4">
+                                            <a href="{{ route('leave.template.download') }}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <form id="ImportLeaveDataForm" class="d-inline">
+                                                @csrf
+                                                <div class="uploadFile-btn me-0">
+                                                    <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm" onclick="document.getElementById('UploadImportleave').click();">Upload File</a>
+                                                    <input type="file" id="UploadImportleave" name="UploadImportleave" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="opacity: 0; position: absolute; z-index: -1;" onchange="displayImportFileName()">
+                                                    <div id="fileNameImportFile" style="margin-top: 10px; color: #333;"></div>
+                                                    <small class="text-muted d-block mt-1">Only .xlsx files are accepted</small>
+                                                </div>
+                                                <button type="submit" class="btn btn-themeBlue btn-sm d-none" id="ImportLeaveDataFormSubmit">Submit</button>
+                                            </form>
                                         </div>
                                     </div>
-                                    <div class="card-footer text-end">
-                                        <button type="submit" class="btn btn-themeBlue" id="ImportLeaveDataFormSubmit">Submit</button>
-                                    </div>
-                                </form>
+                                </div>
                             </div>
                         </div>
                         <div class="col-12">
@@ -523,6 +511,29 @@
         $("#division").select2({ placeholder: "Select Division" });
         $(".Department").select2({ placeholder: "Select Department" });
         $(".Section").select2({ placeholder: "Select Section" });
+
+        // Leave export: datepicker for Start Date and End Date (dd-mm-yyyy for server)
+        $("#leave_start_date, #leave_end_date").datepicker({
+            format: 'dd-mm-yyyy',
+            autoclose: true,
+            todayHighlight: true,
+            orientation: 'bottom auto'
+        });
+
+        // Leave export: ensure end date is not before start date
+        $('#exportLeaveForm').on('submit', function() {
+            var start = $('#leave_start_date').val();
+            var end = $('#leave_end_date').val();
+            if (start && end) {
+                var partsS = start.split('-'), partsE = end.split('-');
+                var dStart = new Date(partsS[2], partsS[1] - 1, partsS[0]);
+                var dEnd = new Date(partsE[2], partsE[1] - 1, partsE[0]);
+                if (dEnd < dStart) {
+                    toastr.error('End date must be on or after start date.', 'Error', { positionClass: 'toast-bottom-right' });
+                    return false;
+                }
+            }
+        });
         $(".Position").select2({ placeholder: "Select Position" });
 
         // Handle Division change event
@@ -950,7 +961,7 @@
 
             var fileInput = $('#UploadImportleave');
             var filePath = fileInput.val();
-            var allowedExtensions = /(\.csv|\.xls|\.xlsx|\.ods|\.xlsb|\.xlt|\.xltx|\.xltm)$/i;
+            var allowedExtensions = /\.xlsx$/i;
 
             if (!filePath) {
                 toastr.error("Please select a file to upload.", "Error", {
@@ -959,12 +970,12 @@
                 return false;
             }
 
-            if (!allowedExtensions.exec(filePath)) {
-            toastr.error("Please upload a valid file (csv, xls, xlsx, ods, xlsb, xlt, xltx, xltm).", "Error", {
-                positionClass: 'toast-bottom-right'
-            });
-            fileInput.val(''); // Clear the input
-            return false;
+            if (!allowedExtensions.test(filePath)) {
+                toastr.error("Only Excel (.xlsx) files are allowed. Please upload an xlsx file.", "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
+                fileInput.val('');
+                return false;
             }
 
             var formData = new FormData(this);
@@ -1112,8 +1123,6 @@
        }
 
          // Initialize date range picker
-
-        // $('.datepicker').datepicker({});
         $("#hiddenInput").daterangepicker({
             autoApply: true,
             startDate: moment(),
