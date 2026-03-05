@@ -64,6 +64,7 @@ class LeaveController extends Controller
         $resort_id = $this->resort->resort_id;
         $emp_id = $getEmployee->id ?? 0;
         $rank = $getEmployee->rank ?? 0;
+        $emp_grade_for_eligibility = Common::getEmpGrade($rank);
 
         $targetRanks = [
             array_search('HOD', config('settings.Position_Rank')),
@@ -93,6 +94,7 @@ class LeaveController extends Controller
                 'lc.color',
                 'lc.leave_category',
                 'lc.combine_with_other',
+                'lc.eligibility',
                 DB::raw("(SELECT SUM(el.total_days)
                             FROM employees_leaves el
                             WHERE el.emp_id = " . (int) ($getEmployee->id ?? 0) . "
@@ -156,6 +158,7 @@ class LeaveController extends Controller
                 'lc.color',
                 'lc.leave_category',
                 'lc.combine_with_other',
+                'lc.eligibility',
                 DB::raw('SUM(el.total_days) as total_days') // Use DB::raw for aggregation
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
@@ -174,6 +177,7 @@ class LeaveController extends Controller
             ->map(function ($item) {
                 $item->combine_with_other = $item->combine_with_other ?? 0;
                 $item->leave_category = $item->leave_category ?? 0;
+                $item->total_leave_days = $item->total_days ?? 0;
                 return $item;
             });
 
@@ -193,6 +197,40 @@ class LeaveController extends Controller
             )
             ->get();
         }
+
+        // Include leave categories that exist for the resort but are not yet in the benefit grid
+        // (e.g. newly added categories) so they appear on the apply page with 0 allocated days
+        $excludedLeaveTypes = ['Absent', 'Present', 'DayOff'];
+        $existingCatIds = $leave_categories->pluck('leave_cat_id')->unique()->filter()->values()->all();
+        $missingCategories = LeaveCategory::where('resort_id', $resort_id)
+            ->whereNotIn('leave_type', $excludedLeaveTypes)
+            ->when(!empty($existingCatIds), function ($q) use ($existingCatIds) {
+                return $q->whereNotIn('id', $existingCatIds);
+            })
+            ->get();
+        foreach ($missingCategories as $lc) {
+            $leave_categories->push((object) [
+                'leave_cat_id' => $lc->id,
+                'leave_type' => $lc->leave_type,
+                'color' => $lc->color ?? '',
+                'leave_category' => $lc->leave_category ?? 0,
+                'combine_with_other' => $lc->combine_with_other ?? 0,
+                'eligibility' => $lc->eligibility ?? '',
+                'total_leave_days' => 0,
+                'allocated_days' => 0,
+            ]);
+        }
+
+        // Filter by leave category eligibility: only show if employee's grade is in the category's eligibility list (or eligibility is empty = all)
+        $leave_categories = $leave_categories->filter(function ($item) use ($emp_grade_for_eligibility) {
+            $eligibilityStr = trim($item->eligibility ?? '');
+            if ($eligibilityStr === '') {
+                return true;
+            }
+            $allowed = array_map('trim', explode(',', $eligibilityStr));
+            return in_array((string) $emp_grade_for_eligibility, $allowed, true);
+        })->values();
+
         $transportations = ResortTransportation::where('resort_id', $resort_id)
             ->pluck('transportation_option','id')
             ->toArray();
@@ -1139,6 +1177,48 @@ class LeaveController extends Controller
                     ]);
                 }
 
+                // If category has a "number of times" limit, enforce it per period (frequency)
+                $numberOfTimesLimit = $leaveCategory->number_of_times ?? null;
+                if ($numberOfTimesLimit !== null && (int) $numberOfTimesLimit > 0) {
+                    $frequency = $leaveCategory->frequency ?? 'Yearly';
+                    $now = Carbon::now();
+                    switch ($frequency) {
+                        case 'Weekly':
+                            $periodStart = $now->copy()->startOfWeek()->format('Y-m-d');
+                            $periodEnd = $now->copy()->endOfWeek()->format('Y-m-d');
+                            break;
+                        case 'Monthly':
+                            $periodStart = $now->copy()->startOfMonth()->format('Y-m-d');
+                            $periodEnd = $now->copy()->endOfMonth()->format('Y-m-d');
+                            break;
+                        case 'Quarterly':
+                            $periodStart = $now->copy()->startOfQuarter()->format('Y-m-d');
+                            $periodEnd = $now->copy()->endOfQuarter()->format('Y-m-d');
+                            break;
+                        default:
+                            $periodStart = $now->copy()->startOfYear()->format('Y-m-d');
+                            $periodEnd = $now->copy()->endOfYear()->format('Y-m-d');
+                    }
+                    $applicationsInPeriod = DB::table('employees_leaves')
+                        ->where('emp_id', $emp_id)
+                        ->where('leave_category_id', $categoryId)
+                        ->whereIn('status', ['Pending', 'Approved'])
+                        ->where(function ($q) use ($periodStart, $periodEnd) {
+                            $q->whereBetween('from_date', [$periodStart, $periodEnd])
+                                ->orWhereBetween('to_date', [$periodStart, $periodEnd])
+                                ->orWhere(function ($q2) use ($periodStart, $periodEnd) {
+                                    $q2->where('from_date', '<=', $periodStart)->where('to_date', '>=', $periodEnd);
+                                });
+                        })
+                        ->count();
+                    if ($applicationsInPeriod >= (int) $numberOfTimesLimit) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "You have reached the maximum number of applications ({$numberOfTimesLimit}) for {$leaveCategory->leave_type} per {$frequency}. You cannot apply again in this period.",
+                        ], 422);
+                    }
+                }
+
                 // Get the employee grade and leave balances
                 $emp_grade = Common::getEmpGrade($rank);
 
@@ -1398,10 +1478,13 @@ class LeaveController extends Controller
         // Find the leave categories by IDs
         $leaveCategories = LeaveCategory::whereIn('id', $categoryId)->get();
 
-        // Check for any relation between `id` and `leave_category`
+        // Check for any relation: leave_category can be comma-separated IDs (e.g. "1,3,5"); at least one selected category must list another selected ID in its leave_category
+        $categoryId = array_map('intval', (array) $categoryId);
         $hasRelation = $leaveCategories->contains(function ($category) use ($categoryId) {
-            // Check if the leave_category field matches one of the selected IDs in the categoryId array
-            return in_array($category->leave_category, $categoryId);
+            $allowed = array_filter(array_map('trim', explode(',', $category->leave_category ?? '')));
+            $allowed = array_map('intval', $allowed);
+            $others = array_diff($categoryId, [(int) $category->id]);
+            return count(array_intersect($others, $allowed)) > 0;
         });
 
         // If no relation is found, return error
