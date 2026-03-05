@@ -16,6 +16,7 @@ use App\Jobs\ImportLeavesJob;
 use Auth;
 use Config;
 use DB;
+use Illuminate\Validation\Rule;
 
 class ConfigController extends Controller
 {
@@ -51,7 +52,7 @@ class ConfigController extends Controller
             'leave_type' => 'required|string|max:255',
             'number_of_days' => 'required|integer|min:1',
             'carry_forward' => 'required|in:1,0',
-            'carry_max' => 'required_if:carry_forward,1|nullable|integer|min:0',
+            'carry_max' => 'nullable|integer|min:0',
             'earned_leave' => 'required|in:1,0',
             'earned_max' => 'required_if:earned_leave,1|nullable|integer|min:0',
             'eligibility' => 'required|array',
@@ -59,8 +60,28 @@ class ConfigController extends Controller
             'number_of_times' => 'nullable|integer|min:1',
             'color' => 'nullable|string|max:7',
             'combine_with_other' => 'nullable|in:1,0',
-            'leave_category' => 'required_if:combine_with_other,1|nullable|string|max:255',
+            'leave_category' => [
+                'nullable',
+                'array',
+                'required_if:combine_with_other,1',
+                Rule::when((int) $request->input('combine_with_other') === 1, 'min:1'),
+            ],
+            'leave_category.*' => 'exists:leave_categories,id',
         ]);
+        // When carry forward is Yes and no max is set, store null so all days can carry forward
+        if (isset($validatedData['carry_forward']) && (int) $validatedData['carry_forward'] === 1) {
+            $validatedData['carry_max'] = isset($validatedData['carry_max']) && $validatedData['carry_max'] !== '' && $validatedData['carry_max'] !== null
+                ? (int) $validatedData['carry_max'] : null;
+        } else {
+            $validatedData['carry_max'] = null;
+        }
+        // Normalize leave_category: store as comma-separated string (1 or more IDs when combining)
+        $validatedData['leave_category'] = isset($validatedData['leave_category']) && is_array($validatedData['leave_category'])
+            ? implode(',', array_filter(array_map('trim', $validatedData['leave_category'])))
+            : '';
+        if ((int) ($request->combine_with_other ?? 0) !== 1) {
+            $validatedData['leave_category'] = '';
+        }
         // dd($request->all());
         try {
             $validatedData['resort_id'] = $resort_id;
@@ -96,7 +117,7 @@ class ConfigController extends Controller
             'leave_type' => 'required|string|max:255',
             'number_of_days' => 'required|integer|min:1',
             'carry_forward' => 'required|in:1,0',
-            'carry_max' => 'required_if:carry_forward,1|nullable|integer|min:0',
+            'carry_max' => 'nullable|integer|min:0',
             'earned_leave' => 'required|in:1,0',
             'earned_max' => 'required_if:earned_leave,1|nullable|integer|min:0',
             'eligibility' => 'required|array',
@@ -104,8 +125,27 @@ class ConfigController extends Controller
             'number_of_times' => 'nullable|integer|min:1',
             'color' => 'nullable|string|max:7',
             'combine_with_other' => 'required|in:1,0',
-            'leave_category' => 'nullable|string|max:255',
+            'leave_category' => [
+                'nullable',
+                'array',
+                'required_if:combine_with_other,1',
+                Rule::when((int) $request->input('combine_with_other') === 1, 'min:1'),
+            ],
+            'leave_category.*' => 'exists:leave_categories,id',
         ]);
+        // When carry forward is Yes and no max is set, store null so all days can carry forward
+        if (isset($validatedData['carry_forward']) && (int) $validatedData['carry_forward'] === 1) {
+            $validatedData['carry_max'] = isset($validatedData['carry_max']) && $validatedData['carry_max'] !== '' && $validatedData['carry_max'] !== null
+                ? (int) $validatedData['carry_max'] : null;
+        } else {
+            $validatedData['carry_max'] = null;
+        }
+        // Normalize leave_category: store as comma-separated string (1 or more IDs when combining)
+        if ((int) ($request->combine_with_other ?? 0) === 1 && !empty($validatedData['leave_category']) && is_array($validatedData['leave_category'])) {
+            $validatedData['leave_category'] = implode(',', array_filter(array_map('trim', $validatedData['leave_category'])));
+        } else {
+            $validatedData['leave_category'] = '';
+        }
         $validatedData['eligibility'] = implode(',', $request->eligibility); // Convert array to comma-separated string
 
         $leaveCategory = LeaveCategory::findOrFail($id);

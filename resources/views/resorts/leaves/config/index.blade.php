@@ -215,7 +215,7 @@
                                                 </div>
                                             </div>
                                             <p>{{$category->number_of_days}} Days</p>
-                                            <p>Forwarded Next Year - {{$category->carry_max ?? 0}} Days</p>
+                                            <p>Forwarded Next Year - {{ $category->carry_forward ? (isset($category->carry_max) && $category->carry_max !== null && $category->carry_max !== '' ? $category->carry_max . ' Days' : 'All days') : 'No' }}</p>
                                         </div>
                                     </div>
                                 @endforeach
@@ -257,9 +257,6 @@
                                                     <label class="form-check-label" for="carryNO">No</label>
                                                 </div>
                                             </div>
-                                            <div class="col">
-                                                <input type="text" class="form-control" name="carry_max" id="carry_max" placeholder="Max No." disabled>
-                                            </div>
                                         </div>
                                     </div>
                                     <div class="col-xl-6 col-lg-12 col-sm-6">
@@ -283,40 +280,40 @@
                                         </div>
                                     </div>
                                     <div class="col-sm-6">
-                                        <label for="eligibility" class="form-label">ELIGIBILITY <span class="red-mark">*</span></label>
-                                        <select class="form-select select2t-none" name="eligibility[]" multiple="multiple" data-parsley-required="true" data-parsley-errors-container="#eligibility-error">
-                                            <option value="">Select Eligibility</option>
+                                        <label for="add_eligibility" class="form-label">ELIGIBILITY <span class="red-mark">*</span></label>
+                                        <select class="form-select select2t-none select2-eligibility" name="eligibility[]" id="add_eligibility" multiple="multiple" data-parsley-required="true" data-parsley-errors-container="#add-eligibility-error">
                                             @if(!empty($eligibilty))
                                                 @foreach ($eligibilty as $key => $value)
                                                     <option value="{{ $key }}">{{ $value }}</option>
                                                 @endforeach
                                             @endif
                                         </select>
-                                        <div id="eligibility-error"></div>
+                                        <div id="add-eligibility-error"></div>
                                     </div>
                                     <div class="col-sm-6">
-                                        <label for="frequency" class="form-label">FREQUENCY <span class="red-mark">*</span></label>
-                                        <select class="form-select select2t-none"  name="frequency" aria-label="Default select example" data-parsley-required="true"
-                                        data-parsley-errors-container="#frequency-error" >
+                                        <label for="add_frequency" class="form-label">FREQUENCY <span class="red-mark">*</span></label>
+                                        <select class="form-select select2t-none" name="frequency" id="add_frequency" aria-label="Default select example" data-parsley-required="true"
+                                        data-parsley-errors-container="#add-frequency-error" >
                                             <option value="">Select Frequency</option>
                                             <option value="Weekly">Weekly</option>
                                             <option value="Monthly">Monthly</option>
                                             <option value="Quarterly">Quarterly</option>
                                             <option value="Yearly">Yearly</option>
                                         </select>
-                                        <div id="frequency-error"></div>
+                                        <div id="add-frequency-error"></div>
                                     </div>
                                     <div class="col-sm-6">
-                                        <label for="number_of_times" class="form-label">NO. OF TIMES <span class="red-mark">*</span></label>
-                                        <input type="number" id="number_of_times" name="number_of_times" placeholder="NO. OF TIMES" class="form-control" required data-parsley-validate-script
+                                        <label for="number_of_times" class="form-label">NO. OF TIMES</label>
+                                        <input type="number" id="number_of_times" name="number_of_times" placeholder="Leave empty for no limit" class="form-control" min="1" data-parsley-validate-script
                                         data-parsley-validate-script-message="Script tags are not allowed."/>
+                                        <small class="text-muted">Leave empty to allow employees to apply any number of times; set a number to limit applications per period (based on frequency).</small>
                                     </div>
                                     <div class="col-sm-6">
                                         <div class="inputCustom-color"> Color Theme
-                                            <input type="color" name="color" id="color" value="#A264F7" style="top:50%"  data-parsley-required="true"
-                                            data-parsley-errors-container="#color-error" >
+                                            <input type="color" name="color" id="add_color" value="#A264F7" style="top:50%"  data-parsley-required="true"
+                                            data-parsley-errors-container="#add-color-error" >
                                         </div>
-                                        <div id="color-error"></div>
+                                        <div id="add-color-error"></div>
                                     </div>
                                     @if(count($LeaveCategories ?? []) >= 1)
                                         <div class="col-sm-6">
@@ -327,23 +324,19 @@
                                             </select>
                                         </div>
 
-                                        <div class="col-sm-6">
-                                            <label for="leave_category" class="form-label">SELECT LEAVE CATEGORY </label>
-                                            <select class="form-select select2t-none"
-                                                    aria-label="Default select example"
-                                                    name="leave_category"
-                                                    id="leave_category"
-                                                    data-parsley-required-if="#combine_with_other"
-                                                    data-parsley-error-message="Please select a leave category if combining with another."
-                                                    data-parsley-errors-container="#leave_category-error" disabled>
-                                                <option value="">Select Leave Category</option>
+                                        <div class="col-sm-6" id="add_leave_category_wrap" style="display: none;">
+                                            <label for="add_leave_category" class="form-label">LEAVE CATEGORY <span class="red-mark">*</span></label>
+                                            <select name="leave_category[]" id="add_leave_category" class="form-select select2-leave-category" multiple="multiple"
+                                                data-parsley-required-if="#combine_with_other"
+                                                data-parsley-error-message="Please select at least one leave category when combining with another."
+                                                data-parsley-errors-container="#add_leave_category-error">
                                                 @if($LeaveCategories)
                                                     @foreach($LeaveCategories as $leaves)
                                                         <option value="{{$leaves->id}}">{{$leaves->leave_type}}</option>
                                                     @endforeach
                                                 @endif
                                             </select>
-                                            <div id="leave_category-error"></div>
+                                            <div id="add_leave_category-error"></div>
                                         </div>
                                     @endif
                                 </div>
@@ -395,9 +388,6 @@
                                         <label class="form-check-label" for="carryNO">No</label>
                                     </div>
                                 </div>
-                                <div class="col">
-                                    <input type="text" class="form-control" name="carry_max" id="carry_max" placeholder="Max No." disabled>
-                                </div>
                             </div>
                         </div>
                         <div class="col-sm-6">
@@ -416,64 +406,67 @@
                                     </div>
                                 </div>
                                 <div class="col">
-                                    <input type="text" class="form-control" name="earned_max" id="earned_max" placeholder="Max Earned." disabled>
+                                    <input type="text" class="form-control" name="earned_max" id="edit_earned_max" placeholder="Max Earned." disabled>
                                 </div>
                             </div>
                         </div>
                         <div class="col-sm-6">
-                            <label for="eligibility" class="form-label">ELIGIBILITY <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="eligibility[]" multiple="multiple" data-parsley-required="true" data-parsley-errors-container="#eligibility-error">
-                            <option value="">Select Eligibility</option>
+                            <label for="edit_eligibility" class="form-label">ELIGIBILITY <span class="red-mark">*</span></label>
+                            <select class="form-select select2t-none select2-eligibility" name="eligibility[]" id="edit_eligibility" multiple="multiple" data-parsley-required="true" data-parsley-errors-container="#edit-eligibility-error">
                                 @if(!empty($eligibilty))
                                     @foreach ($eligibilty as $key => $value)
                                         <option value="{{ $key }}">{{ $value }}</option>
                                     @endforeach
                                 @endif
                             </select>
-                            <div id="eligibility-error"></div>
+                            <div id="edit-eligibility-error"></div>
                         </div>
                         <div class="col-sm-6">
-                            <label for="frequency" class="form-label">FREQUENCY <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none"  name="frequency" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#frequency-error" >
+                            <label for="edit_frequency" class="form-label">FREQUENCY <span class="red-mark">*</span></label>
+                            <select class="form-select select2t-none" name="frequency" id="edit_frequency" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#edit-frequency-error" >
                                 <option value="">Select Frequency</option>
                                 <option value="Weekly">Weekly</option>
                                 <option value="Monthly">Monthly</option>
                                 <option value="Quarterly">Quarterly</option>
                                 <option value="Yearly">Yearly</option>
                             </select>
-                            <div id="frequency-error"></div>
+                            <div id="edit-frequency-error"></div>
                         </div>
                         <div class="col-sm-6">
-                            <label for="noTimes" class="form-label">NO. OF TIMES <span class="red-mark">*</span></label>
-                            <input type="number" id="number_of_times" name="number_of_times" placeholder="NO. OF TIMES" class="form-control" required data-parsley-validate-script
-                            data-parsley-validate-script-message="Script tags are not allowed."/>
+                            <label for="edit_number_of_times" class="form-label">NO. OF TIMES</label>
+                            <input type="number" id="edit_number_of_times" name="number_of_times" placeholder="Leave empty for no limit" class="form-control" min="1" data-parsley-validate-script
+                                        data-parsley-validate-script-message="Script tags are not allowed."/>
+                            <small class="text-muted">Leave empty to allow employees to apply any number of times; set a number to limit applications per period (based on frequency).</small>
                         </div>
                         <div class="col-sm-6">
                             <div class="inputCustom-color"> Color Theme
-                                <input type="color" name="color" id="color" value="#A264F7" style="top:50%"  data-parsley-required="true"
-                                data-parsley-errors-container="#color-error" >
+                                <input type="color" name="color" id="edit_color" value="#A264F7" style="top:50%"  data-parsley-required="true"
+                                data-parsley-errors-container="#edit-color-error" >
                             </div>
-                            <div id="color-error"></div>
+                            <div id="edit-color-error"></div>
                         </div>
                         @if(!empty($LeaveCategories) && count($LeaveCategories) >= 1)
                             <div class="col-sm-6">
-                                <label for="leaveAnother" class="form-label">IS THIS LEAVE COMBINES WITH
+                                <label for="edit_combine_with_other" class="form-label">IS THIS LEAVE COMBINES WITH
                                     ANOTHER?</label>
-                                <select class="form-select select2t-none" name="combine_with_other" aria-label="Default select example">
+                                <select class="form-select select2t-none" name="combine_with_other" id="edit_combine_with_other" aria-label="Default select example">
                                     <option value="0">No</option>
                                     <option value="1">Yes</option>
                                 </select>
                             </div>
-                            <div class="col-sm-6">
-                                <label for="laeveCat" class="form-label">LEAVE CATEGORY <span class="red-mark">*</span></label>
-                                <select name="leave_category" id="laeveCat" class="form-label select2t-none" data-parsley-required-if="#combine_with_other" data-parsley-error-message="Please select a leave category if combining with another." disabled>
-                                    <option value="">Select Leave Category</option>
+                            <div class="col-sm-6" id="edit_leave_category_wrap" style="display: none;">
+                                <label for="edit_leave_category" class="form-label">LEAVE CATEGORY <span class="red-mark">*</span></label>
+                                <select name="leave_category[]" id="edit_leave_category" class="form-select select2-leave-category" multiple="multiple"
+                                    data-parsley-required-if="#edit_combine_with_other"
+                                    data-parsley-error-message="Please select at least one leave category when combining with another."
+                                    data-parsley-errors-container="#edit_leave_category-error">
                                     @if($LeaveCategories)
                                         @foreach($LeaveCategories as $leaves)
                                             <option value="{{$leaves->id}}">{{$leaves->leave_type}}</option>
                                         @endforeach
                                     @endif
                                 </select>
+                                <div id="edit_leave_category-error"></div>
                             </div>
                         @endif
                     </div>
@@ -498,6 +491,19 @@
         color: #dc3545;
         display: block;
         margin-top: 5px;
+    }
+
+    /* Add form leave category combine: ensure Select2 and tags display when wrap is shown */
+    #add_leave_category_wrap .select2-container {
+        width: 100% !important;
+    }
+    #add_leave_category_wrap .select2-selection--multiple .select2-selection__choice {
+        display: inline-block;
+        padding: 2px 8px;
+        margin: 2px 4px 2px 0;
+        border-radius: 4px;
+        background-color: #e9ecef;
+        border: 1px solid #dee2e6;
     }
 </style>
 @endsection
@@ -617,10 +623,42 @@
             errorClass: 'is-invalid'
         });
 
-        // Initialize Select2
-        $('.select2t-none').select2({
-            allowClear: true,
-            closeOnSelect: false
+        // Initialize Select2 (eligibility, frequency, combine_with_other) – skip if layout already inited
+        $('.select2t-none').each(function() {
+            var $sel = $(this);
+            if ($sel.hasClass('select2-hidden-accessible')) return;
+            var opts = { allowClear: true, closeOnSelect: false, width: '100%' };
+            if ($sel.hasClass('select2-eligibility')) {
+                opts.placeholder = 'Select Eligibility';
+            }
+            $sel.select2(opts);
+        });
+
+        // Initialize leave category multi-selects (only when visible; use after wrap is shown)
+        function initLeaveCategorySelect2($el) {
+            if (!$el || !$el.length) return;
+            if ($el.hasClass('select2-hidden-accessible')) {
+                try { $el.select2('destroy'); } catch (e) {}
+            }
+            var opts = {
+                placeholder: 'Select leave category',
+                allowClear: true,
+                closeOnSelect: false,
+                width: '100%',
+                minimumResultsForSearch: 5
+            };
+            // If inside modal, append dropdown to modal so it is not clipped
+            if ($el.closest('.modal').length) {
+                opts.dropdownParent = $el.closest('.modal');
+            }
+            $el.select2(opts);
+        }
+        // Only init leave category Select2 when visible (add/edit wrap); otherwise init on show
+        $('.select2-leave-category').each(function () {
+            var $el = $(this);
+            if ($el.is(':visible')) {
+                initLeaveCategorySelect2($el);
+            }
         });
 
         // Manually trigger Parsley validation when Select2 changes
@@ -651,42 +689,59 @@
         });
 
         $(".addDash-block").click(function () {
-            $(".leaveAdd-block ").removeClass("d-none");
-        });
-
-        $('input[name="carry_forward"]').on('change', function () {
-            if ($(this).val() === '1') {
-                // If "Yes" is selected, enable the textbox
-                $('#carry_max').prop('disabled', false).focus();
-            } else {
-                // If "No" is selected, disable the textbox and clear its value
-                $('#carry_max').prop('disabled', true).val('');
+            $(".leaveAdd-block").removeClass("d-none");
+            var $addWrap = $('#leave-category-form #add_leave_category_wrap');
+            var $addLeaveCat = $('#leave-category-form #add_leave_category');
+            if ($('#leave-category-form #combine_with_other').val() == '1') {
+                $addWrap.show();
+                $addLeaveCat.attr('required', true);
+                setTimeout(function () { initLeaveCategorySelect2($addLeaveCat); }, 50);
             }
         });
 
-        $('input[name="earned_leave"]').on('change', function () {
+        $(document).on('change', 'input[name="earned_leave"]', function () {
+            var $form = $(this).closest('form');
+            var $earnedMax = $form.find('input[name="earned_max"]');
             if ($(this).val() === '1') {
-                // If "Yes" is selected, enable the textbox
-                $('#earned_max').prop('disabled', false).focus();
+                $earnedMax.prop('disabled', false).focus();
             } else {
-                // If "No" is selected, disable the textbox and clear its value
-                $('#earned_max').prop('disabled', true).val('');
+                $earnedMax.prop('disabled', true).val('');
             }
         });
 
-        $('#combine_with_other').on('change', function () {
-            if ($(this).val() === '1') {
-                // If "Yes" is selected, enable the textbox and add required validation
-                $('#leave_category')
-                    .prop('disabled', false)
-                    .attr('required', true) // Add required attribute
-                    .focus();
+        // Add form only: show wrap and init Select2 when "Combine = Yes"
+        $(document).on('change select2:select', '#leave-category-form #combine_with_other', function () {
+            var val = $(this).val();
+            var $wrap = $('#leave-category-form #add_leave_category_wrap');
+            var $leaveCat = $('#leave-category-form #add_leave_category');
+            if (val === '1' || val == 1) {
+                $wrap.show();
+                $leaveCat.attr('required', true);
+                setTimeout(function () { initLeaveCategorySelect2($leaveCat); }, 50);
             } else {
-                // If "No" is selected, disable the textbox, clear its value, and remove validation
-                $('#leave_category')
-                    .prop('disabled', true)
-                    .removeAttr('required') // Remove required attribute
-                    .val(''); // Clear the value
+                $wrap.hide();
+                $leaveCat.removeAttr('required').val([]).trigger('change');
+                if ($leaveCat.hasClass('select2-hidden-accessible')) {
+                    try { $leaveCat.select2('destroy'); } catch (e) {}
+                }
+            }
+        });
+
+        // Edit modal: show/hide wrap and init Select2 when "Combine = Yes"; defer init for modal layout
+        $(document).on('change', '#edit_combine_with_other', function () {
+            var val = $(this).val();
+            var $wrap = $('#editLeave-modal #edit_leave_category_wrap');
+            var $editLeaveCat = $('#editLeave-modal #edit_leave_category');
+            if (val === '1') {
+                $wrap.show();
+                $editLeaveCat.attr('required', true);
+                setTimeout(function () { initLeaveCategorySelect2($editLeaveCat); }, 10);
+            } else {
+                $wrap.hide();
+                $editLeaveCat.removeAttr('required').val([]).trigger('change');
+                if ($editLeaveCat.hasClass('select2-hidden-accessible')) {
+                    try { $editLeaveCat.select2('destroy'); } catch (e) {}
+                }
             }
         });
 
@@ -877,8 +932,9 @@
 
         });
 
-        $(document).on("click", 'a[data-bs-toggle="modal"]', function () {
+        $(document).on("click", 'a[data-bs-toggle="modal"][data-leave-id]', function () {
             const leaveId = $(this).data("leave-id");
+            if (!leaveId) return;
             const leaveType = $(this).data("leave-type");
             const numberOfDays = $(this).data("number-of-days");
             const carryForward = $(this).data("carry-forward");
@@ -902,19 +958,28 @@
             // Populate modal fields
             $('#editLeave-modal #leaveType').val(leaveType);
             $('#editLeave-modal #number_of_days').val(numberOfDays);
-            $('#editLeave-modal #carry_max').val(carryMax).prop('disabled', carryForward !== 1);
-            $('#editLeave-modal #earned_max').val(earnedMax).prop('disabled', earnedLeave !== 1);
+            $('#editLeave-modal #edit_earned_max').val(earnedMax).prop('disabled', earnedLeave !== 1);
             $('#editLeave-modal input[name="carry_forward"][value="' + carryForward + '"]').prop('checked', true);
             $('#editLeave-modal input[name="earned_leave"][value="' + earnedLeave + '"]').prop('checked', true);
-            $('#editLeave-modal select[name="eligibility[]"]').val(eligibilityValues).trigger('change');
-            $('#editLeave-modal select[name="frequency"]').val(frequency).trigger('change');
-            $('#editLeave-modal #number_of_times').val(numberOfTimes);
-            $('#editLeave-modal #color').val(color);
-            $('#editLeave-modal select[name="combine_with_other"]').val(combineWithOther).trigger('change');
-            $('#editLeave-modal #leave_category').val(leaveCategory);
+            $('#editLeave-modal #edit_eligibility').val(eligibilityValues).trigger('change');
+            $('#editLeave-modal #edit_frequency').val(frequency).trigger('change');
+            $('#editLeave-modal #edit_number_of_times').val(numberOfTimes);
+            $('#editLeave-modal #edit_color').val(color);
+            $('#editLeave-modal #edit_combine_with_other').val(combineWithOther).trigger('change');
+            // leave_category: show wrap and set value when "Combine" is Yes so selected items show as tags
+            var leaveCategoryArr = [];
+            if (Number(combineWithOther) === 1 && leaveCategory && String(leaveCategory).trim() !== '') {
+                leaveCategoryArr = String(leaveCategory).split(',').map(function (s) { return String(s).trim(); }).filter(Boolean);
+                leaveCategoryArr = leaveCategoryArr.filter(function (id) { return String(id) !== String(leaveId); });
+            }
+            var $editLeaveCat = $('#editLeave-modal #edit_leave_category');
+            $editLeaveCat.find('option').prop('disabled', false);
+            $editLeaveCat.find('option[value="' + leaveId + '"]').prop('disabled', true);
+            $editLeaveCat.val(leaveCategoryArr);
+            if (Number(combineWithOther) === 1) {
+                $editLeaveCat.trigger('change');
+            }
             $('#editLeave-modal #leave_id').val(leaveId);
-
-
         });
 
         $(document).on('submit', '#edit-leave-category', function (e) {
@@ -1238,35 +1303,40 @@
 
     function initSelect2AndValidation() {
         if ($.fn.select2 && $.fn.parsley) {
-            // Initialize Select2
-            $(".select2t-none").select2({ allowClear: true,
-                closeOnSelect: false});
+            // Only init Select2 on .select2t-none if not already initialized (avoids double-init and breaking leave category)
+            $(".select2t-none").each(function() {
+                if (!$(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2({ allowClear: true, closeOnSelect: false });
+                }
+            });
 
             // Add Parsley validation specifically for Select2
-            $(".select2t-none").on('change', function() {
+            $(".select2t-none").off('change.configSelect2').on('change.configSelect2', function() {
                 $(this).parsley().validate();
             });
 
             // Ensure Select2 trigger changes in Parsley
-            $(".select2t-none").on('select2:select', function() {
+            $(".select2t-none").off('select2:select.configSelect2').on('select2:select.configSelect2', function() {
                 $(this).trigger('change');
             });
         }
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        function initSelect2AndValidation() {
+        function initSelect2AndValidationLocal() {
             if ($.fn.select2 && $.fn.parsley) {
-                // Initialize Select2
-                $(".select2t-none").select2();
+                // Only init .select2t-none if not already initialized (page already inits in main ready)
+                $(".select2t-none").each(function() {
+                    if (!$(this).hasClass('select2-hidden-accessible')) {
+                        $(this).select2({ allowClear: true, closeOnSelect: false });
+                    }
+                });
 
-                // Add Parsley validation specifically for Select2
-                $(".select2t-none").on('change', function() {
+                $(".select2t-none").off('change.configSelect2').on('change.configSelect2', function() {
                     $(this).parsley().validate();
                 });
 
-                // Ensure Select2 trigger changes in Parsley
-                $(".select2t-none").on('select2:select', function() {
+                $(".select2t-none").off('select2:select.configSelect2').on('select2:select.configSelect2', function() {
                     $(this).trigger('change');
                 });
             }
@@ -1408,7 +1478,7 @@
 
         // Initialize All Validations and Plugins
         function initializeFormValidation() {
-            initSelect2AndValidation();
+            initSelect2AndValidationLocal();
             initParsleyValidation();
             initAlphaOnlyInputs();
             initFormSubmission();
