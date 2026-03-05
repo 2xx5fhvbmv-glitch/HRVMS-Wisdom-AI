@@ -10,6 +10,7 @@
                     <div class="page-title">
                         <span>Payroll</span>
                         <h1>{{ $page_title }}</h1>
+                        <p class="text-muted small mb-0">Transactions approved or consented by employees (Consented, Paid, Partial Paid)</p>
                     </div>
                 </div>
                 <div class="col-auto">
@@ -21,7 +22,7 @@
         <div class="row g-3">
             <div class="col-xl-3 col-lg-4 col-md-6">
                 <div class="card dashboard-boxcard timeAttend-boxcard mb-30">
-                    <p class="fw-600 mb-0">Total Payable Amount <span class="text-muted small">(by date range)</span></p>
+                    <p class="fw-600 mb-0">Total Payable Amount <span class="text-muted small"></span></p>
                     <strong id="total-payable-amount">$0.00</strong>
                 </div>
             </div>
@@ -48,11 +49,25 @@
                             <i class="fa-solid fa-download me-1"></i> Download
                         </button>
                     </div>
+                    @if(!empty($canUpdatePaymentStatus))
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <div class="form-check mb-0">
+                            <input type="checkbox" class="form-check-input" id="payment-check-all" aria-label="Check all">
+                            <label class="form-check-label small" for="payment-check-all">Check all</label>
+                        </div>
+                        <button type="button" id="payment-bulk-paid-btn" class="btn btn-theme btn-sm">
+                            <i class="fa-solid fa-check-double me-1"></i> Mark selected as Paid
+                        </button>
+                    </div>
+                    @endif
                 </div>
             </div>
             <table id="payment-table" class="table w-100">
                 <thead>
                     <tr>
+                        @if(!empty($canUpdatePaymentStatus))
+                        <th class="text-center" style="width: 40px;">Select</th>
+                        @endif
                         <th>ID</th>
                         <th>Emp ID</th>
                         <th>Name</th>
@@ -121,6 +136,21 @@
             $('#payment-table').DataTable().destroy();
         }
 
+        var columns = [
+            { data: 'order_id', name: 'order_id', className: 'text-nowrap' },
+            { data: 'Emp_id', name: 'Emp_id', className: 'text-nowrap' },
+            { data: 'name', name: 'name', className: 'text-nowrap' },
+            { data: 'purchased_date', name: 'purchased_date', className: 'text-nowrap' },
+            { data: 'product', name: 'product', className: 'text-nowrap' },
+            { data: 'quantity', name: 'quantity', className: 'text-nowrap' },
+            { data: 'price', name: 'price', className: 'text-nowrap' },
+            { data: 'currency_type', name: 'currency_type', className: 'text-nowrap' },
+            { data: 'status', name: 'status', orderable: false, searchable: false },
+        ];
+        @if(!empty($canUpdatePaymentStatus))
+        columns.unshift({ data: 'checkbox', name: 'checkbox', orderable: false, searchable: false, className: 'text-center' });
+        @endif
+
         $('#payment-table').DataTable({
             searching: false,
             lengthChange: false,
@@ -130,7 +160,7 @@
             pageLength: 15,
             processing: true,
             serverSide: true,
-            order: [[8, 'desc']],
+            order: [[ @if(!empty($canUpdatePaymentStatus)) 9 @else 8 @endif , 'desc']],
             ajax: {
                 url: "{{ route('resort.shopkeeper.payments.list', ['id' => $shopkeeper->id]) }}",
                 type: 'GET',
@@ -145,18 +175,77 @@
                     return json.data;
                 }
             },
-            columns: [
-                { data: 'order_id', name: 'order_id', className: 'text-nowrap' },
-                { data: 'Emp_id', name: 'Emp_id', className: 'text-nowrap' },
-                { data: 'name', name: 'name', className: 'text-nowrap' },
-                { data: 'purchased_date', name: 'purchased_date', className: 'text-nowrap' },
-                { data: 'product', name: 'product', className: 'text-nowrap' },
-                { data: 'quantity', name: 'quantity', className: 'text-nowrap' },
-                { data: 'price', name: 'price', className: 'text-nowrap' },
-                { data: 'currency_type', name: 'currency_type', className: 'text-nowrap' },
-                { data: 'status', name: 'status', orderable: false, searchable: false },
-            ]
+            columns: columns
         });
     }
+
+    @if(!empty($canUpdatePaymentStatus))
+    $(document).on('change', '#payment-check-all', function() {
+        var checked = $(this).prop('checked');
+        $('#payment-table').DataTable().$('.payment-row-checkbox').each(function() {
+            $(this).prop('checked', checked);
+        });
+    });
+
+    $(document).on('change', '.payment-row-checkbox', function() {
+        var total = $('#payment-table').DataTable().$('.payment-row-checkbox').length;
+        var checked = $('#payment-table').DataTable().$('.payment-row-checkbox:checked').length;
+        $('#payment-check-all').prop('checked', total > 0 && checked === total).prop('indeterminate', checked > 0 && checked < total);
+    });
+
+    $(document).on('click', '#payment-bulk-paid-btn', function() {
+        var ids = [];
+        $('#payment-table').DataTable().$('.payment-row-checkbox:checked').each(function() {
+            var id = $(this).data('payment-id');
+            if (id) ids.push(id);
+        });
+        if (ids.length === 0) {
+            if (typeof toastr !== 'undefined') {
+                toastr.warning('Please select at least one payment.', "Notice", { positionClass: 'toast-bottom-right' });
+            } else {
+                alert('Please select at least one payment.');
+            }
+            return;
+        }
+        var btn = $(this);
+        btn.prop('disabled', true);
+        $.ajax({
+            url: "{{ route('resort.shopkeeper.payments.bulkUpdateStatus') }}",
+            type: "POST",
+            data: {
+                payment_ids: ids,
+                _token: "{{ csrf_token() }}"
+            },
+            success: function(response) {
+                if (response.success) {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    } else {
+                        alert(response.message);
+                    }
+                    $('#payment-check-all').prop('checked', false);
+                    PaymentList();
+                } else {
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error(response.message || 'Update failed', "Error", { positionClass: 'toast-bottom-right' });
+                    } else {
+                        alert(response.message || 'Update failed');
+                    }
+                }
+            },
+            error: function(xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Failed to update payments.';
+                if (typeof toastr !== 'undefined') {
+                    toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+                } else {
+                    alert(msg);
+                }
+            },
+            complete: function() {
+                btn.prop('disabled', false);
+            }
+        });
+    });
+    @endif
 </script>
 @endsection

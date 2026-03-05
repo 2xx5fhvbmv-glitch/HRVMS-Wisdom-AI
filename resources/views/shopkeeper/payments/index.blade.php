@@ -35,7 +35,7 @@
                                     <!-- Hidden input field to attach the calendar to -->
                                     <input type="text" class="form-control dateRangeAb datepicker" name="hiddenInput" id="hiddenInput">
                                 </div>
-                                <p id="startDate" class="d-none">Start Date:</p>
+                                <p id="startDate" class="d-none">aaStart Date:</p>
                                 <p id="endDate" class="d-none">End Date:</p>
                             </div>                        
                         </div>

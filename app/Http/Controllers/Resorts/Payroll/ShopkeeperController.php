@@ -26,6 +26,23 @@ class ShopkeeperController extends Controller
         if(!$this->resort) return;
     }
 
+    /**
+     * Whether the current user (HR HOD, HR Excom, Finance HOD, Finance Excom) can change payment status.
+     */
+    protected function canUpdatePaymentStatus(): bool
+    {
+        $employee = $this->resort->getEmployee ?? null;
+        if (!$employee) {
+            return false;
+        }
+        $rankPosition = Common::getEmployeeRankPosition($employee);
+        $position = $rankPosition['position'] ?? null;
+        $rank = $rankPosition['rank'] ?? null;
+        $allowedPositions = ['HR', 'Finance'];
+        $allowedRanks = ['HOD', 'EXCOM'];
+        return in_array($position, $allowedPositions) && in_array($rank, $allowedRanks);
+    }
+
     public function index()
     {
         if(Common::checkRouteWisePermission('shopkeepers.create',config('settings.resort_permissions.view')) == false){
@@ -202,9 +219,9 @@ class ShopkeeperController extends Controller
     {
         $resort_id = $this->resort->resort_id;
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
-        // Total is driven by date range in the list; show 0 until first AJAX load
         $page_title = 'Payments - ' . $shopkeeper->name;
-        return view('resorts.payroll.shopkeeper.payments', compact('page_title', 'shopkeeper'));
+        $canUpdatePaymentStatus = $this->canUpdatePaymentStatus();
+        return view('resorts.payroll.shopkeeper.payments', compact('page_title', 'shopkeeper', 'canUpdatePaymentStatus'));
     }
 
     public function paymentsList(Request $request, $id)
@@ -254,8 +271,18 @@ class ShopkeeperController extends Controller
             ])
             ->get();
 
+        $canUpdatePaymentStatus = $this->canUpdatePaymentStatus();
+
         return datatables()->of($tableData)
             ->with('total_amount', $totalAmount)
+            ->with('can_update_payment_status', $canUpdatePaymentStatus)
+            ->addColumn('checkbox', function ($row) use ($canUpdatePaymentStatus) {
+                $canCheck = $canUpdatePaymentStatus && in_array($row->status, ['Consented', 'Partial Paid']);
+                if (!$canCheck) {
+                    return '—';
+                }
+                return '<input type="checkbox" class="payment-row-checkbox form-check-input" data-payment-id="' . (int) $row->id . '" aria-label="Select row">';
+            })
             ->addColumn('currency_type', function ($row) {
                 $ct = $row->product_currency_type ?? 'USD';
                 return $ct === 'MVR' ? 'MVR' : 'Dollar';
@@ -280,10 +307,12 @@ class ShopkeeperController extends Controller
                     'Paid' => 'badge-success',
                     'Partial Paid' => 'badge-info',
                     'Pending Consent' => 'badge-warning',
-                    'Consented' => 'badge-themeSkyblueLight',
+                    'Consented' => 'badge-themeSkyblue',
+                    'Paid to shopkeeper' => 'badge-themeSuccess',
+                    'Paid by resort' => 'badge-themeSuccess',
                 ];
                 $class = $statusClasses[$row->status] ?? 'badge-secondary';
-                return '<span class="badge ' . $class . '">' . $row->status . '</span>';
+                return '<span class="badge ' . $class . '">' . e($row->status) . '</span>';
             })
             ->escapeColumns([])
             ->make(true);
@@ -302,5 +331,29 @@ class ShopkeeperController extends Controller
         $filename = 'shopkeeper-payments-' . $shopkeeper->id . '-' . date('Y-m-d-His') . '.xlsx';
 
         return Excel::download($export, $filename);
+    }
+
+    public function bulkUpdatePaymentStatus(Request $request)
+    {
+        $request->validate([
+            'payment_ids' => 'required|array',
+            'payment_ids.*' => 'required|integer|exists:payments,id',
+        ]);
+
+        if (!$this->canUpdatePaymentStatus()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized. Only HR/Finance HOD or Excom can update.'], 403);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $updated = Payment::whereIn('id', $request->payment_ids)
+            ->whereHas('shopKeeper', fn ($q) => $q->where('resort_id', $resort_id))
+            ->whereIn('status', ['Consented', 'Partial Paid'])
+            ->update(['status' => 'Paid']);
+
+        return response()->json([
+            'success' => true,
+            'message' => $updated . ' payment(s) marked as Paid.',
+            'updated_count' => $updated,
+        ]);
     }
 }

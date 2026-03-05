@@ -20,6 +20,7 @@ use App\Models\Shopkeeper;
 use App\Models\Payment;
 use App\Models\Employee;
 use App\Models\Product;
+use App\Models\ResortNotification;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\PaymentsExport;
 class PaymentController extends Controller
@@ -87,7 +88,8 @@ class PaymentController extends Controller
                     return $ct === 'MVR' ? 'MVR' : 'Dollar';
                 })
                 ->addColumn('qr_code', function ($row) {
-                    if ($row->status === 'Pending Consent' && !empty($row->qr_code)) {
+                    $showQr = in_array($row->status, ['Pending Consent', 'Rejected']) && !empty($row->qr_code);
+                    if ($showQr) {
                         return '<button type="button" class="btn btn-sm btn-outline-secondary p-1 payment-qr-icon" data-payment-id="' . (int) $row->id . '" title="View QR Code"><i class="fa-solid fa-qrcode fa-lg"></i></button>';
                     }
                     return '—';
@@ -275,16 +277,34 @@ class PaymentController extends Controller
             'paymentID' => 'required|exists:payments,id',
         ]);
 
-        $payment = Payment::findOrFail($request->paymentID);
+        $payment = Payment::with('shopKeeper', 'product')->findOrFail($request->paymentID);
         $shopkeeper = $this->shopkeeper;
 
-        // Send consent notification
-        if ($payment) {
-            $payment->sendConsentProductPurchaseNotification($payment, $shopkeeper);
-            return response()->json(['success' => true, 'message' => 'Consent sent successfully']);
+        $resortId = $payment->shopKeeper->resort_id ?? null;
+        if (!$resortId) {
+            return response()->json(['success' => false, 'message' => 'Resort not found for this payment.'], 404);
         }
 
-        return response()->json(['success' => false, 'message' => 'Payment not found'], 404);
+        $productName = $payment->product->name ?? 'Product';
+        $title = 'Payment consent request';
+        $message = "Please approve your purchase consent from {$shopkeeper->name}. Order #{$payment->order_id} – {$productName}.";
+
+        try {
+            // Create in-app notification for mobile (employee sees it in notification list)
+            ResortNotification::create([
+                'type' => $title,
+                'user_id' => $payment->emp_id,
+                'module' => 'Payment Consent',
+                'resort_id' => $resortId,
+                'message' => $message,
+                'request_id' => $payment->id,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Shopkeeper sendConsent failed: ' . $e->getMessage(), ['payment_id' => $payment->id]);
+            return response()->json(['success' => false, 'message' => 'Failed to send consent notification.'], 500);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Consent notification sent to mobile app']);
     }
 
 }

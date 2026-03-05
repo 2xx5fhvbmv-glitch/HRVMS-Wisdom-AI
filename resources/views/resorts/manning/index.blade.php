@@ -52,7 +52,6 @@
                                 <tr>
                                     <th class="text-nowrap">Name</th>
                                     <th class="text-nowrap">Code</th>
-                                    <th class="text-nowrap">Short Name</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
@@ -88,7 +87,6 @@
                                     <th class="text-nowrap">Name</th>
                                     <th class="text-nowrap">Division</th>
                                     <th class="text-nowrap">Code</th>
-                                    <th class="text-nowrap">Short Name</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
@@ -123,7 +121,6 @@
                                     <th class="text-nowrap">Division</th>
                                     <th class="text-nowrap">Departments</th>
                                     <th class="text-nowrap">Code</th>
-                                    <th class="text-nowrap">Short Name</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
@@ -167,7 +164,6 @@
                                     <th class="text-nowrap">Section</th>
                                     <th class="text-nowrap">Division</th>
                                     <th class="text-nowrap">Code</th>
-                                    <th class="text-nowrap">Short Title</th>
                                     <th class="text-nowrap">Rank</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
@@ -220,11 +216,6 @@
 					<div class="form-group mb-20">
                         <input type="text" id="new-division-code" name="code" class="form-control"
                                placeholder="Add Code of Division"  required data-parsley-required-message="Add Code of Division">
-                    </div>
-
-					<div class="form-group mb-20">
-                        <input type="text" id="new-division-short-name" name="short_name" class="form-control"
-                         required data-parsley-required-message="Add Short Name of Division" placeholder="Add Short Name of Division">
                     </div>
 
                     <div class="form-group mb-3">
@@ -294,9 +285,7 @@
                     <label class="department-name-label" for="new-dept-name">Add Name of Department <span class="red-mark">*</span></label>
                     <input type="text" name="name" id="new-dept-name" class="form-control"
                         placeholder="Add Name of Department"
-                        required data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$"
-                        data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed."
-                        data-parsley-required-message="Department name is required.">
+                        required data-parsley-required-message="Department name is required.">
                 </div>
 
                 <!-- Department Code -->
@@ -304,19 +293,7 @@
                     <label for="new-dept-code">Add Code of Department <span class="red-mark">*</span></label>
                     <input type="text" name="code" id="new-dept-code" class="form-control"
                         placeholder="Add Code of Department"
-                        required data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$"
-                        data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed."
-                        data-parsley-required-message="Department code is required.">
-                </div>
-
-                <!-- Short Name -->
-                <div class="form-group mb-20">
-                    <label for="new-dept-short-name">Add Department Short Name <span class="red-mark">*</span></label>
-                    <input type="text" name="short_name" id="new-dept-short-name" class="form-control"
-                        placeholder="Add Short Name of Department"
-                        required data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$"
-                        data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed."
-                        data-parsley-required-message="Short name is required.">
+                        required data-parsley-required-message="Department code is required.">
                 </div>
 
                 <!-- Status -->
@@ -369,11 +346,10 @@
                     </div>
 
                     <div class="form-group mb-20">
-                        <label class="SelectionModel-name-label" for="new-dept-name">Select Section <span class="red-mark">*</span></label>
+                        <label class="SelectionModel-name-label" for="new-dept-name">Select Section</label>
                         <select id="section-select" name="section_id" class="form-select select2-modal SelectionModel-name-class"
-                          data-parsley-errors-container="#div-section_select" 
-                         required data-parsley-required-message="Please select a section.">
-                            <option value="">Select Section</option>
+                          data-parsley-errors-container="#div-section_select">
+                            <option value="">Select Section (or add new below)</option>
                             @foreach($sections as $section)
                                 <option value="{{ $section->name }}">{{ $section->name }}</option>
                             @endforeach
@@ -386,22 +362,14 @@
 
                     <div class="form-group mb-20">
                         <label class="NameofSection-label" for="new-dept-name">Add Name Of Section <span class="red-mark">*</span></label>
-                        <input type="text" id="new-section-name" name="name" class="form-control NameofSection-class" required data-parsley-required-message="Please Add Name of Section" placeholder="Add Name of Section" data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$" data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed.">
+                        <input type="text" id="new-section-name" name="name" class="form-control NameofSection-class" required data-parsley-required-message="Please Add Name of Section" placeholder="Add Name of Section">
                     </div>
 
                     <div class="form-group mb-20">
                         <label class="department-name-label" for="new-dept-name">Add Section Code <span class="red-mark">*</span></label>
                         <input type="text" name="code" id="new-section-code" class="form-control" 
                         placeholder="Add Code of Section"
-                         required data-parsley-required-message="Please Add Code of Section"  data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$" data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed.">
-                    </div>
-
-                    <div class="form-group mb-20">
-                        
-                        <label class="department-name-label" for="new-dept-name">Add Short Name <span class="red-mark">*</span></label>
-                        <input type="text" name="short_name" id="new-section-short-name" class="form-control" placeholder="Add Short Name of Section" 
-                         required data-parsley-required-message="Please Add Short Name of Section"
-                        required data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$" data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed.">
+                         required data-parsley-required-message="Please Add Code of Section">
                     </div>
 
                     <div class="form-group mb-3">
@@ -463,11 +431,10 @@
                     </div>
 
                     <div class="form-group mb-20">
-                        <label class="position-select-label">Select Position <span class="red-mark">*</span></label>
+                        <label class="position-select-label">Select Position</label>
                         <select id="position-select" name="position_id" class="form-select select2-modal PositionSelect-class"
-                            data-parsley-errors-container="#div-position_select"
-                            required data-parsley-required-message="Please select a position.">
-                            <option value="">Select Position</option>
+                            data-parsley-errors-container="#div-position_select">
+                            <option value="">Select Position (or add new below)</option>
                             @foreach($positions as $position)
                                 <option value="{{ $position->position_title }}">{{ $position->position_title }}</option>
                             @endforeach
@@ -479,25 +446,13 @@
                         <label class="position-title-label">Add Title Of Position <span class="red-mark">*</span></label>
                         <input type="text" id="new-position-title" name="position_title" class="form-control PositionTitle-class"
                             placeholder="Add Title Of Position"
-                            required data-parsley-required-message="Please add the title of the position."
-                            data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$"
-                            data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed.">
+                            required data-parsley-required-message="Please add the title of the position.">
                     </div>
                     <div class="form-group mb-20">
                         <label class="position-code-label">Add Code Of Position <span class="red-mark">*</span></label>
                         <input type="text" id="new-position-code" name="code" class="form-control"
                             placeholder="Add Code Of Position"
-                            required data-parsley-required-message="Please add code of the position."
-                            data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$"
-                            data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed.">
-                    </div>
-                    <div class="form-group mb-20">
-                        <label class="position-short-title-label">Add Short Title Of Position <span class="red-mark">*</span></label>
-                        <input type="text" id="new-position-short-title" name="short_title" class="form-control"
-                            placeholder="Add Short Title Of Position"
-                            required data-parsley-required-message="Please add short title of the position."
-                            data-parsley-pattern="^[a-zA-Z0-9\s\-_.\/']+$"
-                            data-parsley-pattern-message="Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), and apostrophes (') are allowed.">
+                            required data-parsley-required-message="Please add code of the position.">
                     </div>
                     <div class="form-group mb-20">
                         <label class="position-rank-label">Select Rank <span class="red-mark">*</span></label>
@@ -939,12 +894,11 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order: [[5, 'desc']], // Sort by created_at DESC
+        order: [[4, 'desc']], // Sort by created_at DESC
         ajax: '{{ route("manning.divisions.data") }}',
         columns: [
             { data: 'name', name: 'name', className: 'text-nowrap' },
             { data: 'code', name: 'code', className: 'text-nowrap' },
-            { data: 'short_name', name: 'short_name', className: 'text-nowrap' },
             { data: 'status', name: 'status', className: 'text-nowrap' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
             { data: 'created_at', name: 'created_at', visible: false, searchable: false },
@@ -988,7 +942,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                         field.after('<span class="error-message text-danger">' + error[0] + '</span>');
                     });
                 } else {
-                    toastr.error("An error occurred while creating or updating.", "Error", {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : "An error occurred while creating or updating.";
+                    toastr.error(msg, "Error", {
                         positionClass: 'toast-bottom-right'
                     });
                 }
@@ -1002,12 +957,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var $row = $(this).closest("tr");
         // Extract division ID
         var divisionId = $(this).data('division-id');
-        // Extract current values from the row
+        // Extract current values from the row (Name, Code, Status - no Short Name)
         var currentName = $row.find("td:nth-child(1)").text().trim();
         var currentCode = $row.find("td:nth-child(2)").text().trim();
-        var currentShortName = $row.find("td:nth-child(3)").text().trim();
-        var currentStatus = $row.find("td:nth-child(4)").text().trim().toLowerCase(); // Convert to lowercase to ensure match
-        // console.log(currentName,currentCode,currentShortName,currentStatus);
+        var currentStatus = $row.find("td:nth-child(3)").text().trim().toLowerCase();
         var editRowHtml = `
             <td class="py-1">
                 <div class="form-group">
@@ -1017,11 +970,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             <td class="py-1">
                 <div class="form-group">
                     <input type="text" class="form-control" value="${currentCode}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
-                    <input type="text" class="form-control" value="${currentShortName}" />
                 </div>
             </td>
             <td class="py-1">
@@ -1046,11 +994,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var $row = $(this).closest("tr");
 
-        // Get updated values
+        // Get updated values (Name, Code, Status - no Short Name)
         var divisionId = $(this).data('division-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatedCode = $row.find("input").eq(1).val();
-        var updatedShortName = $row.find("input").eq(2).val();
         var updatedStatus = $row.find("select").val();
 
             const hasScriptTag = str => /<\s*script\b[^>]*>(.*?)<\s*\/\s*script\s*>/gi.test(str);
@@ -1075,7 +1022,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 }
 
                 // Validate inputs
-                if (!fieldsAreClean(updatedName, updatedCode, updatedShortName)) {
+                if (!fieldsAreClean(updatedName, updatedCode)) {
                     toastr.error(
                         "Invalid characters detected. Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), apostrophes ('), and ampersands (&) are allowed. Script tags are strictly prohibited.",
                         "Validation Error",
@@ -1089,7 +1036,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             data: {
                 name: updatedName,
                 code: updatedCode,
-                short_name: updatedShortName,
                 status: updatedStatus
             },
             success: function(response) {
@@ -1098,11 +1044,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     var statusClass = updatedStatus === 'active' ? 'text-success' : 'text-danger';
                     var statusLabel = updatedStatus.charAt(0).toUpperCase() + updatedStatus.slice(1);
 
-                    // Update the row with new values
+                    // Update the row with new values (no Short Name)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatedCode}</td>
-                        <td class="text-nowrap">${updatedShortName}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
@@ -1189,13 +1134,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order:[[6,'desc']],
+        order:[[5,'desc']],
         ajax: '{{ route("manning.departments.data") }}',
         columns: [
             { data: 'name', name: 'name' },
             { data: 'division', name: 'division' },
             { data: 'code', name: 'code' },
-            { data: 'short_name', name: 'short_name' },
             { data: 'status', name: 'status' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
             {data:'created_at',visible:false,searchable:false},
@@ -1262,8 +1206,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var currentName = $row.find("td:nth-child(1)").text().trim();
         var currentDivision = $row.find("td:nth-child(2)").text().trim();
         var currentCode = $row.find("td:nth-child(3)").text().trim();
-        var currentShortName = $row.find("td:nth-child(4)").text().trim();
-        var currentStatus = $row.find("td:nth-child(5)").text().trim().toLowerCase();
+        var currentStatus = $row.find("td:nth-child(4)").text().trim().toLowerCase();
 
         // Use the `resortDivisions` array from the global scope
         var divisionOptions = '<option value="">Select Division</option>';
@@ -1290,11 +1233,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             </td>
             <td class="py-1">
                 <div class="form-group">
-                    <input type="text" class="form-control" value="${currentShortName}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
                     <select class="form-select select2-modal">
                         <option ${currentStatus === "active" ? "selected" : ""} value="active">Active</option>
                         <option ${currentStatus === "inactive" ? "selected" : ""} value="inactive">Inactive</option>
@@ -1316,12 +1254,11 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         event.preventDefault(); // Prevent default action
 
         var $row = $(this).closest("tr");
-        // Get updated values
+        // Get updated values (Name, Division, Code, Status - no Short Name)
         var dept_id = $(this).data('dept-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatedDivision = $row.find("select").eq(0).val();
         var updatedCode = $row.find("input").eq(1).val();
-        var updatedShortName = $row.find("input").eq(2).val();
         var updatedStatus = $row.find("select").eq(1).val();
        
                 const hasScriptTag = str => /<\s*script\b[^>]*>(.*?)<\s*\/\s*script\s*>/gi.test(str);
@@ -1346,7 +1283,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 }
 
                 // Validate inputs
-                if (!fieldsAreClean(updatedName, updatedCode, updatedShortName)) {
+                if (!fieldsAreClean(updatedName, updatedCode)) {
                     toastr.error(
                         "Invalid characters detected. Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), apostrophes ('), and ampersands (&) are allowed. Script tags are strictly prohibited.",
                         "Validation Error",
@@ -1362,7 +1299,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 name: updatedName,
                 division:updatedDivision,
                 code: updatedCode,
-                short_name: updatedShortName,
                 status: updatedStatus
             },
             success: function(response) {
@@ -1372,12 +1308,11 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     var statusLabel = updatedStatus.charAt(0).toUpperCase() + updatedStatus.slice(1);
                     var updatedDivisionName = response.divisionName;
 
-                    // Update the row with new values
+                    // Update the row with new values (no Short Name)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatedDivisionName}</td>
                         <td class="text-nowrap">${updatedCode}</td>
-                        <td class="text-nowrap">${updatedShortName}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
@@ -1473,14 +1408,13 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order:[[7,'desc']],
+        order:[[6,'desc']],
         ajax: '{{ route("manning.sections.data") }}',
         columns: [
             { data: 'name', name: 'name' },
             { data: 'division', name: 'division' },
             { data: 'department', name: 'department' },
             { data: 'code', name: 'code' },
-            { data: 'short_name', name: 'short_name' },
             { data: 'status', name: 'status' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
             {data:'created_at',visible:false,searchable:false},
@@ -1544,9 +1478,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var currentDivision = $row.find("td:nth-child(2)").text().trim();
         var currentDepartment = $row.find("td:nth-child(3)").text().trim();
         var currentCode = $row.find("td:nth-child(4)").text().trim();
-        var currentShortName = $row.find("td:nth-child(5)").text().trim();
-        var currentRank = $row.find("td:nth-child(6)").text().trim().toLowerCase();
-        var currentStatus = $row.find("td:nth-child(7)").text().trim().toLowerCase();
+        var currentStatus = $row.find("td:nth-child(5)").text().trim().toLowerCase();
 
         // Use the `resortDivisions` array from the global scope
         var divisionOptions = '<option value="">Select Division</option>';
@@ -1560,7 +1492,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             var selected = (currentDepartment === dept.name) ? 'selected' : '';
             deptOptions += `<option value="${dept.id}" ${selected}>${dept.name}</option>`;
         });
-        // Position_Rank
+
         var editRowHtml = `
             <td class="py-1">
                 <div class="form-group">
@@ -1580,11 +1512,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             <td class="py-1">
                 <div class="form-group">
                     <input type="text" class="form-control" value="${currentCode}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
-                    <input type="text" class="form-control" value="${currentShortName}" />
                 </div>
             </td>
             <td class="py-1">
@@ -1612,13 +1539,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var $row = $(this).closest("tr");
 
-        // Get updated values
+        // Get updated values (Name, Division, Department, Code, Status - no Short Name)
         var section_id = $(this).data('section-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatedDivision = $row.find("select").eq(0).val();
         var updatedDepartment = $row.find("select").eq(1).val();
         var updatedCode = $row.find("input").eq(1).val();
-        var updatedShortName = $row.find("input").eq(2).val();
         var updatedStatus = $row.find("select").eq(2).val();
 
             const hasScriptTag = str => /<\s*script\b[^>]*>(.*?)<\s*\/\s*script\s*>/gi.test(str);
@@ -1643,7 +1569,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 }
 
                 // Validate inputs
-                if (!fieldsAreClean(updatedName, updatedCode, updatedShortName)) {
+                if (!fieldsAreClean(updatedName, updatedCode)) {
                     toastr.error(
                         "Invalid characters detected. Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), apostrophes ('), and ampersands (&) are allowed. Script tags are strictly prohibited.",
                         "Validation Error",
@@ -1661,7 +1587,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 division:updatedDivision,
                 department:updatedDepartment,
                 code: updatedCode,
-                short_name: updatedShortName,
                 status: updatedStatus
             },
             success: function(response) {
@@ -1672,13 +1597,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     var updatedDivisionName = response.divisionName;
                     var updatedDepartmentName = response.deptName;
 
-                    // Update the row with new values
+                    // Update the row with new values (no Short Name)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatedDivisionName}</td>
                          <td class="text-nowrap">${updatedDepartmentName}</td>
                         <td class="text-nowrap">${updatedCode}</td>
-                        <td class="text-nowrap">${updatedShortName}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
@@ -1781,7 +1705,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order:[[10,'desc']],
+        order:[[9,'desc']],
         ajax: {
                 url: '{{ route("manning.positions.data") }}',
                 type: 'GET',
@@ -1799,7 +1723,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             { data: 'section', name: 'section' },
             { data: 'division', name: 'division' },
             { data: 'code', name: 'code' },
-            { data: 'short_title', name: 'short_title' },
             { data: 'Rank', name: 'Rank' },
             { data: 'status', name: 'status' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
@@ -1871,9 +1794,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var currentSection = $row.find("td:nth-child(4)").text().trim();
         var currentDivision = $row.find("td:nth-child(5)").text().trim();
         var currentCode = $row.find("td:nth-child(6)").text().trim();
-        var currentShortName = $row.find("td:nth-child(7)").text().trim();
-        var rankId = $row.find("td:nth-child(8)").text().trim();
-        var currentStatus = $row.find("td:nth-child(9)").text().trim().toLowerCase();
+        var rankId = $row.find("td:nth-child(7)").text().trim();
+        var currentStatus = $row.find("td:nth-child(8)").text().trim().toLowerCase();
         var divisionOptions = '<option value="">Select Division</option>';
 
         // var rankId = $row.find('input[name="rankId"]').val(); // Capture the rankId from the input field
@@ -1936,11 +1858,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             </td>
             <td class="py-1">
                 <div class="form-group">
-                    <input type="text" class="form-control" value="${currentShortName}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
                     <select class="form-select select2-modal">
                         ${RankOptions}
                     </select>
@@ -1972,7 +1889,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var $row = $(this).closest("tr");
 
-        // Get updated values
+        // Get updated values (no Short Title)
         var position_id = $(this).data('position-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatednoofPositions = $row.find("td:nth-child(2)").text().trim();
@@ -1980,7 +1897,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var  updatedSection = $row.find("select").eq(1).val();
         var  updatedDivision = $row.find("select").eq(2).val();
         var updatedCode = $row.find("input").eq(1).val();
-        var updatedShortName = $row.find("input").eq(2).val();
         var Rank = $row.find("select").eq(3).val();
         var updatedStatus  = $row.find("select").eq(4).val();
 
@@ -2010,16 +1926,14 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     var updatedSectionName = response.sectionName;
                     var Rank = response.Rank;
 
-                    // Update the row with new values
+                    // Update the row with new values (no Short Title)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatednoofPositions}</td>
                         <td class="text-nowrap">${updatedDepartmentName}</td>
                         <td class="text-nowrap">${updatedSectionName}</td>
                         <td class="text-nowrap">${updatedDivisionName}</td>
-
                         <td class="text-nowrap">${updatedCode}</td>
-                        <td class="text-nowrap">${updatedShortName}</td>
                         <td class="text-nowrap">${Rank}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
