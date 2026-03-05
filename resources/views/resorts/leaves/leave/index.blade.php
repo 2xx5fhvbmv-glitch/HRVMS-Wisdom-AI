@@ -31,7 +31,7 @@
                                         <div class="row align-items-end g-md-4 g-3 ">
                                             <div class="col-xl-6 col-sm-4">
                                                 <label for="leaveCat1" class="form-label">LEAVE CATEGORY<span class="red-mark">*</span></label>
-                                                <select class="form-control select2t-none LeaveCate_id" name="leave_category_id[]" id="leaveCat1" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#leave-cat-error">
+                                                <select class="form-control LeaveCate_id leave-category-select2" name="leave_category_id[0]" id="leaveCat1" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#leave-cat-error">
                                                     <option value="">Select Leave Category</option>
                                                     @if($leave_categories)
                                                         @foreach($leave_categories as $value)
@@ -375,7 +375,22 @@
             $(this).parsley().validate();
         });
 
-        $(".select2t-none").select2();
+        // Init Leave Category selects (not .select2t-none so layout doesn't double-init and break selection)
+        $(".leave-category-select2, .LeaveCate_id").each(function() {
+            var $sel = $(this);
+            if ($sel.hasClass('select2-hidden-accessible')) { try { $sel.select2('destroy'); } catch (e) {} }
+            $sel.select2({
+                width: '100%',
+                allowClear: true,
+                placeholder: 'Select Leave Category'
+            });
+        });
+        // Init other Select2 (task delegation etc.) – skip if layout already inited
+        $(".select2t-none").each(function() {
+            var $sel = $(this);
+            if ($sel.hasClass('select2-hidden-accessible')) return;
+            $sel.select2({ width: '100%', allowClear: true });
+        });
 
         // Apply leave-category-based validation (Mandatory/Optional/Hidden) when first leave category changes
         $(document).on('change', '#leaveCat1', function () {
@@ -383,25 +398,23 @@
         });
         applyLeaveCategoryValidation();
 
-        // Manually trigger Parsley validation when Select2 changes
-        $(".select2t-none").on('change', function () {
+        // Trigger Parsley when any Select2 (leave category or task delegation) changes
+        $(document).on('change', '.select2t-none, .LeaveCate_id', function () {
             var parsleyField = $(this).parsley();
-            parsleyField.validate();
-
-            // Add/remove the error class to the Select2 container based on validation
-            if (parsleyField.isValid()) {
-                $(this).next('.select2-container').find('.select2-selection').removeClass('is-invalid');
-            } else {
-                $(this).next('.select2-container').find('.select2-selection').addClass('is-invalid');
+            if (parsleyField && parsleyField.validate) {
+                parsleyField.validate();
+                var $sel = $(this).next('.select2-container').find('.select2-selection');
+                if ($sel.length) {
+                    $sel.toggleClass('is-invalid', !parsleyField.isValid());
+                }
             }
         });
 
-        // Parsley field validation handler
+        // Parsley field validation handler (both select2t-none and leave category Select2)
         window.Parsley.on('field:validated', function (fieldInstance) {
             var $element = fieldInstance.$element;
-            if ($element.hasClass('select2t-none')) {
-                // Update the Select2 container's appearance
-                var $select2Container = $element.next('.select2-container').find('.select2-selection');
+            var $select2Container = $element.next('.select2-container').find('.select2-selection');
+            if ($select2Container.length) {
                 if (fieldInstance.isValid()) {
                     $select2Container.removeClass('is-invalid');
                 } else {
@@ -558,36 +571,34 @@
     });
 
     $(document).on('change', '.LeaveCate_id', function () {
-        const selectedCategoryId = $(this).val(); // Get the selected category ID
-        let selectedValues = $("select[name='leave_category_id[]']").map(function () {
-            return $(this).val();
-        }).get();
-        
-        $.ajax({
-            url: "{{ route('leaves.combineInfo.get') }}", // Replace with the correct route URL
-            method: 'GET',
-            data: { category_id: selectedValues }, // Send selected category IDs
-            dataType: 'json',
-            success: function (response) {
-                console.log(response);
-                if (response.status === 'error') {
-                    // Process valid response
-                    toastr.error(response.message, "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
-                    $(this).val(''); // Re
-                }
-            },
-            error: function (xhr, status, error) {
-                if(status == "error" )
-                {
-                    toastr.error(error.message, "Error", {
+        var $select = $(this);
+        // Run after Select2 has finished updating so the selected value is stable
+        var runAjax = function () {
+            var selectedValues = $("select[name^='leave_category_id']").map(function () {
+                return $(this).val();
+            }).get();
+            $.ajax({
+                url: "{{ route('leaves.combineInfo.get') }}",
+                method: 'GET',
+                data: { category_id: selectedValues },
+                dataType: 'json',
+                context: $select,
+                success: function (response) {
+                    if (response.status === 'error') {
+                        toastr.error(response.message || 'Invalid selection', "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        $(this).val(null).trigger('change');
+                    }
+                },
+                error: function (xhr, status, error) {
+                    toastr.error(xhr.responseJSON?.message || error || "Request failed", "Error", {
                         positionClass: 'toast-bottom-right'
                     });
                 }
-                
-            }
-        });
+            });
+        };
+        setTimeout(runAjax, 0);
     });
 
     function toggleDepartureOptions() {
@@ -631,18 +642,23 @@
     }
 }
 
-    function initSelect2AndValidation() {
-        if ($.fn.select2 && $.fn.parsley) {
-            // Initialize Select2
-            $(".select2t-none").select2();
-
-            // Add Parsley validation specifically for Select2
-            $(".select2t-none").on('change', function() {
+    function initSelect2AndValidation(scope) {
+        if (!$.fn.select2) return;
+        var $target = scope ? $(scope).find('.select2t-none') : $(".select2t-none");
+        $target.each(function() {
+            if (!$(this).hasClass('select2-hidden-accessible')) {
+                var $sel = $(this);
+                var opts = { width: '100%', allowClear: true };
+                if ($sel.hasClass('LeaveCate_id') || ($sel.attr('id') && String($sel.attr('id')).indexOf('leaveCat') === 0)) {
+                    opts.placeholder = 'Select Leave Category';
+                }
+                $sel.select2(opts);
+            }
+        });
+        if ($.fn.parsley) {
+            $target.off('change.leaveSelect2 select2:select.leaveSelect2').on('change.leaveSelect2', function() {
                 $(this).parsley().validate();
-            });
-
-            // Ensure Select2 trigger changes in Parsley
-            $(".select2t-none").on('select2:select', function() {
+            }).on('select2:select.leaveSelect2', function() {
                 $(this).trigger('change');
             });
         }
@@ -655,7 +671,7 @@
         let isFormValid = true; // Flag to check if form is valid
 
         $('.append-block').each(function (index) {
-            const leaveCategory = $(this).find('[name="leave_category_id[]"] option:selected');
+            const leaveCategory = $(this).find('select[name^="leave_category_id"] option:selected');
             const leaveCategoryText = leaveCategory.text();
             const leaveCategoryColor = leaveCategory.data('color') || '#cccccc'; // Fallback to default color
             const fromDate = $(this).find('[name="from_date[]"]').val();
@@ -801,7 +817,8 @@
         // Append the new row
         container.insertAdjacentHTML('beforeend', newRow);
 
-        initSelect2AndValidation(); 
+        // Only init Select2 and datepicker for the new row (avoid re-initing existing selects)
+        initSelect2AndValidation('#leave-row-' + uniqueId);
         initDatePicker();
 
         $('#leave-apply').parsley().destroy(); 
@@ -833,18 +850,23 @@
     });
      
     document.addEventListener('DOMContentLoaded', function() {
-        function initSelect2AndValidation() {
-            if ($.fn.select2 && $.fn.parsley) {
-                // Initialize Select2
-                $(".select2t-none").select2();
-
-                // Add Parsley validation specifically for Select2
-                $(".select2t-none").on('change', function() {
+        function initSelect2AndValidationLocal(scope) {
+            if (!$.fn.select2) return;
+            var $target = scope ? $(scope).find('.select2t-none') : $(".select2t-none");
+            $target.each(function() {
+                if (!$(this).hasClass('select2-hidden-accessible')) {
+                    var $sel = $(this);
+                    var opts = { width: '100%', allowClear: true };
+                    if ($sel.hasClass('LeaveCate_id') || ($sel.attr('id') && String($sel.attr('id')).indexOf('leaveCat') === 0)) {
+                        opts.placeholder = 'Select Leave Category';
+                    }
+                    $sel.select2(opts);
+                }
+            });
+            if ($.fn.parsley) {
+                $target.off('change.leaveSelect2 select2:select.leaveSelect2').on('change.leaveSelect2', function() {
                     $(this).parsley().validate();
-                });
-
-                // Ensure Select2 trigger changes in Parsley
-                $(".select2t-none").on('select2:select', function() {
+                }).on('select2:select.leaveSelect2', function() {
                     $(this).trigger('change');
                 });
             }
