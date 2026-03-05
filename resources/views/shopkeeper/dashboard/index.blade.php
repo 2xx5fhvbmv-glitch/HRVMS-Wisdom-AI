@@ -27,7 +27,7 @@
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap">Employees</h3>
+                                    <h3 class="text-nowrap">Transctions</h3>
                                 </div>
                                 <div class="col-auto">
                                     <div class="form-group">
@@ -244,7 +244,11 @@
                 }
             },
             error: function(xhr) {
-                toastr.error("An error occurred while resending consent.", "Error", { positionClass: 'toast-bottom-right' });
+                var msg = "An error occurred while resending consent.";
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
             }
         });
     });

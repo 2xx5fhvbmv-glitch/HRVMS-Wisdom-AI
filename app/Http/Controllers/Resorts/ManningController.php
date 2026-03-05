@@ -105,7 +105,7 @@ class ManningController extends Controller
 
     public function store_divisions(Request $request)
     {
-        if ($request->has('division_id')) {
+        if ($request->filled('division_id')) {
             $request->merge(['name' => $request->division_id]);
         }
 
@@ -122,7 +122,7 @@ class ManningController extends Controller
                 'max:10',
                 Rule::unique('resort_divisions')->where(fn($query) => $query->where('resort_id', $this->resort_id)),
             ],
-            'short_name' => 'required|string|max:50',
+            'short_name' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
             'name.unique' => 'This division name already exists for the selected resort.',
@@ -139,7 +139,7 @@ class ManningController extends Controller
                 'resort_id' => $this->resort_id,
                 'name' => $request->name,
                 'code' => $request->code,
-                'short_name' => $request->short_name,
+                'short_name' => $request->filled('short_name') ? $request->short_name : '',
                 'status' => $request->status,
             ]);
 
@@ -186,7 +186,7 @@ class ManningController extends Controller
                     })
                     ->ignore($id), // Ignore the current record by ID
             ],
-            'short_name' => 'required|string|max:50',
+            'short_name' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
             'name.unique' => 'This division name already exists for the selected resort.',
@@ -198,10 +198,10 @@ class ManningController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
         try {
-            // Update the division's attributes
+            // Update the division's attributes (short_name column may be NOT NULL)
             $division->name = $request->input('name');
             $division->code = $request->input('code');
-            $division->short_name = $request->input('short_name');
+            $division->short_name = $request->filled('short_name') ? $request->short_name : ($division->getRawOriginal('short_name') ?? '');
             $division->status = $request->input('status');
 
             // Save the changes
@@ -303,12 +303,12 @@ class ManningController extends Controller
 
     public function store_departments(Request $request)
     {
-        if ($request->has('dept_id')) {
+        if ($request->filled('dept_id')) {
             $request->merge(['name' => $request->dept_id]);
         }
 
-
         $validator = Validator::make($request->all(), [
+            'division_id' => 'required',
             'name' => [
                 'required',
                 'string',
@@ -331,7 +331,7 @@ class ManningController extends Controller
                     })
                     ->ignore($request->id), // Ignore current record ID if updating
             ],
-            'short_name' => 'required|string|max:50',
+            'short_name' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
             'name.unique' => 'This Department name already exists for the selected Division and resort.',
@@ -348,7 +348,7 @@ class ManningController extends Controller
                 $department->division_id = $request->division_id;
                 $department->name = $request->name;
                 $department->code = $request->code;
-                $department->short_name = $request->short_name;
+                $department->short_name = $request->filled('short_name') ? $request->short_name : '';
                 $department->status = $request->status;
                 $department->save();
 
@@ -399,7 +399,7 @@ class ManningController extends Controller
                                 ->where('division_id', $request->division);
                     })
             ],
-            'short_name' => 'required|string|max:50',
+            'short_name' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
             'name.unique' => 'This Department name already exists for the selected Division and resort.',
@@ -413,11 +413,11 @@ class ManningController extends Controller
         }
 
         try {
-            // Update the division's attributes
+            // Update the department's attributes (short_name column may be NOT NULL)
             $dept->division_id = $request->input('division');
             $dept->name = $request->input('name');
             $dept->code = $request->input('code');
-            $dept->short_name = $request->input('short_name');
+            $dept->short_name = $request->filled('short_name') ? $request->short_name : ($dept->getRawOriginal('short_name') ?? '');
             $dept->status = $request->input('status');
 
             // Save the changes
@@ -482,7 +482,6 @@ class ManningController extends Controller
                 'resort_departments.name as department',
                 'resort_sections.name',
                 'resort_sections.code',
-                'resort_sections.short_name',
                 'resort_sections.status',
                 'resort_sections.created_by',
                 'resort_divisions.name as division',
@@ -524,7 +523,7 @@ class ManningController extends Controller
                     $statusLabel = ucfirst($row->status);
                     return '<span class="' . $statusClass . '">' . $statusLabel . '</span>';
                 })
-                ->rawColumns(['name', 'division','department','code', 'short_name', 'status', 'action'])
+                ->rawColumns(['name', 'division','department','code', 'status', 'action'])
                 ->make(true);
         }
 
@@ -533,13 +532,12 @@ class ManningController extends Controller
 
     public function store_sections(Request $request)
     {
-
-        if ($request->has('section_id'))
-        {
+        if ($request->filled('section_id')) {
             $request->merge(['name' => $request->section_id]);
         }
 
         $validator = Validator::make($request->all(), [
+            'dept_id' => 'required',
             'name' => [
                 'required',
                 'string',
@@ -561,7 +559,7 @@ class ManningController extends Controller
                                 ->where('dept_id', $request->dept_id);
                     })
             ],
-            'short_name' => 'required|string|max:50',
+            'short_name' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
             'name.unique' => 'This Section  name already exists for the selected Division and resort.',
@@ -581,7 +579,7 @@ class ManningController extends Controller
             $section->dept_id = $request->dept_id;
             $section->name = $request->name;
             $section->code = $request->code;
-            $section->short_name = $request->short_name;
+            $section->short_name = $request->filled('short_name') ? $request->short_name : '';
             $section->status = $request->status;
             $section->save();
             return response()->json(['success' => true, 'message' => 'Section added successfully.']);
@@ -641,7 +639,7 @@ class ManningController extends Controller
                             })
                             ->ignore($request->id),
                     ],
-                    'short_name' => 'required|string|max:50',
+                    'short_name' => 'nullable|string|max:50',
                     'status' => 'required|in:active,inactive',
                 ], [
                     'name.unique' => 'This Section name already exists for the selected Department and Resort.',
@@ -655,7 +653,7 @@ class ManningController extends Controller
                 $section->dept_id = $request->input('department');
                 $section->name = $request->input('name');
                 $section->code = $request->input('code');
-                $section->short_name = $request->input('short_name');
+                $section->short_name = $request->filled('short_name') ? $request->short_name : ($section->getRawOriginal('short_name') ?? '');
                 $section->status = $request->input('status');
 
                 // Save the changes
@@ -762,20 +760,25 @@ class ManningController extends Controller
 
     public function store_positions(Request $request)
     {
-        if ($request->has('position_id'))
-        {
+        if ($request->filled('position_id')) {
             $request->merge(['position_title' => $request->position_id]);
         }
 
         $validator = Validator::make($request->all(), [
+            'dept_id' => 'required',
             'position_title' => [
                 'required',
                 'string',
                 'max:255',
                 Rule::unique('resort_positions')
                     ->where(function ($query) use ($request) {
-                        return $query->where('resort_id', $this->resort_id)
-                                       ->where('dept_id', $request->dept_id);
+                        $query->where('resort_id', $this->resort_id);
+                        if ($request->filled('section_id')) {
+                            $query->where('section_id', $request->section_id);
+                        } else {
+                            $query->where('dept_id', $request->dept_id)->whereNull('section_id');
+                        }
+                        return $query;
                     })
             ],
             'code' => [
@@ -783,17 +786,21 @@ class ManningController extends Controller
                 'string',
                 'max:10',
                 Rule::unique('resort_positions')
-
                     ->where(function ($query) use ($request) {
-                        return $query->where('resort_id', $this->resort_id)
-                                ->where('dept_id', $request->dept_id);
+                        $query->where('resort_id', $this->resort_id);
+                        if ($request->filled('section_id')) {
+                            $query->where('section_id', $request->section_id);
+                        } else {
+                            $query->where('dept_id', $request->dept_id)->whereNull('section_id');
+                        }
+                        return $query;
                     })
             ],
-            'short_title' => 'required|string|max:50',
+            'short_title' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
-            'name.unique' => 'This Position  name already exists for the selected Department and resort.',
-            'code.unique' => 'This Position  code already exists for the selected Department and resort.',
+            'position_title.unique' => 'This position name already exists for the selected section.',
+            'code.unique' => 'This position code already exists for the selected section.',
         ]);
         // Usage example:
         if ($validator->fails()) {
@@ -807,11 +814,11 @@ class ManningController extends Controller
             $position = new ResortPosition();
             $position->resort_id = $this->resort_id;
             $position->dept_id = $request->dept_id;
-            $position->section_id = $request->section_id;
+            $position->section_id = $request->filled('section_id') ? $request->section_id : null;
             $position->position_title = $request->position_title;
-            $position->no_of_positions = $request->no_of_positions;
+            $position->no_of_positions = $request->input('no_of_positions', 0);
             $position->code = $request->code;
-            $position->short_title = $request->short_title;
+            $position->short_title = $request->filled('short_title') ? $request->short_title : '';
             $position->status = $request->status;
             $position->Rank = $request->Rank;
             $position->save();
@@ -839,17 +846,20 @@ class ManningController extends Controller
         }
         else
         {
-            $existingDepartment = DB::table('resort_positions')
-            ->where('position_title', $request->position_title)
-            ->where('dept_id', $request->department)
-            ->where('resort_id', $this->resort_id)
-            ->where('id', '!=', $id)
-            ->first();
-
-            if ($existingDepartment) {
+            $sectionId = ($request->input('section') && $request->input('section') != '') ? $request->input('section') : null;
+            $existingQuery = DB::table('resort_positions')
+                ->where('position_title', $request->position_title)
+                ->where('resort_id', $this->resort_id)
+                ->where('id', '!=', $id);
+            if ($sectionId) {
+                $existingQuery->where('section_id', $sectionId);
+            } else {
+                $existingQuery->where('dept_id', $request->department)->whereNull('section_id');
+            }
+            if ($existingQuery->first()) {
                 return response()->json([
                     'errors' => [
-                        'name' => ['This Positions name already exists for the selected Department and resort.']
+                        'name' => ['This position name already exists for the selected section.']
                     ]
                 ], 422);
             }
@@ -861,26 +871,39 @@ class ManningController extends Controller
                     'max:255',
                     Rule::unique('resort_positions')
                         ->where(function ($query) use ($request) {
-                            return $query->where('resort_id', $this->resort_id)
-                                           ->where('dept_id', $request->dept_id);
+                            $query->where('resort_id', $this->resort_id);
+                            $sectionId = ($request->input('section') && $request->input('section') != '') ? $request->input('section') : null;
+                            if ($sectionId) {
+                                $query->where('section_id', $sectionId);
+                            } else {
+                                $query->where('dept_id', $request->input('department'))->whereNull('section_id');
+                            }
+                            return $query;
                         })
+                        ->ignore($id),
                 ],
                 'code' => [
                     'required',
                     'string',
                     'max:10',
                     Rule::unique('resort_positions')
-
                         ->where(function ($query) use ($request) {
-                            return $query->where('resort_id', $this->resort_id)
-                                    ->where('dept_id', $request->dept_id);
+                            $query->where('resort_id', $this->resort_id);
+                            $sectionId = ($request->input('section') && $request->input('section') != '') ? $request->input('section') : null;
+                            if ($sectionId) {
+                                $query->where('section_id', $sectionId);
+                            } else {
+                                $query->where('dept_id', $request->input('department'))->whereNull('section_id');
+                            }
+                            return $query;
                         })
+                        ->ignore($id),
                 ],
-                'short_title' => 'required|string|max:50',
+                'short_title' => 'nullable|string|max:50',
                 'status' => 'required|in:active,inactive',
             ], [
-                'name.unique' => 'This Position  name already exists for the selected Department and resort.',
-                'code.unique' => 'This Position  code already exists for the selected Department and resort.',
+                'position_title.unique' => 'This position name already exists for the selected section.',
+                'code.unique' => 'This position code already exists for the selected section.',
             ]);
             // Usage example:
             if ($validator->fails()) {
@@ -897,7 +920,7 @@ class ManningController extends Controller
                 $position->position_title = $request->input('name');
                 $position->no_of_positions = $request->input('no_of_positions');
                 $position->code = $request->input('code');
-                $position->short_title = $request->input('short_name');
+                // short_title not edited from UI; keep existing value
                 $position->status = $request->input('status');
                 $position->Rank = $request->input('Rank');
                 $update = $position->save();

@@ -79,20 +79,14 @@
                 <div class="col-lg-4 col-md-5">
                     <div class="card h-100 card-confingLink">
                         <ul class="listing-wrapper">
-                            
-                            <li class="@if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                                <a href="{{route('resort.benifitgrid.index')}}" class="a-link ">
-                                    Benefit Grid List
-                                </a>
-                            </li>
-                            <li class=" @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false) d-none @endif">
-                                <a href="{{route('resort.benifitgrid.create')}}" class="a-link">
-                                    Add Benefit Grids
-                                </a>
-                            </li>
                             <li class="@if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.view')) == false) d-none @endif">
                                 <a href="{{route('resort.manning.index')}}" class="a-link">
                                     Resort Configuration
+                                </a>
+                            </li>
+                            <li class="@if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                                <a href="{{route('resort.benifitgrid.index')}}" class="a-link ">
+                                    Benefit Grid List
                                 </a>
                             </li>
                             <li class="@if(App\Helpers\Common::checkRouteWisePermission('resort.budget.index',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -102,7 +96,12 @@
                             </li>
                             <li>
                                 <a href="{{route('resort.Add.Employee')}}" class="a-link ">
-                                    Add Employee 
+                                    Add Employee
+                                </a>
+                            </li>
+                            <li class=" @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false) d-none @endif">
+                                <a href="{{route('resort.benifitgrid.create')}}" class="a-link">
+                                    Add Benefit Grids
                                 </a>
                             </li>
                         </ul>
