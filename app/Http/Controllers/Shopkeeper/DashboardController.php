@@ -74,7 +74,8 @@ class DashboardController extends Controller
                     return $ct === 'MVR' ? 'MVR' : 'Dollar';
                 })
                 ->addColumn('qr_code', function ($row) {
-                    if ($row->status === 'Pending Consent' && !empty($row->qr_code)) {
+                    $showQr = in_array($row->status, ['Pending Consent', 'Rejected']) && !empty($row->qr_code);
+                    if ($showQr) {
                         return '<button type="button" class="btn btn-sm btn-outline-secondary p-1 payment-qr-icon" data-payment-id="' . (int) $row->id . '" title="View QR Code"><i class="fa-solid fa-qrcode fa-lg"></i></button>';
                     }
                     return '—';
