@@ -36,18 +36,18 @@
                                 </div>
                             </div>
                         </div>
-                        @php $total_leaves_allocated = 0 ;$total_taken_laves = 0; @endphp
+                        @php $total_leaves_allocated = 0; $total_leaves_available = 0; @endphp
                             @if($leaveBalances)
                                 @foreach($leaveBalances as $leaves)
                                     @php 
                                         $total_leaves_allocated = $total_leaves_allocated +  $leaves->allocated_days;
-                                        $total_taken_laves = $total_taken_laves +  $leaves->available_days;
+                                        $total_leaves_available = $total_leaves_available + ($leaves->available_days ?? $leaves->allocated_days);
                                     @endphp   
                                 @endforeach
                             @endif
                             <div class="col-auto ms-auto">
                                 <div class="employee-bg">
-                                <p>Total Leave Balance: {{ $total_taken_laves }}/<span>{{ $total_leaves_allocated }}</span></p>
+                                <p class="mb-0">Total Leave Balance: {{ $total_leaves_available }}/<span>{{ $total_leaves_allocated }}</span></p>
                                 </div>
                             </div>
                             <div class="col-auto">
@@ -60,12 +60,16 @@
                     @if($leaveBalances)
                         @foreach($leaveBalances as $balance)
                             @php
-                                // Calculate progress percentage
-                                $progressPercentage = ($balance->allocated_days > 0) 
-                                                    ? ($balance->used_days / $balance->allocated_days) * 100 
-                                                    : 0;
-                                $progressPercentage = round($progressPercentage, 2); // Round to 2 decimals
-                                $progressColor = $balance->color ?? '#ff0000'; // Default to red if color not found
+                                // Total count = eligible total (allocated + carry forward when eligible)
+                                $totalCount = (int) ($balance->available_days ?? 0);
+                                if ($totalCount <= 0) {
+                                    $totalCount = (int) $balance->allocated_days;
+                                }
+                                $progressPercentage = ($totalCount > 0)
+                                    ? ($balance->used_days / $totalCount) * 100
+                                    : 0;
+                                $progressPercentage = round(min($progressPercentage, 100), 2);
+                                $progressColor = $balance->color ?? '#ff0000';
                             @endphp
                             <div>
                                 <div class="progress-container" data-progress="{{ $progressPercentage }}">
@@ -75,7 +79,7 @@
                                                 style="stroke: {{ $progressColor }}; stroke-dasharray: 339.29; stroke-dashoffset: {{ 339.29 - (339.29 * $progressPercentage / 100) }};"></circle>
                                     </svg>
                                     <div class="progress-text">
-                                        {{ $balance->used_days }}/<span>{{ $balance->allocated_days }}</span>
+                                        {{ $balance->used_days }}/<span>{{ $totalCount }}</span>
                                     </div>
                                 </div>
                                 <h6>{{ $balance->leave_type }}</h6>
