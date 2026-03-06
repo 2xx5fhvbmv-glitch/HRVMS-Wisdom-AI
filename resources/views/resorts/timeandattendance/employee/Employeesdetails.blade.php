@@ -35,7 +35,7 @@
                                 </div>
                             </div>
                         </div>
-                        <form action="{{ route('resort.timeandattendance.EmpDetailsPrint') }}" method="post"  id="EmpDetailsPrint">
+                        <form action="{{ route('resort.timeandattendance.EmpDetailsPrint') }}" method="post" id="EmpDetailsPrint" target="_blank">
                             @csrf
                             <div class="col-xl-3 col-lg-4 col-md-5 col-sm-6 col ms-auto">
                                 <div class="dateRangeAb" id="datapicker">
@@ -162,7 +162,7 @@
                                             @foreach($chunk as $item)
                                                 <tr>
                                                     <th>{{ $item->leave_type }}</th>
-                                                    <td>{{ $item->ThisYearOfused_days ?? 0 }}/{{ $item->allocated_days }}</td>
+                                                    <td>{{ $item->ThisYearOfused_days ?? 0 }}/{{ $item->available_days ?? $item->allocated_days }}</td>
                                                 </tr>
                                             @endforeach
                                         </tbody>

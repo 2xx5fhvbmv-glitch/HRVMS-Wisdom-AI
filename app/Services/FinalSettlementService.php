@@ -219,10 +219,12 @@ class FinalSettlementService
             $usedDays = $leaveUsage->get($grid->leave_category_id)->used_days ?? 0;
             $available = $grid->allocated_days;
 
-            if ($grid->carry_forward === 'yes') {
+            // Carry forward when leave is eligible (category allows it) and not used by employee (unused from last year)
+            $carryForwardEnabled = !empty($grid->carry_forward) && $grid->carry_forward != '0';
+            if ($carryForwardEnabled) {
                 $lastYear = Carbon::now()->subYear();
-                $lastYearStart = $lastYear->startOfYear()->format('Y-m-d');
-                $lastYearEnd = $lastYear->endOfYear()->format('Y-m-d');
+                $lastYearStart = $lastYear->copy()->startOfYear()->format('Y-m-d');
+                $lastYearEnd = $lastYear->copy()->endOfYear()->format('Y-m-d');
 
                 $lastYearUsed = DB::table('employees_leaves')
                     ->select(DB::raw('SUM(total_days) as used_days'))
@@ -236,11 +238,14 @@ class FinalSettlementService
                     ->value('used_days') ?? 0;
 
                 $unused = max($grid->allocated_days - $lastYearUsed, 0);
-                $carryForward = min($unused, $grid->carry_max);
+                $carryForward = ($grid->carry_max !== null && $grid->carry_max !== '')
+                    ? min($unused, (int) $grid->carry_max)
+                    : $unused;
                 $available += $carryForward;
             }
 
-            if ($grid->earned_leave === 'yes') {
+            $earnedLeaveEnabled = !empty($grid->earned_leave) && $grid->earned_leave != '0';
+            if ($earnedLeaveEnabled) {
                 $monthsElapsed = Carbon::now()->month;
                 $earnedLeave = min($monthsElapsed * ($grid->earned_max / 12), $grid->earned_max);
                 $available += $earnedLeave;

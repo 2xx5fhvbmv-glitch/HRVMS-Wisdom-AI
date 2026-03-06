@@ -34,20 +34,12 @@
                             </div>
                         </div>
                         <div class="col-xl-3 col-lg-4 col-md-5 col-sm-6 col ms-auto">
-
+                            <p class="mb-0 small text-muted">Period: {{ \Carbon\Carbon::parse($monthStartingDate)->format('d M Y') }} – {{ \Carbon\Carbon::parse($monthEndingDate)->format('d M Y') }}</p>
                         </div>
                         <div class="col-auto">
-                        <form method="GET" action="{{ route('resort.export.attandanceHisotry') }}">
-    
-                        <input type="hidden" name="start_date" value="{{ $monthStartingDate }}">
-                        <input type="hidden" name="end_date" value="{{ $monthEndingDate }}">
-                        <input type="hidden" name="id" value="{{ $employee->emp_id }}">
-
-                        <button type="submit" class="btn btn-themeSkyblue btn-sm">
+                        <a href="{{ route('resort.export.attandanceHisotry') }}?start_date={{ urlencode($monthStartingDate) }}&end_date={{ urlencode($monthEndingDate) }}&id={{ urlencode($employee->emp_id) }}" class="btn btn-themeSkyblue btn-sm" target="_blank" rel="noopener">
                             Export CSV
-                        </button>
-
-                    </form>
+                        </a>
 
                             <a href="#" class="btn btn-themeSkyblue btn-sm" id="printButton">Print</a>
                         </div>
@@ -67,17 +59,17 @@
                             <thead>
                                 <tr>
                                     <th>Leave Type</th>
-                                    <th>Used / Allocated Days</th>
+                                    <th>Used / Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                @php
-                                    // Step 1: Group by leave_type and calculate totals
+                                    // Step 1: Group by leave_type and calculate totals (available_days includes carry forward)
                                     $grouped = $leave_categories->groupBy('leave_type')->map(function ($items) {
                                         return [
                                             'leave_type' => $items->first()->leave_type,
                                             'used_days' => $items->sum('ThisYearOfused_days'),
-                                            'allocated_days' => $items->sum('allocated_days'),
+                                            'available_days' => $items->sum('available_days'),
                                         ];
                                     });
 
@@ -89,7 +81,7 @@
                                     @foreach($chunk as $item)
                                         <tr>
                                             <td>{{ $item['leave_type'] }}</td>
-                                            <td>{{ $item['used_days'] }}/{{ $item['allocated_days'] }}</td>
+                                            <td>{{ $item['used_days'] }}/{{ $item['available_days'] ?? 0 }}</td>
                                         </tr>
                                     @endforeach
                                 @endforeach
@@ -159,11 +151,13 @@
     <script>
 
          $(document).ready(function() {
-        // When the button is clicked
-        $('#printButton').click(function() {
-
-
-            $("#tablePrint").print();
+        $('#printButton').on('click', function(e) {
+            e.preventDefault();
+            if (typeof $.fn.print === 'function') {
+                $("#tablePrint").print();
+            } else {
+                window.print();
+            }
         });
     });
     </script>
