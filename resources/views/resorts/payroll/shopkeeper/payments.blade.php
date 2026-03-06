@@ -88,11 +88,23 @@
 
 @section('import-css')
 <style>
-    .dateRangeAb{position: relative;}
+    .dateRangeAb { position: relative; }
     .dateRangeAb .form-control {
         background-image: url('{{ URL::asset("resorts_assets/images/calendar.svg") }}');
-        background-position: right 10px center;
+        background-position: right 12px center;
         background-repeat: no-repeat;
+        padding-right: 2.75rem;
+    }
+    /* Prevent search icon and browser clear (X) from overlapping */
+    .card-header .input-group .form-control.search {
+        padding-right: 3rem;
+    }
+    .card-header .input-group i.fa-search {
+        right: 1.5rem;
+        pointer-events: none;
+    }
+    .card-header .input-group .form-control.search::-webkit-search-cancel-button {
+        margin-right: 0.25rem;
     }
 </style>
 @endsection
