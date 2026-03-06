@@ -39,6 +39,7 @@ use App\Models\BudgetStatus;
 use App\Models\Questionnaire;
 use App\Models\TaEmailTemplate;
 use App\Models\HiringSource;
+use App\Models\ApplicantInterViewDetails;
 use URL;
 use App\Models\ManningResponse;
 use App\Models\JobAdvertisement;
@@ -2231,6 +2232,30 @@ class Common
 
 					return $vacancy;
 				});
+                // Add upcoming interviews to the todo list
+                $upcomingInterviews = ApplicantInterViewDetails::join('applicant_form_data as af', 'af.id', '=', 'applicant_inter_view_details.Applicant_id')
+                    ->join('vacancies as v', 'v.id', '=', 'af.Parent_v_id')
+                    ->join('resort_positions as rp', 'rp.id', '=', 'v.position')
+                    ->where('applicant_inter_view_details.resort_id', $resort_id)
+                    ->whereIn('applicant_inter_view_details.Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
+                    ->where('applicant_inter_view_details.InterViewDate', '>=', Carbon::today()->format('Y-m-d'))
+                    ->orderBy('applicant_inter_view_details.InterViewDate', 'asc')
+                    ->take(5)
+                    ->get([
+                        'af.first_name', 'af.last_name', 'af.passport_photo', 'af.id as ApplicantID',
+                        'v.id as V_id', 'rp.position_title as Position', 'v.Resort_id',
+                        'applicant_inter_view_details.InterViewDate',
+                        'applicant_inter_view_details.ResortInterviewtime',
+                        'applicant_inter_view_details.Status as InterviewStatus',
+                    ])
+                    ->map(function ($item) {
+                        $item->is_upcoming_interview = true;
+                        $item->profileImg = URL::asset($item->passport_photo);
+                        return $item;
+                    });
+
+                $Vacancies = $Vacancies->concat($upcomingInterviews);
+
 				return $Vacancies;
         }
         elseif(in_array((int)$rank, [2, 8]))
@@ -2290,6 +2315,36 @@ class Common
                     $vacancy->InterviewMeetingLink = null;
                     return $vacancy;
                 });
+
+            // Add upcoming interviews for HOD/GM
+            $interviewQuery = ApplicantInterViewDetails::join('applicant_form_data as af', 'af.id', '=', 'applicant_inter_view_details.Applicant_id')
+                ->join('vacancies as v', 'v.id', '=', 'af.Parent_v_id')
+                ->join('resort_positions as rp', 'rp.id', '=', 'v.position')
+                ->where('applicant_inter_view_details.resort_id', $resort_id)
+                ->whereIn('applicant_inter_view_details.Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
+                ->where('applicant_inter_view_details.InterViewDate', '>=', Carbon::today()->format('Y-m-d'));
+
+            // HOD only sees their department interviews
+            if ($rank == 2 && $userDeptId) {
+                $interviewQuery->where('v.department', $userDeptId);
+            }
+
+            $upcomingInterviews = $interviewQuery->orderBy('applicant_inter_view_details.InterViewDate', 'asc')
+                ->take(5)
+                ->get([
+                    'af.first_name', 'af.last_name', 'af.passport_photo', 'af.id as ApplicantID',
+                    'v.id as V_id', 'rp.position_title as Position', 'v.Resort_id',
+                    'applicant_inter_view_details.InterViewDate',
+                    'applicant_inter_view_details.ResortInterviewtime',
+                    'applicant_inter_view_details.Status as InterviewStatus',
+                ])
+                ->map(function ($item) {
+                    $item->is_upcoming_interview = true;
+                    $item->profileImg = URL::asset($item->passport_photo);
+                    return $item;
+                });
+
+            $Vacancies = $Vacancies->concat($upcomingInterviews);
 
             return $Vacancies;
         }
@@ -4536,6 +4591,14 @@ class Common
         $disk = Storage::disk($diskName);
 
         if (!$disk->exists($path)) {
+            // Fallback: check if file exists as a local public asset
+            if (file_exists(public_path($path))) {
+                return ['success' => true, 'NewURLshow' => URL::asset($path), 'mimeType' => null];
+            }
+            // Also check in storage/app/public path
+            if (Storage::disk('local')->exists('public/' . $path)) {
+                return ['success' => true, 'NewURLshow' => url('storage/' . $path), 'mimeType' => null];
+            }
             return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
         }
 
@@ -5546,8 +5609,24 @@ class Common
         }
         catch (\Exception $e)
         {
-            \Log::error('Failed to create talent acquisition folder or upload file: ' . $e->getMessage());
-            return false;
+            \Log::error('S3 upload failed, falling back to local storage: ' . $e->getMessage());
+
+            // Fallback to local storage
+            try {
+                $localBasePath = 'public/talent_acquisition/' . $main_folder . '/' . base64_encode($vacancy_id);
+                $uploadedFile = $file_name;
+                $newFileName = uniqid('video_', true) . '.' . $uploadedFile->getClientOriginalExtension();
+                $filePath = $uploadedFile->storeAs($localBasePath, $newFileName, 'local');
+
+                $data['status'] = true;
+                $data['path'] = $filePath;
+                $data['filename'] = $newFileName;
+
+                return $data;
+            } catch (\Exception $localException) {
+                \Log::error('Local storage fallback also failed: ' . $localException->getMessage());
+                return false;
+            }
         }
 
     }
@@ -5670,14 +5749,15 @@ class Common
 
     public static function getNotificationCount($resort_id,$user_id){
 
-
-        $resortNotificationCount =  ResortNotification::select([
-                    'id', 'module', 'type', 'message', 'status', 'created_at'
-                ])
-                ->where('resort_id', $resort_id)->count();
+        $resortNotificationCount = ResortNotification::where('resort_id', $resort_id)
+                ->where('user_id', $user_id)
+                ->where('status', 'unread')
+                ->count();
 
         if($resortNotificationCount > 100){
             return '99+';
+        }else if($resortNotificationCount == 0){
+            return '';
         }else{
             return $resortNotificationCount;
         }

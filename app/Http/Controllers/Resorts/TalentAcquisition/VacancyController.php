@@ -123,21 +123,29 @@ class VacancyController extends Controller
                 ->get();
 
             $serviceProviders = ServiceProvider::orderBy('name')->get();
-            // Define the rank values for HOD, MGR, GM from settings config
+            // Define the rank values for SUP, HOD, MGR, EXCOM, GM from settings config
             $targetRanks = [
+                array_search('SUP', config('settings.Position_Rank')),
                 array_search('HOD', config('settings.Position_Rank')),
                 array_search('MGR', config('settings.Position_Rank')),
+                array_search('EXCOM', config('settings.Position_Rank')),
                 array_search('GM', config('settings.Position_Rank'))
             ];
-            // Query for employees in the same resort, with rank HOD/MGR/GM, and HODs from the same department
+            // Query for employees in the same resort with target ranks
+            // SUP and HOD are restricted to same department; MGR, EXCOM, GM shown from any department
+            $deptRanks = [
+                array_search('SUP', config('settings.Position_Rank')),
+                array_search('HOD', config('settings.Position_Rank')),
+            ];
             $reportingEmployees = DB::table('employees')
                 ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                 ->where('employees.resort_id', $resort_id)
+                ->where('employees.status', 'Active')
                 ->whereIn('employees.rank', $targetRanks)
-                ->where(function ($query) use ($Dept_id) {
-                    $query->where('employees.rank', array_search('HOD', config('settings.Position_Rank')))
+                ->where(function ($query) use ($Dept_id, $deptRanks) {
+                    $query->whereIn('employees.rank', $deptRanks)
                           ->where('employees.Dept_id', $Dept_id)
-                          ->orWhere('employees.rank', '<>', array_search('HOD', config('settings.Position_Rank')));
+                          ->orWhereNotIn('employees.rank', $deptRanks);
                 })
                 ->select(
                     'employees.*',
@@ -195,7 +203,7 @@ class VacancyController extends Controller
         ]);
         $resort = Auth::guard('resort-admin')->user();
         $resort_id = $resort->resort_id;
-        $recruitment = !empty($validatedData['recruitement']) ? implode(",", $validatedData['recruitement']) : null;
+        $recruitment = !empty($validatedData['recruitement']) ? implode(",", $validatedData['recruitement']) : '';
             if (!empty($validatedData['new_service_provider'])) 
             {
                 $serviceProvider = ServiceProvider::firstOrCreate(['name' => $validatedData['new_service_provider'],'resort_id' => $resort_id]);
@@ -536,6 +544,7 @@ class VacancyController extends Controller
             $reportingEmployees = DB::table('employees')
                 ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                 ->where('employees.resort_id', $resort_id)
+                ->where('employees.status', 'Active')
                 ->whereIn('employees.rank', $targetRanks)
                 ->where(function ($query) use ($Dept_id) {
                     $query->where('employees.rank', array_search('HOD', config('settings.Position_Rank')))
@@ -611,7 +620,7 @@ class VacancyController extends Controller
             ->where('status', 'Draft')
             ->firstOrFail();
 
-        $recruitment = !empty($validatedData['recruitement']) ? implode(",", $validatedData['recruitement']) : null;
+        $recruitment = !empty($validatedData['recruitement']) ? implode(",", $validatedData['recruitement']) : '';
 
         if (!empty($validatedData['new_service_provider'])) {
             $serviceProvider = ServiceProvider::firstOrCreate(['name' => $validatedData['new_service_provider'], 'resort_id' => $resort_id]);
@@ -1120,7 +1129,16 @@ class VacancyController extends Controller
             ->join("t_anotification_parents as t3", "t3.V_id", "=", "vacancies.id")
             ->join("t_anotification_children as t4", "t4.Parent_ta_id", "=", "t3.id")
             ->join("application_links as t5", "t5.ta_child_id", "=", "t4.id")
-            ->leftjoin("applicant_form_data as t6", "t6.Parent_v_id", "=", "vacancies.id")
+            ->leftjoin("applicant_form_data as t6", function($join) {
+                $join->on("t6.Parent_v_id", "=", "vacancies.id")
+                    ->whereNotExists(function($q) {
+                        $q->select(DB::raw(1))
+                            ->from('applicant_wise_statuses as check_aws')
+                            ->whereRaw('check_aws.Applicant_id = t6.id')
+                            ->whereRaw('check_aws.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = t6.id)')
+                            ->where('check_aws.status', 'Rejected');
+                    });
+            })
             ->where("vacancies.resort_id", $resort_id)
             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
             ->where('t4.status','ForwardedToNext');
@@ -1418,7 +1436,7 @@ class VacancyController extends Controller
         // Count existing active vacancies for this position
         $existingVacancies = Vacancies::where('Resort_id', $resort_id)
             ->where('position', $positionId)
-            ->whereNotIn('status', ['Closed', 'Cancelled'])
+            ->whereNotIn('status', ['Closed', 'Cancelled', 'Draft'])
             ->sum('Total_position_required') ?? 0;
 
         if (!$manningresponse) {
@@ -1452,7 +1470,17 @@ class VacancyController extends Controller
         $availableSlots = max(0, $vacantCount - $existingVacancies);
 
         $result = StoreManningResponseParent::where('Budget_id',$manningresponse->id)->first();
-        $manning_data = $result ? StoreManningResponseChild::where('Parent_SMRP_id',$result->id)->first() : null;
+        // Get salary data for the specific position (average of employees in that position)
+        $manning_data = null;
+        if ($result) {
+            $positionEmpIds = Employee::where('resort_id', $resort_id)
+                ->where('Position_id', $positionId)
+                ->pluck('id')
+                ->toArray();
+            $manning_data = StoreManningResponseChild::where('Parent_SMRP_id', $result->id)
+                ->whereIn('Emp_id', $positionEmpIds)
+                ->first();
+        }
 
         // Determine if the requested vacancy is within budget
         $status = $requestedVacancy <= $vacantCount ? 'Budgeted' : 'Out of Budget';
@@ -1495,6 +1523,22 @@ class VacancyController extends Controller
             }
         }
 
+        // Get all payroll allowances for this resort
+        $allAllowances = ResortBudgetCost::where('resort_id', $resort_id)
+            ->where('is_payroll_allowance', 1)
+            ->get()
+            ->map(function ($item) use ($budgeted_salary) {
+                $calculatedAmount = ($item->amount_unit === '%')
+                    ? round(($item->amount / 100) * $budgeted_salary, 2)
+                    : $item->amount;
+                return [
+                    'name' => $item->particulars,
+                    'amount' => $calculatedAmount,
+                    'unit' => $item->amount_unit,
+                    'raw_amount' => $item->amount,
+                ];
+            });
+
         return response()->json([
             'status' => $status,
             'headcount' => $headcount,
@@ -1502,13 +1546,14 @@ class VacancyController extends Controller
             'vacantCount' => $vacantCount,
             'existingVacancies' => $existingVacancies,
             'availableSlots' => $availableSlots,
-            'budgeted_salary' =>$budgeted_salary,
-            'proposed_salary'=>$proposed_salary,
+            'budgeted_salary' => $budgeted_salary,
+            'proposed_salary' => $proposed_salary,
             'accommodation' => $costs['accommodation'],
             'allowance' => $costs['allowance'],
             'medical' => $costs['medical'],
             'insurance' => $costs['insurance'],
             'pension' => $costs['pension'],
+            'all_allowances' => $allAllowances,
         ]);
     }
     public function shortlisted(Request $request,$id)
@@ -1537,8 +1582,7 @@ class VacancyController extends Controller
                             FROM applicant_wise_statuses
                             WHERE Applicant_id = t1.id
                         )')
-                        ->where('t4.status', '=', 'Sortlisted')
-                        ->where('t4.As_ApprovedBy', '=', 3);
+                        ->where('t4.status', '=', 'Sortlisted');
                 })
                 ->leftjoin('applicant_inter_view_details as t3', function ($join) {
                     $join->on('t3.Applicant_id', '=', 't1.id')
@@ -1614,11 +1658,10 @@ class VacancyController extends Controller
                         </div>';
                     return $string;
                     })
-                    ->addColumn('Stage', function ($row){
-                        $userName = htmlspecialchars(ucfirst($row->first_name . ' ' . $row->last_name), ENT_QUOTES, 'UTF-8');
-
-                        $string = ' <span class="badge badge-themeBlue">HR Sortlisted</span>';
-                    return $string;
+                    ->addColumn('Stage', function ($row) use ($config) {
+                        $rankName = $config[$row->ApprovedBy] ?? 'HR';
+                        $string = '<span class="badge badge-themeBlue">' . $rankName . ' Shortlisted</span>';
+                        return $string;
                     })
 
 
@@ -1645,12 +1688,15 @@ class VacancyController extends Controller
                             </li>';
                         }
 
+                        $viewApplicant = '<li><a class="dropdown-item userApplicants-btn" data-id="' . base64_encode($row->Applicant_id) . '" href="javascript:void(0)">View Applicant</a></li>';
+
                         return '
                             <div class="dropdown table-dropdown">
                                 <button class="btn btn-secondary dropdown-toggle dots-link" type="button" id="dropdownMenuButton' . $dropdownId . '" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fa-solid fa-ellipsis"></i>
                                 </button>
                                 <ul class="dropdown-menu " aria-labelledby="dropdownMenuButton' . $dropdownId . '">
+                                    ' . $viewApplicant . '
                                     ' . $sendInterviewRequest . '
                                     ' . $shareLink . '
                                 </ul>
@@ -1784,11 +1830,10 @@ class VacancyController extends Controller
                         </div>';
                     return $string;
                     })
-                    ->addColumn('Stage', function ($row){
-                        $userName = htmlspecialchars(ucfirst($row->first_name . ' ' . $row->last_name), ENT_QUOTES, 'UTF-8');
-
-                        $string = ' <span class="badge badge-themeBlue">HR Sortlisted</span>';
-                    return $string;
+                    ->addColumn('Stage', function ($row) use ($config) {
+                        $rankName = $config[$row->ApprovedBy] ?? 'HR';
+                        $string = '<span class="badge badge-themeBlue">' . $rankName . ' Shortlisted</span>';
+                        return $string;
                     })
 
 
@@ -1997,8 +2042,7 @@ class VacancyController extends Controller
                                         FROM applicant_wise_statuses
                                         WHERE Applicant_id = t1.id
                                     )')
-                                    ->where('t4.status', '=', 'Sortlisted')
-                                    ->where('t4.As_ApprovedBy', '=', 3);
+                                    ->where('t4.status', '=', 'Sortlisted');
                             })
                             ->join('applicant_inter_view_details as t3', function ($join) {
                                 $join->on('t3.Applicant_id', '=', 't1.id')

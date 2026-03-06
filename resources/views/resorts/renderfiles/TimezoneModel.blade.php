@@ -22,10 +22,14 @@
 
             // Check if the current time slot is booked (handles comma-separated times)
             $isSlotDisabled = false;
+            $slotBookedBy = '';
+            $isOwnBooking = false;
             foreach($bookedTimes as $bookedSlot) {
                 $bookedResortTimes = array_map('trim', explode(',', $bookedSlot['ResortInterviewtime']));
                 if(in_array($startTime->format('h:i A'), $bookedResortTimes)) {
                     $isSlotDisabled = true;
+                    $isOwnBooking = $bookedSlot['is_own'] ?? false;
+                    $slotBookedBy = $bookedSlot['booked_by'] ?? '';
                     break;
                 }
             }
@@ -43,7 +47,9 @@
             </div>
 
             @if($isSlotDisabled)
-                <span class="badge bg-danger" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:1;font-size:11px;">Booked</span>
+                <span class="badge {{ $isOwnBooking ? 'bg-warning text-dark' : 'bg-danger' }}" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:1;font-size:11px;" title="{{ $slotBookedBy ? 'Booked by ' . $slotBookedBy : 'Slot Booked' }}">
+                    {{ $isOwnBooking ? 'Your Booking' : ($slotBookedBy ? 'Booked - ' . $slotBookedBy : 'Booked') }}
+                </span>
             @endif
 
             <input type="checkbox" name="SlotBook[]" value="{{ $i }}" data-id="{{ $i }}" data-ResortInterviewtime="{{ $startTime->format('h:i A') }}" data-ApplicantInterviewtime="{{ $startTime->copy()->setTimezone($applicantTimeZone)->format('h:i A') }}" class="Timezone_checkBox" @if($isSlotDisabled) disabled @endif>

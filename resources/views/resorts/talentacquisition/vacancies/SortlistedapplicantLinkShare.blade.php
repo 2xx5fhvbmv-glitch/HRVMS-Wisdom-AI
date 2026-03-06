@@ -791,6 +791,88 @@ $(document).on("change", '[name="MalidivanManualTime"]', function () {
                 }
             });
         });
+
+        // Notes form AJAX submit
+        $(document).on('submit', '#ApplicantNoteForm', function(e) {
+            e.preventDefault();
+            let form = this;
+            let formData = new FormData(form);
+            let noteText = $(form).find('textarea[name="ApplicantNote"]').val();
+            if (!noteText || !noteText.trim()) {
+                toastr.error('Please write a note before submitting.', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            $.ajax({
+                url: "{{ route('resort.ta.ApplicantNote') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        let $notesBlock = $('#tabPane4 .notes-display-block');
+                        if ($notesBlock.length) {
+                            $notesBlock.find('p').text(noteText);
+                        } else {
+                            let notesHtml = '<div class="intUserApp-block mt-3 notes-display-block"><h6>Notes:</h6><p>' + $('<span>').text(noteText).html() + '</p></div>';
+                            let $last = $('#tabPane4 .a-link').last();
+                            if ($last.length) { $last.after(notesHtml); } else { $('#tabPane4 .table-responsive').after(notesHtml); }
+                        }
+                        $('#myTab button[data-bs-target="#tabPane4"]').tab('show');
+                    }
+                },
+                error: function(response) {
+                    var errors = response.responseJSON;
+                    var errs = (errors && errors.errors) ? Object.values(errors.errors).join('<br>') : 'Failed to save note.';
+                    toastr.error(errs, { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+
+        // Comments form AJAX submit
+        $(document).on('submit', '#RoundWiseForm', function(e) {
+            e.preventDefault();
+            let form = this;
+            let formData = new FormData(form);
+            let commentText = $(form).find('textarea[name="Comment"]').val();
+            if (!commentText || !commentText.trim()) {
+                toastr.error('Please write a comment before submitting.', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            $.ajax({
+                url: "{{ route('resort.ta.RoundWiseForm') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        $(form).find('textarea[name="Comment"]').val('');
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        let $commentsBlock = $('#tabPane4 .comments-display-block');
+                        let commentHtml = '<div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;"><p class="mb-0">' + $('<span>').text(commentText).html() + '</p></div>';
+                        if ($commentsBlock.length) {
+                            $commentsBlock.append(commentHtml);
+                        } else {
+                            let commentsBlockHtml = '<div class="intUserApp-block mt-3 comments-display-block"><h6>Comments:</h6>' + commentHtml + '</div>';
+                            let $notesBlock = $('#tabPane4 .notes-display-block');
+                            if ($notesBlock.length) { $notesBlock.after(commentsBlockHtml); }
+                            else {
+                                let $last = $('#tabPane4 .a-link').last();
+                                if ($last.length) { $last.after(commentsBlockHtml); } else { $('#tabPane4 .table-responsive').after(commentsBlockHtml); }
+                            }
+                        }
+                        $('#myTab button[data-bs-target="#tabPane4"]').tab('show');
+                    }
+                },
+                error: function(response) {
+                    var errors = response.responseJSON;
+                    var errs = (errors && errors.errors) ? Object.values(errors.errors).join('<br>') : 'Failed to save comment.';
+                    toastr.error(errs, { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
 </script>
 @endsection
 

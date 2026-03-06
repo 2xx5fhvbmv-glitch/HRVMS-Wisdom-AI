@@ -131,12 +131,12 @@ class ApplicantsController extends Controller
                         ->where('applicant_form_data.Parent_v_id', $id1)
                         ->where('applicant_form_data.resort_id', $resort_id);
 
-                    // HR sees all applicants, others only see applicants at their interview round
-                    $loggedInRank = $this->resort->GetEmployee->rank ?? null;
-                    $userDeptNameCheck = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id ?? 0)->value('name');
+                    // HR sees all applicants, others only see applicants for their department
+                    $userDeptId = $this->resort->GetEmployee->Dept_id ?? null;
+                    $userDeptNameCheck = \App\Models\ResortDepartment::where('id', $userDeptId)->value('name');
                     $isHrDept = stripos($userDeptNameCheck ?? '', 'Human Resources') !== false;
                     if (!$isHrDept) {
-                        $Applicant_form_data1->where('t1.As_ApprovedBy', $loggedInRank);
+                        $Applicant_form_data1->where('t5.dept_id', $userDeptId);
                     }
 
                     $Applicant_form_data1->orderBy('applicant_form_data.id', 'desc');
@@ -324,7 +324,14 @@ class ApplicantsController extends Controller
         {
 
             $Applicant_form_data = Applicant_form_data::find( $Applicant_id);
-            $Applicant_form_data ->update(['notes'=> $ApplicantNote, 'notes_by' => $this->resort->id]);
+            // Store notes as JSON keyed by user_id so each user has their own note
+            $existingNotes = json_decode($Applicant_form_data->notes, true) ?? [];
+            if (!is_array($existingNotes) || (is_array($existingNotes) && !empty($existingNotes) && !array_key_exists(array_key_first($existingNotes), $existingNotes))) {
+                // Legacy plain text note — clear it
+                $existingNotes = [];
+            }
+            $existingNotes[$this->resort->id] = $ApplicantNote;
+            $Applicant_form_data->update(['notes' => json_encode($existingNotes)]);
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -981,26 +988,30 @@ class ApplicantsController extends Controller
         $Round = $request->Round;
         $InterviewType = $request->InterviewType;
 
-        // Get the booked interview slots for the current interviewer on this date
+        // Get all booked interview slots for this resort on this date (across all interviewers)
         $interviewerId = $this->resort->id;
         $resortId = $this->resort->resort_id;
         $bookedSlots = ApplicantInterViewDetails::where('InterViewDate', $InterviewDate)
             ->whereIn('Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
-            ->where(function ($query) use ($interviewerId, $resortId) {
-                $query->where('interviewer_id', $interviewerId)
-                      ->orWhere(function ($q) use ($resortId) {
-                          $q->whereNull('interviewer_id')
-                            ->where('resort_id', $resortId);
-                      });
-            })
+            ->where('resort_id', $resortId)
             ->get();
         // dd($bookedSlots);
 
-        // Prepare the booked slots in a suitable structure (array of booked time slots)
-        $bookedTimes = $bookedSlots->map(function ($slot) {
+        // Prepare the booked slots with interviewer info
+        $bookedTimes = $bookedSlots->map(function ($slot) use ($interviewerId) {
+            $bookedByName = '';
+            if ($slot->interviewer_id) {
+                $interviewer = \App\Models\ResortAdmin::select('first_name', 'last_name')
+                    ->where('id', $slot->interviewer_id)->first();
+                if ($interviewer) {
+                    $bookedByName = ucwords($interviewer->first_name . ' ' . $interviewer->last_name);
+                }
+            }
             return [
                 'ResortInterviewtime' => $slot->ResortInterviewtime,
-                'ApplicantInterviewtime' => $slot->ApplicantInterviewtime
+                'ApplicantInterviewtime' => $slot->ApplicantInterviewtime,
+                'is_own' => ($slot->interviewer_id == $interviewerId),
+                'booked_by' => $bookedByName,
             ];
         })->toArray();
 
@@ -1037,26 +1048,32 @@ class ApplicantsController extends Controller
             $applicantTime = $request->ApplicantInterviewtime ?? $request->ApplicantManualTime1;
             $interviewDate = Carbon::createFromFormat('Y-m-d', $request->TimeSlotsFormdate)->format('Y-m-d');
 
-            // Validate manual time against interviewer's existing bookings
-            if ($request->MalidivanManualTime1) {
+            // Validate time against all resort-wide bookings (not just current interviewer)
+            $timeToCheck = $request->MalidivanManualTime1 ?? $resortTime;
+            if ($timeToCheck) {
                 $existingBookings = ApplicantInterViewDetails::where('InterViewDate', $interviewDate)
                     ->whereIn('Status', ['Pending Review', 'Invitation Sent', 'Slot Booked'])
-                    ->where(function ($query) use ($interviewerId, $Resort_id) {
-                        $query->where('interviewer_id', $interviewerId)
-                              ->orWhere(function ($q) use ($Resort_id) {
-                                  $q->whereNull('interviewer_id')
-                                    ->where('resort_id', $Resort_id);
-                              });
-                    })
+                    ->where('resort_id', $Resort_id)
                     ->get();
 
                 foreach ($existingBookings as $booking) {
                     $bookedTimes = array_map('trim', explode(',', $booking->ResortInterviewtime));
-                    if (in_array($request->MalidivanManualTime1, $bookedTimes)) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'This time slot is already booked for another candidate.',
-                        ]);
+                    $timesToCheck = array_map('trim', explode(',', $timeToCheck));
+                    foreach ($timesToCheck as $t) {
+                        if (in_array($t, $bookedTimes)) {
+                            $bookedByName = '';
+                            if ($booking->interviewer_id) {
+                                $interviewer = \App\Models\ResortAdmin::select('first_name', 'last_name')
+                                    ->where('id', $booking->interviewer_id)->first();
+                                if ($interviewer) {
+                                    $bookedByName = ' by ' . ucwords($interviewer->first_name . ' ' . $interviewer->last_name);
+                                }
+                            }
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Time slot ' . $t . ' is already booked' . $bookedByName . ' for another candidate.',
+                            ]);
+                        }
                     }
                 }
             }
@@ -1508,7 +1525,23 @@ class ApplicantsController extends Controller
         try
         {
             $ApplicantWiseStatus = ApplicantWiseStatus::find($ApplicantID);
-            $ApplicantWiseStatus->Comments  = $Comment;
+            // Store comments as JSON array so multiple users can comment without overwriting
+            $existingComments = json_decode($ApplicantWiseStatus->Comments, true) ?? [];
+            if (!is_array($existingComments) || (!empty($existingComments) && !isset($existingComments[0]))) {
+                // Legacy plain text comment — convert to array
+                $legacyComment = $ApplicantWiseStatus->Comments;
+                $existingComments = [];
+                if (!empty($legacyComment)) {
+                    $existingComments[] = ['user_id' => null, 'name' => 'Unknown', 'comment' => $legacyComment];
+                }
+            }
+            $user = Auth::guard('resort-admin')->user();
+            $existingComments[] = [
+                'user_id' => $user->id,
+                'name' => ucfirst($user->first_name) . ' ' . ucfirst($user->last_name),
+                'comment' => $Comment,
+            ];
+            $ApplicantWiseStatus->Comments = json_encode($existingComments);
             $ApplicantWiseStatus->save();
             DB::commit();
             return response()->json([
@@ -2338,111 +2371,28 @@ class ApplicantsController extends Controller
      * Generate a filled PDF from a DOCX template by replacing placeholders.
      * Uses PhpWord TemplateProcessor → HTML Writer → DomPDF.
      */
-    private function generatePdfFromDocxTemplate($docxPath, $placeholders)
+    /**
+     * Fill DOCX template placeholders and return path to the filled DOCX file.
+     * We send the DOCX directly instead of converting to PDF, because PhpWord's
+     * HTML writer produces fragmented output that breaks formatting.
+     */
+    private function generateFilledDocxFromTemplate($docxPath, $placeholders)
     {
-        // PhpWord TemplateProcessor to replace placeholders in DOCX
         $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor($docxPath);
 
-        // Replace each {{placeholder}} — TemplateProcessor uses ${} by default, so we set custom delimiters
         $templateProcessor->setMacroOpeningChars('{{');
         $templateProcessor->setMacroClosingChars('}}');
 
         foreach ($placeholders as $key => $value) {
-            // Strip {{ and }} from key for setValue
             $cleanKey = str_replace(['{{', '}}'], '', $key);
-            // Escape XML special characters to prevent DOCX XML corruption
             $safeValue = htmlspecialchars($value ?? '', ENT_XML1 | ENT_QUOTES, 'UTF-8');
             $templateProcessor->setValue($cleanKey, $safeValue);
         }
 
-        // Save filled DOCX to temp file
         $tempDocx = tempnam(sys_get_temp_dir(), 'docx_') . '.docx';
         $templateProcessor->saveAs($tempDocx);
 
-        // Load the original DOCX (before placeholder replacement) to get page setup
-        // This avoids XML parsing issues from replaced content
-        $originalPhpWord = \PhpOffice\PhpWord\IOFactory::load($docxPath);
-        $sections = $originalPhpWord->getSections();
-        $marginTopMm = 25; // defaults: ~1 inch
-        $marginBottomMm = 25;
-        $marginLeftMm = 32; // ~1.25 inch
-        $marginRightMm = 32;
-        if (!empty($sections) && $sections[0]) {
-            $style = $sections[0]->getStyle();
-            if ($style) {
-                $marginTopMm = round(($style->getMarginTop() ?? 1440) / 1440 * 25.4);
-                $marginBottomMm = round(($style->getMarginBottom() ?? 1440) / 1440 * 25.4);
-                $marginLeftMm = round(($style->getMarginLeft() ?? 1800) / 1440 * 25.4);
-                $marginRightMm = round(($style->getMarginRight() ?? 1800) / 1440 * 25.4);
-            }
-        }
-
-        // Load filled DOCX and convert to HTML
-        $phpWord = \PhpOffice\PhpWord\IOFactory::load($tempDocx);
-        $htmlWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML');
-        $tempHtml = tempnam(sys_get_temp_dir(), 'html_') . '.html';
-        $htmlWriter->save($tempHtml);
-        $htmlContent = file_get_contents($tempHtml);
-
-        // Inject CSS to preserve formatting — PhpWord's default HTML has incorrect table borders and no page margins
-        $customCSS = "<style>
-            @page {
-                margin: {$marginTopMm}mm {$marginRightMm}mm {$marginBottomMm}mm {$marginLeftMm}mm;
-            }
-            body {
-                font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
-                font-size: 11pt;
-                line-height: 1.5;
-                color: #000;
-                word-wrap: break-word;
-                overflow-wrap: break-word;
-            }
-            table {
-                border: none !important;
-                border-collapse: collapse;
-                width: 100%;
-                page-break-inside: auto;
-            }
-            td {
-                border: none !important;
-                padding: 4pt 6pt;
-                vertical-align: top;
-            }
-            tr {
-                page-break-inside: avoid;
-            }
-            p {
-                margin: 2pt 0 6pt 0;
-            }
-            h1 {
-                font-size: 16pt;
-                color: #000;
-                margin: 12pt 0 8pt 0;
-            }
-            img {
-                max-width: 100%;
-                height: auto;
-            }
-        </style>";
-
-        // Insert custom CSS before closing </head> to override PhpWord defaults
-        if (strpos($htmlContent, '</head>') !== false) {
-            $htmlContent = str_replace('</head>', $customCSS . '</head>', $htmlContent);
-        } else {
-            $htmlContent = $customCSS . $htmlContent;
-        }
-
-        // Generate PDF from HTML via DomPDF with proper settings
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($htmlContent)
-            ->setPaper('a4')
-            ->setOption('isRemoteEnabled', true)
-            ->setOption('defaultFont', 'DejaVu Sans');
-
-        // Cleanup temp files
-        @unlink($tempDocx);
-        @unlink($tempHtml);
-
-        return $pdf;
+        return $tempDocx;
     }
 
     public function sendOfferLetter(Request $request)
@@ -2480,22 +2430,24 @@ class ApplicantsController extends Controller
             }
 
             if ($template && $template->file_path && !$request->hasFile('offer_letter')) {
-                // DOCX template mode: replace placeholders and generate PDF
+                // DOCX template mode: replace placeholders and send filled DOCX directly
                 $docxFullPath = storage_path('app/public/' . $template->file_path);
                 if (!file_exists($docxFullPath)) {
                     return response()->json(['success' => false, 'message' => 'Template file not found. Please re-upload in Configuration.'], 404);
                 }
 
                 $placeholders = Common::resolveTemplatePlaceholders($applicant_id, $resort_id);
-                $pdf = $this->generatePdfFromDocxTemplate($docxFullPath, $placeholders);
+                $tempDocxPath = $this->generateFilledDocxFromTemplate($docxFullPath, $placeholders);
 
-                $fileName = 'offer_letter_' . time() . '_' . $applicant_id . '.pdf';
+                $fileName = 'offer_letter_' . time() . '_' . $applicant_id . '.docx';
                 $storagePath = 'offer_letters/' . $resort_id;
-                if (!file_exists(storage_path('app/public/' . $storagePath))) {
-                    mkdir(storage_path('app/public/' . $storagePath), 0755, true);
+                $fullStorageDir = storage_path('app/public/' . $storagePath);
+                if (!file_exists($fullStorageDir)) {
+                    mkdir($fullStorageDir, 0755, true);
                 }
                 $filePath = $storagePath . '/' . $fileName;
-                file_put_contents(storage_path('app/public/' . $filePath), $pdf->output());
+                copy($tempDocxPath, storage_path('app/public/' . $filePath));
+                @unlink($tempDocxPath);
                 $pdfPath = storage_path('app/public/' . $filePath);
                 $templateId = $template->id;
 
@@ -2552,9 +2504,13 @@ class ApplicantsController extends Controller
                 $message->to($applicant->email)
                     ->subject($subject);
                 if ($pdfPath && file_exists($pdfPath)) {
+                    $mime = str_ends_with($pdfPath, '.docx')
+                        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                        : 'application/pdf';
+                    $attachName = str_ends_with($pdfPath, '.docx') ? 'Offer_Letter.docx' : 'Offer_Letter.pdf';
                     $message->attach($pdfPath, [
-                        'as' => 'Offer_Letter.pdf',
-                        'mime' => 'application/pdf',
+                        'as' => $attachName,
+                        'mime' => $mime,
                     ]);
                 }
             });
@@ -2603,22 +2559,24 @@ class ApplicantsController extends Controller
             }
 
             if ($template && $template->file_path && !$request->hasFile('contract_file')) {
-                // DOCX template mode
+                // DOCX template mode: replace placeholders and send filled DOCX directly
                 $docxFullPath = storage_path('app/public/' . $template->file_path);
                 if (!file_exists($docxFullPath)) {
                     return response()->json(['success' => false, 'message' => 'Template file not found. Please re-upload in Configuration.'], 404);
                 }
 
                 $placeholders = Common::resolveTemplatePlaceholders($applicant_id, $resort_id);
-                $pdf = $this->generatePdfFromDocxTemplate($docxFullPath, $placeholders);
+                $tempDocxPath = $this->generateFilledDocxFromTemplate($docxFullPath, $placeholders);
 
-                $fileName = 'contract_' . time() . '_' . $applicant_id . '.pdf';
+                $fileName = 'contract_' . time() . '_' . $applicant_id . '.docx';
                 $storagePath = 'contracts/' . $resort_id;
-                if (!file_exists(storage_path('app/public/' . $storagePath))) {
-                    mkdir(storage_path('app/public/' . $storagePath), 0755, true);
+                $fullStorageDir = storage_path('app/public/' . $storagePath);
+                if (!file_exists($fullStorageDir)) {
+                    mkdir($fullStorageDir, 0755, true);
                 }
                 $filePath = $storagePath . '/' . $fileName;
-                file_put_contents(storage_path('app/public/' . $filePath), $pdf->output());
+                copy($tempDocxPath, storage_path('app/public/' . $filePath));
+                @unlink($tempDocxPath);
                 $pdfPath = storage_path('app/public/' . $filePath);
                 $templateId = $template->id;
 
@@ -2672,9 +2630,13 @@ class ApplicantsController extends Controller
                 $message->to($applicant->email)
                     ->subject($subject);
                 if ($pdfPath && file_exists($pdfPath)) {
+                    $mime = str_ends_with($pdfPath, '.docx')
+                        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                        : 'application/pdf';
+                    $attachName = str_ends_with($pdfPath, '.docx') ? 'Employment_Contract.docx' : 'Employment_Contract.pdf';
                     $message->attach($pdfPath, [
-                        'as' => 'Employment_Contract.pdf',
-                        'mime' => 'application/pdf',
+                        'as' => $attachName,
+                        'mime' => $mime,
                     ]);
                 }
             });

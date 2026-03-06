@@ -19,7 +19,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="{{ route('resort.ta.shortlisted',$id) }}" class="btn btn-themeLightNew">Shortlisted Applicants</a>
+                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn btn-themeLightNew">Shortlisted Applicants</a>
                     </div>
                     <div class="col-auto">
                         <a href="{{route('resort.ta.UpcomingApplicants')}}" class="btn btn-themeLightNew">Upcoming Interviews</a>
@@ -307,6 +307,25 @@
         </div>
     </div>
     @if($isHrDepartment)
+    {{-- Confirmation Modal for Interview Progress Actions --}}
+    <div class="modal fade" id="confirm-action-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-action-message">Are you sure you want to proceed?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-themeBlue" id="confirm-action-yes">Yes, Proceed</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="Email-template-selection-modal" tabindex="-1" aria-labelledby="exampleModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-small">
@@ -2016,6 +2035,43 @@
             let interviewRound = $(this).attr("data-interviewRound");
             let applicantstatusid = $(this).attr("data-progress_applicantstatusid");
 
+            // Build confirmation message based on the action
+            let actionLabel = $(this).text().trim();
+            let confirmMsg = 'Are you sure you want to <strong>' + actionLabel + '</strong> this applicant?';
+            if (Rank === "Rejected") {
+                confirmMsg = 'Are you sure you want to <strong>Reject</strong> this applicant? This action cannot be undone.';
+            } else if (Rank === "Selected") {
+                confirmMsg = 'Are you sure you want to <strong>Select</strong> this applicant?';
+            } else if (Rank === "Complete") {
+                confirmMsg = 'Are you sure you want to mark this round as <strong>Complete</strong>?';
+            } else if (Rank === "Sortlisted") {
+                confirmMsg = 'Are you sure you want to <strong>Shortlist</strong> this applicant?';
+            }
+
+            $("#confirm-action-message").html(confirmMsg);
+
+            // Change confirm button style for destructive actions
+            if (Rank === "Rejected") {
+                $("#confirm-action-yes").removeClass("btn-themeBlue").addClass("btn-danger").text("Yes, Reject");
+            } else {
+                $("#confirm-action-yes").removeClass("btn-danger").addClass("btn-themeBlue").text("Yes, Proceed");
+            }
+
+            // Store data for the confirm callback
+            $("#confirm-action-modal").data({ ApplicantID, Rank, interviewRound, applicantstatusid });
+            $("#confirm-action-modal").modal("show");
+        });
+
+        // Handle confirmation
+        $(document).on("click", "#confirm-action-yes", function () {
+            let data = $("#confirm-action-modal").data();
+            let ApplicantID = data.ApplicantID;
+            let Rank = data.Rank;
+            let interviewRound = data.interviewRound;
+            let applicantstatusid = data.applicantstatusid;
+
+            $("#confirm-action-modal").modal("hide");
+
             if ((Rank === "Complete" || Rank === "Rejected" || Rank == "Selected") && isHrDepartment) {
                 // HR users: show email template selection modal
                 $("#EmailTemplateForm").data("ApplicantID", ApplicantID);
@@ -2115,34 +2171,55 @@
         $(document).on('submit', '#ApplicantNoteForm', function(e) {
             e.preventDefault();
 
+            let form = this;
+            let formData = new FormData(form);
+            let noteText = $(form).find('textarea[name="ApplicantNote"]').val();
 
-            let formData = new FormData(this);
+            if (!noteText || !noteText.trim()) {
+                toastr.error('Please write a note before submitting.', { positionClass: 'toast-bottom-right' });
+                return;
+            }
 
             $.ajax({
                 url: "{{ route('resort.ta.ApplicantNote') }}",
                 type: "POST",
                 data: formData,
-                processData: false, // Prevent jQuery from automatically processing the data
-                contentType: false, // Prevent jQuery from setting contentType
+                processData: false,
+                contentType: false,
                 success: function(response) {
-                    $('#respond-rejectModal').modal('hide');
                     if (response.success) {
-                        $("#FreshHiringRequest").html(response.view);
-                        $("#ApplicantsNotes-Model").modal('hide');
-
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
+
+                        // Update notes in INTERVIEW tab without reloading sidebar
+                        let $notesBlock = $('#tabPane4 .notes-display-block');
+                        if ($notesBlock.length) {
+                            $notesBlock.find('p').text(noteText);
+                        } else {
+                            let notesHtml = '<div class="intUserApp-block mt-3 notes-display-block"><h6>Notes:</h6><p>' + $('<span>').text(noteText).html() + '</p></div>';
+                            let $interviewAssessments = $('#tabPane4 .a-link').last();
+                            if ($interviewAssessments.length) {
+                                $interviewAssessments.after(notesHtml);
+                            } else {
+                                $('#tabPane4 .table-responsive').after(notesHtml);
+                            }
+                        }
+
+                        // Switch to INTERVIEW tab
+                        $('#myTab button[data-bs-target="#tabPane4"]').tab('show');
                     }
                 },
                 error: function(response) {
                     var errors = response.responseJSON;
                     var errs = '';
-                    console.log(errors.errors);
-                    $.each(errors.errors, function(key, error) {
-                        console.log(error);
-                        errs += error + '<br>';
-                    });
+                    if (errors && errors.errors) {
+                        $.each(errors.errors, function(key, error) {
+                            errs += error + '<br>';
+                        });
+                    } else {
+                        errs = 'Failed to save note.';
+                    }
                     toastr.error(errs, { positionClass: 'toast-bottom-right' });
                 }
             });
@@ -2150,34 +2227,64 @@
         $(document).on('submit', '#RoundWiseForm', function(e) {
             e.preventDefault();
 
+            let form = this;
+            let formData = new FormData(form);
+            let commentText = $(form).find('textarea[name="Comment"]').val();
 
-                let formData = new FormData(this);
+            if (!commentText || !commentText.trim()) {
+                toastr.error('Please write a comment before submitting.', { positionClass: 'toast-bottom-right' });
+                return;
+            }
 
             $.ajax({
                 url: "{{ route('resort.ta.RoundWiseForm') }}",
                 type: "POST",
                 data: formData,
-                processData: false, // Prevent jQuery from automatically processing the data
-                contentType: false, // Prevent jQuery from setting contentType
+                processData: false,
+                contentType: false,
                 success: function(response) {
-                    $('#respond-rejectModal').modal('hide');
                     if (response.success) {
-                        $("#FreshHiringRequest").html(response.view);
-                        $("#ApplicantsNotes-Model").modal('hide');
+                        // Clear textarea
+                        $(form).find('textarea[name="Comment"]').val('');
 
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
+
+                        // Add comment to INTERVIEW tab without reloading sidebar
+                        let $commentsBlock = $('#tabPane4 .comments-display-block');
+                        let commentHtml = '<div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;"><p class="mb-0">' + $('<span>').text(commentText).html() + '</p></div>';
+                        if ($commentsBlock.length) {
+                            $commentsBlock.append(commentHtml);
+                        } else {
+                            let commentsBlockHtml = '<div class="intUserApp-block mt-3 comments-display-block"><h6>Comments:</h6>' + commentHtml + '</div>';
+                            let $notesBlock = $('#tabPane4 .notes-display-block');
+                            if ($notesBlock.length) {
+                                $notesBlock.after(commentsBlockHtml);
+                            } else {
+                                let $interviewAssessments = $('#tabPane4 .a-link').last();
+                                if ($interviewAssessments.length) {
+                                    $interviewAssessments.after(commentsBlockHtml);
+                                } else {
+                                    $('#tabPane4 .table-responsive').after(commentsBlockHtml);
+                                }
+                            }
+                        }
+
+                        // Switch to INTERVIEW tab
+                        $('#myTab button[data-bs-target="#tabPane4"]').tab('show');
                     }
                 },
                 error: function(response) {
                     var errors = response.responseJSON;
                     var errs = '';
-                    console.log(errors.errors);
-                    $.each(errors.errors, function(key, error) {
-                        console.log(error);
-                        errs += error + '<br>';
-                    });
+                    if (errors && errors.errors) {
+                        $.each(errors.errors, function(key, error) {
+                            errs += error + '<br>';
+                        });
+                    } else {
+                        errs = 'Failed to save comment.';
+                    }
                     toastr.error(errs, { positionClass: 'toast-bottom-right' });
                 }
             });
