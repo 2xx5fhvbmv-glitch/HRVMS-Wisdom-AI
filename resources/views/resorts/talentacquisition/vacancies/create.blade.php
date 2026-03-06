@@ -104,6 +104,16 @@
                                     <input type="text" class="form-control" id="txt-section" name="section" placeholder="SECTION" value="{{ $sectionName }}" disabled>
                                     <input type="hidden" class="form-control" id="section_id" name="section_id" value="{{ $sectionId }}">
                                 </div>
+
+                                <div class="col-sm-6" id="budgeted-salary-container" style="display:none;">
+                                    <label class="form-label">BUDGETED SALARY</label>
+                                    <input type="text" class="form-control" id="txt-budgeted-salary-display" placeholder="—" disabled>
+                                </div>
+                                <div class="col-sm-6" id="budgeted-allowance-container" style="display:none;">
+                                    <label class="form-label">ALLOWANCES</label>
+                                    <div id="allowance-list"></div>
+                                </div>
+
                                 <div class="col-12">
                                     <label for="select-selection" class="form-label">EMPLOYEE TYPE</label>
                                     <ul class="nav mt-2 ">
@@ -439,16 +449,52 @@
                         type: 'GET',
                         data: { positionId: positionId },
                         success: function(response) {
-                            $('#txt-rank').val(response.rank || ''); // Set the rank if available, else empty
+                            $('#txt-rank').val(response.rank || '');
                             $('#rank_id').val(response.rank_id)
                         },
                         error: function() {
                             console.error("An error occurred while fetching the rank.");
                         }
                     });
+
+                    // Fetch budgeted salary and allowances for selected position
+                    $.ajax({
+                        url: '{{route("resort.vacancies.getstatus")}}',
+                        method: 'POST',
+                        data: {
+                            position_id: positionId,
+                            requested_vacancy: 1
+                        },
+                        success: function(response) {
+                            if (response.budgeted_salary > 0) {
+                                $('#txt-budgeted-salary-display').val(response.budgeted_salary);
+                            } else {
+                                $('#txt-budgeted-salary-display').val('—');
+                            }
+                            $('#budgeted-salary-container').show();
+
+                            var allowanceHtml = '';
+                            if (response.all_allowances && response.all_allowances.length > 0) {
+                                allowanceHtml = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Particulars</th><th>Amount</th></tr></thead><tbody>';
+                                response.all_allowances.forEach(function(item) {
+                                    var displayAmt = item.unit === '%'
+                                        ? item.raw_amount + '% (' + item.amount + ')'
+                                        : item.amount;
+                                    allowanceHtml += '<tr><td>' + item.name + '</td><td>' + displayAmt + '</td></tr>';
+                                });
+                                allowanceHtml += '</tbody></table>';
+                            } else {
+                                allowanceHtml = '<span class="text-muted">No allowances configured</span>';
+                            }
+                            $('#allowance-list').html(allowanceHtml);
+                            $('#budgeted-allowance-container').show();
+                        }
+                    });
                 } else {
-                    $('#txt-rank').val(''); // Clear rank field if no position selected
+                    $('#txt-rank').val('');
                     $('#rank_id').val('');
+                    $('#budgeted-salary-container').hide();
+                    $('#budgeted-allowance-container').hide();
                 }
             });
 
@@ -513,6 +559,13 @@
                 submitHandler: function(form) {
                     // Check if Save As Draft was clicked
                     var isDraft = $('#draft-status-input').length > 0;
+
+                    // Validate at least one recruitment checkbox is selected (skip for drafts)
+                    if (!isDraft && $('input[name="recruitement[]"]:checked').length === 0) {
+                        toastr.error('Please select at least one recruitment method.');
+                        return false;
+                    }
+
                     if (isDraft) {
                         // Override status to Draft
                         $('input[name="status"]').prop('checked', false);
@@ -622,6 +675,32 @@
                         $('#txt-acommocation2').val(response.accommodation);
                         $('#txt-Insurance').val(response.insurance);
 
+                        // Show budgeted salary and allowances for the selected position
+                        if (response.budgeted_salary > 0) {
+                            $('#txt-budgeted-salary-display').val(response.budgeted_salary);
+                            $('#budgeted-salary-container').show();
+                        } else {
+                            $('#txt-budgeted-salary-display').val('—');
+                            $('#budgeted-salary-container').show();
+                        }
+
+                        var allowanceHtml = '';
+                        if (response.all_allowances && response.all_allowances.length > 0) {
+                            allowanceHtml = '<table class="table table-sm table-bordered mb-0"><thead><tr><th>Particulars</th><th>Amount</th></tr></thead><tbody>';
+                            response.all_allowances.forEach(function(item) {
+                                var displayAmt = item.unit === '%'
+                                    ? item.raw_amount + '% (' + item.amount + ')'
+                                    : item.amount;
+                                allowanceHtml += '<tr><td>' + item.name + '</td><td>' + displayAmt + '</td></tr>';
+                            });
+                            allowanceHtml += '</tbody></table>';
+                            $('#allowance-list').html(allowanceHtml);
+                            $('#budgeted-allowance-container').show();
+                        } else {
+                            $('#allowance-list').html('<span class="text-muted">No allowances configured</span>');
+                            $('#budgeted-allowance-container').show();
+                        }
+
                         // Show manning info
                         var infoHtml = 'Approved: ' + response.headcount +
                             ' | Filled: ' + response.filledcount +
@@ -668,6 +747,8 @@
                     } else {
                         $('#vacancy-validation-msg').hide();
                         $('#vacancy-manning-info').hide();
+                        $('#budgeted-salary-container').hide();
+                        $('#budgeted-allowance-container').hide();
                         $(self).removeClass('is-invalid');
                     }
                 }, 400); // 400ms debounce
@@ -682,6 +763,8 @@
                 } else {
                     $('#vacancy-validation-msg').hide();
                     $('#vacancy-manning-info').hide();
+                    $('#budgeted-salary-container').hide();
+                    $('#budgeted-allowance-container').hide();
                 }
             });
 
