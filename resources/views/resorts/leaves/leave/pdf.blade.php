@@ -69,18 +69,18 @@
         <div class="empDetails-leave mb-4">
             <div class="card-title">
                 <div class="row g-2 align-items-center">
-                        @php $total_leaves_allocated = 0 ;$total_taken_laves = 0; @endphp
+                        @php $total_leaves_allocated = 0; $total_leaves_available = 0; @endphp
                         @if($leaveBalances)
                             @foreach($leaveBalances as $leaves)
                                 @php 
                                     $total_leaves_allocated = $total_leaves_allocated +  $leaves->allocated_days;
-                                    $total_taken_laves = $total_taken_laves +  $leaves->available_days;
+                                    $total_leaves_available = $total_leaves_available + ($leaves->available_days ?? $leaves->allocated_days);
                                 @endphp   
                             @endforeach
                         @endif
                         <div class="col-auto ms-auto" style="margin-left: auto !important;text-align: right;">
                             <div style="padding: 12px 14px;background: #F5F8F8; border-radius: 15px;display:ruby-text;">
-                            <p>Total Leave Balance: {{ $total_taken_laves }}/<span>{{ $total_leaves_allocated }}</span></p>
+                            <p style="margin:0;">Total Leave Balance: {{ $total_leaves_available }}/<span>{{ $total_leaves_allocated }}</span></p>
                             </div>
                         </div>
                 </div>
@@ -100,7 +100,7 @@
                         @foreach($leaveBalances as $index => $child)
                             @if($index % 2 == 0)<tr>@endif
                             <td>{{ $child->leave_type ?? 'N/A' }}</td>
-                            <td>{{ $child->used_days }} / {{ $child->allocated_days }}</td>
+                            <td>{{ $child->used_days }} / {{ $child->available_days ?? $child->allocated_days }}</td>
                             @if($index % 2 == 1 || $index == $leaveBalances->count() - 1)</tr>@endif
                         @endforeach
                     @else

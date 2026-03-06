@@ -628,10 +628,12 @@ class EmployeeController extends Controller
                             'lc.leave_type',
                             'lc.color',
                             'lc.leave_category',
-                            'lc.combine_with_other','lc.id as leave_cat_id'
+                            'lc.combine_with_other',
+                'lc.carry_forward',
+                'lc.carry_max',
+                'lc.id as leave_cat_id'
                         )
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                        ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
                         ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                         ->where('lc.resort_id', $this->resort->resort_id)
                         ->where(function ($query) use ($religion) {
@@ -643,7 +645,6 @@ class EmployeeController extends Controller
 
                             })
 
-                        ->groupBy('lc.id')
                         ->get()
                         ->map(function ($i) use ($id) {
                             $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
@@ -651,6 +652,7 @@ class EmployeeController extends Controller
                             $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
                             return $i;
             });
+            $leave_categories = $this->addLeaveAvailableWithCarryForward($leave_categories, $id);
             $currentMonthDays = Carbon::now()->daysInMonth;
 
             $previousDay = Carbon::yesterday()->toDateString(); // Format: 'YYYY-MM-DD'
@@ -906,21 +908,62 @@ class EmployeeController extends Controller
         return isset($total_leave_days) ? $total_leave_days:0;
     }
 
+    /**
+     * Add available_days (including carry forward) to each leave category item for time-and-attendance employee details.
+     */
+    private function addLeaveAvailableWithCarryForward($leave_categories, $emp_id)
+    {
+        $lastYearStart = Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+        $lastYearEnd = Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
+        return $leave_categories->map(function ($i) use ($emp_id, $lastYearStart, $lastYearEnd) {
+            $allocated = (int) ($i->allocated_days ?? 0);
+            $usedThisYear = (int) ($i->ThisYearOfused_days ?? 0);
+            $available = max(0, $allocated - $usedThisYear);
+            $carryForwardEnabled = !empty($i->carry_forward) && $i->carry_forward != '0';
+            if ($carryForwardEnabled) {
+                $lastYearUsed = (int) DB::table('employees_leaves')
+                    ->where('emp_id', $emp_id)
+                    ->where('leave_category_id', $i->leave_cat_id)
+                    ->where('status', 'Approved')
+                    ->where(function ($q) use ($lastYearStart, $lastYearEnd) {
+                        $q->whereBetween('from_date', [$lastYearStart, $lastYearEnd])
+                            ->orWhereBetween('to_date', [$lastYearStart, $lastYearEnd]);
+                    })
+                    ->sum('total_days');
+                $unused = max($allocated - $lastYearUsed, 0);
+                $carryMax = isset($i->carry_max) && $i->carry_max !== null && $i->carry_max !== '' ? (int) $i->carry_max : null;
+                $carryForward = $carryMax !== null ? min($unused, $carryMax) : $unused;
+                $available += $carryForward;
+            }
+            $i->available_days = max(0, $available);
+            return $i;
+        });
+    }
+
     public function EmpDetailsPrint(Request $request)
     {
+        $id = $request->emp_id;
+        if (empty($id)) {
+            return redirect()->route('resort.timeandattendance.employee')->with('error', 'Please open the print page from Employee Details using the Download button.');
+        }
+
         $dates = isset($request->hiddenInput) ? explode("-", $request->hiddenInput) : null;
-        $monthStartingDate = isset($dates[0])
-            ? Carbon::createFromFormat('d/m/Y', $dates[0])->format('Y-m-d') // Correct date format for the '03/01/2025' format
-            : Carbon::now()->startOfMonth()->format('Y-m-d'); // Default to the start of the month
-        $monthEndingDate = isset($dates[1])
-            ? Carbon::createFromFormat('d/m/Y', $dates[1])->format('Y-m-d') // Correct date format for the '03/01/2025' format
-            : Carbon::now()->endOfMonth()->format('Y-m-d'); // Default to the end of the month
+        if ($dates && count($dates) >= 2) {
+            $monthStartingDate = Carbon::createFromFormat('d/m/Y', trim($dates[0]))->format('Y-m-d');
+            $monthEndingDate = Carbon::createFromFormat('d/m/Y', trim($dates[1]))->format('Y-m-d');
+        } elseif ($request->start_date && $request->end_date) {
+            $monthStartingDate = Carbon::parse($request->start_date)->format('Y-m-d');
+            $monthEndingDate = Carbon::parse($request->end_date)->format('Y-m-d');
+        } else {
+            $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $monthEndingDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+        }
+
         $page_title = "Employee Details";
         $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank;
         $currentMonthDays = Carbon::now()->daysInMonth;
-           $currentDate = Carbon::now();
-        $id =$request->emp_id;
+        $currentDate = Carbon::now();
             $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
                 ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
@@ -1076,34 +1119,34 @@ class EmployeeController extends Controller
                         ->first();
 
                 $TotalSum=0;
-                 $leave_categories = ResortBenifitGridChild::select(
-                'resort_benefit_grid_child.*',
-                            'lc.leave_type',
-                            'lc.color',
-                            'lc.leave_category',
-                            'lc.combine_with_other','lc.id as leave_cat_id'
-                        )
-                        ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                        ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
-                        ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
-                        ->where('lc.resort_id', $this->resort->resort_id)
-                        ->where(function ($query) use ($religion) {
-                                $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
-                                    ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
-                                if ($religion == 'muslim') {
-                                    $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
-                                }
-
-                            })
-
-                        ->groupBy('lc.id')
-                        ->get()
-                        ->map(function ($i) use ($id) {
-                            $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
-                            $i->leave_category = isset($i->leave_category) && $i->leave_category != "" ? $i->leave_category : 0;
-                            $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
-                            return $i;
-            });
+                $leave_categories = ResortBenifitGridChild::select(
+                    'resort_benefit_grid_child.*',
+                    'lc.leave_type',
+                    'lc.color',
+                    'lc.leave_category',
+                    'lc.combine_with_other',
+                    'lc.carry_forward',
+                    'lc.carry_max',
+                    'lc.id as leave_cat_id'
+                )
+                    ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
+                    ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+                    ->where('lc.resort_id', $this->resort->resort_id)
+                    ->where(function ($query) use ($religion) {
+                        $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
+                            ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
+                        if ($religion == 'muslim') {
+                            $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
+                        }
+                    })
+                    ->get()
+                    ->map(function ($i) use ($id) {
+                        $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
+                        $i->leave_category = isset($i->leave_category) && $i->leave_category != '' ? $i->leave_category : 0;
+                        $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
+                        return $i;
+                    });
+                $leave_categories = $this->addLeaveAvailableWithCarryForward($leave_categories, $id);
                 $TotalSum = $leave_categories->sum('ThisYearOfused_days');
 
 
@@ -1627,10 +1670,12 @@ class EmployeeController extends Controller
                             'lc.leave_type',
                             'lc.color',
                             'lc.leave_category',
-                            'lc.combine_with_other','lc.id as leave_cat_id'
+                            'lc.combine_with_other',
+                'lc.carry_forward',
+                'lc.carry_max',
+                'lc.id as leave_cat_id'
                         )
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                        ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
                         ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                         ->where('lc.resort_id', $this->resort->resort_id)
                         ->where(function ($query) use ($religion) {
@@ -1642,7 +1687,6 @@ class EmployeeController extends Controller
 
                             })
 
-                        ->groupBy('lc.id')
                         ->get()
                         ->map(function ($i) use ($id) {
                             $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
@@ -1832,6 +1876,11 @@ public function attandanceHisotryExport(Request $request)
     $end   = $request->end_date;
     $id    = $request->id;
 
+    if (empty($id) || empty($start) || empty($end)) {
+        return redirect()->route('resort.timeandattendance.employee')
+            ->with('error', 'Export requires employee and date range. Please use Export CSV from the employee details print page.');
+    }
+
     // ===============================
     // 1️⃣ Single Merged Query
     // ===============================
@@ -1848,6 +1897,7 @@ public function attandanceHisotryExport(Request $request)
             'pa.date',
             'pa.CheckingTime',
             'pa.CheckingOutTime',
+            'pa.DayWiseTotalHours',
             'pa.OverTime',
             'pa.Status',
             'ss.ShiftName',
@@ -1861,16 +1911,7 @@ public function attandanceHisotryExport(Request $request)
         )
         ->get();
 
-    if ($AttendanceHistroy->isEmpty()) {
-        return back()->with('error', 'No attendance records found.');
-    }
-
-    // ===============================
-    // 2️⃣ CSV Settings
-    // ===============================
-
     $filename = "Attendance_Report_" . date('M_Y') . ".csv";
-
     $headers = [
         "Content-type"        => "text/csv",
         "Content-Disposition" => "attachment; filename=$filename",
@@ -1879,8 +1920,19 @@ public function attandanceHisotryExport(Request $request)
         "Expires"             => "0"
     ];
 
+    if ($AttendanceHistroy->isEmpty()) {
+        $callback = function() use ($start, $end) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['No attendance records found for the selected period.']);
+            fputcsv($file, ['Start Date:', $start]);
+            fputcsv($file, ['End Date:', $end]);
+            fclose($file);
+        };
+        return response()->stream($callback, 200, $headers);
+    }
+
     // ===============================
-    // 3️⃣ CSV Stream
+    // 2️⃣ CSV Stream (with data)
     // ===============================
 
     $callback = function() use ($AttendanceHistroy) {
@@ -1903,6 +1955,7 @@ public function attandanceHisotryExport(Request $request)
             'Shift',
             'Check In Time',
             'Check Out Time',
+            'Total Hours',
             'Over Time',
             'Status'
         ]);
@@ -1911,12 +1964,12 @@ public function attandanceHisotryExport(Request $request)
 
             $date = Carbon::parse($row->date)->format('d M Y');
 
-            $checkIn = $row->CheckingTime 
-                ? Carbon::parse($row->CheckingTime)->format('h:i A') 
+            $checkIn = $row->CheckingTime
+                ? Carbon::parse($row->CheckingTime)->format('h:i A')
                 : '-';
 
-            $checkOut = $row->CheckingOutTime 
-                ? Carbon::parse($row->CheckingOutTime)->format('h:i A') 
+            $checkOut = $row->CheckingOutTime
+                ? Carbon::parse($row->CheckingOutTime)->format('h:i A')
                 : '-';
 
             fputcsv($file, [
@@ -1924,6 +1977,7 @@ public function attandanceHisotryExport(Request $request)
                 ucfirst($row->ShiftName),
                 $checkIn,
                 $checkOut,
+                $row->DayWiseTotalHours ?? '-',
                 $row->OverTime ?? '-',
                 $row->Status
             ]);

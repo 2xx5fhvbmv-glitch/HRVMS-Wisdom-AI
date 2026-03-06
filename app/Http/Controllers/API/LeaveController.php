@@ -329,6 +329,27 @@ class LeaveController extends Controller
                 $pendingDays                            =   $pendingLeaves;
                 $availableDays                          =   $allocatedDays - $usedDays - $pendingDays;
 
+                // Carry forward when leave is eligible and not used by employee (unused from last year)
+                $apiAddCarryEnabled                     =   !empty($leaveCategory->carry_forward) && $leaveCategory->carry_forward != '0';
+                if ($apiAddCarryEnabled) {
+                    $apiAddLastYearStart                =   Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+                    $apiAddLastYearEnd                  =   Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
+                    $apiAddLastYearUsed                 =   DB::table('employees_leaves')
+                        ->select(DB::raw('SUM(total_days) as used_days'))
+                        ->where('emp_id', $emp_id)
+                        ->where('leave_category_id', $categoryId)
+                        ->where('status', 'Approved')
+                        ->where(function ($query) use ($apiAddLastYearStart, $apiAddLastYearEnd) {
+                            $query->whereBetween('from_date', [$apiAddLastYearStart, $apiAddLastYearEnd])
+                                ->orWhereBetween('to_date', [$apiAddLastYearStart, $apiAddLastYearEnd]);
+                        })
+                        ->value('used_days') ?? 0;
+                    $apiAddUnused                       =   max($allocatedDays - $apiAddLastYearUsed, 0);
+                    $apiAddCarryMax                     =   isset($leaveCategory->carry_max) && $leaveCategory->carry_max !== null && $leaveCategory->carry_max !== '' ? (int) $leaveCategory->carry_max : null;
+                    $apiAddCarryForward                 =   $apiAddCarryMax !== null ? min($apiAddUnused, $apiAddCarryMax) : $apiAddUnused;
+                    $availableDays                      +=  $apiAddCarryForward;
+                }
+
                 // Check if the requested leave exceeds the available days
                 if ($totalDays > $availableDays) {
                     return response()->json([
@@ -929,9 +950,14 @@ class LeaveController extends Controller
                                                                     'lc.id as leave_category_id',
                                                                     'lc.leave_type',
                                                                     'lc.color',
+                                                                    'lc.carry_forward',
+                                                                    'lc.carry_max',
                                                                     'rbgc.allocated_days'
                                                                 )
                                                                 ->get();
+
+                    $apiLastYearStart                   =   Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+                    $apiLastYearEnd                     =   Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
 
                     // Calculate total leaves taken for each category for the current year
                     $currentYearStart                   =   Carbon::now()->startOfYear()->format('Y-m-d');
@@ -951,11 +977,30 @@ class LeaveController extends Controller
 
                     if($leaveUsage) {
 
-                        // Combine leave balances and usage
-                        $leaveBalances                  =   $benefit_grids->map(function ($grid) use ($leaveUsage) {
-                            $usedDays                   =   (int) ($leaveUsage->get($grid->leave_category_id)->used_days ?? 0);
+                        // Combine leave balances and usage (carry forward when leave is eligible and not used by employee)
+                        $leaveBalances                  =   $benefit_grids->map(function ($grid) use ($leaveUsage, $emp_id, $apiLastYearStart, $apiLastYearEnd) {
+                            $usageRow                   =   $leaveUsage->get($grid->leave_category_id);
+                            $usedDays                   =   $usageRow ? (int) $usageRow->used_days : 0;
                             $grid->used_days            =   $usedDays;
-                            $grid->available_days       =   $grid->allocated_days - $usedDays;
+                            $available                 =   $grid->allocated_days - $usedDays;
+                            $apiCarryEnabled            =   !empty($grid->carry_forward) && $grid->carry_forward != '0';
+                            if ($apiCarryEnabled) {
+                                $lastYearUsed           =   DB::table('employees_leaves')
+                                                                    ->select(DB::raw('SUM(total_days) as used_days'))
+                                                                    ->where('emp_id', $emp_id)
+                                                                    ->where('leave_category_id', $grid->leave_category_id)
+                                                                    ->where('status', 'Approved')
+                                                                    ->where(function ($query) use ($apiLastYearStart, $apiLastYearEnd) {
+                                                                        $query->whereBetween('from_date', [$apiLastYearStart, $apiLastYearEnd])
+                                                                            ->orWhereBetween('to_date', [$apiLastYearStart, $apiLastYearEnd]);
+                                                                    })
+                                                                    ->value('used_days') ?? 0;
+                                $unused                 =   max($grid->allocated_days - $lastYearUsed, 0);
+                                $carryMax               =   isset($grid->carry_max) && $grid->carry_max !== null && $grid->carry_max !== '' ? (int) $grid->carry_max : null;
+                                $carryForward           =   $carryMax !== null ? min($unused, $carryMax) : $unused;
+                                $available              +=  $carryForward;
+                            }
+                            $grid->available_days       =   max(0, $available);
                             return $grid;
                         });
 
@@ -1975,6 +2020,27 @@ class LeaveController extends Controller
 
                 $usedDays                               =   $leaveUsage->used_days ?? 0;
                 $availableDays                          =   $allocatedDays - $usedDays;
+
+                // Carry forward when leave is eligible and not used by employee (unused from last year)
+                $apiCarryForwardEnabled                 =   !empty($leaveCategory->carry_forward) && $leaveCategory->carry_forward != '0';
+                if ($apiCarryForwardEnabled) {
+                    $apiLastYearStartApply              =   Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+                    $apiLastYearEndApply                =   Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
+                    $apiLastYearUsed                    =   DB::table('employees_leaves')
+                        ->select(DB::raw('SUM(total_days) as used_days'))
+                        ->where('emp_id', $emp_id)
+                        ->where('leave_category_id', $categoryId)
+                        ->where('status', 'Approved')
+                        ->where(function ($query) use ($apiLastYearStartApply, $apiLastYearEndApply) {
+                            $query->whereBetween('from_date', [$apiLastYearStartApply, $apiLastYearEndApply])
+                                ->orWhereBetween('to_date', [$apiLastYearStartApply, $apiLastYearEndApply]);
+                        })
+                        ->value('used_days') ?? 0;
+                    $apiUnused                          =   max($allocatedDays - $apiLastYearUsed, 0);
+                    $apiCarryMax                        =   isset($leaveCategory->carry_max) && $leaveCategory->carry_max !== null && $leaveCategory->carry_max !== '' ? (int) $leaveCategory->carry_max : null;
+                    $apiCarryForward                    =   $apiCarryMax !== null ? min($apiUnused, $apiCarryMax) : $apiUnused;
+                    $availableDays                      +=  $apiCarryForward;
+                }
 
                 // Check if the requested leave exceeds the available days for the category
                 if ($totalDays > $availableDays) {
