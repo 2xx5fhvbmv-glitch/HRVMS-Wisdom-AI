@@ -609,14 +609,22 @@ class DutyRosterController extends Controller
             else
             {
                 DB::beginTransaction();
+                    // Normalize overtime to HH:MM (store on duty_roster_entries so view shows it)
+                    $overtimeValue = '00:00';
+                    if (!empty($Overtime) && is_string($Overtime)) {
+                        $Overtime = trim($Overtime);
+                        if (preg_match('/^(\d{1,2}):(\d{2})$/', $Overtime, $m)) {
+                            $overtimeValue = sprintf('%02d:%02d', (int)$m[1], (int)$m[2]);
+                        }
+                    }
+
                     $DutyRosterEntry = DutyRosterEntry::updateOrCreate(['id'=>$Attd_id],[
                         "Shift_id"=>$Shift,
                         "DayWiseTotalHours"=>$DayWiseTotalHours,
-                        // "Status"=>"DayOff"
-
+                        "OverTime"=>$overtimeValue,
                     ]);
 
-                    // Handle overtime from employee_overtimes table
+                    // Handle overtime from employee_overtimes table (for reporting/payroll)
                     if ($DutyRosterEntry && $Overtime) {
                         $resort_id = $this->resort->resort_id;
                         $Emp_id = $DutyRosterEntry->Emp_id;
