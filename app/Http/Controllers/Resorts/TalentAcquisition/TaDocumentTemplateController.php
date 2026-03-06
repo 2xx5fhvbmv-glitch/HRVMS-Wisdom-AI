@@ -71,8 +71,31 @@ class TaDocumentTemplateController extends Controller
             ->addColumn('action', function ($row) {
                 $deleteBtn = '<a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="' . $row->id . '"><img src="' . asset('resorts_assets/images/trash-red.svg') . '" alt="Delete" class="img-fluid" /></a>';
                 $downloadBtn = '';
-                if ($row->file_path && Storage::disk('public')->exists($row->file_path)) {
-                    $downloadBtn = '<a href="' . asset('storage/' . $row->file_path) . '" download class="btn-lg-icon icon-bg-green me-1"><i class="fa-solid fa-download"></i></a>';
+                if ($row->file_path) {
+                    $downloadUrl = null;
+                    $configDisk = config('filesystems.default', 'local');
+                    $disk = Storage::disk($configDisk);
+                    try {
+                        if ($disk->exists($row->file_path)) {
+                            if (method_exists($disk, 'temporaryUrl') && $configDisk === 's3') {
+                                $downloadUrl = $disk->temporaryUrl($row->file_path, now()->addMinutes(30));
+                            } else {
+                                $downloadUrl = $disk->url($row->file_path);
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                    if (!$downloadUrl && Storage::disk('public')->exists($row->file_path)) {
+                        $downloadUrl = asset('storage/' . $row->file_path);
+                    }
+                    if (!$downloadUrl && file_exists(public_path($row->file_path))) {
+                        $downloadUrl = asset($row->file_path);
+                    }
+                    if (!$downloadUrl && Storage::disk('local')->exists('public/' . $row->file_path)) {
+                        $downloadUrl = url('storage/' . $row->file_path);
+                    }
+                    if ($downloadUrl) {
+                        $downloadBtn = '<a href="' . $downloadUrl . '" download class="btn-lg-icon icon-bg-green me-1"><i class="fa-solid fa-download"></i></a>';
+                    }
                 }
                 return '<div class="d-flex align-items-center">' . $downloadBtn . $deleteBtn . '</div>';
             })
@@ -180,9 +203,18 @@ class TaDocumentTemplateController extends Controller
             $wasDefault = $template->is_default;
             $type = $template->type;
 
-            // Delete file from storage
-            if ($template->file_path && Storage::disk('public')->exists($template->file_path)) {
-                Storage::disk('public')->delete($template->file_path);
+            // Delete file from storage (check configured disk first, then fallbacks)
+            if ($template->file_path) {
+                $configDisk = config('filesystems.default', 'local');
+                $disk = Storage::disk($configDisk);
+                try {
+                    if ($disk->exists($template->file_path)) {
+                        $disk->delete($template->file_path);
+                    }
+                } catch (\Exception $e) {}
+                if (Storage::disk('public')->exists($template->file_path)) {
+                    Storage::disk('public')->delete($template->file_path);
+                }
             }
 
             $template->delete();

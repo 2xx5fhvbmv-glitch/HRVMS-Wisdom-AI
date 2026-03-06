@@ -43,6 +43,29 @@ class ApplicantController extends Controller
         $page_title = 'Job Applicant Form';
         $source = base64_decode($request->get('source'));
 
+        // Auto-detect source from referrer if no source param provided
+        if (empty($source)) {
+            $referrer = $request->headers->get('referer', '');
+            $referrerMap = [
+                'facebook.com' => 'Facebook',
+                'fb.com' => 'Facebook',
+                'instagram.com' => 'Instagram',
+                'linkedin.com' => 'LinkedIn',
+                'twitter.com' => 'Twitter',
+                'x.com' => 'Twitter',
+                'indeed.com' => 'Indeed',
+            ];
+            foreach ($referrerMap as $domain => $sourceName) {
+                if (stripos($referrer, $domain) !== false) {
+                    $source = $sourceName;
+                    break;
+                }
+            }
+            if (empty($source)) {
+                $source = 'Direct';
+            }
+        }
+
         $resort_id_de = base64_decode($id);
 
         $get_ids = explode("/", $resort_id_de);
@@ -149,7 +172,7 @@ class ApplicantController extends Controller
                 'mobile_number' => 'required|string|max:20',
                 'email' => 'required|email|max:150',
                 'marital_status' => 'required',
-                'number_of_children' => 'required|integer|min:0',
+                'number_of_children' => 'nullable|integer|min:0',
                 'address_line_one' => 'required|string|max:255',
                 'country' => 'required|integer|exists:countries,id',
                 'city' => 'required|string|max:100',
@@ -210,7 +233,23 @@ class ApplicantController extends Controller
             $applicant->NotiesPeriod = $request->notice_period;
             $applicant->SalaryExpectation = $request->expected_salary;
             $applicant->TimeZone = $timezone[0];
-            $applicant->Applicant_Source = $request->source;
+
+            // Resolve Applicant_Source to hiring_sources ID
+            $sourceValue = $request->source;
+            if (!empty($sourceValue)) {
+                if (is_numeric($sourceValue)) {
+                    $applicant->Applicant_Source = $sourceValue;
+                } else {
+                    // Source is a name (e.g. "Facebook", "Direct") - find or create
+                    $defaultColours = ['Facebook' => '#1877F2', 'Instagram' => '#E4405F', 'LinkedIn' => '#0A66C2', 'Twitter' => '#1DA1F2', 'Indeed' => '#003A9B', 'Direct' => '#6c757d'];
+                    $hiringSource = \App\Models\HiringSource::firstOrCreate(
+                        ['resort_id' => $request->resort_id, 'source_name' => $sourceValue],
+                        ['colour' => $defaultColours[$sourceValue] ?? '#' . substr(md5($sourceValue), 0, 6)]
+                    );
+                    $applicant->Applicant_Source = $hiringSource->id;
+                }
+            }
+
             $applicant->save(); // Save applicant data first to get ID
 
 
@@ -263,6 +302,13 @@ class ApplicantController extends Controller
                 $file = $request->file('full_length_photo');
                 $aws= Common::ApplicantWiseStorefileaws($request->resort_id, $vacancy_id,$file);
                 $applicant->full_length_photo = $aws['path']; // Save relative file path
+            }
+
+            // Handle Other Document Upload
+            if ($request->hasFile('other_document')) {
+                $file = $request->file('other_document');
+                $aws= Common::ApplicantWiseStorefileaws($request->resort_id, $vacancy_id,$file);
+                $applicant->other_document = $aws['path'];
             }
 
             // Save updated file paths
