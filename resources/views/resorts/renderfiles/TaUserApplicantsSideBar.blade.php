@@ -138,7 +138,25 @@
                             </tr>
                             <tr>
                                 <th>Experience:</th>
-                                <td>{{ $Applicant_form_data->Total_Experiance }}</td>
+                                <td>
+                                    @php
+                                        $totalExp = $Applicant_form_data->Total_Experiance ?? 0;
+                                        if ($totalExp >= 1) {
+                                            $years = floor($totalExp);
+                                            $months = round(($totalExp - $years) * 12);
+                                            $expDisplay = $years . ' ' . ($years == 1 ? 'year' : 'years');
+                                            if ($months > 0) {
+                                                $expDisplay .= ' ' . $months . ' ' . ($months == 1 ? 'month' : 'months');
+                                            }
+                                        } elseif ($totalExp > 0) {
+                                            $months = round($totalExp * 12);
+                                            $expDisplay = $months . ' ' . ($months == 1 ? 'month' : 'months');
+                                        } else {
+                                            $expDisplay = '0 years';
+                                        }
+                                    @endphp
+                                    {{ $expDisplay }}
+                                </td>
                             </tr>
                             <tr>
                                 <th>Passport No.:</th>
@@ -153,12 +171,12 @@
                                 <td>{{ $Applicant_form_data->Education }}</td>
                             </tr>
                             <tr>
-                                <th>Current Address:</th>
-                                <td>{{ $Applicant_form_data->address_line_one }} {{ $Applicant_form_data->state}} {{ $Applicant_form_data->city}} {{$Applicant_form_data->pin_code }}</td>
+                                <th>Address Line 1:</th>
+                                <td>{{ $Applicant_form_data->address_line_one }} {{ $Applicant_form_data->city}} {{ $Applicant_form_data->state}} {{$Applicant_form_data->pin_code }}</td>
                             </tr>
                             <tr>
-                                <th>Permanent Address:</th>
-                                <td>{{ $Applicant_form_data->address_line_two }} {{ $Applicant_form_data->state}} {{ $Applicant_form_data->city}} {{$Applicant_form_data->pin_code }}</td>
+                                <th>Address Line 2:</th>
+                                <td>{{ $Applicant_form_data->address_line_two }} {{ $Applicant_form_data->city}} {{ $Applicant_form_data->state}} {{$Applicant_form_data->pin_code }}</td>
                             </tr>
                             <tr>
                                 <th>Current Employment Status:</th>
@@ -492,7 +510,11 @@
                                     @csrf
                                     <input type="hidden" value="{{ base64_encode($Applicant_form_data->ApplicantID) }}" id="Applicant_id" name="Applicant_id">
                                     <div class="textarea-icon mt-2 mb-3">
-                                        <textarea rows="9" name="ApplicantNote" class="form-control" placeholder="Type Here">{{ $Applicant_form_data->notes }}</textarea>
+                                        @php
+                                            $notesData = json_decode($Applicant_form_data->notes, true);
+                                            $currentUserNote = is_array($notesData) ? ($notesData[$currentUserId] ?? '') : '';
+                                        @endphp
+                                        <textarea rows="9" name="ApplicantNote" class="form-control" placeholder="Type Here">{{ $currentUserNote }}</textarea>
                                         <img src="{{ URL::asset('resorts_assets/images/textarea-icon.svg') }}" alt="icon">
                                     </div>
                                     <div>
@@ -507,15 +529,7 @@
                                     @csrf
                                     <div class=" mb-3">
                                     <input type="hidden" name="Applicant_id" value="{{base64_encode($Applicant_form_data->ApplicantStatusID) }}">
-                                        @if($interviewer=="HOD Round" ||  $interviewer=="HR Round" || $interviewer=="GM Round" || $interviewer=="Interviewer")
-
-                                        <?php $comments ='' ; ?>
-                                        @else
-
-                                        <?php  $comments =$Applicant_form_data->Comments ; ?>
-                                        @endif
-
-                                        <textarea rows="4" name="Comment" class="form-control"  placeholder="Type Here">{{ $comments }}</textarea>
+                                        <textarea rows="4" name="Comment" class="form-control" placeholder="Type your comment here..."></textarea>
                                     </div>
                                     <div>
                                         <button type="submit" class="btn btn-themeSkyblue btn-sm">Submit</button>
@@ -548,7 +562,7 @@
                                 <th>Department:</th>
                                 <td>{{ $Applicant_form_data->DepartmentName}}</td>
                             </tr>
-                            @if($Applicant_form_data->InterViewDate)
+                            @if($Applicant_form_data->InterViewDate && $Applicant_form_data->InterViewDate != '0000-00-00' && strtotime($Applicant_form_data->InterViewDate) > 0)
                             <tr>
                                 <th>Interview Date & Time:</th>
                                 <td>{{ date('d/M/Y',strtotime($Applicant_form_data->InterViewDate)) }} -  <b>Applicant Time </b> :-{{ $Applicant_form_data->ApplicantInterviewtime}}  :   <b>Maldivan Time</b>:-{{ $Applicant_form_data->ResortInterviewtime}} </td>
@@ -583,7 +597,18 @@
                                                     Comments</a>
                                             </div>
                                         </div>
-                                        <div class="userAppInt-commBlock">{{ $interview->Comments}} </div>
+                                        <div class="userAppInt-commBlock">
+                                            @php
+                                                $parsedComments = json_decode($interview->Comments, true);
+                                            @endphp
+                                            @if(is_array($parsedComments) && isset($parsedComments[0]))
+                                                @foreach($parsedComments as $pc)
+                                                    <div class="mb-1"><strong>{{ $pc['name'] ?? '' }}:</strong> {{ $pc['comment'] ?? '' }}</div>
+                                                @endforeach
+                                            @elseif(!empty($interview->Comments))
+                                                {{ $interview->Comments }}
+                                            @endif
+                                        </div>
                                         @if( $interview->status=="Round" || $interview->status=="Sortlisted" || $interview->As_ApprovedBy==3 && $interview->status=="Complete")
                                         <div class="mb-2">
                                             <span class="text-medium">Scheduled Interview:</span>
@@ -637,32 +662,50 @@
                         <!-- <a target="_blank" href="{{ route('interview-assessment.viewResponse', ['formId' => $response->form_id, 'responseId' => $response->id]) }}" class="a-link mx-auto">{{ $availableRank }} Interview Assessment</a> -->
                     @endforeach
                 @endif
-                @if(!empty($Applicant_form_data->notes) && (is_null($Applicant_form_data->notes_by) || $Applicant_form_data->notes_by == $currentUserId))
-                <div class="intUserApp-block mt-3">
+                @php
+                    $allNotes = json_decode($Applicant_form_data->notes, true);
+                    // Handle legacy plain text notes
+                    if (!is_array($allNotes)) {
+                        $allNotes = !empty($Applicant_form_data->notes) ? [$currentUserId => $Applicant_form_data->notes] : [];
+                    }
+                    $myNote = $allNotes[$currentUserId] ?? null;
+                @endphp
+                @if(!empty($myNote))
+                <div class="intUserApp-block mt-3 notes-display-block">
                     <h6>Notes:</h6>
-                    <p>{{ $Applicant_form_data->notes }}</p>
+                    <p>{{ $myNote }}</p>
                 </div>
                 @endif
 
                 @php
-                    $hasComments = !empty($Applicant_form_data->Comments);
-                    $hasInterviewComments = $InterviewComments->contains(function($c) { return !empty($c->Comments); });
+                    // Collect all comments from interview round status records only
+                    $allComments = [];
+                    foreach ($InterviewComments as $ic) {
+                        if (!empty($ic->Comments)) {
+                            $decoded = json_decode($ic->Comments, true);
+                            if (is_array($decoded) && isset($decoded[0])) {
+                                foreach ($decoded as $c) {
+                                    if (empty($c['name'])) $c['name'] = $ic->rank_name;
+                                    $allComments[] = $c;
+                                }
+                            } else {
+                                $allComments[] = ['name' => $ic->rank_name, 'comment' => $ic->Comments];
+                            }
+                        }
+                    }
                 @endphp
-                @if($hasComments || $hasInterviewComments)
-                <div class="intUserApp-block mt-3">
+                @if(!empty($allComments))
+                <div class="intUserApp-block mt-3 comments-display-block">
                     <h6>Comments:</h6>
-                    @if($hasComments)
+                    @foreach($allComments as $c)
                     <div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;">
-                        <p class="mb-0">{{ $Applicant_form_data->Comments }}</p>
-                    </div>
-                    @endif
-                    @foreach($InterviewComments as $comment)
-                        @if(!empty($comment->Comments))
-                        <div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;">
-                            <span class="text-medium">{{ $comment->rank_name }}:</span>
-                            <p class="mb-0">{{ $comment->Comments }}</p>
-                        </div>
+                        @if(!empty($c['name']))
+                            <span class="text-medium">{{ $c['name'] }}:</span>
+                        @elseif(!empty($c['rank_name']))
+                            <span class="text-medium">{{ $c['rank_name'] }}:</span>
                         @endif
+                        <p class="mb-0">{{ $c['comment'] ?? '' }}</p>
+                    </div>
                     @endforeach
                 </div>
                 @endif

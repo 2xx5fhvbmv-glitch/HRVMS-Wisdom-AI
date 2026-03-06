@@ -197,6 +197,11 @@ class InterviewAssessmentController extends Controller
         $applicant_id = base64_decode($applicant_id);
 
         $form = InterviewAssessmentForm::where('position',$position_id)->get();
+
+        if ($form->isEmpty()) {
+            return redirect()->back()->with('error', 'Interview Assessment Form has not been created for this job position yet. Please create one first from the Interview Assessment section.');
+        }
+
         $interviewer_id = $this->resort->id;
         $interviewee_id = $applicant_id;
 

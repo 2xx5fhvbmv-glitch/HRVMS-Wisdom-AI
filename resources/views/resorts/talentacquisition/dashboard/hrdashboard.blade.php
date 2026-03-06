@@ -242,6 +242,15 @@
                                                             class="a-link AddMeetingLink">Add Meeting Link </a>
                                                         </div>
 
+                                                    @elseif(isset($t->is_upcoming_interview) && $t->is_upcoming_interview)
+                                                        <div class="img-circle">
+                                                            <img src="{{ $t->profileImg }}" alt="image">
+                                                        </div>
+                                                        <div>
+                                                            <p><i class="fa-regular fa-calendar me-1"></i> {{ ucfirst($t->first_name) . ' ' . ucfirst($t->last_name) }} - Interview for {{ $t->Position ?? '' }} on {{ \Carbon\Carbon::parse($t->InterViewDate)->format('d M Y') }} at {{ $t->ResortInterviewtime }}</p>
+                                                            <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">View Applicant</a>
+                                                        </div>
+
                                                 @endif
                                             </div>
                                         @endforeach

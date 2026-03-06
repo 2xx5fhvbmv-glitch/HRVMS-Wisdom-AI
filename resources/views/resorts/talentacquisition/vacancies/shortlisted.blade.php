@@ -62,6 +62,7 @@
                                 <th>Contact</th>
                                 <th>Position	</th>
                                 <th>Department</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
 
@@ -74,6 +75,9 @@
 
     </div>
     <input type="hidden" name="{{     $id }}" value="{{$id }}" id="RequestedID" >
+
+    {{-- Applicant Sidebar --}}
+    <div class="userApplicants-wrapper"></div>
     @endsection
 
 @section('import-css')
@@ -100,6 +104,41 @@ $(document).ready(function() {
     SortlistedList()
 
 });
+
+    // Applicant sidebar handler
+    const $userApplicantsWrapper = $(".userApplicants-wrapper");
+    $(document).on("click", ".userApplicants-btn", function (e) {
+        e.stopPropagation();
+        let id = $(this).data("id");
+        let url = "{{ route('resort.ta.TaUserApplicantsSideBar', ':id') }}";
+        url = url.replace(':id', id);
+        $.ajax({
+            url: url,
+            type: "GET",
+            success: function(response) {
+                if (response.success) {
+                    $(".userApplicants-wrapper").html(response.view);
+                }
+            },
+            error: function(response) {
+                toastr.error('Failed to load applicant details.', { positionClass: 'toast-bottom-right' });
+            }
+        });
+        $userApplicantsWrapper.toggleClass("end-0");
+    });
+
+    $(document).on("click", ".closeSlider", function (e) {
+        e.preventDefault();
+        $userApplicantsWrapper.toggleClass("end-0");
+    });
+
+    // Close sidebar when clicking outside
+    $(document).on("click", function (e) {
+        if (!$userApplicantsWrapper.is(e.target) && $userApplicantsWrapper.has(e.target).length === 0 &&
+            !$(e.target).hasClass('userApplicants-btn') && $(e.target).closest('.userApplicants-btn').length === 0) {
+            $userApplicantsWrapper.removeClass("end-0");
+        }
+    });
 
 function  SortlistedList()
     {
@@ -148,11 +187,94 @@ function  SortlistedList()
                     { data: 'Contact', name: 'Contact', className: 'text-nowrap' },
                     { data: 'Position', name: 'Position', className: 'text-nowrap' },
                     { data: 'Department', name: 'Department', className: 'text-nowrap' },
+                    { data: 'Action', name: 'Action', orderable: false, searchable: false, className: 'text-nowrap' },
                     {data:'created_at', visible:false,searchable:false},
 
                 ]
         });
     }
+
+    // Notes form AJAX submit
+    $(document).on('submit', '#ApplicantNoteForm', function(e) {
+        e.preventDefault();
+        let form = this;
+        let formData = new FormData(form);
+        let noteText = $(form).find('textarea[name="ApplicantNote"]').val();
+        if (!noteText || !noteText.trim()) {
+            toastr.error('Please write a note before submitting.', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        $.ajax({
+            url: "{{ route('resort.ta.ApplicantNote') }}",
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    let $notesBlock = $('#tabPane4 .notes-display-block');
+                    if ($notesBlock.length) {
+                        $notesBlock.find('p').text(noteText);
+                    } else {
+                        let notesHtml = '<div class="intUserApp-block mt-3 notes-display-block"><h6>Notes:</h6><p>' + $('<span>').text(noteText).html() + '</p></div>';
+                        let $last = $('#tabPane4 .a-link').last();
+                        if ($last.length) { $last.after(notesHtml); } else { $('#tabPane4 .table-responsive').after(notesHtml); }
+                    }
+                    $('#myTab button[data-bs-target="#tabPane4"]').tab('show');
+                }
+            },
+            error: function(response) {
+                var errors = response.responseJSON;
+                var errs = (errors && errors.errors) ? Object.values(errors.errors).join('<br>') : 'Failed to save note.';
+                toastr.error(errs, { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    // Comments form AJAX submit
+    $(document).on('submit', '#RoundWiseForm', function(e) {
+        e.preventDefault();
+        let form = this;
+        let formData = new FormData(form);
+        let commentText = $(form).find('textarea[name="Comment"]').val();
+        if (!commentText || !commentText.trim()) {
+            toastr.error('Please write a comment before submitting.', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        $.ajax({
+            url: "{{ route('resort.ta.RoundWiseForm') }}",
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    $(form).find('textarea[name="Comment"]').val('');
+                    toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    let $commentsBlock = $('#tabPane4 .comments-display-block');
+                    let commentHtml = '<div class="mb-2 p-2" style="background:#f5f5f5; border-radius:6px;"><p class="mb-0">' + $('<span>').text(commentText).html() + '</p></div>';
+                    if ($commentsBlock.length) {
+                        $commentsBlock.append(commentHtml);
+                    } else {
+                        let commentsBlockHtml = '<div class="intUserApp-block mt-3 comments-display-block"><h6>Comments:</h6>' + commentHtml + '</div>';
+                        let $notesBlock = $('#tabPane4 .notes-display-block');
+                        if ($notesBlock.length) { $notesBlock.after(commentsBlockHtml); }
+                        else {
+                            let $last = $('#tabPane4 .a-link').last();
+                            if ($last.length) { $last.after(commentsBlockHtml); } else { $('#tabPane4 .table-responsive').after(commentsBlockHtml); }
+                        }
+                    }
+                    $('#myTab button[data-bs-target="#tabPane4"]').tab('show');
+                }
+            },
+            error: function(response) {
+                var errors = response.responseJSON;
+                var errs = (errors && errors.errors) ? Object.values(errors.errors).join('<br>') : 'Failed to save comment.';
+                toastr.error(errs, { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
 
 </script>
 @endsection

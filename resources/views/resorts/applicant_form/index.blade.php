@@ -81,6 +81,21 @@
                                     </div>
                                 </div>
                                 <div class="col-6">
+                                    <div class="upload-area drop-zone " id="uploadfile">
+                                        <div class="d-flex align-items-center text-start drop-zone__prompt">
+                                            <div class="img-box">
+                                                <img src="{{ URL::asset('resorts_assets/images/upload.svg')}}" alt="" class="img-fluid" />
+                                            </div>
+                                            <div>
+                                                <h3>Upload Other Document</h3>
+                                                <span>PDF Format</span>
+                                            </div>
+                                        </div>
+                                        <p>Education Document, Experience Letter, etc.</p>
+                                        <input type="file" name="other_document" class="drop-zone__input" accept=".pdf">
+                                    </div>
+                                </div>
+                                <div class="col-6">
                                     <label class="form-label">PASSPORT-SIZE PHOTO<span class="red-mark">*</span></label>
                                     <div class="d-md-flex align-items-center">
                                         <div class="profile-img-box">
@@ -132,7 +147,6 @@
                                         <option value="">Select Gender</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
-                                        <option value="other">Other</option>
                                     </select>
                                     <div id="gender-error"></div>
                                 </div>
@@ -171,7 +185,7 @@
                                 <div class="col-md-6 ">
                                     <label for="txt-number-children" class="form-label">NUMBER OF
                                         CHILDREN<span class="red-mark">*</span></label>
-                                    <input type="text" name="number_of_children" value="" class="form-control" id="txt-number-children" placeholder="Number of children" required data-parsley-type="digits" data-parsley-trigger="change">
+                                    <input type="text" name="number_of_children" value="" class="form-control" id="txt-number-children" placeholder="Number of children" data-parsley-type="digits" data-parsley-trigger="change">
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="txt-address-line-1" class="form-label">ADDRESS LINE
@@ -475,9 +489,13 @@
 
                                                                 <div class="col-auto">
                                                                     <label for="fileInput-{{$key}}" class="btn btn-themeBlue btn-sm" >Upload File</label>
-                                                                    <input type="file" name="video_file[]" id="fileInput-{{$key}}" style="display: none;" onchange="handleFileSelection(event, {{$key}})" >
-                                                                </div> 
-                                                        
+                                                                    <input type="file" name="video_file[]" id="fileInput-{{$key}}" style="display: none;" onchange="handleFileSelection(event, {{$key}})" accept="video/*">
+                                                                </div>
+
+                                                                <div class="col-auto">
+                                                                    <button id="clearRecord-{{$key}}" onclick="clearRecording({{$key}})" class="btn btn-outline-danger btn-sm" style="display:none;">Clear Video</button>
+                                                                </div>
+
                                                             </div>
                                                         </div>
 
@@ -581,7 +599,9 @@
                                 </div>
                             </div>
                             <div class="row g-4">
-                                {!! $termsAndCondition->terms_and_condition !!}
+                                <div class="col-12 terms-content" style="max-height: 400px; overflow-y: auto; padding: 15px; border: 1px solid #dee2e6; border-radius: 5px; background: #f8f9fa;">
+                                    {!! $termsAndCondition->terms_and_condition !!}
+                                </div>
                                 <div class="col-md-12">
                                     <div class="form-check ">
                                         <input class="form-check-input" type="checkbox" name="terms_conditions" required=""
@@ -1125,7 +1145,7 @@
         });
 
         $('.alpha-only').on('input', function () {
-            this.value = this.value.replace(/[^a-zA-Z ]/g, ''); // Allow only alphabetic characters and spaces
+            this.value = this.value.replace(/[^a-zA-ZÀ-ÖØ-öø-ÿ\s''-]/g, ''); // Allow alphabetic, accented characters, apostrophes and spaces
         });
 
         // Handle currently-working-checkbox initial state
@@ -1220,7 +1240,7 @@
         });
 
         $('.alpha-only').on('input', function () {
-            this.value = this.value.replace(/[^a-zA-Z ]/g, ''); // Allow only alphabetic characters and spaces
+            this.value = this.value.replace(/[^a-zA-ZÀ-ÖØ-öø-ÿ\s''-]/g, ''); // Allow alphabetic, accented characters, apostrophes and spaces
         });
 
         // Remove functionality for dynamically added rows
@@ -1241,55 +1261,82 @@
     let recordedChunks = [];
     let videoBlob = null;
     let currentAssessmentKey = null;
+    let currentStream = null;
 
-    async function startRecording(key) 
+    // Detect Safari-compatible MIME type
+    function getSupportedMimeType() {
+        const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+        for (const type of types) {
+            if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        return '';
+    }
+
+    function getVideoExtension(mimeType) {
+        if (mimeType.includes('mp4')) return 'mp4';
+        return 'webm';
+    }
+
+    async function startRecording(key)
     {
         currentAssessmentKey = key;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            currentStream = stream;
 
             // Display the live camera feed in a video element
             const previewVideoElement = document.getElementById(`previewVideo-${key}`);
             if (previewVideoElement) {
                 previewVideoElement.srcObject = stream;
-                previewVideoElement.play(); // Start playing the live feed
+                previewVideoElement.setAttribute('playsinline', true); // Safari requires playsinline
+                previewVideoElement.play();
             }
 
-            mediaRecorder = new MediaRecorder(stream);
-            recordedChunks = []; // Reset recorded chunks
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType: mimeType } : {};
+            mediaRecorder = new MediaRecorder(stream, options);
+            recordedChunks = [];
 
-            // Collect chunks of data
             mediaRecorder.ondataavailable = event => {
                 if (event.data.size > 0) {
                     recordedChunks.push(event.data);
                 }
             };
 
-            // When recording stops
             mediaRecorder.onstop = () => {
-                videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                const blobType = mimeType || 'video/webm';
+                videoBlob = new Blob(recordedChunks, { type: blobType });
 
-                // Display the recorded video
                 const recordedVideoElement = document.getElementById(`recordedVideo-${key}`);
                 if (recordedVideoElement) {
                     recordedVideoElement.src = URL.createObjectURL(videoBlob);
                     recordedVideoElement.controls = true;
-                    recordedVideoElement.style.display = 'block'; // Show the recorded video
+                    recordedVideoElement.setAttribute('playsinline', true);
+                    recordedVideoElement.style.display = 'block';
                 }
 
-                // Enable submit button
+                // Hide preview video
+                const previewEl = document.getElementById(`previewVideo-${key}`);
+                if (previewEl) {
+                    previewEl.srcObject = null;
+                    previewEl.style.display = 'none';
+                }
+
+                // Show clear button
+                const clearBtn = document.getElementById(`clearRecord-${key}`);
+                if (clearBtn) clearBtn.style.display = 'inline-block';
+
                 const submitButton = document.getElementById(`submitRecord-${key}`);
-                if (submitButton) {
-                    submitButton.disabled = false;
-                }
+                if (submitButton) submitButton.disabled = false;
 
-                // Stop the preview feed
                 stream.getTracks().forEach(track => track.stop());
+                currentStream = null;
             };
 
-            mediaRecorder.start();
+            mediaRecorder.start(1000); // Collect data every second for Safari compatibility
 
-            // Update button states
             const startButton = document.getElementById(`startRecord-${key}`);
             const stopButton = document.getElementById(`stopRecord-${key}`);
             if (startButton) startButton.disabled = true;
@@ -1307,12 +1354,52 @@
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
 
-            // Update button states
             const startButton = document.getElementById(`startRecord-${key}`);
             const stopButton = document.getElementById(`stopRecord-${key}`);
             if (stopButton) stopButton.disabled = true;
             if (startButton) startButton.disabled = false;
         }
+    }
+
+    function clearRecording(key) {
+        videoBlob = null;
+        recordedChunks = [];
+
+        const recordedVideoElement = document.getElementById(`recordedVideo-${key}`);
+        if (recordedVideoElement) {
+            recordedVideoElement.src = '';
+            recordedVideoElement.style.display = 'none';
+        }
+
+        const previewEl = document.getElementById(`previewVideo-${key}`);
+        if (previewEl) {
+            previewEl.style.display = '';
+        }
+
+        const clearBtn = document.getElementById(`clearRecord-${key}`);
+        if (clearBtn) clearBtn.style.display = 'none';
+
+        const submitButton = document.getElementById(`submitRecord-${key}`);
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Submit';
+        }
+
+        const startButton = document.getElementById(`startRecord-${key}`);
+        if (startButton) startButton.disabled = false;
+
+        // Clear file input too
+        const fileInput = document.getElementById(`fileInput-${key}`);
+        if (fileInput) fileInput.value = '';
+
+        // Reset assessment status
+        const completedInput = document.getElementById(`assessment_completed_${key}`);
+        if (completedInput) completedInput.value = '';
+
+        const videoref = document.getElementById(`tempVideoReference_${key}`);
+        if (videoref) videoref.value = '';
+
+        $("#Append_startAssessment-modal-" + key).text('');
     }
 
         function handleFileSelection(event, key) {
@@ -1355,20 +1442,13 @@
             });
             return;
         }
-        const originalFileName = videoBlob.name; // e.g., "example.mp4"
+
+        const originalFileName = videoBlob.name;
+        const ext = originalFileName ? originalFileName.split('.').pop() : getVideoExtension(getSupportedMimeType());
         const formData = new FormData();
-        if(originalFileName){      
-            formData.append('video', videoBlob, `language-assessment-${key}-${originalFileName}`);
-            formData.append('key', key);  
-        }
-        else{
-            formData.append('video', videoBlob, `language-assessment-${key}.webm`);
-            formData.append('key', key);
-        }
-    
-        for (let pair of formData.entries()) {
-            console.log(`${pair[0]}: ${pair[1]}`);
-        }
+        formData.append('video', videoBlob, originalFileName || `language-assessment-${key}.${ext}`);
+        formData.append('key', key);
+
         const resortId = $('#resort_id').val();
         if (resortId) {
             formData.append('resort_id', resortId);
@@ -1383,6 +1463,14 @@
             formData.append('vacancy_id', vacancy_id);
         }
 
+        // Show loader on submit button
+        const submitButton = document.getElementById(`submitRecord-${key}`);
+        const originalText = submitButton ? submitButton.textContent : 'Submit';
+        if (submitButton) {
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Uploading...';
+            submitButton.disabled = true;
+        }
+
         try {
             const response = await fetch('{{ route('resort.applicant_tempVideoStore') }}', {
                 method: 'POST',
@@ -1390,50 +1478,44 @@
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
             });
 
-            // console.log('Response:', response);
             if (response.ok) {
                 const data = await response.json();
-                // Mark assessment as completed
                 const completedInput = document.getElementById(`assessment_completed_${key}`);
-                if (completedInput) {
-                    completedInput.value = "1";
-                }
+                if (completedInput) completedInput.value = "1";
 
                 const videoref = document.getElementById(`tempVideoReference_${key}`);
-                if (videoref) {
-                    videoref.value = data.video_id;
-                }
+                if (videoref) videoref.value = data.video_id;
 
-                // Update UI to show video was submitted
-                const submitButton = document.getElementById(`submitRecord-${key}`);
                 if (submitButton) {
-                    submitButton.textContent = 'Submitted';
+                    submitButton.innerHTML = 'Submitted';
                     submitButton.disabled = true;
                 }
 
-                // Validate overall assessment completion
                 validateAssessmentCompletion();
-                
-                // Close the modal
+
                 const modal = document.getElementById(`startAssessment-modal-${key}`);
                 if (modal) {
                     const modalInstance = bootstrap.Modal.getInstance(modal);
-                    if (modalInstance) {
-                        modalInstance.hide();
-                    }
+                    if (modalInstance) modalInstance.hide();
                 }
 
-                
-              
                 toastr.success('Video uploaded successfully!', 'Success', {
                     positionClass: 'toast-bottom-right'
                 });
             } else {
+                if (submitButton) {
+                    submitButton.innerHTML = originalText;
+                    submitButton.disabled = false;
+                }
                 toastr.error('Failed to upload video. Please try again.', 'Error', {
                     positionClass: 'toast-bottom-right'
                 });
             }
         } catch (error) {
+            if (submitButton) {
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
             toastr.error('Error uploading video. Please try again.', 'Error', {
                 positionClass: 'toast-bottom-right'
             });
@@ -1873,10 +1955,10 @@
             }
         }
 
-        // Alpha-only Input Handling
+        // Alpha-only Input Handling (allows accented letters and apostrophes)
         function initAlphaOnlyInputs() {
             $('.alpha-only').on('keyup blur', function() {
-                $(this).val($(this).val().replace(/[^a-zA-Z\s]/g, ''));
+                $(this).val($(this).val().replace(/[^a-zA-ZÀ-ÖØ-öø-ÿ\s''-]/g, ''));
             });
         }
 
@@ -1973,6 +2055,24 @@
             });
         }
 
+        // Marital Status Handler - disable children field when unmarried
+        function initMaritalStatusHandler() {
+            var childrenField = $('#txt-number-children');
+            $('#select-marital-status').on('change', function() {
+                if ($(this).val() === 'unmarried') {
+                    childrenField.val('0').prop('disabled', true);
+                    childrenField.removeAttr('data-parsley-required');
+                } else {
+                    childrenField.prop('disabled', false);
+                    childrenField.val('');
+                }
+            });
+            // Trigger on load if already set
+            if ($('#select-marital-status').val() === 'unmarried') {
+                childrenField.val('0').prop('disabled', true);
+            }
+        }
+
         // Initialize All Validations and Plugins
         function initializeFormValidation() {
             initSelect2AndValidation();
@@ -1981,6 +2081,7 @@
             initDatePicker();
             initAlphaOnlyInputs();
             initPhoneNumberFormatting();
+            initMaritalStatusHandler();
             initFormSubmission();
         }
 

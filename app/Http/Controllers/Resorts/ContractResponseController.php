@@ -193,28 +193,55 @@ class ContractResponseController extends Controller
             }
         }
 
+        // Check if employee already exists for this email (e.g. contract re-accepted)
+        // Use withTrashed to also find soft-deleted records (unique constraint still blocks insert)
+        $existingAdmin = ResortAdmin::withTrashed()
+            ->where('email', $applicant->email)
+            ->first();
+
+        if ($existingAdmin) {
+            $existingEmployee = Employee::withTrashed()->where('Admin_Parent_id', $existingAdmin->id)->first();
+            if ($existingEmployee && !$existingEmployee->trashed()) {
+                // Active employee already exists — skip
+                return;
+            }
+            // If soft-deleted employee exists, remove it so we can create fresh
+            if ($existingEmployee && $existingEmployee->trashed()) {
+                $existingEmployee->forceDelete();
+            }
+        }
+
         // Generate password
         $plainPassword = Common::generateUniquePassword(8);
 
-        // Create ResortAdmin record (stores personal info: name, email, phone, address)
-        $resortAdmin = ResortAdmin::create([
-            'resort_id' => $contract->resort_id,
-            'first_name' => $applicant->first_name,
-            'last_name' => $applicant->last_name,
-            'email' => $applicant->email,
-            'personal_phone' => $applicant->mobile_number,
-            'gender' => $applicant->gender,
-            'password' => Hash::make($plainPassword),
-            'address_line_1' => $applicant->address_line_one,
-            'address_line_2' => $applicant->address_line_two,
-            'city' => $applicant->city,
-            'state' => $applicant->state,
-            'country' => $countryName ?? $applicant->country,
-            'type' => 'sub',
-            'is_employee' => 1,
-            'is_master_admin' => 0,
-            'status' => 'Active',
-        ]);
+        // Create ResortAdmin record or reuse existing
+        if ($existingAdmin) {
+            $resortAdmin = $existingAdmin;
+            // Restore if soft-deleted
+            if ($resortAdmin->trashed()) {
+                $resortAdmin->restore();
+            }
+            $resortAdmin->update(['password' => Hash::make($plainPassword), 'status' => 'Active', 'is_employee' => 1]);
+        } else {
+            $resortAdmin = ResortAdmin::create([
+                'resort_id' => $contract->resort_id,
+                'first_name' => $applicant->first_name,
+                'last_name' => $applicant->last_name,
+                'email' => $applicant->email,
+                'personal_phone' => $applicant->mobile_number,
+                'gender' => $applicant->gender,
+                'password' => Hash::make($plainPassword),
+                'address_line_1' => $applicant->address_line_one,
+                'address_line_2' => $applicant->address_line_two,
+                'city' => $applicant->city,
+                'state' => $applicant->state,
+                'country' => $countryName ?? $applicant->country,
+                'type' => 'sub',
+                'is_employee' => 1,
+                'is_master_admin' => 0,
+                'status' => 'Active',
+            ]);
+        }
 
         // Create Employee record (stores job info: department, position, dates)
         $employee = Employee::create([
