@@ -306,7 +306,6 @@
                                         <label for="number_of_times" class="form-label">NO. OF TIMES</label>
                                         <input type="number" id="number_of_times" name="number_of_times" placeholder="Leave empty for no limit" class="form-control" min="1" data-parsley-validate-script
                                         data-parsley-validate-script-message="Script tags are not allowed."/>
-                                        <small class="text-muted">Leave empty to allow employees to apply any number of times; set a number to limit applications per period (based on frequency).</small>
                                     </div>
                                     <div class="col-sm-6">
                                         <div class="inputCustom-color"> Color Theme
@@ -413,7 +412,7 @@
                         <div class="col-sm-6">
                             <label for="edit_eligibility" class="form-label">ELIGIBILITY <span class="red-mark">*</span></label>
                             <select class="form-select select2t-none select2-eligibility" name="eligibility[]" id="edit_eligibility" multiple="multiple" data-parsley-required="true" data-parsley-errors-container="#edit-eligibility-error">
-                                @if(!empty($eligibilty))
+                                @if(!empty($eligibilty))   
                                     @foreach ($eligibilty as $key => $value)
                                         <option value="{{ $key }}">{{ $value }}</option>
                                     @endforeach
@@ -436,7 +435,6 @@
                             <label for="edit_number_of_times" class="form-label">NO. OF TIMES</label>
                             <input type="number" id="edit_number_of_times" name="number_of_times" placeholder="Leave empty for no limit" class="form-control" min="1" data-parsley-validate-script
                                         data-parsley-validate-script-message="Script tags are not allowed."/>
-                            <small class="text-muted">Leave empty to allow employees to apply any number of times; set a number to limit applications per period (based on frequency).</small>
                         </div>
                         <div class="col-sm-6">
                             <div class="inputCustom-color"> Color Theme
@@ -453,7 +451,7 @@
                                     <option value="0">No</option>
                                     <option value="1">Yes</option>
                                 </select>
-                            </div>
+                            </div> 
                             <div class="col-sm-6" id="edit_leave_category_wrap" style="display: none;">
                                 <label for="edit_leave_category" class="form-label">LEAVE CATEGORY <span class="red-mark">*</span></label>
                                 <select name="leave_category[]" id="edit_leave_category" class="form-select select2-leave-category" multiple="multiple"
@@ -494,16 +492,30 @@
     }
 
     /* Add form leave category combine: ensure Select2 and tags display when wrap is shown */
-    #add_leave_category_wrap .select2-container {
+    #add_leave_category_wrap .select2-container,
+    #edit_leave_category_wrap .select2-container {
         width: 100% !important;
     }
-    #add_leave_category_wrap .select2-selection--multiple .select2-selection__choice {
+    #add_leave_category_wrap .select2-selection--multiple .select2-selection__choice,
+    #edit_leave_category_wrap .select2-selection--multiple .select2-selection__choice {
         display: inline-block;
-        padding: 2px 8px;
+        position: relative;
+        padding: 4px 28px 4px 10px;
         margin: 2px 4px 2px 0;
         border-radius: 4px;
         background-color: #e9ecef;
         border: 1px solid #dee2e6;
+    }
+    /* Fix overlapping X: put remove on the right with space so text never overlaps */
+    #add_leave_category_wrap .select2-selection--multiple .select2-selection__choice__remove,
+    #edit_leave_category_wrap .select2-selection--multiple .select2-selection__choice__remove {
+        position: absolute !important;
+        right: 6px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        left: auto !important;
+        margin: 0 !important;
+        float: none !important;
     }
 </style>
 @endsection
@@ -665,21 +677,23 @@
         $(".select2t-none").on('change', function () {
             var parsleyField = $(this).parsley();
             parsleyField.validate();
-
-            // Add/remove the error class to the Select2 container based on validation
-            if (parsleyField.isValid()) {
-                $(this).next('.select2-container').find('.select2-selection').removeClass('is-invalid');
-            } else {
-                $(this).next('.select2-container').find('.select2-selection').addClass('is-invalid');
+            var $sel = $(this).next('.select2-container').find('.select2-selection');
+            if (parsleyField.isValid()) $sel.removeClass('is-invalid'); else $sel.addClass('is-invalid');
+        });
+        $(document).on('change', '.select2-leave-category', function () {
+            var parsleyField = $(this).parsley();
+            if (parsleyField) {
+                parsleyField.validate();
+                var $sel = $(this).next('.select2-container').find('.select2-selection');
+                if (parsleyField.isValid()) $sel.removeClass('is-invalid'); else $sel.addClass('is-invalid');
             }
         });
 
-        // Parsley field validation handler
+        // Parsley field validation handler (select2t-none and leave category multi-select)
         window.Parsley.on('field:validated', function (fieldInstance) {
             var $element = fieldInstance.$element;
-            if ($element.hasClass('select2t-none')) {
-                // Update the Select2 container's appearance
-                var $select2Container = $element.next('.select2-container').find('.select2-selection');
+            var $select2Container = $element.next('.select2-container').find('.select2-selection');
+            if ($select2Container.length && ($element.hasClass('select2t-none') || $element.hasClass('select2-leave-category'))) {
                 if (fieldInstance.isValid()) {
                     $select2Container.removeClass('is-invalid');
                 } else {
@@ -1368,13 +1382,17 @@
                 window.Parsley.addValidator('requiredIf', {
                     requirementType: 'string',
                     validateString: function (value, selector) {
-                        var relatedField = $(selector); // Get the related field
-                        console.log(relatedField);
-                        if (!relatedField.length) {
-                            return true; // If the related field is not found, skip validation
-                        }
-                        var relatedValue = relatedField.val(); // Get the value of the related field
-                        return !(relatedValue === '1' && value.trim() === ''); // Validation condition
+                        var relatedField = $(selector);
+                        if (!relatedField.length) return true;
+                        var relatedValue = relatedField.val();
+                        return !(relatedValue === '1' && (value == null || String(value).trim() === ''));
+                    },
+                    validateMultiple: function (values, selector) {
+                        var relatedField = $(selector);
+                        if (!relatedField.length) return true;
+                        var relatedValue = relatedField.val();
+                        if (relatedValue !== '1') return true;
+                        return Array.isArray(values) && values.length > 0;
                     },
                     messages: {
                         en: 'This field is required when the condition is met.'
@@ -1383,9 +1401,8 @@
 
                 window.Parsley.on('field:validated', function (fieldInstance) {
                     var $element = fieldInstance.$element;
-                    if ($element.hasClass('select2t-none')) {
-                        // Update the Select2 container's appearance
-                        var $select2Container = $element.next('.select2-container').find('.select2-selection');
+                    var $select2Container = $element.next('.select2-container').find('.select2-selection');
+                    if ($select2Container.length && ($element.hasClass('select2t-none') || $element.hasClass('select2-leave-category'))) {
                         if (fieldInstance.isValid()) {
                             $select2Container.removeClass('is-invalid');
                         } else {

@@ -82,11 +82,18 @@ class ConfigController extends Controller
         if ((int) ($request->combine_with_other ?? 0) !== 1) {
             $validatedData['leave_category'] = '';
         }
-        // dd($request->all());
+        // Ensure NOT NULL string columns get a value (DB may not accept null)
+        $validatedData['number_of_times'] = isset($validatedData['number_of_times']) && $validatedData['number_of_times'] !== '' && $validatedData['number_of_times'] !== null
+            ? (string) $validatedData['number_of_times'] : '';
+        $validatedData['color'] = !empty($validatedData['color']) ? $validatedData['color'] : '#A264F7';
+        $validatedData['leave_category'] = $validatedData['leave_category'] ?? '';
+
         try {
             $validatedData['resort_id'] = $resort_id;
-            $validatedData['eligibility'] = implode(',', $request->eligibility); // Convert array to comma-separated string
-            
+            $validatedData['eligibility'] = is_array($request->eligibility ?? null)
+                ? implode(',', $request->eligibility)
+                : '';
+
             // Store data in the database
             LeaveCategory::create($validatedData);
         
@@ -99,12 +106,15 @@ class ConfigController extends Controller
                 'leaveCategoriesHtml' => view('resorts.renderfiles.leave_categories', ['LeaveCategories' => $savedLeaveCategory])->render()
             ]);
         } catch (\Exception $e) {
-            // Log the error for debugging
-            \Log::error('Leave Category Store Error: ' . $e->getMessage());
-        
+            \Log::error('Leave Category Store Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            $message = config('app.debug') ? 'Failed to save: ' . $e->getMessage() : 'Failed to save data. Please try again later.';
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to save data. Please try again later.'
+                'message' => $message
             ], 500);
         }
         

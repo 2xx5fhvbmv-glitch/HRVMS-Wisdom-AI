@@ -192,13 +192,21 @@
                                                                                                                                 if ($rawOverTime === null || $rawOverTime === '' || $rawOverTime === '0' || $rawOverTime === 0 || $rawOverTime === '0:00' || $rawOverTime === '00:0') {
                                                                                                                                     $rawOverTime = '00:00';
                                                                                                                                 }
-                                                                                                                                // Normalize to HH:MM
-                                                                                                                                if (strpos($rawOverTime, ':') === false) {
-                                                                                                                                    $h = (int) $rawOverTime;
-                                                                                                                                    $rawOverTime = str_pad($h, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                                                // Normalize to HH:MM: number without colon is treated as MINUTES when < 24 (so 20 -> 00:20, not 20:00)
+                                                                                                                                if (strpos((string)$rawOverTime, ':') === false) {
+                                                                                                                                    $num = (int) $rawOverTime;
+                                                                                                                                    if ($num <= 0) {
+                                                                                                                                        $rawOverTime = '00:00';
+                                                                                                                                    } elseif ($num < 24) {
+                                                                                                                                        $rawOverTime = '00:' . str_pad($num, 2, '0', STR_PAD_LEFT);
+                                                                                                                                    } else {
+                                                                                                                                        $rawOverTime = str_pad($num, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                                                    }
                                                                                                                                 }
                                                                                                                                 // Clamp unrealistic big overtime (>= 12 hours) to 00:00
-                                                                                                                                [$oH, $oM] = array_map('intval', explode(':', $rawOverTime));
+                                                                                                                                $parts = array_map('intval', explode(':', $rawOverTime));
+                                                                                                                                $oH = $parts[0] ?? 0;
+                                                                                                                                $oM = $parts[1] ?? 0;
                                                                                                                                 $oMinutes = $oH * 60 + $oM;
                                                                                                                                 if ($oMinutes >= 12 * 60) {
                                                                                                                                     $rawOverTime = '00:00';
@@ -388,11 +396,19 @@
                                                                                                         if ($rawOverTime2 === null || $rawOverTime2 === '' || $rawOverTime2 === '0' || $rawOverTime2 === 0 || $rawOverTime2 === '0:00' || $rawOverTime2 === '00:0') {
                                                                                                             $rawOverTime2 = '00:00';
                                                                                                         }
-                                                                                                        if (strpos($rawOverTime2, ':') === false) {
-                                                                                                            $h2 = (int) $rawOverTime2;
-                                                                                                            $rawOverTime2 = str_pad($h2, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                        if (strpos((string)$rawOverTime2, ':') === false) {
+                                                                                                            $num2 = (int) $rawOverTime2;
+                                                                                                            if ($num2 <= 0) {
+                                                                                                                $rawOverTime2 = '00:00';
+                                                                                                            } elseif ($num2 < 24) {
+                                                                                                                $rawOverTime2 = '00:' . str_pad($num2, 2, '0', STR_PAD_LEFT);
+                                                                                                            } else {
+                                                                                                                $rawOverTime2 = str_pad($num2, 2, '0', STR_PAD_LEFT) . ':00';
+                                                                                                            }
                                                                                                         }
-                                                                                                        [$oH2, $oM2] = array_map('intval', explode(':', $rawOverTime2));
+                                                                                                        $parts2 = array_map('intval', explode(':', $rawOverTime2));
+                                                                                                        $oH2 = $parts2[0] ?? 0;
+                                                                                                        $oM2 = $parts2[1] ?? 0;
                                                                                                         $oMinutes2 = $oH2 * 60 + $oM2;
                                                                                                         if ($oMinutes2 >= 12 * 60) {
                                                                                                             $rawOverTime2 = '00:00';
@@ -781,10 +797,16 @@
                 normalizedDayHours = String(dh).padStart(2, '0') + ':00';
             }
 
-            // Ensure overtime is in HH:MM (24-hour) so we can compare as minutes
+            // Ensure overtime is in HH:MM (24-hour). Bare number < 24 = minutes (so 20 -> 00:20, not 20:00)
             if (overtime && overtime.indexOf(':') === -1) {
-                let hours = parseInt(overtime) || 0;
-                overtime = String(hours).padStart(2, '0') + ':00';
+                let num = parseInt(overtime, 10) || 0;
+                if (num <= 0) {
+                    overtime = '00:00';
+                } else if (num < 24) {
+                    overtime = '00:' + String(num).padStart(2, '0');
+                } else {
+                    overtime = String(num).padStart(2, '0') + ':00';
+                }
             }
 
             // If stored overtime looks invalidly large compared to shift hours, treat it as "no overtime"
@@ -801,8 +823,13 @@
             }
 
             $("#ShiftOverTime").val(overtime);
-            if ($("#ShiftOverTime")[0]._flatpickr) {
-                $("#ShiftOverTime")[0]._flatpickr.setDate('2000-01-01 ' + overtime, false);
+            let fp = $("#ShiftOverTime")[0]._flatpickr;
+            if (fp) {
+                // Set time in local to avoid UTC->local showing 20:00 for 00:00
+                const [h, m] = overtime.split(':').map(v => parseInt(v, 10) || 0);
+                const d = new Date();
+                d.setHours(h, m, 0, 0);
+                fp.setDate(d, false);
             }
             $("#editdutyRoster-modal").modal('show');
             $("#ShiftOverTime").attr('data-DayWiseTotalHours', DayWiseTotalHours);
