@@ -272,7 +272,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('/employee/import', ['App\Http\Controllers\Resorts\EmployeeController','ImportEmployee'])->name('resort.Depat_Position_Emp_Import');
     Route::get( '/employee/export', 'EmployeeController@exportRelatedDepartment')->name('resort.export.Employee');
-    Route::get( '/attandanceHisotry/export/', ['App\Http\Controllers\Resorts\TimeAndAttendance\EmployeeController','attandanceHisotryExport'])->name('resort.export.attandanceHisotry');
+    Route::get( '/attandanceHisotry/export/', ['App\Http\Controllers\Resorts\TimeAndAttendance\EmployeeController','attandanceHisotryExport']);
     /* salary */
     Route::get('/salary-increment/get-increment-details', 'SalaryIncrementController@getIncrementDetails')->name('employee.salaryincrement.get');
     Route::post('/salary-increment/save', 'SalaryIncrementController@saveSalaryIncrement')->name('employee.salaryincrement.save');
@@ -530,7 +530,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/time-and-attendance/update-overtime-status', 'TimeandAttendanceDashboardController@UpdateOvertimeStatus')->name('resort.timeandattendance.UpdateOvertimeStatus');
     Route::post('/time-and-attendance/overtime/status-update', 'TimeAndAttendance\EmployeeController@OTStatusUpdate')->name('resort.timeandattendance.OTStatusUpdate');
     Route::post('/time-and-attendance/manual-check-in-out', 'TimeandAttendanceDashboardController@ManualCheckInOut')->name('resort.timeandattendance.ManualCheckInOut');
-    Route::post('/time-and-attendance/employee-details-print', 'TimeAndAttendance\EmployeeController@EmpDetailsPrint')->name('resort.timeandattendance.EmpDetailsPrint');
+    Route::match(['get', 'post'], '/time-and-attendance/employee-details-print', 'TimeAndAttendance\EmployeeController@EmpDetailsPrint')->name('resort.timeandattendance.EmpDetailsPrint');
+    Route::match(['get', 'post'], '/time-and-attendance/attendance-history-export', 'TimeAndAttendance\EmployeeController@attandanceHisotryExport')->name('resort.export.attandanceHisotry');
 
     Route::post('/time-and-attendance/employee-details-filter', 'TimeAndAttendance\EmployeeController@EmpDetailsFilters')->name('resort.timeandattendance.EmpDetailsFilters');
 

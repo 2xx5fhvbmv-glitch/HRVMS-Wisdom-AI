@@ -95,16 +95,13 @@ class LeaveController extends Controller
                 'lc.leave_category',
                 'lc.combine_with_other',
                 'lc.eligibility',
-                DB::raw("(SELECT SUM(el.total_days)
+                DB::raw("(SELECT COALESCE(SUM(el.total_days), 0)
                             FROM employees_leaves el
                             WHERE el.emp_id = " . (int) ($getEmployee->id ?? 0) . "
                             AND el.leave_category_id = lc.id
                             AND el.status = 'Approved'
-                            AND (
-                                (el.from_date BETWEEN '" . Carbon::now()->startOfYear()->startOfMonth()->format('Y-m-d') . "' AND '" . Carbon::now()->endOfYear()->endOfMonth()->format('Y-m-d') . "')
-                                OR
-                                (el.to_date BETWEEN '" . Carbon::now()->startOfYear()->startOfMonth()->format('Y-m-d') . "' AND '" . Carbon::now()->endOfYear()->endOfMonth()->format('Y-m-d') . "')
-                            )
+                            AND el.from_date <= '" . Carbon::now()->endOfYear()->format('Y-m-d') . "'
+                            AND el.to_date >= '" . Carbon::now()->startOfYear()->format('Y-m-d') . "'
                             ) as total_leave_days")
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
@@ -152,6 +149,8 @@ class LeaveController extends Controller
             $emp_grade = Common::getEmpGrade($rank);
             $benefit_grid = Common::getBenefitGrid($emp_grade,$resort_id);
 
+            $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
+            $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
             $leave_categories = ResortBenifitGridChild::select(
                 'resort_benefit_grid_child.*',
                 'lc.leave_type',
@@ -159,25 +158,31 @@ class LeaveController extends Controller
                 'lc.leave_category',
                 'lc.combine_with_other',
                 'lc.eligibility',
-                DB::raw('SUM(el.total_days) as total_days') // Use DB::raw for aggregation
+                DB::raw("(SELECT COALESCE(SUM(el2.total_days), 0)
+                            FROM employees_leaves el2
+                            WHERE el2.emp_id = " . (int) $emp_id . "
+                            AND el2.leave_category_id = lc.id
+                            AND el2.status = 'Approved'
+                            AND (
+                                (el2.from_date BETWEEN '" . $currentYearStart . "' AND '" . $currentYearEnd . "')
+                                OR (el2.to_date BETWEEN '" . $currentYearStart . "' AND '" . $currentYearEnd . "')
+                                OR (el2.from_date <= '" . $currentYearStart . "' AND el2.to_date >= '" . $currentYearEnd . "')
+                            )
+                            ) as total_leave_days")
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-            ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
-            
             ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
-
             ->where(function ($query) {
                 $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
                         ->orWhere('resort_benefit_grid_child.eligible_emp_type', "all");
             })
             ->where('lc.resort_id', $resort_id)
-            ->group_by('el.leave_category_id')
             ->get()
             ->map(function ($item) {
                 $item->combine_with_other = $item->combine_with_other ?? 0;
                 $item->leave_category = $item->leave_category ?? 0;
-                $item->total_leave_days = $item->total_days ?? 0;
+                $item->total_leave_days = (int) ($item->total_leave_days ?? 0);
                 return $item;
             });
 
@@ -218,6 +223,7 @@ class LeaveController extends Controller
                 'eligibility' => $lc->eligibility ?? '',
                 'total_leave_days' => 0,
                 'allocated_days' => 0,
+                'available_days' => 0,
             ]);
         }
 
@@ -230,6 +236,39 @@ class LeaveController extends Controller
             $allowed = array_map('trim', explode(',', $eligibilityStr));
             return in_array((string) $emp_grade_for_eligibility, $allowed, true);
         })->values();
+
+        // Compute available_days (allocated - used + carry forward) so apply page allows using extended/carry forward leave
+        $leaveCatIds = $leave_categories->pluck('leave_cat_id')->unique()->filter()->values()->all();
+        $lcCarry = $leaveCatIds ? DB::table('leave_categories')->whereIn('id', $leaveCatIds)->get()->keyBy('id') : collect();
+        $lastYearStart = Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+        $lastYearEnd = Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
+        $lastYearUsedByCat = DB::table('employees_leaves')
+            ->select('leave_category_id', DB::raw('SUM(total_days) as used_days'))
+            ->where('emp_id', $emp_id)
+            ->where('status', 'Approved')
+            ->where(function ($q) use ($lastYearStart, $lastYearEnd) {
+                $q->whereBetween('from_date', [$lastYearStart, $lastYearEnd])
+                    ->orWhereBetween('to_date', [$lastYearStart, $lastYearEnd]);
+            })
+            ->groupBy('leave_category_id')
+            ->get()
+            ->keyBy('leave_category_id');
+        $leave_categories = $leave_categories->map(function ($item) use ($lcCarry, $lastYearUsedByCat) {
+            $allocated = (int) ($item->allocated_days ?? 0);
+            $usedThisYear = (int) ($item->total_leave_days ?? 0);
+            $available = max(0, $allocated - $usedThisYear);
+            $lc = $lcCarry->get($item->leave_cat_id);
+            $carryForwardEnabled = $lc && !empty($lc->carry_forward) && $lc->carry_forward != '0';
+            if ($carryForwardEnabled) {
+                $lastYearUsed = (int) ($lastYearUsedByCat->get($item->leave_cat_id)->used_days ?? 0);
+                $unused = max($allocated - $lastYearUsed, 0);
+                $carryMax = isset($lc->carry_max) && $lc->carry_max !== null && $lc->carry_max !== '' ? (int) $lc->carry_max : null;
+                $carryForward = $carryMax !== null ? min($unused, $carryMax) : $unused;
+                $available += $carryForward;
+            }
+            $item->available_days = max(0, $available);
+            return $item;
+        });
 
         $transportations = ResortTransportation::where('resort_id', $resort_id)
             ->pluck('transportation_option','id')
@@ -762,18 +801,20 @@ class LeaveController extends Controller
                 ->join('leave_categories as lc','lc.id','=','employees_leaves.leave_category_id')
                 ->first();
             // dd($combinedLeave);
-            // Fetch total leave allocation for the employee
+            // Fetch total leave allocation for the employee (same rank as used in leave balance below)
             $emp_grade = Common::getEmpGrade($leaveDetail->rank);
 
             $benefit_grid = DB::table('resort_benifit_grid as rbg')
                 ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                 ->where('rbg.emp_grade', $emp_grade)
+                ->where('rbg.resort_id', $resort_id)
+                ->where('rbgc.rank', $leaveDetail->rank)
                 ->get();
             // Calculate total leaves taken by the employee for the current year
             $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
             $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
             $leavesTaken = DB::table('employees_leaves')
-                ->where('emp_id', $leaveDetail->employee_id)
+                ->where('emp_id', $leaveDetail->emp_id)
                 ->where('status', 'Approved')
                 ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
                     $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
@@ -812,10 +853,13 @@ class LeaveController extends Controller
                 'lc.id as leave_category_id',
                 'lc.leave_type',
                 'lc.color',
+                'lc.carry_forward',
+                'lc.carry_max',
                 'rbgc.allocated_days'
             )
             ->get();
         $empID = $leaveDetail->emp_id;
+
         // Calculate total leaves taken for each category for the current year
         $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
         $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
@@ -830,12 +874,36 @@ class LeaveController extends Controller
             ->groupBy('leave_category_id')
             ->get()
             ->keyBy('leave_category_id');
-        // dd($leaveUsage);
-        // Combine leave balances and usage
-        $leaveBalances = $benefit_grids->map(function ($grid) use ($leaveUsage) {
-            $usedDays = $leaveUsage->get($grid->leave_category_id)->used_days ?? 0;
+
+        $lastYearStart = Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+        $lastYearEnd = Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
+
+        // Combine leave balances and usage (carry forward when leave is eligible and not used by employee)
+        $leaveBalances = $benefit_grids->map(function ($grid) use ($leaveUsage, $leaveDetail, $lastYearStart, $lastYearEnd) {
+            $usageRow = $leaveUsage->get($grid->leave_category_id);
+            $usedDays = $usageRow ? (int) $usageRow->used_days : 0;
             $grid->used_days = $usedDays;
-            $grid->available_days = $grid->allocated_days - $usedDays;
+            $available = (int) $grid->allocated_days - $usedDays;
+
+            $carryForwardEnabled = !empty($grid->carry_forward) && $grid->carry_forward != '0';
+            if ($carryForwardEnabled) {
+                $lastYearUsed = DB::table('employees_leaves')
+                    ->select(DB::raw('SUM(total_days) as used_days'))
+                    ->where('emp_id', $leaveDetail->emp_id)
+                    ->where('leave_category_id', $grid->leave_category_id)
+                    ->where('status', 'Approved')
+                    ->where(function ($query) use ($lastYearStart, $lastYearEnd) {
+                        $query->whereBetween('from_date', [$lastYearStart, $lastYearEnd])
+                            ->orWhereBetween('to_date', [$lastYearStart, $lastYearEnd]);
+                    })
+                    ->value('used_days') ?? 0;
+                $unused = max((int) $grid->allocated_days - $lastYearUsed, 0);
+                $carryMax = isset($grid->carry_max) && $grid->carry_max !== null && $grid->carry_max !== '' ? (int) $grid->carry_max : null;
+                $carryForward = $carryMax !== null ? min($unused, $carryMax) : $unused;
+                $available += $carryForward;
+            }
+
+            $grid->available_days = max(0, $available);
             return $grid;
         });
 
@@ -1258,6 +1326,27 @@ class LeaveController extends Controller
 
                 $usedDays = $leaveUsage->used_days ?? 0;
                 $availableDays = $allocatedDays - $usedDays;
+
+                // Add carry forward when leave is eligible and not used by employee (unused from last year)
+                $carryForwardEnabled = !empty($leaveCategory->carry_forward) && $leaveCategory->carry_forward != '0';
+                if ($carryForwardEnabled) {
+                    $lastYearStart = Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+                    $lastYearEnd = Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
+                    $lastYearUsed = DB::table('employees_leaves')
+                        ->select(DB::raw('SUM(total_days) as used_days'))
+                        ->where('emp_id', $emp_id)
+                        ->where('leave_category_id', $categoryId)
+                        ->where('status', 'Approved')
+                        ->where(function ($query) use ($lastYearStart, $lastYearEnd) {
+                            $query->whereBetween('from_date', [$lastYearStart, $lastYearEnd])
+                                ->orWhereBetween('to_date', [$lastYearStart, $lastYearEnd]);
+                        })
+                        ->value('used_days') ?? 0;
+                    $unused = max($allocatedDays - $lastYearUsed, 0);
+                    $carryMax = isset($leaveCategory->carry_max) && $leaveCategory->carry_max !== null && $leaveCategory->carry_max !== '' ? (int) $leaveCategory->carry_max : null;
+                    $carryForward = $carryMax !== null ? min($unused, $carryMax) : $unused;
+                    $availableDays += $carryForward;
+                }
 
                 // Check if the requested leave exceeds the available days for the category
                 if ($totalDays > $availableDays) {
@@ -1712,9 +1801,14 @@ class LeaveController extends Controller
                 'lc.id as leave_category_id',
                 'lc.leave_type',
                 'lc.color',
+                'lc.carry_forward',
+                'lc.carry_max',
                 'rbgc.allocated_days'
             )
             ->get();
+
+        $lastYearStartPdf = Carbon::now()->subYear()->startOfYear()->format('Y-m-d');
+        $lastYearEndPdf = Carbon::now()->subYear()->endOfYear()->format('Y-m-d');
 
         // Used days per leave category: only approved leaves deduct from balance
         $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
@@ -1732,10 +1826,28 @@ class LeaveController extends Controller
             ->groupBy('leave_category_id')
             ->pluck('used_days', 'leave_category_id');
 
-        $leaveBalances = $benefit_grids->map(function ($grid) use ($usedPerCategory) {
+        $leaveBalances = $benefit_grids->map(function ($grid) use ($usedPerCategory, $empIdInt, $lastYearStartPdf, $lastYearEndPdf) {
             $usedDays = (int) ($usedPerCategory->get($grid->leave_category_id) ?? 0);
             $grid->used_days = $usedDays;
-            $grid->available_days = max(0, (int) $grid->allocated_days - $usedDays);
+            $available = (int) $grid->allocated_days - $usedDays;
+            $carryForwardEnabled = !empty($grid->carry_forward) && $grid->carry_forward != '0';
+            if ($carryForwardEnabled) {
+                $lastYearUsed = DB::table('employees_leaves')
+                    ->select(DB::raw('SUM(total_days) as used_days'))
+                    ->where('emp_id', $empIdInt)
+                    ->where('leave_category_id', $grid->leave_category_id)
+                    ->where('status', 'Approved')
+                    ->where(function ($query) use ($lastYearStartPdf, $lastYearEndPdf) {
+                        $query->whereBetween('from_date', [$lastYearStartPdf, $lastYearEndPdf])
+                            ->orWhereBetween('to_date', [$lastYearStartPdf, $lastYearEndPdf]);
+                    })
+                    ->value('used_days') ?? 0;
+                $unused = max((int) $grid->allocated_days - $lastYearUsed, 0);
+                $carryMax = isset($grid->carry_max) && $grid->carry_max !== null && $grid->carry_max !== '' ? (int) $grid->carry_max : null;
+                $carryForward = $carryMax !== null ? min($unused, $carryMax) : $unused;
+                $available += $carryForward;
+            }
+            $grid->available_days = max(0, $available);
             return $grid;
         });
 

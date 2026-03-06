@@ -38,7 +38,7 @@
                                                             <option value="{{$value->leave_cat_id}}"
                                                             data-combine-with-other="{{$value->combine_with_other}}" data-leave-category="{{$value->leave_category}}"
                                                             data-used-leaves = "{{$value->total_leave_days}}"
-                                                             data-color="{{$value->color}}" data-allowedDays="{{$value->allocated_days}}">{{$value->leave_type}}</option>
+                                                             data-color="{{$value->color}}" data-alloweddays="{{$value->allocated_days}}" data-available-days="{{ $value->available_days ?? $value->allocated_days }}">{{$value->leave_type}}</option>
                                                         @endforeach
                                                     @endif
                                                 </select>
@@ -677,10 +677,11 @@
             const fromDate = $(this).find('[name="from_date[]"]').val();
             const toDate = $(this).find('[name="to_date[]"]').val();
 
-            // Retrieve allowed and used leaves from data attributes
-            const allowedLeaves = parseInt(leaveCategory.data('alloweddays')) || 0; // Default to 0 if not set
-            const usedLeaves = parseInt(leaveCategory.data('used-leaves')) || 0; // Default to 0 if not set
-            const remainingLeaves = allowedLeaves - usedLeaves;
+            // Use available_days (includes carry forward) so extended leave can be applied; fallback to allocated - used
+            const availableDays = parseInt(leaveCategory.data('available-days'), 10);
+            const allowedLeaves = parseInt(leaveCategory.data('alloweddays'), 10) || 0;
+            const usedLeaves = parseInt(leaveCategory.data('used-leaves'), 10) || 0;
+            const remainingLeaves = (!isNaN(availableDays) && availableDays >= 0) ? availableDays : (allowedLeaves - usedLeaves);
 
             if (leaveCategoryText && fromDate && toDate) {
                 const { totalDays, formattedRange } = calculateTotalDays(fromDate, toDate);
@@ -705,7 +706,7 @@
                         <div class="d-flex">
                             <h6>${formattedRange}</h6><span>${totalDays} Days</span>
                         </div>
-                        <p>Remaining Leave Balance: ${remainingLeaves} ${warningText}</p>
+                        <p>Available Leave Balance: ${remainingLeaves} ${warningText}</p>
                     </div>
                     <hr class="mt-1 mb-3">
                 `;
@@ -792,7 +793,7 @@
                             <option value="">Select Leave Category</option>
                             @if($leave_categories)
                                 @foreach($leave_categories as $value)
-                                    <option value="{{$value->leave_cat_id}}" data-allowedDays="{{$value->allocated_days}}" data-used-leaves = "{{$value->total_leave_days}}" data-color="{{$value->color}}">{{$value->leave_type}}</option>
+                                    <option value="{{$value->leave_cat_id}}" data-alloweddays="{{$value->allocated_days}}" data-available-days="{{ $value->available_days ?? $value->allocated_days }}" data-used-leaves="{{$value->total_leave_days}}" data-color="{{$value->color}}">{{$value->leave_type}}</option>
                                 @endforeach
                             @endif
                         </select>
