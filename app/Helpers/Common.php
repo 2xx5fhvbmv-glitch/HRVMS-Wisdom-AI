@@ -5652,18 +5652,26 @@ class Common
             $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
 
             $driver = config('filesystems.default', 'local');
+            $uploadedToS3 = false;
 
             if ($driver === 's3') {
-                $s3 = Storage::disk('s3');
+                try {
+                    $s3 = Storage::disk('s3');
 
-                $folderExists = $s3->exists($basePath . '/.gitkeep');
-                if (!$folderExists) {
-                    $s3->put($basePath . '/.gitkeep', '');
+                    $folderExists = $s3->exists($basePath . '/.gitkeep');
+                    if (!$folderExists) {
+                        $s3->put($basePath . '/.gitkeep', '');
+                    }
+
+                    $filePath = $basePath . '/' . $newFileName;
+                    $s3->put($filePath, file_get_contents($uploadedFile->getRealPath()));
+                    $uploadedToS3 = true;
+                } catch (\Exception $e) {
+                    \Log::warning('S3 upload failed, falling back to local storage: ' . $e->getMessage());
                 }
+            }
 
-                $filePath = $basePath . '/' . $newFileName;
-                $s3->put($filePath, file_get_contents($uploadedFile->getRealPath()));
-            } else {
+            if (!$uploadedToS3) {
                 $localPath = 'talent_acquisition/' . base64_encode($vacancy_id);
                 $fullDir = public_path($localPath);
                 if (!file_exists($fullDir)) {
@@ -5678,7 +5686,7 @@ class Common
             $data['filename'] = $newFileName;
 
             return $data;
-             } catch (\Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('Failed to create talent acquisition folder or upload file: ' . $e->getMessage());
             return ['status' => false];
         }
