@@ -27,7 +27,7 @@ class HiringSource extends Model
         parent::boot();
 
         self::saving(function ($model) {
-            if (!$model->exists) {
+            if (!$model->exists && Auth::guard('resort-admin')->check()) {
                 $model->created_by = Auth::guard('resort-admin')->user()->id;
             }
 
