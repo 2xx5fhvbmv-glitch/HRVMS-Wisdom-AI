@@ -80,19 +80,20 @@
                                         <input type="file" id="fileInput" name="passport" class="drop-zone__input"  data-parsley-required="true" data-parsley-required-message="Please upload your passport" >
                                     </div>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-12">
                                     <div class="upload-area drop-zone " id="uploadfile">
                                         <div class="d-flex align-items-center text-start drop-zone__prompt">
                                             <div class="img-box">
                                                 <img src="{{ URL::asset('resorts_assets/images/upload.svg')}}" alt="" class="img-fluid" />
                                             </div>
                                             <div>
-                                                <h3>Upload Other Document</h3>
-                                                <span>PDF Format</span>
+                                                <h3>Upload Other Documents</h3>
+                                                <span>PDF Format (Multiple files allowed)</span>
                                             </div>
                                         </div>
                                         <p>Education Document, Experience Letter, etc.</p>
-                                        <input type="file" name="other_document" class="drop-zone__input" accept=".pdf">
+                                        <input type="file" name="other_document[]" class="drop-zone__input" accept=".pdf" multiple>
+                                        <div id="otherDocFileList" class="mt-2" style="max-height:150px;overflow-y:auto;"></div>
                                     </div>
                                 </div>
                                 <div class="col-6">
@@ -1787,6 +1788,62 @@
         }
 
         // Dropzone Initialization with Validation
+        // Render the other document file list with remove buttons
+        function renderOtherDocList(inputElement, dropZoneElement) {
+            const fileListDiv = document.getElementById('otherDocFileList');
+            fileListDiv.innerHTML = '';
+            const files = window._otherDocFiles || [];
+
+            // Update dropzone prompt
+            const prompt = dropZoneElement.querySelector('.drop-zone__prompt');
+            let thumb = dropZoneElement.querySelector('.drop-zone__thumb');
+            if (files.length === 0) {
+                if (prompt) prompt.style.display = '';
+                if (thumb) thumb.remove();
+            } else {
+                if (prompt) prompt.style.display = 'none';
+                if (!thumb) {
+                    thumb = document.createElement('div');
+                    thumb.classList.add('drop-zone__thumb');
+                    dropZoneElement.appendChild(thumb);
+                }
+                thumb.textContent = files.length + ' file(s) selected';
+                thumb.style.cssText = 'padding:10px;font-size:14px;color:#004552;font-weight:600;';
+            }
+
+            files.forEach((f, idx) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:4px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;';
+
+                const info = document.createElement('span');
+                info.style.cssText = 'color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80%;';
+                info.innerHTML = '<svg width="14" height="14" fill="#dc3545" viewBox="0 0 16 16" style="margin-right:5px;vertical-align:middle;"><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/></svg>' + f.name + ' <small style="color:#888;">(' + (f.size / 1024).toFixed(1) + ' KB)</small>';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.style.cssText = 'background:none;border:none;color:#dc3545;font-size:18px;font-weight:bold;cursor:pointer;padding:0 4px;line-height:1;';
+                removeBtn.title = 'Remove this file';
+                removeBtn.addEventListener('click', () => {
+                    window._otherDocFiles.splice(idx, 1);
+                    // Sync input FileList
+                    const dt = new DataTransfer();
+                    window._otherDocFiles.forEach(f => dt.items.add(f));
+                    inputElement.files = dt.files;
+                    renderOtherDocList(inputElement, dropZoneElement);
+                });
+
+                row.appendChild(info);
+                row.appendChild(removeBtn);
+                fileListDiv.appendChild(row);
+            });
+
+            // Sync the actual input's FileList from our array
+            const dt = new DataTransfer();
+            files.forEach(f => dt.items.add(f));
+            inputElement.files = dt.files;
+        }
+
         function initDropzoneValidation() {
             document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
                 const dropZoneElement = inputElement.closest(".drop-zone");
@@ -1801,14 +1858,34 @@
                 // Handle file selection
                 inputElement.addEventListener("change", (event) => {
                     if (inputElement.files.length) {
+                        // Multiple files support for other_document
+                        if (inputElement.name === 'other_document[]') {
+                            // Accumulate files into a stored array
+                            if (!window._otherDocFiles) window._otherDocFiles = [];
+                            let hasInvalid = false;
+                            for (let i = 0; i < inputElement.files.length; i++) {
+                                const f = inputElement.files[i];
+                                if (f.type !== 'application/pdf') {
+                                    hasInvalid = true;
+                                    continue;
+                                }
+                                window._otherDocFiles.push(f);
+                            }
+                            if (hasInvalid) {
+                                toastr.error('Only PDF files are allowed.');
+                            }
+                            renderOtherDocList(inputElement, dropZoneElement);
+                            return;
+                        }
+
                         const file = inputElement.files[0];
                         const fileType = getFileType(inputElement);
-                        
+
                         // Validate file
                         if (validateFile(file, fileType, inputElement)) {
                             updateDropzoneThumbnail(dropZoneElement, file);
                             // console.log(file,"file");
-                            
+
                             // Trigger Parsley validation
                             $(inputElement).parsley().validate();
                         } else {
@@ -1855,7 +1932,7 @@
             // Determine file type
             function getFileType(inputElement) {
                 const name = inputElement.name;
-                if (name === 'curriculum_file' || name === 'passport') return 'PDF';
+                if (name === 'curriculum_file' || name === 'passport' || name === 'other_document[]') return 'PDF';
                 if (name === 'profile_picture') return 'Photo';
                 return 'Unknown';
             }
