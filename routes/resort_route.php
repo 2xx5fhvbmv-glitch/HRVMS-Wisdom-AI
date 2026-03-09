@@ -636,6 +636,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('accommodation/floor-and-room/store', 'Accommodation\ConfigrationController@StoreFloorandroom')->name('resort.accommodation.StoreFloorandroom');
     Route::get('accommodation/floor-and-room/index', 'Accommodation\ConfigrationController@FloorRoomIndex')->name('resort.accommodation.config.FloorRoomIndex');
     Route::put('/accommodation/floor-and-room/update/{id}', 'Accommodation\ConfigrationController@FloorAndRoomUpdate')->name('resort.accommodation.FloorAndRoomUpdate');
+    Route::delete('/accommodation/floor-and-room/destroy/{id}', 'Accommodation\ConfigrationController@FloorAndRoomDestroy')->name('resort.accommodation.FloorAndRoomDestroy');
     Route::get('accommodation/get-floor', 'Accommodation\ConfigrationController@GetBuildingWiseFloor')->name('resort.accommodation.config.getFloor');
     Route::get('accommodation/get-floor-wise-rooms', 'Accommodation\ConfigrationController@GetFloorWiseRooms')->name('resort.accommodation.config.GetFloorWiseRooms');
     Route::post('accommodation/occupancy/threshold-form', 'Accommodation\ConfigrationController@OccupancyThreshold')->name('resort.accommodation.config.OccupancyThresholdForm');

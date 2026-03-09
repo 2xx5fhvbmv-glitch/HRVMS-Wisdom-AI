@@ -76,7 +76,7 @@
                             </div>
                             <div class="col-lg-4 col-md-4 col-sm-6">
                                 <label for="floor" class="form-label">FLOOR</label>
-                                <input type="number" min="1" class="form-control" id="Floor_1" name="Floor" placeholder="1 st floort ">
+                                <input type="number" min="0" class="form-control" id="Floor_1" name="Floor" placeholder="0 for Ground Floor">
 
                             </div>
                             <div class="col-lg-4 col-md-4 col-sm-6">
