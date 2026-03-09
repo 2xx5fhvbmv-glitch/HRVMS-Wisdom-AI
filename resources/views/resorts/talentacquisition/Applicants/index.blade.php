@@ -306,8 +306,7 @@
             </div>
         </div>
     </div>
-    @if($isHrDepartment)
-    {{-- Confirmation Modal for Interview Progress Actions --}}
+    {{-- Confirmation Modal for Interview Progress Actions (available to all roles) --}}
     <div class="modal fade" id="confirm-action-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content">
@@ -326,6 +325,7 @@
         </div>
     </div>
 
+    @if($isHrDepartment)
     <div class="modal fade" id="Email-template-selection-modal" tabindex="-1" aria-labelledby="exampleModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-small">
@@ -688,6 +688,9 @@
                                                     data-ApplicantID="${response.data.ApplicantID}"
                                                     data-ApplicantStatus_id="${nrApplicantStatusId}"
                                                     class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                                if (nr.InterviewStatus == 'Invitation Rejected') {
+                                                    nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${nr.interviewRejectionReason}</div>` : ''}`;
+                                                }
                                             } else if (nr.InterviewStatus == 'Invitation Sent') {
                                                 nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                                 nrStatusBadge = `<span class="badge bg-info text-white">Invitation Sent</span>`;
@@ -781,13 +784,33 @@
                                                             <td>${response.data.Date}</td>
                                                             <td>${response.data.MalidivanTime}</td>
                                                             <td>${response.data.ApplicantTime}</td>
-                                                            <td>${response.data.InterviewStatus}</td>
+                                                            <td>${response.data.InterviewStatus}${response.data.InterviewStatus == 'Invitation Rejected' && response.data.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${response.data.interviewRejectionReason}</div>` : ''}</td>
                                                             <td>
                                                                 ${newTag}
                                                             </td>
                                                         </tr>
                                                         ${nextRoundRow}
                                                     </table>
+                                                    ${response.data.rejectionReason ? `<div class="mt-2 p-2" style="background:#fff3f3; border-left:3px solid #dc3545; border-radius:4px;">
+                                                        <strong class="text-danger">${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? 'Offer Letter' : 'Contract'} Declined</strong>
+                                                        <p class="mb-0 mt-1"><strong>Reason:</strong> ${response.data.rejectionReason}</p>
+                                                    </div>` : ''}
+                                                    @if($isHrDepartment)
+                                                    ${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? `<div class="mt-2">
+                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendOfferLetterBtn"
+                                                            data-id="${response.data.ApplicantID}"
+                                                            data-applicantstatusid="${response.data.ApplicantStatus_id}">
+                                                            Resend Offer Letter
+                                                        </a>
+                                                    </div>` : ''}
+                                                    ${response.data.applicantStatusRaw == 'Contract Rejected' ? `<div class="mt-2">
+                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendContractBtn"
+                                                            data-id="${response.data.ApplicantID}"
+                                                            data-applicantstatusid="${response.data.ApplicantStatus_id}">
+                                                            Resend Contract
+                                                        </a>
+                                                    </div>` : ''}
+                                                    @endif
                                                 </div>
                                             </td>
                                         </tr>`;
@@ -892,6 +915,9 @@
                                                 data-ApplicantID="${response.data.ApplicantID}"
                                                 data-ApplicantStatus_id="${nrApplicantStatusId}"
                                                 class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                            if (nr.InterviewStatus == 'Invitation Rejected') {
+                                                nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${nr.interviewRejectionReason}</div>` : ''}`;
+                                            }
                                         } else if (nr.InterviewStatus == 'Invitation Sent') {
                                             nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                             nrStatusBadge = `<span class="badge bg-info text-white">Invitation Sent</span>`;
@@ -985,13 +1011,33 @@
                                                         <td>${response.data.Date}</td>
                                                         <td>${response.data.MalidivanTime}</td>
                                                         <td>${response.data.ApplicantTime}</td>
-                                                        <td>${response.data.InterviewStatus}</td>
+                                                        <td>${response.data.InterviewStatus}${response.data.InterviewStatus == 'Invitation Rejected' && response.data.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${response.data.interviewRejectionReason}</div>` : ''}</td>
                                                         <td>
                                                             ${newTag}
                                                         </td>
                                                     </tr>
                                                     ${nextRoundRow}
                                                 </table>
+                                                ${response.data.rejectionReason ? `<div class="mt-2 p-2" style="background:#fff3f3; border-left:3px solid #dc3545; border-radius:4px;">
+                                                    <strong class="text-danger">${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? 'Offer Letter' : 'Contract'} Declined</strong>
+                                                    <p class="mb-0 mt-1"><strong>Reason:</strong> ${response.data.rejectionReason}</p>
+                                                </div>` : ''}
+                                                @if($isHrDepartment)
+                                                ${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? `<div class="mt-2">
+                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendOfferLetterBtn"
+                                                        data-id="${response.data.ApplicantID}"
+                                                        data-applicantstatusid="${response.data.ApplicantStatus_id}">
+                                                        Resend Offer Letter
+                                                    </a>
+                                                </div>` : ''}
+                                                ${response.data.applicantStatusRaw == 'Contract Rejected' ? `<div class="mt-2">
+                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendContractBtn"
+                                                        data-id="${response.data.ApplicantID}"
+                                                        data-applicantstatusid="${response.data.ApplicantStatus_id}">
+                                                        Resend Contract
+                                                    </a>
+                                                </div>` : ''}
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>`;
@@ -1749,13 +1795,15 @@
         $(document).on("click",".DownloadFile", function () {
             let fileId = $(this).data("id");
             let fileFlag = $(this).data("flag");
+            let fileIndex = $(this).data("index");
 
             $.ajax({
                 url: "{{ route('resort.ta.DownloadFile') }}",
                 type: "POST",
                 data: {
                     id: fileId,
-                    flag: fileFlag
+                    flag: fileFlag,
+                    index: fileIndex
                 },
                 success: function(response) {
                     if (response.success) 
@@ -2127,10 +2175,21 @@
         function makeAjaxRequest(interviewRound, ApplicantID, applicantstatusid, Rank, emailTemplateID, rejectionReason) {
             // Remove ' Rank' and anything after it from interviewRound
             if (Rank && interviewRound.includes(" Complete")) {
-                // console.log(interviewRound);
-                interviewRound = interviewRound.split(" Complete")[0]; // Keep only the part before " Rank"
+                interviewRound = interviewRound.split(" Complete")[0];
             }
-            // console.log(interviewRound);
+
+            // Show loader on all progress buttons and disable them
+            var $progressBtns = $('.ApprovedOrSortListed');
+            $progressBtns.each(function() {
+                $(this).prop('disabled', true);
+                if (!$(this).find('.spinner-border').length) {
+                    $(this).prepend('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>');
+                }
+            });
+
+            // Also disable confirm button if visible
+            $('#confirm-action-yes').prop('disabled', true);
+
             $.ajax({
                 url: "{{ route('resort.ta.ApprovedOrSortApplicantWiseStatus') }}",
                 type: "POST",
@@ -2139,7 +2198,7 @@
                     ApplicantID: ApplicantID,
                     applicantstatusid: applicantstatusid,
                     Rank: Rank,
-                    emailTemplateID: emailTemplateID, // Can be null if no template is used
+                    emailTemplateID: emailTemplateID,
                     rejectionReason: rejectionReason || null,
                     _token: "{{ csrf_token() }}",
                 },
@@ -2147,7 +2206,6 @@
                     if (response.success) {
                         $(".userApplicants-wrapper").html(response.view);
                         DatatableGrid();
-                        // Remove all expanded details rows so stale data doesn't persist
                         $('tr.details-row').remove();
                         $('td.details-control').closest('tr').removeClass('shown');
                         datatablelist();
@@ -2164,6 +2222,14 @@
                         errs += error + "<br>";
                     });
                     toastr.error(errs, { positionClass: "toast-bottom-right" });
+                },
+                complete: function() {
+                    // Remove loader and re-enable buttons
+                    $progressBtns.each(function() {
+                        $(this).prop('disabled', false);
+                        $(this).find('.spinner-border').remove();
+                    });
+                    $('#confirm-action-yes').prop('disabled', false);
                 },
             });
         }
@@ -2493,6 +2559,64 @@
                 },
                 complete: function() {
                     $submitBtn.prop('disabled', false).text('Send Contract');
+                }
+            });
+        });
+        // Save Salary Allocation
+        $(document).on("click", ".saveSalaryAllocation", function() {
+            var $btn = $(this);
+            var $form = $('#salaryAllocationForm');
+            var basicSalary = parseFloat($form.find('input[name="basic_salary"]').val());
+            var maxSalary = parseFloat($form.find('#maxBudgetedSalary').val());
+
+            if (!basicSalary || basicSalary <= 0) {
+                toastr.error("Please enter a valid basic salary.", "Error", { positionClass: 'toast-bottom-right' });
+                return;
+            }
+
+            if (maxSalary > 0 && basicSalary > maxSalary) {
+                toastr.error("Basic salary cannot exceed budgeted salary of " + maxSalary.toFixed(2) + ".", "Error", { positionClass: 'toast-bottom-right' });
+                return;
+            }
+
+            // Validate allowances against their budget amounts
+            var hasError = false;
+            $form.find('.allowance-input').each(function() {
+                var val = parseFloat($(this).val());
+                var max = parseFloat($(this).data('max'));
+                var name = $(this).data('name');
+                if (val && max > 0 && val > max) {
+                    toastr.error(name + " cannot exceed budget amount of " + max.toFixed(2) + ".", "Error", { positionClass: 'toast-bottom-right' });
+                    hasError = true;
+                    return false;
+                }
+            });
+            if (hasError) return;
+
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...');
+
+            $.ajax({
+                url: "{{ route('resort.ta.saveSalaryAllocation') }}",
+                type: "POST",
+                data: $form.serialize() + '&_token={{ csrf_token() }}',
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $btn.text('Update Salary Allocation');
+                    } else {
+                        toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function(xhr) {
+                    var msg = 'Something went wrong.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+                },
+                complete: function() {
+                    $btn.prop('disabled', false);
+                    if ($btn.find('.fa-spinner').length) {
+                        $btn.html('Update Salary Allocation');
+                    }
                 }
             });
         });
