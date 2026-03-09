@@ -21,15 +21,15 @@ class PerformanceMeetingController extends Controller
 {
 
 
-    public $resort='';
-    protected $underEmp_id=[];
+    public $resort = '';
+    public $globalUser = '';
+    protected $underEmp_id = [];
 
     public function __construct()
     {
-        $this->resort = Auth::guard('resort-admin')->user();
-        $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(!$this->resort) return;
-        if($this->resort->is_master_admin == 0){
+        $this->resort = $this->globalUser = Auth::guard('resort-admin')->user();
+        if (!$this->resort) return;
+        if ($this->resort->is_master_admin == 0 && isset($this->globalUser->GetEmployee) && $this->globalUser->GetEmployee) {
             $reporting_to = $this->globalUser->GetEmployee->id;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
@@ -284,34 +284,46 @@ class PerformanceMeetingController extends Controller
 
     public function GetPerformanceEmp(Request $request)
     {
-        $searchValue= $request->searchValue;
+        $searchValue = trim((string) ($request->input('searchValue', '')));
+        $department = $request->input('department');
+        $position = $request->input('position');
+        $employment_grade = $request->input('employment_grade');
+        $gender = $request->input('gender');
 
-        $department = $request->department;
-        $position = $request->position;
-        $employment_grade = $request->employment_grade;
         $employees = Employee::with(['resortAdmin', 'position'])
-                                    ->where('resort_id', $this->resort->resort_id)
-                                    ->where(function ($query) use ($searchValue) {
-                                        $query->whereHas('resortAdmin', function ($q) use ($searchValue) {
-                                            $q->whereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$searchValue}%"]);
-                                        })
-                                        ->orWhereHas('position', function ($q) use ($searchValue) {
-                                            $q->where('position_title', 'LIKE', "%{$searchValue}%");
-                                        });
-                                    });
-                                    if(isset($employment_grade))
-                                    {
-                                       $employees->where('rank',$employment_grade);
-                                    }
-                                    if(isset($department) && $department !="Department")
-                                    {
-                                       $employees->where('Dept_id',$department);
-                                    }
-                                    if(isset($position))
-                                    {
-                                       $employees->where('Position_id',$position);
-                                    }
-        $employees =  $employees ->distinct() // Ensures unique results
+            ->where('resort_id', $this->resort->resort_id);
+
+        if ($searchValue !== '') {
+            $employees->where(function ($query) use ($searchValue) {
+                $query->whereHas('resortAdmin', function ($q) use ($searchValue) {
+                    $q->whereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$searchValue}%"]);
+                })
+                ->orWhereHas('position', function ($q) use ($searchValue) {
+                    $q->where('position_title', 'LIKE', "%{$searchValue}%");
+                });
+            });
+        }
+
+        $departments = $this->normalizeFilterArray($department, true);
+        if (!empty($departments)) {
+            $employees->whereIn('Dept_id', $departments);
+        }
+        $positions = $this->normalizeFilterArray($position, true);
+        if (!empty($positions)) {
+            $employees->whereIn('Position_id', $positions);
+        }
+        $grades = $this->normalizeFilterArray($employment_grade, true);
+        if (!empty($grades)) {
+            $employees->whereIn('rank', $grades);
+        }
+        $genders = $this->normalizeFilterArray($gender, false);
+        if (!empty($genders)) {
+            $employees->whereHas('resortAdmin', function ($q) use ($genders) {
+                $q->whereIn('gender', $genders);
+            });
+        }
+
+        $employees = $employees->distinct()
                                     ->get()
                                     ->map(function ($e) {
                                         $e->Emp_id = base64_encode($e->id);
@@ -322,7 +334,33 @@ class PerformanceMeetingController extends Controller
                                     });
             return response()->json([
                 'success' => true,
-                'data' =>$employees,
+                'data' => $employees->values()->all(),
             ], 200);
+    }
+
+    /**
+     * Normalize filter input to array of scalar values (for department, position, grade, gender).
+     * @param bool $castInt For Dept_id, Position_id, rank use true so values are int for whereIn.
+     */
+    private function normalizeFilterArray($value, bool $castInt = false): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+        $raw = [];
+        if (is_array($value)) {
+            foreach ($value as $v) {
+                $v = is_scalar($v) ? trim((string) $v) : '';
+                if ($v !== '' && $v !== 'Department') {
+                    $raw[] = $castInt ? (int) $v : $v;
+                }
+            }
+        } else {
+            $v = trim((string) $value);
+            if ($v !== '' && $v !== 'Department') {
+                $raw[] = $castInt ? (int) $v : $v;
+            }
+        }
+        return array_values($raw);
     }
 }

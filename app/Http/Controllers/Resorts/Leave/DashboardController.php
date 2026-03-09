@@ -29,15 +29,15 @@ class DashboardController extends Controller
         // // dd($reporting_to);
         // $this->underEmp_id = Common::getSubordinates($this->reporting_to);
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
-        if(isset($this->resort->GetEmployee))
-        {
-            $reporting_to = $this->resort->GetEmployee->id;
+        if (!$this->resort) {
+            return;
         }
-        else
-        {
-            $reporting_to = $this->resort->id;
+        if (isset($this->resort->GetEmployee) && $this->resort->GetEmployee) {
+            $this->reporting_to = $this->resort->GetEmployee->id;
+        } else {
+            $this->reporting_to = $this->resort->id ?? null;
         }
-        $this->underEmp_id = Common::getSubordinates($reporting_to);
+        $this->underEmp_id = $this->reporting_to ? Common::getSubordinates($this->reporting_to) : [];
 
     }
 
@@ -807,13 +807,15 @@ class DashboardController extends Controller
                 }
             }
 
-            // Can approve: only applicant's reporting_to (from employee profile; can be changed in profile settings) or GM leave: HR/EXCOM/HOD
-            $reportingToStr = trim((string)($leaveRequest->reporting_to ?? ''));
-            $loggedInIdStr = trim((string)$loggedInEmployeeId);
+            // Can approve: (1) applicant's reporting_to, or (2) GM leave and current user is HR/EXCOM/HOD, or (3) current user has a Pending row in the approval chain (e.g. HR EXCOM as reporting manager)
+            $reportingToInt = (int)($leaveRequest->reporting_to ?? 0);
             $applicantRankStr = trim((string)($leaveRequest->applicant_rank ?? ''));
-            $isReportingManager = $reportingToStr !== '' && $reportingToStr === $loggedInIdStr;
+            $isReportingManager = $reportingToInt > 0 && $reportingToInt === (int)$loggedInEmployeeId;
             $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($loggedInRankStr, ['1', '2', '3'], true);
-            $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover) && $isPending && !$isFullyApproved);
+            $hasCurrentUserPendingRow = $statuses->contains(function ($row) use ($loggedInEmployeeId) {
+                return (int)($row->approver_id ?? 0) === (int)$loggedInEmployeeId && strtolower(trim((string)($row->status ?? ''))) === 'pending';
+            });
+            $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover || $hasCurrentUserPendingRow) && $isPending && !$isFullyApproved);
 
             // Handle combined leaves
             if ($leaveRequest->combinedLeave) {

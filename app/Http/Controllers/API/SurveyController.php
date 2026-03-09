@@ -43,48 +43,84 @@ class SurveyController extends Controller
         }
 
         try {
-            $employee_id                                =   $this->user->GetEmployee->id;
+            // Get employee linked to this ResortAdmin (same as login: login finds Employee by Emp_id, then ResortAdmin by employee.Admin_Parent_id; we have the token's ResortAdmin, so get Employee by Admin_Parent_id)
+            $employee = $this->user->getEmployee ?? $this->user->GetEmployee ?? null;
+            if (!$employee || !isset($employee->id)) {
+                $employee = Employee::where('Admin_Parent_id', $this->user->id)->first();
+            }
+            if (!$employee || !isset($employee->id)) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Surveys Employee Dashboard',
+                    'survey_data' => [
+                        'total_count' => 0,
+                        'total_pending_count' => 0,
+                        'total_complete_count' => 0,
+                        'servey_list_data' => [],
+                    ],
+                ], 200);
+            }
 
-            // Optimized query using conditional aggregation
-            $surveyCounts                               =   ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
-                                                                ->where('se.Emp_id', $employee_id)
-                                                                ->where('resort_id', $this->resort_id)
-                                                                ->whereIn('parent_surveys.Status', ['OnGoing', 'Complete'])
-                                                                ->selectRaw("
-                                                                    COUNT(*) AS total_count,
-                                                                    COUNT(CASE WHEN se.emp_status = 'no' AND parent_surveys.Status = 'OnGoing' THEN 1 END) AS total_pending_count,
-                                                                    COUNT(CASE WHEN se.emp_status = 'yes' AND parent_surveys.Status = 'OnGoing' THEN 1 END) AS total_complete_count
-                                                                ")->first();
-                                                                
-            // Get all the surveys with their question count in a single query
-            $surveyQuestionData                         =   ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
-                                                                ->leftJoin('survey_questions as sq', 'sq.Parent_survey_id', '=', 'parent_surveys.id')
-                                                                ->where('se.Emp_id', $employee_id)
-                                                                ->where('parent_surveys.resort_id', $this->resort_id)
-                                                                ->whereIn('parent_surveys.Status', ['OnGoing', 'Complete'])
-                                                                ->orderBy('parent_surveys.created_at', 'desc')
-                                                                ->select(
-                                                                    'parent_surveys.id',
-                                                                    'parent_surveys.Surevey_title',
-                                                                    'parent_surveys.Start_date',
-                                                                    'parent_surveys.End_date',
-                                                                    'parent_surveys.Status',
-                                                                    'se.Complete_time',
-                                                                    'se.emp_status',
-                                                                    \DB::raw('COUNT(sq.id) as surveyQuetioncount')
-                                                                )
-                                                                ->groupBy('parent_surveys.id')
-                                                                ->get();
+            $employee_id = (int) $employee->id;
 
-             // Prepare the survey data
+            // Only surveys for this resort (parent_surveys.resort_id must match logged-in user's resort_id, e.g. 26)
+            $surveyCounts = ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
+                ->where('se.Emp_id', $employee_id)
+                ->where('parent_surveys.resort_id', $this->resort_id)
+                ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
+                ->selectRaw("
+                    COUNT(*) AS total_count,
+                    COUNT(CASE WHEN se.emp_status = 'no' AND parent_surveys.Status IN ('Publish', 'OnGoing') THEN 1 END) AS total_pending_count,
+                    COUNT(CASE WHEN se.emp_status = 'yes' AND parent_surveys.Status IN ('Publish', 'OnGoing') THEN 1 END) AS total_complete_count
+                ")->first();
+
+            // Get all the surveys with their question count (one row per survey for this employee); match parent_surveys.resort_id to user's resort
+            $surveyQuestionData = ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
+                ->where('se.Emp_id', $employee_id)
+                ->where('parent_surveys.resort_id', $this->resort_id)
+                ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
+                ->orderBy('parent_surveys.created_at', 'desc')
+                ->select(
+                    'parent_surveys.id',
+                    'parent_surveys.Surevey_title',
+                    'parent_surveys.Start_date',
+                    'parent_surveys.End_date',
+                    'parent_surveys.Status',
+                    'parent_surveys.created_at',
+                    'se.id as sur_emp_id',
+                    'se.Complete_time',
+                    'se.emp_status',
+                    \DB::raw('(SELECT COUNT(*) FROM survey_questions WHERE Parent_survey_id = parent_surveys.id) as surveyQuetioncount')
+                )
+                ->get()
+                ->map(function ($row) {
+                    // Mobile-friendly: ensure counts are int, add base64 survey_id for questions API
+                    $row->surveyQuetioncount = (int) $row->surveyQuetioncount;
+                    $row->survey_id = (int) $row->id;
+                    $row->survey_id_encoded = base64_encode($row->id);
+                    $row->sur_emp_id = (int) ($row->sur_emp_id ?? 0);
+                    return $row;
+                });
+
+            // When no surveys, first() returns null
             $surveyData = [
-                'total_count'                           =>  $surveyCounts->total_count,
-                'total_pending_count'                   =>  $surveyCounts->total_pending_count,
-                'total_complete_count'                  =>  $surveyCounts->total_complete_count,
-                'servey_list_data'                           =>  $surveyQuestionData
+                'total_count' => $surveyCounts ? (int) $surveyCounts->total_count : 0,
+                'total_pending_count' => $surveyCounts ? (int) $surveyCounts->total_pending_count : 0,
+                'total_complete_count' => $surveyCounts ? (int) $surveyCounts->total_complete_count : 0,
+                'servey_list_data' => $surveyQuestionData,
+                'survey_list_data' => $surveyQuestionData, // alias for mobile (correct spelling)
             ];
 
-            return response()->json(['success' => true, 'message' => 'Surveys Employee Dashboard', 'survey_data' => $surveyData], 200);
+            $response = ['success' => true, 'message' => 'Surveys Employee Dashboard', 'survey_data' => $surveyData];
+            // Optional debug: add ?debug=1 to request to see which employee/resort the API is using (for troubleshooting "survey not showing")
+            if (request()->has('debug') && request()->input('debug') == '1') {
+                $response['_debug'] = [
+                    'employee_id' => $employee_id,
+                    'resort_id' => $this->resort_id,
+                    'employee_emp_id' => $employee->Emp_id ?? null,
+                ];
+            }
+            return response()->json($response, 200);
 
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
@@ -102,45 +138,68 @@ class SurveyController extends Controller
         }
 
         try {
-           
-            $employee_id                                =   $this->user->GetEmployee->id;
-            $id                                         =   base64_decode($surveyId);
+            $employee = $this->user->getEmployee ?? $this->user->GetEmployee ?? null;
+            if (!$employee || !isset($employee->id)) {
+                $employee = Employee::where('Admin_Parent_id', $this->user->id)->first();
+            }
+            if (!$employee || !isset($employee->id)) {
+                return response()->json(['success' => false, 'message' => 'Employee not found'], 200);
+            }
+            $employee_id = (int) $employee->id;
+            $id = (int) base64_decode($surveyId);
+            if ($id <= 0) {
+                return response()->json(['success' => false, 'message' => 'Invalid survey'], 200);
+            }
 
-            $parent                                     =   ParentSurvey::join("resort_admins as t2","t2.id","=","parent_surveys.created_by")
-                                                                ->join('employees as t1',"t1.Admin_Parent_id","=","t2.id")
-                                                                ->join('resort_positions as rp', "rp.id", "=", "t1.Position_id")
-                                                                ->where("parent_surveys.id",$id)
-                                                                ->where("parent_surveys.resort_id",$this->resort_id)
-                                                                ->first(['parent_surveys.*','t2.first_name','t2.last_name','t2.id as ParentId','rp.position_title'] );
+            // Ensure this employee is a participant in this survey (mobile: only show questions if assigned)
+            $participantCheck = SurveyEmployee::where('Parent_survey_id', $id)
+                ->where('Emp_id', $employee_id)
+                ->exists();
+            if (!$participantCheck) {
+                return response()->json(['success' => false, 'message' => 'Survey not found or you are not a participant'], 200);
+            }
+
+            $parent = ParentSurvey::join("resort_admins as t2", "t2.id", "=", "parent_surveys.created_by")
+                ->join('employees as t1', "t1.Admin_Parent_id", "=", "t2.id")
+                ->join('resort_positions as rp', "rp.id", "=", "t1.Position_id")
+                ->where("parent_surveys.id", $id)
+                ->where("parent_surveys.resort_id", $this->resort_id)
+                ->first(['parent_surveys.*', 't2.first_name', 't2.last_name', 't2.id as ParentId', 'rp.position_title']);
             if (!$parent) {
-                    return response()->json(['success' => false, 'message' => 'Survey not found'], 200);
+                return response()->json(['success' => false, 'message' => 'Survey not found'], 200);
             }
 
             $parent->EmployeeName                       =   ucfirst($parent->first_name . ' ' .  $parent->last_name);
             $parent->profileImg                         =   Common::getResortUserPicture($parent->Parentid);              
-            $surveyQuestionAnsData                      =   ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
-                                                                ->leftJoin('survey_questions as sq', 'sq.Parent_survey_id', '=', 'parent_surveys.id')
-                                                                ->where('se.Emp_id', $employee_id)
-                                                                ->where('parent_surveys.resort_id', $this->resort_id)
-                                                                ->where('parent_surveys.id',$id) 
-                                                                ->select(
-                                                                    'sq.id as survey_que_id',
-                                                                    'sq.Question_Text',
-                                                                    'sq.Question_Type',
-                                                                    'sq.Total_Option_Json',
-                                                                    'sq.Question_Complusory',
-                                                                    'se.id as sur_emp_id'
-                                                                )->get()
-                                                                ->map(function ($question) {
-                                                                    // Decode the Total_Option_Json to an array
-                                                                    $question->Total_Option_Json = json_decode($question->Total_Option_Json);
-                                                                    return $question;
-                                                                });
-            $totalQuestionCount                         =   $surveyQuestionAnsData->count();                                                
+            $surveyQuestionAnsData = ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
+                ->leftJoin('survey_questions as sq', 'sq.Parent_survey_id', '=', 'parent_surveys.id')
+                ->where('se.Emp_id', $employee_id)
+                ->where('parent_surveys.resort_id', $this->resort_id)
+                ->where('parent_surveys.id', $id)
+                ->select(
+                    'sq.id as survey_que_id',
+                    'sq.Question_Text',
+                    'sq.Question_Type',
+                    'sq.Total_Option_Json',
+                    'sq.Question_Complusory',
+                    'se.id as sur_emp_id'
+                )
+                ->get()
+                ->filter(function ($q) {
+                    return $q->survey_que_id !== null; // exclude nulls from leftJoin when no questions
+                })
+                ->map(function ($question) {
+                    $question->survey_que_id = (int) $question->survey_que_id;
+                    $question->sur_emp_id = (int) $question->sur_emp_id;
+                    $question->Total_Option_Json = $question->Total_Option_Json ? json_decode($question->Total_Option_Json) : null;
+                    return $question;
+                })
+                ->values();
+            $totalQuestionCount = $surveyQuestionAnsData->count();
             $surveyData = [
-                'parent_data'                           =>  $parent,
-                'total_question_count'                  =>  $totalQuestionCount,
-                'survey_question_data'                  =>  $surveyQuestionAnsData
+                'parent_data' => $parent,
+                'total_question_count' => (int) $totalQuestionCount,
+                'survey_question_data' => $surveyQuestionAnsData,
             ];
             return response()->json(['success' => true, 'message' => 'Surveys Employee Dashboard', 'survey_data' => $surveyData], 200);
 
@@ -174,7 +233,14 @@ class SurveyController extends Controller
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
-        $employee_id                                =   $this->user->GetEmployee->id;
+        $employee = $this->user->getEmployee ?? $this->user->GetEmployee ?? null;
+        if (!$employee || !isset($employee->id)) {
+            $employee = Employee::where('Admin_Parent_id', $this->user->id)->first();
+        }
+        if (!$employee || !isset($employee->id)) {
+            return response()->json(['success' => false, 'message' => 'Employee not found'], 200);
+        }
+        $employee_id = (int) $employee->id;
 
         if (
             count($request->parent_survey_id) !== count($request->survey_emp_ta_id) ||
@@ -187,31 +253,46 @@ class SurveyController extends Controller
         DB::beginTransaction();
         try {
 
-            $surveyResults                              = [];
+            $surveyResults = [];
             foreach ($request->parent_survey_id as $index => $parentSurveyId) {
-                $surveyResults[]                        = [
-                    'Parent_survey_id'                  => $parentSurveyId,
-                    'Survey_emp_ta_id'                  => $request->survey_emp_ta_id[$index],
-                    'Question_id'                       => $request->question_id[$index],
-                    'Emp_Ans'                           => $request->emp_ans[$index],
-                    'created_at'                        => now(),
-                    'updated_at'                        => now(),
+                $surveyResults[] = [
+                    'Parent_survey_id' => (int) $parentSurveyId,
+                    'Survey_emp_ta_id' => (int) $request->survey_emp_ta_id[$index],
+                    'Question_id' => (int) $request->question_id[$index],
+                    'Emp_Ans' => $request->emp_ans[$index],
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
             }
             SurveyResult::insert($surveyResults);
 
-            // Check the response count
-            $survEmp                                    =   SurveyResult::where('Parent_survey_id', $request->parent_survey_id[0])
-                                                                ->where('Survey_emp_ta_id', $request->survey_emp_ta_id[0])
-                                                                ->count();
+            $survEmp = SurveyResult::where('Parent_survey_id', $request->parent_survey_id[0])
+                ->where('Survey_emp_ta_id', $request->survey_emp_ta_id[0])
+                ->count();
 
-            $existingTime                               =   SurveyEmployee::where('Parent_survey_id', $request->parent_survey_id[0])
-                                                                ->where('Emp_id', $employee_id)
-                                                                ->value('Complete_time');
+            $existingTime = SurveyEmployee::where('Parent_survey_id', $request->parent_survey_id[0])
+                ->where('Emp_id', $employee_id)
+                ->value('Complete_time');
 
-            // Convert times to seconds
-            $newTimeInSeconds                           =   Carbon::createFromFormat('H:i:s', $request->complete_time)->secondsSinceMidnight();
-            $existingTimeInSeconds                      =   $existingTime ? Carbon::createFromFormat('H:i:s', $existingTime)->secondsSinceMidnight() : 0;
+            // Parse complete_time (mobile may send H:i:s or HH:MM:SS or similar)
+            $timeStr = preg_replace('/\s+/', '', (string) $request->complete_time);
+            try {
+                $newTimeInSeconds = Carbon::createFromFormat('H:i:s', $timeStr)->secondsSinceMidnight();
+            } catch (\Exception $e) {
+                try {
+                    $newTimeInSeconds = (int) Carbon::parse($timeStr)->secondsSinceMidnight();
+                } catch (\Exception $e2) {
+                    $newTimeInSeconds = 0;
+                }
+            }
+            $existingTimeInSeconds = 0;
+            if ($existingTime) {
+                try {
+                    $existingTimeInSeconds = Carbon::createFromFormat('H:i:s', $existingTime)->secondsSinceMidnight();
+                } catch (\Exception $e) {
+                    $existingTimeInSeconds = (int) Carbon::parse($existingTime)->secondsSinceMidnight();
+                }
+            }
 
             // Add times together
             $totalTimeInSeconds                         =   $newTimeInSeconds + $existingTimeInSeconds;

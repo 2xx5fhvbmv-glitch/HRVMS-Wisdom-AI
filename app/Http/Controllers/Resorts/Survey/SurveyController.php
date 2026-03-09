@@ -17,6 +17,7 @@ use App\Exports\SurveyResultExport;
 use App\Models\SurveyResult;
 use Illuminate\Support\Facades\Http;
 use App\Exports\SurveyDownloadQuestionAndAns;
+use Barryvdh\DomPDF\Facade\Pdf;
 class SurveyController extends Controller
 {
     protected $resort;
@@ -69,6 +70,34 @@ class SurveyController extends Controller
         return view('resorts.Survey.SurveyPages.create',compact('emp','page_title','ResortDepartment'));
     }
 
+    /**
+     * Get all resort employees for survey "Everyone" participant selection (same format as create list).
+     */
+    public function getSurveyAllEmployees(Request $request)
+    {
+        $emp = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->select(
+                't1.id as Parentid',
+                't1.first_name',
+                't1.last_name',
+                't1.profile_picture',
+                'employees.id as emp_id',
+                'employees.Emp_id as EmployeeId',
+                't2.position_title',
+            )
+            ->groupBy('employees.id')
+            ->get()
+            ->map(function ($item) {
+                $item->Emp_id = base64_encode($item->emp_id);
+                $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
+                $item->positionName = ucfirst($item->position_title ?? '');
+                $item->profileImg = Common::getResortUserPicture($item->Parentid);
+                return $item;
+            });
+        return response()->json(['success' => true, 'data' => $emp], 200);
+    }
 
     public function SaveSurvey(Request $request)
     {
@@ -83,11 +112,32 @@ class SurveyController extends Controller
 
                 $recurring_survey  = $request->recurring_survey;
                 $reminderNotification = $request->reminderNotification;
-                $minimum_responses = $request->minimum_responses;
+                if (is_array($reminderNotification)) {
+                    $reminderNotification = implode(',', array_filter($reminderNotification));
+                }
+                $reminderNotification = $reminderNotification ?? '';
+                $minimum_responses = $request->minimum_responses ?? 0;
                 $surevey_editable = isset($request->surevey_editable)  ?  'yes' : 'No';
                 $CheckBoxOption = $request->CheckBoxOption;
                 $RadioOption = $request->RadioOption;
+
                 $Emp_id = $request->Emp_id;
+                if (!is_array($Emp_id)) {
+                    $Emp_id = $Emp_id ? [$Emp_id] : [];
+                }
+                if (empty($Emp_id) && $request->selectParticipants === 'Everyone') {
+                    $Emp_id = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                        ->where('ra.resort_id', $this->resort->resort_id)
+                        ->pluck('employees.id')
+                        ->map(fn($id) => base64_encode($id))
+                        ->values()
+                        ->toArray();
+                }
+                if (empty($Emp_id)) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => 'Please select at least one participant.'], 422);
+                }
+
                 $survey =ParentSurvey::create(["resort_id"=>$this->resort->resort_id,
                                             "Surevey_title"=>$request->survey_title,
                                             "Start_date" =>$startDate,
@@ -158,33 +208,39 @@ class SurveyController extends Controller
                 $moduleName = "Survey";
                 foreach($Emp_id as $e)
                 {
-                    $employeeId = (int)base64_decode($e);
-                 
-                    SurveyEmployee::create(["Emp_id"=>$employeeId,"Parent_survey_id"=> (int) $survey->id]);
-                   
-                    
-                     event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 
-                                                                            10,
-                                                                            $notificationTitle,
-                                                                            $notificationMessage,
-                                                                            0,
-                                                                            $employeeId,
-                                                                            'Survey'
-                                                                        )));
+                    $employeeId = (int) base64_decode($e);
+                    if ($employeeId <= 0) {
+                        continue;
+                    }
+                    SurveyEmployee::create(["Emp_id" => $employeeId, "Parent_survey_id" => (int) $survey->id]);
+
+                    try {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            10,
+                            $notificationTitle,
+                            $notificationMessage,
+                            0,
+                            $employeeId,
+                            'Survey'
+                        )));
+                    } catch (\Exception $notificationException) {
+                        \Log::warning('Survey notification failed for employee ' . $employeeId . ': ' . $notificationException->getMessage());
+                    }
                 }
             DB::commit();
-            $route = route('Survey.view',base64_encode($survey->id));
-            return response()->json(['success' => true, 'msg' => 'Ticket Agent added successfully.',"route"=>$route], 200);
+            $route = route('Survey.view', base64_encode($survey->id));
+            return response()->json(['success' => true, 'message' => 'Survey saved successfully.', 'msg' => 'Survey saved successfully.', 'route' => $route], 200);
         }
-        catch( \Exception $e )
+        catch (\Exception $e)
         {
-
             DB::rollBack();
-            \Log::emergency("File: ".$e->getFile());
-            \Log::emergency("Line: ".$e->getLine());
-            \Log::emergency("Message: ".$e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to add Agent Email.'], 500);
-
+            \Log::emergency("Survey SaveSurvey: " . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            $message = config('app.debug') ? $e->getMessage() : 'Failed to save survey. Please try again.';
+            return response()->json(['success' => false, 'message' => $message], 500);
         }
 
      
@@ -684,13 +740,15 @@ class SurveyController extends Controller
             }
         }
 
+        $deadlineStart = Carbon::today()->format('Y-m-d');
+        $deadlineEnd = Carbon::today()->addDays(3)->format('Y-m-d');
+
         $ParentSurvey = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
             ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-            ->where('t1.emp_status', 'no')
-            ->where('parent_surveys.Status', 'OnGoing')
-            ->whereIn('parent_surveys.End_date', $this->newdates) // 2 days before deadline
+            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
+            ->whereBetween('parent_surveys.End_date', [$deadlineStart, $deadlineEnd])
             ->select(
                 'parent_surveys.id',
                 'parent_surveys.Status',
@@ -698,11 +756,12 @@ class SurveyController extends Controller
                 'parent_surveys.Surevey_title as title',
                 'parent_surveys.Start_date',
                 'parent_surveys.End_date',
+                'parent_surveys.created_at',
                 DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
                 DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
                 DB::raw("COUNT(t1.id) as total_count")
             )
-            ->groupBy('parent_surveys.id') // Ensure correct grouping for aggregates
+            ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.survey_privacy_type', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date', 'parent_surveys.created_at')
             ->where(function ($query) use ($search, $searchDate) {
                 if (!empty($search)) {
                     $query->where('parent_surveys.Surevey_title', 'LIKE', "%$search%")
@@ -941,7 +1000,37 @@ class SurveyController extends Controller
     }
     public function DownloadQuestionAndAns($id)
     {
-        return Excel::download(new SurveyDownloadQuestionAndAns($id), 'survey data.xlsx');
+        if (Common::checkRouteWisePermission('Survey.Surveylist', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
 
+        $decodedId = base64_decode($id);
+        $parent = ParentSurvey::join('resort_admins as t2', 't2.id', '=', 'parent_surveys.created_by')
+            ->join('employees as t1', 't1.Admin_Parent_id', '=', 't2.id')
+            ->where('parent_surveys.id', $decodedId)
+            ->where('parent_surveys.resort_id', $this->resort->resort_id)
+            ->first(['parent_surveys.*', 't2.first_name', 't2.last_name', 't2.id as ParentId']);
+        if (!$parent) {
+            return abort(404, 'Survey not found.');
+        }
+        $parent->EmployeeName = ucfirst($parent->first_name . ' ' . $parent->last_name);
+        $parent->profileImg = Common::getResortUserPicture($parent->ParentId);
+
+        $Question = SurveyQuestion::where('Parent_survey_id', $decodedId)->get();
+
+        $participantEmp = SurveyEmployee::join('employees as t1', 't1.id', '=', 'survey_employees.Emp_id')
+            ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+            ->where('survey_employees.Parent_survey_id', $decodedId)
+            ->get(['t2.first_name', 't2.last_name', 't2.id as ParentId'])
+            ->map(function ($i) {
+                $i->EmployeeName = ucfirst($i->first_name . ' ' . $i->last_name);
+                $i->profileImg = Common::getResortUserPicture($i->ParentId);
+                return $i;
+            });
+
+        $filename = 'Survey_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $parent->Surevey_title) . '_' . date('Y-m-d') . '.pdf';
+        return Pdf::loadView('resorts.Survey.SurveyPages.survey-download-pdf', compact('parent', 'Question', 'participantEmp'))
+            ->setPaper('a4', 'portrait')
+            ->download($filename);
     }
 }

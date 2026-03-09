@@ -102,66 +102,56 @@
                                             </div>
                                         </div>
                                     </div>
-                                    {{-- <div class="col-sm-6">
-                                        <label for="search" class="form-label">SEARCH</label>
-                                        <div class="input-group searchInput-group">
-                                            <input type="search" class="form-control " placeholder="Search" />
-                                            <i class="fa-solid fa-search"></i>
-                                        </div>
-                                    </div> --}}
-                                    <div class="col-auto">
+                                    {{-- Filters: shown only when Selective; hidden when Everyone --}}
+                                    <div class="col-auto participant-filters-actions">
                                         <div class="position-relative">
                                             <a href="javascript:void(0)"
                                                 class="btn btn-themeGrayLight filters-btn">Filters<i
                                                     class="fa-solid fa-angle-down"></i></a>
-
                                         </div>
                                     </div>
-                                    <div class="col-auto">
-                                        <a href="javascript:void(0)"    class="a-link d-inline-block mb-md-3 mb-3 ClearFilter">Clear Filter</a>
+                                    <div class="col-auto participant-filters-actions">
+                                        <a href="javascript:void(0)" class="a-link d-inline-block mb-md-3 mb-3 ClearFilter">Clear Filter</a>
                                     </div>
                                     <div class="col-12">
-                                        <div class="filters-block d-none">
+                                        <div class="filters-block d-none participant-filters-block">
                                             <div class="row g-md-4 g-3 align-items-end">
-                                          
-                                                <div class="col-sm-6">
+                                                <div class="col-sm-6 col-lg-3">
                                                     <label for="department" class="form-label">DEPARTMENT</label>
-                                                    <select class="form-select select2t-none" id="department" name="department" aria-label="Default select example">
-                                                        <option selected>Department </option>
+                                                    <select class="form-select select2-multi" id="department" name="department[]" multiple="multiple" data-placeholder="Department">
                                                         @if( $ResortDepartment->isNotEmpty())
-                                                         @foreach ($ResortDepartment  as $d)
+                                                            @foreach ($ResortDepartment as $d)
                                                                 <option value="{{ $d->id }}">{{ $d->name }}</option>
-                                                         @endforeach
-                                                        @endif
-                                                    </select>
-                                                </div>
-                                               
-                                                <div class="col-sm-6">
-                                                    <label for="positionFilter" class="form-label">POSITION</label>
-                                                    <select class="form-select select2t-none" name="position" id="position"
-                                                        aria-label="Default select example">
-                                                       
-                                                    </select>
-                                                </div>
-                                                <div class="col-sm-6">
-                                                    <label for="employment_type" class="form-label">EMPLOYMENT
-                                                        TYPE  (Grade)</label>
-                                     
-                                                        @php
-                                                            $grade = config('settings.eligibilty');
-                                                        @endphp
-                                                    <select class="form-select select2t-none" name="employment_grade" id="employment_grade" aria-label="Default select example">
-                                                        <option disabled selected>Type </option>
-                                                        @if( !empty($grade))
-                                                            @foreach ($grade  as $k=>$d)
-                                                                <option value="{{ $k }}">{{$d}}</option>
                                                             @endforeach
                                                         @endif
                                                     </select>
                                                 </div>
-                                               
-                                                <div class="col-auto ">
-                                                    <a href=" javascript:void(0)" class="FilterSubmit btn btn-themeBlue ">Submit</a>
+                                                <div class="col-sm-6 col-lg-3">
+                                                    <label for="position" class="form-label">POSITION</label>
+                                                    <select class="form-select select2-multi" name="position[]" id="position" multiple="multiple" data-placeholder="Position">
+                                                    </select>
+                                                </div>
+                                                <div class="col-sm-6 col-lg-3">
+                                                    <label for="employment_grade" class="form-label">EMPLOYMENT TYPE (Grade)</label>
+                                                    @php $grade = config('settings.eligibilty'); @endphp
+                                                    <select class="form-select select2-multi" name="employment_grade[]" id="employment_grade" multiple="multiple" data-placeholder="Type">
+                                                        @if( !empty($grade))
+                                                            @foreach ($grade as $k => $d)
+                                                                <option value="{{ $k }}">{{ $d }}</option>
+                                                            @endforeach
+                                                        @endif
+                                                    </select>
+                                                </div>
+                                                <div class="col-sm-6 col-lg-3">
+                                                    <label for="gender" class="form-label">GENDER</label>
+                                                    <select class="form-select select2t-none" name="gender" id="gender" data-placeholder="Male / Female">
+                                                        <option value="">Male / Female</option>
+                                                        <option value="Male">Male</option>
+                                                        <option value="Female">Female</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-auto">
+                                                    <a href="javascript:void(0)" class="FilterSubmit btn btn-themeBlue">Submit</a>
                                                 </div>
                                             </div>
                                         </div>
@@ -173,6 +163,7 @@
                                 <div class="bg-themeGrayLight sumDisEmp-block">
                                     <div class="card-title mb-md-3">
                                         <h3>Selected Participants</h3>
+                                        <p class="text-muted small mb-0 d-none" id="everyoneLabel">All resort employees are selected (non-editable).</p>
                                     </div>
                                     <input type="text" class="form-control" id="searchEmployee" placeholder="Search employees...">
                                     <div class="overflow-auto pe-1" id="employeeList">                                      
@@ -216,6 +207,11 @@
                                     <label class="form-check-label" for="privacy1">Confidential</label>
                                 </div>
                                 <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="survey_privacy_type" id="privacy2"
+                                        value="Neutral">
+                                    <label class="form-check-label" for="privacy2">Neutral</label>
+                                </div>
+                                <div class="form-check form-check-inline">
                                     <input class="form-check-input" type="radio" name="survey_privacy_type" id="privacy3"
                                         value="Anonymous">
                                     <label class="form-check-label" for="privacy3">Anonymous</label>
@@ -256,6 +252,7 @@
                                     data-parsley-required-message="Please select a recurring survey option"
                                     data-parsley-group="block-2"
                                     data-parsley-trigger="change">
+                                    <option value="One time">One time</option>
                                     <option value="Daily">Daily</option>
                                     <option value="Weekly">Weekly</option>
                                     <option value="Monthly">Monthly</option>
@@ -266,27 +263,16 @@
                             
                             <div class="col-sm-6">
                                 <label for="reminderNotification" class="form-label">REMINDER NOTIFICATIONS</label>
-                                <select class="form-select select2t-none" name="reminderNotification" id="reminderNotification"  
+                                <select class="form-select select2-multi" name="reminderNotification[]" id="reminderNotification" multiple="multiple"
+                                    data-placeholder="Days before expiry"
                                     data-parsley-required="true"
-                                    data-parsley-required-message="Please select a reminder notification day"
+                                    data-parsley-required-message="Please select at least one reminder notification"
                                     data-parsley-group="block-2"
                                     data-parsley-trigger="change">
                                     @for($i=1; $i<=10; $i++)
-                                    <option value="{{ $i }}">{{$i}} Days Before Expiry</option>
+                                    <option value="{{ $i }}">{{ $i }} Days Before Expiry</option>
                                     @endfor
                                 </select>
-                            </div>
-                            
-                            <div class="col-lg-6">
-                                <label for="minimumNumber" class="form-label">MINIMUM NUMBER OF RESPONSES</label>
-                                <input type="number" min="1" class="form-control" id="minimumNumber" name="minimum_responses"
-                                    placeholder="Set minimum number of responses" data-parsley-required="true"
-                                    data-parsley-required-message="Please enter minimum number of responses"
-                                    data-parsley-type="number"
-                                    data-parsley-min="1"
-                                    data-parsley-min-message="Minimum responses must be at least 1"
-                                    data-parsley-group="block-2"
-                                    data-parsley-trigger="change">
                             </div>
                             
                             <div class="col-lg-6 confiCreateSurvey-switch">
@@ -307,7 +293,7 @@
                         <a href="javascript:void(0)" data-flag="SaveAsDraft" class="a-link me-md-3 me-1 SubmitAsSaveAsDraft ">
                             Save As Draft
                         </a>
-                        <a href="javascript:void(0)" class="a-linkTheme me-1 ">Preview</a>
+                        <a href="javascript:void(0)" class="a-linkTheme me-1 SurveyPreview" role="button">Preview</a>
                         <button type="submit" data-flag="Publish" class="btn btn-themeBlue btn-sm float-end SubmitAsPublish ">
                             Publish Survey
                         </button>
@@ -415,12 +401,6 @@
 
         $(".next").click(function (e) {
         e.preventDefault();
-        $("#department").select2({
-          'placeholder':'Select Department',
-        });
-        $("#position").select2({
-          'placeholder':'Select position',
-        });
         var currentFieldset = $(this).closest('fieldset');
         var currentGroup = currentFieldset.data('parsley-group');
         var form = $('#msform').parsley();
@@ -433,12 +413,10 @@
             $("input[name='Emp_id[]']:checked").each(function () {
                 selectedEmployees.push($(this).val());
             });
-        if ( currentGroup == "block-1" && selectedEmployees.length === 0) 
-        {
+        var isEveryone = $("input[name='selectParticipants']:checked").val() === 'Everyone';
+        if (currentGroup == "block-1" && !isEveryone && selectedEmployees.length === 0) {
             toastr.error("Please Apply the Filter before You proceed to the next step and select at least one employee before proceeding.", "Error",
-            {
-                 positionClass: 'toast-bottom-right'
-            });
+            { positionClass: 'toast-bottom-right' });
             return false;
         }  
 
@@ -495,6 +473,12 @@
 
 
 
+        $(".SurveyPreview").on("click", function (e) {
+            e.preventDefault();
+            $('#msform').data('preview-after-save', true);
+            $(".SubmitAsSaveAsDraft").click();
+        });
+
         $(".SubmitAsPublish , .SubmitAsSaveAsDraft").click(function (e) 
         {
             e.preventDefault(); // Prevent default form submission
@@ -524,6 +508,12 @@
                     $(".SubmitAsPublish , .SubmitAsSaveAsDraft").prop("disabled", false); // Enable buttons
 
                     if (response.success) {
+                        if ($('#msform').data('preview-after-save')) {
+                            $('#msform').removeData('preview-after-save');
+                            window.open(response.route, '_blank');
+                            toastr.success('Preview opened in new tab.', 'Success', { positionClass: 'toast-bottom-right' });
+                            return;
+                        }
                         toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                         form[0].reset(); // Reset form after success
                         parsleyForm.reset(); // Reset Parsley validation
@@ -536,6 +526,7 @@
                 },
                 error: function (response) {
                     $(".SubmitAsPublish , .SubmitAsSaveAsDraft").prop("disabled", false); // Enable buttons
+                    $('#msform').removeData('preview-after-save');
 
                     var errors = response.responseJSON;
                     var errorMsg = '';
@@ -569,9 +560,86 @@
         // );
 
         $(".filters-btn").click(function () {
-            $(this).toggleClass("active"); // Add class on hover
+            $(this).toggleClass("active");
             $(".filters-block").toggleClass("d-none");
+            if (!$(".filters-block").hasClass("d-none")) {
+                var deptVal = $("#department").val();
+                if (!deptVal || !deptVal.length) loadPositionOptions(null);
+            }
         });
+
+        // Participant Selection: Everyone = all resort employees, non-editable, hide filters
+        $("input[name='selectParticipants']").on("change", function () {
+            var value = $(this).val();
+            if (value === "Everyone") {
+                $(".participant-filters-actions").addClass("d-none");
+                $(".participant-filters-block").addClass("d-none");
+                $(".filters-btn").removeClass("active");
+                $("#searchEmployee").prop("disabled", true).addClass("bg-light");
+                $("#everyoneLabel").removeClass("d-none");
+                loadAllResortEmployees();
+            } else {
+                $(".participant-filters-actions").removeClass("d-none");
+                $("#searchEmployee").prop("disabled", false).removeClass("bg-light");
+                $("#everyoneLabel").addClass("d-none");
+                loadSelectiveEmployees();
+            }
+        });
+
+        function loadAllResortEmployees() {
+            $.ajax({
+                url: "{{ route('Survey.getAllEmployees') }}",
+                type: "GET",
+                success: function (response) {
+                    var employeeList = $("#employeeList");
+                    employeeList.empty();
+                    if (response.success && response.data && response.data.length > 0) {
+                        response.data.forEach(function (e) {
+                            var html = '<div class="d-flex employee-item">' +
+                                '<div class="img-circle userImg-block"><img src="' + (e.profileImg || '') + '" alt="user"></div>' +
+                                '<div class="employee-details"><h6 class="employee-name">' + (e.EmployeeName || '') + '</h6><p class="position-name">' + (e.positionName || '') + '</p></div>' +
+                                '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '" checked disabled></div>' +
+                                '</div>';
+                            employeeList.append(html);
+                        });
+                    } else {
+                        employeeList.append("<p class='text-muted'>No employees found for this resort.</p>");
+                    }
+                },
+                error: function () {
+                    $("#employeeList").empty().append("<p class='text-danger'>Failed to load employees.</p>");
+                    toastr.error("Failed to load employees.", "Error", { positionClass: "toast-bottom-right" });
+                }
+            });
+        }
+
+        /** Selective: load all employees with checkboxes enabled (no filters applied); user can use Filters to narrow down. */
+        function loadSelectiveEmployees() {
+            $.ajax({
+                url: "{{ route('Survey.getAllEmployees') }}",
+                type: "GET",
+                success: function (response) {
+                    var employeeList = $("#employeeList");
+                    employeeList.empty();
+                    if (response.success && response.data && response.data.length > 0) {
+                        response.data.forEach(function (e) {
+                            var html = '<div class="d-flex employee-item">' +
+                                '<div class="img-circle userImg-block"><img src="' + (e.profileImg || '') + '" alt="user"></div>' +
+                                '<div class="employee-details"><h6 class="employee-name">' + (e.EmployeeName || '') + '</h6><p class="position-name">' + (e.positionName || '') + '</p></div>' +
+                                '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '"></div>' +
+                                '</div>';
+                            employeeList.append(html);
+                        });
+                    } else {
+                        employeeList.append("<p class='text-muted'>No employees found for this resort.</p>");
+                    }
+                },
+                error: function () {
+                    $("#employeeList").empty().append("<p class='text-danger'>Failed to load employees.</p>");
+                    toastr.error("Failed to load employees.", "Error", { positionClass: "toast-bottom-right" });
+                }
+            });
+        }
 
         
            
@@ -815,122 +883,126 @@
     });
 
 
-    $(document).on('change', '#department', function() {
-        var deptId = $(this).val();
-
+    function loadPositionOptions(deptIds, callback) {
+        var $pos = $("#position");
+        $pos.empty();
+        if (!deptIds || !deptIds.length) {
             $.ajax({
                 url: "{{ route('resort.get.position') }}",
                 type: "post",
-                data: {
-                    deptId: deptId
-                },
+                data: { "_token": "{{ csrf_token() }}" },
                 success: function(data) {
-                    // Clear the dropdown and add a placeholder option
-                    $("#position").empty().append('<option value="">Select Position</option>');
-
-                    if(data.success == true) {
-                        // Append new options
-                        $.each(data.data, function(key, value) {
-                            $("#position").append('<option value="'+value.id+'">'+value.position_title+'</option>');
+                    if (data.success && data.data && data.data.length) {
+                        data.data.forEach(function(p) { $pos.append('<option value="'+p.id+'">'+p.position_title+'</option>'); });
+                    }
+                    $pos.trigger('change');
+                    if (typeof callback === 'function') callback();
+                },
+                error: function() { $pos.trigger('change'); if (typeof callback === 'function') callback(); }
+            });
+            return;
+        }
+        var allPositions = {};
+        var done = 0;
+        deptIds.forEach(function(deptId) {
+            $.ajax({
+                url: "{{ route('resort.get.position') }}",
+                type: "post",
+                data: { deptId: deptId, "_token": "{{ csrf_token() }}" },
+                success: function(data) {
+                    if (data.success && data.data && data.data.length) {
+                        data.data.forEach(function(p) { allPositions[p.id] = p; });
+                    }
+                    done++;
+                    if (done === deptIds.length) {
+                        $.each(allPositions, function(id, p) {
+                            $pos.append('<option value="'+p.id+'">'+p.position_title+'</option>');
                         });
-                    } else {
-                        // If no data, just keep the placeholder
-                        $("#position").empty().append('<option value="">Select Position</option>');
+                        $pos.trigger('change');
+                        if (typeof callback === 'function') callback();
                     }
                 },
-                error: function(response) {
-                    toastr.error("Position Not Found", { positionClass: 'toast-bottom-right' });
-                }
+                error: function() { done++; if (done === deptIds.length) { $pos.trigger('change'); if (typeof callback === 'function') callback(); } }
             });
         });
+    }
+
+    $(document).on('change', '#department', function() {
+        var deptIds = $(this).val();
+        loadPositionOptions(deptIds, function() { filterdata(); });
+    });
+    $(document).on('change', '#position, #employment_grade, #gender', function() {
+        filterdata();
+    });
 
 
 
     $(document).on("click",".FilterSubmit",function(){
-        var department = $("#department").val();
-        var position = $("#position").val();
-        var employment_grade = $("#employment_grade").val();
-
-        if (department === "Department" && position ==null && employment_grade==null) 
-        {
-            toastr.error("Please select at least one option (Department, Position, or Employment Type) before proceeding.", {
-                positionClass: 'toast-bottom-right'
-            });
-            return false;
-        }
         filterdata();
-    });   
+    });
     $(document).on("click",".ClearFilter",function(){
-
-        var department = $("#department").val('').trigger('change');
-        var position = $("#position").val('').trigger('change');
-        var employment_grade = $("#employment_grade").val('').trigger('change');
-        filterdata();
+        $("#department").val(null).trigger('change');
+        $("#employment_grade").val(null).trigger('change');
+        $("#gender").val('').trigger('change');
+        $("#searchEmployee").val('');
+        loadPositionOptions(null, function() {
+            $("#position").val(null);
+            loadSelectiveEmployees();
+        });
     });
 
  
-    function filterdata()
-    {
-            var searchValue =  $("#searchEmployee").val();
+    function filterdata() {
+            var searchValue = $("#searchEmployee").val();
             var department = $("#department").val();
             var position = $("#position").val();
             var employment_grade = $("#employment_grade").val();
+            var gender = $("#gender").val();
+            var payload = {
+                _token: "{{ csrf_token() }}",
+                searchValue: searchValue || '',
+                department: Array.isArray(department) ? department : (department ? [department] : []),
+                position: Array.isArray(position) ? position : (position ? [position] : []),
+                employment_grade: Array.isArray(employment_grade) ? employment_grade : (employment_grade ? [employment_grade] : []),
+                gender: gender ? gender : ''
+            };
             $.ajax({
                 url: "{{ route('Performance.Meeting.GetPerformanceEmp') }}",
                 type: "POST",
-                data: {
-                    "_token":"{{ csrf_token() }}",
-                    "searchValue":searchValue,
-                    "department":department,
-                    "position":position,
-                    "employment_grade":employment_grade
-
-                },
+                contentType: "application/json",
+                data: JSON.stringify(payload),
                 success: function (response) {
-                    if (response.success) {
-                        let employeeList = $("#employeeList"); // Replace with the actual ID of your container
-                        employeeList.empty();
-                        console.log(response.data === 0,response.data);
-                        if (response.data === 0)
-                        {
-                            employeeList.append("<p>No results found.</p>");
-                        }
-                        else
-                        {
-                            response.data.forEach((e) => {
-                                let employeeHtml = `<div class="employee-item">
-                                                        <div class="d-flex">
-                                                            <div class="img-circle userImg-block">
-                                                                <img src="${e.profileImg}" alt="user">
-                                                            </div>
-                                                            <div>
-                                                                <h6 class="employee-name">${e.EmployeeName}</h6>
-                                                                <p class="position-name">${e.positionName}</p>
-                                                            </div>
-                                                            <div class="form-check no-label">
-                                                                <input class="form-check-input" type="checkbox" name="Emp_id[]" value="${e.Emp_id}">
-                                                            </div>
-                                                        </div>
-                                                    </div>`;
+                    var employeeList = $("#employeeList");
+                    employeeList.empty();
+                    if (response.success && response.data) {
+                        var data = response.data;
+                        if (!data.length || data === 0) {
+                            employeeList.append("<p class='text-muted'>No results found. Try different filters.</p>");
+                        } else {
+                            data.forEach(function (e) {
+                                var employeeHtml = '<div class="employee-item"><div class="d-flex">' +
+                                    '<div class="img-circle userImg-block"><img src="' + (e.profileImg || '') + '" alt="user"></div>' +
+                                    '<div><h6 class="employee-name">' + (e.EmployeeName || '') + '</h6><p class="position-name">' + (e.positionName || '') + '</p></div>' +
+                                    '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '" checked></div>' +
+                                    '</div></div>';
                                 employeeList.append(employeeHtml);
                             });
                         }
                     } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: "toast-bottom-right",
-                        });
+                        employeeList.append("<p class='text-muted'>No results found. Try different filters.</p>");
+                        if (response.message) {
+                            toastr.warning(response.message, "Info", { positionClass: "toast-bottom-right" });
+                        }
                     }
                 },
-                error: function (response)
-                {
-                    var errors = response.responseJSON;
-                    var errs = '';
-                    $.each(errors.errors, function (key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, "Error", {
-                        positionClass: "toast-bottom-right",
-                    });
+                error: function (response) {
+                    $("#employeeList").empty().append("<p class='text-muted'>Filter failed. Showing all employees.</p>");
+                    loadSelectiveEmployees();
+                    var errs = (response.responseJSON && response.responseJSON.errors) ? response.responseJSON.errors : null;
+                    if (errs) {
+                        var msg = typeof errs === 'string' ? errs : (errs.message || Object.values(errs).flat().join(' '));
+                        toastr.error(msg, "Error", { positionClass: "toast-bottom-right" });
+                    }
                 }
             });
     }
@@ -956,17 +1028,19 @@
      document.addEventListener('DOMContentLoaded', function() {
         function initSelect2AndValidation() {
             if ($.fn.select2 && $.fn.parsley) {
-                // Initialize Select2
                 $(".select2t-none").select2();
+                $(".select2t-none").on('change', function() { $(this).parsley().validate(); });
+                $(".select2t-none").on('select2:select', function() { $(this).trigger('change'); });
 
-                // Add Parsley validation specifically for Select2
-                $(".select2t-none").on('change', function() {
-                    $(this).parsley().validate();
-                });
-
-                // Ensure Select2 trigger changes in Parsley
-                $(".select2t-none").on('select2:select', function() {
-                    $(this).trigger('change');
+                // Multi-select filters (Participant Selection step)
+                $(".select2-multi").each(function() {
+                    var $el = $(this);
+                    $el.select2({
+                        allowClear: true,
+                        closeOnSelect: false,
+                        placeholder: $el.data('placeholder') || 'Select...',
+                        width: '100%'
+                    });
                 });
             }
         }

@@ -11,12 +11,15 @@
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
-            <div class="row  g-3">
+            <div class="row g-3 align-items-center justify-content-between">
                 <div class="col-auto">
                     <div class="page-title">
                         <span>Survey</span>
                         <h1>Dashboard</h1>
                     </div>
+                </div>
+                <div class="col-auto ms-auto">
+                    <a href="{{ route('Survey.create') }}" class="btn btn-theme @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
                 </div>
                 <!-- <div class="col-xxl-2 col-auto ms-auto">
                     <select class="form-select select2t-none" id="select-budgeted"
@@ -36,7 +39,7 @@
                             <p class="mb-0  fw-500">Total Surveys</p>
                             <strong>{{ $total_Survey_count }}</strong>
                         </div>
-                        <a href="#">
+                        <a href="{{ route('Survey.Surveylist') }}">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
                         </a>
                     </div>
@@ -49,7 +52,7 @@
                             <p class="mb-0  fw-500">Open Surveys</p>
                             <strong>{{ $OngoingSurvey_count }}</strong>
                         </div>
-                        <a href="#">
+                        <a href="{{ route('Survey.Surveylist') }}">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
                         </a>
                     </div>
@@ -59,10 +62,10 @@
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="mb-0  fw-500">Pending Surveys</p>
-                            <strong>{{ $PublishSurvey_count }}</strong>
+                            <p class="mb-0  fw-500">Draft Surveys</p>
+                            <strong>{{ $DraftSurvey_count }}</strong>
                         </div>
-                        <a href="#">
+                        <a href="{{ route('Survey.DarftSurvey') }}">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
                         </a>
                     </div>
@@ -75,7 +78,7 @@
                             <p class="mb-0  fw-500">Complete Surveys</p>
                             <strong>{{ $CompleteSurvey_count }}</strong>
                         </div>
-                        <a href="#">
+                        <a href="{{ route('Survey.CompleteSurvey') }}">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
                         </a>
                     </div>
@@ -86,6 +89,9 @@
                     <div class="card-title">
                         <h3>Survey Status</h3>
                     </div>
+                    @if($OngoingSurvey->isEmpty())
+                        <p class="text-muted mb-0 py-3">No open or ongoing surveys at the moment.</p>
+                    @endif
                     @foreach($OngoingSurvey as $survey)
                         @php
                             $progress = ($survey->total_count > 0) ? round(($survey->completed_count / $survey->total_count) * 100) : 0;
@@ -129,8 +135,10 @@
                 </div>
             </div>
             @php
-                $firstSurvey = isset($ParticipationRate[0]) ? $ParticipationRate[0] : '';
-                $participationRate = $firstSurvey ? $firstSurvey->participation_rate : 0; // Default to 0 if no data
+                $firstSurvey = isset($ParticipationRate[0]) ? $ParticipationRate[0] : null;
+                $participationRate = $firstSurvey && $firstSurvey->participation_rate !== null
+                    ? (float) $firstSurvey->participation_rate
+                    : 0;
             @endphp
 
             <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -170,8 +178,9 @@
                         </div>
                     </div>
                     <div class="leaveUser-main">
-
-                        @if($NearingDeadline->isNotEmpty())
+                        @if($NearingDeadline->isEmpty())
+                            <p class="text-muted mb-0 py-3">No surveys nearing deadline with pending participants.</p>
+                        @else
                             @foreach ($NearingDeadline as $n)
                             @php
                                 $progress = ($n->total_count > 0) ? round(($n->completed_count / $n->total_count) * 100) : 0;
@@ -188,7 +197,6 @@
                             </div>
                             @endforeach
                         @endif
-                        
                     </div>
                 </div>
             </div>
@@ -200,7 +208,7 @@
                                 <h3 class="text-nowrap">Recent Survey Results</h3>
                             </div>
                             <div class="col-auto">
-                                <a href="" class="a-link">View All</a>
+                                <a href="{{ route('Survey.CompleteSurvey') }}" class="a-link">View All</a>
                             </div>
                         </div>
                     </div>
@@ -222,7 +230,11 @@
                                     <td><a href="{{ route('Survey.GetSurveyResults',  base64_encode($r->id)) }}" class="a-linkTheme">View Details</a></td>
                                 </tr>
                             @endforeach
-                          @endif
+                        @else
+                            <tr>
+                                <td colspan="3" class="text-muted py-3">No completed survey results yet.</td>
+                            </tr>
+                        @endif
                         </table>
                     </div>
                 </div>
@@ -251,7 +263,7 @@
                                 
                             <div class="col-auto">
                                 <div class="doughnut-label">
-                                    <span style="background-color: {{ $d->color }}"></span>{{ $d->Department_name }}</span>
+                                    <span style="background-color: {{ $d->color }}"></span>{{ $d->Department_name }}
                                 </div>
                             </div>
                             @endforeach
@@ -274,7 +286,7 @@
                                     @foreach ($SurveyComparison as $com)
                                     <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                         <div class="doughnut-label">
-                                            <span style="background-color: {{ $com->color }}"></span>{{ $com->title }}</span>
+                                            <span style="background-color: {{ $com->color }}"></span>{{ $com->title }}
 
                                         </div>
                                     </div>
@@ -385,7 +397,7 @@
         </div>
     </div>
 </div>
-<div class="modal fade show" id="Surveyparticipant" tabindex="-1" aria-labelledby="exampleModalLabel" aria-modal="true" role="dialog" >
+<div class="modal fade" id="Surveyparticipant" tabindex="-1" aria-labelledby="exampleModalLabel" aria-modal="true" role="dialog">
     <div class="modal-dialog modal-dialog-centered modal-small">
         <div class="modal-content">
 
@@ -449,7 +461,7 @@
     // Adjust heights on page load and window resize
     function adjustHeights() {
         equalizeHeights('card-surveyStatus', ['card-surveysDeadline']);
-        equalizeHeights('card-comParticipation', ['card-draftedSurveys', 'card-wiInsightsSurvey']);
+        equalizeHeights('card-comParticipation', ['card-draftedSurveys']);
     }
 
     window.onload = adjustHeights; // Initial height adjustment
@@ -464,16 +476,13 @@
 
     progressContainers.forEach(container => {
         const progressCircle = container.querySelector('.progress');
-        // const progressText = container.querySelector('.progress-text');
-        const progressValue = container.getAttribute('data-progress'); // Get the progress value from the container's data attribute
-        const offset = circumference - (progressValue / 100 * circumference); // Calculate the offset
+        if (!progressCircle) return;
+        const progressValue = parseFloat(container.getAttribute('data-progress')) || 0;
+        const offset = circumference - (progressValue / 100 * circumference);
 
-        // Set the initial stroke-dashoffset to the full circumference
         progressCircle.style.strokeDashoffset = circumference;
 
-        // Use a small timeout to allow the browser to render the initial state before applying the offset (to trigger the animation)
         setTimeout(() => {
-            // Apply the calculated offset to the progress bar with animation
             progressCircle.style.strokeDashoffset = offset;
 
             // Update the text inside the circle
@@ -570,9 +579,12 @@ var datasets = Object.keys(groupedData).map(type => ({
     borderRadius: 10,
 }));
 
-// Create Chart
-var ctx = document.getElementById('myStackedBarChart').getContext('2d');
-var myStackedBarChart = new Chart(ctx, {
+// Create Chart (guard: canvas may be hidden by permission)
+var ctxEl = document.getElementById('myStackedBarChart');
+var myStackedBarChart = null;
+if (ctxEl) {
+var ctx = ctxEl.getContext('2d');
+myStackedBarChart = new Chart(ctx, {
     type: 'bar',
     data: {
         labels: labels, // Last two months and current month dynamically
@@ -606,14 +618,16 @@ var myStackedBarChart = new Chart(ctx, {
         }
     }
 });
-
-
+}
 
     var departmentLabels = {!! json_encode($departmentWise->pluck('Department_name')) !!};
     var departmentData = {!! json_encode($departmentWise->pluck('completed_count')) !!};
     var departmentColors = {!! json_encode($departmentWise->pluck('color')) !!}; // Random colors
 
-    var ctz = document.getElementById('myDoughnutChart').getContext('2d');
+    var doughnutEl = document.getElementById('myDoughnutChart');
+    var myDoughnutChart = null;
+    if (doughnutEl) {
+    var ctz = doughnutEl.getContext('2d');
 
     const doughnutLabelsInsideN = {
         id: 'doughnutLabelsInsideN',
@@ -624,8 +638,8 @@ var myStackedBarChart = new Chart(ctx, {
                 if (!meta.hidden) {
                     meta.data.forEach(function (element, index) {
                         var dataValue = dataset.data[index];
-                        var total = dataset.data.reduce((acc, val) => acc + val, 0);
-                        var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
+                        var total = dataset.data.reduce(function(acc, val) { return acc + val; }, 0);
+                        var percentage = total === 0 ? '0%' : ((dataValue / total) * 100).toFixed(0) + '%';
 
                         var position = element.tooltipPosition();
                         ctx.fillStyle = '#fff';
@@ -678,13 +692,16 @@ var myStackedBarChart = new Chart(ctx, {
         },
         plugins: [doughnutLabelsInsideN] // Attach custom plugin
     });
+    }
 
     var surveyLabels = {!! json_encode($SurveyWiseParticipationRates->pluck('title')) !!}; // Survey titles
     var completedData = {!! json_encode($SurveyWiseParticipationRates->pluck('completed_count')) !!}; // Completed count
 
-
-    const ctp = document.getElementById('myAttendance').getContext('2d');
-    const myAttendance = new Chart(ctp, {
+    var attendanceEl = document.getElementById('myAttendance');
+    var myAttendance = null;
+    if (attendanceEl) {
+    var ctp = attendanceEl.getContext('2d');
+    myAttendance = new Chart(ctp, {
         type: 'bar',
         data: {
             labels: surveyLabels,
@@ -748,13 +765,14 @@ var myStackedBarChart = new Chart(ctx, {
             }
         }
     });
+    }
 
-    
     var participationRate = {!! json_encode($ParticipationRate->pluck('participation_rate')) !!}; // Participation rate %
     document.addEventListener("DOMContentLoaded", function() {
         var progressContainer = document.querySelector(".progress-container");
-        var participationValue = progressContainer.getAttribute("data-progress") || 0;
-        var progressCircle = document.querySelector(".progress");
+        var participationValue = parseFloat(progressContainer ? progressContainer.getAttribute("data-progress") : null) || 0;
+        var progressCircle = progressContainer ? progressContainer.querySelector(".progress") : null;
+        if (!progressCircle) return;
         var radius = 54;
         var circumference = 2 * Math.PI * radius;
         var progress = participationValue / 100;
