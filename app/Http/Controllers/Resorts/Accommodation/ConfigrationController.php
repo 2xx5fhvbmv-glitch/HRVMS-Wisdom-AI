@@ -37,7 +37,7 @@ class ConfigrationController extends Controller
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
         if(!$this->resort) return;
         if($this->resort->is_master_admin == 0){
-            $reporting_to = $this->globalUser->GetEmployee->id;
+            $reporting_to = $this->resort->GetEmployee->id;
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
     }
@@ -682,13 +682,14 @@ class ConfigrationController extends Controller
                 'required',
             ],
             'Floor' => [
-                'required',
+                'present', 'numeric', 'min:0',
             ],
             'Room' => [
                 'required',
-                Rule::unique('bulidng_and_floor_and_rooms')->where(function ($query) use ($request,$resort_id) {
+                Rule::unique('bulidng_and_floor_and_rooms')->where(function ($query) use ($request, $resort_id, $building_id) {
                     return $query->where('Floor', $request->Floor)
-                                 ->where('resort_id',$resort_id);
+                                 ->where('building_id', $building_id)
+                                 ->where('resort_id', $resort_id);
                 }),
             ],
         ], [
@@ -791,6 +792,28 @@ class ConfigrationController extends Controller
         }
 
     }
+
+    public function FloorAndRoomDestroy($id)
+    {
+        $id = base64_decode($id);
+
+        DB::beginTransaction();
+        try {
+            BulidngAndFloorAndRoom::where("id", $id)->delete();
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Floor and Room deleted successfully.',
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'error' => 'Failed to delete Floor and Room'], 500);
+        }
+    }
+
     public function GetBuildingWiseFloor(Request $request)
     {
         $building_id = $request->buildingId;
