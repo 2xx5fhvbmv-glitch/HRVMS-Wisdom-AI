@@ -159,7 +159,7 @@ class Employee extends Model
 
     public function section()
     {
-        return $this->belongsTo(ResortSection::class, 'section_id', 'id');
+        return $this->belongsTo(ResortSection::class, 'Section_id', 'id');
     }
 
     public function resortAdmin()

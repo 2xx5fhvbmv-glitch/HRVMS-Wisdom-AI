@@ -170,7 +170,7 @@ class ConfigController extends Controller
         // dd($request['cutoff_day']);
         // Validate the input
         $request->validate([
-            'cutoff_day' => 'required|integer|min:1|max:28',
+            'cutoff_day' => 'required|integer|min:1|max:31',
         ]);
 
         // Save to the database
