@@ -68,33 +68,30 @@ class ResortInternalPermission extends Controller
     }
     public function GetDepartmentWisePosition(Request $request)
     {
-
-        try{
+        try {
             $resort_id = $this->resortdata->resort_id;
+            $deptId = $request->deptId;
+            $hasDept = $deptId !== null && $deptId !== '' && (!is_array($deptId) || count($deptId) > 0);
 
+            $query = ResortPosition::where('resort_id', $resort_id)->where('status', 'active')->orderBy('id', 'desc');
+            if ($hasDept) {
+                $deptIds = is_array($deptId) ? $deptId : [$deptId];
+                $query->whereIn('dept_id', $deptIds);
+            }
+            $Position = $query->get(['id', 'position_title']);
 
-
-
-            $Position = ResortPosition::where('resort_id', $resort_id   )->where('dept_id',$request->deptId)->where('status', 'active')->orderBy("id","desc")->get(['id', 'position_title']);
-
-
-                    $response['success'] = ($Position->isNotEmpty()) ? true : false;
-                    $response['msg'] =($Position->isNotEmpty()) ? 'Position found succefully' : 'Position Not found';  ;
-                    $response['data'] = $Position;
-
-
-
-        }catch( \Exception $e ) {
-            \Log::emergency("File: ".$e->getFile());
-            \Log::emergency("Line: ".$e->getLine());
-            \Log::emergency("Message: ".$e->getMessage());
+            $response['success'] = true;
+            $response['msg'] = $Position->isNotEmpty() ? 'Position found successfully' : ($hasDept ? 'Position not found' : 'No positions found');
+            $response['data'] = $Position;
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
             $response['success'] = false;
-
-            $response['msg'] = 'Please Select Department';
+            $response['msg'] = 'Please try again';
+            $response['data'] = [];
         }
         return response()->json($response);
-
-
     }
 
     public function InternalPermissiones(Request $request)

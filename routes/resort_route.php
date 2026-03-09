@@ -1095,6 +1095,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     //  Survey Module
     Route::get('survey/schedule', 'Survey\SurveyController@index')->name('Survey.index');
     Route::get('survey/create', 'Survey\SurveyController@index')->name('Survey.create');
+    Route::get('survey/get-all-employees', 'Survey\SurveyController@getSurveyAllEmployees')->name('Survey.getAllEmployees');
     Route::post('/survey/store', 'Survey\SurveyController@SaveSurvey')->name('Survey.store');
     Route::get('/survey/view/{id}', 'Survey\SurveyController@SurveyView')->name('Survey.view');
     Route::get('survey/list', 'Survey\SurveyController@Surveylist')->name('Survey.Surveylist');

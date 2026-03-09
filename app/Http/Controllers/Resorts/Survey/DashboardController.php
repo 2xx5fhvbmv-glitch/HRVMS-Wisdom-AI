@@ -9,6 +9,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ParentSurvey;
 use App\Models\SurveyEmployee;
+use App\Models\ResortDepartment;
+
 class DashboardController extends Controller
 {
     protected $resort;
@@ -26,6 +28,52 @@ class DashboardController extends Controller
             $this->olddates[] =  Carbon::today()->subDays($i)->format('Y-m-d');
             $this->newdates[] =  Carbon::today()->addDays($i)->format('Y-m-d');
         }
+    }
+
+    /**
+     * HR department (or Executive Office), HOD, and EXCOM see whole resort survey data.
+     * Other users also see whole resort data; no department filter is applied on survey dashboard.
+     */
+    protected function canViewAllDepartments()
+    {
+        if (!isset($this->resort->GetEmployee)) {
+            return true; // no employee link: show whole resort
+        }
+
+        $employee = $this->resort->GetEmployee;
+        $rank     = $employee->rank ?? null;
+        $deptId   = $employee->Dept_id ?? null;
+
+        $department = $deptId
+            ? ResortDepartment::where('id', $deptId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first(['name', 'code'])
+            : null;
+
+        $deptName = strtolower(trim($department->name ?? ''));
+        $deptCode = $department->code ?? '';
+
+        $isHRDept = in_array($deptName, ['human resources', 'hr']);
+        $isEODept = ($deptCode === 'EO_1') || (strpos($deptName, 'executive office') !== false);
+
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->GetEmployee);
+        $positionName         = $employeeRankPosition['position'] ?? '';
+        $rankName             = $employeeRankPosition['rank'] ?? '';
+
+        $isGM    = ($positionName === 'GM') || ($rankName === 'GM');
+        $isEXCOM = ($positionName === 'EXCOM') || ($rankName === 'EXCOM') || $rank == 1 || $rank === '1';
+        $isHOD   = ($rank == 2 || $rank === '2');
+
+        if (($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD)) {
+            return true;
+        }
+
+        // Department HOD (rank 2 in non-HR dept) also sees whole resort data on survey dashboard
+        if ($isHOD) {
+            return true;
+        }
+
+        return false;
     }
     public function Admin_Dashobard(Request $request)
     {
@@ -124,17 +172,17 @@ class DashboardController extends Controller
             $departmentWise = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
                                             ->join('resort_departments as t3', 't3.id', '=', 't2.Dept_id')
-                                            ->where('parent_surveys.Status', 'OnGoing')
+                                            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-                                            ->where('t1.emp_status', 'yes') // Only count completed surveys
+                                            ->where('t1.emp_status', 'yes')
                                             ->select(
                                                 'parent_surveys.Surevey_title',
                                                 't3.name as Department_name',
                                                 DB::raw("COUNT(t1.id) as completed_count") 
                                             )
-                                            ->groupBy('t2.Dept_id') // Group by department
+                                            ->groupBy('t2.Dept_id', 't3.name', 'parent_surveys.Surevey_title')
                                             ->get()
-                                            ->map(function ($department) use (&$i, $colors) { // Pass $i by reference
+                                            ->map(function ($department) use (&$i, $colors) {
                                                 if ($i < count($colors)) {
                                                     $department->color = $colors[$i]; // Assign color if available
                                                 }
@@ -148,7 +196,7 @@ class DashboardController extends Controller
                                             });
 
         $SurveyWiseParticipationRates = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                                    ->where('parent_surveys.Status', 'OnGoing')
+                                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                                     ->select(
                                                         'parent_surveys.id',
@@ -157,24 +205,23 @@ class DashboardController extends Controller
                                                         DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
                                                         DB::raw("COUNT(t1.id) as total_count")
                                                     )
-                                                    ->groupBy('parent_surveys.id')
+                                                    ->groupBy('parent_surveys.id', 'parent_surveys.Surevey_title')
                                                     ->get();
 
         $ParticipationRate = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                            ->where('parent_surveys.Status', 'OnGoing')
+                                            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                             ->select(
-                                                'parent_surveys.id',
-                                                'parent_surveys.Surevey_title as title', // Survey title
+                                                'parent_surveys.resort_id',
                                                 DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
                                                 DB::raw("COUNT(t1.id) as total_count"),
-                                                DB::raw("ROUND((SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) / COUNT(t1.id)) * 100, 2) as participation_rate") // Calculate %
+                                                DB::raw("ROUND((SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) / NULLIF(COUNT(t1.id), 0)) * 100, 2) as participation_rate")
                                             )
                                             ->groupBy('parent_surveys.resort_id')
                                             ->get();
 
         $SurveyComparison = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                            ->where('parent_surveys.Status', 'OnGoing')
+                                            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                             ->whereBetween('parent_surveys.Start_date', [
                                                 now()->subMonths(2)->startOfMonth(),
@@ -205,20 +252,19 @@ class DashboardController extends Controller
          $RecentSurveyResults = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                             ->where('parent_surveys.Status', 'Complete')
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-                                            ->whereIn('parent_surveys.End_date', $this->olddates) // Ensure old dates array is valid
                                             ->select(
                                                 'parent_surveys.id',
                                                 'parent_surveys.Status',
-                                                'parent_surveys.Surevey_title as title', // Survey title
-                                                'parent_surveys.Start_date', // Creation date
-                                                'parent_surveys.End_date', // Closing date
+                                                'parent_surveys.Surevey_title as title',
+                                                'parent_surveys.Start_date',
+                                                'parent_surveys.End_date',
                                                 DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
                                                 DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
                                                 DB::raw("COUNT(t1.id) as total_count")
                                             )
-                                            ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date') // Include all selected columns in groupBy
-                                            ->orderBy('parent_surveys.End_date', 'asc') // Sort to get the minimum surveys
-                                            ->limit(5) // Get only the minimum 5 surveys
+                                            ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date')
+                                            ->orderBy('parent_surveys.End_date', 'desc')
+                                            ->limit(5)
                                             ->get()
                                             ->map(function ($a) { 
                                                 $a->Newid = base64_encode($a->id);
@@ -248,9 +294,9 @@ class DashboardController extends Controller
                 });
             
         $total_Survey_count = ParentSurvey::where('resort_id', $this->resort->resort_id)->count();
-        $OngoingSurvey_count = ParentSurvey::where('Status','OnGoing')->where('resort_id', $this->resort->resort_id)->count();
-        $PublishSurvey_count =ParentSurvey::whereIn('Status',['Publish','SaveAsDraft'])->where('resort_id', $this->resort->resort_id)->count();
-        $CompleteSurvey_count =ParentSurvey::where('Status','Complete')->where('resort_id', $this->resort->resort_id)->count();
+        $OngoingSurvey_count = ParentSurvey::whereIn('Status', ['Publish', 'OnGoing'])->where('resort_id', $this->resort->resort_id)->count();
+        $DraftSurvey_count = ParentSurvey::where('Status', 'SaveAsDraft')->where('resort_id', $this->resort->resort_id)->count();
+        $CompleteSurvey_count = ParentSurvey::where('Status','Complete')->where('resort_id', $this->resort->resort_id)->count();
   
         // $OngoingSurvey = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
         //                 ->where('parent_surveys.Status', 'OnGoing')
@@ -263,49 +309,49 @@ class DashboardController extends Controller
         //                 )
         //                 ->groupBy('parent_surveys.id')
         //                 ->get();
-        $OngoingSurvey = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                    ->where('parent_surveys.Status', 'OnGoing')
+        $OngoingSurvey = ParentSurvey::leftJoin('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
+                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                     ->select(
                                         'parent_surveys.id',
                                         'parent_surveys.Status',
-                                        'parent_surveys.Surevey_title as title', // Survey title
-                                        'parent_surveys.Start_date', // Creation date
-                                        'parent_surveys.End_date', // Closing date
-                                        DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
-                                        DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
+                                        'parent_surveys.Surevey_title as title',
+                                        'parent_surveys.Start_date',
+                                        'parent_surveys.End_date',
+                                        DB::raw("COALESCE(SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END), 0) as completed_count"),
+                                        DB::raw("COALESCE(SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END), 0) as pending_count"),
                                         DB::raw("COUNT(t1.id) as total_count")
                                     )
-                                    ->groupBy('parent_surveys.id')
+                                    ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date')
                                     ->get();
     
 
                                     
               
 
+        $deadlineStart = Carbon::today()->format('Y-m-d');
+        $deadlineEnd = Carbon::today()->addDays(3)->format('Y-m-d');
         $NearingDeadline = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                    ->where('parent_surveys.Status', 'OnGoing')
+                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
+                                    ->whereBetween('parent_surveys.End_date', [$deadlineStart, $deadlineEnd])
                                     ->select(
                                         'parent_surveys.id',
                                         'parent_surveys.Status',
-                                        'parent_surveys.Surevey_title as title', // Survey title
-                                        'parent_surveys.Start_date', // Creation date
-                                        'parent_surveys.End_date', // Closing date
+                                        'parent_surveys.Surevey_title as title',
+                                        'parent_surveys.Start_date',
+                                        'parent_surveys.End_date',
                                         DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
                                         DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
                                         DB::raw("COUNT(t1.id) as total_count")
                                     )
-                                    ->where('t1.emp_status','no')
-
-                                    ->groupBy('parent_surveys.id')
-                                    ->whereIn('End_date',   $this->newdates) // 2 days before deadline
+                                    ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date')
+                                    ->havingRaw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) > 0")
                                     ->get()
-                                    
-                                    ->map(function($a){ 
-                                        $a->Newid=base64_encode($a->id);
-                                        $a->startDate = carbon::parse($a->Start_date)->format('d M Y');
-                                        $a->endDate = carbon::parse($a->End_date)->format('d M Y');
+                                    ->map(function($a){
+                                        $a->Newid = base64_encode($a->id);
+                                        $a->startDate = Carbon::parse($a->Start_date)->format('d M Y');
+                                        $a->endDate = Carbon::parse($a->End_date)->format('d M Y');
                                         return $a;
                                     });
                                   
@@ -327,17 +373,17 @@ class DashboardController extends Controller
             $departmentWise = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
                                             ->join('resort_departments as t3', 't3.id', '=', 't2.Dept_id')
-                                            ->where('parent_surveys.Status', 'OnGoing')
+                                            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-                                            ->where('t1.emp_status', 'yes') // Only count completed surveys
+                                            ->where('t1.emp_status', 'yes')
                                             ->select(
                                                 'parent_surveys.Surevey_title',
                                                 't3.name as Department_name',
                                                 DB::raw("COUNT(t1.id) as completed_count") 
                                             )
-                                            ->groupBy('t2.Dept_id') // Group by department
+                                            ->groupBy('t2.Dept_id', 't3.name', 'parent_surveys.Surevey_title')
                                             ->get()
-                                            ->map(function ($department) use (&$i, $colors) { // Pass $i by reference
+                                            ->map(function ($department) use (&$i, $colors) {
                                                 if ($i < count($colors)) {
                                                     $department->color = $colors[$i]; // Assign color if available
                                                 }
@@ -351,7 +397,7 @@ class DashboardController extends Controller
                                             });
 
         $SurveyWiseParticipationRates = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                                    ->where('parent_surveys.Status', 'OnGoing')
+                                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                                     ->select(
                                                         'parent_surveys.id',
@@ -360,24 +406,23 @@ class DashboardController extends Controller
                                                         DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
                                                         DB::raw("COUNT(t1.id) as total_count")
                                                     )
-                                                    ->groupBy('parent_surveys.id')
+                                                    ->groupBy('parent_surveys.id', 'parent_surveys.Surevey_title')
                                                     ->get();
 
         $ParticipationRate = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                            ->where('parent_surveys.Status', 'OnGoing')
+                                            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                             ->select(
-                                                'parent_surveys.id',
-                                                'parent_surveys.Surevey_title as title', // Survey title
+                                                'parent_surveys.resort_id',
                                                 DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
                                                 DB::raw("COUNT(t1.id) as total_count"),
-                                                DB::raw("ROUND((SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) / COUNT(t1.id)) * 100, 2) as participation_rate") // Calculate %
+                                                DB::raw("ROUND((SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) / NULLIF(COUNT(t1.id), 0)) * 100, 2) as participation_rate")
                                             )
                                             ->groupBy('parent_surveys.resort_id')
                                             ->get();
 
         $SurveyComparison = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                            ->where('parent_surveys.Status', 'OnGoing')
+                                            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                             ->whereBetween('parent_surveys.Start_date', [
                                                 now()->subMonths(2)->startOfMonth(),
@@ -408,20 +453,19 @@ class DashboardController extends Controller
          $RecentSurveyResults = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                             ->where('parent_surveys.Status', 'Complete')
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-                                            ->whereIn('parent_surveys.End_date', $this->olddates) // Ensure old dates array is valid
                                             ->select(
                                                 'parent_surveys.id',
                                                 'parent_surveys.Status',
-                                                'parent_surveys.Surevey_title as title', // Survey title
-                                                'parent_surveys.Start_date', // Creation date
-                                                'parent_surveys.End_date', // Closing date
+                                                'parent_surveys.Surevey_title as title',
+                                                'parent_surveys.Start_date',
+                                                'parent_surveys.End_date',
                                                 DB::raw("SUM(CASE WHEN t1.emp_status = 'yes' THEN 1 ELSE 0 END) as completed_count"),
                                                 DB::raw("SUM(CASE WHEN t1.emp_status = 'no' THEN 1 ELSE 0 END) as pending_count"),
                                                 DB::raw("COUNT(t1.id) as total_count")
                                             )
-                                            ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date') // Include all selected columns in groupBy
-                                            ->orderBy('parent_surveys.End_date', 'asc') // Sort to get the minimum surveys
-                                            ->limit(5) // Get only the minimum 5 surveys
+                                            ->groupBy('parent_surveys.id', 'parent_surveys.Status', 'parent_surveys.Surevey_title', 'parent_surveys.Start_date', 'parent_surveys.End_date')
+                                            ->orderBy('parent_surveys.End_date', 'desc')
+                                            ->limit(5)
                                             ->get()
                                             ->map(function ($a) { 
                                                 $a->Newid = base64_encode($a->id);
@@ -431,7 +475,7 @@ class DashboardController extends Controller
                                                 return $a;
                                             });
 
-        return view('resorts.Survey.dashboard.hrdashboard',compact('page_title','RecentSurveyResults','SurveyComparison','ParticipationRate','SurveyWiseParticipationRates','departmentWise','NearingDeadline','OngoingSurvey','CompleteSurvey_count','PublishSurvey_count','OngoingSurvey_count','total_Survey_count','SaveAsDraft'));
+        return view('resorts.Survey.dashboard.hrdashboard',compact('page_title','RecentSurveyResults','SurveyComparison','ParticipationRate','SurveyWiseParticipationRates','departmentWise','NearingDeadline','OngoingSurvey','CompleteSurvey_count','DraftSurvey_count','OngoingSurvey_count','total_Survey_count','SaveAsDraft'));
     }
 
    

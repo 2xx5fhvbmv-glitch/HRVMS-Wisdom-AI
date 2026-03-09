@@ -278,12 +278,9 @@ class LeaveController extends Controller
     }
 
     /**
-     * Leave approval flow (who can approve):
-     * - Line worker (6) / SUP (5): only reporting_to approves; if reporting_to is not HOD, HOD sees "just for info" (no approve).
-     * - MGR (4): reporting_to is HOD → HOD approves.
-     * - HOD (2): reporting_to is EXCOM → EXCOM approves.
-     * - EXCOM (1): reporting_to is GM → GM approves.
-     * - GM (8): HR (3) / EXCOM (1) / HOD (2) can approve (no single reporting_to).
+     * Leave approval: any employee's leave is approved by their Reporting To (from Employee Details page).
+     * Approval chain on submit: applicant's reporting manager is always added first; for GM, HR/EXCOM/HOD are also added.
+     * Who can approve: (1) the applicant's reporting manager, or (2) for GM leave, HR/EXCOM/HOD if they have a Pending row.
      */
     public function request()
     {
@@ -390,9 +387,11 @@ class LeaveController extends Controller
                     'els.approver_id AS approver_id',
                 )->paginate(10);
                     // dd($leaveRequests);
-                // Leave approval flow: only applicant's reporting_to can approve; GM's leave can also be approved by HR/EXCOM/HOD. Line worker/SUP: if reporting_to is not HOD, HOD sees just for info (no approve).
+                // Can approve: (1) applicant's reporting_to, or (2) GM leave and current user is HR/EXCOM/HOD, or (3) current user has a Pending row in the chain
                 $currentUserRank = trim((string)($loggedInEmployee->rank ?? ''));
-                $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($resort_id, $loggedInEmployeeId, $currentUserRank) {
+                $leaveIds = $leaveRequests->getCollection()->pluck('id')->toArray();
+                $leaveIdsWithCurrentUserPending = $leaveIds ? EmployeeLeaveStatus::whereIn('leave_request_id', $leaveIds)->where('approver_id', $loggedInEmployeeId)->where('status', 'Pending')->pluck('leave_request_id')->toArray() : [];
+                $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($resort_id, $loggedInEmployeeId, $currentUserRank, $leaveIdsWithCurrentUserPending) {
                     $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
 
                     // Fetch employee grade and benefit grid
@@ -485,20 +484,19 @@ class LeaveController extends Controller
                 }
                 $finalLeaveRequests = $finalLeaveRequests->merge($separateLeaveRequests);
 
-                // can_approve: only applicant's reporting_to (from employee profile) or GM leave approvers (HR/EXCOM/HOD)
+                // can_approve: applicant's reporting_to, or GM leave and user is HR/EXCOM/HOD, or user has a Pending row (same as transform above)
+                $finalLeaveIds = $finalLeaveRequests->pluck('id')->toArray();
+                $finalLeaveIdsWithPending = $finalLeaveIds ? EmployeeLeaveStatus::whereIn('leave_request_id', $finalLeaveIds)->where('approver_id', $loggedInEmployeeId)->where('status', 'Pending')->pluck('leave_request_id')->toArray() : [];
                 $currentUserRank = trim((string)($loggedInEmployee->rank ?? ''));
-                $finalLeaveRequests->each(function ($request) use ($loggedInEmployeeId, $currentUserRank) {
-                    $applicantReportingTo = $request->reporting_to ?? $request->applicant_reporting_to ?? null;
-                    if ($applicantReportingTo === null || $applicantReportingTo === '') {
-                        $isReportingManager = false;
-                    } else {
-                        $isReportingManager = (int)$applicantReportingTo === (int)$loggedInEmployeeId;
-                    }
+                $finalLeaveRequests->each(function ($request) use ($loggedInEmployeeId, $currentUserRank, $finalLeaveIdsWithPending) {
+                    $reportingToInt = (int)($request->reporting_to ?? $request->applicant_reporting_to ?? 0);
+                    $isReportingManager = $reportingToInt > 0 && $reportingToInt === (int)$loggedInEmployeeId;
                     $applicantRankStr = trim((string)($request->rank ?? ''));
                     $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
+                    $hasPendingRow = in_array($request->id, $finalLeaveIdsWithPending);
                     $statusVal = $request->status ?? $request->leave_status ?? '';
                     $leaveIsPending = strtolower(trim((string)$statusVal)) === 'pending';
-                    $request->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover) && $leaveIsPending);
+                    $request->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover || $hasPendingRow) && $leaveIsPending);
                 });
 
                 $show_department_filter = $canViewWholeResort;
@@ -908,12 +906,10 @@ class LeaveController extends Controller
         });
 
         // Can approve: (1) applicant's reporting_to, or (2) applicant is GM and current user is HR/EXCOM/HOD, or (3) current user has a Pending status row (their turn in the chain)
-        $applicantReportingTo = $leaveDetail->applicant_reporting_to ?? $leaveDetail->reporting_to ?? null;
-        $reportingToStr = trim((string)($applicantReportingTo ?? ''));
-        $currentUserIdStr = trim((string)($employee->id ?? ''));
+        $reportingToInt = (int)($leaveDetail->applicant_reporting_to ?? $leaveDetail->reporting_to ?? 0);
         $currentUserRank = trim((string)($employee->rank ?? ''));
         $applicantRankStr = trim((string)($leaveDetail->rank ?? ''));
-        $isReportingManager = $reportingToStr !== '' && $reportingToStr === $currentUserIdStr;
+        $isReportingManager = $reportingToInt > 0 && $reportingToInt === (int)$employee->id;
         $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
         $leaveIsPending = strtolower(trim($leaveDetail->status ?? '')) === 'pending';
         $currentUserHasPendingStatus = EmployeeLeaveStatus::where('leave_request_id', $decodedId)
@@ -1489,31 +1485,28 @@ class LeaveController extends Controller
                     }
                 }
 
-                // Leave approval flow per spec:
-                // Line worker (6) / SUP (5): only reporting_to approves; if not HOD then HOD sees "just for info" (no row).
-                // MGR (4): reporting_to (HOD) approves.
-                // HOD (2): reporting_to (EXCOM) approves.
-                // EXCOM (1): reporting_to (GM) approves.
-                // GM (8): HR, EXCOM; if not EXCOM then HOD (any one of them can approve).
+                // Leave approval: any employee's leave is approved by their Reporting To (from Employee Details page).
+                // All ranks including GM: add the applicant's reporting manager first; for GM only, also add HR/EXCOM/HOD as optional additional approvers.
+                if ($directReportingManager && $directReportingManager->rank) {
+                    $approvalFlow->push($directReportingManager);
+                }
                 if ($rank === "8") {
-                    // GM: HR, EXCOM; if not EXCOM then HOD
+                    // GM: after reporting manager, also add HR, EXCOM (or HOD if no EXCOM) so any of them can approve if needed
+                    $approvalIds = $approvalFlow->pluck('id')->toArray();
                     $hrApprover = Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $this->resort->resort_id)->where('rank', 3)->first();
-                    if ($hrApprover) {
+                    if ($hrApprover && !in_array($hrApprover->id, $approvalIds)) {
                         $approvalFlow->push($hrApprover);
+                        $approvalIds[] = $hrApprover->id;
                     }
                     $excomApprover = Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $this->resort->resort_id)->where('rank', 1)->first();
-                    if ($excomApprover) {
+                    if ($excomApprover && !in_array($excomApprover->id, $approvalIds)) {
                         $approvalFlow->push($excomApprover);
+                        $approvalIds[] = $excomApprover->id;
                     } else {
                         $hodApprover = Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $this->resort->resort_id)->where('rank', 2)->first();
-                        if ($hodApprover) {
+                        if ($hodApprover && !in_array($hodApprover->id, $approvalIds)) {
                             $approvalFlow->push($hodApprover);
                         }
-                    }
-                } else {
-                    // All others: only direct reporting manager (single approver)
-                    if ($directReportingManager && $directReportingManager->rank) {
-                        $approvalFlow->push($directReportingManager);
                     }
                 }
 
@@ -1913,14 +1906,22 @@ class LeaveController extends Controller
 
         // Is current user the applicant's reporting_to? (from employee profile – same source as profile settings)
         $isReportingManager = $applicant && $applicantReportingToStr !== '' && (int) $applicantReportingToStr === $currentApproverIdInt;
-        $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRankNum, ['1', '2', '3'], true);
+        // GM leave approvers: rank 1 (EXCOM), 2 (HOD), 3 (HR) or role by position/department (e.g. HR dept)
+        $currentUserEmployee = $this->resort->GetEmployee ?? $this->resort->getEmployee ?? null;
+        $rankPosition = $currentUserEmployee ? Common::getEmployeeRankPosition($currentUserEmployee) : ['rank' => null, 'position' => null];
+        $currentUserRankLabel = $rankPosition['rank'] ?? '';
+        $currentUserPositionLabel = $rankPosition['position'] ?? '';
+        $isHRExcomHodByRank = in_array($currentUserRankNum, ['1', '2', '3'], true);
+        $isHRExcomHodByRole = in_array(strtoupper(trim($currentUserRankLabel)), ['EXCOM', 'HOD', 'HR'], true) || strtoupper(trim($currentUserPositionLabel ?? '')) === 'HR';
+        $isGMLeaveApprover = ($applicantRankStr === '8') && ($isHRExcomHodByRank || $isHRExcomHodByRole);
 
-        // GM flow: allow if you have a Pending row AND you are HR/EXCOM/HOD
+        // GM flow: allow if (1) you are the applicant's reporting manager, OR (2) you have a Pending row AND you are HR/EXCOM/HOD
         if ($applicantRankStr === '8') {
-            if (!$currentUserPendingRow || !$isGMLeaveApprover) {
+            $canApproveGM = $isReportingManager || ($currentUserPendingRow && $isGMLeaveApprover);
+            if (!$canApproveGM) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Only HR, EXCOM or HOD can approve or reject GM leave. You can view it only.',
+                    'message' => 'Only the reporting manager or HR, EXCOM or HOD can approve or reject GM leave. You can view it only.',
                 ], 403);
             }
         } else {
