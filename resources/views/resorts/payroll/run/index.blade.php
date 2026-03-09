@@ -51,6 +51,27 @@
                                     <div class="col-xxl-7 col-xl-8 col-lg-10 col-md-12">
                                         <div class="bg-themeGrayLight payrollPeriod-block mb-3">
                                             <div class="text-start mb-md-5 mb-4">
+                                                <div class="mb-3">
+                                                    <label for="payrollPeriodSelect" class="form-label fw-600">Select Payroll Period</label>
+                                                    @php $firstUnpaidSelected = false; @endphp
+                                                    <select id="payrollPeriodSelect" class="form-select">
+                                                        @foreach($availablePeriods as $index => $period)
+                                                            <option value="{{ $period['start_date'] }}|{{ $period['end_date'] }}"
+                                                                {{ $period['is_paid'] ? 'disabled' : '' }}
+                                                                @if(!$period['is_paid'] && !$firstUnpaidSelected)
+                                                                    selected
+                                                                    @php $firstUnpaidSelected = true; @endphp
+                                                                @endif>
+                                                                {{ $period['label'] }}
+                                                                @if($period['is_paid'])
+                                                                    (Paid)
+                                                                @else
+                                                                    (Unpaid)
+                                                                @endif
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
                                                 <div class="dateRangeAb datepicker"  id="datapicker">
                                                     <div>
                                                         <!-- Hidden input field to attach the calendar to -->
@@ -58,7 +79,7 @@
                                                     </div>
                                                     <p id="startDate" class="d-none">Start Date:</p>
                                                     <p id="endDate" class="d-none">End Date:</p>
-                                                </div>                        
+                                                </div>
                                             </div>
                                             <button type="button" class="btn btn-themeBlue btn-sm next">   Continue</button>
                                         </div>
@@ -518,6 +539,7 @@
     var selectedEmployees = [];
     var currency = "{{$currency}}";
     let employeeData = {}; // Store employee details
+    var selectedEmployeeSet = new Set(); // Persist selection across pages
     //  console.log(currency);
     $(document).ready(function () {
         // Ensure Parsley is loaded
@@ -530,40 +552,49 @@
         // Set the cutoff day (from Laravel config)
         const cutoffDay = "{{ $cutoffDay ?? 25 }}";
 
-        // Get today's date
-        const today = moment();
-        let startDate, endDate;
-
-        // Calculate based on cutoff logic (only previous period active)
-        const currentMonth = today.month();
-        const currentYear = today.year();
-
-        startDate = moment([currentYear, currentMonth - 1, cutoffDay]);
-        endDate = moment([currentYear, currentMonth, cutoffDay - 1]);
+        // Get initial period from dropdown
+        let selectedPeriod = $('#payrollPeriodSelect').val();
+        let periodParts = selectedPeriod ? selectedPeriod.split('|') : [];
+        let startDate = periodParts.length === 2 ? moment(periodParts[0], "YYYY-MM-DD") : moment().subtract(1, 'month').date(cutoffDay);
+        let endDate = periodParts.length === 2 ? moment(periodParts[1], "YYYY-MM-DD") : moment().date(cutoffDay).subtract(1, 'day');
 
         // Fallback for invalid date scenarios
-        startDate = startDate.isValid() ? startDate : moment([currentYear, currentMonth - 1, 1]).endOf('month');
-        endDate = endDate.isValid() ? endDate : moment([currentYear, currentMonth, 1]).endOf('month');
+        if (!startDate.isValid()) startDate = moment().subtract(1, 'month').startOf('month');
+        if (!endDate.isValid()) endDate = moment().startOf('month').subtract(1, 'day');
 
         // Initialize daterangepicker
-        $("#hiddenInput").daterangepicker({
-            autoApply: true,
-            startDate: startDate,
-            endDate: endDate,
-            opens: 'right',
-            parentEl: '#datapicker',
-            alwaysShowCalendars: false,
-            linkedCalendars: false,
-            locale: {
-                format: "DD-MM-YYYY",
-            },
-            isInvalidDate: function () {
-                return true; // disables all dates
-            }
-        }, function (start, end) {
-            // Still trigger display update
-            $("#startDate").text("Start Date: " + start.format("DD-MM-YYYY")).removeClass('d-none');
-            $("#endDate").text("End Date: " + end.format("DD-MM-YYYY")).removeClass('d-none');
+        function initDateRangePicker(start, end) {
+            $("#hiddenInput").daterangepicker({
+                autoApply: true,
+                startDate: start,
+                endDate: end,
+                opens: 'right',
+                parentEl: '#datapicker',
+                alwaysShowCalendars: false,
+                linkedCalendars: false,
+                locale: {
+                    format: "DD-MM-YYYY",
+                },
+                isInvalidDate: function () {
+                    return true; // disables all dates
+                }
+            }, function (s, e) {
+                $("#startDate").text("Start Date: " + s.format("DD-MM-YYYY")).removeClass('d-none');
+                $("#endDate").text("End Date: " + e.format("DD-MM-YYYY")).removeClass('d-none');
+            });
+        }
+
+        initDateRangePicker(startDate, endDate);
+
+        // Update daterangepicker when period dropdown changes
+        $('#payrollPeriodSelect').on('change', function() {
+            var val = $(this).val();
+            var parts = val.split('|');
+            var newStart = moment(parts[0], "YYYY-MM-DD");
+            var newEnd = moment(parts[1], "YYYY-MM-DD");
+            initDateRangePicker(newStart, newEnd);
+            $("#startDate").text("Start Date: " + newStart.format("DD-MM-YYYY")).removeClass('d-none');
+            $("#endDate").text("End Date: " + newEnd.format("DD-MM-YYYY")).removeClass('d-none');
         });
 
         $("#hiddenInput").on('apply.daterangepicker', function (ev, picker) {
@@ -647,28 +678,33 @@
                     return;
                 }
 
+                // Sync current page checkboxes to the persistent Set before collecting
+                updateSelectedCount();
+
                 var selectedEmployees = [];
                 var selectedEmployeesIds = [];
 
+                // Collect from persistent Set (works across all pages)
+                selectedEmployeeSet.forEach(function(empId) {
+                    selectedEmployeesIds.push({ id: empId });
+                });
+
+                // Also build selectedEmployees from visible rows for localStorage cache
                 $("#payroll-employees tbody tr").each(function () {
-                    // console.log($(this).find("td:eq(6)").text().trim());
-                    let isChecked = $(this).find(".form-check-input").prop("checked"); // Check if employee is selected
-                    if (isChecked) {
+                    let checkbox = $(this).find(".form-check-input");
+                    if (checkbox.prop("checked")) {
                         selectedEmployees.push({
-                            id: $(this).find("td:eq(1)").text().trim(), // Employee ID
-                            name: $(this).find("td:eq(2)").text().trim(), // Employee Name
-                            position: $(this).find("td:eq(3)").text().trim(), // Position
-                            department: $(this).find("td:eq(4)").text().trim(), // Department
-                            section: $(this).find("td:eq(5)").text().trim(), // Section
-                            paymentMethod: $(this).find("td:eq(6)").text().trim() // Payment Method
+                            id: $(this).find("td:eq(1)").text().trim(),
+                            name: $(this).find("td:eq(2)").text().trim(),
+                            position: $(this).find("td:eq(3)").text().trim(),
+                            department: $(this).find("td:eq(4)").text().trim(),
+                            section: $(this).find("td:eq(5)").text().trim(),
+                            paymentMethod: $(this).find("td:eq(6)").text().trim()
                         });
-                        selectedEmployeesIds.push({
-                            id: $(this).find("td:eq(1)").text().trim() // Employee ID
-                        })
                     }
                 });
 
-                if (selectedEmployees.length === 0) {
+                if (selectedEmployeeSet.size === 0) {
                     toastr.error("Please select at least one employee.", 'Error', {
                         positionClass: 'toast-bottom-right'
                     });
@@ -681,7 +717,7 @@
                     method: 'POST',
                     data: {
                         payroll_id: payrollId,
-                        employees: selectedEmployees,
+                        employee_ids: Array.from(selectedEmployeeSet),
                         _token: '{{ csrf_token() }}'
                     },
                     success: function (response) {
@@ -728,26 +764,37 @@
 
                 $("#table-timeAttendance tbody tr").each(function () {
                     let $row = $(this);
+
+                    // Skip empty DataTable rows ("No data available in table")
+                    if ($row.find("td.dataTables_empty").length > 0 || $row.find("td").length <= 1) {
+                        return; // continue to next row
+                    }
+
                     let employeeId = $row.find("td:eq(0)").text().trim(); // Employee ID
 
-                    let present = $row.find("td:eq(3) input").length > 0 ? 
-                        parseInt($row.find("td:eq(3) input").val().trim()) || 0 : 
+                    // Skip rows with invalid/empty employee IDs
+                    if (!employeeId || employeeId === '' || !/^[A-Za-z0-9_-]+$/.test(employeeId)) {
+                        return; // continue to next row
+                    }
+
+                    let present = $row.find("td:eq(3) input").length > 0 ?
+                        parseInt($row.find("td:eq(3) input").val().trim()) || 0 :
                         parseInt($row.find("td:eq(3)").text().trim()) || 0;
 
-                    let absent = $row.find("td:eq(4) input").length > 0 ? 
-                        parseInt($row.find("td:eq(4) input").val().trim()) || 0 : 
+                    let absent = $row.find("td:eq(4) input").length > 0 ?
+                        parseInt($row.find("td:eq(4) input").val().trim()) || 0 :
                         parseInt($row.find("td:eq(4)").text().trim()) || 0;
 
-                    let regularOT = $row.find("td:eq(6) input").length > 0 ? 
-                        parseFloat($row.find("td:eq(6) input").val().trim()) || 0 : 
+                    let regularOT = $row.find("td:eq(6) input").length > 0 ?
+                        parseFloat($row.find("td:eq(6) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(6)").text().trim()) || 0;
 
-                    let holidayOT = $row.find("td:eq(7) input").length > 0 ? 
-                        parseFloat($row.find("td:eq(7) input").val().trim()) || 0 : 
+                    let holidayOT = $row.find("td:eq(7) input").length > 0 ?
+                        parseFloat($row.find("td:eq(7) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(7)").text().trim()) || 0;
 
-                    let totalOT = $row.find("td:eq(8) input").length > 0 ? 
-                        parseFloat($row.find("td:eq(8) input").val().trim()) || 0 : 
+                    let totalOT = $row.find("td:eq(8) input").length > 0 ?
+                        parseFloat($row.find("td:eq(8) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(8)").text().trim()) || 0;
 
                     AttendaceData.push({
@@ -1392,17 +1439,21 @@
         $('#unselectAll').on('click', function(e){
             e.preventDefault();
             $('#select-all').prop('checked', false);
+            selectedEmployeeSet.clear();
             updateSelectedCount();
             employeeList();
         });
 
-        // "Select All" checkbox functionality (optional)
+        // "Select All" checkbox functionality
         $('#select-all').on('change', function(){
             var isChecked = $(this).is(':checked');
+            if (!isChecked) {
+                selectedEmployeeSet.clear();
+            }
             $('#payroll-employees tbody input[type="checkbox"]').prop('checked', isChecked);
             updateSelectedCount();
             employeeList();
-            updatePageLength() ;
+            updatePageLength();
         });
         // Initialize count on page load in case some checkboxes are pre-checked
         updateSelectedCount();
@@ -1412,7 +1463,7 @@
             updatePageLength();
         }, 1000);
         // Filter change event
-        $('#searchInput, #departmentFilter, #positionFilter').on('keyup change', function () {
+        $('#searchInput, #departmentFilter, #positionFilter, #sectionFilter').on('keyup change', function () {
             employeeList();
         });
 
@@ -1602,7 +1653,16 @@
     }
 
     function updateSelectedCount(){
-        var count = $('#payroll-employees tbody input[type="checkbox"]:checked').length;
+        // Sync visible checkboxes to the persistent Set
+        $('#payroll-employees tbody input[type="checkbox"]').each(function(){
+            var empId = $(this).val();
+            if($(this).prop('checked')){
+                selectedEmployeeSet.add(empId);
+            } else {
+                selectedEmployeeSet.delete(empId);
+            }
+        });
+        var count = selectedEmployeeSet.size;
         $('#selectedCount').text(count + " Employees Selected");
     }
 
@@ -1618,11 +1678,9 @@
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
         var endDate = moment(dates[1], "DD-MM-YYYY", true);
-        var selectedEmployees = [];
 
-        $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-            selectedEmployees.push($(this).val());
-        });
+        // Use persistent Set for cross-page selection
+        var selectedEmployees = Array.from(selectedEmployeeSet);
 
         if (selectedEmployees.length === 0) {
             toastr.error("Please select at least one employee before proceeding.", 'Error',{ positionClass: 'toast-bottom-right' });
@@ -2778,12 +2836,13 @@
                     d.searchTerm = $('#searchInput').val();
                     d.department = $('#departmentFilter').val();
                     d.position = $('#positionFilter').val();
+                    d.section = $('#sectionFilter').val();
                     d.isChecked = isChecked;
                 },
-                dataSrc: function (json) 
+                dataSrc: function (json)
                 {
                     $('#selectedCount').text(json.totalChecked + " Employees Selected");
-                    return json.data; 
+                    return json.data;
                 }
             },
             columns: [
@@ -2811,10 +2870,14 @@
                 { data: 'payment_method', defaultContent: 'Cash' }
             ],
             drawCallback: function(settings) {
-                // ✅ Another way to update selectedCount after table reload
-                let api = this.api();
-                let totalChecked = api.ajax.json().totalChecked; // Get total checked from JSON response
-                $("#selectedCount").val(totalChecked);
+                // Restore checkbox state from persistent Set after each page draw
+                $('#payroll-employees tbody input[type="checkbox"]').each(function(){
+                    var empId = $(this).val();
+                    if(selectedEmployeeSet.has(empId)){
+                        $(this).prop('checked', true);
+                    }
+                });
+                $('#selectedCount').text(selectedEmployeeSet.size + " Employees Selected");
             }
         });
     }
@@ -2836,6 +2899,7 @@
                     searchTerm : $('#searchInput').val(),
                     department : $('#departmentFilter').val(),
                     position : $('#positionFilter').val(),
+                    section : $('#sectionFilter').val(),
                     isChecked : true,
                 },
                 success: function (response) {

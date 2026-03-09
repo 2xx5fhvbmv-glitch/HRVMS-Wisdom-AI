@@ -77,14 +77,45 @@ class PayrollController extends Controller
         $sections = ResortSection::where('status','active')->where('resort_id',$resort_id)->get();
         $cut_off_date = PayrollConfig::where('resort_id',$resort_id)->first();// Default to 15 if not set
         $cutoffDay = $cut_off_date ? $cut_off_date->cutoff_day : 15;
-        return view('resorts.payroll.run.index',compact('page_title','positions','departments','sections','deductions','employees','currency','cutoffDay'));
+
+        // Generate available payroll periods (check up to 6 previous months for unpaid)
+        $availablePeriods = [];
+        $today = \Carbon\Carbon::now();
+        for ($i = 1; $i <= 6; $i++) {
+            $periodStart = \Carbon\Carbon::create($today->year, $today->month, $cutoffDay)->subMonths($i);
+            $periodEnd = \Carbon\Carbon::create($today->year, $today->month, $cutoffDay)->subMonths($i - 1)->subDay();
+
+            // Validate dates
+            if (!$periodStart->day == $cutoffDay) {
+                $periodStart = $periodStart->endOfMonth();
+            }
+
+            // Check if payroll exists and is locked/completed for this period
+            $existingPayroll = Payroll::where('resort_id', $resort_id)
+                ->where('start_date', $periodStart->format('Y-m-d'))
+                ->where('end_date', $periodEnd->format('Y-m-d'))
+                ->whereIn('status', ['locked', 'completed'])
+                ->exists();
+
+            $availablePeriods[] = [
+                'start_date' => $periodStart->format('Y-m-d'),
+                'end_date' => $periodEnd->format('Y-m-d'),
+                'label' => $periodStart->format('d M Y') . ' - ' . $periodEnd->format('d M Y'),
+                'is_paid' => $existingPayroll,
+            ];
+        }
+
+        // Reverse so oldest period appears first (process oldest unpaid first)
+        $availablePeriods = array_reverse($availablePeriods);
+
+        return view('resorts.payroll.run.index',compact('page_title','positions','departments','sections','deductions','employees','currency','cutoffDay','availablePeriods'));
     }
 
     public function getEmployees(Request $request)
     {
         $resort_id = auth()->user()->resort_id;
         $isChecked = $request->isChecked;
-        $query = Employee::with(['resortAdmin', 'position', 'department'])
+        $query = Employee::with(['resortAdmin', 'position', 'department', 'section'])
             ->where('resort_id', $resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned']);
 
@@ -106,7 +137,11 @@ class PayrollController extends Controller
         }
 
         if ($request->position) {
-            $query->orwhere('Position_id', $request->position);
+            $query->where('Position_id', $request->position);
+        }
+
+        if ($request->section) {
+            $query->where('Section_id', $request->section);
         }
 
         $query = $query->get()
@@ -151,10 +186,13 @@ class PayrollController extends Controller
                 'department_code' => $employee->department->code ?? 'N/A',
             ];
         })
+        ->addColumn('section', function ($employee) {
+            return $employee->section->name ?? 'N/A';
+        })
         ->addColumn('payment_method', function ($employee) {
             return $employee->payment_mode; // Adjust based on actual logic
         })
-        ->rawColumns(['id', 'employee', 'position', 'department', 'payment_method'])
+        ->rawColumns(['id', 'employee', 'position', 'department', 'section', 'payment_method'])
         ->make(true);
 
         // ✅ Inject totalChecked into the JSON response
@@ -249,19 +287,33 @@ class PayrollController extends Controller
     public function saveEmployeesToPayroll(Request $request)
     {
         try {
-            foreach ($request->employees as $employee) {
-                // Fetch Employee details along with position and department
-                $emp_detail = Employee::with(['position', 'department'])->where('Emp_id', $employee['id'])->first();
+            $employeeIds = $request->employee_ids ?? [];
+
+            // Support legacy format (array of objects with 'id' key)
+            if (empty($employeeIds) && $request->employees) {
+                foreach ($request->employees as $employee) {
+                    $employeeIds[] = $employee['id'];
+                }
+            }
+
+            foreach ($employeeIds as $empId) {
+                // Fetch Employee details along with position, department and section
+                $emp_detail = Employee::with(['position', 'department', 'section'])->find($empId);
+
+                // Fallback: try by Emp_id if not found by primary key
+                if (!$emp_detail) {
+                    $emp_detail = Employee::with(['position', 'department', 'section'])->where('Emp_id', $empId)->first();
+                }
 
                 if (!$emp_detail) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Employee not found for ID: ' . $employee['id']
+                        'message' => 'Employee not found for ID: ' . $empId
                     ], 404);
                 }
 
                 // Check if section exists, otherwise set it to NULL
-                $sectionId = isset($emp_detail['section']) ? $emp_detail['section'] : null;
+                $sectionId = $emp_detail->section_id ?? null;
 
                 // Insert or Update payroll employee record
                 PayrollEmployees::updateOrCreate(
@@ -270,11 +322,11 @@ class PayrollController extends Controller
                         'employee_id' => $emp_detail->id,
                     ],
                     [
-                        'Emp_id' => $employee['id'],
-                        'position' => $emp_detail->position->id,
-                        'department' => $emp_detail->department->id,
-                        'section' => $sectionId, // NULL if section doesn't exist
-                        'paymentMethod' => $employee['paymentMethod'],
+                        'Emp_id' => $emp_detail->Emp_id,
+                        'position' => $emp_detail->position->id ?? null,
+                        'department' => $emp_detail->department->id ?? null,
+                        'section' => $sectionId,
+                        'paymentMethod' => $emp_detail->payment_mode ?? 'Cash',
                     ]
                 );
             }
@@ -661,8 +713,8 @@ class PayrollController extends Controller
         // dd($request->reviewData);
         try {
             foreach ($request->reviewData as $review) {
-                $total_earnings = $review['earnedSalary'] + $review['overtimeTotal'] + $review['serviceCharge'] + $review['earningsAllowance'];
-                $total_deductions = $review['totalDeductions'] ?? 0;
+                $total_earnings = (float)($review['earnedSalary'] ?? 0) + (float)($review['overtimeTotal'] ?? 0) + (float)($review['serviceCharge'] ?? 0) + (float)($review['earningsAllowance'] ?? 0);
+                $total_deductions = (float)($review['totalDeductions'] ?? 0);
                 // dd($review);
                 // ✅ Fetch Employee details
                 $emp_detail = Employee::with(['position', 'department'])
@@ -1541,8 +1593,10 @@ class PayrollController extends Controller
             foreach ($records as $rec) {
                 $attendance_id = $rec->id;
                 if (!empty($rec->OverTime)) {
-                    [$h, $m] = explode(':', $rec->OverTime);
-                    $hours = (int)$h + ((int)$m / 60);
+                    $otParts = explode(':', $rec->OverTime);
+                    $h = (int)($otParts[0] ?? 0);
+                    $m = (int)($otParts[1] ?? 0);
+                    $hours = $h + ($m / 60);
                     $totalHours += $hours;
 
                     $isHoliday = PublicHoliday::where('holiday_date', date('d-m-Y', strtotime($rec->date)))->exists();
