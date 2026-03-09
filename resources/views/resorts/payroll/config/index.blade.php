@@ -33,7 +33,7 @@
                             <div class="mb-3 ">
                                 <label for="cutoff_day" class="form-label">CutOff Day</label>
                                 <select name="cutoff_day" id="cutoff_day" class="form-select select2t-none">
-                                    @for($i=1;$i<=28;$i++)
+                                    @for($i=1;$i<=31;$i++)
                                         <option value="{{$i}}">{{$i}}</option>
                                     @endfor
                                 </select>
