@@ -6817,6 +6817,31 @@ class Common
         ]);
         $companyAddress = implode(', ', $companyAddressParts);
 
+        // Fetch applicant salary allocation if available
+        $salaryAllocation = \App\Models\ApplicantSalaryAllocation::where('applicant_id', $applicantId)
+            ->where('resort_id', $resortId)
+            ->first();
+
+        $allocatedSalary = ($salaryAllocation && $salaryAllocation->basic_salary > 0)
+            ? $salaryAllocation->basic_salary
+            : ($vacancy->propsed_salary ?? $vacancy->salary ?? '');
+
+        $allocatedCurrency = ($salaryAllocation && $salaryAllocation->currency)
+            ? $salaryAllocation->currency
+            : ($extraFields['currency'] ?? '');
+
+        $allocatedAllowancesTotal = 0;
+        if ($salaryAllocation && is_array($salaryAllocation->allowances)) {
+            foreach ($salaryAllocation->allowances as $al) {
+                $allocatedAllowancesTotal += (float)($al['value'] ?? 0);
+            }
+        }
+        $allowancesTotal = $allocatedAllowancesTotal > 0 ? $allocatedAllowancesTotal : ($vacancy->allowance ?? '');
+
+        $grossSalary = (is_numeric($allocatedSalary) && is_numeric($allowancesTotal))
+            ? ((float)$allocatedSalary + (float)$allowancesTotal)
+            : ($vacancy->salary ?? '');
+
         $placeholders = [
             // Personal Information
             '{{candidate_full_name}}' => ucfirst($applicant->first_name) . ' ' . ucfirst($applicant->last_name),
@@ -6858,13 +6883,13 @@ class Common
             '{{termination_notice_during_probation_days}}' => $extraFields['termination_notice_during_probation_days'] ?? '',
 
             // Compensation
-            '{{basic_salary_amount}}' => $vacancy->propsed_salary ?? $vacancy->salary ?? '',
-            '{{currency}}' => $extraFields['currency'] ?? '',
+            '{{basic_salary_amount}}' => $allocatedSalary,
+            '{{currency}}' => $allocatedCurrency,
             '{{salary_frequency}}' => $extraFields['salary_frequency'] ?? 'Monthly',
             '{{service_charge_eligible}}' => $extraFields['service_charge_eligible'] ?? '',
             '{{estimated_service_charge_range}}' => $extraFields['estimated_service_charge_range'] ?? '',
-            '{{allowances_total}}' => $vacancy->allowance ?? '',
-            '{{gross_salary_amount}}' => $vacancy->salary ?? '',
+            '{{allowances_total}}' => $allowancesTotal,
+            '{{gross_salary_amount}}' => $grossSalary,
             '{{offer_issue_date}}' => now()->format('d/m/Y'),
             '{{offer_expiry_date}}' => '',
             '{{background_verification_required}}' => $extraFields['background_verification_required'] ?? '',

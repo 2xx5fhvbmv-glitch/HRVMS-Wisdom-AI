@@ -109,6 +109,10 @@
                 <button class="nav-link" id="tab5" data-bs-toggle="tab" data-bs-target="#tabPane5" type="button"
                     role="tab" aria-controls="tabPane5" aria-selected="false">QUESTION</button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab6" data-bs-toggle="tab" data-bs-target="#tabPane6" type="button"
+                    role="tab" aria-controls="tabPane6" aria-selected="false">SALARY & BENEFIT</button>
+            </li>
         </ul>
         <div class="tab-content" id="myTabContent">
             <div class="tab-pane fade show active" id="tabPane1" role="tabpanel" aria-labelledby="tab1"
@@ -246,6 +250,22 @@
                                 <th>Full Length Photo</th>
                                 <td><a  data-id="{{ base64_encode($Applicant_form_data->id) }}" data-flag="full_length_photo" href="javascript:void(0)" class="a-link DownloadFile">Download</a></td>
                             </tr>
+                            @php
+                                $otherDocs = json_decode($Applicant_form_data->other_document, true);
+                            @endphp
+                            @if(is_array($otherDocs) && count($otherDocs) > 0)
+                                @foreach($otherDocs as $docIdx => $docPath)
+                                <tr>
+                                    <th>Other Document {{ count($otherDocs) > 1 ? ($docIdx + 1) : '' }}</th>
+                                    <td><a data-id="{{ base64_encode($Applicant_form_data->id) }}" data-flag="other_document" data-index="{{ $docIdx }}" href="javascript:void(0)" class="a-link DownloadFile">Download</a></td>
+                                </tr>
+                                @endforeach
+                            @elseif(!empty($Applicant_form_data->other_document) && !is_array($otherDocs))
+                                <tr>
+                                    <th>Other Document</th>
+                                    <td><a data-id="{{ base64_encode($Applicant_form_data->id) }}" data-flag="other_document" data-index="0" href="javascript:void(0)" class="a-link DownloadFile">Download</a></td>
+                                </tr>
+                            @endif
 
                         </tbody>
                     </table>
@@ -431,12 +451,19 @@
                                                         }
                                                     }
                                                     if ($interviewer == "select") $buttonRoundRank = $finalRoundRank;
-                                                    // Only HR can select/reject; for other actions, HR can act on all rounds, others only on their own round
+
+                                                    // Only HR can select/reject at final stage; other roles can only complete their own round
                                                     $canAct = ($interviewer == "select") ? $isHrDepartment : ($isHrDepartment || $CurrentRankOFUser == $buttonRoundRank);
+
+                                                    // Check if meeting link exists for the current round (not just latest interview detail)
+                                                    $hasMeetingLink = false;
+                                                    if (!empty($Applicant_form_data->MeetingLink) && $Applicant_form_data->MeetingLink != '0') {
+                                                        $hasMeetingLink = true;
+                                                    }
                                                 @endphp
 
                                                 @if($canAct)
-                                                    @if(in_array($interviewer,$CompleteArray) && $Applicant_form_data->MeetingLink!="")
+                                                    @if(in_array($interviewer,$CompleteArray) && $hasMeetingLink)
 
                                                         <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
                                                             data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
@@ -474,6 +501,8 @@
                                                     @else
                                                         <a href="javascript:void(0)" class="btn btn-themeSkyblue  btn-sm"> Please generate Interview Link</a>
                                                     @endif
+                                                @else
+                                                    <span class="text-muted small"><i class="fa-solid fa-lock me-1"></i>Waiting for {{ $interviewer == 'select' ? 'HR' : ($InterViewRound[$buttonRoundRank] ?? '') }} to act</span>
                                                 @endif
                                             @endif
 
@@ -489,13 +518,50 @@
                                             Selected
                                         </button>
                                     </h2>
-                                    <div id="collapseFour" class="accordion-collapse collapse"
+                                    <div id="collapseFour" class="accordion-collapse collapse @if(in_array($Applicant_form_data->ApplicantStatus, ['Selected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'])) show @endif"
                                         aria-labelledby="headingFour" data-bs-parent="#accordionExample">
                                         <div class="accordion-body">
-                                            {{-- Lorem ipsum dolor sit amet consectetur adipisicing elit. Repellendus
-                                            molestiae perspiciatis doloribus porro, recusandae ipsum totam
-                                            dignissimos incidunt vero harum et omnis autem quaerat consequatur a
-                                            voluptates quam reiciendis odit. --}}
+                                            @if(isset($offerContract) && $offerContract->isNotEmpty())
+                                                @foreach($offerContract as $oc)
+                                                <div class="mb-3 p-2" style="background:#f8f9fa; border-radius:6px; border-left:3px solid {{ $oc->status == 'Rejected' ? '#dc3545' : ($oc->status == 'Accepted' ? '#198754' : '#0d6efd') }};">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <strong>{{ ucfirst($oc->type == 'offer_letter' ? 'Offer Letter' : 'Contract') }}</strong>
+                                                        <span class="badge {{ $oc->status == 'Rejected' ? 'bg-danger' : ($oc->status == 'Accepted' ? 'bg-success' : 'bg-primary') }}">{{ $oc->status }}</span>
+                                                    </div>
+                                                    <small class="text-muted">Sent: {{ $oc->created_at }}</small>
+                                                    @if($oc->responded_at)
+                                                        <br><small class="text-muted">Responded: {{ $oc->responded_at->format('d-m-Y H:i') }}</small>
+                                                    @endif
+                                                    @if($oc->status == 'Rejected' && !empty($oc->rejection_reason))
+                                                        <div class="mt-2 p-2 bg-white" style="border-radius:4px;">
+                                                            <small class="text-danger"><strong>Reason:</strong> {{ $oc->rejection_reason }}</small>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                                @endforeach
+                                            @endif
+
+                                            @if($isHrDepartment)
+                                                @if(in_array($Applicant_form_data->ApplicantStatus, ['Selected', 'Offer Letter Rejected']))
+                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendOfferLetterBtn"
+                                                        data-id="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
+                                                        data-applicantstatusid="{{ base64_encode($Applicant_form_data->ApplicantStatusID) }}">
+                                                        {{ $Applicant_form_data->ApplicantStatus == 'Offer Letter Rejected' ? 'Resend Offer Letter' : 'Send Offer Letter' }}
+                                                    </a>
+                                                @elseif(in_array($Applicant_form_data->ApplicantStatus, ['Offer Letter Accepted', 'Contract Rejected']))
+                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendContractBtn"
+                                                        data-id="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
+                                                        data-applicantstatusid="{{ base64_encode($Applicant_form_data->ApplicantStatusID) }}">
+                                                        {{ $Applicant_form_data->ApplicantStatus == 'Contract Rejected' ? 'Resend Contract' : 'Send Contract' }}
+                                                    </a>
+                                                @elseif($Applicant_form_data->ApplicantStatus == 'Offer Letter Sent')
+                                                    <span class="badge bg-info text-white">Offer Letter Sent - Awaiting Response</span>
+                                                @elseif($Applicant_form_data->ApplicantStatus == 'Contract Sent')
+                                                    <span class="badge bg-info text-white">Contract Sent - Awaiting Response</span>
+                                                @elseif($Applicant_form_data->ApplicantStatus == 'Contract Accepted')
+                                                    <span class="badge bg-success">Contract Accepted - Employee Created</span>
+                                                @endif
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -562,7 +628,7 @@
                                 <th>Department:</th>
                                 <td>{{ $Applicant_form_data->DepartmentName}}</td>
                             </tr>
-                            @if($Applicant_form_data->InterViewDate && $Applicant_form_data->InterViewDate != '0000-00-00' && strtotime($Applicant_form_data->InterViewDate) > 0)
+                            @if(!empty($Applicant_form_data->InterViewDate) && $Applicant_form_data->InterViewDate != '0000-00-00' && strtotime($Applicant_form_data->InterViewDate) > 0 && !empty($Applicant_form_data->ApplicantInterviewtime))
                             <tr>
                                 <th>Interview Date & Time:</th>
                                 <td>{{ date('d/M/Y',strtotime($Applicant_form_data->InterViewDate)) }} -  <b>Applicant Time </b> :-{{ $Applicant_form_data->ApplicantInterviewtime}}  :   <b>Maldivan Time</b>:-{{ $Applicant_form_data->ResortInterviewtime}} </td>
@@ -572,16 +638,20 @@
                             <tr>
                                 <th>Interview link:</th>
                                 <td>
-                                    @if($isHrDepartment)
-                                        <a href="{{ $Applicant_form_data->MeetingLink}}" class="a-link">{{ $Applicant_form_data->MeetingLink}}</a>
+                                    @if($isHrDepartment || $CurrentRankOFUser == $Applicant_form_data->As_ApprovedBy)
+                                        <a href="{{ $Applicant_form_data->MeetingLink}}" class="a-link" target="_blank">{{ $Applicant_form_data->MeetingLink}}</a>
                                     @else
                                         <span class="text-muted"><i class="fa-solid fa-lock me-1"></i>Available after your round is scheduled</span>
                                     @endif
                                 </td>
                             </tr>
                             @endif
-                            @if($InterviewComments->isNotEmpty())
+                            @php
+                                $hasInterviewData = $InterviewComments->filter(function($i) { return !empty($i->InterViewDate); })->isNotEmpty();
+                            @endphp
+                            @if($hasInterviewData)
                                 @foreach($InterviewComments as $interview)
+                                @if(!empty($interview->InterViewDate))
                                 <tr>
                                     <th>Interviewer -  {{ $interview->rank_name }}  {{ $interview->ApplicantInterviewtime}}:</th>
                                     <td>{{ $interview->InterViewDate}}  - <b>Applicant Time </b> :-{{ $interview->ApplicantInterviewtime}}  <b>Maldivan Time</b>:-{{ $interview->ResortInterviewtime}}
@@ -591,25 +661,15 @@
                                             <span class="userApplicants-btn">{{ ucfirst($interview->interviewer_first_name ?? '') }} {{ ucfirst($interview->interviewer_last_name ?? '') }}</span>
                                             <div class="ms-2"><img src="{{ URL::asset('resorts_assets/images/thumbs-up.svg')}}" alt="icon">
                                             </div>
-                                            <div class="ms-auto">
-                                                <a href="javascript:void(0)" class="a-link userAppInt-vCommBtn">View Comments</a>
-                                                <a href="javascript:void(0)" class="a-link userAppInt-hCommBtn d-none">Hide
-                                                    Comments</a>
-                                            </div>
                                         </div>
-                                        <div class="userAppInt-commBlock">
-                                            @php
-                                                $parsedComments = json_decode($interview->Comments, true);
-                                            @endphp
-                                            @if(is_array($parsedComments) && isset($parsedComments[0]))
-                                                @foreach($parsedComments as $pc)
-                                                    <div class="mb-1"><strong>{{ $pc['name'] ?? '' }}:</strong> {{ $pc['comment'] ?? '' }}</div>
-                                                @endforeach
-                                            @elseif(!empty($interview->Comments))
-                                                {{ $interview->Comments }}
+                                        @if(!empty($interview->interview_status) && $interview->interview_status == 'Invitation Rejected')
+                                        <div class="mt-2 p-2" style="background:#fff3f3; border-left:3px solid #dc3545; border-radius:4px;">
+                                            <strong class="text-danger"><i class="fa-solid fa-circle-xmark me-1"></i>Invitation Rejected</strong>
+                                            @if(!empty($interview->interview_rejection_reason))
+                                                <p class="mb-0 mt-1"><strong>Reason:</strong> {{ $interview->interview_rejection_reason }}</p>
                                             @endif
                                         </div>
-                                        @if( $interview->status=="Round" || $interview->status=="Sortlisted" || $interview->As_ApprovedBy==3 && $interview->status=="Complete")
+                                        @elseif( $interview->status=="Round" || $interview->status=="Sortlisted" || $interview->As_ApprovedBy==3 && $interview->status=="Complete")
                                         <div class="mb-2">
                                             <span class="text-medium">Scheduled Interview:</span>
                                             {{ $interview->InterViewDate}} -
@@ -634,6 +694,7 @@
                                         @endif
                                     </td>
                                 </tr>
+                                @endif
                                 @endforeach
                             @else
                             <tr>
@@ -678,15 +739,21 @@
                 @endif
 
                 @php
-                    // Collect all comments from interview round status records only
+                    // Collect all comments from status records, deduplicate by status id
                     $allComments = [];
+                    $processedStatusIds = [];
                     foreach ($InterviewComments as $ic) {
+                        if (in_array($ic->status_id, $processedStatusIds)) continue;
+                        $processedStatusIds[] = $ic->status_id;
+
                         if (!empty($ic->Comments)) {
                             $decoded = json_decode($ic->Comments, true);
-                            if (is_array($decoded) && isset($decoded[0])) {
+                            if (is_array($decoded)) {
                                 foreach ($decoded as $c) {
-                                    if (empty($c['name'])) $c['name'] = $ic->rank_name;
-                                    $allComments[] = $c;
+                                    if (is_array($c) && isset($c['comment'])) {
+                                        if (empty($c['name'])) $c['name'] = $ic->rank_name;
+                                        $allComments[] = $c;
+                                    }
                                 }
                             } else {
                                 $allComments[] = ['name' => $ic->rank_name, 'comment' => $ic->Comments];
@@ -772,6 +839,158 @@
 
                         </tbody>
                     </table>
+                </div>
+            </div>
+            {{-- SALARY & BENEFIT TAB --}}
+            <div class="tab-pane fade" id="tabPane6" role="tabpanel" aria-labelledby="tab6" tabindex="0">
+                <div class="p-3">
+                    {{-- Position Budget Summary --}}
+                    <div class="card-title mb-3">
+                        <h3 style="color:#004552; font-size:15px; font-weight:600;">Position Budget</h3>
+                    </div>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-lable table-bordered mb-0">
+                            <tbody>
+                                <tr>
+                                    <th>Position</th>
+                                    <td>{{ $Applicant_form_data->position_title }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Department</th>
+                                    <td>{{ $Applicant_form_data->DepartmentName }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Budgeted Salary</th>
+                                    <td>{{ $Applicant_form_data->vacancy_currency ?? 'USD' }} {{ number_format($Applicant_form_data->vacancy_budgeted_salary ?? 0, 2) }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Vacancy Salary</th>
+                                    <td>{{ $Applicant_form_data->vacancy_currency ?? 'USD' }} {{ number_format($Applicant_form_data->vacancy_salary ?? 0, 2) }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Vacancy Allowance</th>
+                                    <td>{{ $Applicant_form_data->vacancy_currency ?? 'USD' }} {{ number_format($Applicant_form_data->vacancy_allowance ?? 0, 2) }}</td>
+                                </tr>
+                                @if(isset($positionBudget))
+                                <tr>
+                                    <th>Budget Basic Salary</th>
+                                    <td>USD {{ number_format($positionBudget->basic_salary ?? 0, 2) }}</td>
+                                </tr>
+                                @if($positionBudget->current_salary > 0)
+                                <tr>
+                                    <th>Budget Current Salary</th>
+                                    <td>USD {{ number_format($positionBudget->current_salary, 2) }}</td>
+                                </tr>
+                                @endif
+                                @endif
+                                <tr>
+                                    <th>Applicant Expected Salary</th>
+                                    <td>{{ number_format($Applicant_form_data->SalaryExpectation ?? 0, 2) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{-- Allocated Salary Form (HR Only) --}}
+                    <div class="card-title mb-3">
+                        <h3 style="color:#004552; font-size:15px; font-weight:600;">Applicant Salary Allocation</h3>
+                    </div>
+
+                    @php
+                        $existingAllowances = [];
+                        if (isset($salaryAllocation) && $salaryAllocation && $salaryAllocation->allowances) {
+                            foreach ($salaryAllocation->allowances as $al) {
+                                $existingAllowances[$al['resort_budget_cost_id']] = $al['value'];
+                            }
+                        }
+                    @endphp
+
+                    @php
+                        $maxSalary = $Applicant_form_data->vacancy_budgeted_salary ?? 0;
+                        $maxAllowance = $Applicant_form_data->vacancy_allowance ?? 0;
+                        $vacancyCurrency = $Applicant_form_data->vacancy_currency ?? 'USD';
+                    @endphp
+                    <form id="salaryAllocationForm">
+                        <input type="hidden" name="applicant_id" value="{{ base64_encode($Applicant_form_data->ApplicantID) }}">
+                        <input type="hidden" id="maxBudgetedSalary" value="{{ $maxSalary }}">
+                        <div class="table-responsive">
+                            <table class="table table-lable table-bordered mb-0">
+                                <tbody>
+                                    <tr>
+                                        <th>Currency</th>
+                                        <td>
+                                            <select name="currency" class="form-control form-control-sm" {{ !$isHrDepartment ? 'disabled' : '' }}>
+                                                <option value="USD" {{ (isset($salaryAllocation) && $salaryAllocation && $salaryAllocation->currency == 'USD') ? 'selected' : '' }}>USD</option>
+                                                <option value="MVR" {{ (isset($salaryAllocation) && $salaryAllocation && $salaryAllocation->currency == 'MVR') ? 'selected' : '' }}>MVR</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Basic Salary <span class="text-danger">*</span></th>
+                                        <td>
+                                            <input type="number" step="0.01" min="0" max="{{ $maxSalary }}" name="basic_salary" class="form-control form-control-sm"
+                                                value="{{ isset($salaryAllocation) && $salaryAllocation ? $salaryAllocation->basic_salary : '' }}"
+                                                placeholder="Enter basic salary" {{ !$isHrDepartment ? 'disabled' : '' }}>
+                                            <small class="text-muted">Max: {{ $vacancyCurrency }} {{ number_format($maxSalary, 2) }}</small>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- Allowances Section --}}
+                        @if($budgetCosts->isNotEmpty())
+                        <div class="card-title mt-3 mb-2">
+                            <h3 style="color:#004552; font-size:14px; font-weight:600;">Allowances & Benefits</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-lable table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="font-size:12px;">Particulars</th>
+                                        <th style="font-size:12px;">Budget Amount</th>
+                                        <th style="font-size:12px;">Frequency</th>
+                                        <th style="font-size:12px;">Allocated Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($budgetCosts as $cost)
+                                    <tr>
+                                        <td style="font-size:13px;">{{ $cost->particulars }}</td>
+                                        <td style="font-size:13px;">{{ number_format($cost->amount, 2) }}</td>
+                                        <td style="font-size:13px;">{{ $cost->frequency }}</td>
+                                        <td>
+                                            <input type="number" step="0.01" min="0" max="{{ $cost->amount }}"
+                                                name="allowances[{{ $cost->id }}]"
+                                                class="form-control form-control-sm allowance-input"
+                                                data-max="{{ $cost->amount }}" data-name="{{ $cost->particulars }}"
+                                                value="{{ $existingAllowances[$cost->id] ?? '' }}"
+                                                placeholder="0.00"
+                                                {{ !$isHrDepartment ? 'disabled' : '' }}>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @endif
+
+                        {{-- Remarks --}}
+                        <div class="mt-3">
+                            <label class="form-label" style="font-weight:600; color:#004552; font-size:13px;">Remarks</label>
+                            <textarea name="remarks" class="form-control form-control-sm" rows="2"
+                                placeholder="Add any remarks..."
+                                {{ !$isHrDepartment ? 'disabled' : '' }}>{{ isset($salaryAllocation) && $salaryAllocation ? $salaryAllocation->remarks : '' }}</textarea>
+                        </div>
+
+                        @if($isHrDepartment)
+                        <div class="mt-3 text-end">
+                            <button type="button" class="btn btn-themeSkyblue btn-sm saveSalaryAllocation">
+                                {{ isset($salaryAllocation) && $salaryAllocation ? 'Update' : 'Save' }} Salary Allocation
+                            </button>
+                        </div>
+                        @endif
+                    </form>
                 </div>
             </div>
         </div>

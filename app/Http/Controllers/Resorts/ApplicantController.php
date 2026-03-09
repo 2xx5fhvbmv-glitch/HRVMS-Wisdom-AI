@@ -304,11 +304,18 @@ class ApplicantController extends Controller
                 $applicant->full_length_photo = $aws['path']; // Save relative file path
             }
 
-            // Handle Other Document Upload
+            // Handle Other Document Upload (multiple files)
             if ($request->hasFile('other_document')) {
-                $file = $request->file('other_document');
-                $aws= Common::ApplicantWiseStorefileaws($request->resort_id, $vacancy_id,$file);
-                $applicant->other_document = $aws['path'];
+                $otherDocPaths = [];
+                foreach ($request->file('other_document') as $otherFile) {
+                    $aws = Common::ApplicantWiseStorefileaws($request->resort_id, $vacancy_id, $otherFile);
+                    if (!empty($aws['path'])) {
+                        $otherDocPaths[] = $aws['path'];
+                    }
+                }
+                if (!empty($otherDocPaths)) {
+                    $applicant->other_document = json_encode($otherDocPaths);
+                }
             }
 
             // Save updated file paths

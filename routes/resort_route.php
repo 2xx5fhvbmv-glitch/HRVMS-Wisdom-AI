@@ -453,6 +453,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/talent-acquisition/check-availability', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','checkAvailability'])->name('resort.ta.checkAvailability');
     Route::post('/talent-acquisition/delete-talent-pool-applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','deleteTalentPoolApplicant'])->name('resort.ta.deleteTalentPoolApplicant');
 
+    Route::post('/talent-acquisition/save-salary-allocation', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','saveSalaryAllocation'])->name('resort.ta.saveSalaryAllocation');
+
     // Email Tamplate start
 
     Route::get('/talent-acquisition/email-templates', ['App\Http\Controllers\Resorts\TalentAcquisition\TaEmailTemplateController','index'])->name('resort.ta.emailtemplates');

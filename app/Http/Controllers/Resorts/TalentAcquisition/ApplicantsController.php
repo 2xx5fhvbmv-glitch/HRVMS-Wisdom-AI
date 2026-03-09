@@ -32,6 +32,9 @@ use App\Models\Applicant_form_job_assessment;
 use Illuminate\Support\Str;
 use App\Models\ApplicantOfferContract;
 use App\Models\InterviewAssessmentResponseForm;
+use App\Models\ApplicantSalaryAllocation;
+use App\Models\ResortBudgetCost;
+use App\Models\ResortVacantBudgetCost;
 class ApplicantsController extends Controller
 {
     //
@@ -131,11 +134,13 @@ class ApplicantsController extends Controller
                         ->where('applicant_form_data.Parent_v_id', $id1)
                         ->where('applicant_form_data.resort_id', $resort_id);
 
-                    // HR sees all applicants, others only see applicants for their department
+                    // HR and GM see all applicants, others only see applicants for their department
                     $userDeptId = $this->resort->GetEmployee->Dept_id ?? null;
+                    $userRank = $this->resort->GetEmployee->rank ?? null;
                     $userDeptNameCheck = \App\Models\ResortDepartment::where('id', $userDeptId)->value('name');
                     $isHrDept = stripos($userDeptNameCheck ?? '', 'Human Resources') !== false;
-                    if (!$isHrDept) {
+                    $isGm = (int)$userRank === 8;
+                    if (!$isHrDept && !$isGm) {
                         $Applicant_form_data1->where('t5.dept_id', $userDeptId);
                     }
 
@@ -412,6 +417,12 @@ class ApplicantsController extends Controller
                          applicant_form_data.Total_Experiance,
                         t6.rank as vacancy_rank,
                         t8.name as DepartmentName,
+                        t7.dept_id as dept_id,
+                        t6.id as vacancy_id,
+                        t6.salary as vacancy_salary,
+                        t6.budgeted_salary as vacancy_budgeted_salary,
+                        t6.allowance as vacancy_allowance,
+                        t6.amount_unit as vacancy_currency,
                         t9.InterViewDate,
                         t9.ApplicantInterviewtime,
                         t9.ResortInterviewtime,
@@ -476,13 +487,16 @@ class ApplicantsController extends Controller
             }
             
 
-            $InterviewComments = ApplicantWiseStatus::leftjoin('applicant_inter_view_details as t1','t1.ApplicantStatus_id',"=","applicant_wise_statuses.id")
+            $InterviewComments = ApplicantWiseStatus::leftjoin('applicant_inter_view_details as t1', function ($join) {
+                                                                $join->on('t1.ApplicantStatus_id', '=', 'applicant_wise_statuses.id')
+                                                                    ->whereRaw('t1.id = (SELECT MAX(id) FROM applicant_inter_view_details WHERE ApplicantStatus_id = applicant_wise_statuses.id)');
+                                                            })
                                                             ->leftJoin('resort_admins as t9', 't9.id', '=', 't1.interviewer_id')
                                                             ->where("applicant_wise_statuses.Applicant_id", $Applicant_form_data->ApplicantID)
-                                                            ->orderBy('status', 'asc') // Sort by "status" in ascending order
+                                                            ->orderBy('applicant_wise_statuses.id', 'asc')
                                                             ->whereNotIn('applicant_wise_statuses.status',['Sortlisted By Wisdom AI','Rejected','Rejected By Wisdom AI'])
-                                                            ->whereNotNull('t1.id')
                                                             ->get([
+                                                                            "applicant_wise_statuses.id as status_id",
                                                                             "applicant_wise_statuses.Applicant_id",
                                                                             "t1.InterViewDate",'t1.ApplicantInterviewtime',
                                                                             "t1.ResortInterviewtime","applicant_wise_statuses.As_ApprovedBy",
@@ -491,12 +505,14 @@ class ApplicantsController extends Controller
                                                                             "applicant_wise_statuses.As_ApprovedBy",
                                                                             "t1.MeetingLink",
                                                                             "t9.first_name as interviewer_first_name",
-                                                                            "t9.last_name as interviewer_last_name"
+                                                                            "t9.last_name as interviewer_last_name",
+                                                                            "t1.Status as interview_status",
+                                                                            "t1.rejection_reason as interview_rejection_reason"
                                                                             ])
                                                             ->Map(function($s) use($config){
                                                                 $config = config('settings.Position_Rank');
                                                                 $s->rank_name = $config[$s->As_ApprovedBy] ?? 'Unknown Rank';
-                                                                $s->InterViewDate =Carbon::parse($s->InterViewDate)->format('d-m-Y');
+                                                                $s->InterViewDate = !empty($s->InterViewDate) ? Carbon::parse($s->InterViewDate)->format('d-m-Y') : null;
                                                                 return $s;
                                                             });
 
@@ -527,7 +543,29 @@ class ApplicantsController extends Controller
 
 
         $currentUserId = $this->resort->id;
-        $view =  view('resorts.renderfiles.TaUserApplicantsSideBar',compact('currentUserId','getFileapplicant','CurrentRankOFUser','isHrDepartment','ApplicantLanguage','WorkExperiences','InterviewComments','CurrentRank','HrSortlisted','completeRound','ApplicantWiseStatusFinal','Applicant_form_data','InterViewRound','SimpleQuestions','VideoQuestions','interview_assesment_response','finalRoundRank'))->render();
+
+        // Fetch offer letter and contract records for this applicant
+        $offerContract = ApplicantOfferContract::where('applicant_id', $Applicant_form_data->ApplicantID)
+            ->orderByDesc('id')
+            ->get();
+
+        // Fetch budget data for the position
+        $resortId = $this->resort->resort_id;
+        $positionBudget = ResortVacantBudgetCost::where('position_id', $Applicant_form_data->position_id)
+            ->where('resort_id', $resortId)
+            ->where('year', date('Y'))
+            ->first();
+
+        $budgetCosts = ResortBudgetCost::where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'cost_title', 'particulars', 'amount', 'cost_type', 'frequency', 'is_payroll_allowance']);
+
+        // Fetch existing salary allocation for this applicant
+        $salaryAllocation = ApplicantSalaryAllocation::where('applicant_id', $Applicant_form_data->ApplicantID)
+            ->where('resort_id', $resortId)
+            ->first();
+
+        $view =  view('resorts.renderfiles.TaUserApplicantsSideBar',compact('currentUserId','getFileapplicant','CurrentRankOFUser','isHrDepartment','ApplicantLanguage','WorkExperiences','InterviewComments','CurrentRank','HrSortlisted','completeRound','ApplicantWiseStatusFinal','Applicant_form_data','InterViewRound','SimpleQuestions','VideoQuestions','interview_assesment_response','finalRoundRank','offerContract','positionBudget','budgetCosts','salaryAllocation'))->render();
         return response()->json([
             'success' => true,
             'view'=>$view,
@@ -591,11 +629,12 @@ class ApplicantsController extends Controller
         ->where('applicant_form_data.resort_id', $resort_id)
         ->orderBy('applicant_form_data.id', 'desc');
 
-        // HR sees all applicants, others only see applicants at their interview round
+        // HR and GM see all applicants, others only see applicants at their interview round
         $loggedInRank = $this->resort->GetEmployee->rank ?? null;
         $userDeptNameCheck = \App\Models\ResortDepartment::where('id', $this->resort->GetEmployee->Dept_id ?? 0)->value('name');
         $isHrDept = stripos($userDeptNameCheck ?? '', 'Human Resources') !== false;
-        if (!$isHrDept) {
+        $isGm = (int)$loggedInRank === 8;
+        if (!$isHrDept && !$isGm) {
             $Applicant_form_data1->where('t1.As_ApprovedBy', $loggedInRank);
         }
 
@@ -727,7 +766,8 @@ class ApplicantsController extends Controller
                         vacancies.Resort_id,
                         t3.id as InterView_id,
                         t3.EmailTemplateId,
-                        vacancies.rank as vacancy_rank
+                        vacancies.rank as vacancy_rank,
+                        t3.rejection_reason as interviewRejectionReason
                     ')
                     ->first();
                 if ($StatusApplicantStatus) {
@@ -854,6 +894,7 @@ class ApplicantsController extends Controller
                                         $nextRound['Interview_id'] = base64_encode($nextInterview->id);
                                         $nextRound['MeetingLink'] = $nextInterview->MeetingLink;
                                         $nextRound['ApplicantStatus_id'] = base64_encode($nextStatus->id);
+                                        $nextRound['interviewRejectionReason'] = $nextInterview->rejection_reason ?? null;
                                     } else {
                                         $nextRound['ApplicantStatus_id'] = base64_encode($nextStatus->id);
                                     }
@@ -930,6 +971,18 @@ class ApplicantsController extends Controller
                     $currentEmailTemplate = DB::table('ta_email_templates')->where('id', $StatusApplicantStatus->EmailTemplateId)->value('TempleteName') ?? '-';
                 }
 
+                // Fetch rejection reason if offer letter or contract was rejected
+                $rejectionReason = null;
+                if (in_array($StatusApplicantStatus->ApplicantStatus_raw, ['Offer Letter Rejected', 'Contract Rejected'])) {
+                    $type = $StatusApplicantStatus->ApplicantStatus_raw == 'Offer Letter Rejected' ? 'offer_letter' : 'contract';
+                    $rejectedRecord = ApplicantOfferContract::where('applicant_id', $StatusApplicantStatus->Applicant_id)
+                        ->where('type', $type)
+                        ->where('status', 'Rejected')
+                        ->orderByDesc('id')
+                        ->first();
+                    $rejectionReason = $rejectedRecord->rejection_reason ?? null;
+                }
+
                 return response()->json([
                     'success' => true,
                     'data' => [
@@ -949,6 +1002,9 @@ class ApplicantsController extends Controller
                         'emailTemplate' => $currentEmailTemplate,
                         'nextRound' => $nextRound ?? null,
                         'pastRounds' => $pastRounds,
+                        'rejectionReason' => $rejectionReason,
+                        'applicantStatusRaw' => $StatusApplicantStatus->ApplicantStatus_raw,
+                        'interviewRejectionReason' => $StatusApplicantStatus->interviewRejectionReason ?? null,
                     ],
                 ]);
 
@@ -2159,11 +2215,11 @@ class ApplicantsController extends Controller
        
         $ApplicantID = base64_decode($request->id);
         $flag        = $request->flag;
-        
+
         $wherefind = "";
         if($flag == "curriculum_vitae")
         {
-            $wherefind = "curriculum_vitae";  
+            $wherefind = "curriculum_vitae";
         }
         elseif($flag == "passport_img")
         {
@@ -2173,13 +2229,32 @@ class ApplicantsController extends Controller
         {
             $wherefind = "passport_photo";
         }
+        elseif($flag == "other_document")
+        {
+            $wherefind = "other_document";
+        }
         else
         {
             $wherefind = "full_length_photo";
         }
 
         $applicant = Applicant_form_data::where('id', $ApplicantID)->select($wherefind)->first();
-        $getFileapplicant = Common::GetApplicantAWSFile($applicant->$wherefind);
+
+        // Handle other_document (JSON array of paths)
+        if ($flag == "other_document") {
+            $index = (int) ($request->index ?? 0);
+            $docs = json_decode($applicant->other_document, true);
+            if (is_array($docs) && isset($docs[$index])) {
+                $filePath = $docs[$index];
+            } elseif (!is_array($docs) && !empty($applicant->other_document)) {
+                $filePath = $applicant->other_document;
+            } else {
+                return response()->json(['success' => false, 'message' => 'File Not Found!']);
+            }
+            $getFileapplicant = Common::GetApplicantAWSFile($filePath);
+        } else {
+            $getFileapplicant = Common::GetApplicantAWSFile($applicant->$wherefind);
+        }
         if($getFileapplicant['success'] == true)
         {
             return response()->json([
@@ -2202,7 +2277,7 @@ class ApplicantsController extends Controller
     public function GetAllAwsFiles(Request $request)
     {
         $ApplicantID = base64_decode($request->id);
-        $fields = ['curriculum_vitae', 'passport_img', 'passport_photo', 'full_length_photo'];
+        $fields = ['curriculum_vitae', 'passport_img', 'passport_photo', 'full_length_photo', 'other_document'];
         $applicant = Applicant_form_data::where('id', $ApplicantID)->select($fields)->first();
 
         if (!$applicant) {
@@ -2211,6 +2286,27 @@ class ApplicantsController extends Controller
 
         $files = [];
         foreach ($fields as $field) {
+            if ($field === 'other_document' && !empty($applicant->other_document)) {
+                $docs = json_decode($applicant->other_document, true);
+                if (is_array($docs)) {
+                    foreach ($docs as $idx => $docPath) {
+                        $result = Common::GetApplicantAWSFile($docPath);
+                        if ($result['success']) {
+                            $files[] = [
+                                'name' => 'other_document_' . ($idx + 1),
+                                'url' => $result['NewURLshow'],
+                            ];
+                        }
+                    }
+                } else {
+                    $result = Common::GetApplicantAWSFile($applicant->other_document);
+                    if ($result['success']) {
+                        $files[] = ['name' => 'other_document', 'url' => $result['NewURLshow']];
+                    }
+                }
+                continue;
+            }
+
             if (!empty($applicant->$field)) {
                 $result = Common::GetApplicantAWSFile($applicant->$field);
                 if ($result['success']) {
@@ -2804,5 +2900,71 @@ class ApplicantsController extends Controller
             \Log::emergency("Delete talent pool applicant error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to delete applicant.'], 500);
         }
+    }
+
+    public function saveSalaryAllocation(Request $request)
+    {
+        $applicantId = base64_decode($request->applicant_id);
+        $resortId = $this->resort->resort_id;
+
+        $applicant = Applicant_form_data::leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'v.position')
+            ->where('applicant_form_data.id', $applicantId)
+            ->first(['applicant_form_data.id', 'p.id as position_id', 'p.dept_id', 'v.budgeted_salary', 'v.allowance as vacancy_allowance']);
+
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        // Validate salary does not exceed budgeted salary
+        $basicSalary = (float)($request->basic_salary ?? 0);
+        if ($basicSalary < 0) {
+            return response()->json(['success' => false, 'message' => 'Salary cannot be negative.'], 422);
+        }
+        if ($applicant->budgeted_salary > 0 && $basicSalary > (float)$applicant->budgeted_salary) {
+            return response()->json(['success' => false, 'message' => 'Basic salary cannot exceed budgeted salary of ' . number_format($applicant->budgeted_salary, 2) . '.'], 422);
+        }
+
+        $allowances = [];
+        if ($request->has('allowances') && is_array($request->allowances)) {
+            // Get budget cost amounts for validation
+            $budgetCostAmounts = ResortBudgetCost::where('resort_id', $resortId)
+                ->where('status', 'active')
+                ->pluck('amount', 'id');
+
+            foreach ($request->allowances as $costId => $value) {
+                if ($value !== null && $value !== '') {
+                    $val = (float)$value;
+                    if ($val < 0) {
+                        return response()->json(['success' => false, 'message' => 'Allowance values cannot be negative.'], 422);
+                    }
+                    $maxAmount = (float)($budgetCostAmounts[$costId] ?? 0);
+                    if ($maxAmount > 0 && $val > $maxAmount) {
+                        return response()->json(['success' => false, 'message' => 'Allowance value cannot exceed budget amount of ' . number_format($maxAmount, 2) . '.'], 422);
+                    }
+                    $allowances[] = [
+                        'resort_budget_cost_id' => (int)$costId,
+                        'value' => $val,
+                    ];
+                }
+            }
+        }
+
+        $salaryAllocation = ApplicantSalaryAllocation::updateOrCreate(
+            [
+                'applicant_id' => $applicantId,
+                'resort_id' => $resortId,
+            ],
+            [
+                'position_id' => $applicant->position_id,
+                'department_id' => $applicant->dept_id,
+                'basic_salary' => $request->basic_salary ?? 0,
+                'currency' => $request->currency ?? 'USD',
+                'allowances' => $allowances,
+                'remarks' => $request->remarks,
+            ]
+        );
+
+        return response()->json(['success' => true, 'message' => 'Salary allocation saved successfully!']);
     }
 }
