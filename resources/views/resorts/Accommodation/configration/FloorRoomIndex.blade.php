@@ -116,7 +116,7 @@
                 if (result.isConfirmed) {
                     $.ajax({
                         type: "DELETE",
-                        url: "{{ route('resort.accommodation.BuildingDestory', ':id') }}".replace(':id', main_id),
+                        url: "{{ route('resort.accommodation.FloorAndRoomDestroy', ':id') }}".replace(':id', main_id),
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success) {
