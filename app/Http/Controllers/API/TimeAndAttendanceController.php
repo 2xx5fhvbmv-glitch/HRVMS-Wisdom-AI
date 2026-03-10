@@ -341,26 +341,38 @@ class TimeAndAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate request data
-        $validator = Validator::make($request->all(), [
-            'filter'                                        => 'required',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
-        }
-
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
         $emp_id                                             =   $employee->id;
-        $reporting_to                                       =   $emp_id;
-        $Rank                                               =   $employee->rank;
-        $underEmp_id                                        =   Common::getSubordinates($reporting_to);
         $resort_id                                          =   $user->resort_id;
+        $Rank                                               =   $employee->rank;
+        $filter                                             =   $request->input('filter', 'weekly');
+
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');
+            })
+            ->value('id');
+        $isHRDepartmentHODOrExcom                           =   $hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId && in_array(strtoupper($currentRankLabel), ['HOD', 'EXCOM'], true);
+        $isHROrGMRank                                       =   in_array(strtoupper($currentRankLabel), ['HR', 'GM'], true);
+
+        $underEmp_id                                        =   Common::getSubordinates($emp_id);
+        if ($isHRDepartmentHODOrExcom || $isHROrGMRank) {
+            $underEmp_id                                    =   null;
+        }
+        if (empty($underEmp_id) && $underEmp_id !== null) {
+            $underEmp_id                                    =   [$emp_id];
+        }
 
         try {
-
-            if ($request->filter === 'weekly') {
+            $today                                           =   Carbon::now(config('app.timezone'))->format('Y-m-d');
+            if ($filter === 'weekly') {
                 $startDate                                  =   Carbon::now()->startOfWeek();
                 $endDate                                    =   Carbon::now()->endOfWeek();
             } else {
@@ -368,163 +380,210 @@ class TimeAndAttendanceController extends Controller
                 $endDate                                    =   Carbon::now()->endOfMonth();
             }
 
-            // Handle empty subordinates array - if empty, use HOD's own ID
-            if (empty($underEmp_id)) {
-                $underEmp_id = [$emp_id];
-            }
-
-            // Count total employees (subordinates)
-            $employeesCountQuery = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+            $empQuery                                        =   Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('t1.resort_id', $resort_id)
-                ->where('employees.status', 'Active')
-                ->whereIn('employees.id', $underEmp_id);
-
-            $employeesCount = $employeesCountQuery->distinct()->count('employees.id');
-            $employeesCount = $employeesCount ?? 0;
-
-            // Count present employees - distinct count to avoid duplicates
-            $totalPresentEmployeeQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                ->whereNotNull('t3.CheckingTime')
-                ->whereNotNull('t3.CheckingOutTime')
-                ->whereIn('t3.Status', ['Present', 'On-Time', 'Late']) // Include all present statuses
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
-                ->where("t1.resort_id", $resort_id)
-                ->whereIn('employees.id', $underEmp_id);
-
-            $totalPresentEmployee = $totalPresentEmployeeQuery->distinct()->count('employees.id');
-            $totalPresentEmployee = $totalPresentEmployee ?? 0;
-
-            // Count absent employees - handle both 'Absent' and 'Absant' (typo in DB)
-            $totalAbsentEmployeeQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
-                ->whereIn('t3.Status', ['Absent', 'Absant']) // Handle both spellings
-                ->where(function($query) {
-                    $query->whereNull('t3.CheckingTime')
-                        ->orWhereNull('t3.CheckingOutTime');
-                })
-                ->where("t1.resort_id", $resort_id)
-                ->whereIn('employees.id', $underEmp_id);
-
-            $totalAbsentEmployee = $totalAbsentEmployeeQuery->distinct()->count('employees.id');
-            $totalAbsentEmployee = $totalAbsentEmployee ?? 0;
-
-            // Get OT Approved employees
-            $employeeOTApprvoedQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                ->whereNotNull('t3.OverTime')
-                ->where('t3.OTStatus', 'Approved')
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
-                ->where("t1.resort_id", $resort_id)
-                ->whereIn('employees.id', $underEmp_id);
-
-            $employeeOTApprvoed = $employeeOTApprvoedQuery
-                ->select('t3.id', 't1.first_name', 't1.last_name', 't3.OverTime', 't3.Emp_id', 't1.id as Admin_Parent_id')
-                ->get();
-
-            // Convert OverTime to Minutes and Sum
-            $OTApprvoedMin = 0;
-            if ($employeeOTApprvoed->isNotEmpty()) {
-                $OTApprvoedMin = $employeeOTApprvoed->sum(function ($item) {
-                    if (!empty($item->OverTime) && strpos($item->OverTime, ':') !== false) {
-                        list($hours, $minutes) = explode(':', $item->OverTime);
-                        return ((int)$hours * 60) + (int)$minutes;
-                    }
-                    return 0;
-                });
+                ->where('employees.status', 'Active');
+            if ($underEmp_id !== null) {
+                $empQuery->whereIn('employees.id', $underEmp_id);
             }
+            $total_employees                                 =   (int) $empQuery->distinct()->count('employees.id');
 
-            // Convert Total Minutes Back to HH:mm Format
-            $totalOTHrsApproved = floor($OTApprvoedMin / 60) . ':' . str_pad($OTApprvoedMin % 60, 2, '0', STR_PAD_LEFT);
-
-            // Get OT Request employees - include Admin_Parent_id for profile picture
-            $employeeOTReqQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                ->whereNotNull('t3.OverTime')
-                ->whereNotNull('t3.CheckingTime')
-                ->whereNotNull('t3.CheckingOutTime')
-                ->where(function ($query) {
-                    $query->whereNull('t3.OTStatus')
-                        ->orWhereNotIn('t3.OTStatus', ['Approved', 'Rejected']);
-                })
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
-                ->where("t1.resort_id", $resort_id)
-                ->whereIn('employees.id', $underEmp_id);
-
-            $employeeOTReq = $employeeOTReqQuery
-                ->select('t3.id', 't1.first_name', 't1.last_name', 't3.OverTime', 't3.Emp_id', 't3.OTStatus', 't3.CheckingTime', 't3.CheckingOutTime', 't3.DayWiseTotalHours', 't1.id as Admin_Parent_id')
-                ->get();
-
-            // Convert OverTime to Minutes and Sum
-            $OTReqMin = 0;
-            if ($employeeOTReq->isNotEmpty()) {
-                $OTReqMin = $employeeOTReq->sum(function ($item) {
-                    if (!empty($item->OverTime) && strpos($item->OverTime, ':') !== false) {
-                        list($hours, $minutes) = explode(':', $item->OverTime);
-                        return ((int)$hours * 60) + (int)$minutes;
-                    }
-                    return 0;
-                });
+            // Today: present = parent_attendaces today with Status Present/On-Time/Late (distinct emp)
+            $presentQuery                                    =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereDate('parent_attendaces.date', $today)
+                ->whereIn('parent_attendaces.Status', ['Present', 'On-Time', 'Late'])
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $presentQuery->whereIn('employees.id', $underEmp_id);
             }
+            $present                                         =   (int) $presentQuery->distinct()->count('employees.id');
 
-            // Convert Total Minutes Back to HH:mm Format
-            $totalOTHrsReq = floor($OTReqMin / 60) . ':' . str_pad($OTReqMin % 60, 2, '0', STR_PAD_LEFT);
+            // Today: absent = parent_attendaces today with Status Absent
+            $absentQuery                                     =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereDate('parent_attendaces.date', $today)
+                ->whereIn('parent_attendaces.Status', ['Absent', 'Absant'])
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $absentQuery->whereIn('employees.id', $underEmp_id);
+            }
+            $absent                                          =   (int) $absentQuery->distinct()->count('employees.id');
 
-            // Map OT requests and add profile pictures
-            $employeeOTReq = $employeeOTReq->map(function ($item) {
-                $item->profile_picture = Common::getResortUserPicture($item->Admin_Parent_id);
-                return $item;
-            })->toArray();
+            // Today: on_leave = employees with approved leave covering today
+            $onLeaveQuery                                    =   EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                ->where('employees_leaves.status', 'Approved')
+                ->where('employees_leaves.from_date', '<=', $today)
+                ->where('employees_leaves.to_date', '>=', $today)
+                ->join('employees', 'employees.id', '=', 'employees_leaves.emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $onLeaveQuery->whereIn('employees.id', $underEmp_id);
+            }
+            $on_leave                                        =   (int) $onLeaveQuery->distinct()->count('employees.id');
 
-            // Calculate leave days for each date in range
-            $dates = [];
-            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                $formattedDate = $date->format('Y-m-d');
+            // Approved OT hours (period) – total minutes then display as number
+            $otApprovedQuery                                 =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereNotNull('parent_attendaces.OverTime')
+                ->where('parent_attendaces.OTStatus', 'Approved')
+                ->whereBetween('parent_attendaces.date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $otApprovedQuery->whereIn('employees.id', $underEmp_id);
+            }
+            $otApprovedRows                                  =   $otApprovedQuery->select('parent_attendaces.OverTime')->get();
+            $approvedOtMinutes                               =   $otApprovedRows->sum(function ($item) {
+                if (empty($item->OverTime) || strpos($item->OverTime, ':') === false) {
+                    return 0;
+                }
+                $parts = explode(':', $item->OverTime);
+                return ((int)($parts[0] ?? 0) * 60) + (int)($parts[1] ?? 0);
+            });
+            $approved_ot_hours                               =   (int) round($approvedOtMinutes / 60);
 
-                $totalLeaveEmployeeQuery = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                    ->join('employees_leaves as t2', "t2.emp_id", "=", "employees.id")
-                    ->where('t2.from_date', "<=", $formattedDate)
-                    ->where('t2.to_date', ">=", $formattedDate)
-                    ->where("t1.resort_id", $resort_id)
-                    ->whereIn('employees.id', $underEmp_id)
-                    ->where("employees.rank", "!=", $Rank);
+            // Pending OT requests (period) – list for Figma "Pending Requests"
+            $otReqQuery                                      =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereNotNull('parent_attendaces.OverTime')
+                ->where(function ($q) {
+                    $q->whereNull('parent_attendaces.OTStatus')->orWhereNotIn('parent_attendaces.OTStatus', ['Approved', 'Rejected']);
+                })
+                ->whereBetween('parent_attendaces.date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $otReqQuery->whereIn('employees.id', $underEmp_id);
+            }
+            $otReqList                                       =   $otReqQuery->select(
+                'parent_attendaces.id as attendance_id',
+                'parent_attendaces.Emp_id as emp_id',
+                'parent_attendaces.date',
+                'parent_attendaces.OverTime',
+                't1.first_name',
+                't1.last_name',
+                't1.id as admin_id'
+            )->get();
+            $ot_requests_count                               =   $otReqList->count();
+            $ot_requests                                     =   $otReqList->map(function ($row) {
+                $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                $date   =   $row->date ? \Carbon\Carbon::parse($row->date)->format('d M Y') : '';
+                $hrs    =   $row->OverTime ? (explode(':', $row->OverTime)[0] ?? '0') : '0';
+                $desc   =   $name ? ($name . ' Requested ot for ' . $date . ' - ' . $hrs . ' hrs') : ('OT for ' . $date . ' - ' . $hrs . ' hrs');
+                return [
+                    'attendance_id' => $row->attendance_id,
+                    'emp_id'        => $row->emp_id,
+                    'name'          => $name,
+                    'profile_picture' => Common::getResortUserPicture($row->admin_id),
+                    'description'   => $desc,
+                    'date'          => $row->date,
+                    'hours'         => $hrs,
+                    'can_accept'    => true,
+                    'can_reject'    => true,
+                ];
+            })->values()->toArray();
 
-                $totalLeaveEmployee = $totalLeaveEmployeeQuery->distinct()->count('employees.id');
-                $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
+            // Pending leave requests
+            $leaveReqQuery                                   =   EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                ->where('employees_leaves.status', 'Pending')
+                ->join('employees', 'employees.id', '=', 'employees_leaves.emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->leftJoin('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $leaveReqQuery->whereIn('employees.id', $underEmp_id);
+            }
+            $leaveReqList                                    =   $leaveReqQuery->select(
+                'employees_leaves.id',
+                'employees_leaves.emp_id',
+                'employees_leaves.from_date',
+                'employees_leaves.to_date',
+                't1.first_name',
+                't1.last_name',
+                't1.id as admin_id',
+                'lc.leave_type'
+            )->get();
+            $leave_requests                                  =   $leaveReqList->map(function ($row) {
+                $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                $from   =   $row->from_date ? \Carbon\Carbon::parse($row->from_date)->format('d M Y') : '';
+                $to     =   $row->to_date ? \Carbon\Carbon::parse($row->to_date)->format('d M Y') : '';
+                $type   =   $row->leave_type ?? 'leave';
+                $desc   =   $name ? ($name . ' requested ' . $type . ' for ' . $from . ' to ' . $to) : ('Leave for ' . $from . ' to ' . $to);
+                return [
+                    'id'              => $row->id,
+                    'emp_id'          => $row->emp_id,
+                    'name'            => $name,
+                    'profile_picture' => Common::getResortUserPicture($row->admin_id),
+                    'description'     => $desc,
+                    'from_date'       => $row->from_date,
+                    'to_date'         => $row->to_date,
+                    'leave_type'      => $row->leave_type ?? 'Leave',
+                    'can_accept'      => true,
+                    'can_reject'      => true,
+                ];
+            })->values()->toArray();
 
-                $dates[] = [
-                    'leave' => $totalLeaveEmployee,
+            // Employee reminders: haven't taken a break after 5 hours (today, checked in, no break or last break > 5h ago)
+            $todayStart                                      =   $today . ' 00:00:00';
+            $fiveHoursAgo                                    =   Carbon::now(config('app.timezone'))->subHours(5)->format('H:i');
+            $presentToday                                    =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereDate('parent_attendaces.date', $today)
+                ->whereIn('parent_attendaces.Status', ['Present', 'On-Time', 'Late'])
+                ->whereNotNull('parent_attendaces.CheckingTime')
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if ($underEmp_id !== null) {
+                $presentToday->whereIn('employees.id', $underEmp_id);
+            }
+            $presentToday                                    =   $presentToday->select('parent_attendaces.id as parent_attd_id', 'parent_attendaces.Emp_id', 'parent_attendaces.CheckingTime', 't1.first_name', 't1.last_name', 't1.id as admin_id')->get();
+            $employee_reminders                               =   [];
+            foreach ($presentToday as $pa) {
+                $checkIn = $pa->CheckingTime;
+                if (!$checkIn) {
+                    continue;
+                }
+                $hasBreak                                     =   BreakAttendaces::where('Parent_attd_id', $pa->parent_attd_id)->exists();
+                if ($hasBreak) {
+                    continue;
+                }
+                $name                                         =   trim(($pa->first_name ?? '') . ' ' . ($pa->last_name ?? ''));
+                $employee_reminders[]                         =   [
+                    'emp_id'          => $pa->Emp_id,
+                    'parent_attd_id'  => $pa->parent_attd_id,
+                    'name'            => $name,
+                    'profile_picture' => Common::getResortUserPicture($pa->admin_id),
+                    'message'         => $name ? ($name . " haven't taken a break after 5 hours") : "Haven't taken a break after 5 hours",
+                    'action'          => 'Send Reminder for break',
                 ];
             }
 
-            $dates[] = [
-                'present' => $totalPresentEmployee,
-                'absent' => $totalAbsentEmployee,
-                'employee' => $employeesCount,
+            $dashboard                                       =   [
+                'filter'              => $filter,
+                'summary'             => [
+                    'total_employees' => $total_employees,
+                    'present'         => $present,
+                    'absent'          => $absent,
+                    'on_leave'        => $on_leave,
+                ],
+                'approved_ot_hours'   => $approved_ot_hours,
+                'ot_requests_count'   => $ot_requests_count,
+                'employee_reminders'  => $employee_reminders,
+                'pending_requests'    => [
+                    'ot_requests'     => $ot_requests,
+                    'leave_requests'  => $leave_requests,
+                ],
             ];
 
-            $totalPresentDays = array_sum(array_column($dates, 'present'));
-            $totalAbsentDays = array_sum(array_column($dates, 'absent'));
-            $totalLeaveDays = array_sum(array_column($dates, 'leave'));
-
-            $timeAttendanceData['total_present_days'] = $totalPresentDays;
-            $timeAttendanceData['total_absent_days'] = $totalAbsentDays;
-            $timeAttendanceData['total_leave_days'] = $totalLeaveDays;
-            $timeAttendanceData['employee'] = $employeesCount;
-            $timeAttendanceData['ot_approved_hrs'] = $totalOTHrsApproved;
-            $timeAttendanceData['ot_request_hrs'] = $totalOTHrsReq;
-            $timeAttendanceData['over_time_request'] = $employeeOTReq;
-
-            $response['status'] = true;
-            $response['message'] = 'Time TimeAttendance HOD Dashboard';
-            $response['time_attendance'] = $timeAttendanceData;
-
-            return response()->json($response);
+            return response()->json([
+                'status'    => true,
+                'message'   => 'Time Attendance HOD Dashboard',
+                'dashboard' => $dashboard,
+            ]);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -1569,10 +1628,42 @@ class TimeAndAttendanceController extends Controller
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
+        $resort_id                                          =   $user->resort_id;
         $emp_id                                             =   $employee->id;
         $reporting_to                                       =   $emp_id;
+
+        // Default: subordinates under this HOD
         $underEmp_id                                        =   Common::getSubordinates($reporting_to);
-        $resort_id                                          =   $user->resort_id;
+
+        // If HOD belongs to HR department, show only HR + EXCOM rank employees across the resort
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+                                                                        ->where(function ($q) {
+                                                                            $q->where('name', 'Human Resources')
+                                                                              ->orWhere('name', 'like', '%Human Resources%');
+                                                                        })
+                                                                        ->value('id');
+
+        $isHRDepartmentHOD                                  =   ($hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId && strtoupper($currentRankLabel) === 'HOD');
+
+        if ($isHRDepartmentHOD) {
+            $hrRankKey                                      =   array_search('HR', $rankConfig, true);
+            $excomRankKey                                   =   array_search('EXCOM', $rankConfig, true);
+
+            $rankKeys                                       =   array_filter([$hrRankKey, $excomRankKey], function ($v) {
+                                                                    return $v !== false && $v !== null;
+                                                                });
+
+            if (!empty($rankKeys)) {
+                $underEmp_id                                =   Employee::where('resort_id', $resort_id)
+                                                                        ->whereIn('rank', $rankKeys)
+                                                                        ->pluck('id')
+                                                                        ->toArray();
+            } else {
+                $underEmp_id                                =   [];
+            }
+        }
 
         try {
             $currentDate                                    =   Carbon::now()->format('Y-m-d');
@@ -1708,26 +1799,81 @@ class TimeAndAttendanceController extends Controller
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
+        $resort_id                                          =   $user->resort_id;
         $emp_id                                             =   $employee->id;
         $reporting_to                                       =   $emp_id;
         $underEmp_id                                        =   Common::getSubordinates($reporting_to);
 
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+                                                                        ->where(function ($q) {
+                                                                            $q->where('name', 'Human Resources')
+                                                                              ->orWhere('name', 'like', '%Human Resources%');
+                                                                        })
+                                                                        ->value('id');
+        $isHRDepartmentHODOrExcom                           =   ($hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId && in_array(strtoupper($currentRankLabel), ['HOD', 'EXCOM'], true));
+        $isHROrGMRank                                       =   in_array(strtoupper($currentRankLabel), ['HR', 'GM'], true);
+
+        if ($isHRDepartmentHODOrExcom || $isHROrGMRank) {
+            $underEmp_id                                    =   null;
+        }
+
         try {
 
-            $underEmp_HOD                                   =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                    ->select('t1.id', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id')
-                                                                    ->whereIN('employees.id', $underEmp_id)
-                                                                    ->get();
+            $currentDate                                    =   Carbon::now()->format('Y-m-d');
+
+            // Use duty_roster_entries for "has roster today"; left join parent_attendaces by Emp_id+date so status shows Present once marked (any roster)
+            $query                                           =   DutyRosterEntry::from('duty_roster_entries as dre')
+                                                                    ->whereRaw('DATE(dre.date) = ?', [$currentDate])
+                                                                    ->where('dre.resort_id', $resort_id)
+                                                                    ->join('employees', 'employees.id', '=', 'dre.Emp_id')
+                                                                    ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                                                                    ->join('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                                                                    ->leftJoin('parent_attendaces as t3', function ($join) use ($currentDate, $resort_id) {
+                                                                        $join->on('t3.Emp_id', '=', 'dre.Emp_id')
+                                                                             ->where('t3.resort_id', $resort_id)
+                                                                             ->whereRaw('DATE(t3.date) = ?', [$currentDate]);
+                                                                    })
+                                                                    ->where('t1.resort_id', $resort_id)
+                                                                    ->select(
+                                                                        't1.id as admin_id',
+                                                                        't1.first_name',
+                                                                        't1.last_name',
+                                                                        't1.profile_picture',
+                                                                        'employees.id as emp_id',
+                                                                        'rp.position_title',
+                                                                        't3.id as attendance_id',
+                                                                        't3.Status as attendance_status',
+                                                                        't3.CheckingTime',
+                                                                        't3.CheckingOutTime',
+                                                                        't3.CheckInCheckOut_Type'
+                                                                    );
+
+            if ($underEmp_id !== null) {
+                $query->whereIn('employees.id', $underEmp_id);
+            }
+
+            $underEmp_HOD                                   =   $query->get();
 
             $underEmp_HOD                                   =   $underEmp_HOD->map(function ($item) {
                 if (empty($item->profile_picture) || $item->profile_picture == '0') {
-                    $item->profile_picture = Common::getResortUserPicture($item->Parentid); // Ensure it's using Parentid if 'profile_picture' is missing
+                    $item->profile_picture = Common::getResortUserPicture($item->admin_id);
                 }
+
+                $status                                     =   $item->attendance_status;
+                $item->attendance_display_status           =   ($status === 'Present' || $status === 'On-Time' || $status === 'Late') ? 'Present' : 'Absent';
+                $item->can_mark_present                     =   ($status === '' || $status === null) && !empty($item->attendance_id);
+
                 return $item;
             })->toArray();
 
             $response['status']                             =   true;
-            $response['message']                            =   'Employee list under HOD fetched successfully.';
+            $response['message']                            =   'Employees under HOD with duty roster for today fetched successfully.';
             $response['emp_time_attendance']                =   $underEmp_HOD;
 
             return response()->json($response);
@@ -1739,7 +1885,13 @@ class TimeAndAttendanceController extends Controller
         }
     }
 
-    public function hodMarkAttendance()
+    /**
+     * HOD mark attendance: employee list for marking.
+     * - HR department (HR rank, or EXCOM/HOD from Human Resources dept): whole resort employees.
+     * - Other departments (EXCOM/HOD): only their department employees.
+     * Optional query: perms=all (whole resort) | perms=department (only my department). If not sent, scope is auto from role/dept.
+     */
+    public function hodMarkAttendance(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
@@ -1747,29 +1899,85 @@ class TimeAndAttendanceController extends Controller
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
-        $reporting_to                                       =   $emp_id;
-        $underEmp_id                                        =   Common::getSubordinates($reporting_to);
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
         $resort_id                                          =   $user->resort_id;
+        $perms                                              =   $request->query('perms', '');
+
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+                                                                        ->where(function ($q) {
+                                                                            $q->where('name', 'Human Resources')
+                                                                              ->orWhere('name', 'like', '%Human Resources%');
+                                                                        })
+                                                                        ->value('id');
+
+        $isHRDepartment                                     =   ($hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId);
+        $isHROrGM                                           =   in_array($currentRankLabel, ['HR', 'GM'], true);
+
+        if (strtolower($perms) === 'all') {
+            $employeeIds                                    =   null;
+        } elseif (strtolower($perms) === 'department') {
+            $employeeIds                                    =   Employee::where('resort_id', $resort_id)
+                                                                        ->where('Dept_id', $employee->Dept_id)
+                                                                        ->pluck('id')
+                                                                        ->toArray();
+            $employeeIds                                    =   empty($employeeIds) ? [-1] : $employeeIds;
+        } else {
+            if ($isHROrGM || $isHRDepartment) {
+                $employeeIds                                =   null;
+            } else {
+                $employeeIds                                =   Employee::where('resort_id', $resort_id)
+                                                                            ->where('Dept_id', $employee->Dept_id)
+                                                                            ->pluck('id')
+                                                                            ->toArray();
+                $employeeIds                                =   empty($employeeIds) ? [-1] : $employeeIds;
+            }
+        }
 
         try {
 
-            $currentDate                                    =   Carbon::now()->format('Y-m-d');
-            $employeeAttendance                             =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                    ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                                                                    ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                                                                    ->join('resort_positions as rp', "rp.id", "=", "employees.Position_id")
-                                                                    ->where('t3.date', $currentDate) // Use the formatted date
-                                                                    ->where("t1.resort_id", $resort_id)
-                                                                    ->whereIn('employees.id', $underEmp_id)
-                                                                    ->select('t3.id', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 'rp.position_title', 't3.Status', 't3.CheckingTime', 't3.CheckingOutTime', 't3.date', 't3.CheckInCheckOut_Type')
-                                                                    ->get();
+            $currentDate                                    =   Carbon::today()->format('Y-m-d');
+            // Return only employees who are marked present for today (Status Present/On-Time/Late)
+            $query                                           =   ParentAttendace::from('parent_attendaces as t3')
+                                                                    ->where('t3.resort_id', $resort_id)
+                                                                    ->whereRaw('DATE(t3.date) = ?', [$currentDate])
+                                                                    ->whereIn('t3.Status', ['Present', 'On-Time', 'Late'])
+                                                                    ->join('employees', 'employees.id', '=', 't3.Emp_id')
+                                                                    ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                                                                    ->join('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                                                                    ->where('t1.resort_id', $resort_id)
+                                                                    ->select(
+                                                                        't3.id as id',
+                                                                        't1.id as admin_id',
+                                                                        't1.first_name',
+                                                                        't1.last_name',
+                                                                        't1.profile_picture',
+                                                                        'employees.id as emp_id',
+                                                                        'rp.position_title',
+                                                                        't3.Status',
+                                                                        't3.CheckingTime',
+                                                                        't3.CheckingOutTime',
+                                                                        't3.date as date',
+                                                                        't3.CheckInCheckOut_Type'
+                                                                    );
 
+            if ($employeeIds !== null) {
+                $query->whereIn('employees.id', $employeeIds);
+            }
+
+            $employeeAttendance                             =   $query->get();
 
             $employeeAttendance                             =   $employeeAttendance->map(function ($item) {
                 if (empty($item->profile_picture) || $item->profile_picture == '0') {
-                    $item->profile_picture = Common::getResortUserPicture($item->Parentid); // Ensure it's using Parentid if 'profile_picture' is missing
+                    $item->profile_picture = Common::getResortUserPicture($item->admin_id);
                 }
+                $item->attendance_display_status             =   'Present';
+                $item->can_mark_present                     =   false;
                 return $item;
             })->toArray();
 
@@ -1792,72 +2000,250 @@ class TimeAndAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate request data
-        $validator = Validator::make($request->all(), [
-            'attendance_id'                                 => 'required|array|min:1',  // Must be an array with at least 1 entry
-            'attendance_id.*'                               => 'integer|exists:parent_attendaces,id',
-            'hod_location'                                  =>  'required',
-        ]);
+        $user                                               =   Auth::guard('api')->user();
+        $resort_id                                          =   $user->resort_id;
 
+        // Accept either emp_id (array) or attendance_id (array); at least one required
+        $empIds                                             =   $request->input('emp_id');
+        $attendaceIds                                       =   $request->input('attendance_id');
+        if (!is_array($empIds)) {
+            $empIds                                         =   $empIds !== null && $empIds !== '' ? [(int) $empIds] : [];
+        }
+        if (!is_array($attendaceIds)) {
+            $attendaceIds                                   =   $attendaceIds !== null && $attendaceIds !== '' ? [(int) $attendaceIds] : [];
+        }
+
+        $validator                                          =   Validator::make($request->all(), [
+            'hod_location'                                  =>  'required|string',
+        ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
-        $user                                               =   Auth::guard('api')->user();
-        $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
-        $resort_id                                          =   $user->resort_id;
+        if (empty($empIds) && empty($attendaceIds)) {
+            return response()->json(['success' => false, 'message' => 'Send either emp_id (array) or attendance_id (array).'], 400);
+        }
+
+        if (!empty($empIds)) {
+            $validatorEmp                                   =   Validator::make(['emp_id' => $empIds], [
+                'emp_id'                                    =>  'array|min:1',
+                'emp_id.*'                                  =>  'integer',
+            ]);
+            if ($validatorEmp->fails()) {
+                return response()->json(['success' => false, 'errors' => $validatorEmp->errors()], 400);
+            }
+            $empIds                                         =   array_values(array_unique(array_map('intval', $empIds)));
+        }
+        if (!empty($attendaceIds)) {
+            $validatorAtt                                   =   Validator::make(['attendance_id' => $attendaceIds], [
+                'attendance_id'                             =>  'array|min:1',
+                'attendance_id.*'                           =>  'integer|exists:parent_attendaces,id',
+            ]);
+            if ($validatorAtt->fails()) {
+                return response()->json(['success' => false, 'errors' => $validatorAtt->errors()], 400);
+            }
+        }
 
         try {
-            $attendaceId                                    =   $request->attendance_id;
             $timeAttendance                                 =   [];
+            $appTimezone                                   =   config('app.timezone', 'UTC');
+            $currentDate                                    =   $request->input('date');
+            if (empty($currentDate) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentDate)) {
+                $currentDate                                =   Carbon::now($appTimezone)->format('Y-m-d');
+            }
 
-            DB::beginTransaction(); // Start transaction
-            foreach ($attendaceId as $key => $value) {
+            DB::beginTransaction();
 
-                $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)->where('id', $value)->where('Status', '')->first();
-
+            // Mark by attendance_id (existing behaviour)
+            foreach ($attendaceIds as $value) {
+                $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)->where('id', $value)->whereIn('Status', ['', null])->first();
                 if ($parentAttendance) {
-                    $shiftData                                  =   ShiftSettings::where('resort_id', $resort_id)->where('id', $parentAttendance->Shift_id)->first();
-
+                    $shiftData                              =   ShiftSettings::where('resort_id', $resort_id)->where('id', $parentAttendance->Shift_id)->first();
                     if ($shiftData) {
-                        $parentAttendance->CheckingTime         =   $shiftData->StartTime;
-                        $parentAttendance->CheckingOutTime      =   $shiftData->EndTime;
-                        $parentAttendance->Status               =   'Present';
-                        $parentAttendance->CheckInCheckOut_Type =   'Manual';
+                        $parentAttendance->CheckingTime     =   $shiftData->StartTime;
+                        $parentAttendance->CheckingOutTime  =   $shiftData->EndTime;
+                        $parentAttendance->Status           =   'Present';
+                        $parentAttendance->CheckInCheckOut_Type = 'Manual';
                         $parentAttendance->save();
 
-                        $childAttendace = ChildAttendace::updateOrCreate(
-                            ['Parent_attd_id'                   =>  $parentAttendance->id], // Search condition
+                        ChildAttendace::updateOrCreate(
+                            ['Parent_attd_id'               =>  $parentAttendance->id],
                             [
-                                'InTime_out'                    =>  $shiftData->StartTime,
-                                'OutTime_out'                   =>  $shiftData->EndTime,
-                                'InTime_Location'               =>  $request->hod_location,
-                                'OutTime_Location'              =>  $request->hod_location,
+                                'InTime_out'                =>  $shiftData->StartTime,
+                                'OutTime_out'               =>  $shiftData->EndTime,
+                                'InTime_Location'           =>  $request->hod_location,
+                                'OutTime_Location'          =>  $request->hod_location,
                             ]
                         );
-
-                        $timeAttendance[]                       = [
-                            'id'                                => $parentAttendance->id,
-                            'CheckingTime'                      => $parentAttendance->CheckingTime,
-                            'CheckingOutTime'                   => $parentAttendance->CheckingOutTime,
-                            'Status'                            => $parentAttendance->Status,
-                            'CheckInCheckOut_Type'              => $parentAttendance->CheckInCheckOut_Type,
+                        $timeAttendance[]                   =   [
+                            'emp_id'                        =>  $parentAttendance->Emp_id,
+                            'id'                            =>  $parentAttendance->id,
+                            'CheckingTime'                  =>  $parentAttendance->CheckingTime,
+                            'CheckingOutTime'               =>  $parentAttendance->CheckingOutTime,
+                            'Status'                        =>  $parentAttendance->Status,
+                            'CheckInCheckOut_Type'          =>  $parentAttendance->CheckInCheckOut_Type,
                         ];
                     }
                 }
             }
 
-            if (empty($timeAttendance)) {
-                return response()->json(['success' => false, 'message' => 'No new attendance records updated. Employee is already marked as present.'], 422);
+            // Mark by emp_id: find any existing attendance for today or create from duty_roster_entry, then set Present.
+            // Build one response entry per requested emp_id (marked = true with data, or marked = false with reason).
+            $markResultByEmpId                              =   [];
+            foreach ($empIds as $empId) {
+                $empId                                      =   (int) $empId;
+                $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)
+                    ->where('Emp_id', $empId)
+                    ->whereDate('date', $currentDate)
+                    ->first();
+                if (!$parentAttendance) {
+                    $emp                                    =   Employee::find($empId);
+                    $empResortId                             =   $emp ? (int) $emp->resort_id : null;
+                    if ($empResortId && $empResortId !== (int) $resort_id) {
+                        $parentAttendance                   =   ParentAttendace::where('resort_id', $empResortId)
+                            ->where('Emp_id', $empId)
+                            ->whereDate('date', $currentDate)
+                            ->first();
+                    }
+                }
+
+                if (!$parentAttendance) {
+                    $rosterEntry                            =   DutyRosterEntry::where('resort_id', $resort_id)
+                        ->where('Emp_id', $empId)
+                        ->whereDate('date', $currentDate)
+                        ->first();
+                    if (!$rosterEntry) {
+                        $emp                                =   Employee::find($empId);
+                        $empResortId                         =   $emp ? (int) $emp->resort_id : null;
+                        if ($empResortId && $empResortId !== (int) $resort_id) {
+                            $rosterEntry                    =   DutyRosterEntry::where('resort_id', $empResortId)
+                                ->where('Emp_id', $empId)
+                                ->whereDate('date', $currentDate)
+                                ->first();
+                        }
+                    }
+                    if (!$rosterEntry) {
+                        $markResultByEmpId[$empId]          =   [
+                            'emp_id'                        =>  $empId,
+                            'marked'                        =>  false,
+                            'message'                       =>  'No duty roster for this date. Ensure roster exists for ' . $currentDate . '.',
+                        ];
+                        continue;
+                    }
+                    $rosterResortId                         =   (int) $rosterEntry->resort_id;
+                    $shiftData                              =   ShiftSettings::where('resort_id', $rosterResortId)->where('id', $rosterEntry->Shift_id)->first();
+                    $startTime                              =   $shiftData ? $shiftData->StartTime : ($rosterEntry->CheckingTime ?? '00:00');
+                    $endTime                                =   $shiftData ? $shiftData->EndTime : ($rosterEntry->CheckingOutTime ?? '00:00');
+                    $parentAttendance                       =   ParentAttendace::create([
+                        'Emp_id'                            =>  $empId,
+                        'date'                              =>  $currentDate,
+                        'roster_id'                         =>  $rosterEntry->roster_id,
+                        'resort_id'                         =>  $rosterResortId,
+                        'Shift_id'                          =>  $rosterEntry->Shift_id,
+                        'CheckingTime'                      =>  $startTime,
+                        'CheckingOutTime'                   =>  $endTime,
+                        'DayWiseTotalHours'                 =>  $rosterEntry->DayWiseTotalHours ?? '00:00',
+                        'Status'                            =>  'Present',
+                        'CheckInCheckOut_Type'              =>  'Manual',
+                    ]);
+                    ChildAttendace::create([
+                        'Parent_attd_id'                    =>  $parentAttendance->id,
+                        'InTime_out'                        =>  $startTime,
+                        'OutTime_out'                       =>  $endTime,
+                        'InTime_Location'                   =>  $request->hod_location,
+                        'OutTime_Location'                  =>  $request->hod_location,
+                    ]);
+                    $timeAttendance[]                       =   [
+                        'emp_id'                            =>  $empId,
+                        'id'                                =>  $parentAttendance->id,
+                        'CheckingTime'                      =>  $parentAttendance->CheckingTime,
+                        'CheckingOutTime'                   =>  $parentAttendance->CheckingOutTime,
+                        'Status'                            =>  $parentAttendance->Status,
+                        'CheckInCheckOut_Type'              =>  $parentAttendance->CheckInCheckOut_Type,
+                    ];
+                    $markResultByEmpId[$empId]              =   [
+                        'emp_id'                            =>  $empId,
+                        'marked'                            =>  true,
+                        'id'                                =>  $parentAttendance->id,
+                        'CheckingTime'                      =>  $parentAttendance->CheckingTime,
+                        'CheckingOutTime'                   =>  $parentAttendance->CheckingOutTime,
+                        'Status'                            =>  $parentAttendance->Status,
+                        'CheckInCheckOut_Type'              =>  $parentAttendance->CheckInCheckOut_Type,
+                    ];
+                    continue;
+                }
+
+                // Update existing row to Present (even if it was Absent or other)
+                $attendanceResortId                         =   (int) $parentAttendance->resort_id;
+                $shiftData                                  =   ShiftSettings::where('resort_id', $attendanceResortId)->where('id', $parentAttendance->Shift_id)->first();
+                $startTime                                  =   $shiftData ? $shiftData->StartTime : ($parentAttendance->CheckingTime ?? '00:00');
+                $endTime                                    =   $shiftData ? $shiftData->EndTime : ($parentAttendance->CheckingOutTime ?? '00:00');
+                $parentAttendance->CheckingTime             =   $startTime;
+                $parentAttendance->CheckingOutTime          =   $endTime;
+                $parentAttendance->Status                   =   'Present';
+                $parentAttendance->CheckInCheckOut_Type     =   'Manual';
+                $parentAttendance->save();
+
+                ChildAttendace::updateOrCreate(
+                    ['Parent_attd_id'                       =>  $parentAttendance->id],
+                    [
+                        'InTime_out'                        =>  $startTime,
+                        'OutTime_out'                       =>  $endTime,
+                        'InTime_Location'                   =>  $request->hod_location,
+                        'OutTime_Location'                  =>  $request->hod_location,
+                    ]
+                );
+                $timeAttendance[]                          =   [
+                    'emp_id'                                =>  $parentAttendance->Emp_id,
+                    'id'                                    =>  $parentAttendance->id,
+                    'CheckingTime'                         =>  $parentAttendance->CheckingTime,
+                    'CheckingOutTime'                      =>  $parentAttendance->CheckingOutTime,
+                    'Status'                                =>  $parentAttendance->Status,
+                    'CheckInCheckOut_Type'                 =>  $parentAttendance->CheckInCheckOut_Type,
+                ];
+                $markResultByEmpId[$empId]                  =   [
+                    'emp_id'                                =>  $parentAttendance->Emp_id,
+                    'marked'                                =>  true,
+                    'id'                                    =>  $parentAttendance->id,
+                    'CheckingTime'                         =>  $parentAttendance->CheckingTime,
+                    'CheckingOutTime'                      =>  $parentAttendance->CheckingOutTime,
+                    'Status'                                =>  $parentAttendance->Status,
+                    'CheckInCheckOut_Type'                 =>  $parentAttendance->CheckInCheckOut_Type,
+                ];
             }
-            DB::commit(); // Commit transaction
 
-            $response['status']                             = true;
-            $response['message']                            = 'Attendance data stored successfully.';
-            $response['mark_attendance']                    = $timeAttendance;
+            // Response: when emp_id was sent, one entry per requested emp_id (same order); else use timeAttendance (attendance_id path)
+            if (!empty($empIds)) {
+                $mark_attendance_response                    =   [];
+                foreach ($empIds as $eid) {
+                    $eid                                    =   (int) $eid;
+                    $mark_attendance_response[]             =   $markResultByEmpId[$eid] ?? [
+                        'emp_id'                            =>  $eid,
+                        'marked'                            =>  false,
+                        'message'                           =>  'No duty roster for today or could not update.',
+                    ];
+                }
+                $response['mark_attendance']                =   $mark_attendance_response;
+            } else {
+                $response['mark_attendance']                =   $timeAttendance;
+            }
 
+            if (empty($timeAttendance)) {
+                DB::rollBack();
+                if (empty($empIds)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No attendance records updated.',
+                    ], 422);
+                }
+                $response['status']                         =   true;
+                $response['message']                        =   'No employees could be marked present. Check mark_attendance for each emp_id reason.';
+                return response()->json($response);
+            }
 
+            DB::commit();
+            $response['status']                             =   true;
+            $response['message']                            =   'Attendance marked successfully.';
             return response()->json($response);
         } catch (\Exception $e) {
             DB::rollBack();
