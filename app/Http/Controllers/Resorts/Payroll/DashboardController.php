@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Employee;
 use App\Models\Payroll;
+use App\Models\PayrollEmployees;
 use App\Models\ResortPosition;
 use App\Models\ResortDepartment;
 use App\Models\ServiceCharges;
@@ -32,7 +33,20 @@ class DashboardController extends Controller
         $payrollData = $this->buildPayrollComparison($currentMonth);
         // dd($payrollData);
         $total_employees = Employee::where('resort_id',$resort_id)->where('status','active')->count();
-        $total_paid_employees = Employee::where('resort_id',$resort_id)->where('status','active')->count();
+
+        // Count employees actually paid (net_salary > 0) in the last completed/locked payroll
+        $lastCompletedPayroll = Payroll::where('resort_id', $resort_id)
+            ->whereIn('status', ['locked', 'completed'])
+            ->where('total_payroll', '>', 0)
+            ->orderBy('end_date', 'desc')
+            ->first();
+        $total_paid_employees = 0;
+        if ($lastCompletedPayroll) {
+            $total_paid_employees = DB::table('payroll_reviews')
+                ->where('payroll_id', $lastCompletedPayroll->id)
+                ->where('net_salary', '>', 0)
+                ->count();
+        }
         $today = now();
         $currentMonth = $today->month;
         $currentYear = $today->year;
@@ -83,17 +97,31 @@ class DashboardController extends Controller
             })
             ->orderBy('start_date')
             ->first();
-        // dd($upcomingPayroll);
 
-        return view('resorts.payroll.dashboard.dashboard',compact('page_title','total_employees','total_paid_employees','lastPayroll','upcomingPayroll','payrollData'));
+        // If upcoming payroll has no total yet, estimate from attendance + employee salaries
+        $upcomingEstimated = 0;
+        if ($upcomingPayroll && $upcomingPayroll->total_payroll <= 0) {
+            $upcomingEstimated = DB::table('parent_attendaces as pa')
+                ->join('employees as e', 'e.id', '=', 'pa.Emp_id')
+                ->where('pa.resort_id', $resort_id)
+                ->where('pa.Status', 'Present')
+                ->whereBetween('pa.date', [$upcomingPayroll->start_date, $today->format('Y-m-d')])
+                ->selectRaw('SUM(e.basic_salary / 30) as estimated_total')
+                ->value('estimated_total') ?? 0;
+            $upcomingEstimated = round($upcomingEstimated, 2);
+        }
+
+        return view('resorts.payroll.dashboard.dashboard',compact('page_title','total_employees','total_paid_employees','lastPayroll','upcomingPayroll','upcomingEstimated','payrollData'));
     }
     public function getServiceCharges(Request $request)
     {
         $currentYear = $request->YearWiseServichCharges;
+        $resort_id = $this->resort->resort_id;
         $serviceCharges = ServiceCharges::select(
             DB::raw('MONTHNAME(CONCAT(year, "-", month, "-01")) as label'),
             'service_charge'
         )
+        ->where('resort_id', $resort_id)
         ->where('year',$currentYear)
         ->orderBy('year', 'asc')
         ->orderBy('month', 'asc')
@@ -153,6 +181,7 @@ class DashboardController extends Controller
     public function getPayrollExpenses(Request $request)
     {
         $year = $request->input('year', date('Y'));
+        $resort_id = $this->resort->resort_id;
 
         // Get payroll data for the selected year
         $payrollData = DB::table('payroll')
@@ -160,6 +189,7 @@ class DashboardController extends Controller
                 DB::raw("MONTHNAME(start_date) as month"),
                 DB::raw("SUM(total_payroll) as payroll_cost")
             )
+            ->where('resort_id', $resort_id)
             ->whereYear('start_date', $year)
             ->groupBy('month')
             ->get();
@@ -167,6 +197,7 @@ class DashboardController extends Controller
         $otData = DB::table('payroll as p')
         ->join('payroll_time_and_attandance as pta', 'p.id', '=', 'pta.payroll_id')
         ->join('employees as e', 'e.id', '=', 'pta.employee_id')
+        ->where('p.resort_id', $resort_id)
         ->whereYear('start_date', $year)
         ->where(function ($query) {
             $query->where('pta.regular_ot_hours', '>', 0)
@@ -192,6 +223,7 @@ class DashboardController extends Controller
                 DB::raw("MONTHNAME(payroll.start_date) as month"),
                 DB::raw("SUM(payroll_service_charges.service_charge_amount) as service_charge")
             )
+            ->where('payroll.resort_id', $resort_id)
             ->whereYear('payroll.start_date', $year)
             ->groupBy('month')
             ->get();
@@ -239,7 +271,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'labels' => array_map(fn($m) => "$m $year", $months),
+            'labels' => array_map(fn($m) => substr($m, 0, 3) . " " . substr($year, -2), $months),
             'data' => [
                 'payrollCost' => $payrollCost,
                 'otCost' => $otCost,
@@ -263,6 +295,7 @@ class DashboardController extends Controller
         $selectedMonth = $selectedMonth ?? now()->month;
         $currentYear = now()->year;
         $previousYear = $currentYear - 1;
+        $resort_id = $this->resort->resort_id;
 
         $months = [
             ['year' => $currentYear, 'month' => $selectedMonth],
@@ -274,93 +307,89 @@ class DashboardController extends Controller
         foreach ($months as $m) {
             $monthName = date("F Y", strtotime("{$m['year']}-{$m['month']}-01"));
 
-            $payroll = DB::table('payroll as p')
+            $result = DB::table('payroll as p')
                 ->join('payroll_reviews as pr', 'p.id', '=', 'pr.payroll_id')
+                ->where('p.resort_id', $resort_id)
                 ->whereYear('p.start_date', $m['year'])
-                ->whereMonth('p.start_date', $m['month']);
+                ->whereMonth('p.start_date', $m['month'])
+                ->selectRaw("
+                    SUM(pr.earned_salary) as total_basic_salary,
+                    SUM(pr.service_charge) as service_charge,
+                    SUM(pr.regularOTPay) as total_regular_ot_cost,
+                    SUM(pr.holidayOTPay) as total_holiday_ot_cost
+                ")
+                ->first();
 
-            $basic = clone $payroll;
-            $service = clone $payroll;
-            $normalOT = clone $payroll;
-            $holidayOT = clone $payroll;
-
-            $total_basic_salary = $basic->selectRaw("SUM(pr.earned_salary) as total_basic_salary")->first();
-            $service_charge = $service->selectRaw("SUM(pr.service_charge) as service_charge")->first();
-            $regularOTPay = $normalOT->selectRaw("SUM(pr.regularOTPay) as total_regular_ot_cost")->first();
-            $holidayOTPay = $holidayOT->selectRaw("SUM(pr.holidayOTPay) as total_holiday_ot_cost")->first();
-
-            $total = ($total_basic_salary->total_basic_salary ?? 0) +
-                    ($service_charge->service_charge ?? 0) +
-                    ($regularOTPay->total_regular_ot_cost ?? 0) +
-                    ($holidayOTPay->total_holiday_ot_cost ?? 0);
+            $basicSalary = $result->total_basic_salary ?? 0;
+            $serviceCharge = $result->service_charge ?? 0;
+            $regularOT = $result->total_regular_ot_cost ?? 0;
+            $holidayOT = $result->total_holiday_ot_cost ?? 0;
+            $total = $basicSalary + $serviceCharge + $regularOT + $holidayOT;
 
             $data[$monthName] = [
                 'basicSalary' => [
-                    'amount' => $total_basic_salary->total_basic_salary ?? 0,
-                    'percentage' => $total > 0 ? round(($total_basic_salary->total_basic_salary / $total) * 100) : 0
+                    'amount' => $basicSalary,
+                    'percentage' => $total > 0 ? round(($basicSalary / $total) * 100) : 0
                 ],
                 'serviceCharge' => [
-                    'amount' => $service_charge->service_charge ?? 0,
-                    'percentage' => $total > 0 ? round(($service_charge->service_charge / $total) * 100) : 0
+                    'amount' => $serviceCharge,
+                    'percentage' => $total > 0 ? round(($serviceCharge / $total) * 100) : 0
                 ],
                 'normalOT' => [
-                    'amount' => $regularOTPay->total_regular_ot_cost ?? 0,
-                    'percentage' => $total > 0 ? round(($regularOTPay->total_regular_ot_cost / $total) * 100) : 0
+                    'amount' => $regularOT,
+                    'percentage' => $total > 0 ? round(($regularOT / $total) * 100) : 0
                 ],
                 'holidayOT' => [
-                    'amount' => $holidayOTPay->total_holiday_ot_cost ?? 0,
-                    'percentage' => $total > 0 ? round(($holidayOTPay->total_holiday_ot_cost / $total) * 100) : 0
+                    'amount' => $holidayOT,
+                    'percentage' => $total > 0 ? round(($holidayOT / $total) * 100) : 0
                 ],
                 'total' => $total
             ];
         }
-        // dd($data);
         return $data;
     }
 
 
     public function getPayrollDistribution()
     {
-        // Fetch total net pay for employees who receive payments via cash
-        $cashPayments = DB::table('payroll_employees as pe')
-            ->join('payroll_reviews as pr', 'pe.employee_id', '=', 'pr.employee_id')
-            ->leftJoin('payroll_deductions as pd', 'pe.employee_id', '=', 'pd.employee_id')
-            ->where('pe.paymentMethod', 'Cash')
-            ->selectRaw('SUM(
-                pr.net_salary
-            ) as total_cash_pay')
-            ->value('total_cash_pay');
-        // dd($cashPayments);
+        $resort_id = $this->resort->resort_id;
 
-        // Fetch total net pay for employees who receive payments via bank transfer
-        $bankTransfers = DB::table('payroll_employees as pe')
-            ->join('payroll_reviews as pr', 'pe.employee_id', '=', 'pr.employee_id')
-            ->leftJoin('payroll_deductions as pd', 'pe.employee_id', '=', 'pd.employee_id')
-            ->where('pe.paymentMethod', 'Bank')
-            ->selectRaw('SUM(
-                pr.net_salary
-            ) as total_bank_pay')
-            ->value('total_bank_pay');
+        // Fetch total net pay for employees grouped by payment method (Cash vs Bank)
+        $payments = DB::table('payroll_employees as pe')
+            ->join('payroll as p', 'p.id', '=', 'pe.payroll_id')
+            ->join('payroll_reviews as pr', function ($join) {
+                $join->on('pe.employee_id', '=', 'pr.employee_id')
+                     ->on('pe.payroll_id', '=', 'pr.payroll_id');
+            })
+            ->where('p.resort_id', $resort_id)
+            ->selectRaw("
+                SUM(CASE WHEN pe.paymentMethod = 'Cash' THEN pr.net_salary ELSE 0 END) as total_cash_pay,
+                SUM(CASE WHEN pe.paymentMethod = 'Bank' THEN pr.net_salary ELSE 0 END) as total_bank_pay
+            ")
+            ->first();
 
         return response()->json([
-            'cashPayments' => $cashPayments ?? 0,
-            'bankTransfers' => $bankTransfers ?? 0
+            'cashPayments' => $payments->total_cash_pay ?? 0,
+            'bankTransfers' => $payments->total_bank_pay ?? 0
         ]);
     }
 
     public function getDepartmentDistribution()
     {
+        $resort_id = $this->resort->resort_id;
+
         // Fetch department-wise payroll distribution
         $departments = Payroll::join('payroll_employees as pe', 'payroll.id', '=', 'pe.payroll_id')
-        ->join('payroll_reviews as pr', 'pr.employee_id', '=', 'pe.employee_id')
+        ->join('payroll_reviews as pr', function ($join) {
+            $join->on('pr.employee_id', '=', 'pe.employee_id')
+                 ->on('pr.payroll_id', '=', 'pe.payroll_id');
+        })
         ->join('resort_departments as rd', 'rd.id', '=', 'pe.department')
-        ->leftJoin('payroll_deductions as pd', 'pd.employee_id', '=', 'pe.employee_id')
+        ->where('payroll.resort_id', $resort_id)
         ->selectRaw('rd.name as department, SUM(pr.net_salary) as total')
-        ->groupBy('pe.department') // Ensure grouping is applied at this stage
+        ->groupBy('pe.department', 'rd.name')
         ->get();
-        // dd($departments);
 
-        // Define colors for each department
         // Generate unique colors dynamically for each department
         $departmentColors = [];
         foreach ($departments as $index => $dept) {
@@ -368,16 +397,12 @@ class DashboardController extends Controller
             $departmentColors[$dept->department] = "hsl($hue, 70%, 60%)";
         }
 
-        foreach ($departments as $index => $dept) {
-            $departmentColors[$dept->department] = $predefinedColors[$dept->department]
-                ?? "hsl(" . (($index * 137.5) % 360) . ", 70%, 60%)";
-        }
         // Format data for the chart
         $data = $departments->map(function ($item) use ($departmentColors) {
             return [
                 'what' => $item->department,
                 'value' => $item->total,
-                'color' => $departmentColors[$item->department] ?? '#999999', // Default color if not found
+                'color' => $departmentColors[$item->department] ?? '#999999',
             ];
         });
 
@@ -389,10 +414,15 @@ class DashboardController extends Controller
         $currentYear = $request->YearWisePensionData;
         // dd($currentYear);
         // Fetch pension deductions grouped by month
+        $resort_id = $this->resort->resort_id;
         $pensionData = Payroll::join('payroll_employees as pe', 'payroll.id', '=', 'pe.payroll_id')
-            ->join('payroll_deductions as pd', 'pd.employee_id', '=', 'pe.employee_id')
-            ->selectRaw("DATE_FORMAT(payroll.start_date, '%b %Y') as month, 
-                        SUM(pd.pension) as employee, 
+            ->join('payroll_deductions as pd', function ($join) {
+                $join->on('pd.employee_id', '=', 'pe.employee_id')
+                     ->on('pd.payroll_id', '=', 'pe.payroll_id');
+            })
+            ->where('payroll.resort_id', $resort_id)
+            ->selectRaw("DATE_FORMAT(payroll.start_date, '%b %Y') as month,
+                        SUM(pd.pension) as employee,
                         SUM(pd.pension) as employer")
             ->whereYear('payroll.start_date', $currentYear) // Filter by year
             ->groupBy('month')
@@ -406,8 +436,10 @@ class DashboardController extends Controller
     {
         $year = $request->input('year', now()->year); // Default to current year
 
+        $resort_id = $this->resort->resort_id;
         $otData = DB::table('payroll_time_and_attandance')
             ->join('payroll', 'payroll_time_and_attandance.payroll_id', '=', 'payroll.id')
+            ->where('payroll.resort_id', $resort_id)
             ->whereYear('payroll.start_date', $year) // filter by selected year
             ->selectRaw("DATE_FORMAT(payroll.start_date, '%b %Y') as month, SUM(total_ot) as total_ot")
             ->groupBy('month')
@@ -455,7 +487,11 @@ class DashboardController extends Controller
         // Get all taxable incomes (in USD or whatever stored) and convert to MVR
         $records = DB::table('payroll as p')
             ->join('payroll_deductions as pd', 'pd.payroll_id', '=', 'p.id')
-            ->join('payroll_reviews as pr', 'pr.payroll_id', '=', 'p.id')
+            ->join('payroll_reviews as pr', function ($join) {
+                $join->on('pr.payroll_id', '=', 'p.id')
+                     ->on('pr.employee_id', '=', 'pd.employee_id');
+            })
+            ->where('p.resort_id', $resortId)
             ->whereYear('p.start_date', $year)
             ->select('pd.ewt', DB::raw('(pr.total_earnings - pd.pension) as taxable_income'))
             ->get();
@@ -481,6 +517,56 @@ class DashboardController extends Controller
         return response()->json([
             'labels' => array_keys($result),
             'data' => array_map(fn($v) => round($v, 2), array_values($result)),
+        ]);
+    }
+
+    public function getBudgetComparison(Request $request)
+    {
+        $year = $request->input('year', now()->year);
+        $resort_id = $this->resort->resort_id;
+
+        $months = [
+            1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr',
+            5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug',
+            9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'
+        ];
+
+        $labels = [];
+        $budgetedAmounts = [];
+        $actualAmounts = [];
+
+        foreach ($months as $monthNum => $monthName) {
+            $labels[] = $monthName . ' ' . substr($year, -2);
+
+            // Budgeted: employee budget configs + vacant budget configs for this month
+            $employeeBudget = DB::table('resort_employee_budget_cost_configurations')
+                ->where('resort_id', $resort_id)
+                ->where('year', $year)
+                ->where('month', $monthNum)
+                ->sum('value');
+
+            $vacantBudget = DB::table('resort_vacant_budget_cost_configurations')
+                ->where('resort_id', $resort_id)
+                ->where('year', $year)
+                ->where('month', $monthNum)
+                ->sum('value');
+
+            $budgetedAmounts[] = round($employeeBudget + $vacantBudget, 2);
+
+            // Actual: payroll total_payroll for this month
+            $actualPayroll = DB::table('payroll')
+                ->where('resort_id', $resort_id)
+                ->whereYear('start_date', $year)
+                ->whereMonth('start_date', $monthNum)
+                ->sum('total_payroll');
+
+            $actualAmounts[] = round($actualPayroll, 2);
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'budgeted' => $budgetedAmounts,
+            'actual' => $actualAmounts
         ]);
     }
 

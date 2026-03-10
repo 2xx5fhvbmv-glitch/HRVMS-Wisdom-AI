@@ -250,25 +250,57 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-auto">
-                                            <button type="button" class="btn btn-danger remove-deduction">Remove</button>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-themeSkyblue btn-sm mb-3 add-deduction">Add More</button>
-                            <div class="mb-3">
-                                <label for="maximum" class="form-label">MAXIMUM DEDUCTION LIMIT</label>
-                                <input type="text" class="form-control maximum_limit" id="maximum"
-                                    placeholder="Enter certain % of basic salary" name="maximum_limit">
+                            <div class="row g-md-4 g-2 mb-3">
+                                <div class="col-sm-4">
+                                    <label for="maximum_limit_type" class="form-label">LIMIT TYPE</label>
+                                    <select class="form-select" id="maximum_limit_type" name="maximum_limit_type">
+                                        <option value="percentage">Percentage (%)</option>
+                                        <option value="fixed">Fixed Amount</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-8">
+                                    <label for="maximum" class="form-label">MAXIMUM DEDUCTION LIMIT</label>
+                                    <input type="number" step="0.01" class="form-control maximum_limit" id="maximum"
+                                        placeholder="Enter limit value" name="maximum_limit">
+                                </div>
                             </div>
                             <div class="card-footer text-end">
                                 <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
-                  
-                   
+
+                    <div class="card mb-30">
+                        <div class="card-title">
+                            <div class="row g-3 align-items-center justify-content-between">
+                                <div class="col-auto">
+                                    <h3>Recent Deductions</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{ route('deductions.index') }}" class="btn btn-themeSkyblue btn-sm">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm" id="recentDeductionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Currency</th>
+                                        <th>Limit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentDeductionsBody">
+                                    <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -281,486 +313,318 @@
 
 @section('import-scripts')
 <script type="text/javascript">
-    // new DataTable('#example');
+    var allowedFileExtensions = ['csv', 'xls', 'xlsx', 'ods', 'xlsb', 'xlt', 'xltx', 'xltm'];
+
+    function isValidFileExtension(fileInput) {
+        if (!fileInput.files || !fileInput.files[0]) return false;
+        var ext = fileInput.files[0].name.split('.').pop().toLowerCase();
+        return allowedFileExtensions.indexOf(ext) !== -1;
+    }
+
+    function showAjaxErrors(response) {
+        if (response.responseJSON) {
+            var errors = response.responseJSON;
+            var errs = '';
+            if (errors.errors) {
+                $.each(errors.errors, function(key, error) {
+                    errs += error + '<br>';
+                });
+            } else if (errors.message) {
+                errs = errors.message;
+            }
+            toastr.error(errs || 'Something went wrong.', "Error", { positionClass: 'toast-bottom-right' });
+        } else {
+            toastr.error('Something went wrong.', "Error", { positionClass: 'toast-bottom-right' });
+        }
+    }
+
+    function submitFileForm(formId, fileInputId, url, $btn) {
+        var fileInput = document.getElementById(fileInputId);
+        if (!fileInput.files || !fileInput.files[0]) {
+            toastr.error('Please select a file to upload.', "Error", { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        if (!isValidFileExtension(fileInput)) {
+            toastr.error('Please upload a valid file (csv, xls, xlsx, ods, xlsb, xlt, xltx, xltm).', "Error", { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        var originalText = $btn.html();
+        $btn.html('<i class="fa fa-spinner fa-spin"></i> Uploading...').prop('disabled', true);
+
+        var formData = new FormData(document.getElementById(formId));
+        $.ajax({
+            url: url,
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $btn.html(originalText).prop('disabled', false);
+                if (response.success) {
+                    toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    document.getElementById(formId).reset();
+                    $('#' + formId).find('[id$="ImportFile"], #fileNameImportFile').text('');
+                } else {
+                    toastr.error(response.message || 'Upload failed.', "Error", { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function(response) {
+                $btn.html(originalText).prop('disabled', false);
+                showAjaxErrors(response);
+            }
+        });
+    }
+
     $(document).ready(function () {
         $('.select2t-none').select2();
-        $('#ImportServiceChargeForm').validate({
-            rules: {
-                ImportServiceCharge: {
-                    required: true,
-                    extension: "csv|xls|xlsx|ods|xlsb|xlt|xltx|xltm" // Validate file types
-                }
-            },
-            messages: {
-                ImportServiceCharge: {
-                    required: "Please select a file to upload.",
-                    extension: "Please upload a valid file (csv, xls, xlsx, ods, xlsb, xlt, xltx, xltm)."
-                }
-            },
-            submitHandler: function(form, event) {
-                event.preventDefault(); // Prevent page refresh on submit
 
-                var formData = new FormData(form);
-                formData.append('fileUpload', $('#ImportServiceCharge')[0].files[0]); // Append the file to the form data
-                $.ajax({
-                    url: "{{ route('import.service-charges') }}", // Your route for file upload
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        if(response.responseJSON)
-                        {
-                            var errors = response.responseJSON;
-                            var errs = '';
-                            $.each(errors.errors, function(key, error) {
-                                errs += error + '<br>';
-                            });
-                            toastr.error(errs, {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
-        $('#ImportEarningsForm').validate({
-            rules: {
-                ImportEarnings: {
-                    required: true,
-                    extension: "csv|xls|xlsx|ods|xlsb|xlt|xltx|xltm" // Validate file types
-                }
-            },
-            messages: {
-                ImportEarnings: {
-                    required: "Please select a file to upload.",
-                    extension: "Please upload a valid file (csv, xls, xlsx, ods, xlsb, xlt, xltx, xltm)."
-                }
-            },
-            submitHandler: function(form, event) {
-                event.preventDefault(); // Prevent page refresh on submit
-
-                var formData = new FormData(form);
-                formData.append('fileUpload', $('#ImportEarnings')[0].files[0]); // Append the file to the form data
-                $.ajax({
-                    url: "{{ route('import.earnings') }}", // Your route for file upload
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        if(response.responseJSON)
-                        {
-                            var errors = response.responseJSON;
-                            var errs = '';
-                            $.each(errors.errors, function(key, error) {
-                                errs += error + '<br>';
-                            });
-                            toastr.error(errs, {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
-        $('#ImportDeductionForm').validate({
-            rules: {
-                ImportDeductions: {
-                    required: true,
-                    extension: "csv|xls|xlsx|ods|xlsb|xlt|xltx|xltm" // Validate file types
-                }
-            },
-            messages: {
-                ImportDeductions: {
-                    required: "Please select a file to upload.",
-                    extension: "Please upload a valid file (csv, xls, xlsx, ods, xlsb, xlt, xltx, xltm)."
-                }
-            },
-            submitHandler: function(form, event) {
-                event.preventDefault(); // Prevent page refresh on submit
-
-                var formData = new FormData(form);
-                formData.append('fileUpload', $('#ImportDeductions')[0].files[0]); // Append the file to the form data
-                $.ajax({
-                    url: "{{ route('import.deductions') }}", // Your route for file upload
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        if(response.responseJSON)
-                        {
-                            var errors = response.responseJSON;
-                            var errs = '';
-                            $.each(errors.errors, function(key, error) {
-                                errs += error + '<br>';
-                            });
-                            toastr.error(errs, {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
-        $('#cutOffDateForm').validate({
-            rules: {
-                cutoff_day: {
-                    required: true,
-                }
-            },
-            messages: {
-                cutoff_day: {
-                    required: "Please select cutoff day",
-                }
-            },
-            submitHandler: function(form, event) {
-                event.preventDefault(); // Prevent page refresh on submit
-                var formData = new FormData(form);
-                $.ajax({
-                    url: "{{ route('save.cutoff.day') }}", // Your route for file upload
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        if(response.responseJSON)
-                        {
-                            var errors = response.responseJSON;
-                            var errs = '';
-                            $.each(errors.errors, function(key, error) {
-                                errs += error + '<br>';
-                            });
-                            toastr.error(errs, {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    }
-                });
-            }
-        });
-    });
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const earningsMain = document.querySelector('.earnings-main');
-
-        // Add More Fields
-        document.querySelector('.add-earnings').addEventListener('click', function () {
-            const newRow = `
-                <div class="row align-items-end g-md-4 g-2 earnings-row">
-                    <div class="col-sm-6">
-                        <label for="allow_name" class="form-label">ALLOWANCE NAME</label>
-                        <input type="text" class="form-control allow_name" placeholder="Allowance Name" name="allow_name[]">
-                    </div>
-                    <div class="col-sm-6">
-                        <label for="allow_type" class="form-label">ALLOWANCE TYPE</label>
-                        <input type="text" class="form-control allow_type" placeholder="Allowance Type" name="allow_type[]">
-                    </div>
-                    <div class="col">
-                        <div class="d-flex align-items-center">
-                            <label class="form-label mb-0 me-md-4 me-3">CURRENCY:</label>
-                            <label class="form-label mb-0 me-3">Rufiyaa</label>
-                            <div class="form-check form-switch form-switchTheme">
-                                <input class="form-check-input currency-switch" type="checkbox" name="currency[]">
-                            </div>
-                            <label class="form-label mb-0 me-3">USD</label>
-                        </div>
-                    </div>
-                    <div class="col-auto">
-                        <button type="button" class="btn btn-danger remove-earnings">Remove</button>
-                    </div>
-                </div>`;
-            earningsMain.insertAdjacentHTML('beforeend', newRow);
-        });
-
-        // Remove Fields
-        earningsMain.addEventListener('click', function (e) {
-            if (e.target.classList.contains('remove-earnings')) {
-                e.target.closest('.earnings-row').remove();
-            }
-        });
-
-        // Submit Form
-        document.querySelector('#earningsForm').addEventListener('submit', function (e) {
+        // Upload Previous Service Charge
+        $('#ImportServiceChargeForm').on('submit', function(e) {
             e.preventDefault();
+            submitFileForm('ImportServiceChargeForm', 'ImportServiceCharge', "{{ route('import.service-charges') }}", $(this).find('button[type=submit]'));
+        });
 
-            // Gather all entries
-            const rows = document.querySelectorAll('.earnings-row');
-            const earningsData = [];
-            rows.forEach(row => {
-                const allowName = row.querySelector('.allow_name').value;
-                const allowType = row.querySelector('.allow_type').value;
-                const currency = row.querySelector('.currency-switch').checked ? 'USD' : 'Rufiyaa';
+        // Import Earnings
+        $('#ImportEarningsForm').on('submit', function(e) {
+            e.preventDefault();
+            submitFileForm('ImportEarningsForm', 'ImportEarnings', "{{ route('import.earnings') }}", $(this).find('button[type=submit]'));
+        });
 
+        // Import Deductions
+        $('#ImportDeductionForm').on('submit', function(e) {
+            e.preventDefault();
+            submitFileForm('ImportDeductionForm', 'ImportDeductions', "{{ route('import.deductions') }}", $(this).find('button[type=submit]'));
+        });
 
-                if (allowName && allowType) { // Validate entries
-                    earningsData.push({ allow_name: allowName, allow_type: allowType, currency });
-                }
-            });
-            // console.log(earningsData);
-
-            // Validate data
-            if (earningsData.length === 0) {
-                // alert('Please fill in at least one entry.');
-                toastr.error("Please fill in at least one entry.", "Error", {
-                    positionClass: 'toast-bottom-right'
-                });
+        // Cutoff Day
+        $('#cutOffDateForm').on('submit', function(e) {
+            e.preventDefault();
+            var $btn = $(this).find('button[type=submit]');
+            var cutoffDay = $('#cutoff_day').val();
+            if (!cutoffDay) {
+                toastr.error('Please select cutoff day.', "Error", { positionClass: 'toast-bottom-right' });
                 return;
             }
+            var originalText = $btn.html();
+            $btn.html('<i class="fa fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
 
-            // Submit via AJAX
             $.ajax({
-                url:"{{ route('earnings.submit') }}",
+                url: "{{ route('save.cutoff.day') }}",
                 type: "POST",
-                data: {
-                    earnings: earningsData, // Wrap data in an 'earnings' key
-                    _token: "{{ csrf_token() }}" // Include CSRF token if necessary
-                },
+                data: new FormData(this),
+                processData: false,
+                contentType: false,
                 success: function(response) {
+                    $btn.html(originalText).prop('disabled', false);
                     if (response.success) {
-                        // alert(response.message);
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        // Optionally, reset the form
-                        document.querySelector('#earningsForm').reset();
-                        // earningsMain.innerHTML = ''; // Clear all dynamic rows
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                     } else {
-                        toastr.error("Failed to save earnings.", "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        // alert('Failed to save earnings.');
+                        toastr.error(response.message || 'Failed to save.', "Error", { positionClass: 'toast-bottom-right' });
                     }
                 },
                 error: function(response) {
-                    if(response.responseJSON)
-                    {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) {
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                }
-            });
-        });
-
-        //Deduction Code
-        const deductionMain = document.querySelector('.deduction-main');
-
-        // Add More Fields
-        document.querySelector('.add-deduction').addEventListener('click', function (e) {
-            e.preventDefault();
-
-            const newRow = `
-                <div class="deduction-block mb-md-4 mb-3">
-                    <div class="row align-items-end g-md-4 g-2">
-                        <div class="col-sm-6">
-                            <label for="deduction_name" class="form-label">DEDUCTION NAME</label>
-                            <input type="text" class="form-control deduction_name" placeholder="Deduction Name" name="deduction_name[]">
-                        </div>
-                        <div class="col-sm-6">
-                            <label for="deduction_type" class="form-label">DEDUCTION TYPE</label>
-                            <input type="text" class="form-control deduction_type" placeholder="Deduction Type" name="deduction_type[]">
-                        </div>
-                        <div class="col">
-                            <div class="d-flex align-items-center">
-                                <label class="form-label mb-0 me-md-4 me-3">CURRENCY:</label>
-                                <label class="form-label mb-0 me-3">Rufiyaa</label>
-                                <div class="form-check form-switch form-switchTheme">
-                                    <input class="form-check-input currency-switch" type="checkbox" name="currency[]">
-                                    <label class="form-check-label">USD</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <button type="button" class="btn btn-danger remove-deduction">Remove</button>
-                        </div>
-                    </div>
-                </div>`;
-            deductionMain.insertAdjacentHTML('beforeend', newRow);
-        });
-
-        // Remove Fields
-        deductionMain.addEventListener('click', function (e) {
-            if (e.target.classList.contains('remove-deduction')) {
-                e.preventDefault();
-                e.target.closest('.deduction-block').remove();
-            }
-        });
-
-        // Submit Form
-        document.querySelector('#deductionForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            // Gather all deduction entries
-            const rows = document.querySelectorAll('.deduction-block');
-            const deductionsData = [];
-            rows.forEach(row => {
-                const deductionName = row.querySelector('.deduction_name').value;
-                const deductionType = row.querySelector('.deduction_type').value;
-                const currency = row.querySelector('.currency-switch').checked ? 'USD' : 'Rufiyaa';
-
-                if (deductionName && deductionType) { // Validate entries
-                    deductionsData.push({ deduction_name: deductionName, deduction_type: deductionType, currency });
-                }
-            });
-
-            const maximumLimit = document.querySelector('#maximum').value;
-
-            // Validate overall data
-            if (deductionsData.length === 0 || !maximumLimit) {
-                toastr.error("Please fill in all required fields.", "Error", {
-                    positionClass: 'toast-bottom-right'
-                });
-                return;
-            }
-
-            // Submit via AJAX
-            $.ajax({
-                url: "{{ route('deductions.submit') }}",
-                type: "POST",
-                data: {
-                    deductions: deductionsData,
-                    maximum_limit: maximumLimit,
-                    _token: "{{ csrf_token() }}"
-                },
-                success: function (response) {
-                    if (response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        // Optionally, reset the form
-                        document.querySelector('#deductionForm').reset();
-                        // deductionMain.innerHTML = ''; // Clear all dynamic rows
-                    } else {
-                        toastr.error("Failed to save deductions.", "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function (xhr) {
-                    if (xhr.responseJSON) {
-                        const errors = xhr.responseJSON.errors;
-                        let errorMessages = '';
-                        Object.keys(errors).forEach(function (key) {
-                            errorMessages += `${errors[key]}<br>`;
-                        });
-                        toastr.error(errorMessages, "Validation Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
+                    $btn.html(originalText).prop('disabled', false);
+                    showAjaxErrors(response);
                 }
             });
         });
     });
+
+    $(document).ready(function () {
+        // Earnings - Add More Fields
+        $(document).on('click', '.add-earnings', function () {
+            var newRow = '<div class="earnings-block mb-md-4 mb-3"><div class="row align-items-end g-md-4 g-2 earnings-row">' +
+                '<div class="col-sm-6"><label class="form-label">ALLOWANCE NAME</label>' +
+                '<input type="text" class="form-control allow_name" placeholder="Allowance Name" name="allow_name[]"></div>' +
+                '<div class="col-sm-6"><label class="form-label">ALLOWANCE TYPE</label>' +
+                '<input type="text" class="form-control allow_type" placeholder="Allowance Type" name="allow_type[]"></div>' +
+                '<div class="col"><div class="d-flex align-items-center">' +
+                '<label class="form-label mb-0 me-md-4 me-3">CURRENCY:</label>' +
+                '<label class="form-label mb-0 me-3">Rufiyaa</label>' +
+                '<div class="form-check form-switch form-switchTheme">' +
+                '<input class="form-check-input currency-switch" type="checkbox" name="currency[]">' +
+                '<label class="form-check-label">USD</label></div></div></div>' +
+                '<div class="col-auto"><button type="button" class="btn btn-danger remove-earnings">Remove</button></div>' +
+                '</div></div>';
+            $('.earnings-main').append(newRow);
+        });
+
+        // Earnings - Remove Fields
+        $(document).on('click', '.remove-earnings', function () {
+            $(this).closest('.earnings-row, .earnings-block').remove();
+        });
+
+        // Earnings - Submit Form
+        $('#earningsForm').on('submit', function (e) {
+            e.preventDefault();
+            var earningsData = [];
+            $('.earnings-row').each(function () {
+                var allowName = $(this).find('.allow_name').val();
+                var allowType = $(this).find('.allow_type').val();
+                var currency = $(this).find('.currency-switch').is(':checked') ? 'USD' : 'Rufiyaa';
+                if (allowName && allowType) {
+                    earningsData.push({ allow_name: allowName, allow_type: allowType, currency: currency });
+                }
+            });
+            if (earningsData.length === 0) {
+                toastr.error("Please fill in at least one entry.", "Error", { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            var $btn = $(this).find('button[type=submit]');
+            var originalText = $btn.html();
+            $btn.html('<i class="fa fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
+
+            $.ajax({
+                url: "{{ route('earnings.submit') }}",
+                type: "POST",
+                data: { earnings: earningsData, _token: "{{ csrf_token() }}" },
+                success: function (response) {
+                    $btn.html(originalText).prop('disabled', false);
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $('#earningsForm')[0].reset();
+                    } else {
+                        toastr.error("Failed to save earnings.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (response) {
+                    $btn.html(originalText).prop('disabled', false);
+                    showAjaxErrors(response);
+                }
+            });
+        });
+
+        // Deductions - Add More Fields
+        $(document).on('click', '.add-deduction', function (e) {
+            e.preventDefault();
+            var newRow = '<div class="deduction-block mb-md-4 mb-3"><div class="row align-items-end g-md-4 g-2">' +
+                '<div class="col-sm-6"><label class="form-label">DEDUCTION NAME</label>' +
+                '<input type="text" class="form-control deduction_name" placeholder="Deduction Name" name="deduction_name[]"></div>' +
+                '<div class="col-sm-6"><label class="form-label">DEDUCTION TYPE</label>' +
+                '<input type="text" class="form-control deduction_type" placeholder="Deduction Type" name="deduction_type[]"></div>' +
+                '<div class="col"><div class="d-flex align-items-center">' +
+                '<label class="form-label mb-0 me-md-4 me-3">CURRENCY:</label>' +
+                '<label class="form-label mb-0 me-3">Rufiyaa</label>' +
+                '<div class="form-check form-switch form-switchTheme">' +
+                '<input class="form-check-input currency-switch" type="checkbox" name="currency[]">' +
+                '<label class="form-check-label">USD</label></div></div></div>' +
+                '<div class="col-auto"><button type="button" class="btn btn-danger remove-deduction">Remove</button></div>' +
+                '</div></div>';
+            $('.deduction-main').append(newRow);
+        });
+
+        // Deductions - Remove Fields
+        $(document).on('click', '.remove-deduction', function (e) {
+            e.preventDefault();
+            $(this).closest('.deduction-block').remove();
+        });
+
+        // Update placeholder based on limit type
+        $('#maximum_limit_type').on('change', function() {
+            var type = $(this).val();
+            if (type === 'percentage') {
+                $('#maximum').attr('placeholder', 'Enter percentage (e.g. 50)');
+            } else {
+                $('#maximum').attr('placeholder', 'Enter fixed amount');
+            }
+        });
+
+        // Deductions - Submit Form
+        $('#deductionForm').on('submit', function (e) {
+            e.preventDefault();
+            var deductionsData = [];
+            $('.deduction-block').each(function () {
+                var deductionName = $(this).find('.deduction_name').val();
+                var deductionType = $(this).find('.deduction_type').val();
+                var currency = $(this).find('.currency-switch').is(':checked') ? 'USD' : 'Rufiyaa';
+                if (deductionName && deductionType) {
+                    deductionsData.push({ deduction_name: deductionName, deduction_type: deductionType, currency: currency });
+                }
+            });
+            var maximumLimit = $('#maximum').val();
+            var maximumLimitType = $('#maximum_limit_type').val();
+            if (deductionsData.length === 0 || !maximumLimit) {
+                toastr.error("Please fill in all required fields.", "Error", { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            var $btn = $(this).find('button[type=submit]');
+            var originalText = $btn.html();
+            $btn.html('<i class="fa fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
+
+            $.ajax({
+                url: "{{ route('deductions.submit') }}",
+                type: "POST",
+                data: { deductions: deductionsData, maximum_limit: maximumLimit, maximum_limit_type: maximumLimitType, _token: "{{ csrf_token() }}" },
+                success: function (response) {
+                    $btn.html(originalText).prop('disabled', false);
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $('#deductionForm')[0].reset();
+                        loadRecentDeductions();
+                    } else {
+                        toastr.error("Failed to save deductions.", "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (response) {
+                    $btn.html(originalText).prop('disabled', false);
+                    showAjaxErrors(response);
+                }
+            });
+        });
+
+        // Load recent deductions on page load
+        loadRecentDeductions();
+    });
+
+    function loadRecentDeductions() {
+        $.ajax({
+            url: "{{ route('deductions.list') }}",
+            type: "GET",
+            success: function(response) {
+                if (response.success && response.data.length > 0) {
+                    var html = '';
+                    var items = response.data.slice(0, 4);
+                    items.forEach(function(d) {
+                        var limitDisplay = d.maximum_limit;
+                        if (d.maximum_limit_type === 'percentage') {
+                            limitDisplay += '%';
+                        } else {
+                            limitDisplay = (d.currency === 'USD' ? '$' : '') + limitDisplay;
+                        }
+                        html += '<tr>' +
+                            '<td>' + d.deduction_name + '</td>' +
+                            '<td>' + d.deduction_type + '</td>' +
+                            '<td>' + d.currency + '</td>' +
+                            '<td>' + limitDisplay + '</td>' +
+                            '</tr>';
+                    });
+                    $('#recentDeductionsBody').html(html);
+                } else {
+                    $('#recentDeductionsBody').html('<tr><td colspan="4" class="text-center">No deductions found.</td></tr>');
+                }
+            },
+            error: function() {
+                $('#recentDeductionsBody').html('<tr><td colspan="4" class="text-center text-danger">Failed to load.</td></tr>');
+            }
+        });
+    }
 
     function displayImportFileName() {
         var fileInput = document.getElementById('ImportServiceCharge');
         var fileName = fileInput.files.length > 0 ? fileInput.files[0].name : 'No file selected';
-
-        // Display the file name
         document.getElementById('fileNameImportFile').innerText = fileName;
-
-        // Submit the form if a file is selected
-        if (fileInput.files.length > 0) {
-            $('#ImportServiceChargeForm').submit(); // Trigger the validation and AJAX submit
-        }
-        else
-        {
-            toastr.error('Please select a file before submitting.', "Error", {
-                positionClass: 'toast-bottom-right'
-            });
-        }
     }
 
     function displayEarningImportFileName(){
         var fileInput = document.getElementById('ImportEarnings');
         var fileName = fileInput.files.length > 0 ? fileInput.files[0].name : 'No file selected';
-
-        // Display the file name
         document.getElementById('earningImportFile').innerText = fileName;
-
-        // Submit the form if a file is selected
-        if (fileInput.files.length > 0) {
-            $('#ImportEarningsForm').submit(); // Trigger the validation and AJAX submit
-        }
-        else
-        {
-            toastr.error('Please select a file before submitting.', "Error", {
-                positionClass: 'toast-bottom-right'
-            });
-        }
     }
 
     function displayDeductonImportFileName(){
         var fileInput = document.getElementById('ImportDeductions');
         var fileName = fileInput.files.length > 0 ? fileInput.files[0].name : 'No file selected';
-
-        // Display the file name
         document.getElementById('deductionImportFile').innerText = fileName;
-
-        // Submit the form if a file is selected
-        if (fileInput.files.length > 0) {
-            $('#ImportDeductionForm').submit(); // Trigger the validation and AJAX submit
-        }
-        else
-        {
-            toastr.error('Please select a file before submitting.', "Error", {
-                positionClass: 'toast-bottom-right'
-            });
-        }
     }
 </script>
 @endsection
