@@ -716,8 +716,12 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('payroll/earnings/submit', 'Payroll\ConfigController@storeEarnings')->name('earnings.submit');
     Route::get('payroll/earnings/download-template', 'Payroll\ConfigController@downloadEarningsTemplate')->name('allowances.download-template');
     Route::post('payroll/import-earnings', 'Payroll\ConfigController@importEarnings')->name('import.earnings');
+    Route::get('payroll/deductions', 'Payroll\ConfigController@deductionsIndex')->name('deductions.index');
+    Route::get('payroll/deductions/list', 'Payroll\ConfigController@getDeductions')->name('deductions.list');
     Route::post('payroll/deductions/submit', 'Payroll\ConfigController@storeDeductions')->name('deductions.submit');
     Route::get('payroll/deductions/download-template', 'Payroll\ConfigController@downloadDeductionTemplate')->name('deductions.download-template');
+    Route::put('payroll/deductions/{id}', 'Payroll\ConfigController@updateDeduction')->name('deductions.update');
+    Route::delete('payroll/deductions/{id}', 'Payroll\ConfigController@deleteDeduction')->name('deductions.delete');
     Route::post('payroll/import-deductions', 'Payroll\ConfigController@importDeductions')->name('import.deductions');
     Route::post('payroll/save-cutoff-day', 'Payroll\ConfigController@storeCutoffDay')->name('save.cutoff.day');
     Route::get('payroll/shopkeepers/create', 'Payroll\ShopkeeperController@create')->name('shopkeepers.create');
@@ -801,6 +805,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/payroll/get-pension-chartdata','Payroll\DashboardController@getMonthlyPensionData')->name('payroll.getMonthlyPensionData');
     Route::get('/payroll/bank-cash-sheet/download/{id}', 'Payroll\PayrollController@downloadBankAndCashSheets')->name('payroll.bankcashsheet.download');
     Route::get('/payroll/ewt-tax-bracket-chart', 'Payroll\DashboardController@getTaxBracketDistribution')->name('payroll.ewtBracketChart');
+    Route::get('/payroll/budget-comparison', 'Payroll\DashboardController@getBudgetComparison')->name('payroll.budgetComparison');
 
     //Payroll Module End
 

@@ -35,8 +35,9 @@ class ImportDeduction implements  ToModel, WithHeadingRow
                 'deduction_type' => $row['deduction_type'],
             ],
             [
-                'currency' => $row['currency'], // Fields to update
-                'maximum_limit' => $row['maximum_limit_in']
+                'currency' => $row['currency'],
+                'maximum_limit' => $row['maximum_limit_in'],
+                'maximum_limit_type' => isset($row['maximum_limit_type']) && strtolower($row['maximum_limit_type']) === 'fixed' ? 'fixed' : 'percentage'
             ]
         );
     }
