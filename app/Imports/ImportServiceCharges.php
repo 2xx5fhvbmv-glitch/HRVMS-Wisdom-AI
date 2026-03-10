@@ -26,19 +26,34 @@ class ImportServiceCharges implements  ToModel, WithHeadingRow
 
     public function model(array $row)
     {
-        // Convert month name to month number
-        $monthName = $row['month']; // Example: 'January', 'February', etc.
-        $monthNumber = \DateTime::createFromFormat('F', $monthName)->format('n');
-    
+        // Skip empty rows
+        if (empty($row['month']) || empty($row['year'])) {
+            return null;
+        }
+
+        // Convert month to number - handle multiple formats
+        $monthValue = trim($row['month']);
+        if (is_numeric($monthValue)) {
+            $monthNumber = (int) $monthValue;
+        } else {
+            // Try full name (January) then abbreviation (Jan)
+            $date = \DateTime::createFromFormat('F', $monthValue)
+                 ?: \DateTime::createFromFormat('M', $monthValue);
+            if (!$date) {
+                return null; // Skip rows with invalid month
+            }
+            $monthNumber = (int) $date->format('n');
+        }
+
         // Update or create the record
         return ServiceCharges::updateOrCreate(
             [
-                'resort_id' => $this->resort->resort_id, // Unique fields to check
+                'resort_id' => $this->resort->resort_id,
                 'month'     => $monthNumber,
                 'year'      => $row['year'],
             ],
             [
-                'service_charge' => $row['service_charge_in'], // Fields to update
+                'service_charge' => $row['service_charge_in'],
             ]
         );
     }

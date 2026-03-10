@@ -75,7 +75,11 @@
                         <div>
                             <p class="mb-0 fw-500">Upcoming Payroll</p>
                             <strong>
-                                ${{ number_format($upcomingPayroll->total_payroll ?? 0, 2) }}
+                                @if(($upcomingPayroll->total_payroll ?? 0) > 0)
+                                    ${{ number_format($upcomingPayroll->total_payroll, 2) }}
+                                @else
+                                    ${{ number_format($upcomingEstimated ?? 0, 2) }}
+                                @endif
                             </strong>
                         </div>
                         @if($upcomingPayroll)
@@ -410,6 +414,11 @@
                 <div class="card">
                     <div class="card-title">
                         <h3>Budget Comparison</h3>
+                        <select class="form-select YearWiseBudgetComparison" aria-label="Default select example" style="width: auto; display: inline-block;">
+                            @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
+                                <option value="{{ $i }}" {{ $i == date('Y') ? 'selected' : '' }}>{{ $i }}</option>
+                            @endfor
+                        </select>
                     </div>
                     <canvas id="budgetComp" width="365" height="293" class="mb-2"></canvas>
                     <div class="row g-2 justify-content-center">
@@ -1228,72 +1237,80 @@
         });
     }
 
-    var ctd = document.getElementById('budgetComp').getContext('2d');
-    var budgetComp = new Chart(ctd, {
-        type: 'line',
-        data: {
-            labels: ['', 'Sep 2024', 'Oct 2024', 'Nov 2024', 'Dec 2024'], // X-axis labels
-            datasets: [
-                {
-                    label: 'Budgeted Amount',
-                    data: [7, 10, 15, 20, 30],
-                    borderColor: '#014653',
-                    backgroundColor: '#014653',
-                    borderWidth: 1,
-                    fill: false,
-                    tension: 0.4, // Creates smooth curves
-                    // cubicInterpolationMode: 'monotone', // Monotone interpolation
-                    pointRadius: 0 // Remove dots
-                },
-                {
-                    label: 'Actual Amount',
-                    data: [4, 7, 20, 35, 25], // Data points for the dataset
-                    borderColor: ' #2EACB3', // Line color
-                    backgroundColor: '#2EACB3',
-                    borderWidth: 1,
-                    fill: false,
-                    tension: 0.4, // Default cubic Bézier curve (smooth curve)
-                    pointRadius: 0 // Remove dots
-                },
-            ]
-        },
-        options: {
-            plugins: {
-                doughnutLabelsInside: true, // Enable the custom plugin
-                legend: {
-                    display: false
-                }
-            },
-            layout: {
-                padding: {
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    right: 0
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true, // Start x-axis at zero
-                    grid: {
-                        display: false // Hide grid lines on the x-axis
-                    },
-                    border: {
-                        display: true // Hide the x-axis border
-                    }
-                },
-                y: {
-                    grid: {
-                        display: false // Hide grid lines on the y-axis
-                    },
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 5,
-                    }
-                }
-            }
-        }
+    var budgetCompChart = null;
 
+    function fetchBudgetComparison(year) {
+        $.ajax({
+            url: "{{ route('payroll.budgetComparison') }}",
+            type: 'GET',
+            data: { year: year },
+            success: function (response) {
+                var ctd = document.getElementById('budgetComp').getContext('2d');
+
+                if (budgetCompChart) {
+                    budgetCompChart.destroy();
+                }
+
+                budgetCompChart = new Chart(ctd, {
+                    type: 'line',
+                    data: {
+                        labels: response.labels,
+                        datasets: [
+                            {
+                                label: 'Budgeted Amount',
+                                data: response.budgeted,
+                                borderColor: '#014653',
+                                backgroundColor: '#014653',
+                                borderWidth: 1,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'Actual Amount',
+                                data: response.actual,
+                                borderColor: '#2EACB3',
+                                backgroundColor: '#2EACB3',
+                                borderWidth: 1,
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 0
+                            },
+                        ]
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        layout: {
+                            padding: { top: 0, bottom: 0, left: 0, right: 0 }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: { display: false },
+                                border: { display: true }
+                            },
+                            y: {
+                                grid: { display: false },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            },
+            error: function (xhr) {
+                console.error("Failed to fetch budget comparison data", xhr);
+            }
+        });
+    }
+
+    fetchBudgetComparison($('.YearWiseBudgetComparison').val());
+
+    $(document).on("change", ".YearWiseBudgetComparison", function () {
+        fetchBudgetComparison($(this).val());
     });
 
     function renderEwtTaxChart(year = new Date().getFullYear()) {

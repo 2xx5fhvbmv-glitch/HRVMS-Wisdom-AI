@@ -18,7 +18,8 @@ class DeductionTemplateExport implements FromCollection, WithHeadings, WithEvent
             'Deduction Name',
             'Deduction Type',
             'Currency',
-            'Maximum Limit in (%)'
+            'Maximum Limit in (%)',
+            'Maximum Limit Type'
         ];
     }
 
@@ -32,7 +33,8 @@ class DeductionTemplateExport implements FromCollection, WithHeadings, WithEvent
             'deduction_name' => '',
             'deduction_type' => '',
             'currency' => '',
-            'maximum_limit' => ''
+            'maximum_limit' => '',
+            'maximum_limit_type' => ''
         ]);
             
         return $result;
@@ -63,6 +65,21 @@ class DeductionTemplateExport implements FromCollection, WithHeadings, WithEvent
                         ->setPrompt('Choose a currency from the dropdown')
                         ->setFormula1('"' . implode(',', $currency) . '"');
                 }
+
+                // Create dropdown validation for column E (Maximum Limit Type)
+                $limitTypes = ['percentage', 'fixed'];
+                $typeValidation = $sheet->getDataValidation('E2:E200');
+                $typeValidation->setType(DataValidation::TYPE_LIST)
+                    ->setErrorStyle(DataValidation::STYLE_STOP)
+                    ->setAllowBlank(true)
+                    ->setShowInputMessage(true)
+                    ->setShowErrorMessage(true)
+                    ->setShowDropDown(true)
+                    ->setErrorTitle('Input Error')
+                    ->setError('Select a limit type from the list')
+                    ->setPromptTitle('Limit Type')
+                    ->setPrompt('Choose percentage or fixed')
+                    ->setFormula1('"' . implode(',', $limitTypes) . '"');
             }
         ];
     }
