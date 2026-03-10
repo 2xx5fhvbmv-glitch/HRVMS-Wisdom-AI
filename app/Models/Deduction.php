@@ -15,7 +15,7 @@ class Deduction extends Model
     use HasFactory;
     protected $table = 'resort_deductions';
     protected $fillable = [
-        'resort_id','deduction_name','deduction_type','currency','maximum_limit'
+        'resort_id','deduction_name','deduction_type','currency','maximum_limit','maximum_limit_type'
     ];
 
     public static function boot(){
