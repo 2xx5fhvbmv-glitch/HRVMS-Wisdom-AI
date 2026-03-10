@@ -697,48 +697,125 @@ class BoardingPassController extends Controller
         }
     }
 
+    /**
+     * GET /api/boarding/boarding-pass-view/{pass_id}
+     * Returns single boarding pass details. Only applicant or approver can view.
+     * pass_id: numeric (e.g. 480) or base64-encoded id.
+     */
     public function boardingPassView($passId)
     {
         if (!Auth::guard('api')->check()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found for this user.'], 403);
         }
 
         try {
-            $passId                                 =   base64_decode($passId, true);
-            $EmployeeTravelPassView                 =   EmployeeTravelPass::with([
-                                                            'employeeTravelPassStatusData',
-                                                            'employee:id,Admin_Parent_id,Position_id',
-                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture',
-                                                            'employee.position:id,position_title',
-                                                            'DepartureResortTransportation:id,resort_id,transportation_option',
-                                                            'ArrivalResortTransportation:id,resort_id,transportation_option'
-                                                            ])
-                                                            ->where('resort_id', $this->resort_id)
-                                                            ->where('id', $passId)
-                                                            ->first();
+            if (is_numeric($passId) || ctype_digit((string) $passId)) {
+                $passId = (int) $passId;
+            } else {
+                $decoded = base64_decode($passId, true);
+                $passId = ($decoded !== false && is_numeric($decoded)) ? (int) $decoded : (int) $passId;
+            }
+            if ($passId <= 0) {
+                return response()->json(['success' => false, 'message' => 'Invalid pass id.'], 400);
+            }
 
+            $EmployeeTravelPassView = EmployeeTravelPass::with([
+                'employeeTravelPassStatusData',
+                'employee:id,Admin_Parent_id,Position_id',
+                'employee.resortAdmin:id,first_name,last_name,profile_picture',
+                'employee.position:id,position_title',
+                'DepartureResortTransportation:id,resort_id,transportation_option',
+                'ArrivalResortTransportation:id,resort_id,transportation_option',
+            ])
+                ->where('resort_id', $this->resort_id)
+                ->where('id', $passId)
+                ->first();
 
-                $rankConfig                         =   config('settings.Position_Rank');
-                foreach ($EmployeeTravelPassView->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
-                }
+            if (!$EmployeeTravelPassView) {
+                return response()->json(['success' => false, 'message' => 'Boarding pass not found.'], 404);
+            }
 
+            $currentEmployeeId = $employee->id;
+            $isApplicant = (int) $EmployeeTravelPassView->employee_id === (int) $currentEmployeeId;
+            $isApprover = EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+                ->where('approver_id', $currentEmployeeId)
+                ->exists();
 
-            // Replace profile_picture with url
-            $EmployeeTravelPassView->each(function ($pass) {
-                $resortAdmin                        =   $pass->employee->resortAdmin ?? null;
-                if ($resortAdmin) {
-                    $resortAdmin->profile_picture   =   Common::getResortUserPicture($resortAdmin->id);
-                }
-            });
+            if (!$isApplicant && !$isApprover) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to view this boarding pass.',
+                ], 403);
+            }
+
+            $rankConfig = config('settings.Position_Rank', []);
+            foreach ($EmployeeTravelPassView->employeeTravelPassStatusData ?? [] as $item) {
+                $role = ucfirst(strtolower($item->approver_rank ?? ''));
+                $item->rank_type = $rankConfig[$role] ?? '';
+            }
+
+            $emp = $EmployeeTravelPassView->employee;
+            $resortAdmin = $emp ? $emp->resortAdmin : null;
+            $profilePicture = '';
+            if ($resortAdmin) {
+                $profilePicture = Common::getResortUserPicture($resortAdmin->id);
+                $resortAdmin->profile_picture = $profilePicture;
+            }
+
+            $employeeName = $resortAdmin
+                ? trim(($resortAdmin->first_name ?? '') . ' ' . ($resortAdmin->last_name ?? ''))
+                : '';
+            $designation = ($emp && $emp->position) ? ($emp->position->position_title ?? '') : '';
+
+            $travelSegments = [];
+            if ($EmployeeTravelPassView->departure_date && $EmployeeTravelPassView->DepartureResortTransportation) {
+                $travelSegments[] = [
+                    'segment_type' => 'departure',
+                    'label' => $EmployeeTravelPassView->DepartureResortTransportation->transportation_option ?? 'Departure',
+                    'departure_date' => $EmployeeTravelPassView->departure_date,
+                    'departure_time' => $EmployeeTravelPassView->departure_time,
+                    'departure_date_display' => Carbon::parse($EmployeeTravelPassView->departure_date)->format('d M Y, D'),
+                    'departure_time_display' => $EmployeeTravelPassView->departure_time ?? '—',
+                ];
+            }
+            if ($EmployeeTravelPassView->arrival_date && $EmployeeTravelPassView->ArrivalResortTransportation) {
+                $travelSegments[] = [
+                    'segment_type' => 'arrival',
+                    'label' => $EmployeeTravelPassView->ArrivalResortTransportation->transportation_option ?? 'Arrival',
+                    'arrival_date' => $EmployeeTravelPassView->arrival_date,
+                    'arrival_time' => $EmployeeTravelPassView->arrival_time,
+                    'departure_date_display' => Carbon::parse($EmployeeTravelPassView->arrival_date)->format('d M Y, D'),
+                    'departure_time_display' => $EmployeeTravelPassView->arrival_time ?? '—',
+                ];
+            }
+
+            $reason = trim(($EmployeeTravelPassView->departure_reason ?? '') . ' ' . ($EmployeeTravelPassView->arrival_reason ?? ''));
+            if ($reason === '') {
+                $reason = null;
+            }
+
+            $viewDisplay = [
+                'employee' => [
+                    'name' => $employeeName,
+                    'designation' => $designation,
+                    'profile_picture' => $profilePicture,
+                    'status' => $EmployeeTravelPassView->status ?? 'Pending',
+                ],
+                'travel_segments' => $travelSegments,
+                'reason' => $reason,
+            ];
 
             return response()->json([
-                'success'                           =>  true,
-                'message'                           =>  'Employee boarding pass details fetched successfully',
-                'borading_pass_details'             =>  $EmployeeTravelPassView
+                'success' => true,
+                'message' => 'Employee boarding pass details fetched successfully',
+                'borading_pass_details' => $EmployeeTravelPassView,
+                'view_display' => $viewDisplay,
             ], 200);
-
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
