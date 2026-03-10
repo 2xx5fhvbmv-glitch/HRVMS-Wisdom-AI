@@ -108,11 +108,13 @@ use Illuminate\Support\Facades\Route;
 			Route::get('resort/hod-who-is-on-leave', [App\Http\Controllers\API\LeaveController::class, 'hodWhoIsOnLeave']);
 
 			//Time and Attendance HOD
+			Route::get('timeandattendance/time-attendance-hod-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHODDashboard']);
 			Route::post('timeandattendance/time-attendance-hod-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHODDashboard']);
 			Route::post('timeandattendance/hod-time-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodTimeAttendance']);
 			Route::post('timeandattendance/hod-view-duty-roster', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodViewDutyRoster']);
 			Route::get('timeandattendance/under-emp-hod', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'underEmpHOD']);
 			Route::get('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendance']);
+			Route::post('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
 			Route::post('timeandattendance/hod-mark-attendance-present', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
 			//Accommodation HOD
 			Route::post('accommodation/hod-housekeeping-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hodHouseKeepingDashboard']);
