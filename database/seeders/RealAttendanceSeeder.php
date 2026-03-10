@@ -85,12 +85,18 @@ class RealAttendanceSeeder extends Seeder
             foreach ($dailyStatuses as $index => $rawStatus) {
                 $date = $dates[$index];
 
-                // Delete existing record for this employee+date so we replace it
-                DB::table('parent_attendaces')
+                // Delete existing record and its child records first
+                $existingIds = DB::table('parent_attendaces')
                     ->where('resort_id', $resortId)
                     ->where('Emp_id', $empId)
                     ->where('date', $date)
-                    ->delete();
+                    ->pluck('id');
+
+                if ($existingIds->isNotEmpty()) {
+                    DB::table('child_attendaces')->whereIn('Parent_attd_id', $existingIds)->delete();
+                    DB::table('break_attendaces')->whereIn('Parent_attd_id', $existingIds)->delete();
+                    DB::table('parent_attendaces')->whereIn('id', $existingIds)->delete();
+                }
 
                 // Map raw status to DB values
                 $status = 'Present';
