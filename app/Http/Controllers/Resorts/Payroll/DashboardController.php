@@ -31,7 +31,6 @@ class DashboardController extends Controller
         $resort_id = $this->resort->resort_id;
         $currentMonth = now()->month;
         $payrollData = $this->buildPayrollComparison($currentMonth);
-        // dd($payrollData);
         $total_employees = Employee::where('resort_id',$resort_id)->where('status','active')->count();
 
         // Count employees actually paid (net_salary > 0) in the last completed/locked payroll
@@ -47,58 +46,47 @@ class DashboardController extends Controller
                 ->where('net_salary', '>', 0)
                 ->count();
         }
+
         $today = now();
-        $currentMonth = $today->month;
-        $currentYear = $today->year;
 
-        // Get Last Month Range
-        $lastMonth = $today->copy()->subMonthNoOverflow();
-        $lastMonthStart = $lastMonth->copy()->startOfMonth();
-        $lastMonthEnd = $lastMonth->copy()->endOfMonth();
-
-        // Last Payroll = for April (processed in May)
-        // Find the most recent completed payroll that ended before today
+        // Last Payroll = most recent payroll (any status), use end_date as the reference date
         $lastPayroll = Payroll::where('resort_id', $resort_id)
-            ->where('end_date', '<', now())
+            ->where('end_date', '<', $today)
             ->orderBy('end_date', 'desc')
             ->first();
-        
-        // If no payroll found with that criteria, try finding one with flexible date range
         if (!$lastPayroll) {
             $lastPayroll = Payroll::where('resort_id', $resort_id)
-            ->where(function($query) use ($lastMonthStart, $lastMonthEnd) {
-                $query->whereBetween('start_date', [$lastMonthStart, $lastMonthEnd])
-                  ->orWhereBetween('end_date', [$lastMonthStart, $lastMonthEnd]);
-            })
-            ->orderBy('end_date', 'desc')
-            ->first();
+                ->orderBy('end_date', 'desc')
+                ->first();
         }
 
-        // dd($lastPayroll);
-        // Upcoming Payroll = for May (to process in June)
+        // Upcoming Payroll: find current/upcoming payroll record
         $currentMonthStart = $today->copy()->startOfMonth();
         $currentMonthEnd = $today->copy()->endOfMonth();
-
-        // Find the upcoming payroll by looking for a period that overlaps with current month
-        // or starts after today but is the closest to now
         $upcomingPayroll = Payroll::where('resort_id', $resort_id)
             ->where(function($query) use ($currentMonthStart, $currentMonthEnd, $today) {
-            // Payroll that overlaps with current month
-            $query->where(function($q) use ($currentMonthStart, $currentMonthEnd) {
-                $q->whereBetween('start_date', [$currentMonthStart, $currentMonthEnd])
-                  ->orWhereBetween('end_date', [$currentMonthStart, $currentMonthEnd])
-                  ->orWhere(function($q2) use ($currentMonthStart, $currentMonthEnd) {
-                  $q2->where('start_date', '<=', $currentMonthStart)
-                     ->where('end_date', '>=', $currentMonthEnd);
-                  });
-            })
-            // Or payroll starting in the future (nearest one)
-            ->orWhere('start_date', '>', $today);
+                $query->where(function($q) use ($currentMonthStart, $currentMonthEnd) {
+                    $q->whereBetween('start_date', [$currentMonthStart, $currentMonthEnd])
+                      ->orWhereBetween('end_date', [$currentMonthStart, $currentMonthEnd])
+                      ->orWhere(function($q2) use ($currentMonthStart, $currentMonthEnd) {
+                          $q2->where('start_date', '<=', $currentMonthStart)
+                             ->where('end_date', '>=', $currentMonthEnd);
+                      });
+                })->orWhere('start_date', '>', $today);
             })
             ->orderBy('start_date')
             ->first();
 
-        // If upcoming payroll has no total yet, estimate from attendance + employee salaries
+        // Calculate upcoming cutoff date from PayrollConfig
+        $payrollConfig = \App\Models\PayrollConfig::where('resort_id', $resort_id)->first();
+        $cutoffDay = $payrollConfig->cutoff_day ?? 1;
+        if ($today->day <= $cutoffDay) {
+            $upcomingCutoffDate = $today->copy()->setDay($cutoffDay);
+        } else {
+            $upcomingCutoffDate = $today->copy()->addMonthNoOverflow()->setDay($cutoffDay);
+        }
+
+        // If upcoming payroll has no total yet, estimate from attendance
         $upcomingEstimated = 0;
         if ($upcomingPayroll && $upcomingPayroll->total_payroll <= 0) {
             $upcomingEstimated = DB::table('parent_attendaces as pa')
@@ -111,7 +99,11 @@ class DashboardController extends Controller
             $upcomingEstimated = round($upcomingEstimated, 2);
         }
 
-        return view('resorts.payroll.dashboard.dashboard',compact('page_title','total_employees','total_paid_employees','lastPayroll','upcomingPayroll','upcomingEstimated','payrollData'));
+        return view('resorts.payroll.dashboard.dashboard', compact(
+            'page_title', 'total_employees', 'total_paid_employees',
+            'lastPayroll', 'upcomingPayroll', 'upcomingEstimated',
+            'payrollData', 'upcomingCutoffDate'
+        ));
     }
     public function getServiceCharges(Request $request)
     {

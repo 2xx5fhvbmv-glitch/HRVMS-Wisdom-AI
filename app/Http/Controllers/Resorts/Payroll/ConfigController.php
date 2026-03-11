@@ -32,7 +32,8 @@ class ConfigController extends Controller
     {
         $page_title ='Payroll Configuration';
         $resort_id = $this->resort->resort_id;
-        return view('resorts.payroll.config.index',compact('page_title'));
+        $payroll_config = \App\Models\PayrollConfig::where('resort_id', $resort_id)->first();
+        return view('resorts.payroll.config.index', compact('page_title', 'payroll_config'));
     }
 
     public function deductionsIndex()

@@ -222,6 +222,7 @@ class BenifitGridController extends Controller
                     'standard_staff_rate_for_single' => $request->standard_staff_rate_for_single,
                     'standard_staff_rate_for_double' => $request->standard_staff_rate_for_double,
                     'staff_rate_for_seaplane_male' => $request->staff_rate_for_seaplane_male,
+                    'male_subsistence_allowance' => $request->male_subsistence_allowance,
                     'status' => $request->status,
                     'custom_fields' => json_encode($customFields)
                 ]
@@ -456,6 +457,7 @@ class BenifitGridController extends Controller
                     'standard_staff_rate_for_single' => $request->standard_staff_rate_for_single,
                     'standard_staff_rate_for_double' => $request->standard_staff_rate_for_double,
                     'staff_rate_for_seaplane_male' => $request->staff_rate_for_seaplane_male,
+                    'male_subsistence_allowance' => $request->male_subsistence_allowance,
                     'status' => $request->status,
                     'custom_fields' => json_encode($customFields)
                 ]
