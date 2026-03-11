@@ -1368,9 +1368,13 @@ class Common
         else
         {
 
-            $department_id = $Resort->GetEmployee->Dept_id;
-            $Position_id = $Resort->GetEmployee->Position_id;
-            $Resort_id = $Resort->GetEmployee->resort_id;
+            $employee = $Resort->GetEmployee;
+            if (!$employee) {
+                return [];
+            }
+            $department_id = $employee->Dept_id;
+            $Position_id = $employee->Position_id;
+            $Resort_id = $employee->resort_id;
 
             $accessible = ResortPagewisePermission::join('resort_interal_pages_permissions as t1', 't1.resort_id', '=', 'resort_pagewise_permissions.resort_id')
             ->where('resort_pagewise_permissions.resort_id', $Resort_id)
@@ -1431,8 +1435,12 @@ class Common
 
                 $Resort = $Permissions['Resort'];
 
-                $Position_id = $Resort->GetEmployee->Position_id;
-                $Resort_id = $Resort->GetEmployee->resort_id;
+                $employee = $Resort->GetEmployee;
+                if (!$employee) {
+                    return false;
+                }
+                $Position_id = $employee->Position_id;
+                $Resort_id = $employee->resort_id;
 
                 foreach ($ResortPermissions as $moduleId => $pages) {
                     foreach ($pages as $pageId => $permissions) {
@@ -5541,8 +5549,13 @@ class Common
             return false;
         }
 
-        $Position_id = $Resort->GetEmployee->Position_id;
-        $Resort_id   = $Resort->GetEmployee->resort_id;
+        $employee = $Resort->GetEmployee;
+        if (!$employee) {
+            return false;
+        }
+
+        $Position_id = $employee->Position_id;
+        $Resort_id   = $employee->resort_id;
 
         // Optimized: check if such permission exists directly
         return ResortPagewisePermission::where('resort_pagewise_permissions.resort_id', $Resort_id)
@@ -5723,8 +5736,12 @@ class Common
             return true;
         }
 
-        $Position_id = $Resort->GetEmployee->Position_id;
-        $Resort_id   = $Resort->GetEmployee->resort_id;
+        $employee = $Resort->GetEmployee;
+        if (!$employee) {
+            return false;
+        }
+        $Position_id = $employee->Position_id;
+        $Resort_id   = $employee->resort_id;
         $permission_id = $permission_id;
 
         $pagesList = ModulePages::where('internal_route',$routeName)

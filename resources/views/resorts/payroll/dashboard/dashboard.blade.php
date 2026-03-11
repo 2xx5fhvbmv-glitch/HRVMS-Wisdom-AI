@@ -60,7 +60,7 @@
                             </strong>
                         </div>
                         <div class="text-end">
-                            <span>{{ $lastPayroll ? \Carbon\Carbon::parse($lastPayroll->draft_date)->format('d M Y') : '-' }}</span><br>
+                            <span>{{ $lastPayroll ? \Carbon\Carbon::parse($lastPayroll->end_date)->format('d M Y') : '-' }}</span><br>
                             <span class="badge badge-themeSuccess">
                                 {{ ucfirst($lastPayroll->status ?? 'N/A') }}
                             </span>
@@ -82,14 +82,12 @@
                                 @endif
                             </strong>
                         </div>
-                        @if($upcomingPayroll)
-                            <div class="text-end">
-                                <span>{{ \Carbon\Carbon::parse($upcomingPayroll->draft_date)->format('d M Y') ?? '-' }}</span><br>
-                                <span class="badge badge-themeWarning">
-                                    {{ ucfirst($upcomingPayroll->status ?? 'Pending') }}
-                                </span>
-                            </div>
-                        @endif
+                        <div class="text-end">
+                            <span>{{ $upcomingCutoffDate->format('d M Y') }}</span><br>
+                            <span class="badge badge-themeWarning">
+                                {{ ucfirst($upcomingPayroll->status ?? 'Pending') }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

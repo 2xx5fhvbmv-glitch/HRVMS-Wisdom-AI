@@ -109,6 +109,9 @@
                 emnurend();
                 $('.hrvmsshowMenu').show(10);
             },
+            error: function() {
+                $('.hrvmsshowMenu').show(10);
+            }
         });
     }
     function emnurend(){
