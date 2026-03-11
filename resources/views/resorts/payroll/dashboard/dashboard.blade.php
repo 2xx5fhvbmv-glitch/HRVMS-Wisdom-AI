@@ -568,6 +568,7 @@
     }
     // Global variable to store the chart instance
     let myDoughnutChart = null;
+    let serviceChargeAvg = 0;
     //Service Charges Chart
     const ctz = document.getElementById('myDoughnutChart').getContext('2d');
     const doughnutLabelsInsideN = {
@@ -604,11 +605,8 @@
 
             ctx.restore();
 
-            // Calculate total dynamically from the chart data
-            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-
-            // Format the total as a currency value
-            const formattedTotal = '$' + total.toLocaleString();
+            // Use the real average service charge (not sum of percentages)
+            const formattedTotal = '$' + serviceChargeAvg.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
             // Text configuration
             ctx.textBaseline = 'middle';
@@ -645,6 +643,8 @@
                 const labels = data.map(item => item.label);
                 const serviceCharges = data.map(item => item.service_charge);
                 const serviceChargespercentage = data.map(item => item.percentage);
+                // Set average for center text (total / number of months)
+                serviceChargeAvg = data.length > 0 ? parseFloat(total.replace(/,/g, '')) / data.length : 0;
                 const colors = ['#014653', '#53CAFF', '#EFB408', '#50B9BF', '#333333', '#8DC9C9'];
 
                  // Check if the chart exists and destroy it

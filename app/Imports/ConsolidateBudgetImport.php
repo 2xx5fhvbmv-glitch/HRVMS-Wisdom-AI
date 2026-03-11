@@ -25,7 +25,7 @@ class ConsolidateBudgetImport implements ToCollection
     public function collection(Collection $collection)
     {
         // Fetch the headers
-        $this->headers = $collection->first()->toArray();
+        $allHeaders = $collection->first()->toArray();
         $tableData = ResortBudgetCost::where('resort_id', $this->resort->resort_id)->get()->pluck('particulars')->toArray();
 
             $Newfilds = [
@@ -42,9 +42,15 @@ class ConsolidateBudgetImport implements ToCollection
                         ];
 
 
-        $expectedHeaders =array_merge($Newfilds, $tableData);
-        
-        if(count($this->headers) ==  count($expectedHeaders))
+        $expectedHeaders = array_merge($Newfilds, $tableData);
+        $expectedCount   = count($expectedHeaders);
+
+        // The exported template includes hidden helper columns (DivisionID, DepartmentID,
+        // DivisionName, DepartmentName) which inflate the column count. Truncate to the
+        // expected number of columns so those hidden extras are ignored.
+        $this->headers = array_slice($allHeaders, 0, $expectedCount);
+
+        if(count($this->headers) ==  $expectedCount)
         {
             $data = $collection->slice(1)->values();
 
@@ -52,9 +58,10 @@ class ConsolidateBudgetImport implements ToCollection
 
             foreach ($data as $row)
             {
-                if(count($row) === count($this->headers) )
+                // Truncate row to match expected column count (ignores hidden helper columns)
+                $rowArray = array_slice($row->toArray(), 0, $expectedCount);
+                if(count($rowArray) === count($this->headers) )
                 {
-                    $rowArray = $row->toArray();
 
                     // Remove null and empty values from the row
                     $filteredRow = array_filter($rowArray, function ($value) {
@@ -98,8 +105,10 @@ class ConsolidateBudgetImport implements ToCollection
                 DB::rollBack();
             }
         } else {
-
-            throw new \Exception('Headers do not match the expected structure.');
+            throw new \Exception(
+                'The uploaded file has ' . count($this->headers) . ' column(s) but ' . $expectedCount . ' are expected. '
+                . 'Please download and use the latest template.'
+            );
         }
     }
 

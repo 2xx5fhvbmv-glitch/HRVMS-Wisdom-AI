@@ -1485,13 +1485,35 @@ class PayrollController extends Controller
             ], 422);
         }
 
-        $invalidAttendance = ParentAttendace::whereIn('Emp_id', $request->employees)
+        // Block if any record has no Status at all
+        $missingStatus = ParentAttendace::whereIn('Emp_id', $request->employees)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->where(function ($query) {
-                $query->whereNull('Status')
-                    ->orWhere('Status', '')
-                    ->orWhereNull('CheckingTime')
-                    ->orWhereNull('CheckingOutTime');
+                $query->whereNull('Status')->orWhere('Status', '');
+            })->get();
+
+        if ($missingStatus->isNotEmpty()) {
+            $employeeIds = $missingStatus->pluck('Emp_id')->unique();
+            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->get()
+                ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot proceed. The following employees have attendance entries with missing status: ' . $employeeNames
+            ], 422);
+        }
+
+        // Only Present employees require both CheckingTime and CheckingOutTime
+        $invalidAttendance = ParentAttendace::whereIn('Emp_id', $request->employees)
+            ->whereBetween('date', [$request->startDate, $request->endDate])
+            ->where('Status', 'Present')
+            ->where(function ($query) {
+                $query->whereNull('CheckingTime')
+                    ->orWhere('CheckingTime', '')
+                    ->orWhere('CheckingTime', '00:00:00')
+                    ->orWhereNull('CheckingOutTime')
+                    ->orWhere('CheckingOutTime', '')
+                    ->orWhere('CheckingOutTime', '00:00:00');
             })->get();
 
         if ($invalidAttendance->isNotEmpty()) {
@@ -1501,7 +1523,7 @@ class PayrollController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot proceed. The following employees have attendance entries with missing status or check-in/out times: ' . $employeeNames
+                'message' => 'Cannot proceed. The following employees have Present records with missing check-in/out times: ' . $employeeNames
             ], 422);
         }
         // Check if next month is Ramadan (based on start date)

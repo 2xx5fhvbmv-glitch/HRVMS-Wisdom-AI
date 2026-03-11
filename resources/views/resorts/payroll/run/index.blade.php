@@ -72,13 +72,11 @@
                                                         @endforeach
                                                     </select>
                                                 </div>
-                                                <div class="dateRangeAb datepicker"  id="datapicker">
-                                                    <div>
-                                                        <!-- Hidden input field to attach the calendar to -->
-                                                        <input type="text" class="form-control dateRangeAb datepicker" name="hiddenInput" id="hiddenInput" readonly disabled>
-                                                    </div>
-                                                    <p id="startDate" class="d-none">Start Date:</p>
-                                                    <p id="endDate" class="d-none">End Date:</p>
+                                                <div id="datapicker">
+                                                    <!-- Hidden input used by JS to read selected date range -->
+                                                    <input type="text" class="dateRangeAb datepicker d-none" name="hiddenInput" id="hiddenInput" readonly>
+                                                    <p id="startDate" class="d-none"></p>
+                                                    <p id="endDate" class="d-none"></p>
                                                 </div>
                                             </div>
                                             <button type="button" class="btn btn-themeBlue btn-sm next">   Continue</button>
@@ -579,8 +577,7 @@
                     return true; // disables all dates
                 }
             }, function (s, e) {
-                $("#startDate").text("Start Date: " + s.format("DD-MM-YYYY")).removeClass('d-none');
-                $("#endDate").text("End Date: " + e.format("DD-MM-YYYY")).removeClass('d-none');
+                // dates stored in hidden input; no visible output needed
             });
         }
 
@@ -593,14 +590,10 @@
             var newStart = moment(parts[0], "YYYY-MM-DD");
             var newEnd = moment(parts[1], "YYYY-MM-DD");
             initDateRangePicker(newStart, newEnd);
-            $("#startDate").text("Start Date: " + newStart.format("DD-MM-YYYY")).removeClass('d-none');
-            $("#endDate").text("End Date: " + newEnd.format("DD-MM-YYYY")).removeClass('d-none');
+            // dates stored in hidden input; no visible output needed
         });
 
-        $("#hiddenInput").on('apply.daterangepicker', function (ev, picker) {
-            $("#startDate").text("Start Date: " + picker.startDate.format("DD-MM-YYYY"));
-            $("#endDate").text("End Date: " + picker.endDate.format("DD-MM-YYYY"));
-        });
+        // dates are tracked via hiddenInput value only
         $(".select2t-none").select2();
 
         $(".next").click(async function (e) {

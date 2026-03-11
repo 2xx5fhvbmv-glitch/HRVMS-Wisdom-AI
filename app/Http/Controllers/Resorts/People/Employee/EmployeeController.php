@@ -697,7 +697,7 @@ class EmployeeController extends Controller
         $ResortSiteSettings = ResortSiteSettings::where('resort_id', $resort_id)->first();
 
         // Convert basic salary and allowances to MVR
-        $conversionRate = $ResortSiteSettings->DollertoMVR;
+        $conversionRate = $ResortSiteSettings ? ($ResortSiteSettings->DollertoMVR ?? 15.42) : 15.42;
         $basicMvr = $employee->basic_salary_currency === 'USD' ? $employee->basic_salary * $conversionRate : $employee->basic_salary;
         $totalAllowanceMvr = 0;
         foreach ($employee->allowance as $allowance)
