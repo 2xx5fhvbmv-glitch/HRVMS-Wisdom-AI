@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\ManningandbudgetingConfigfiles;
 use App\Services\BudgetCalculationService;
 use App\Jobs\ConsolidateBudgetImportJob;
+use App\Imports\ConsolidateBudgetImport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Models\StoreConsolidateBudgetParent;
 use App\Models\StoreConsolidateBudgetChild;
 use App\Models\StoreManningResponseParent;
@@ -1271,29 +1273,30 @@ class BudgetController extends Controller
     public function UploadconfigFiles(Request $request)
     {
         $consolidatdebudget_Year = $request->consolidatdebudget_Year;
-        $consolidatedbudgetFile = $request->hasfile('consolidatedbudget');
-        if(isset( $consolidatedbudgetFile ))
-        {
-            $validator = Validator::make($request->all(), [
-                'consolidatedbudget' => 'required|file|mimes:xls,xlsx|max:2048',
-            ],
-            [
-                'consolidatedbudget.mimes' => 'The consolidated budget file must be a type of: jpg, jpeg, png, xls, xlsx.',
-                'consolidatedbudget.max' => 'The consolidated budget file may not be greater than 2MB.',
-                'consolidatedbudget.required' => 'The consolidated budget file is required.',
-            ]);
+        $hasFile = $request->hasFile('consolidatedbudget');
 
-        }
-        $validator = Validator::make($request->all(), [
-            'xpat' => 'required|numeric|min:0',
+        // Validate xpat/local always
+        $rules = [
+            'xpat'  => 'required|numeric|min:0',
             'local' => 'required|numeric|min:0',
-        ],
-        [
-            'xpat.required' => 'The Xpat Value Required .',
-            'local.required' => 'The Local Value Required .',
-        ]);
+        ];
+        $messages = [
+            'xpat.required'  => 'The Xpat Value is required.',
+            'local.required' => 'The Local Value is required.',
+        ];
+
+        // If a file is being uploaded, also validate it and require year
+        if ($hasFile) {
+            $rules['consolidatedbudget']       = 'required|file|mimes:xls,xlsx|max:2048';
+            $rules['consolidatdebudget_Year']  = 'required';
+            $messages['consolidatedbudget.mimes'] = 'The consolidated budget file must be an Excel file (.xls, .xlsx).';
+            $messages['consolidatedbudget.max']   = 'The consolidated budget file may not be greater than 2MB.';
+            $messages['consolidatdebudget_Year.required'] = 'Please select a year when uploading a file.';
+        }
+
+        $validator = Validator::make($request->all(), $rules, $messages);
         if ($validator->fails()) {
-          return response()->json(['success' => false, 'message' => $validator->errors()]);
+            return response()->json(['success' => false, 'msg' => $validator->errors()->first()], 422);
         }
         // $path_path = config( 'settings.Resort_BudgetConfigFiles')."/".Auth::guard('resort-admin')->user()->resort->resort_id;
 
@@ -1329,25 +1332,22 @@ class BudgetController extends Controller
                 //                         ? url($path_path.'/'.$configurationBudget->benifitgrid)
                 //                          :url(config('settings.default_picture'));
 
-            if(isset( $consolidatedbudgetFile ))
+            if($hasFile)
             {
                 $data = [
                     "Year"=>$request->consolidatdebudget_Year,
                     "Resort_id"=>$this->resort->resort_id,
-                    "file"=>!empty($request->file('consolidatedbudget')) ? $request->file('consolidatedbudget')->getClientOriginalName() : ""
+                    "file"=>$request->file('consolidatedbudget')->getClientOriginalName()
                 ];
                 try {
-                    if(!empty($request->file('consolidatedbudget')))
-                    {
-                        $filePath = $request->file( 'consolidatedbudget')->store('imports');
-                        $check =  ConsolidateBudgetImportJob::dispatch($filePath,$data);
-                    }
+                    $filePath = $request->file('consolidatedbudget')->store('imports');
+                    Excel::import(new ConsolidateBudgetImport($data), $filePath);
                 }
                 catch (\Exception $e)
                 {
-                    $response['msg'] ="Something went wrong. Please check excel file format .";
+                    $response['msg'] = $e->getMessage() ?: 'Something went wrong. Please check the Excel file format and ensure headers match the template.';
                     $response['success'] = false;
-                    return response()->json($response);
+                    return response()->json($response, 422);
                 }
             }
 

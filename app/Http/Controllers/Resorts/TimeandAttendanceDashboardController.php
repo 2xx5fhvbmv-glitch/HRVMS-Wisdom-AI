@@ -1717,7 +1717,7 @@ class TimeandAttendanceDashboardController extends Controller
          */
         elseif ($hasCheckIn && $hasCheckOut && $attendance->OTStatus === 'Pending') {
 
-            $actionType = 'pending_ot';
+            $actionType = 'overtime_pending';
             $message = 'Pending OT Approval';
         }
 
@@ -1973,10 +1973,10 @@ class TimeandAttendanceDashboardController extends Controller
                     ->where('OTStatus', null)
                     ->first();
                     
-                  $otDate = $employeeOt->date;
                 if (!$employeeOt) {
                     return response()->json(['success' => false, 'message' => 'Pending OT not found.']);
                 }
+                $otDate = $employeeOt->date;
             
                 // Get the duty roster for that employee on that date
                 $dutyRoster = DB::table('duty_rosters')

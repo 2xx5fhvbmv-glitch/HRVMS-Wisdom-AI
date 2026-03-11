@@ -446,6 +446,8 @@
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const shiftDate = $(this).data('date');
+        const shiftTime = $(this).data('time');
         const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
         const button = $(this);
         const row = button.closest('tr');
@@ -470,7 +472,9 @@
                     data: {
                         _token: "{{ csrf_token() }}",
                         roster_id: rosterId,
-                        action: action
+                        action: action,
+                        date: shiftDate,
+                        time: shiftTime
                     },
                     success: function(response) {
                         if (response.success) {

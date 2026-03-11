@@ -158,38 +158,26 @@
                     contentType: false,  // Important for file uploads
                     processData: false,  // Important for file uploads
                     success: function (response) {
+                        $(".ConsolidateBudget").prop('disabled', false);
                         if (response.success) {
-                            // Update the consolidatedBudget link
-                            $(".consolidatedBudget").attr('href', response.data[0]);
                             toastr.success(response.msg, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
-                            
-                            $(".ConsolidateBudget").prop('disabled', false); 
+                            // Clear file input and filename text after successful upload
+                            $('#consolidatedbudget').val('');
+                            $('.uploadFile-text').text('');
                         } else {
                             toastr.error(response.msg, "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
-                            
-                            $(".ConsolidateBudget").prop('disabled', false);
                         }
                     },
                     error: function (response) {
-                        if (response.status === 422) {
-                            var errors = response.responseJSON.errors; // This is where Laravel stores validation errors
-                            var errs = '';
-                            // Loop through each validation error
-                            $.each(errors, function (key, error) {
-                                errs += error + '<br>';
-                            });
-                            toastr.error(errs, "Validation Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else {
-                            toastr.error(response.responseJSON.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
+                        $(".ConsolidateBudget").prop('disabled', false);
+                        var msg = (response.responseJSON && response.responseJSON.msg)
+                            ? response.responseJSON.msg
+                            : 'Something went wrong.';
+                        toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
                     }
                 });
             },
@@ -215,8 +203,10 @@
                 }
             }
         });
-        // Optional: Add file change listener to trigger validation when file is selected
+        // Show filename and trigger year validation when file is selected
         $('#consolidatedbudget').on('change', function() {
+            const fileName = this.files[0] ? this.files[0].name : '';
+            $(this).closest('.uploadFile-block').find('.uploadFile-text').text(fileName);
             $('#BudgetConfigFiles').validate().element('[name="consolidatdebudget_Year"]');
         });
         $('.data-Table').dataTable({
@@ -249,6 +239,6 @@
 }
 
     // Call the function when document is loaded
-    document.addEventListener('DOMContentLoaded', populateYears);
+    $(document).ready(populateYears);
 </script>
 @endsection

@@ -689,28 +689,26 @@ class DashboardController extends Controller
                 ->join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
                 ->first();
 
-            // Status Logic
+            // Status Logic — use main leave status as source of truth
             $statuses = $statusesGrouped[$leaveRequest->id] ?? collect();
-
-            // Check rejection
-            $rejected = $statuses->firstWhere('status', 'Rejected');
             $isPending = false;
             $isFullyApproved = false;
-            if ($rejected) {
-                $rejectedBy = $rank[$rejected->approver_rank] ?? $rejected->approver_rank;
-                $leaveRequest->status_text = "Rejected by {$rejectedBy}";
-            } else {
-                // Check last approved
-                $lastApproved = $statuses->where('status', 'Approved')->last();
-                $approvedRanks = $statuses->where('status', 'Approved')->pluck('approver_rank')->map(function ($r) {
-                    return strtoupper($r);
-                })->unique()->toArray();
 
-                $required = ['HOD', 'GM', 'HR'];
-                if (!array_diff($required, $approvedRanks)) {
-                    $leaveRequest->status_text = "Approved";
-                    $isFullyApproved = true;
-                } elseif ($lastApproved) {
+            if ($leaveRequest->status === 'Approved') {
+                $leaveRequest->status_text = "Approved";
+                $isFullyApproved = true;
+            } elseif ($leaveRequest->status === 'Rejected') {
+                $rejected = $statuses->firstWhere('status', 'Rejected');
+                if ($rejected) {
+                    $rejectedBy = $rank[$rejected->approver_rank] ?? $rejected->approver_rank;
+                    $leaveRequest->status_text = "Rejected by {$rejectedBy}";
+                } else {
+                    $leaveRequest->status_text = "Rejected";
+                }
+            } else {
+                // Still pending — show partial approval progress if any
+                $lastApproved = $statuses->where('status', 'Approved')->last();
+                if ($lastApproved) {
                     $approvedBy = $rank[$lastApproved->approver_rank] ?? $lastApproved->approver_rank;
                     $leaveRequest->status_text = "Approved by {$approvedBy}";
                 } else {

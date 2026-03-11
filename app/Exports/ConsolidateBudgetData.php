@@ -14,7 +14,6 @@ class ConsolidateBudgetData implements WithMultipleSheets
     {
         return [
             new ConsolidateBudgetMainSheet($this->resortId),
-            new ConsolidateBudgetDropdownSheet($this->resortId),
         ];
     }
 }
