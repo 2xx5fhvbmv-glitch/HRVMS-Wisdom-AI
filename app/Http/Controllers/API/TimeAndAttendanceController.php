@@ -56,13 +56,14 @@ class TimeAndAttendanceController extends Controller
             for ($date = $startOfMonth; $date->lte($endOfMonth); $date->addDay()) {
 
                 $formattedDate                              =   $date->format('Y-m-d'); // Keep formatted date separate
+                // Present only when employee has real check-in (any date)
                 $totalPresentEmployee                       =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                                                     ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
                                                                     ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
+                                                                    ->where('t3.Status', 'Present')
                                                                     ->whereNotNull('t3.CheckingTime')
-                                                                    ->whereNotNull('t3.CheckingOutTime')
-                                                                    ->where('t3.Status', 'Present') // Ensure 'Present' is a string
-                                                                    ->where('t3.date', $formattedDate) // Use the formatted date
+                                                                    ->whereRaw("TRIM(COALESCE(t3.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
+                                                                    ->where('t3.date', $formattedDate)
                                                                     ->where("t1.resort_id", $resort_id)
                                                                     ->where('employees.id', $emp_id)
                                                                     ->count();
@@ -270,63 +271,438 @@ class TimeAndAttendanceController extends Controller
         }
     }
 
+    /**
+     * POST employee duty roster: returns the logged-in employee's scheduled roster (from duty_roster_entries).
+     * Body: filter = weekly | monthly (optional, default weekly); year, month (optional, for monthly).
+     */
     public function employeeDutyRoster(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate request data
-        $validator = Validator::make($request->all(), [
-            'filter'                                        => 'required',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        $user                                               =   Auth::guard('api')->user();
+        $employee                                           =   $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
         }
 
-        $user                                               =  Auth::guard('api')->user();
-        $employee                                           =  $user->GetEmployee;
+        $filter                                             =   $request->input('filter', 'weekly');
+        $resort_id                                          =   $user->resort_id;
+        $emp_id                                             =   $employee->id;
 
         try {
+            $WeekstartDate                                  =   Carbon::now(config('app.timezone'))->startOfWeek();
+            $WeekendDate                                    =   Carbon::now(config('app.timezone'))->endOfWeek();
+            $startOfMonth                                   =   Carbon::now(config('app.timezone'))->startOfMonth();
+            $endOfMonth                                     =   Carbon::now(config('app.timezone'))->endOfMonth();
+            $year                                           =   $request->input('year', $startOfMonth->format('Y'));
+            $month                                          =   $request->input('month', $startOfMonth->format('m'));
 
-            $WeekstartDate                                  =   '';
-            $WeekendDate                                    =   '';
-            $startOfMonth                                   =   '';
-            $endOfMonth                                     =   '';
-            $Rosterdata                                     =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                                                                    ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
-                                                                    ->join('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
-                                                                    ->join('parent_attendaces as t4', "t4.roster_id", "=", "t3.id")
-                                                                    ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
-                                                                    ->where('employees.id', $employee->id)
-                                                                    ->get();
+            // Get roster_id from duty_roster_entries for this employee (schedule lives here, not in parent_attendaces)
+            $rosterEntry                                    =   DutyRosterEntry::where('Emp_id', $emp_id)
+                ->where('resort_id', $resort_id)
+                ->when($filter === 'weekly', function ($q) use ($WeekstartDate, $WeekendDate) {
+                    $q->whereBetween('date', [$WeekstartDate->toDateString(), $WeekendDate->toDateString()]);
+                }, function ($q) use ($startOfMonth, $endOfMonth) {
+                    $q->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()]);
+                })
+                ->orderBy('date')
+                ->first();
+
+            if (!$rosterEntry) {
+                $rosterEntry                                =   DutyRosterEntry::where('Emp_id', $emp_id)
+                    ->where('resort_id', $resort_id)
+                    ->orderBy('date', 'desc')
+                    ->first();
+            }
+
             $timeAttendanceData                             =   [];
-
-            $WeekstartDate                                  =   Carbon::now()->startOfWeek();
-            $WeekendDate                                    =   Carbon::now()->endOfWeek();
-            $startOfMonth                                   =   Carbon::now()->startOfMonth(); // Get the first day of the month
-            $endOfMonth                                     =   Carbon::now()->endOfMonth(); // Get the last day of the month
-            $year                                           =   $request->year;
-            $month                                          =   $request->month;
-
-
-            foreach ($Rosterdata as $roster) {
-
-                if ($request->filter === 'weekly') {
-                    $RosterInternalData                     =   Common::dutyRosterMonthAndWeekWise($user->resort_id, $roster->duty_roster_id, $roster->emp_id, $WeekstartDate, $WeekendDate, '', '', '', '', 'weekly');
-                } elseif ($request->filter === 'monthly') {
-                    $RosterInternalData                     =   Common::dutyRosterMonthAndWeekWise($user->resort_id, $roster->duty_roster_id, $roster->emp_id, '', '',  $startOfMonth, $endOfMonth, $year, $month, 'Monthwise');
+            if ($rosterEntry) {
+                $duty_roster_id                             =   $rosterEntry->roster_id;
+                if ($filter === 'weekly') {
+                    $timeAttendanceData                    =   Common::GetRosterdata($resort_id, $duty_roster_id, $emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, 'weekly');
+                } else {
+                    $timeAttendanceData                    =   Common::GetRosterdata($resort_id, $duty_roster_id, $emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, 'Monthwise');
                 }
-
-                $timeAttendanceData                         =   $RosterInternalData;
+                $timeAttendanceData                         =   $timeAttendanceData ? (is_array($timeAttendanceData) ? $timeAttendanceData : $timeAttendanceData->toArray()) : [];
+                $todayStr                                  =   Carbon::today(config('app.timezone'))->format('Y-m-d');
+                $datesInRoster                             =   array_values(array_unique(array_filter(array_map(function ($r) {
+                    $d = $r['date'] ?? null;
+                    return $d ? (is_object($d) ? $d->format('Y-m-d') : (string) $d) : null;
+                }, $timeAttendanceData))));
+                $checkIns                                  =   collect([]);
+                if (!empty($datesInRoster)) {
+                    $placeholders                         =   implode(',', array_fill(0, count($datesInRoster), '?'));
+                    $checkIns                              =   ParentAttendace::where('resort_id', $resort_id)
+                        ->where('Emp_id', $emp_id)
+                        ->whereRaw("DATE(date) IN ($placeholders)", $datesInRoster)
+                        ->whereIn('Status', ['Present', 'On-Time', 'Late'])
+                        ->whereNotNull('CheckingTime')
+                        ->whereRaw("TRIM(COALESCE(CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
+                        ->get()
+                        ->keyBy(function ($pa) { return $pa->date ? \Carbon\Carbon::parse($pa->date)->format('Y-m-d') : ''; });
+                }
+                $minDate                                  =   !empty($datesInRoster) ? min($datesInRoster) : null;
+                $maxDate                                  =   !empty($datesInRoster) ? max($datesInRoster) : null;
+                $leavesByDate                              =   [];
+                if ($minDate && $maxDate) {
+                    $leaveRecords                          =   EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                        ->where('employees_leaves.emp_id', $emp_id)
+                        ->where('employees_leaves.status', 'Approved')
+                        ->where('employees_leaves.from_date', '<=', $maxDate)
+                        ->where('employees_leaves.to_date', '>=', $minDate)
+                        ->join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
+                        ->get(['employees_leaves.from_date', 'employees_leaves.to_date', 'lc.leave_type']);
+                    foreach ($leaveRecords as $lev) {
+                        if (empty($lev->from_date) || empty($lev->to_date)) {
+                            continue;
+                        }
+                        try {
+                            $from                          =   \Carbon\Carbon::parse($lev->from_date)->format('Y-m-d');
+                            $to                            =   \Carbon\Carbon::parse($lev->to_date)->format('Y-m-d');
+                            if ($from > $to) {
+                                continue;
+                            }
+                            $d                             =   $from;
+                            $maxIterations                  =   366;
+                            $iterations                     =   0;
+                            while ($d <= $to && $iterations < $maxIterations) {
+                                if ($d >= $minDate && $d <= $maxDate) {
+                                    $leavesByDate[$d]      =   $lev->leave_type ?? 'On Leave';
+                                }
+                                $d                          =   \Carbon\Carbon::parse($d)->addDay()->format('Y-m-d');
+                                $iterations++;
+                            }
+                        } catch (\Exception $e) {
+                            continue;
+                        }
+                    }
+                }
+                foreach ($timeAttendanceData as &$row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $rowDate                               =   $row['date'] ?? null;
+                    if ($rowDate === null || $rowDate === '') {
+                        continue;
+                    }
+                    $dateKey                               =   is_object($rowDate) && method_exists($rowDate, 'format') ? $rowDate->format('Y-m-d') : (string) $rowDate;
+                    $dateKey                               =   trim($dateKey);
+                    if ($dateKey === '') {
+                        continue;
+                    }
+                    $originalStatus                        =   $row['Status'] ?? null;
+                    $hasCheckIn                            =   $checkIns->get($dateKey);
+                    if ($hasCheckIn && $dateKey <= $todayStr) {
+                        $row['Status']                    =   $hasCheckIn->Status ?? 'Present';
+                        $row['CheckingTime']             =   $hasCheckIn->CheckingTime ?? null;
+                        $row['CheckingOutTime']          =   $hasCheckIn->CheckingOutTime ?? null;
+                        $row['LeaveType']                =   'Present';
+                    } else {
+                        $row['Status']                    =   'Scheduled';
+                        $row['CheckingTime']              =   null;
+                        $row['CheckingOutTime']           =   null;
+                        if (isset($leavesByDate[$dateKey])) {
+                            $row['LeaveType']            =   $leavesByDate[$dateKey];
+                        } elseif (in_array(strtoupper(trim((string) $originalStatus)), ['DAYOFF', 'DAY OFF'], true)) {
+                            $row['LeaveType']            =   'Day Off';
+                        } else {
+                            $row['LeaveType']            =   'Scheduled';
+                        }
+                    }
+                    $lt                               =   $row['LeaveType'] ?? '';
+                    $row['LeaveFirstName']           =   $lt !== '' ? mb_substr(trim($lt), 0, 1) : '-';
+                    $dayHours                              =   $row['DayWiseTotalHours'] ?? null;
+                    $startTime                             =   $row['StartTime'] ?? null;
+                    $endTime                               =   $row['EndTime'] ?? null;
+                    $invalidDayHours                       =   false;
+                    if ($dayHours !== null && $dayHours !== '') {
+                        $parts                             =   array_map('intval', explode(':', trim($dayHours)));
+                        $h                                 =   $parts[0] ?? 0;
+                        $m                                 =   $parts[1] ?? 0;
+                        if ($h >= 24 || $h < 0 || $m < 0 || $m > 59) {
+                            $invalidDayHours               =   true;
+                        }
+                    } else {
+                        $invalidDayHours                   =   true;
+                    }
+                    if ($invalidDayHours && $startTime !== null && $endTime !== null && $startTime !== '' && $endTime !== '') {
+                        $row['DayWiseTotalHours']         =   static::calculateShiftDuration($startTime, $endTime);
+                    }
+                }
+                unset($row);
+                $timeAttendanceData                         =   array_values($timeAttendanceData);
             }
 
             $response['status']                             =   true;
-            $response['message']                            =   'Time TimeAttendance Dashboard';
+            $response['message']                            =   'Employee duty roster';
+            $response['filter']                             =   $filter;
             $response['time_attendance']                    =   $timeAttendanceData;
 
             return response()->json($response);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * GET employee attendance summary for dashboard cards.
+     * HR dept HOD/EXCOM or HR/GM rank = whole resort; other departments = only their dept data.
+     * Optional type=total|present|absent|on_leave, date=Y-m-d.
+     */
+    public function employeeAttendanceSummary(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $user                                               =   Auth::guard('api')->user();
+        $employee                                           =   $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
+        $resort_id                                          =   $user->resort_id;
+        $typeParam                                          =   $request->query('type');
+
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');
+            })
+            ->value('id');
+        $isHRDepartmentHODOrExcom                           =   $hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId && in_array(strtoupper($currentRankLabel), ['HOD', 'EXCOM'], true);
+        $isHROrGMRank                                       =   in_array(strtoupper($currentRankLabel), ['HR', 'GM'], true);
+        $scopeResortWide                                    =   $isHRDepartmentHODOrExcom || $isHROrGMRank;
+
+        try {
+            $dateParam                                       =   $request->query('date');
+            $targetDate                                      =   $dateParam
+                ? (($parsed = Carbon::createFromFormat('Y-m-d', $dateParam)) ? $parsed->format('Y-m-d') : Carbon::today(config('app.timezone'))->format('Y-m-d'))
+                : Carbon::now(config('app.timezone'))->format('Y-m-d');
+            $todayStr                                        =   Carbon::today(config('app.timezone'))->format('Y-m-d');
+            $isFutureDate                                    =   $targetDate > $todayStr;
+
+            $totalQuery                                      =   Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id)
+                ->where('employees.status', 'Active');
+            if (!$scopeResortWide) {
+                $totalQuery->where('employees.Dept_id', $employee->Dept_id);
+            }
+            $total_employees                                 =   (int) $totalQuery->distinct()->count('employees.id');
+
+            $presentQuery                                   =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->where('parent_attendaces.date', '<=', $todayStr)
+                ->whereDate('parent_attendaces.date', $targetDate)
+                ->whereIn('parent_attendaces.Status', ['Present', 'On-Time', 'Late'])
+                ->whereNotNull('parent_attendaces.CheckingTime')
+                ->whereRaw("TRIM(COALESCE(parent_attendaces.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if (!$scopeResortWide) {
+                $presentQuery->where('employees.Dept_id', $employee->Dept_id);
+            }
+            $present                                        =   $isFutureDate ? 0 : (int) $presentQuery->distinct()->count('employees.id');
+
+            $absentQuery                                    =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->where('parent_attendaces.date', '<=', $todayStr)
+                ->whereDate('parent_attendaces.date', $targetDate)
+                ->whereIn('parent_attendaces.Status', ['Absent', 'Absant'])
+                ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if (!$scopeResortWide) {
+                $absentQuery->where('employees.Dept_id', $employee->Dept_id);
+            }
+            $absent                                         =   $isFutureDate ? 0 : (int) $absentQuery->distinct()->count('employees.id');
+
+            $onLeaveQuery                                    =   EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                ->where('employees_leaves.status', 'Approved')
+                ->where('employees_leaves.from_date', '<=', $targetDate)
+                ->where('employees_leaves.to_date', '>=', $targetDate)
+                ->join('employees', 'employees.id', '=', 'employees_leaves.emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id);
+            if (!$scopeResortWide) {
+                $onLeaveQuery->where('employees.Dept_id', $employee->Dept_id);
+            }
+            $on_leave                                       =   (int) $onLeaveQuery->distinct()->count('employees.id');
+
+            $allowed                                        =   ['total', 'present', 'absent', 'on_leave'];
+            if ($typeParam !== null && $typeParam !== '' && in_array($typeParam, $allowed, true)) {
+                $count  =   $typeParam === 'total' ? $total_employees : ($typeParam === 'present' ? $present : ($typeParam === 'absent' ? $absent : $on_leave));
+                return response()->json([
+                    'status'  => true,
+                    'message' => 'Attendance data for ' . $typeParam,
+                    'date'    => $targetDate,
+                    'type'    => $typeParam,
+                    'scope'   => $scopeResortWide ? 'resort' : 'department',
+                    'count'   => $count,
+                ]);
+            }
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Employee attendance summary',
+                'date'    => $targetDate,
+                'scope'   => $scopeResortWide ? 'resort' : 'department',
+                'summary' => [
+                    'total_employees' => $total_employees,
+                    'present'         => $present,
+                    'absent'          => $absent,
+                    'on_leave'        => $on_leave,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * GET list of employees for the clicked dashboard card.
+     * HR dept HOD/EXCOM or HR/GM rank = whole resort; other departments = only their dept data.
+     * Query: type = total | present | absent | on_leave; optional date=Y-m-d (default today).
+     */
+    public function employeeAttendanceSummaryList(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $user                                               =   Auth::guard('api')->user();
+        $employee                                           =   $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
+        $type                                               =   $request->query('type', 'total');
+        $allowed                                            =   ['total', 'present', 'absent', 'on_leave'];
+        if (!in_array($type, $allowed, true)) {
+            return response()->json(['success' => false, 'message' => 'Invalid type. Use: total, present, absent, on_leave.'], 400);
+        }
+
+        $resort_id                                          =   $user->resort_id;
+
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $currentRankLabel                                   =   $rankConfig[$employee->rank ?? ''] ?? '';
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');
+            })
+            ->value('id');
+        $isHRDepartmentHODOrExcom                           =   $hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId && in_array(strtoupper($currentRankLabel), ['HOD', 'EXCOM'], true);
+        $isHROrGMRank                                       =   in_array(strtoupper($currentRankLabel), ['HR', 'GM'], true);
+        $scopeResortWide                                    =   $isHRDepartmentHODOrExcom || $isHROrGMRank;
+
+        try {
+            $dateParam                                       =   $request->query('date');
+            $targetDate                                      =   $dateParam
+                ? (($parsed = Carbon::createFromFormat('Y-m-d', $dateParam)) ? $parsed->format('Y-m-d') : Carbon::today(config('app.timezone'))->format('Y-m-d'))
+                : Carbon::now(config('app.timezone'))->format('Y-m-d');
+            $todayStr                                        =   Carbon::today(config('app.timezone'))->format('Y-m-d');
+            $isFutureDate                                    =   $targetDate > $todayStr;
+            $baseSelect                                     =   ['employees.id as emp_id', 't1.id as admin_id', 't1.first_name', 't1.last_name', 't1.profile_picture', 'rp.position_title'];
+
+            if ($type === 'total') {
+                $query                                      =   Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                    ->leftJoin('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                    ->where('t1.resort_id', $resort_id)
+                    ->where('employees.status', 'Active');
+                if (!$scopeResortWide) {
+                    $query->where('employees.Dept_id', $employee->Dept_id);
+                }
+                $list                                        =   $query->select($baseSelect)->distinct()->get();
+            } elseif ($type === 'present') {
+                if ($isFutureDate) {
+                    $list                                    =   collect([]);
+                } else {
+                    $presentSelect                           =   array_merge($baseSelect, ['parent_attendaces.CheckingTime', 'parent_attendaces.CheckingOutTime']);
+                    $query                                  =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                        ->where('parent_attendaces.date', '<=', $todayStr)
+                        ->whereDate('parent_attendaces.date', $targetDate)
+                        ->whereIn('parent_attendaces.Status', ['Present', 'On-Time', 'Late'])
+                        ->whereNotNull('parent_attendaces.CheckingTime')
+                        ->whereRaw("TRIM(COALESCE(parent_attendaces.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
+                        ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                        ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                        ->leftJoin('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                        ->where('t1.resort_id', $resort_id);
+                    if (!$scopeResortWide) {
+                        $query->where('employees.Dept_id', $employee->Dept_id);
+                    }
+                    $list                                    =   $query->select($presentSelect)->distinct()->get();
+                }
+            } elseif ($type === 'absent') {
+                if ($isFutureDate) {
+                    $list                                    =   collect([]);
+                } else {
+                    $query                                  =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                        ->where('parent_attendaces.date', '<=', $todayStr)
+                        ->whereDate('parent_attendaces.date', $targetDate)
+                        ->whereIn('parent_attendaces.Status', ['Absent', 'Absant'])
+                        ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
+                        ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                        ->leftJoin('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                        ->where('t1.resort_id', $resort_id);
+                    if (!$scopeResortWide) {
+                        $query->where('employees.Dept_id', $employee->Dept_id);
+                    }
+                    $list                                    =   $query->select($baseSelect)->distinct()->get();
+                }
+            } else {
+                $query                                      =   EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                    ->where('employees_leaves.status', 'Approved')
+                    ->where('employees_leaves.from_date', '<=', $targetDate)
+                    ->where('employees_leaves.to_date', '>=', $targetDate)
+                    ->join('employees', 'employees.id', '=', 'employees_leaves.emp_id')
+                    ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                    ->leftJoin('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                    ->leftJoin('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
+                    ->where('t1.resort_id', $resort_id);
+                if (!$scopeResortWide) {
+                    $query->where('employees.Dept_id', $employee->Dept_id);
+                }
+                $list                                        =   $query->select(array_merge($baseSelect, ['employees_leaves.from_date', 'employees_leaves.to_date', 'lc.leave_type']))->distinct()->get();
+            }
+
+            $employees                                       =   $list->map(function ($row) use ($type) {
+                $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                $item   =   [
+                    'emp_id'          => $row->emp_id,
+                    'admin_id'        => $row->admin_id ?? null,
+                    'name'            => $name,
+                    'profile_picture' => !empty($row->profile_picture) && $row->profile_picture !== '0' ? $row->profile_picture : Common::getResortUserPicture($row->admin_id ?? null),
+                    'position_title'  => $row->position_title ?? null,
+                ];
+                if ($type === 'present') {
+                    $item['check_in_time']  =   isset($row->CheckingTime) ? $row->CheckingTime : null;
+                    $item['check_out_time'] =   isset($row->CheckingOutTime) ? $row->CheckingOutTime : null;
+                }
+                if ($type === 'on_leave' && isset($row->from_date)) {
+                    $item['from_date']   =   $row->from_date;
+                    $item['to_date']    =   $row->to_date ?? null;
+                    $item['leave_type'] =   $row->leave_type ?? 'Leave';
+                }
+                return $item;
+            })->values()->toArray();
+
+            return response()->json([
+                'status'    => true,
+                'message'   => 'Employee list for ' . $type,
+                'date'      => $targetDate,
+                'type'      => $type,
+                'scope'     => $scopeResortWide ? 'resort' : 'department',
+                'employees' => $employees,
+            ]);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -388,10 +764,13 @@ class TimeAndAttendanceController extends Controller
             }
             $total_employees                                 =   (int) $empQuery->distinct()->count('employees.id');
 
-            // Today: present = parent_attendaces today with Status Present/On-Time/Late (distinct emp)
+            // Today: present = parent_attendaces today with Status Present/On-Time/Late and real check-in in DB (distinct emp; no future)
             $presentQuery                                    =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
                 ->whereDate('parent_attendaces.date', $today)
+                ->where('parent_attendaces.date', '<=', $today)
                 ->whereIn('parent_attendaces.Status', ['Present', 'On-Time', 'Late'])
+                ->whereNotNull('parent_attendaces.CheckingTime')
+                ->whereRaw("TRIM(COALESCE(parent_attendaces.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
                 ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('t1.resort_id', $resort_id);
@@ -532,15 +911,17 @@ class TimeAndAttendanceController extends Controller
             $fiveHoursAgo                                    =   Carbon::now(config('app.timezone'))->subHours(5)->format('H:i');
             $presentToday                                    =   ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
                 ->whereDate('parent_attendaces.date', $today)
+                ->where('parent_attendaces.date', '<=', $today)
                 ->whereIn('parent_attendaces.Status', ['Present', 'On-Time', 'Late'])
                 ->whereNotNull('parent_attendaces.CheckingTime')
+                ->whereRaw("TRIM(COALESCE(parent_attendaces.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
                 ->join('employees', 'employees.id', '=', 'parent_attendaces.Emp_id')
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('t1.resort_id', $resort_id);
             if ($underEmp_id !== null) {
                 $presentToday->whereIn('employees.id', $underEmp_id);
             }
-            $presentToday                                    =   $presentToday->select('parent_attendaces.id as parent_attd_id', 'parent_attendaces.Emp_id', 'parent_attendaces.CheckingTime', 't1.first_name', 't1.last_name', 't1.id as admin_id')->get();
+            $presentToday                                    =   $presentToday->select('parent_attendaces.id as parent_attd_id', 'parent_attendaces.Emp_id', 'parent_attendaces.CheckingTime', 'parent_attendaces.CheckingOutTime', 't1.first_name', 't1.last_name', 't1.id as admin_id')->get();
             $employee_reminders                               =   [];
             foreach ($presentToday as $pa) {
                 $checkIn = $pa->CheckingTime;
@@ -600,74 +981,63 @@ class TimeAndAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // Validate request data
-        $validator = Validator::make($request->all(), [
-            'filter'                                        =>  'required',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
-        }
-
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+        }
+
+        $filter                                             =   $request->input('filter', 'weekly');
 
         try {
-
-            $Dept_id                                        =   $employee->Dept_id;
-            $Rank                                           =   $employee->rank;
             $resort_id                                      =   $user->resort_id;
-
-            $EmpRank                                        =   config('settings.Position_Rank');
-            $current_rank                                   =   $Rank ?? null;
+            $EmpRank                                        =   config('settings.Position_Rank', []);
+            $current_rank                                   =   $employee->rank ?? null;
             $available_rank                                 =   $EmpRank[$current_rank] ?? '';
 
-
-            if ($request->filter === 'weekly') {
-                $startDate                                  =   Carbon::now()->startOfWeek();
-                $endDate                                    =   Carbon::now()->endOfWeek();
+            if ($filter === 'weekly') {
+                $startDate                                  =   Carbon::now(config('app.timezone'))->startOfWeek();
+                $endDate                                    =   Carbon::now(config('app.timezone'))->endOfWeek();
             } else {
-                $startDate                                  =   Carbon::now()->startOfMonth();
-                $endDate                                    =   Carbon::now()->endOfMonth();
+                $startDate                                  =   Carbon::now(config('app.timezone'))->startOfMonth();
+                $endDate                                    =   Carbon::now(config('app.timezone'))->endOfMonth();
             }
+
+            $dateFrom                                       =   $startDate->toDateString();
+            $dateTo                                         =   $endDate->toDateString();
+            $today                                          =   Carbon::now(config('app.timezone'))->format('Y-m-d');
 
             $ResortPosition                                 =   ResortPosition::where("resort_id", $resort_id)->get();
             $ResortDepartment                               =   ResortDepartment::where("resort_id", $resort_id)->get();
-            $employeesCount                                 =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->where("t1.resort_id", $resort_id)
+
+            // Total active employees in resort
+            $employeesCount                                 =   (int) Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id)
+                ->where('employees.status', 'Active')
+                ->distinct()
+                ->count('employees.id');
+
+            // Today only: present count (employees with real check-in time in DB today; no future dates)
+            $totalPresentDays                               =   (int) ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereDate('parent_attendaces.date', $today)
+                ->where('parent_attendaces.date', '<=', $today)
+                ->whereIn('parent_attendaces.Status', ['Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave'])
+                ->whereNotNull('parent_attendaces.CheckingTime')
+                ->whereRaw("TRIM(COALESCE(parent_attendaces.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
                 ->count();
 
-            $employeesCount                                 =   $employeesCount ?? 0;
-            $totalPresentEmployee                           =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                ->whereNotNull('t3.CheckingTime')
-                ->whereNotNull('t3.CheckingOutTime')
-                ->whereIn('t3.Status', ['Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave'])
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
-                ->where("t1.resort_id", $resort_id)
-                ->count();
-
-            $totalPresentEmployee                           =   $totalPresentEmployee ?? 0;
-
-            $totalAbsentEmployee                            =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
-                // ->where("t3.date",$formattedDate)
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
-                ->where("t3.Status", "Absent")
-                ->whereNull('t3.CheckingTime')
-                ->whereNull('t3.CheckingOutTime')
-                ->where("t1.resort_id", $resort_id)
+            // Today only: absent count (employees marked absent today)
+            $totalAbsentDays                                =   (int) ParentAttendace::where('parent_attendaces.resort_id', $resort_id)
+                ->whereDate('parent_attendaces.date', $today)
+                ->whereIn('parent_attendaces.Status', ['Absent', 'Absant'])
                 ->count();
 
             $employeeOTApprvoed                             =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
+                ->join('parent_attendaces as t3', "t3.Emp_id", "=", "employees.id")
+                ->where('t3.resort_id', $resort_id)
                 ->whereNotNull('t3.OverTime')
                 ->where('t3.OTStatus', 'Approved')
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->whereBetween('t3.date', [$dateFrom, $dateTo])
                 ->where("t1.resort_id", $resort_id)
                 ->select('t3.id', 't1.first_name', 't1.last_name', 't3.OverTime', 't3.Emp_id')
                 ->get();
@@ -681,17 +1051,16 @@ class TimeAndAttendanceController extends Controller
             $totalOTHrsApproved                             =   floor($OTApprvoedMin / 60) . ':' . str_pad($OTApprvoedMin % 60, 2, '0', STR_PAD_LEFT);
 
             $employeeOTReq                                  =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
-                ->join('parent_attendaces as t3', "t3.roster_id", "=", "t2.id")
+                ->join('parent_attendaces as t3', "t3.Emp_id", "=", "employees.id")
+                ->where('t3.resort_id', $resort_id)
                 ->whereNotNull('t3.OverTime')
                 ->whereNotNull('t3.CheckingTime')
                 ->whereNotNull('t3.CheckingOutTime')
                 ->where(function ($query) {
-                    $query->whereNull('t3.OTStatus') // Include NULL values
-                        ->orWhereNotIn('t3.OTStatus', ['Approved', 'Rejected']); // Exclude 'Approved' & 'Rejected'
+                    $query->whereNull('t3.OTStatus')
+                        ->orWhereNotIn('t3.OTStatus', ['Approved', 'Rejected']);
                 })
-
-                ->whereBetween('t3.date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->whereBetween('t3.date', [$dateFrom, $dateTo])
                 ->where("t1.resort_id", $resort_id)
                 ->select('t3.id', 't1.first_name', 't1.last_name', 't3.OverTime', 't3.Emp_id', 't3.OTStatus', 't3.CheckingTime', 't3.CheckingOutTime', 't3.DayWiseTotalHours')
                 ->get();
@@ -719,41 +1088,16 @@ class TimeAndAttendanceController extends Controller
             $totalMinutesSum                                =   $approvedMinutesTotal + $requestedMinutesTotal;
             $totalOTSum                                     =   floor($totalMinutesSum / 60) . ':' . str_pad($totalMinutesSum % 60, 2, '0', STR_PAD_LEFT);
 
-            if ($totalAbsentEmployee != 0) {
-                $totalAbsentEmployee                        =   $employeesCount - $totalAbsentEmployee;
-            } else {
-                $totalAbsentEmployee                        =   0;
-            }
-
-            $dates                                          =   [];
-
-            for ($date = $startDate; $date->lte($endDate); $date->addDay()) {
-
-                $formattedDate                              =   $date->format('Y-m-d'); // Keep formatted date separate
-
-                $totalLeaveEmployee                         =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                    ->join('employees_leaves as t2', "t2.Emp_id", "=", "employees.id")
-                    ->where('t2.from_date', "<=", $formattedDate) // Date should be within leave range
-                    ->where('t2.to_date', ">=", $formattedDate)
-                    ->where("t1.resort_id", $resort_id)
-                    ->count();
-
-                $totalLeaveEmployee                         =   $totalLeaveEmployee ?? 0;
-                $dates[]                                    =   [
-                    'leave'                                 =>  $totalLeaveEmployee,
-                ];
-            }
-
-            $dates[$formattedDate]                          =   [
-                'present'                                   =>  $totalPresentEmployee,
-                'absent'                                    =>  $totalAbsentEmployee,
-                'employee'                                  =>  $employeesCount,
-            ];
-
-            $totalPresentDays                               =   array_sum(array_column($dates, 'present'));
-            $totalAbsentDays                                =   array_sum(array_column($dates, 'absent'));
-            $totalLeaveDays                                 =   array_sum(array_column($dates, 'leave'));
-            $employeesCount                                 =   $employeesCount;
+            // Today only: employees on approved leave today
+            $totalLeaveDays                                 =   (int) EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                ->where('employees_leaves.status', 'Approved')
+                ->where('employees_leaves.from_date', '<=', $today)
+                ->where('employees_leaves.to_date', '>=', $today)
+                ->join('employees', 'employees.id', '=', 'employees_leaves.emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id)
+                ->distinct()
+                ->count('employees.id');
 
             //brerak notification
             $requireBreak = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
@@ -771,7 +1115,7 @@ class TimeAndAttendanceController extends Controller
                         ->orWhereRaw('TIMESTAMPDIFF(HOUR, STR_TO_DATE(CONCAT(pa.date, " ", ba.Break_OutTime), "%Y-%m-%d %H:%i"), NOW()) > 5'); // Last break was more than 5 hrs ago
                 })
 
-                ->select('pa.id', 'pa.Emp_id', 'pa.CheckingTime as intime', 't1.first_name', 't1.last_name', \DB::raw("
+                ->select('pa.id', 'pa.Emp_id', 'pa.CheckingTime as intime', 't1.first_name', 't1.last_name', 't1.id as admin_id', \DB::raw("
                         CASE
                             WHEN t1.profile_picture = '0' THEN NULL
                             ELSE t1.profile_picture
@@ -780,22 +1124,63 @@ class TimeAndAttendanceController extends Controller
                 ->get();
 
             $requireBreak                             =   $requireBreak->map(function ($item) {
-                if ($item->profile_picture === null) { // If profile picture is 0 or NULL, get custom image
-                    $item->profile_picture = Common::getResortUserPicture($item->Admin_Parent_id);
+                if ($item->profile_picture === null) {
+                    $item->profile_picture = Common::getResortUserPicture($item->admin_id ?? null);
                 }
                 return $item;
             })->toArray();
 
+            // Pending leave requests for dashboard (same format as HOD dashboard)
+            $leaveReqList                                  =   EmployeeLeave::where('employees_leaves.resort_id', $resort_id)
+                ->where('employees_leaves.status', 'Pending')
+                ->join('employees', 'employees.id', '=', 'employees_leaves.emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->leftJoin('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
+                ->where('t1.resort_id', $resort_id)
+                ->select(
+                    'employees_leaves.id',
+                    'employees_leaves.emp_id',
+                    'employees_leaves.from_date',
+                    'employees_leaves.to_date',
+                    't1.first_name',
+                    't1.last_name',
+                    't1.id as admin_id',
+                    'lc.leave_type'
+                )->get();
+            $leave_requests                                 =   $leaveReqList->map(function ($row) {
+                $name   =   trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                $from   =   $row->from_date ? Carbon::parse($row->from_date)->format('d M Y') : '';
+                $to     =   $row->to_date ? Carbon::parse($row->to_date)->format('d M Y') : '';
+                $type   =   $row->leave_type ?? 'leave';
+                $desc   =   $name ? ($name . ' requested ' . $type . ' for ' . $from . ' to ' . $to) : ('Leave for ' . $from . ' to ' . $to);
+                return [
+                    'id'              => $row->id,
+                    'emp_id'          => $row->emp_id,
+                    'name'            => $name,
+                    'profile_picture' => Common::getResortUserPicture($row->admin_id),
+                    'description'     => $desc,
+                    'from_date'       => $row->from_date,
+                    'to_date'         => $row->to_date,
+                    'leave_type'      => $row->leave_type ?? 'Leave',
+                    'can_accept'      => true,
+                    'can_reject'      => true,
+                ];
+            })->values()->toArray();
 
-            $timeAttendanceData['total_present_days']       =   $totalPresentDays;
-            $timeAttendanceData['total_absent_days']        =   $totalAbsentDays;
-            $timeAttendanceData['total_leave_days']         =   $totalLeaveDays;
-            $timeAttendanceData['employee']                 =   $employeesCount;
+            $timeAttendanceData['total_present_emp_today']  =   $totalPresentDays;
+            $timeAttendanceData['total_absent_emp_today']   =   $totalAbsentDays;
+            $timeAttendanceData['total_on_leave_emp_today']=   $totalLeaveDays;
+            $timeAttendanceData['employee']                =   $employeesCount;
+            $timeAttendanceData['date']                     =   $today;
+            $timeAttendanceData['period_from']             =   $dateFrom;
+            $timeAttendanceData['period_to']               =   $dateTo;
+            $timeAttendanceData['filter']                  =   $filter;
             $timeAttendanceData['ot_approved_hrs']          =   $totalOTHrsApproved;
             $timeAttendanceData['ot_request_hrs']           =   $totalOTHrsReq;
             $timeAttendanceData['ot_total_hr']              =   $totalOTSum;
             $timeAttendanceData['over_time_request']        =   $employeeOTReq;
             $timeAttendanceData['requires_break']           =   $requireBreak;
+            $timeAttendanceData['leave_requests']           =   $leave_requests;
 
 
             $response['status']                             =   true;
@@ -1942,11 +2327,14 @@ class TimeAndAttendanceController extends Controller
         try {
 
             $currentDate                                    =   Carbon::today()->format('Y-m-d');
-            // Return only employees who are marked present for today (Status Present/On-Time/Late)
+            // Return only employees who are marked present for today (Status Present/On-Time/Late and real check-in in DB; no future)
             $query                                           =   ParentAttendace::from('parent_attendaces as t3')
                                                                     ->where('t3.resort_id', $resort_id)
                                                                     ->whereRaw('DATE(t3.date) = ?', [$currentDate])
+                                                                    ->whereRaw('t3.date <= ?', [$currentDate])
                                                                     ->whereIn('t3.Status', ['Present', 'On-Time', 'Late'])
+                                                                    ->whereNotNull('t3.CheckingTime')
+                                                                    ->whereRaw("TRIM(COALESCE(t3.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
                                                                     ->join('employees', 'employees.id', '=', 't3.Emp_id')
                                                                     ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                                                                     ->join('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
@@ -2817,5 +3205,34 @@ class TimeAndAttendanceController extends Controller
         }
     }
 
-
+    /**
+     * Calculate shift duration from StartTime and EndTime (handles overnight e.g. 20:00 to 04:00 = 8 hours).
+     * Returns format "HH:MM" (max 23:59 for single day).
+     */
+    protected static function calculateShiftDuration($startTime, $endTime)
+    {
+        $start = Carbon::createFromFormat('H:i', trim($startTime));
+        if (!$start) {
+            $start = Carbon::createFromFormat('H:i:s', trim($startTime));
+        }
+        $end = Carbon::createFromFormat('H:i', trim($endTime));
+        if (!$end) {
+            $end = Carbon::createFromFormat('H:i:s', trim($endTime));
+        }
+        if (!$start || !$end) {
+            return '00:00';
+        }
+        $endCopy = $end->copy();
+        if ($endCopy->lte($start)) {
+            $endCopy->addDay();
+        }
+        $totalMinutes = $start->diffInMinutes($endCopy);
+        $hours        = (int) floor($totalMinutes / 60);
+        $minutes      = (int) ($totalMinutes % 60);
+        if ($hours >= 24) {
+            $hours   = 23;
+            $minutes = 59;
+        }
+        return sprintf('%02d:%02d', $hours, $minutes);
+    }
 }
