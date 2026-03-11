@@ -108,6 +108,8 @@ use Illuminate\Support\Facades\Route;
 			Route::get('resort/hod-who-is-on-leave', [App\Http\Controllers\API\LeaveController::class, 'hodWhoIsOnLeave']);
 
 			//Time and Attendance HOD
+			Route::get('timeandattendance/employee-attendance-summary', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummary']);
+			Route::get('timeandattendance/employee-attendance-summary-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummaryList']);
 			Route::get('timeandattendance/time-attendance-hod-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHODDashboard']);
 			Route::post('timeandattendance/time-attendance-hod-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHODDashboard']);
 			Route::post('timeandattendance/hod-time-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodTimeAttendance']);
@@ -134,8 +136,8 @@ use Illuminate\Support\Facades\Route;
 		});
 
 
-		//HR Middleware
-		Route::middleware(['auth:api', 'check.rank:HR,GM'])->group(function () {
+		//HR Middleware (HR, GM, and HOD/EXCOM for HR department access)
+		Route::middleware(['auth:api', 'check.rank:HR,GM,HOD,EXCOM'])->group(function () {
 
 			//Leave for HR
 			Route::get('resort/leave-dashboard-hr', [App\Http\Controllers\API\LeaveController::class, 'leaveDashboardHR']);
@@ -144,6 +146,9 @@ use Illuminate\Support\Facades\Route;
 			Route::get('resort/island-pass-view-hr', [App\Http\Controllers\API\LeaveController::class, 'islandPassViewHR']);
 
 			//Time and Attendance HR
+			Route::get('timeandattendance/employee-attendance-summary', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummary']);
+			Route::get('timeandattendance/employee-attendance-summary-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummaryList']);
+			Route::get('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
 			Route::post('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
 			Route::post('timeandattendance/hr-time-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hrTimeAttendance']);
 			//Accommodation HR
