@@ -43,24 +43,15 @@ class EmployeeImport implements ToModel, WithHeadingRow
         // Keep track of errors
         static $errors = [];
 
-        // Validate required fields first
-        $validationErrors = $this->validateRequiredFields($row, $excelRowNumber);
-        if (!empty($validationErrors)) {
-            $errors = array_merge($errors, $validationErrors);
-            session(['import_errors' => $errors]);
+        // Silently skip completely empty rows (template padding rows)
+        if ($this->isRowEmpty($row)) {
             return null;
         }
 
-        // Check if row is empty - skip if all required fields are empty
-        if ($this->isRowEmpty($row)) {
-            $errors[] = [
-                'row' => $excelRowNumber,
-                'name' => "Row is empty",
-                'email' => "N/A",
-                'department' => "N/A",
-                'position' => "N/A",
-                'error' => "Empty row - all required fields are missing."
-            ];
+        // Validate required fields
+        $validationErrors = $this->validateRequiredFields($row, $excelRowNumber);
+        if (!empty($validationErrors)) {
+            $errors = array_merge($errors, $validationErrors);
             session(['import_errors' => $errors]);
             return null;
         }

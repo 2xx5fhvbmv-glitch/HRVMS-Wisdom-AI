@@ -767,39 +767,27 @@ class DashboardController extends Controller
                 ->join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
                 ->first();
 
-            // Status Logic
+            // Status Logic — use main leave status as source of truth
             $statuses = $statusesGrouped[$leaveRequest->id] ?? collect();
-
-            // Helper: get role label for an approver (prefer approver_id -> Employee.rank, fallback to status row approver_rank)
-            $getApproverLabel = function ($statusRow) use ($rank, $approverIdToLabel) {
-                $approverIdInt = (int) ($statusRow->approver_id ?? 0);
-                if ($approverIdInt && isset($approverIdToLabel[$approverIdInt])) {
-                    return $approverIdToLabel[$approverIdInt];
-                }
-                $rk = $statusRow->approver_rank !== null && $statusRow->approver_rank !== '' ? (string) $statusRow->approver_rank : null;
-                return ($rk !== null && array_key_exists($rk, $rank)) ? $rank[$rk] : 'designated approver';
-            };
-
-            // Check rejection
-            $rejected = $statuses->firstWhere('status', 'Rejected');
             $isPending = false;
             $isFullyApproved = false;
-            if ($rejected) {
-                $rejectedBy = $getApproverLabel($rejected);
-                $leaveRequest->status_text = "Rejected by {$rejectedBy}";
-            } else {
-                // Check last approved (by id, so the most recent approval)
-                $lastApproved = $statuses->where('status', 'Approved')->sortByDesc('id')->first();
-                $approvedRanks = $statuses->where('status', 'Approved')->map(function ($s) use ($getApproverLabel) {
-                    return $getApproverLabel($s);
-                })->unique()->filter()->values()->toArray();
 
-                $required = ['HOD', 'GM', 'HR'];
-                if (count(array_intersect($required, $approvedRanks)) === count($required)) {
-                    $leaveRequest->status_text = "Approved";
-                    $isFullyApproved = true;
-                } elseif ($lastApproved) {
-                    $approvedBy = $getApproverLabel($lastApproved);
+            if ($leaveRequest->status === 'Approved') {
+                $leaveRequest->status_text = "Approved";
+                $isFullyApproved = true;
+            } elseif ($leaveRequest->status === 'Rejected') {
+                $rejected = $statuses->firstWhere('status', 'Rejected');
+                if ($rejected) {
+                    $rejectedBy = $rank[$rejected->approver_rank] ?? $rejected->approver_rank;
+                    $leaveRequest->status_text = "Rejected by {$rejectedBy}";
+                } else {
+                    $leaveRequest->status_text = "Rejected";
+                }
+            } else {
+                // Still pending — show partial approval progress if any
+                $lastApproved = $statuses->where('status', 'Approved')->last();
+                if ($lastApproved) {
+                    $approvedBy = $rank[$lastApproved->approver_rank] ?? $lastApproved->approver_rank;
                     $leaveRequest->status_text = "Approved by {$approvedBy}";
                 } else {
                     $leaveRequest->status_text = "Pending";
