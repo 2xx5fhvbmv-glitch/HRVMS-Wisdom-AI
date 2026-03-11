@@ -1768,7 +1768,7 @@ class MasterDashboardController extends Controller
         $resort_id = Auth::guard('resort-admin')->user()->resort_id;
         $auth_id = isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->id : 26;
 
-        $menu = Common::GetResortMenu($resort_id , Route::currentRouteName());
+        $menu = Common::GetResortMenu($resort_id, $page_route ?: Route::currentRouteName());
 
 
         foreach ($menu['menu'] as &$module) {

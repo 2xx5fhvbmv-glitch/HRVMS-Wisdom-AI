@@ -127,7 +127,7 @@
                                     <div class="row">
                                         <div class="col-lg-6 form-group mb-2">
                                             <label class="form-label" for="{{str_replace(' ', '', $leave->leave_type)}}">Number of Days</label>
-                                            <input type="number" min="0" 
+                                            <input type="number" min="0" step="any" 
                                                 required 
                                                 data-parsley-required-message="Please enter number of days." 
                                                 id="{{str_replace(' ', '', $leave->leave_type)}}"  
@@ -164,7 +164,7 @@
                                 <div class="row">
                                     <div class="col-sm-6 form-group mb-2">
                                         <label class="form-label" for="ramadan_bonus">Amount</label>
-                                        <input type="number" min="0" id="ramadan_bonus" name="ramadan_bonus" class="form-control" value="{{$benefit_grid->ramadan_bonus}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                                        <input type="number" min="0" step="any" id="ramadan_bonus" name="ramadan_bonus" class="form-control" value="{{$benefit_grid->ramadan_bonus}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                                     </div>
                                     <div class="col-sm-6 form-group mb-2">
                                         <label class="form-label" for="ramadan_bonus_eligibility">Eligible Employee Type</label>
@@ -216,7 +216,7 @@
                         <div class="row">
                             <div class="col-sm-4">
                                 <label>{{ $leave->leave_name }}</label>
-                                <input type="number" min="0" name="custom_leave[{{ $loop->index }}][days]" class="form-control" value="{{ $leave->leave_days }}" />
+                                <input type="number" min="0" step="any" name="custom_leave[{{ $loop->index }}][days]" class="form-control" value="{{ $leave->leave_days }}" />
                             </div>
                         </div>
                     @endforeach
@@ -226,7 +226,7 @@
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="day_off_per_week">Day Off Per Week (In Days)</label>
-                            <input type="number" min="0" id="day_off_per_week" name="day_off_per_week"
+                            <input type="number" min="0" step="any" id="day_off_per_week" name="day_off_per_week"
                             required 
                             data-parsley-required-message="Please enter Day off per week." 
                              class="form-control" value="{{$benefit_grid->day_off_per_week}}" @if(isset($isViewMode) && $isViewMode) disabled @endif data-parsley-required="true" 
@@ -236,21 +236,22 @@
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="working_hrs_per_week"> Working Hours per week (In Hours)</label>
-                            <input type="number" min="0"
+                            <input type="number" min="0" step="any"
                             required 
                             data-parsley-required-message="Please enter Working hours per week." 
                              id="working_hrs_per_week" name="working_hrs_per_week" class="form-control" value="{{$benefit_grid->working_hrs_per_week}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
-                    <div class="col-xxl-4  col-sm-6">
+                    {{-- Public Holiday Per Year field hidden temporarily --}}
+                    {{-- <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="public_holiday_per_year">Public Holiday Per Year (In Days)</label>
-                            <input type="number" id="public_holiday_per_year" min="0"
-                            required 
-                            data-parsley-required-message="Please enter public holiday per year." 
+                            <input type="number" id="public_holiday_per_year" min="0" step="any"
+                            required
+                            data-parsley-required-message="Please enter public holiday per year."
                              name="public_holiday_per_year" class="form-control" value="{{$benefit_grid->public_holiday_per_year}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
-                    </div>
+                    </div> --}}
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="overtime-select">Overtime</label>
@@ -264,8 +265,8 @@
                     <!-- <div class="col-xxl-4  col-sm-6" id="holiday-rate-container" @if($benefit_grid->overtime == "n/a") style="display: none;" @endif>
                         <div class="form-group mb-2">
                             <label  class="form-label" for="annual_leave">Friday & Public Holiday Rate</label>
-                            <input type="number" id="paid_worked_public_holiday_and_friday" min="0"
-                            required 
+                            <input type="number" id="paid_worked_public_holiday_and_friday" min="0" step="any"
+                            required
                             data-parsley-required-message="Please enter Rate for friday & public holiday." 
                             name="paid_worked_public_holiday_and_friday" class="form-control" value="{{$benefit_grid->paid_worked_public_holiday_and_friday}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
@@ -299,8 +300,8 @@
                     {{-- <div class="col-xxl-4  col-sm-6">
                        <div class="form-group mb-2">
                             <label  class="form-label" for="service_charge">Incentives Service Charge </label>
-                            <input type="number" id="service_charge" min="0"
-                            required 
+                            <input type="number" id="service_charge" min="0" step="any"
+                            required
                             data-parsley-required-message="Please enter incentives service charge." 
                             min="0"
                             name="service_charge" class="form-control" value="{{$benefit_grid->service_charge}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
@@ -384,7 +385,8 @@
                                 <option value="" selected>Select Housekeeping</option>
                                 <option value="once a week" @if($benefit_grid->housekeeping == "once a week") selected @endif>Once a week</option>
                                 <option value="twice a week" @if($benefit_grid->housekeeping == "twice a week") selected @endif>Twice a week</option>
-                                <option value="3 a week" @if($benefit_grid->housekeeping == "3 a week") selected @endif>3 a week</option>
+                                <option value="thrice a week" @if(in_array($benefit_grid->housekeeping, ['thrice a week', '3 a week'])) selected @endif>Thrice a week</option>
+                                <option value="not eligible" @if($benefit_grid->housekeeping == "not eligible") selected @endif>Not Eligible</option>
                             </select>
                         </div>
                     </div>
@@ -424,7 +426,8 @@
                                 <option value="">Select Laundry Access</option>
                                 <option value="once a week" @if($benefit_grid->laundry == "once a week") selected @endif>Once a week</option>
                                 <option value="twice a week" @if($benefit_grid->laundry == "twice a week") selected @endif>Twice a week</option>
-                                <option value="3 a week" @if($benefit_grid->laundry == "3 a week") selected @endif>3 a week</option>
+                                <option value="thrice a week" @if(in_array($benefit_grid->laundry, ['thrice a week', '3 a week'])) selected @endif>Thrice a week</option>
+                                <option value="not eligible" @if($benefit_grid->laundry == "not eligible") selected @endif>Not Eligible</option>
                             </select>
                         </div>
                     </div>
@@ -481,9 +484,9 @@
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
-                            <label  class="form-label" for="relocation_ticket">Relocation Tickets to Maldives</label>
+                            <label  class="form-label" for="relocation_ticket">Relocation Tickets</label>
                             <select id="relocation_ticket" name="relocation_ticket" class="form-select select2t-none" @if(isset($isViewMode) && $isViewMode) disabled @endif>
-                                <option value="">Select Relocation Tickets to Maldives</option>
+                                <option value="">Select Relocation Tickets</option>
                                 <option value="yes" @if($benefit_grid->relocation_ticket == "yes") selected @endif>Yes</option>
                                 <option value="no" @if($benefit_grid->relocation_ticket == "no") selected @endif>No</option>
                             </select>
@@ -492,7 +495,7 @@
                     <div class="col-xxl-8">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="max_excess_luggage_relocation_expense">Maximum Excess Luggage Relocation Allowance (In Dollars)</label>
-                            <input min="0" type="number" id="max_excess_luggage_relocation_expense" name="max_excess_luggage_relocation_expense" class="form-control" value="{{$benefit_grid->max_excess_luggage_relocation_expense}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input min="0" step="any" type="number" id="max_excess_luggage_relocation_expense" name="max_excess_luggage_relocation_expense" class="form-control" value="{{$benefit_grid->max_excess_luggage_relocation_expense}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <!-- Custom Fields for Additional Benefits -->
@@ -562,37 +565,37 @@
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="paid_circumcision_leave_per_year">Meals Per Day</label>
-                            <input type="number" min="0" id="meals_per_day" name="meals_per_day" class="form-control" value="{{$benefit_grid->meals_per_day}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="meals_per_day" name="meals_per_day" class="form-control" value="{{$benefit_grid->meals_per_day}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="food_and_beverages_discount">Food And Beverages Discount(In %)</label>
-                            <input type="number" min="0" id="food_and_beverages_discount" name="food_and_beverages_discount" class="form-control"  value="{{$benefit_grid->food_and_beverages_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="food_and_beverages_discount" name="food_and_beverages_discount" class="form-control"  value="{{$benefit_grid->food_and_beverages_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="alchoholic_beverages_discount">Alchoholic Beverages Discount(In %)</label>
-                            <input type="number" min="0" id="alchoholic_beverages_discount" name="alchoholic_beverages_discount" class="form-control" value="{{$benefit_grid->alchoholic_beverages_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="alchoholic_beverages_discount" name="alchoholic_beverages_discount" class="form-control" value="{{$benefit_grid->alchoholic_beverages_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="spa_discount">Spa Discount(In %)</label>
-                            <input type="number" min="0" id="spa_discount" name="spa_discount" class="form-control" value="{{$benefit_grid->spa_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="spa_discount" name="spa_discount" class="form-control" value="{{$benefit_grid->spa_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="dive_center_discount">Dive Center Discount(In %)</label>
-                            <input type="number" min="0" id="dive_center_discount" name="dive_center_discount" class="form-control" value="{{$benefit_grid->dive_center_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="dive_center_discount" name="dive_center_discount" class="form-control" value="{{$benefit_grid->dive_center_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="water_sports_discount">Water Sports Discount(In %)</label>
-                            <input type="number" min="0" id="water_sports_discount" name="water_sports_discount" class="form-control" value="{{$benefit_grid->water_sports_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="water_sports_discount" name="water_sports_discount" class="form-control" value="{{$benefit_grid->water_sports_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <!-- Custom Fields for Additional Discounts -->
@@ -721,11 +724,11 @@
                         <div class="row g-md-4 g-3 ">
                             <div class="form-group mb-2 col-sm-6">
                                 <label  class="form-label" for="standard_staff_rate_for_single">For Single(In Dollars)</label>
-                                <input type="number" min="0" id="standard_staff_rate_for_single" name="standard_staff_rate_for_single" class="form-control" value="{{$benefit_grid->standard_staff_rate_for_single}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                                <input type="number" min="0" step="any" id="standard_staff_rate_for_single" name="standard_staff_rate_for_single" class="form-control" value="{{$benefit_grid->standard_staff_rate_for_single}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                             </div>
                             <div class="form-group mb-2 col-sm-6">
                                 <label  class="form-label" for="standard_staff_rate_for_double">For Double(In Dollars)</label>
-                                <input type="number" min="0" id="standard_staff_rate_for_double" name="standard_staff_rate_for_double" class="form-control" value="{{$benefit_grid->standard_staff_rate_for_double}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                                <input type="number" min="0" step="any" id="standard_staff_rate_for_double" name="standard_staff_rate_for_double" class="form-control" value="{{$benefit_grid->standard_staff_rate_for_double}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                             </div>
                         </div>
                     </div>
@@ -733,13 +736,13 @@
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="friends_with_benefit_discount">Friends With Benefit Discount(In %)</label>
-                            <input type="number"  min="0" id="friends_with_benefit_discount" name="friends_with_benefit_discount" class="form-control" value="{{$benefit_grid->friends_with_benefit_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="friends_with_benefit_discount" name="friends_with_benefit_discount" class="form-control" value="{{$benefit_grid->friends_with_benefit_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="staff_rate_for_seaplane_male">Staff rate (seaplane) to/from Male (In Dollars)</label>
-                            <input type="number" min="0" id="staff_rate_for_seaplane_male" name="staff_rate_for_seaplane_male" class="form-control" value="{{$benefit_grid->staff_rate_for_seaplane_male}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="staff_rate_for_seaplane_male" name="staff_rate_for_seaplane_male" class="form-control" value="{{$benefit_grid->staff_rate_for_seaplane_male}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
@@ -765,13 +768,13 @@
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="male_subsistence_allowance">MALE Subsistence Allowance(In Dollars)</label>
-                            <input type="number" min="0" id="male_subsistence_allowance" name="male_subsistence_allowance" class="form-control" value="{{$benefit_grid->male_subsistence_allowance}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="male_subsistence_allowance" name="male_subsistence_allowance" class="form-control" value="{{$benefit_grid->male_subsistence_allowance}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
                             <label  class="form-label" for="free_return_flight_to_male_per_year">Free return flight to Male Per Year(In Number)</label>
-                            <input type="number" min="0" id="free_return_flight_to_male_per_year" name="free_return_flight_to_male_per_year" class="form-control" value="{{$benefit_grid->free_return_flight_to_male_per_year}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
+                            <input type="number" min="0" step="any" id="free_return_flight_to_male_per_year" name="free_return_flight_to_male_per_year" class="form-control" value="{{$benefit_grid->free_return_flight_to_male_per_year}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
                     <div class="col-xxl-4  col-sm-6">
@@ -884,7 +887,7 @@
                                             <div class="row">
                                                 <div class="col-lg-6 form-group mb-2">
                                                     <label class="form-label" for="${leaveTypeId}">Number of Days</label>
-                                                    <input type="number" min="0"
+                                                    <input type="number" min="0" step="any"
                                                         required 
                                                         id="${leaveTypeId}"
                                                         name="LeaveCat[${leave.id}][${leave.eligibility}][]"
@@ -922,7 +925,7 @@
                                         <div class="row">
                                             <div class="col-sm-6 form-group mb-2">
                                                 <label class="form-label" for="ramadan_bonus">Amount</label>
-                                                <input type="number" min="0" id="ramadan_bonus" name="ramadan_bonus" class="form-control" value="${response.bonus_amount ?? 0}" ${response.isViewMode ? 'disabled' : ''} />
+                                                <input type="number" min="0" step="any" id="ramadan_bonus" name="ramadan_bonus" class="form-control" value="${response.bonus_amount ?? 0}" ${response.isViewMode ? 'disabled' : ''} />
                                             </div>
                                             <div class="col-sm-6 form-group mb-2">
                                                 <label class="form-label" for="ramadan_bonus_eligibility">Eligible Employee Type</label>
@@ -1034,7 +1037,7 @@
                     </div>
                     <div class="col-xxl-4 col-lg-5 col-md-4 col-sm-6">
                         <div class="form-group mb-2">
-                            <input type="number" min="0" id="custom_leave_days_${customLeaveIndex}" name="custom_leave[${customLeaveIndex}][days]" class="form-control" required placeholder="Leave Days"/>
+                            <input type="number" min="0" step="any" id="custom_leave_days_${customLeaveIndex}" name="custom_leave[${customLeaveIndex}][days]" class="form-control" required placeholder="Leave Days"/>
                         </div>
                     </div>
                     <div class="col-auto">

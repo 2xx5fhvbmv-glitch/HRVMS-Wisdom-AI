@@ -34,7 +34,7 @@
                                 <label for="cutoff_day" class="form-label">CutOff Day</label>
                                 <select name="cutoff_day" id="cutoff_day" class="form-select select2t-none">
                                     @for($i=1;$i<=31;$i++)
-                                        <option value="{{$i}}">{{$i}}</option>
+                                        <option value="{{$i}}" @if(isset($payroll_config) && $payroll_config->cutoff_day == $i) selected @endif>{{$i}}</option>
                                     @endfor
                                 </select>
                             </div>
