@@ -1056,10 +1056,12 @@ class TimeAndAttendanceController extends Controller
                 ->select('t3.id', 't1.first_name', 't1.last_name', 't3.OverTime', 't3.Emp_id')
                 ->get();
 
-            // Convert OverTime to Minutes and Sum
+            // Convert OverTime to Minutes and Sum (safe when OverTime is empty or missing colon)
             $OTApprvoedMin                                  =   $employeeOTApprvoed->sum(function ($item) {
-                list($hours, $minutes) = explode(':', $item->OverTime);  // Convert "HH:mm" to [hours, minutes]
-                return ((int)$hours * 60) + (int)$minutes;  // Convert to total minutes
+                $parts = explode(':', (string) ($item->OverTime ?? '0:0'));
+                $hours = (int) ($parts[0] ?? 0);
+                $minutes = (int) ($parts[1] ?? 0);
+                return ($hours * 60) + $minutes;
             });
             // Convert Total Minutes Back to HH:mm Format
             $totalOTHrsApproved                             =   floor($OTApprvoedMin / 60) . ':' . str_pad($OTApprvoedMin % 60, 2, '0', STR_PAD_LEFT);
@@ -1079,10 +1081,12 @@ class TimeAndAttendanceController extends Controller
                 ->select('t3.id', 't1.first_name', 't1.last_name', 't3.OverTime', 't3.Emp_id', 't3.OTStatus', 't3.CheckingTime', 't3.CheckingOutTime', 't3.DayWiseTotalHours')
                 ->get();
 
-            // Convert OverTime to Minutes and Sum
+            // Convert OverTime to Minutes and Sum (safe when OverTime is empty or missing colon)
             $OTReqMin                                       =   $employeeOTReq->sum(function ($item) {
-                list($hours, $minutes) = explode(':', $item->OverTime);  // Convert "HH:mm" to [hours, minutes]
-                return ((int)$hours * 60) + (int)$minutes;  // Convert to total minutes
+                $parts = explode(':', (string) ($item->OverTime ?? '0:0'));
+                $hours = (int) ($parts[0] ?? 0);
+                $minutes = (int) ($parts[1] ?? 0);
+                return ($hours * 60) + $minutes;
             });
 
             // Convert Total Minutes Back to HH:mm Format
@@ -1205,9 +1209,11 @@ class TimeAndAttendanceController extends Controller
 
             return response()->json($response);
         } catch (\Exception $e) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
-            \Log::error($e->getMessage());
+            \Log::error('timeAttendanceHRDashboard: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
@@ -2898,8 +2904,8 @@ class TimeAndAttendanceController extends Controller
                     if ($todayAttendance->Status == "Present" && !empty($todayAttendance->CheckingTime) && trim($todayAttendance->CheckingTime ?? '') !== '' && !in_array(trim($todayAttendance->CheckingTime ?? ''), ['00:00', '00:00:00'])) {
                         $presentCount = 1;
                         if (!empty($todayAttendance->OverTime) && $todayAttendance->OverTime != "-" && $todayAttendance->OverTime != "00:00") {
-                            list($Othours, $Otminutes) = explode(':', $todayAttendance->OverTime ?? '0:0');
-                            $totalOtHours = (int)$Othours + ((int)$Otminutes / 60);
+                            $otParts = explode(':', (string) ($todayAttendance->OverTime ?? '0:0'));
+                            $totalOtHours = (int)($otParts[0] ?? 0) + ((int)($otParts[1] ?? 0) / 60);
                         }
                     } elseif ($todayAttendance->Status == "Absent") {
                         $hasCheckIn = !empty($todayAttendance->CheckingTime) && trim($todayAttendance->CheckingTime ?? '') !== '' && !in_array(trim($todayAttendance->CheckingTime ?? ''), ['00:00', '00:00:00']);
@@ -2971,8 +2977,8 @@ class TimeAndAttendanceController extends Controller
                     if ($shiftData->Status == "Present" && $hasCheckIn) {
                         $presentDates[$d] = true;
                         if (!empty($shiftData->OverTime) && $shiftData->OverTime != "-" && $shiftData->OverTime != "00:00") {
-                            list($Othours, $Otminutes) = explode(':', $shiftData->OverTime ?? '0:0');
-                            $totalOtHours += (int)$Othours + ((int)$Otminutes / 60);
+                            $otParts = explode(':', (string) ($shiftData->OverTime ?? '0:0'));
+                            $totalOtHours += (int)($otParts[0] ?? 0) + ((int)($otParts[1] ?? 0) / 60);
                         }
                     } elseif ($shiftData->Status == "Absent" && !$hasCheckIn) {
                         $absentDates[$d] = true;
