@@ -60,6 +60,29 @@
                                         <button type="submit" class="btn btn-theme">Submit</button>
                                     </div>
                                 </form>
+
+                                {{-- Error Table (shown after failed import) --}}
+                                <div id="import-error-section" class="mt-4" style="display:none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="text-danger mb-0">Import Errors</h6>
+                                        <span id="import-error-count" class="badge bg-danger"></span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-sm" id="import-error-table">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Row</th>
+                                                    <th>Name</th>
+                                                    <th>Email</th>
+                                                    <th>Department</th>
+                                                    <th>Position</th>
+                                                    <th>Error</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             {{-- </div>
                         </div> --}}
                     </div>
@@ -75,158 +98,106 @@
 @endsection
 
 @section('import-scripts')
-
 <script>
-  $(document).ready(function () {
+$(document).ready(function () {
 
-
-    $('.uploadFile-btn a').click(function() {
+    // Trigger hidden file input when styled button is clicked
+    $('.uploadFile-btn a').on('click', function () {
         $('#Employeefile').click();
     });
 
-    // Show file name on file select
-    $('#Employeefile').on('change', function() {
-        let fileName = this.files[0] ? this.files[0].name : '';
+    // Show selected file name
+    $('#Employeefile').on('change', function () {
+        const fileName = this.files[0] ? this.files[0].name : '';
         $('#file-name-display').text(fileName);
+        $('#file-extension-error').hide();
     });
 
-    $("#department").select2({
-    'placeholder':'Select Department',
-    });
-    $("#position").select2({
-    'placeholder':'Select position',
-    });
-
-    // Department wise Position
-    $(document).on('change', '#department', function() {
-        var deptId = $(this).val();
-        $.ajax({
-            url: "{{ route('resort.get.position') }}",
-            type: "post",
-            data: {
-                deptId: deptId,
-
-            },
-            success: function(data) {
-                // Clear the dropdown and add a placeholder option
-                $("#position").empty().append('<option value="">Select Position</option>');
-
-                if(data.success == true) {
-                    // Append new options
-                    $.each(data.data, function(key, value) {
-                        $("#position").append('<option value="'+value.id+'">'+value.position_title+'</option>');
-                    });
-
-                } else {
-                    // If no data, just keep the placeholder
-                    $("#position").empty().append('<option value="">Select Position</option>');
-                }
-            },
-            error: function(response) {
-                toastr.error("Position Not Found", { positionClass: 'toast-bottom-right' });
+    $('#BudgetConfigFiles').validate({
+        rules: {
+            Employeefile: {
+                required: true,
             }
-        });
-    });
-    $('#BudgetConfigFiles').on('submit', function(e) {
-                const fileInput = $('#Employeefile');
-                const filePath = fileInput.val();
-                const allowedExtensions = /(\.xls|\.xlsx)$/i;
+        },
+        messages: {
+            Employeefile: {
+                required: "Please select an Employee Excel file.",
+            }
+        },
+        submitHandler: function (form) {
+            const fileInput = document.getElementById('Employeefile');
+            const fileName  = fileInput.value;
+            const allowed   = /(\.xls|\.xlsx)$/i;
 
-                // Check if the file extension is valid
-                if (!allowedExtensions.exec(filePath)) {
-                    e.preventDefault(); // Prevent form submission
-                    $('#error-message').show(); // Show error message
-                } else {
-                    $('#error-message').hide(); // Hide error message if valid
-                }
-            });
-            $('#BudgetConfigFiles').validate({
-                rules: {
-                    department: {
-                        required: true,
-                    },
-                    position: {
-                        required: true,
-                    },
-                    Employeefile: {
-                        required: true,
-                    }
-                },
-                messages: {
-                    department: {
-                        required: "Please select a Department.",
-                    },
-                    position: {
-                        required: "Please select Position.",
-                    },
-                    Employeefile: {
-                        required: "Please select Employee File.",
-                    }
-                },
-                submitHandler: function (form) {
-                    var formData = new FormData(form);
-
-                    $.ajax({
-                        url: "{{ route('resort.Depat_Position_Emp_Import') }}",
-                        type: "POST",
-                        data: formData,
-                        contentType: false,
-                        processData: false,
-                        success: function (response) {
-                            if (response.success) {
-                                toastr.success(response.msg, "Success", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                                $('#BudgetConfigFiles')[0].reset();
-                            } else {
-                                toastr.error(response.msg, "Error", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            }
-                        },
-                        error: function (xhr) {
-                            if (xhr.status === 422 || xhr.status === 400) {
-                                var response = xhr.responseJSON; // The whole response object
-                                var errorMessages = '';
-                                if (response.errors && Array.isArray(response.errors)) {
-                                    // Loop through each error object
-                                    response.errors.forEach(function(errorObj) {
-                                        errorMessages += `Row ${errorObj.row}: ${errorObj.error} <br>`;
-                                    });
-                                } else {
-                                    errorMessages = response.msg || "An unexpected error occurred.";
-                                }
-
-                                toastr.error(errorMessages, "Import Error", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            } else {
-                                toastr.error("An unexpected error occurred. Please try again.", "Error", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            }
-                        }
-                    });
-                }
-            });
-
-});
-
-
-</script>
-<script>
-    // Show error message for invalid file extension
-    $('#BudgetConfigFiles').on('submit', function(e) {
-        const fileInput = $('#Employeefile');
-        const filePath = fileInput.val();
-        const allowedExtensions = /(\.xls|\.xlsx)$/i;
-
-        if (!allowedExtensions.exec(filePath)) {
-            e.preventDefault();
-            $('#file-extension-error').text('Only .xls or .xlsx files are allowed.').show();
-        } else {
+            if (!allowed.exec(fileName)) {
+                $('#file-extension-error').text('Only .xls or .xlsx files are allowed.').show();
+                return false;
+            }
             $('#file-extension-error').hide();
+
+            const $btn = $(form).find('[type="submit"]');
+            $btn.prop('disabled', true).text('Uploading...');
+
+            const formData = new FormData(form);
+
+            $.ajax({
+                url: "{{ route('resort.Depat_Position_Emp_Import') }}",
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function (response) {
+                    $btn.prop('disabled', false).text('Submit');
+                    if (response.success) {
+                        toastr.success(response.msg, 'Success', { positionClass: 'toast-bottom-right' });
+                        form.reset();
+                        $('#file-name-display').text('');
+                        $('#import-error-section').hide();
+                        $('#import-error-table tbody').empty();
+                    } else {
+                        toastr.error(response.msg, 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (xhr) {
+                    $btn.prop('disabled', false).text('Submit');
+                    const response = xhr.responseJSON || {};
+
+                    if (response.errors && Array.isArray(response.errors)) {
+                        const tbody = $('#import-error-table tbody').empty();
+                        response.errors.forEach(function (err) {
+                            tbody.append(
+                                '<tr>' +
+                                '<td>' + err.row + '</td>' +
+                                '<td>' + (err.name || 'N/A') + '</td>' +
+                                '<td>' + (err.email || 'N/A') + '</td>' +
+                                '<td>' + (err.department || 'N/A') + '</td>' +
+                                '<td>' + (err.position || 'N/A') + '</td>' +
+                                '<td class="text-danger">' + err.error + '</td>' +
+                                '</tr>'
+                            );
+                        });
+                        $('#import-error-count').text(response.errors.length + ' error(s)');
+                        $('#import-error-section').show();
+                        toastr.error(response.errors.length + ' row(s) could not be imported. See details below.', 'Import Errors', { positionClass: 'toast-bottom-right' });
+                    } else {
+                        toastr.error(response.msg || 'Something went wrong. Please try again.', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                }
+            });
+        },
+        errorPlacement: function (error, element) {
+            error.insertAfter(element.closest('.uploadFile-block').length
+                ? element.closest('.uploadFile-block')
+                : element);
+        },
+        highlight: function (element) {
+            $(element).addClass('is-invalid');
+        },
+        unhighlight: function (element) {
+            $(element).removeClass('is-invalid');
         }
     });
+
+});
 </script>
 @endsection

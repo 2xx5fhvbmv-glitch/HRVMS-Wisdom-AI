@@ -1473,35 +1473,36 @@ class LeaveController extends Controller
             ],200);
         }
 
+        // If leave is already finalized, block action
+        if (in_array($leave->status, ['Approved', 'Rejected'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This leave request is already '.$leave->status.'.',
+            ], 200);
+        }
+
         // Check if the current approver is authorized to take action
         $lastStatus = EmployeeLeaveStatus::where('leave_request_id', $leaveId)
             ->where('status','Pending')
             ->orderBy('created_at', 'desc')
             ->first();
 
-        if (!$lastStatus) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'This leave request is already '.$leave->status.'. ',
-            ],200);
-        }
-
-        // dd($this->resort->GetEmployee->rank,$lastStatus->approver_rank);
-
         $rankConfig = config('settings.Position_Rank');
         $currentApproverRank = array_key_exists($this->resort->GetEmployee->rank, $rankConfig) ? $rankConfig[$this->resort->GetEmployee->rank] : '';
-        $lastApproverRank = array_key_exists($lastStatus->approver_rank, $rankConfig) ? $rankConfig[$lastStatus->approver_rank] : '';
+        $isHROrExcom = in_array($currentApproverRank, ['HR', 'EXCOM', 'GM']);
 
-
-        $actionname = ($action == "Rejected") ? "reject" : "approve";
-        if ($lastStatus && $lastStatus->approver_id != $currentApproverId) {
+        // If a pending chain record exists, verify the current user is the expected approver
+        // HR/EXCOM/GM can override the chain order
+        if ($lastStatus && $lastStatus->approver_id != $currentApproverId && !$isHROrExcom) {
+            $lastApproverRank = array_key_exists($lastStatus->approver_rank, $rankConfig) ? $rankConfig[$lastStatus->approver_rank] : '';
+            $actionname = ($action == "Rejected") ? "reject" : "approve";
             return response()->json([
                 'status' => 'error',
                 'message' => "You cannot $actionname this request. The request must first be approved by the $lastApproverRank.",
-            ],403);
+            ], 403);
         }
 
-        // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
+        // Can approve: (1) applicant's reporting_to, (2) GM leave approved by HR/EXCOM/HOD, or (3) HR/EXCOM can approve any leave
         $applicant = Employee::find($leave->emp_id);
         $applicantReportingToStr = trim((string)($applicant->reporting_to ?? ''));
         $currentApproverIdStr = trim((string)$currentApproverId);
@@ -1509,47 +1510,54 @@ class LeaveController extends Controller
         $currentUserRankNum = trim((string)($this->resort->GetEmployee->rank ?? ''));
         $isReportingManager = $applicantReportingToStr !== '' && $applicantReportingToStr === $currentApproverIdStr;
         $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRankNum, ['1', '2', '3'], true);
-        if (!$applicant || (!$isReportingManager && !$isGMLeaveApprover)) {
+        if (!$applicant || (!$isReportingManager && !$isGMLeaveApprover && !$isHROrExcom)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Only the employee\'s direct manager (or HR/EXCOM/HOD for GM leave) can approve or reject this leave. You can view it only.',
             ], 403);
         }
 
-        EmployeeLeaveStatus::where('leave_request_id' , $leave->id)->where('approver_id', $currentApproverId)->update([
-            'leave_request_id' => $leave->id,
-            'approver_id' => $currentApproverId,
-            'status' => $action,
-            'comments' => $comments, // Save comments if provided
-            'approved_at'=>now(),
-        ]);
+        // Update all pending chain records — HR/EXCOM finalizes the entire chain
+        if ($isHROrExcom) {
+            EmployeeLeaveStatus::where('leave_request_id', $leave->id)
+                ->where('status', 'Pending')
+                ->update([
+                    'status'     => $action,
+                    'comments'   => $comments,
+                    'approved_at'=> now(),
+                ]);
+        } elseif ($lastStatus) {
+            EmployeeLeaveStatus::where('leave_request_id', $leave->id)
+                ->where('approver_id', $currentApproverId)
+                ->update([
+                    'status'     => $action,
+                    'comments'   => $comments,
+                    'approved_at'=> now(),
+                ]);
+        }
 
         if ($action == 'Approved') {
-            // Mark main leave as Approved when no approvers are left Pending (last in chain: HR, HOD, or EXCOM)
             $pendingCount = EmployeeLeaveStatus::where('leave_request_id', $leave->id)->where('status', 'Pending')->count();
             if ($pendingCount === 0) {
                 $leave->status = 'Approved';
                 $leave->save();
             }
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Leave approved successfully.',
-            ],200);
-        }
-        elseif ($action === 'Rejected')
-        {
-            $leave->status="Rejected";
+            ], 200);
+        } elseif ($action === 'Rejected') {
+            $leave->status = 'Rejected';
             $leave->save();
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Leave Rejected.',
-            ],200);
-        }
-        else{
+            ], 200);
+        } else {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Invalid action.',
-            ],200);
+            ], 200);
         }
     }
 
