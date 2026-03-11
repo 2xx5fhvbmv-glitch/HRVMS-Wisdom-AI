@@ -982,9 +982,23 @@ class TimeAndAttendanceController extends Controller
         }
 
         $user                                               =   Auth::guard('api')->user();
-        $employee                                           =   $user->GetEmployee;
+        $employee                                           =   $user->GetEmployee ?? $user->getEmployee ?? null;
         if (!$employee) {
-            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 403);
+            return response()->json(['error' => 'Forbidden: No employee record linked'], 403);
+        }
+
+        $resort_id                                          =   $user->resort_id;
+        $rankConfig                                         =   config('settings.Position_Rank', []);
+        $rankLabel                                          =   strtoupper((string) ($rankConfig[$employee->rank ?? ''] ?? $rankConfig[$employee->main_rank ?? ''] ?? ''));
+        $allowedRanks                                       =   ['HR', 'GM', 'HOD', 'EXCOM'];
+        $hrDeptId                                           =   ResortDepartment::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');
+            })
+            ->value('id');
+        $isInHRDept                                         =   $hrDeptId !== null && (int) $employee->Dept_id === (int) $hrDeptId;
+        if (!in_array($rankLabel, $allowedRanks, true) && !$isInHRDept) {
+            return response()->json(['error' => 'Forbidden: Insufficient rank'], 403);
         }
 
         $filter                                             =   $request->input('filter', 'weekly');
@@ -1167,6 +1181,8 @@ class TimeAndAttendanceController extends Controller
                 ];
             })->values()->toArray();
 
+            // All data above is resort-wide (no department filter). HR dept EXCOM/HOD and HR/GM rank see whole resort.
+            $timeAttendanceData['scope']                     =   'resort';
             $timeAttendanceData['total_present_emp_today']  =   $totalPresentDays;
             $timeAttendanceData['total_absent_emp_today']   =   $totalAbsentDays;
             $timeAttendanceData['total_on_leave_emp_today']=   $totalLeaveDays;

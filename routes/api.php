@@ -96,6 +96,9 @@ use Illuminate\Support\Facades\Route;
 		Route::get('boarding/manifest-details-pdf/{manifest_id}', [App\Http\Controllers\API\BoardingPassController::class, 'manifestDetailsPDFWithEmployees']);
 		Route::post('boarding/boarding-pass-status-update', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassStatusUpdate']);
 
+		// Time & Attendance HR Dashboard (auth only; rank/department check done in controller)
+		Route::get('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
+		Route::post('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
 
 		//HOD Middleware
 		Route::middleware(['auth:api', 'check.rank:HOD,EXCOM'])->group(function () {
@@ -148,8 +151,6 @@ use Illuminate\Support\Facades\Route;
 			//Time and Attendance HR
 			Route::get('timeandattendance/employee-attendance-summary', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummary']);
 			Route::get('timeandattendance/employee-attendance-summary-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummaryList']);
-			Route::get('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
-			Route::post('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
 			Route::post('timeandattendance/hr-time-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hrTimeAttendance']);
 			//Accommodation HR
 			Route::get('accommodation/accommodation-hr-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'HR_Dashobard']);
