@@ -54,11 +54,11 @@ class FinalSettlementService
         $totalDays = $payrollEnd->diffInDays($payrollStart) + 1;
 
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
-        // dd($settings);
+        $conversionRate = $settings ? ($settings->DollertoMVR ?? 15.42) : 15.42;
         $currency = $employee->basic_salary_currency;
 
         $basic = floatval($employee->basic_salary);
-        $basicMVR = ($currency === 'USD') ? $basic * $settings->DollertoMVR : $basic;
+        $basicMVR = ($currency === 'USD') ? $basic * $conversionRate : $basic;
 
         $dailySalary = round($basicMVR / $totalDays, 2);
         $leaveBalance = $this->getLeaveBalance($employee, $resortId);
@@ -88,7 +88,7 @@ class FinalSettlementService
         $totalAllowance = 0;
         foreach ($allowances as $a) {
             $amount = floatval($a->amount);
-            $convertedAmount = ($currency === 'USD') ? $amount * $settings->DollertoMVR : $amount;
+            $convertedAmount = ($currency === 'USD') ? $amount * $conversionRate : $amount;
             $totalAllowance += $convertedAmount;
 
             $allowanceDetails[] = [
@@ -138,9 +138,9 @@ class FinalSettlementService
         $recoveryData = PayrollRecoverySchedule::where('employee_id', $employee->id)
             ->where('status', 'Pending')
             ->get()
-            ->sum(function ($item) use ($currency, $settings) {
+            ->sum(function ($item) use ($currency, $conversionRate) {
                 $amount = ($item->amount ?? 0) + ($item->interest_amount ?? 0);
-                return ($currency === 'USD') ? $amount * $settings->DollertoMVR : $amount;
+                return ($currency === 'USD') ? $amount * $conversionRate : $amount;
             });
         // Remove dd() when done debugging
         // dd($recoveryData);

@@ -19,6 +19,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Validator;
 use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
+use App\Models\PayrollConfig;
 class AttandanceRegisterController extends Controller
 {
     protected $resort;
@@ -74,103 +75,9 @@ class AttandanceRegisterController extends Controller
     public function index()
     {
        $page_title = 'Attandance Register';
+       $ResortDepartment = ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
 
-        //    ResortBenifitGridChild::updateorcreate([
-        //    ]);
-       $Rank =  $this->resort->GetEmployee->rank ?? '';
-
-        $ResortDepartment =  ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
-
-
-        $WeekstartDate = Carbon::now()->startOfWeek(); //Week start Start date
-        $WeekendDate = Carbon::now()->endOfWeek();
-        $headers = [];
-        $numberOfDays = 7;
-        $days = [];
-        for ($i = 0; $i < $numberOfDays; $i++)
-        {
-            $currentDate = $WeekstartDate->clone()->addDays($i);
-            $headers[] = [
-                'date' => $currentDate->format('d M'),
-                'day' => $currentDate->format('D'),
-                'newdate'=> $currentDate->format('Y-m-d'),
-                'full_date' => $currentDate
-            ];
-            $days[] =$currentDate->format('D');
-        }
-        $attandanceregister = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                            ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
-                            ->join('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
-                            ->leftjoin('parent_attendaces as t4', "t4.resort_id", "=", "t3.id")
-                            ->select(
-                                't1.id as Parentid',
-                                't1.first_name',
-                                't1.last_name',
-                                't1.profile_picture',
-                                'employees.id as emp_id',
-                                'employees.Emp_id as EmployeeId',
-                                't2.position_title',
-                                't3.id as duty_roster_id'
-                            )
-                            ->groupBy('employees.id')
-                            ->where("t1.resort_id", $this->resort->resort_id);
-
-                              if($Rank != '3'){
-                $attandanceregister->whereIn('employees.id', $this->underEmp_id);
-            }
-                        // Get the paginated results before mapping
-                        $paginatedResults = $attandanceregister->paginate(10);
-
-                        // Transform the paginated collection
-                        $paginatedResults->getCollection()->transform(function ($item) {
-                            $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
-                            $item->Position = ucfirst($item->position_title);
-                            $item->profileImg = Common::getResortUserPicture($item->Parentid);
-                            return $item;
-                        });
-
-                        $attandanceregister = $paginatedResults;
-
-                    $year = now()->year; // Current year
-                    $month = now()->month; // Current month
-                    $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
-
-
-                    $monthwiseheaders=[];
-                    for ($day = 1; $day <= $totalDays; $day++)
-                    {
-                        $date = Carbon::createFromDate($year, $month, $day); // Create a date for each day
-                        $dayName = $date->format('D'); // Get the day name (e.g., Mon, Tue)
-                        $newdate = $date->format('d-m-Y');
-                        $monthwiseheaders[] = ["day"=>str_pad($day, 2, '0', STR_PAD_LEFT),"dayname" => $dayName,'newdate'=>$newdate];
-                    }
-                    $resort_id  = $this->resort->resort_id;
-                    $LeaveCategory = LeaveCategory::where('resort_id',$this->resort->resort_id)->get();
-
-                    $startOfMonth = Carbon::now()->startOfMonth(); // Get the first day of the month
-                    $endOfMonth =Carbon::now()->endOfMonth(); // Get the last day of the month
-
-                    // Get public holidays (including Fridays)
-                    $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
-
-                    // Fetch overtime data from employee_overtimes table for all employees in the date range
-                    $employeeIds = $attandanceregister->pluck('emp_id')->toArray();
-                    $overtimeData = collect([]);
-                    if (!empty($employeeIds)) {
-                        $overtimeData = EmployeeOvertime::whereIn('Emp_id', $employeeIds)
-                            ->whereBetween('date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
-                            ->where('status', 'approved') // Only get approved overtime
-                            ->get()
-                            ->groupBy('Emp_id')
-                            ->map(function ($overtimes) {
-                                return $overtimes->keyBy(function ($ot) {
-                                    // $ot->date is already a Carbon date object due to model cast
-                                    return $ot->date->format('Y-m-d');
-                                });
-                            });
-                    }
-
-       return view('resorts.timeandattendance.attandanceregister.index',compact('LeaveCategory','monthwiseheaders','page_title','ResortDepartment','headers','attandanceregister','resort_id','WeekstartDate','WeekendDate','startOfMonth','endOfMonth','publicHolidays','overtimeData'));
+       return view('resorts.timeandattendance.attandanceregister.index',compact('page_title','ResortDepartment'));
     }
 
     public function CheckoutTimeMissing(Request $request)
@@ -385,25 +292,27 @@ class AttandanceRegisterController extends Controller
 
                         // Handle cases
                         if (empty($month)) {
-                            // No month selected → use current month/year
                             $year  = now()->year;
                             $month = now()->month;
                         } elseif (empty($year)) {
-                            // Month selected but year missing → use current year
                             $year = now()->year;
                         }
 
-                        // Base date for calculations
+                        // Get cutoff day from payroll configuration
+                        $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+
+                        // Calculate cutoff period based on selected month/year
+                        // If cutoff is 25 and month is March 2026: period = 25 Mar 2026 → 24 Apr 2026
                         $baseDate = Carbon::createFromDate($year, $month, 1);
+                        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
+                        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
 
-                        // Month info
-                        $totalDays    = $baseDate->daysInMonth;
-                        $startOfMonth = $baseDate->copy()->startOfMonth();
-                        $endOfMonth   = $baseDate->copy()->endOfMonth();
+                        // Total days in the cutoff period
+                        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
 
-                        // Week info (first week of the month)
-                        $WeekstartDate = $baseDate->copy()->startOfWeek();
-                        $WeekendDate   = $baseDate->copy()->endOfWeek();
+                        // Week info (first week of the cutoff period)
+                        $WeekstartDate = $startOfMonth->copy()->startOfWeek();
+                        $WeekendDate   = $startOfMonth->copy()->endOfWeek();
 
                         // Transform the paginated results
                         $attandanceregister->getCollection()->transform(function ($item) {
@@ -413,18 +322,15 @@ class AttandanceRegisterController extends Controller
                             return $item;
                         });
 
-
-                    // $year = now()->year;
-                    // $month = now()->month;
-                    $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth;
-
+                    // Build monthwise headers for the cutoff period (day by day)
                     $monthwiseheaders=[];
-                    for ($day = 1; $day <= $totalDays; $day++)
+                    $headerDate = $startOfMonth->copy();
+                    for ($i = 0; $i < $totalDays; $i++)
                     {
-                        $date = Carbon::createFromDate($year, $month, $day);
-                        $dayName = $date->format('D');
-                        $newdate = $date->format('d-m-Y');
-                        $monthwiseheaders[] = ["day"=>str_pad($day, 2, '0', STR_PAD_LEFT),"dayname" => $dayName,'newdate'=>$newdate];
+                        $dayName = $headerDate->format('D');
+                        $newdate = $headerDate->format('d-m-Y');
+                        $monthwiseheaders[] = ["day"=>$headerDate->format('d'),"dayname" => $dayName,'newdate'=>$newdate];
+                        $headerDate->addDay();
                     }
                     $resort_id  = $this->resort->resort_id;
 

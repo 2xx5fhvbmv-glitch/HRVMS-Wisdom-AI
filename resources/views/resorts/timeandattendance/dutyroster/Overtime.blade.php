@@ -242,10 +242,10 @@
                                                             @endif
                                                         </td>
                                                     @endforeach
-                                                    <td>{{ $holidayOtMonthly }}</td>
-                                                    <td>{{ $regularOtMonthly }}</td>
+                                                    <td>{{ sprintf('%02d:%02d', floor($holidayOtMonthly), round(($holidayOtMonthly - floor($holidayOtMonthly)) * 60)) }}</td>
+                                                    <td>{{ sprintf('%02d:%02d', floor($regularOtMonthly), round(($regularOtMonthly - floor($regularOtMonthly)) * 60)) }}</td>
 
-                                                    <td> Total Hrs: <span>{{ number_format($totalMonthWiseHours, 2) }}</span>
+                                                    <td>{{ sprintf('%02d:%02d', floor($totalMonthWiseHours), round(($totalMonthWiseHours - floor($totalMonthWiseHours)) * 60)) }}
                                                     </td>
                                                 </tr>
                                             @endforeach
@@ -539,9 +539,8 @@
                                 toastr.success(response.message, "Success", {
                                     positionClass: 'toast-bottom-right'
                                 });
-                                setTimeout(function() {
-                                    window.location.reload();
-                                }, 3000);
+                                // Refresh table via AJAX instead of page reload
+                                updateFilterWiseTable();
                             } else {
                                 toastr.error(response.message, "Error", {
                                     positionClass: 'toast-bottom-right'
@@ -605,13 +604,16 @@
             window.location.href = "{{ route('resort.timeandattendance.OverTime') }}";
         });
 
-        document.getElementById('DutyRosterCreateDatePickerFilter').addEventListener('input', function () {
-            let rawDate = this.value; // Format: YYYY-MM-DD
-            if (rawDate) {
-                let parts = rawDate.split('-');
-                this.value = `${parts[2]}-${parts[1]}-${parts[0]}`; // Converts to DD-MM-YYYY
-            }
-        });
+        var datePickerFilter = document.getElementById('DutyRosterCreateDatePickerFilter');
+        if (datePickerFilter) {
+            datePickerFilter.addEventListener('input', function () {
+                let rawDate = this.value; // Format: YYYY-MM-DD
+                if (rawDate) {
+                    let parts = rawDate.split('-');
+                    this.value = `${parts[2]}-${parts[1]}-${parts[0]}`; // Converts to DD-MM-YYYY
+                }
+            });
+        }
         $(document).on("change", "#Shift", function() {
             let overtime = "00:00";
             let DayWiseTotalHours="";
@@ -1002,7 +1004,7 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        // Hide modal - try both Bootstrap 4 and 5 syntax
+                        // Hide modal
                         if (typeof bootstrap !== 'undefined') {
                             var modalElement = document.getElementById('editOvertimeModal');
                             var modal = bootstrap.Modal.getInstance(modalElement);
@@ -1015,9 +1017,8 @@
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 1000);
+                        // Refresh table via AJAX instead of page reload
+                        updateFilterWiseTable();
                     } else {
                         toastr.error(response.message, "Error", {
                             positionClass: 'toast-bottom-right'

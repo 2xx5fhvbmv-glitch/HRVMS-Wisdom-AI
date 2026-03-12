@@ -627,7 +627,7 @@
                         iDisplayLength: 6,
                         processing: true,
                         serverSide: true,
-                        order: [[7, 'desc']],
+                        order: [[8, 'asc']],
                         ajax: {
                             url: url,
                             type: 'GET',
@@ -652,7 +652,7 @@
                             { data: 'OverTime', name: 'OverTime', className: 'text-nowrap'},
                             { data: 'Status', name: 'Status', className: 'text-nowrap'},
                             { data: 'Action', name: 'Action', className: 'text-nowrap'},
-                            { data: 'created_at', name: 'created_at', visible: false, searchable: false, orderable: true },
+                            { data: 'sort_date', name: 'sort_date', visible: false, searchable: false, orderable: true },
 
                         ]
                     });

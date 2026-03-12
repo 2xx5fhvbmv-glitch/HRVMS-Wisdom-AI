@@ -271,6 +271,11 @@
         datatablelist()
     });
 
+    $(document).on('change', '.Department', function () {
+        EmployeeGrid();
+        datatablelist();
+    });
+
     $(document).on('change', '#position', function () {
         EmployeeGrid();
         datatablelist()
@@ -278,11 +283,12 @@
     function EmployeeGrid()
     {
         var search = $(".Search").val();
-        var Poitions = $("#position").val();
+        var position = $("#position").val();
+        var department = $("#department").val();
         $.ajax({
                 url: "{{ route('resort.timeandattendance.SearchEmployeegird') }}",
                 type: "get",
-                data: {"_token":"{{ csrf_token() }}","search":search,"Poitions":Poitions},
+                data: {"_token":"{{ csrf_token() }}","search":search,"position":position,"department":department},
                 success: function (response) {
 
                     if (response.success)
@@ -324,12 +330,13 @@
                 iDisplayLength: 6,
                 processing: true,
                 serverSide: true,
-                order: [[9, 'desc']],
+                order: [[0, 'asc']],
                 ajax: {
                     url: "{{ route('resort.timeandattendance.EmployeeList') }}",
                     type: 'GET',
                     data: function(d) {
                         d.position = $("#position").val();
+                        d.department = $("#department").val();
                         d.searchTerm = $('.Search').val();
                     }
                 },
@@ -343,7 +350,6 @@
                     { data: 'TotalWorkingDay', name: 'TotalWorkingDay' },
                     { data: 'TotalDayOffs', name: 'TotalDayOffs' },
                     { data: 'Action', name: 'action', orderable: false, searchable: false },
-                    {data:'created_at', visible:false,searchable:false},
                 ]
 
             });

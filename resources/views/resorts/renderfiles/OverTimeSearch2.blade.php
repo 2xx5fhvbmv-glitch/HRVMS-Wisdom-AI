@@ -123,10 +123,10 @@
                                 @endif
                             </td>
                         @endforeach
-                        <td>{{ number_format($holidayOtMonthly, 2) }}</td>
-                        <td>{{ number_format($regularOtMonthly, 2) }}</td>
+                        <td>{{ sprintf('%02d:%02d', floor($holidayOtMonthly), round(($holidayOtMonthly - floor($holidayOtMonthly)) * 60)) }}</td>
+                        <td>{{ sprintf('%02d:%02d', floor($regularOtMonthly), round(($regularOtMonthly - floor($regularOtMonthly)) * 60)) }}</td>
 
-                        <td><span>{{ number_format($totalMonthWiseHours, 2) }}</span>
+                        <td>{{ sprintf('%02d:%02d', floor($totalMonthWiseHours), round(($totalMonthWiseHours - floor($totalMonthWiseHours)) * 60)) }}
                         </td>
                     </tr>
                 @endforeach

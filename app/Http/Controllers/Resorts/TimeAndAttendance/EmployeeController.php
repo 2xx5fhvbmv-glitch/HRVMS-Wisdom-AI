@@ -22,6 +22,7 @@ use App\Models\ResortBenifitGridChild;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
+use App\Models\PayrollConfig;
 class EmployeeController extends Controller
 {
     protected $resort;
@@ -37,17 +38,178 @@ class EmployeeController extends Controller
         }
         $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
+
+    private function getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate)
+    {
+        return [
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date)
+                FROM parent_attendaces pa
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                AND pa.CheckingTime IS NOT NULL
+                AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as PresentCount
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date)
+                FROM parent_attendaces pa
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status = 'Absent'
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as AbsentCount
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date)
+                FROM parent_attendaces pa
+                JOIN shift_settings ss2 ON pa.Shift_id = ss2.id
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
+                AND pa.CheckingTime <= ADDTIME(ss2.StartTime, '00:10:00')
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as OnTimeCount
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date)
+                FROM parent_attendaces pa
+                JOIN shift_settings ss2 ON pa.Shift_id = ss2.id
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
+                AND pa.CheckingTime > ADDTIME(ss2.StartTime, '00:10:00')
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as LateCount
+            "),
+            DB::raw("
+                (
+                    SELECT CONCAT(
+                        FLOOR(COALESCE(SUM(CAST(pa.DayWiseTotalHours AS DECIMAL(10,2))), 0)),
+                        ':',
+                        LPAD(ROUND((COALESCE(SUM(CAST(pa.DayWiseTotalHours AS DECIMAL(10,2))), 0) - FLOOR(COALESCE(SUM(CAST(pa.DayWiseTotalHours AS DECIMAL(10,2))), 0))) * 60), 2, '0')
+                    )
+                    FROM parent_attendaces pa
+                    WHERE pa.Emp_id = employees.id
+                    AND pa.resort_id = {$resortId}
+                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as TotalHoursWorked
+            "),
+            DB::raw("
+                (
+                    SELECT CONCAT(
+                        FLOOR(COALESCE(SUM(CAST(pa.OverTime AS DECIMAL(10,2))), 0)),
+                        ':',
+                        LPAD(ROUND((COALESCE(SUM(CAST(pa.OverTime AS DECIMAL(10,2))), 0) - FLOOR(COALESCE(SUM(CAST(pa.OverTime AS DECIMAL(10,2))), 0))) * 60), 2, '0')
+                    )
+                    FROM parent_attendaces pa
+                    WHERE pa.Emp_id = employees.id
+                    AND pa.resort_id = {$resortId}
+                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as TotalOverTime
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status = 'DayOff'
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as DayOffCount
+            "),
+            DB::raw("
+                (SELECT IFNULL(SUM(
+                    DATEDIFF(
+                        LEAST(to_date, '{$monthEndingDate}'),
+                        GREATEST(from_date, '{$monthStartingDate}')
+                    ) + 1
+                ), 0)
+                FROM employees_leaves
+                WHERE resort_id = {$resortId}
+                AND emp_id = employees.id
+                AND status = 'Approved'
+                AND from_date <= '{$monthEndingDate}'
+                AND to_date >= '{$monthStartingDate}'
+                ) as LeaveCount
+            "),
+        ];
+    }
+
+    private function getAttendanceSelectColumns($resortId, $monthStartingDate, $monthEndingDate)
+    {
+        return [
+            DB::raw("
+                (SELECT IFNULL(SUM(
+                    DATEDIFF(
+                        LEAST(to_date, '{$monthEndingDate}'),
+                        GREATEST(from_date, '{$monthStartingDate}')
+                    ) + 1
+                ), 0)
+                FROM employees_leaves
+                WHERE resort_id = {$resortId}
+                AND emp_id = employees.id
+                AND status = 'Approved'
+                AND from_date <= '{$monthEndingDate}'
+                AND to_date >= '{$monthStartingDate}'
+                ) as LeaveCount
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status = 'Absent'
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as AbsentCount
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                AND pa.CheckingTime IS NOT NULL
+                AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as PresentCount
+            "),
+            DB::raw("
+                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND pa.Status = 'DayOff'
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as DayOffCount
+            "),
+            DB::raw("
+                (SELECT GROUP_CONCAT(DISTINCT dr.DayOfDate)
+                FROM parent_attendaces pa
+                JOIN duty_rosters dr ON pa.roster_id = dr.id
+                WHERE pa.Emp_id = employees.id
+                AND pa.resort_id = {$resortId}
+                AND dr.DayOfDate IS NOT NULL
+                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                ) as DaysInRoster
+            ")
+        ];
+    }
+
     public function index(Request $request)
     {
         // $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank ?? '';
         // $page_title = 'Time And Attendance';
         $ResortDepartment = ResortDepartment::where("resort_id",$this->resort->resort_id)->get();
-        $currentMonthDays = Carbon::now()->daysInMonth;
-        $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d');
-        $monthEndingDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+        $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+        $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+        $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
+        $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
+        $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
         $currentDate = Carbon::now();
-            $employeesQuery = Employee::select([
+            $attendanceCols = $this->getAttendanceSelectColumns($this->resort->resort_id, $monthStartingDate, $monthEndingDate);
+            $employeesQuery = Employee::select(array_merge([
                 'employees.id as employee_id',
                 't1.id as Parentid',
                 't1.first_name',
@@ -55,63 +217,7 @@ class EmployeeController extends Controller
                 't1.profile_picture',
                 't2.position_title',
                 'employees.*',
-                DB::raw("
-                    (SELECT SUM(
-                        DATEDIFF(
-                            LEAST(to_date, '{$monthEndingDate}'),
-                            GREATEST(from_date, '{$monthStartingDate}')
-                        ) + 1
-                    )
-                    FROM employees_leaves
-                    WHERE resort_id = {$this->resort->resort_id}
-                    AND emp_id = employees.id
-                    AND status = 'Approved'
-                    AND (
-                        (from_date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}') OR
-                        (to_date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}')
-                    )
-                    ) as LeaveCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status = 'Absent'
-                    AND pa.CheckingTime IS NULL
-                    AND pa.CheckingOutTime IS NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as AbsentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL
-                    AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as PresentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status = 'DayOff'
-                    AND pa.CheckingTime IS NULL
-                    AND pa.CheckingOutTime IS NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as DayOffCount
-                "),
-                DB::raw("
-                    (SELECT GROUP_CONCAT(DISTINCT dr.DayOfDate)
-                    FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.Emp_id = employees.id
-                    AND dr.DayOfDate IS NOT NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as DaysInRoster
-                ")
-            ])
+            ], $attendanceCols))
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
             ->where('t1.resort_id', $this->resort->resort_id);
@@ -120,17 +226,19 @@ class EmployeeController extends Controller
                 $employeesQuery->whereIn('employees.id', $this->underEmp_id);
             }
            $employees = $employeesQuery->paginate(10);
-                $employees->getCollection()->transform(function ($employee) use ($currentMonthDays) {
+                $today = Carbon::today()->format('Y-m-d');
+                $employees->getCollection()->transform(function ($employee) use ($currentMonthDays, $monthStartingDate, $monthEndingDate, $today) {
                 $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
                 $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
                 $employee->Position = ucfirst($employee->position_title);
                 $employee->TotalWorkingDays = $currentMonthDays;
                 $employee->Leave = isset($employee->LeaveCount) ? $employee->LeaveCount : 0 ;
-                $employee->Absent = $employee->AbsentCount;
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
+                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
                 $employee->CompletedWorkingDays = $employee->PresentCount;
-                $employee->TotalDayoff = Common::getWeekCountInMonth();
+                $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                 $employee->CompletedDayoff = $employee->DayOffCount;
                 return $employee;
             });
@@ -146,13 +254,17 @@ class EmployeeController extends Controller
     {
         $search = $request->search;
         $department = $request->department;
+        $position = $request->position;
         $Rank =  $this->resort->GetEmployee->rank;
         $Dept_id = $this->resort->GetEmployee->Dept_id;
         $currentDate = Carbon::now();
-        $currentMonthDays = Carbon::now()->daysInMonth;
-        $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
-        $monthEndingDate = Carbon::now()->endOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
-        $employees = Employee::select([
+        $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+        $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+        $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
+        $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
+        $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
+        $attendanceCols = $this->getAttendanceSelectColumns($this->resort->resort_id, $monthStartingDate, $monthEndingDate);
+        $employees = Employee::select(array_merge([
             'employees.id as employee_id',
             't1.id as Parentid',
             't1.first_name',
@@ -160,69 +272,11 @@ class EmployeeController extends Controller
             't1.profile_picture',
             't2.position_title',
             'employees.*',
-            DB::raw("
-                (SELECT SUM(
-                    DATEDIFF(
-                        LEAST(to_date, '{$monthEndingDate}'),
-                        GREATEST(from_date, '{$monthStartingDate}')
-                    ) + 1
-                )
-                FROM employees_leaves
-                WHERE resort_id = {$this->resort->resort_id}
-                  AND emp_id = employees.id
-                  AND status = 'Approved'
-                  AND (
-                      (from_date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}') OR
-                      (to_date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}')
-                  )
-                ) as LeaveCount
-            "),
-            DB::raw("
-                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                 JOIN duty_rosters dr ON pa.roster_id = dr.id
-                 WHERE dr.emp_id = employees.id
-                   AND pa.Status = 'Absent'
-                   AND pa.CheckingTime IS NULL
-                   AND pa.CheckingOutTime IS NULL
-                   AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                ) as AbsentCount
-            "),
-            DB::raw("
-                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                 JOIN duty_rosters dr ON pa.roster_id = dr.id
-                 WHERE dr.emp_id = employees.id
-                   AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                   AND pa.CheckingTime IS NOT NULL
-                   AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                   AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                ) as PresentCount
-            "),
-            DB::raw("
-                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                 JOIN duty_rosters dr ON pa.roster_id = dr.id
-                 WHERE dr.emp_id = employees.id
-                   AND pa.Status = 'DayOff'
-                   AND pa.CheckingTime IS NULL
-                   AND pa.CheckingOutTime IS NULL
-                   AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                ) as DayOffCount
-            "),
-            DB::raw("
-                (SELECT GROUP_CONCAT(DISTINCT dr.DayOfDate)
-                FROM parent_attendaces pa
-                JOIN duty_rosters dr ON pa.roster_id = dr.id
-                WHERE dr.Emp_id = employees.id
-                AND dr.DayOfDate IS NOT NULL
-                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                ) as DaysInRoster
-            ")
-        ])
+        ], $attendanceCols))
         ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-        ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id');
-        // ->where('employees.Dept_id', $Dept_id)
-        // ->where('t1.resort_id', $this->resort->resort_id)
-        // ->where('employees.rank', '!=', $Rank)
-        // Apply filters based on search and position
+        ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+        ->where('t1.resort_id', $this->resort->resort_id);
+
         if($Rank != '3'){
             $employees->whereIn('employees.id', $this->underEmp_id);
         }
@@ -239,24 +293,29 @@ class EmployeeController extends Controller
             $employees->where('employees.Dept_id', $department);
         }
 
+        if ($position) {
+            $employees->where('employees.Position_id', $position);
+        }
+
         // Paginate results
         $employees = $employees->paginate(10); // Adjust pagination per your needs
 
         // Apply the transform to the paginated results
-        $employees->getCollection()->transform(function ($employee) use ($currentMonthDays) {
+        $today = Carbon::today()->format('Y-m-d');
+        $employees->getCollection()->transform(function ($employee) use ($currentMonthDays, $monthStartingDate, $monthEndingDate, $today) {
             // Add computed fields
             $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
             $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
             $employee->Position = ucfirst($employee->position_title);
             $employee->TotalWorkingDays = $currentMonthDays;
 
-
             $employee->Leave = isset($employee->LeaveCount) ? $employee->LeaveCount : 0 ;
-            $employee->Absent = $employee->AbsentCount;
             $employee->Present = $employee->PresentCount;
             $employee->Dayoff = $employee->DayOffCount;
+            $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+            $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
             $employee->CompletedWorkingDays = $employee->PresentCount;
-            $employee->TotalDayoff = Common::getWeekCountInMonth();
+            $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
             $employee->CompletedDayoff = $employee->DayOffCount;
             return $employee;
         });
@@ -290,14 +349,18 @@ class EmployeeController extends Controller
         {
             $search = $request->searchTerm;
             $department = $request->department;
+            $position = $request->position;
             $Rank =  $this->resort->GetEmployee->rank;
             $Dept_id = $this->resort->GetEmployee->Dept_id;
             $currentDate = Carbon::now();
-            $currentMonthDays = Carbon::now()->daysInMonth;
-            $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
-            $monthEndingDate = Carbon::now()->endOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
+            $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+            $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+            $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
+            $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
+            $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
 
-            $employees = Employee::select([
+            $attendanceCols = $this->getAttendanceSelectColumns($this->resort->resort_id, $monthStartingDate, $monthEndingDate);
+            $employees = Employee::select(array_merge([
                 'employees.id as employee_id',
                 't1.id as Parentid',
                 't1.first_name',
@@ -306,68 +369,10 @@ class EmployeeController extends Controller
                 't2.position_title',
                 't2.code',
                 'employees.*',
-                DB::raw("
-                    (SELECT SUM(
-                        DATEDIFF(
-                            LEAST(to_date, '{$monthEndingDate}'),
-                            GREATEST(from_date, '{$monthStartingDate}')
-                        ) + 1
-                    )
-                    FROM employees_leaves
-                    WHERE resort_id = {$this->resort->resort_id}
-                      AND emp_id = employees.id
-                      AND status = 'Approved'
-                      AND (
-                          (from_date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}') OR
-                          (to_date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}')
-                      )
-                    ) as LeaveCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                     JOIN duty_rosters dr ON pa.roster_id = dr.id
-                     WHERE dr.emp_id = employees.id
-                       AND pa.Status = 'Absent'
-                       AND pa.CheckingTime IS NULL
-                       AND pa.CheckingOutTime IS NULL
-                       AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as AbsentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                     JOIN duty_rosters dr ON pa.roster_id = dr.id
-                     WHERE dr.emp_id = employees.id
-                       AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                       AND pa.CheckingTime IS NOT NULL
-                       AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                       AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as PresentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                     JOIN duty_rosters dr ON pa.roster_id = dr.id
-                     WHERE dr.emp_id = employees.id
-                       AND pa.Status = 'DayOff'
-                       AND pa.CheckingTime IS NULL
-                       AND pa.CheckingOutTime IS NULL
-                       AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as DayOffCount
-                "),
-                DB::raw("
-                    (SELECT GROUP_CONCAT(DISTINCT dr.DayOfDate)
-                    FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.Emp_id = employees.id
-                    AND dr.DayOfDate IS NOT NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as DaysInRoster
-                ")
-            ])
+            ], $attendanceCols))
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-            // ->whereIn('employees.id', $this->underEmp_id)
             ->where('t1.resort_id', $this->resort->resort_id);
-            // ->where('employees.rank', '!=', $Rank);
 
             if($Rank != '3'){
                 $employees->whereIn('employees.id', $this->underEmp_id);
@@ -387,20 +392,25 @@ class EmployeeController extends Controller
                 $employees->where('employees.Dept_id', $department);
             }
 
-            $employees = $employees->get()->map(function ($employee) use ($currentMonthDays)
+            if ($position) {
+                $employees->where('employees.Position_id', $position);
+            }
+
+            $today = Carbon::today()->format('Y-m-d');
+            $employees = $employees->get()->map(function ($employee) use ($currentMonthDays, $monthStartingDate, $monthEndingDate, $today)
             {
                 $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
                 $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
                 $employee->Position = ucfirst($employee->position_title);
                 $employee->TotalWorkingDays = $currentMonthDays;
 
-
                 $employee->Leave = isset($employee->LeaveCount) ? $employee->LeaveCount : 0 ;
-                $employee->Absent = $employee->AbsentCount;
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
+                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
                 $employee->CompletedWorkingDays = $employee->PresentCount;
-                $employee->TotalDayoff = Common::getWeekCountInMonth();
+                $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                 $employee->CompletedDayoff = $employee->DayOffCount;
                 return $employee;
             });
@@ -464,19 +474,20 @@ class EmployeeController extends Controller
         $page_title = "Employee Details";
         $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank;
-        $currentMonthDays = Carbon::now()->daysInMonth;
-        $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d'); // Format as 'YYYY-MM-DD'
-        $monthEndingDate = Carbon::now()->format('Y-m-d'); // Today (default range: 1st of month to today)
+        $resortId = $this->resort->resort_id;
+        $cutoffDay = PayrollConfig::where('resort_id', $resortId)->value('cutoff_day') ?? 1;
+        $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+        $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
+        $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
+        $currentMonthDays = $cutoffPeriod['start']->diffInDays($cutoffPeriod['end']) + 1;
         $currentDate = Carbon::now();
+        $detailCols = $this->getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate);
         $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
             ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
-            ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id') // Assuming duty_rosters has a shift_id
-            // ->where('employees.Dept_id', $Dept_id)
-            // ->where('t1.resort_id', $this->resort->resort_id)
-            // ->where('employees.rank', '!=', $Rank)
+            ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id')
             ->where('employees.id', $id)
-            ->select(
+            ->select(array_merge([
                 't3.id as duty_roster_id',
                 't3.DayOfDate',
                 't1.id as Parentid',
@@ -490,96 +501,26 @@ class EmployeeController extends Controller
                 't2.position_title',
                 't2.code as PositionCode',
                 'employees.Dept_id',
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL
-                    AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as PresentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status = 'Absent'
-                    AND pa.CheckingTime IS NULL
-                    AND pa.CheckingOutTime IS NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as AbsentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN shift_settings ss ON pa.Shift_id = ss.id
-                    WHERE pa.Emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.CheckingTime <= ADDTIME(ss.StartTime, '00:10:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as OnTimeCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN shift_settings ss ON pa.Shift_id = ss.id
-                    WHERE pa.Emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.CheckingTime > ADDTIME(ss.StartTime, '00:10:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as LateCount
-                "),
-                DB::raw("
-                    (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.DayWiseTotalHours)), 0)), '%H:%i')
-                        FROM parent_attendaces pa
-                        WHERE pa.Emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as TotalHoursWorked
-                "),
-                DB::raw("
-                    (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.OverTime)), 0)), '%H:%i')
-                        FROM parent_attendaces pa
-                        WHERE pa.Emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as TotalOverTime
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status = 'DayOff'
-                    AND pa.CheckingTime IS NULL
-                    AND pa.CheckingOutTime IS NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as DayOffCount
-                "),
-            )
+            ], $detailCols))
             ->first();
             $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
             if ($employee)
             {
-                $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name); // Full name
-                $employee->profile_picture = Common::getResortUserPicture($employee->Parentid); // Custom profile picture logic
-                $employee->Position = ucfirst($employee->position_title); // Position title formatting
-                $employee->TotalWorkingDays = Carbon::now()->daysInMonth; // Total days in the current month
-                $employee->Leave = $employee->LeaveCount ?? 0; // Handle LeaveCount
-                $employee->Absent = $employee->AbsentCount;
+                $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
+                $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
+                $employee->Position = ucfirst($employee->position_title);
+                $employee->TotalWorkingDays = $currentMonthDays;
+                $employee->Leave = $employee->LeaveCount ?? 0;
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
+                $today = Carbon::today()->format('Y-m-d');
+                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
                 $employee->CompletedWorkingDays = $employee->PresentCount;
                 $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
                 $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
-                $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
+                $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                 $employee->CompletedDayoff = $employee->DayOffCount;
                 $employee->department = $department;
                 if (isset($employee->PresentCount) && $employee->PresentCount > 0)
@@ -653,18 +594,15 @@ class EmployeeController extends Controller
                             return $i;
             });
             $leave_categories = $this->addLeaveAvailableWithCarryForward($leave_categories, $id);
-            $currentMonthDays = Carbon::now()->daysInMonth;
-
-            $previousDay = Carbon::yesterday()->toDateString(); // Format: 'YYYY-MM-DD'
-            $previousMonthStart = Carbon::now()->startOfMonth()->toDateString();
-            $previousMonthEnd = Carbon::now()->today()->toDateString();
             $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
                 ->whereIn('parent_attendaces.Status', ['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
+                ->where('parent_attendaces.resort_id', $resortId)
+                ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])
+                ->groupBy('parent_attendaces.id')
                 ->orderBy('parent_attendaces.date', 'ASC')
-                ->whereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd])
                 ->paginate(10, [
                     't2.InTime_Location',
                     't2.OutTime_Location',
@@ -955,24 +893,24 @@ class EmployeeController extends Controller
             $monthStartingDate = Carbon::parse($request->start_date)->format('Y-m-d');
             $monthEndingDate = Carbon::parse($request->end_date)->format('Y-m-d');
         } else {
-            $monthStartingDate = Carbon::now()->startOfMonth()->format('Y-m-d');
-            $monthEndingDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+            $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+            $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+            $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
+            $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
         }
 
         $page_title = "Employee Details";
-        $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank;
-        $currentMonthDays = Carbon::now()->daysInMonth;
+        $resortId = $this->resort->resort_id;
+        $currentMonthDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse($monthEndingDate)) + 1;
         $currentDate = Carbon::now();
+            $detailCols = $this->getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate);
             $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
                 ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
-                ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id') // Assuming duty_rosters has a shift_id
-                // ->where('employees.Dept_id', $Dept_id)
-                // ->where('t1.resort_id', $this->resort->resort_id)
-                // ->where('employees.rank', '!=', $Rank)
+                ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id')
                 ->where('employees.id', $id)
-                ->select(
+                ->select(array_merge([
                     't3.id as duty_roster_id',
                     't3.DayOfDate',
                     't1.id as Parentid',
@@ -986,96 +924,26 @@ class EmployeeController extends Controller
                     't2.position_title',
                     't2.code as PositionCode',
                     'employees.Dept_id',
-                    DB::raw("
-                        (SELECT COUNT(DISTINCT pa.date)
-                        FROM parent_attendaces pa
-                        JOIN duty_rosters dr ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.CheckingTime IS NOT NULL
-                        AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as PresentCount
-                    "),
-                    DB::raw("
-                        (SELECT COUNT(DISTINCT pa.date)
-                        FROM parent_attendaces pa
-                        JOIN duty_rosters dr ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
-                        AND pa.Status = 'Absent'
-                        AND pa.CheckingTime IS NULL
-                        AND pa.CheckingOutTime IS NULL
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as AbsentCount
-                    "),
-                    DB::raw("
-                        (SELECT COUNT(DISTINCT pa.date)
-                        FROM parent_attendaces pa
-                        JOIN shift_settings ss ON pa.Shift_id = ss.id
-                        WHERE pa.Emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                        AND pa.CheckingTime <= ADDTIME(ss.StartTime, '00:10:00')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as OnTimeCount
-                    "),
-                    DB::raw("
-                        (SELECT COUNT(DISTINCT pa.date)
-                        FROM parent_attendaces pa
-                        JOIN shift_settings ss ON pa.Shift_id = ss.id
-                        WHERE pa.Emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                        AND pa.CheckingTime > ADDTIME(ss.StartTime, '00:10:00')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as LateCount
-                    "),
-                    DB::raw("
-                        (
-                            SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.DayWiseTotalHours)), 0)), '%H:%i')
-                            FROM parent_attendaces pa
-                            WHERE pa.Emp_id = employees.id
-                            AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                            AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as TotalHoursWorked
-                    "),
-                    DB::raw("
-                        (
-                            SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.OverTime)), 0)), '%H:%i')
-                            FROM parent_attendaces pa
-                            WHERE pa.Emp_id = employees.id
-                            AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                            AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as TotalOverTime
-                    "),
-                    DB::raw("
-                        (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                        JOIN duty_rosters dr ON pa.roster_id = dr.id
-                        WHERE dr.emp_id = employees.id
-                        AND pa.Status = 'DayOff'
-                        AND pa.CheckingTime IS NULL
-                        AND pa.CheckingOutTime IS NULL
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                        ) as DayOffCount
-                    "),
-                )
+                ], $detailCols))
                 ->first();
                 $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
                 if ($employee)
                 {
-                    $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name); // Full name
-                    $employee->profile_picture = Common::getResortUserPicture($employee->Parentid); // Custom profile picture logic
-                    $employee->Position = ucfirst($employee->position_title); // Position title formatting
-                    $employee->TotalWorkingDays = Carbon::now()->daysInMonth; // Total days in the current month
-                    $employee->Leave = $employee->LeaveCount ?? 0; // Handle LeaveCount
-                    $employee->Absent = $employee->AbsentCount;
+                    $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
+                    $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
+                    $employee->Position = ucfirst($employee->position_title);
+                    $employee->TotalWorkingDays = $currentMonthDays;
+                    $employee->Leave = $employee->LeaveCount ?? 0;
                     $employee->Present = $employee->PresentCount;
                     $employee->Dayoff = $employee->DayOffCount;
+                    $today = Carbon::today()->format('Y-m-d');
+                    $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                    $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
                     $employee->CompletedWorkingDays = $employee->PresentCount;
                     $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
                     $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
-                    $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
+                    $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                     $employee->CompletedDayoff = $employee->DayOffCount;
                     $employee->department = $department;
                     if (isset($employee->PresentCount) && $employee->PresentCount > 0)
@@ -1281,9 +1149,10 @@ class EmployeeController extends Controller
     {
         if($request->ajax())
         {
-            $currentMonthDays = Carbon::now()->daysInMonth;
-            $previousMonthStart = Carbon::now()->startOfMonth()->toDateString();
-            $previousMonthEnd = Carbon::now()->today()->toDateString();
+            $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+            $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+            $previousMonthStart = $cutoffPeriod['start']->format('Y-m-d');
+            $previousMonthEnd = $cutoffPeriod['end']->format('Y-m-d');
             // Use filter dates when provided (e.g. from employee details date range)
             if ($request->filled('start_date') && $request->filled('end_date')) {
                 try {
@@ -1293,12 +1162,16 @@ class EmployeeController extends Controller
                     // keep defaults on parse error
                 }
             }
+            $currentMonthDays = Carbon::parse($previousMonthStart)->diffInDays(Carbon::parse($previousMonthEnd)) + 1;
             $AttendanceHistroy =  ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
                 ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
+                ->where('parent_attendaces.resort_id', $this->resort->resort_id)
                 ->whereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd])
+                ->groupBy('parent_attendaces.id')
+                ->orderBy('parent_attendaces.date', 'ASC')
                 ->get([
                             't2.InTime_Location',
                             't2.OutTime_Location',
@@ -1317,8 +1190,8 @@ class EmployeeController extends Controller
                         ])
 
                 ->map(function($h)use($currentMonthDays){
-                    $h->date = Carbon::parse($h->date)->format('d M Y');;
-                    //  $h->date = Carbon::parse($h->date)->format('d M Y');;
+                    $h->raw_date = Carbon::parse($h->date)->format('Y-m-d');
+                    $h->date = Carbon::parse($h->date)->format('d M Y');
                     $h->shift = ucfirst($h->ShiftName) ;
                     
 
@@ -1483,8 +1356,8 @@ class EmployeeController extends Controller
                             <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" icon>
                         </a>';
                     })
-                    ->addColumn('created_at', function ($row) {
-                        return $row->created_at ?? '';
+                    ->addColumn('sort_date', function ($row) {
+                        return $row->raw_date;
                     })
                     ->rawColumns(['Date', 'Shift', 'CheckinTime', 'CheckOutTime', 'TotalHours','OverTime', 'Status', 'Action'])
                     ->make(true);
@@ -1500,28 +1373,29 @@ class EmployeeController extends Controller
         // $monthEndingDate = isset($dates[1])
         //     ? Carbon::createFromFormat('d/m/Y', $dates[1])->format('Y-m-d') // Correct date format for the '03/01/2025' format
         //     : Carbon::now()->endOfMonth()->format('Y-m-d'); // Default to the end of the month
-            $monthStartingDate = isset($request->start_date)
-            ? Carbon::createFromFormat('d/m/Y', $request->start_date)->format('Y-m-d') // Correct date format for the '03/01/2025' format
-            : Carbon::now()->startOfMonth()->format('Y-m-d'); // Default to the start of the month
-        $monthEndingDate = isset($request->end_date)
-            ? Carbon::createFromFormat('d/m/Y', $request->end_date)->format('Y-m-d') // Correct date format for the '03/01/2025' format
-            : Carbon::now()->endOfMonth()->format('Y-m-d'); // Default to the end of the month
+        if (isset($request->start_date) && isset($request->end_date)) {
+            $monthStartingDate = Carbon::createFromFormat('d/m/Y', $request->start_date)->format('Y-m-d');
+            $monthEndingDate = Carbon::createFromFormat('d/m/Y', $request->end_date)->format('Y-m-d');
+        } else {
+            $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+            $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+            $monthStartingDate = $cutoffPeriod['start']->format('Y-m-d');
+            $monthEndingDate = $cutoffPeriod['end']->format('Y-m-d');
+        }
         $id = base64_decode($request->emp_id);
         $page_title = "Employee Details";
-        $Dept_id = $this->resort->GetEmployee->Dept_id;
         $Rank =  $this->resort->GetEmployee->rank;
-        $currentMonthDays = Carbon::now()->daysInMonth;
+        $resortId = $this->resort->resort_id;
+        $currentMonthDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse($monthEndingDate)) + 1;
 
         $currentDate = Carbon::now();
+        $detailCols = $this->getDetailSelectColumns($resortId, $monthStartingDate, $monthEndingDate);
         $employee = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
             ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
-            ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id') // Assuming duty_rosters has a shift_id
-            // ->where('employees.Dept_id', $Dept_id)
-            // ->where('t1.resort_id', $this->resort->resort_id)
-            // ->where('employees.rank', '!=', $Rank)
+            ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id')
             ->where('employees.id', $id)
-            ->select(
+            ->select(array_merge([
                 't3.id as duty_roster_id',
                 't3.DayOfDate',
                 't1.id as Parentid',
@@ -1534,95 +1408,25 @@ class EmployeeController extends Controller
                 'employees.religion',
                 't2.position_title',
                 't2.code as PositionCode',
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL
-                    AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as PresentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status = 'Absent'
-                    AND pa.CheckingTime IS NULL
-                    AND pa.CheckingOutTime IS NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as AbsentCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN shift_settings ss ON pa.Shift_id = ss.id
-                    WHERE pa.Emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.CheckingTime <= ADDTIME(ss.StartTime, '00:10:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as OnTimeCount
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date)
-                    FROM parent_attendaces pa
-                    JOIN shift_settings ss ON pa.Shift_id = ss.id
-                    WHERE pa.Emp_id = employees.id
-                    AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                    AND pa.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
-                    AND pa.CheckingTime > ADDTIME(ss.StartTime, '00:10:00')
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as LateCount
-                "),
-                DB::raw("
-                    (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.DayWiseTotalHours)), 0)), '%H:%i')
-                        FROM parent_attendaces pa
-                        WHERE pa.Emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as TotalHoursWorked
-                "),
-                DB::raw("
-                    (
-                        SELECT TIME_FORMAT(SEC_TO_TIME(COALESCE(SUM(TIME_TO_SEC(pa.OverTime)), 0)), '%H:%i')
-                        FROM parent_attendaces pa
-                        WHERE pa.Emp_id = employees.id
-                        AND pa.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
-                        AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as TotalOverTime
-                "),
-                DB::raw("
-                    (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                    JOIN duty_rosters dr ON pa.roster_id = dr.id
-                    WHERE dr.emp_id = employees.id
-                    AND pa.Status = 'DayOff'
-                    AND pa.CheckingTime IS NULL
-                    AND pa.CheckingOutTime IS NULL
-                    AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
-                    ) as DayOffCount
-                "),
-            )
+            ], $detailCols))
             ->first();
 
             if ($employee)
             {
-                $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name); // Full name
-                $employee->profile_picture = Common::getResortUserPicture($employee->Parentid); // Custom profile picture logic
-                $employee->Position = ucfirst($employee->position_title); // Position title formatting
-                $employee->TotalWorkingDays = Carbon::now()->daysInMonth; // Total days in the current month
-                $employee->Leave = $employee->LeaveCount ?? 0; // Handle LeaveCount
-                $employee->Absent = $employee->AbsentCount;
+                $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
+                $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
+                $employee->Position = ucfirst($employee->position_title);
+                $employee->TotalWorkingDays = $currentMonthDays;
+                $employee->Leave = $employee->LeaveCount ?? 0;
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
+                $today = Carbon::today()->format('Y-m-d');
+                $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
+                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
                 $employee->CompletedWorkingDays = $employee->PresentCount;
                 $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
                 $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
-                $employee->TotalDayoff = Common::getWeekCountInMonth(); // Assuming a utility function for week count
+                $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                 $employee->CompletedDayoff = $employee->DayOffCount;
                 if (isset($employee->PresentCount) && $employee->PresentCount > 0)
                 {
@@ -1694,18 +1498,15 @@ class EmployeeController extends Controller
                             $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
                             return $i;
             });
-            $currentMonthDays = Carbon::now()->daysInMonth;
-
-            $previousDay = Carbon::yesterday()->toDateString(); // Format: 'YYYY-MM-DD'
-            $previousMonthStart = Carbon::now()->startOfMonth()->toDateString();
-            $previousMonthEnd = Carbon::now()->today()->toDateString();
             $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
                 ->whereIn('parent_attendaces.Status', ['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
                 ->where('t1.id', $id)
-                ->orderBy('parent_attendaces.date', 'ASC')
+                ->where('parent_attendaces.resort_id', $resortId)
                 ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])
+                ->groupBy('parent_attendaces.id')
+                ->orderBy('parent_attendaces.date', 'ASC')
                 ->paginate(10, [
                     'parent_attendaces.id',
                     't2.InTime_Location',
