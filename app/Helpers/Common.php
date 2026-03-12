@@ -2766,8 +2766,15 @@ class Common
         }
     }
 
+    private static $attendanceCache = [];
+
     public static function GetAttandanceRegister($resort_id,$duty_roster_id,$Employee,$WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth,$flag)
     {
+        // Cache key to avoid duplicate queries for same employee/flag
+        $cacheKey = "{$duty_roster_id}_{$Employee}_{$flag}";
+        if (isset(self::$attendanceCache[$cacheKey])) {
+            return self::$attendanceCache[$cacheKey];
+        }
 
         if($flag =="weekly")
         {
@@ -2781,15 +2788,43 @@ class Common
             ->whereBetween('t2.date', [$WeekstartDate, $WeekendDate])
             ->where('t1.resort_id', '=', $resort_id)
             ->where('duty_rosters.id', '=', $duty_roster_id)
-            // ->where('duty_rosters.Year', '=', $WeekstartDateCarbon->format('Y'))
             ->orderBy('t2.date', 'asc')
+            ->groupBy('t2.id')
             ->get([
                 't2.OTStatus', 't2.OTApproved_By', 't3.id as Child_Attd_id', 't3.InTime_Location', 't3.OutTime_Location',
                 't2.CheckingOutTime', 't2.CheckingTime', 't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date',
                 't2.Shift_id', 'duty_rosters.DayOfDate', 't1.ShiftName', 'OverTime', 't1.StartTime', 't1.EndTime',
-                't2.DayWiseTotalHours'
-            ])
-            ->map(function ($roster) use($WeekstartDate, $WeekendDate,$resort_id) {
+                't2.DayWiseTotalHours', 't2.note'
+            ]);
+
+            // Pre-fetch all approved names to avoid N+1 queries
+            $approverIds = $DutyRoster->pluck('OTApproved_By')->filter()->unique()->values()->toArray();
+            $approvedNames = collect([]);
+            if (!empty($approverIds)) {
+                $approvedNames = ResortAdmin::whereIn('id', $approverIds)->get(['id', 'first_name', 'last_name'])->keyBy('id');
+            }
+
+            // Pre-fetch all leave data for this employee in date range (single query)
+            $empIds = $DutyRoster->pluck('Emp_id')->unique()->values()->toArray();
+            $allLeaveData = collect([]);
+            if (!empty($empIds)) {
+                $allLeaveData = LeaveCategory::join('employees_leaves as t1', 't1.leave_category_id', '=', 'leave_categories.id')
+                    ->whereIn('t1.Emp_id', $empIds)
+                    ->where('leave_categories.resort_id', $resort_id)
+                    ->where(function ($query) use ($WeekstartDate, $WeekendDate) {
+                        $query->whereBetween('t1.from_date', [$WeekstartDate, $WeekendDate])
+                            ->orWhereBetween('t1.to_date', [$WeekstartDate, $WeekendDate])
+                            ->orWhere(function ($query) use ($WeekstartDate, $WeekendDate) {
+                                $query->where('t1.from_date', '<', $WeekstartDate)
+                                    ->where('t1.to_date', '>', $WeekendDate);
+                            });
+                    })
+                    ->where('t1.status', 'Approved')
+                    ->get(['t1.total_days','leave_categories.leave_type','leave_categories.id as leave_cat_id','t1.from_date','t1.to_date','t1.Emp_id','t1.status'])
+                    ->groupBy('Emp_id');
+            }
+
+            $DutyRoster = $DutyRoster->map(function ($roster) use($WeekstartDate, $WeekendDate,$resort_id, $approvedNames, $allLeaveData) {
                 // Format times
                 $checkInTimeParsed = self::safeParseTime($roster->CheckingTime);
                 $roster->CheckInTime = $checkInTimeParsed ? $checkInTimeParsed->format('h:i A') : null;
@@ -2797,8 +2832,8 @@ class Common
                 $checkOutTimeParsed = self::safeParseTime($roster->CheckingOutTime);
                 $roster->CheckOutTime = $checkOutTimeParsed ? $checkOutTimeParsed->format('h:i A') : null;
 
-                // Fetch approved name
-                $approved_name = ResortAdmin::where('id', $roster->OTApproved_By)->first(['first_name', 'last_name']);
+                // Use pre-fetched approved name
+                $approved_name = $approvedNames->get($roster->OTApproved_By);
                 $roster->ApprovedName = isset($approved_name) ? ucfirst($approved_name->first_name . ' ' . $approved_name->last_name): "";
 
                 // Check internal status
@@ -2830,7 +2865,12 @@ class Common
                     $overTime = $roster->OverTime ?? "00:00";
 
                     if ($endTime) {
-                        list($hours, $minutes) = explode(':', $overTime);
+                        if (strpos($overTime, ':') !== false) {
+                            list($hours, $minutes) = explode(':', $overTime);
+                        } else {
+                            $hours = intval($overTime);
+                            $minutes = 0;
+                        }
                         $updatedEndTime = $endTime->copy()->addHours($hours)->addMinutes($minutes);
                     } else {
                         $updatedEndTime = null;
@@ -2856,21 +2896,9 @@ class Common
                         $roster->msg = "Continue";
                     }
 
-                    $Leavevcategory = LeaveCategory::join('employees_leaves as t1', 't1.leave_category_id', '=', 'leave_categories.id')
-                                                ->where('t1.Emp_id', $roster->Emp_id)
-                                                ->where('leave_categories.resort_id', $resort_id)
-                                                ->where(function ($query) use ($WeekstartDate, $WeekendDate) {
-                                                    $query->whereBetween('t1.from_date', [$WeekstartDate, $WeekendDate]) // Leave starts in the month
-                                                        ->orWhereBetween('t1.to_date', [$WeekstartDate, $WeekendDate])   // Leave ends in the month
-                                                        ->orWhere(function ($query) use ($WeekstartDate, $WeekendDate) { // Leave spans the entire month
-                                                            $query->where('t1.from_date', '<', $WeekstartDate)
-                                                                ->where('t1.to_date', '>', $WeekendDate);
-                                                        });
-                                                })
-                                                ->where('t1.status', 'Approved')
-                                        ->where('leave_categories.resort_id', $resort_id)
-                                    ->get(['t1.total_days','leave_categories.leave_type','leave_categories.id as leave_cat_id','t1.from_date','t1.to_date','t1.Emp_id','t1.status']);
-                                    $transformedLeaveData = $Leavevcategory->map(function ($item) {
+                    // Use pre-fetched leave data
+                    $Leavevcategory = $allLeaveData->get($roster->Emp_id, collect([]));
+                    $transformedLeaveData = $Leavevcategory->map(function ($item) {
                                         return $item->only(['total_days', 'leave_type', 'leave_cat_id', 'from_date', 'to_date', 'Emp_id', 'status']);
                                     })->values()->toArray();
                                  $roster->LeaveData = $transformedLeaveData;
@@ -2885,22 +2913,52 @@ class Common
             // $endOfMonth = Carbon::now()->endOfMonth()->format('Y-m-d'); // Last day of the month
 
 
+                $startStr = $startOfMonth->format('Y-m-d');
+                $endStr = $endOfMonth->format('Y-m-d');
+
                 $DutyRoster = DutyRoster::join('parent_attendaces as t2', 't2.Emp_id', '=', 'duty_rosters.Emp_id')
                     ->join('shift_settings as t1', 't1.id', '=', 't2.Shift_id')
                     ->leftJoin('child_attendaces as t3', 't3.Parent_attd_id', '=', 't2.id')
-                    ->whereBetween('t2.date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
-
-                    // ->where('duty_rosters.Year', '=', date('Y'))
+                    ->whereBetween('t2.date', [$startStr, $endStr])
                     ->where('t1.resort_id', '=', $resort_id)
                     ->where('duty_rosters.id', '=', $duty_roster_id)
                     ->orderBy('t2.date', 'asc')
+                    ->groupBy('t2.id')
                     ->get([
                         't2.OTStatus', 't2.OTApproved_By', 't3.id as Child_Attd_id', 't3.InTime_Location', 't3.OutTime_Location',
                         't2.CheckingOutTime', 't2.CheckingTime', 't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date',
                         't2.Shift_id', 'duty_rosters.DayOfDate', 't1.ShiftName', 'OverTime', 't1.StartTime', 't1.EndTime',
-                        't2.DayWiseTotalHours'
-                    ])
-                    ->map(function ($roster) use($resort_id,$startOfMonth,$endOfMonth) {
+                        't2.DayWiseTotalHours', 't2.note'
+                    ]);
+
+                // Pre-fetch all approved names to avoid N+1 queries
+                $approverIds = $DutyRoster->pluck('OTApproved_By')->filter()->unique()->values()->toArray();
+                $approvedNames = collect([]);
+                if (!empty($approverIds)) {
+                    $approvedNames = ResortAdmin::whereIn('id', $approverIds)->get(['id', 'first_name', 'last_name'])->keyBy('id');
+                }
+
+                // Pre-fetch all leave data for employees in date range (single query)
+                $empIds = $DutyRoster->pluck('Emp_id')->unique()->values()->toArray();
+                $allLeaveData = collect([]);
+                if (!empty($empIds)) {
+                    $allLeaveData = LeaveCategory::join('employees_leaves as t1', 't1.leave_category_id', '=', 'leave_categories.id')
+                        ->whereIn('t1.Emp_id', $empIds)
+                        ->where('leave_categories.resort_id', $resort_id)
+                        ->where(function ($query) use ($startStr, $endStr) {
+                            $query->whereBetween('t1.from_date', [$startStr, $endStr])
+                                ->orWhereBetween('t1.to_date', [$startStr, $endStr])
+                                ->orWhere(function ($query) use ($startStr, $endStr) {
+                                    $query->where('t1.from_date', '<', $startStr)
+                                        ->where('t1.to_date', '>', $endStr);
+                                });
+                        })
+                        ->where('t1.status', 'Approved')
+                        ->get(['t1.total_days','leave_categories.leave_type','leave_categories.id as leave_cat_id','t1.from_date','t1.to_date','t1.Emp_id','t1.status'])
+                        ->groupBy('Emp_id');
+                }
+
+                $DutyRoster = $DutyRoster->map(function ($roster) use($resort_id,$startOfMonth,$endOfMonth, $approvedNames, $allLeaveData) {
                         // Format times
                         $checkInTimeParsed = self::safeParseTime($roster->CheckingTime);
                         $roster->CheckInTime = $checkInTimeParsed ? $checkInTimeParsed->format('h:i A') : null;
@@ -2908,8 +2966,8 @@ class Common
                         $checkOutTimeParsed = self::safeParseTime($roster->CheckingOutTime);
                         $roster->CheckOutTime = $checkOutTimeParsed ? $checkOutTimeParsed->format('h:i A') : null;
 
-                        // Fetch approved name
-                        $approved_name = ResortAdmin::where('id', $roster->OTApproved_By)->first(['first_name', 'last_name']);
+                        // Use pre-fetched approved name
+                        $approved_name = $approvedNames->get($roster->OTApproved_By);
                         $roster->ApprovedName = isset($approved_name) ? ucfirst($approved_name->first_name . ' ' . $approved_name->last_name): "";
 
                         // Check internal status
@@ -2941,22 +2999,20 @@ class Common
                             $overTime = $roster->OverTime ?? "00:00";
 
                             if ($endTime) {
-
-                                $time = $overTime ?? '0:0';
-                            
-                                $parts = explode(':', $time);
-                            
-                                $hours = $parts[0] ?? 0;
-                                $minutes = $parts[1] ?? 0;
-                            
+                                if (strpos($overTime, ':') !== false) {
+                                    $parts = explode(':', $overTime);
+                                    $hours = $parts[0] ?? 0;
+                                    $minutes = $parts[1] ?? 0;
+                                } else {
+                                    $hours = intval($overTime);
+                                    $minutes = 0;
+                                }
                                 $updatedEndTime = $endTime->copy()
                                     ->addHours((int)$hours)
                                     ->addMinutes((int)$minutes);
-                            
                             } else {
                                 $updatedEndTime = null;
                             }
-                            
 
                             // Convert to formatted time for display
                             $formattedUpdatedEndTime = $updatedEndTime ? $updatedEndTime->format('h:i A') : null;
@@ -2978,24 +3034,9 @@ class Common
                                 $roster->msg = "Continue";
                             }
 
-                            // Get leave data (use Y-m-d for date column comparison)
-                            $startStr = $startOfMonth->format('Y-m-d');
-                            $endStr = $endOfMonth->format('Y-m-d');
-                            $Leavevcategory = LeaveCategory::join('employees_leaves as t1', 't1.leave_category_id', '=', 'leave_categories.id')
-                                                ->where('t1.Emp_id', $roster->Emp_id)
-                                                ->where('leave_categories.resort_id', $resort_id)
-                                                ->where(function ($query) use ($startStr, $endStr) {
-                                                    $query->whereBetween('t1.from_date', [$startStr, $endStr])
-                                                        ->orWhereBetween('t1.to_date', [$startStr, $endStr])
-                                                        ->orWhere(function ($query) use ($startStr, $endStr) {
-                                                            $query->where('t1.from_date', '<', $startStr)
-                                                                ->where('t1.to_date', '>', $endStr);
-                                                        });
-                                                })
-                                                ->where('t1.status', 'Approved')
-                                        ->where('leave_categories.resort_id', $resort_id)
-                                    ->get(['t1.total_days','leave_categories.leave_type','leave_categories.id as leave_cat_id','t1.from_date','t1.to_date','t1.Emp_id','t1.status']);
-                                    $transformedLeaveData = $Leavevcategory->map(function ($item) {
+                            // Use pre-fetched leave data
+                            $Leavevcategory = $allLeaveData->get($roster->Emp_id, collect([]));
+                            $transformedLeaveData = $Leavevcategory->map(function ($item) {
                                         return $item->only(['total_days', 'leave_type', 'leave_cat_id', 'from_date', 'to_date', 'Emp_id', 'status']);
                                     })->values()->toArray();
                                  $roster->LeaveData = $transformedLeaveData;
@@ -3004,26 +3045,30 @@ class Common
 
 
         }
+        self::$attendanceCache[$cacheKey] = $DutyRoster;
         return $DutyRoster;
     }
-    public static function getWeekCountInMonth()
+    public static function getWeekCountInMonth($startDate = null, $endDate = null)
     {
-        $month=12;
-        $year = 2025;
-        // Get the first and last days of the month
-        $startOfMonth = Carbon::createFromDate($year, $month, 1);
-        $endOfMonth = $startOfMonth->copy()->endOfMonth();
-
-        // Get the first and last weeks of the month
-        $firstWeek = $startOfMonth->weekOfYear;
-        $lastWeek = $endOfMonth->weekOfYear;
-
-        // Handle edge case for December spanning into January
-        if ($firstWeek > $lastWeek) {
-            return ($lastWeek + 52) - $firstWeek + 1;
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate);
+            $end = Carbon::parse($endDate);
+        } else {
+            $start = Carbon::now()->startOfMonth();
+            $end = Carbon::now()->endOfMonth();
         }
 
-        return $lastWeek - $firstWeek + 1;
+        // Count Fridays (common day-off) in the period
+        $count = 0;
+        $current = $start->copy();
+        while ($current->lte($end)) {
+            if ($current->isFriday()) {
+                $count++;
+            }
+            $current->addDay();
+        }
+
+        return $count;
     }
 
 
@@ -3296,6 +3341,7 @@ class Common
                                             ->where('t1.resort_id', '=', $resort_id)
                                             ->where('duty_rosters.id', '=', $duty_roster_id)
                                             ->orderBy('t2.date', 'asc')
+                                            ->groupBy('t2.id')
                                             ->get([
                                                 't2.Status', 't2.CheckInCheckOut_Type','t2.id as Attd_id', 't2.Emp_id', 't2.date', 't2.Shift_id', 'duty_rosters.DayOfDate',
                                                 't1.ShiftName', 'OverTime', 't1.StartTime', 't1.EndTime', 't2.DayWiseTotalHours','t2.CheckingTime','t2.CheckingOutTime','t3.InTime_Location','t3.OutTime_Location'

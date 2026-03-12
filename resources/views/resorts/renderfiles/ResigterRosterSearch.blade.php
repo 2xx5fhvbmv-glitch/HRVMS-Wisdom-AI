@@ -329,9 +329,12 @@
                                                     $presentDates = [];
                                                     $absentDates = [];
                                                     $dayOffDates = [];
+                                                    $seenDates = [];
                                                     foreach ($RosterInternalDataMonth as $sd) {
                                                         if (!isset($sd->date)) continue;
                                                         $d = is_object($sd->date) ? $sd->date->format('Y-m-d') : $sd->date;
+                                                        if (isset($seenDates[$d])) continue;
+                                                        $seenDates[$d] = true;
                                                         $hasCheckIn = !empty($sd->CheckingTime) && trim($sd->CheckingTime ?? '') !== '' && !in_array(trim($sd->CheckingTime ?? ''), ['00:00', '00:00:00']);
                                                         if (isset($sd->Status)) {
                                                             if ($sd->Status == 'Present' && $hasCheckIn) $presentDates[$d] = true;
@@ -376,7 +379,19 @@
                                                             $cellStyle = '';
 
                                                             if ($shiftData) {
-                                                                if($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
+                                                                $hasOT = !empty($shiftData->OverTime) && !in_array($shiftData->OverTime, ['0', '0:0', '00:00', '0:00', '00:00:00'], true);
+                                                                if($shiftData->Status == "Present" && !empty($shiftData->CheckingTime) && $hasOT) {
+                                                                    $cellClass .= ' bg-overtime';
+                                                                    $cellLabel = 'OT';
+                                                                    $cellStatus = 'PRESENT + OVERTIME';
+                                                                    $tooltipData = json_encode([
+                                                                        'date' => $date,
+                                                                        'status' => 'PRESENT + OVERTIME',
+                                                                        'punchIn' => $shiftData->CheckingTime ?? '--:--',
+                                                                        'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
+                                                                        'overtime' => $overtimeValue
+                                                                    ]);
+                                                                } elseif($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
                                                                     $cellClass .= ' bg-present';
                                                                     $cellLabel = 'P';
                                                                     $cellStatus = 'PRESENT';
@@ -398,6 +413,14 @@
                                                                         'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
                                                                         'overtime' => $overtimeValue
                                                                     ]);
+                                                                } elseif($shiftData->Status == "Absent" && isset($shiftData->note) && $shiftData->note == 'Unpaid Leave') {
+                                                                    $cellClass .= ' bg-unpaidleave';
+                                                                    $cellLabel = 'UL';
+                                                                    $cellStatus = 'UNPAID LEAVE';
+                                                                    $tooltipData = json_encode([
+                                                                        'date' => $date,
+                                                                        'status' => 'UNPAID LEAVE'
+                                                                    ]);
                                                                 } elseif($shiftData->Status == "Absent") {
                                                                     $cellClass .= ' bg-absent';
                                                                     $cellLabel = 'A';
@@ -406,20 +429,42 @@
                                                                         'date' => $date,
                                                                         'status' => 'ABSENT'
                                                                     ]);
-                                                                } elseif($shiftData->LeaveFirstName != null) {
-                                                                    $leaveColor = $shiftData->LeaveColor ?? '#FFC107';
+                                                                } elseif($shiftData->Status == "FullDayLeave" || ($shiftData->LeaveFirstName ?? null) != null) {
+                                                                    $leaveColor = $shiftData->LeaveColor ?? '#17a2b8';
                                                                     $cellClass .= ' bg-leave';
-                                                                    $cellLabel = substr($shiftData->LeaveFirstName, 0, 1);
-                                                                    $cellStatus = strtoupper($shiftData->LeaveFirstName);
+                                                                    $cellLabel = 'AL';
+                                                                    $cellStatus = 'ANNUAL LEAVE';
                                                                     $cellStyle = 'background-color: ' . $leaveColor . ' !important;';
                                                                     $tooltipData = json_encode([
                                                                         'date' => $date,
-                                                                        'status' => $shiftData->LeaveFirstName,
+                                                                        'status' => 'ANNUAL LEAVE',
                                                                         'color' => $leaveColor
+                                                                    ]);
+                                                                } elseif($shiftData->Status == "DayOff" && $hasOT && (($shiftData->note ?? '') == 'Holiday overtime' || $isPublicHoliday)) {
+                                                                    $cellClass .= ' bg-holidayot';
+                                                                    $cellLabel = 'HOT';
+                                                                    $cellStatus = 'HOLIDAY OVERTIME';
+                                                                    $tooltipData = json_encode([
+                                                                        'date' => $date,
+                                                                        'status' => 'HOLIDAY OVERTIME',
+                                                                        'punchIn' => $shiftData->CheckingTime ?? '--:--',
+                                                                        'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
+                                                                        'overtime' => $overtimeValue
+                                                                    ]);
+                                                                } elseif($shiftData->Status == "DayOff" && $hasOT) {
+                                                                    $cellClass .= ' bg-dayoffot';
+                                                                    $cellLabel = 'FOT';
+                                                                    $cellStatus = 'DAY OFF + OVERTIME';
+                                                                    $tooltipData = json_encode([
+                                                                        'date' => $date,
+                                                                        'status' => 'DAY OFF + OVERTIME',
+                                                                        'punchIn' => $shiftData->CheckingTime ?? '--:--',
+                                                                        'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
+                                                                        'overtime' => $overtimeValue
                                                                     ]);
                                                                 } elseif($shiftData->Status == "DayOff") {
                                                                     $cellClass .= ' bg-dayoff';
-                                                                    $cellLabel = '-';
+                                                                    $cellLabel = 'F';
                                                                     $cellStatus = 'DAY OFF';
                                                                     $tooltipData = json_encode([
                                                                         'date' => $date,
@@ -500,9 +545,12 @@
                     $presentDates = [];
                     $absentDates = [];
                     $leaveDates = [];
+                    $seenDates = [];
                     foreach ($RosterInternalDataMonth as $shiftData) {
                         $d = isset($shiftData->date) ? (is_object($shiftData->date) ? $shiftData->date->format('Y-m-d') : $shiftData->date) : null;
                         if (!$d) continue;
+                        if (isset($seenDates[$d])) continue;
+                        $seenDates[$d] = true;
                         $hasCheckIn = !empty($shiftData->CheckingTime) && trim($shiftData->CheckingTime ?? '') !== '' && !in_array(trim($shiftData->CheckingTime ?? ''), ['00:00', '00:00:00']);
                         if ($shiftData->Status == "Present" && $hasCheckIn) {
                             $presentDates[$d] = true;
