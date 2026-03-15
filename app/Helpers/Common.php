@@ -3115,6 +3115,38 @@ class Common
         return $emp_grade;
     }
 
+    /**
+     * Prorate allocated leave days based on employee's joining date.
+     * If employee joined in the current year, prorate by months worked.
+     * If joined before current year, return full allocation.
+     */
+    public static function prorateLeaveByJoiningDate($allocatedDays, $joiningDate)
+    {
+        if (empty($joiningDate) || empty($allocatedDays)) {
+            return $allocatedDays;
+        }
+
+        $joining = \Carbon\Carbon::parse($joiningDate);
+        $currentYearStart = \Carbon\Carbon::now()->startOfYear();
+        $currentYearEnd = \Carbon\Carbon::now()->endOfYear();
+
+        // If joined before current year, full allocation
+        if ($joining->lt($currentYearStart)) {
+            return $allocatedDays;
+        }
+
+        // If joined after current year end (future), no allocation
+        if ($joining->gt($currentYearEnd)) {
+            return 0;
+        }
+
+        // Prorated: count months from joining month to December (inclusive)
+        $monthsWorked = 12 - $joining->month + 1;
+        $prorated = round(($allocatedDays / 12) * $monthsWorked, 1);
+
+        return $prorated;
+    }
+
     public static function getBenefitGrid($emp_grade,$resort_id){
         $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
             ->where('resort_id', $resort_id)
@@ -5857,6 +5889,65 @@ class Common
         }
     }
 
+
+    /**
+     * Check if $delegateEmpId has delegation authority for $absentEmpId right now.
+     * Returns true if $absentEmpId has an Approved leave covering today
+     * with task_delegation = $delegateEmpId.
+     *
+     * @param int $delegateEmpId  The employee claiming delegation power
+     * @param int $absentEmpId    The employee who is on leave (the original approver)
+     * @param int|null $resortId  Optional resort filter
+     * @return bool
+     */
+    public static function hasDelegationAuthority($delegateEmpId, $absentEmpId, $resortId = null)
+    {
+        if (empty($delegateEmpId) || empty($absentEmpId) || $delegateEmpId == $absentEmpId) {
+            return false;
+        }
+
+        $today = \Carbon\Carbon::today()->format('Y-m-d');
+
+        $query = \App\Models\EmployeeLeave::where('emp_id', $absentEmpId)
+            ->where('task_delegation', $delegateEmpId)
+            ->where('status', 'Approved')
+            ->where('from_date', '<=', $today)
+            ->where('to_date', '>=', $today);
+
+        if ($resortId) {
+            $query->where('resort_id', $resortId);
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * Get all employee IDs that the given delegate is currently acting on behalf of.
+     * Returns array of employee IDs who are on approved leave with task_delegation = $delegateEmpId.
+     *
+     * @param int $delegateEmpId
+     * @param int|null $resortId
+     * @return array
+     */
+    public static function getDelegatedEmployeeIds($delegateEmpId, $resortId = null)
+    {
+        if (empty($delegateEmpId)) {
+            return [];
+        }
+
+        $today = \Carbon\Carbon::today()->format('Y-m-d');
+
+        $query = \App\Models\EmployeeLeave::where('task_delegation', $delegateEmpId)
+            ->where('status', 'Approved')
+            ->where('from_date', '<=', $today)
+            ->where('to_date', '>=', $today);
+
+        if ($resortId) {
+            $query->where('resort_id', $resortId);
+        }
+
+        return $query->pluck('emp_id')->unique()->toArray();
+    }
 
     public static function GetResortPositionWiseRank($position_id,$position_rank, $resort_id)
     {

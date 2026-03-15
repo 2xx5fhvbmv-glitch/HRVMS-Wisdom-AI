@@ -428,6 +428,19 @@ class TransferController extends Controller
             ->whereIn('status', ['Pending', 'On Hold'])
             ->first();
 
+        $delegateComment = '';
+        if (!$currentApproval) {
+            // Check delegation authority
+            $pendingApprovals = $transfer->approvals()->whereIn('status', ['Pending', 'On Hold'])->get();
+            foreach ($pendingApprovals as $pa) {
+                if (\App\Helpers\Common::hasDelegationAuthority($currentEmployee->id, $pa->approved_by, $this->resort->resort_id)) {
+                    $currentApproval = $pa;
+                    $delegateComment = ' (Acted by delegate)';
+                    break;
+                }
+            }
+        }
+
         if (!$currentApproval) {
             return response()->json([
                 'status' => 'error',
@@ -451,7 +464,7 @@ class TransferController extends Controller
         // Update current approval
         $currentApproval->update([
             'status' => $actionName,
-            'remarks' => $comments,
+            'remarks' => ($comments ?? '') . $delegateComment,
             'approved_at' => now(),
         ]);
 

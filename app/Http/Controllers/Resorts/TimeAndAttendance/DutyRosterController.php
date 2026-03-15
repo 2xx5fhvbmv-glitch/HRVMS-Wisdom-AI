@@ -1099,12 +1099,10 @@ class DutyRosterController extends Controller
                                 ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
                                 ->where("t1.resort_id",$this->resort->resort_id);
 
-                                if($employeeRankPosition['position'] != "HR")
+                                if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM")
                                 {
-                                    if($employeeRankPosition['position'] != "EXCOM")
-                                    {
-                                        $Rosterdata=$Rosterdata->whereIn('employees.id',  $this->underEmp_id);
-                                    }
+                                    // Non-HR/EXCOM users only see their own department
+                                    $Rosterdata=$Rosterdata->where('employees.Dept_id', $Dept_id);
                                 }
                                 $Rosterdata=$Rosterdata->groupBy('employees.id');
                                 $Rosterdata=$Rosterdata->paginate(10);
@@ -1124,24 +1122,16 @@ class DutyRosterController extends Controller
         }
         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)
         ->where("resort_id",$this->resort->resort_id)->get();
-         if($this->resort->is_master_admin == 0){
-            $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")->where("t1.resort_id",$this->resort->resort_id)
-                            ->where("employees.rank","!=",$Rank)
-                            ->where("employees.status","Active")
-                             ->when($Rank != '3', function ($query) {
-                                        return $query->whereIn('employees.id', $this->underEmp_id);
-                                    })
-                            ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
-            }else{
+        $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
+                        ->where("t1.resort_id",$this->resort->resort_id)
+                        ->where("employees.status","Active");
 
-                $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")->where("Dept_id",$Dept_id)
-                                ->where("t1.resort_id",$this->resort->resort_id)
-                                ->where("employees.status","Active")
-                                 ->when($Rank != '3', function ($query) {
-                                        return $query->whereIn('employees.id', $this->underEmp_id);
-                                    })
-                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
-            }
+        if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM") {
+            // Non-HR/EXCOM users only see their own department
+            $employees = $employees->where('employees.Dept_id', $Dept_id);
+        }
+
+        $employees = $employees->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
         $ShiftSettings = ShiftSettings::where("resort_id", $this->resort->resort_id)->get(['id','ShiftName','TotalHours']);
 
         $startOfMonth = Carbon::now()->startOfMonth(); // Get the first day of the month
@@ -1225,9 +1215,10 @@ class DutyRosterController extends Controller
 
         
 
-                        if($employeeRankPosition['position'] != "HR" || $employeeRankPosition['rank'] != "EXCOM")
+                        if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM")
                         {
-                            $Rosterdata1->whereIn('employees.id',  $this->underEmp_id);
+                            // Non-HR/EXCOM users only see their own department
+                            $Rosterdata1->where('employees.Dept_id', $Dept_id);
                         }
 
                     // Check for the `$Poitions` variable and apply the filter if set

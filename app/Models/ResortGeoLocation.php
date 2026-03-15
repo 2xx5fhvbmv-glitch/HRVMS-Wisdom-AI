@@ -13,7 +13,7 @@ class ResortGeoLocation extends Model
     use HasFactory;
     public $table = 'resort_geo_locations';
     public  $fillable = [
-        'resort_id','longitude','latitude'
+        'resort_id','longitude','latitude','polygon_coords'
     ];
 
 

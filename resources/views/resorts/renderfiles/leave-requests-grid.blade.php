@@ -64,6 +64,9 @@
                     <div class="bg leave">
                         <p><a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="a-link">View Leave Balance</a></p>
                     </div>
+                    <div class="mb-2">
+                        <span class="badge {{ $request->status_class ?? 'badge-themeWarning' }}">{{ $request->status_text ?? 'Pending' }}</span>
+                    </div>
                     <div class="btn-block">
                         <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
                         @if($request->can_approve ?? false)
@@ -114,6 +117,9 @@
                     <p class="text-start">{{ $request->reason ?? 'No reason provided' }}</p>
                     <div class="bg leave">
                         <p><span class="text-lightblue">{{$request -> available_balance}}</span> Leaves Available</p>
+                    </div>
+                    <div class="mb-2">
+                        <span class="badge {{ $request->status_class ?? 'badge-themeWarning' }}">{{ $request->status_text ?? 'Pending' }}</span>
                     </div>
                     <div class="btn-block">
                         <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>

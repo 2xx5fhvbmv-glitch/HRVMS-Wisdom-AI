@@ -413,6 +413,15 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post( '/timeandattendance//ShiftSotre', 'TimeAndAttendance\ConfigrationController@ShiftStore')->name('resort.timeandattendance.ShiftSotre');
     Route::post( '/timeandattendance/removeshift', 'TimeAndAttendance\ConfigrationController@removeshift')->name('resort.timeandattendance.removeshift');
     Route::post( '/timeandattendance/GeoFencing', 'TimeAndAttendance\ConfigrationController@GeoLocation')->name('resort.timeandattendance.GeoFencing');
+
+    // Geofence Zones CRUD
+    Route::get('/time-and-attendance/geofences', 'TimeAndAttendance\ConfigrationController@geofenceList')->name('resort.geofences.list');
+    Route::post('/time-and-attendance/geofences/store', 'TimeAndAttendance\ConfigrationController@geofenceStore')->name('resort.geofences.store');
+    Route::post('/time-and-attendance/geofences/update/{id}', 'TimeAndAttendance\ConfigrationController@geofenceUpdate')->name('resort.geofences.update');
+    Route::post('/time-and-attendance/geofences/delete/{id}', 'TimeAndAttendance\ConfigrationController@geofenceDelete')->name('resort.geofences.delete');
+    Route::post('/time-and-attendance/geofences/toggle/{id}', 'TimeAndAttendance\ConfigrationController@geofenceToggle')->name('resort.geofences.toggle');
+    Route::get('/time-and-attendance/geofence-zones', 'TimeAndAttendance\ConfigrationController@geofencePage')->name('resort.geofences.page');
+
     Route::post( '/timeandattendance/ResortHoliday', 'TimeAndAttendance\ConfigrationController@ResortHoliday')->name('resort.timeandattendance.ResortHoliday');
     Route::get('/timeandattendance/publicholidaylist', 'TimeAndAttendance\ConfigrationController@Publicholidaylist')->name('resort.timeandattendance.publicholidaylist');
     Route::post( '/timeandattendance/ResortHolidayUpdate', 'TimeAndAttendance\ConfigrationController@ResortHolidayUpdate')->name('resort.timeandattendance.ResortHolidayUpdate');

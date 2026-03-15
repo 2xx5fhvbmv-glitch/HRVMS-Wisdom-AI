@@ -243,10 +243,28 @@ class BoardingPassController extends Controller
         //     ], 403);
         // }
 
-        EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)->where('approver_id', $currentApproverId)->update([
-            'approver_id'                       =>  $currentApproverId,
+        // Check if current user is the approver, or acting as a delegate for an approver on leave
+        $effectiveApproverId = $currentApproverId;
+        $delegateComment = '';
+        $hasOwnRow = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+            ->where('approver_id', $currentApproverId)->where('status', 'Pending')->exists();
+
+        if (!$hasOwnRow) {
+            // Check if current user is a delegate for any pending approver
+            $pendingApproverIds = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                ->where('status', 'Pending')->pluck('approver_id')->toArray();
+            foreach ($pendingApproverIds as $pId) {
+                if (Common::hasDelegationAuthority($currentApproverId, $pId, $this->resort->resort_id)) {
+                    $effectiveApproverId = $pId;
+                    $delegateComment = ' (Acted by delegate)';
+                    break;
+                }
+            }
+        }
+
+        EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)->where('approver_id', $effectiveApproverId)->update([
             'status'                            =>  $action,
-            'comments'                          =>  $comments, // Save comments if provided
+            'comments'                          =>  ($comments ?? '') . $delegateComment,
             'approved_at'                       =>  now(),
         ]);
 

@@ -454,20 +454,25 @@ class SalaryIncrementController extends Controller
             ->select('id')
             ->first();
 
-            if($financeApprover){
-                $peopleSalaryIncrementStatusFinance = PeopleSalaryIncrementStatus::whereIn('people_salary_increment_id', $ids)->where('approval_rank', 'Finance')->whereIn('status', ['Pending','Hold'])->get();                
+            $currentEmpId = $this->resort->GetEmployee->id ?? null;
+            // Check direct match OR delegation authority for Finance/GM approver
+            $isFinanceOrDelegate = $financeApprover && ($financeApprover->id == $currentEmpId || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $financeApprover->id, $this->resort->resort_id));
+            $isGMOrDelegate = $gmApprover && ($gmApprover->id == $currentEmpId || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $gmApprover->id, $this->resort->resort_id));
+
+            if($isFinanceOrDelegate){
+                $peopleSalaryIncrementStatusFinance = PeopleSalaryIncrementStatus::whereIn('people_salary_increment_id', $ids)->where('approval_rank', 'Finance')->whereIn('status', ['Pending','Hold'])->get();
                 if($peopleSalaryIncrementStatusFinance->count() > 0){
                     $hasFinanceApproval = true;
                 }
-            }elseif($gmApprover){
+            }elseif($isGMOrDelegate){
                 $peopleSalaryIncrementStatusFinanceIds = PeopleSalaryIncrementStatus::whereIn('people_salary_increment_id', $ids)->where('approval_rank', 'Finance')->whereIn('status', ['Approved','Hold'])->get();
                 if($peopleSalaryIncrementStatusFinanceIds ->count() > 0){
-                    
+
                     $peopleSalaryIncrementStatusGM = PeopleSalaryIncrementStatus::whereIn('people_salary_increment_id', $ids)->where('approval_rank', 'GM')->whereIn('status', ['Pending','Hold'])->get();
                     if($peopleSalaryIncrementStatusGM->count() > 0){
                         $hasGMApproval = true;
-                    }      
-                }       
+                    }
+                }
             }
 
             $currentBasicSalary = (clone $query)->sum('previous_salary');
@@ -508,10 +513,10 @@ class SalaryIncrementController extends Controller
     
     // update status of salary increment
     public function updateStatus(Request $request){
-       
+
         $status = $request->status;
         $paylaod = is_string($request->payload) ? json_decode($request->payload, true) : $request->payload;
-        
+
         $financeManagerTitles = ['Director of Finance', 'Finance Manager'];
 
         
