@@ -440,11 +440,24 @@ class PromotionController extends Controller
         $actionName = $action;
         $hr = Employee::where('resort_id',$this->resort->resort_id)->where('Admin_Parent_id',$promotion->created_by)->first();
 
-        // Get current approval record
+        // Get current approval record (direct or via delegation)
         $currentApproval = $promotion->approvals()
             ->where('approved_by', $currentEmployee->id)
             ->whereIn('status', ['Pending', 'On Hold'])
             ->first();
+
+        $delegateComment = '';
+        if (!$currentApproval) {
+            // Check if current user is a delegate for any pending approver
+            $pendingApprovals = $promotion->approvals()->whereIn('status', ['Pending', 'On Hold'])->get();
+            foreach ($pendingApprovals as $pa) {
+                if (Common::hasDelegationAuthority($currentEmployee->id, $pa->approved_by, $this->resort->resort_id)) {
+                    $currentApproval = $pa;
+                    $delegateComment = ' (Acted by delegate)';
+                    break;
+                }
+            }
+        }
 
         if (!$currentApproval) {
             return response()->json([
@@ -470,7 +483,7 @@ class PromotionController extends Controller
         // Update current approval
         $currentApproval->update([
             'status' => $actionName,
-            'remarks' => $comments,
+            'remarks' => ($comments ?? '') . $delegateComment,
             'approved_at' => now(),
         ]);
 

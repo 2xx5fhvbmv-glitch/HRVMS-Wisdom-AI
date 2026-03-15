@@ -361,8 +361,26 @@ class AdvanceSalaryController extends Controller
                     'message' => 'Guarantor approval is pending.',
                     ]);
                 }
-                // HR rank is 3
+                // HR rank is 3 — check direct or via delegation
                 $hr = Employee::where('resort_id',$this->resort->resort_id)->where('rank',3)->where('id',$this->resort->GetEmployee->id)->first();
+                if (!$hr) {
+                    // Check if current user is a delegate for any HR employee on leave
+                    $hrEmployees = Employee::where('resort_id',$this->resort->resort_id)->where('rank',3)->pluck('id')->toArray();
+                    foreach ($hrEmployees as $hrEmpId) {
+                        if (\App\Helpers\Common::hasDelegationAuthority($this->resort->GetEmployee->id, $hrEmpId, $this->resort->resort_id)) {
+                            $hr = Employee::find($hrEmpId);
+                            break;
+                        }
+                    }
+                }
+
+                if (!$hr) {
+                    return response()->json([
+                        'success' => false,
+                        'status' => 'error',
+                        'message' => 'You are not authorized to approve this request as HR.',
+                    ], 403);
+                }
 
                 if($request->status == 'Approved' ){
                     if($payrollAdvance->guarantor->status != 'Approved'){
@@ -416,14 +434,24 @@ class AdvanceSalaryController extends Controller
                 $positionIds = ResortPosition::where('resort_id', $this->resort->resort_id)
                     ->whereIn('position_title', $financeManagerTitles)
                     ->pluck('id');
-                    
+
                 $financeApprover = Employee::with(['resortAdmin', 'position'])
                     ->whereIn('position_id', $positionIds)
                     ->where('resort_id', $this->resort->resort_id)
                     ->where('Admin_Parent_id',$this->resort->id)
                     ->select('id')
                     ->first();
-            
+
+                // If current user is not the finance approver, check delegation
+                if ($financeApprover && $financeApprover->id != ($this->resort->GetEmployee->id ?? null)) {
+                    if (!\App\Helpers\Common::hasDelegationAuthority($this->resort->GetEmployee->id, $financeApprover->id, $this->resort->resort_id)) {
+                        $financeApprover = null;
+                    }
+                }
+                if (!$financeApprover) {
+                    return response()->json(['success' => false, 'status' => 'error', 'message' => 'You are not authorized to approve as Finance.'], 403);
+                }
+
                 if($request->status == 'Approved'){
                     $payrollAdvance->update([
                     'finance_status' => 'Approved',
@@ -470,7 +498,17 @@ class AdvanceSalaryController extends Controller
                     ->where('Admin_Parent_id',$this->resort->id)
                     ->select('id')
                     ->first();
-                    
+
+                // If current user is not the GM, check delegation
+                if ($gmApprover && $gmApprover->id != ($this->resort->GetEmployee->id ?? null)) {
+                    if (!\App\Helpers\Common::hasDelegationAuthority($this->resort->GetEmployee->id, $gmApprover->id, $this->resort->resort_id)) {
+                        $gmApprover = null;
+                    }
+                }
+                if (!$gmApprover) {
+                    return response()->json(['success' => false, 'status' => 'error', 'message' => 'You are not authorized to approve as GM.'], 403);
+                }
+
                 $recovery_schedule = PayrollRecoverySchedule::where('payroll_advance_id', $payrollAdvance->id)
                     ->update(['status' => 'Pending']);
 

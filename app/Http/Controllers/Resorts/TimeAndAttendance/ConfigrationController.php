@@ -20,6 +20,7 @@ use App\Models\ResortPosition;
 use App\Exports\EmployeeAttendanceExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Jobs\ResortHolidayImportJob;
+use App\Models\ResortGeofence;
 use Carbon\Carbon;
 use DateTime;
 class ConfigrationController extends Controller
@@ -39,8 +40,9 @@ class ConfigrationController extends Controller
             $resort_divisions   = ResortDivision::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
             $resort_departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
             $colorThemes        = ColorTheme::where('resort_id', $resort_id)->get();
-            
-            return view('resorts.timeandattendance.Configration.index',compact('page_title','resort_divisions','resort_departments','ResortGeoLocation','resort_id','ShiftSettings','PublicHoliday','colorThemes'));
+            $geofenceZones      = ResortGeofence::where('resort_id', $resort_id)->orderBy('name')->get();
+
+            return view('resorts.timeandattendance.Configration.index',compact('page_title','resort_divisions','resort_departments','ResortGeoLocation','resort_id','ShiftSettings','PublicHoliday','colorThemes','geofenceZones'));
     }
     public function ShiftStore(Request $request)
     {
@@ -158,7 +160,9 @@ class ConfigrationController extends Controller
             $latitude = $request->latitude;
             $longitude = $request->longitude;
 
-            $GeoLocation = ResortGeoLocation::updateOrCreate(["resort_id"=>$resort_id],["resort_id"=>$resort_id,'latitude'=>$latitude,'longitude'=>$longitude]);
+            $polygonCoords = $request->polygon_coords;
+
+            $GeoLocation = ResortGeoLocation::updateOrCreate(["resort_id"=>$resort_id],["resort_id"=>$resort_id,'latitude'=>$latitude,'longitude'=>$longitude,'polygon_coords'=>$polygonCoords]);
 
             DB::commit();
             return response()->json([
@@ -178,6 +182,116 @@ class ConfigrationController extends Controller
             ]);
         }
     }
+
+    // ── Geofence Zone CRUD ──────────────────────────────────────────
+
+    public function geofenceList()
+    {
+        $resort_id = $this->resort->resort_id;
+        $zones = ResortGeofence::where('resort_id', $resort_id)->orderBy('name')->get();
+        return response()->json(['success' => true, 'zones' => $zones]);
+    }
+
+    public function geofencePage()
+    {
+        $page_title = 'Geofence Zones';
+        $resort_id = $this->resort->resort_id;
+        $geofenceZones = ResortGeofence::where('resort_id', $resort_id)->orderBy('name')->get();
+        $ResortGeoLocation = ResortGeoLocation::where('resort_id', $resort_id)->first();
+        return view('resorts.timeandattendance.Configration.geofence-zones', compact('page_title', 'resort_id', 'geofenceZones', 'ResortGeoLocation'));
+    }
+
+    public function geofenceStore(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'color' => 'required|string|max:20',
+            'shape_type' => 'required|in:polygon,circle',
+            'coordinates' => 'required|string',
+            'grace_period' => 'nullable|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        try {
+            $zone = ResortGeofence::create([
+                'resort_id' => $this->resort->resort_id,
+                'name' => $request->name,
+                'color' => $request->color,
+                'shape_type' => $request->shape_type,
+                'coordinates' => $request->coordinates,
+                'grace_period' => $request->grace_period ?? 10,
+                'status' => 'active',
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Geofence zone created.', 'zone' => $zone]);
+        } catch (\Exception $e) {
+            \Log::error('Geofence store error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to create zone.'], 500);
+        }
+    }
+
+    public function geofenceUpdate(Request $request, $id)
+    {
+        $zone = ResortGeofence::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$zone) {
+            return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'color' => 'required|string|max:20',
+            'shape_type' => 'required|in:polygon,circle',
+            'coordinates' => 'required|string',
+            'grace_period' => 'nullable|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        try {
+            $zone->update([
+                'name' => $request->name,
+                'color' => $request->color,
+                'shape_type' => $request->shape_type,
+                'coordinates' => $request->coordinates,
+                'grace_period' => $request->grace_period ?? 10,
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Geofence zone updated.', 'zone' => $zone]);
+        } catch (\Exception $e) {
+            \Log::error('Geofence update error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to update zone.'], 500);
+        }
+    }
+
+    public function geofenceDelete(Request $request, $id)
+    {
+        $zone = ResortGeofence::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$zone) {
+            return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
+        }
+
+        $zone->delete();
+        return response()->json(['success' => true, 'message' => 'Geofence zone deleted.']);
+    }
+
+    public function geofenceToggle(Request $request, $id)
+    {
+        $zone = ResortGeofence::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$zone) {
+            return response()->json(['success' => false, 'message' => 'Zone not found.'], 404);
+        }
+
+        $zone->status = $zone->status === 'active' ? 'paused' : 'active';
+        $zone->save();
+
+        return response()->json(['success' => true, 'message' => 'Zone status updated.', 'zone' => $zone]);
+    }
+
     public function Publicholidaylist(Request $request)
     {
         if(Common::checkRouteWisePermission('resort.upcomingholiday.list',config('settings.resort_permissions.view')) == false) {

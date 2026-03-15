@@ -47,8 +47,17 @@ class ApprovalController extends Controller
 
             $mergedRequests = collect(); // Final merged collection
 
-            // Info Update Requests (only for rank 3)
-            if ($rank == 3) {
+            // Get employee IDs that current user is delegated for (on-leave employees)
+            $delegatedForIds = Common::getDelegatedEmployeeIds($employee->id, $resort->resort_id);
+
+            // Batch fetch ranks for all delegated employees to avoid N+1
+            $delegatedRanks = !empty($delegatedForIds)
+                ? Employee::whereIn('id', $delegatedForIds)->pluck('rank', 'id')->toArray()
+                : [];
+            $isDelegateForHR = in_array(3, $delegatedRanks);
+            $isDelegateForFinance = in_array(7, $delegatedRanks);
+            $isDelegateForGM = in_array(8, $delegatedRanks);
+            if ($rank == 3 || $isDelegateForHR) {
                 $infoUpdateQuery = EmployeeInfoUpdateRequest::where('resort_id', $resort->resort_id)
                     ->where('status', 'Pending')
                     ->with(['employee.resortAdmin', 'employee.department', 'employee.position'])
@@ -95,12 +104,13 @@ class ApprovalController extends Controller
 
             }
 
-            // Employee Promotion Requests
+            // Employee Promotion Requests (include delegated approvals)
+            $approverIds = array_merge([$employee->id], $delegatedForIds);
             $promotionQuery = EmployeePromotion::where('resort_id', $resort->resort_id)
                 ->where('status', 'Pending')
-                ->with(['approvals' => function ($query) use ($employee) {
+                ->with(['approvals' => function ($query) use ($approverIds) {
                     $query->where('status', 'Pending')
-                        ->where('approved_by', $employee->id);
+                        ->whereIn('approved_by', $approverIds);
                 }, 'employee.resortAdmin', 'employee.department', 'employee.position']);
 
             // Apply filters for promotions
@@ -148,11 +158,11 @@ class ApprovalController extends Controller
                 ->with(['employee.resortAdmin', 'employee.position', 'employee.department'])
                 ->whereHas('employee.resortAdmin');
 
-            if ($rank == 3) {
+            if ($rank == 3 || $isDelegateForHR) {
                 $payroll_data_query->where('hr_status', 'Pending');
-            } elseif ($rank == 7) {
+            } elseif ($rank == 7 || $isDelegateForFinance) {
                 $payroll_data_query->where('hr_status', 'Approved');
-            } elseif ($rank == 8) {
+            } elseif ($rank == 8 || $isDelegateForGM) {
                 $payroll_data_query->where('finance_status', 'Approved');
             }
 
@@ -203,9 +213,15 @@ class ApprovalController extends Controller
                 ->where('status', 'Pending');
 
             if ($rank == 2) {
-                $empResignations->where('hod_id', $employee->id)->where('hod_status', 'Pending');
-            } elseif ($rank == 3) {
-                $empResignations->where('hr_id', $employee->id)->where('hr_status', 'Pending');
+                $empResignations->where(function($q) use ($employee, $delegatedForIds) {
+                    $q->where('hod_id', $employee->id)
+                      ->orWhereIn('hod_id', $delegatedForIds);
+                })->where('hod_status', 'Pending');
+            } elseif ($rank == 3 || $isDelegateForHR) {
+                $empResignations->where(function($q) use ($employee, $delegatedForIds) {
+                    $q->where('hr_id', $employee->id)
+                      ->orWhereIn('hr_id', $delegatedForIds);
+                })->where('hr_status', 'Pending');
             }
 
             // Apply filters for resignations

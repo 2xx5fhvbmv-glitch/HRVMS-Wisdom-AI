@@ -170,15 +170,26 @@ class DashboardController extends Controller
         $show_department_filter = $isFromHRDepartment;
 
         $canViewWholeResort = $isHR || $isHRExcom || $isGM;
+        $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
+        $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
+
         if( $canViewWholeResort ){
             $total_applied_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->count();
+            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
+            ->count();
             $total_approved_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Approved')->count();
+            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Approved')
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
+            ->count();
             $total_pending_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Pending')->count();
+            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Pending')
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
+            ->count();
             $total_rejected_leaves = DB::table('employees_leaves as el')
-            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Rejected')->count();
+            ->where('el.resort_id', $this->resort->resort_id)->where('flag',null)->where('status','Rejected')
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
+            ->count();
         }
         else{
             $total_applied_leaves = DB::table('employees_leaves as el')
@@ -187,6 +198,7 @@ class DashboardController extends Controller
             ->where(function ($q) use ($loggedInEmployeeId) {
                 $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
             })
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
             ->where('el.resort_id', $this->resort->resort_id)->count();
 
             $total_approved_leaves = DB::table('employees_leaves as el')
@@ -196,6 +208,7 @@ class DashboardController extends Controller
                 $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
             })
             ->where('flag',null)
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
             ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Approved')->count();
 
             $total_pending_leaves = DB::table('employees_leaves as el')
@@ -205,6 +218,7 @@ class DashboardController extends Controller
                 $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
             })
             ->where('flag',null)
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
             ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Pending')->count();
 
             $total_rejected_leaves = DB::table('employees_leaves as el')
@@ -214,6 +228,7 @@ class DashboardController extends Controller
                 $q->where('els.approver_id',$loggedInEmployeeId)->orWhere('el.emp_id', $loggedInEmployeeId);
             })
             ->where('flag',null)
+            ->where('el.from_date', '<=', $currentYearEnd)->where('el.to_date', '>=', $currentYearStart)
             ->where('el.resort_id', $this->resort->resort_id)->where('el.status','Rejected')->count();
         }
 
@@ -650,7 +665,8 @@ class DashboardController extends Controller
                 });
             }
         } else {
-            // Leaves where current user is applicant OR has a Pending approver row; only same department (other depts see only their data)
+            // Leaves where current user is applicant OR has a Pending approver row OR is a delegate for a pending approver
+            $delegatedForIds = \App\Helpers\Common::getDelegatedEmployeeIds($loggedInEmployeeId, $resort_id);
             $leaveIds = DB::table('employees_leaves as el')
                 ->join('employees as e', 'e.id', '=', 'el.emp_id')
                 ->where('el.resort_id', $resort_id)
@@ -661,7 +677,7 @@ class DashboardController extends Controller
                 ->when($userDeptId, function ($q) use ($userDeptId) {
                     $q->where('e.Dept_id', $userDeptId);
                 })
-                ->where(function ($q) use ($loggedInEmployeeId) {
+                ->where(function ($q) use ($loggedInEmployeeId, $delegatedForIds) {
                     $q->where('el.emp_id', $loggedInEmployeeId)
                         ->orWhereIn('el.id', function ($sub) use ($loggedInEmployeeId) {
                             $sub->select('leave_request_id')
@@ -669,6 +685,15 @@ class DashboardController extends Controller
                                 ->where('approver_id', $loggedInEmployeeId)
                                 ->where('status', 'Pending');
                         });
+                    // Also include leaves where delegated employees are approvers
+                    if (!empty($delegatedForIds)) {
+                        $q->orWhereIn('el.id', function ($sub) use ($delegatedForIds) {
+                            $sub->select('leave_request_id')
+                                ->from('employees_leaves_status')
+                                ->whereIn('approver_id', $delegatedForIds)
+                                ->where('status', 'Pending');
+                        });
+                    }
                 })
                 ->pluck('el.id')
                 ->unique()
@@ -712,6 +737,7 @@ class DashboardController extends Controller
             'e.Admin_Parent_id',
             'e.reporting_to as reporting_to',
             'e.rank as applicant_rank',
+            'e.joining_date',
             'ra.first_name',
             'ra.last_name',
             'lc.leave_type',
@@ -774,6 +800,7 @@ class DashboardController extends Controller
 
             if ($leaveRequest->status === 'Approved') {
                 $leaveRequest->status_text = "Approved";
+                $leaveRequest->status_class = "badge-themeSuccess";
                 $isFullyApproved = true;
             } elseif ($leaveRequest->status === 'Rejected') {
                 $rejected = $statuses->firstWhere('status', 'Rejected');
@@ -783,27 +810,44 @@ class DashboardController extends Controller
                 } else {
                     $leaveRequest->status_text = "Rejected";
                 }
+                $leaveRequest->status_class = "badge-themeDanger";
             } else {
                 // Still pending — show partial approval progress if any
                 $lastApproved = $statuses->where('status', 'Approved')->last();
                 if ($lastApproved) {
                     $approvedBy = $rank[$lastApproved->approver_rank] ?? $lastApproved->approver_rank;
-                    $leaveRequest->status_text = "Approved by {$approvedBy}";
+                    $leaveRequest->status_text = "Pending - {$approvedBy} Approved";
                 } else {
                     $leaveRequest->status_text = "Pending";
                     $isPending = true;
                 }
+                $leaveRequest->status_class = "badge-themeWarning";
             }
 
-            // Can approve: (1) applicant's reporting_to, or (2) GM leave and current user is HR/EXCOM/HOD, or (3) current user has a Pending row in the approval chain (e.g. HR EXCOM as reporting manager)
+            // Can approve: (1) applicant's reporting_to, (2) GM leave and current user is HR/EXCOM/HOD, (3) current user has a Pending row, (4) HR/EXCOM can approve any pending leave
             $reportingToInt = (int)($leaveRequest->reporting_to ?? 0);
             $applicantRankStr = trim((string)($leaveRequest->applicant_rank ?? ''));
             $isReportingManager = $reportingToInt > 0 && $reportingToInt === (int)$loggedInEmployeeId;
             $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($loggedInRankStr, ['1', '2', '3'], true);
+            $loggedInRankLabel = $rank[$loggedInRankStr] ?? '';
+            $isHROrExcomUser = in_array($loggedInRankLabel, ['HR', 'EXCOM', 'GM']);
             $hasCurrentUserPendingRow = $statuses->contains(function ($row) use ($loggedInEmployeeId) {
                 return (int)($row->approver_id ?? 0) === (int)$loggedInEmployeeId && strtolower(trim((string)($row->status ?? ''))) === 'pending';
             });
-            $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover || $hasCurrentUserPendingRow) && $isPending && !$isFullyApproved);
+
+            // Check if current user is a delegate for any pending approver
+            $isDelegateForApprover = false;
+            if (!$hasCurrentUserPendingRow && !$isHROrExcomUser) {
+                $pendingApproverIds = $statuses->where('status', 'Pending')->pluck('approver_id')->filter()->toArray();
+                foreach ($pendingApproverIds as $pId) {
+                    if (\App\Helpers\Common::hasDelegationAuthority($loggedInEmployeeId, $pId, $this->resort->resort_id)) {
+                        $isDelegateForApprover = true;
+                        break;
+                    }
+                }
+            }
+
+            $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover || $hasCurrentUserPendingRow || $isHROrExcomUser || $isDelegateForApprover) && !$isFullyApproved && strtolower(trim($leaveRequest->status ?? '')) === 'pending');
 
             // Handle combined leaves
             if ($leaveRequest->combinedLeave) {

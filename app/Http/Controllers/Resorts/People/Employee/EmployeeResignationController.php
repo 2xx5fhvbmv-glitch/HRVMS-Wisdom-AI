@@ -207,6 +207,14 @@ class EmployeeResignationController extends Controller
             $is_hod = true;
         }
 
+        // Delegation authority: if current user is not the HOD/HR but is their delegate
+        if (!$is_hod && $employeeResignation->hod_id && \App\Helpers\Common::hasDelegationAuthority($user->id, $employeeResignation->hod_id, $this->resort->resort_id)) {
+            $is_hod = true;
+        }
+        if (!$is_hr && $employeeResignation->hr_id && \App\Helpers\Common::hasDelegationAuthority($user->id, $employeeResignation->hr_id, $this->resort->resort_id)) {
+            $is_hr = true;
+        }
+
         if($employeeResignation->hod_status === 'Pending' && $is_hod == true) {
             $employeeResignation->hod_status = $status;
             $employeeResignation->hod_meeting_status = 'Completed';

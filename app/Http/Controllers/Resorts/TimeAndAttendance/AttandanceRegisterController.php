@@ -261,9 +261,14 @@ class AttandanceRegisterController extends Controller
 
                             // ->whereIn('employees.id', $this->underEmp_id)
                             ->where('t1.resort_id', $this->resort->resort_id);
-                            if($Rank != '3'){
-                $attandanceregister->whereIn('employees.id', $this->underEmp_id);
-            }
+
+                            $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+                            $userDeptId = $this->resort->GetEmployee->Dept_id ?? '';
+
+                            if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM"){
+                                // Non-HR/EXCOM users only see their own department
+                                $attandanceregister->where('employees.Dept_id', $userDeptId);
+                            }
 
                         // Apply search filter
                         if (!empty($search)) {
@@ -274,7 +279,7 @@ class AttandanceRegisterController extends Controller
                             });
                         }
 
-                        // Apply department filter
+                        // Apply department filter (for HR/EXCOM users who have department dropdown)
                         if (!empty($department)) {
                             $attandanceregister->where('employees.Dept_id', $department);
                         }

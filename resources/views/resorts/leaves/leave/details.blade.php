@@ -94,7 +94,10 @@
                             $statusVal = $leaveDetail->status ?? $leaveDetail->leave_status ?? 'Pending';
                             $statusClass = strtolower($statusVal) === 'approved' ? 'bg-success' : (strtolower($statusVal) === 'rejected' ? 'bg-danger' : 'bg-warning text-dark');
                         @endphp
-                        <span class="badge {{ $statusClass }} px-3 py-2">{{ $statusVal }}</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge border-0" style="color:{{$leaveDetail->color}}; background:{{$leaveDetail->color}}22;">{{ $leaveDetail->leave_type ?? 'N/A' }}</span>
+                            <span class="badge {{ $statusClass }} px-3 py-2">{{ $statusVal }}</span>
+                        </div>
                     </div>
                     <div class="card-body p-4">
                         {{-- Leave overview --}}

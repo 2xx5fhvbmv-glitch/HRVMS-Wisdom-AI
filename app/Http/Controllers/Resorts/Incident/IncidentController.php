@@ -606,22 +606,40 @@ class IncidentController extends Controller
         $incident->status = "Approval Pending";
         $incident->save();
 
-        // Notify GM
-        $gm = Employee::with(['position','resortAdmin'])->where('Rank', 8)->first(); // Or adjust to your structure
+        // Notify GM (and their delegate if GM is on leave)
+        $gm = Employee::with(['position','resortAdmin'])->where('Rank', 8)->first();
         if ($gm) {
             $msg = 'An investigation report is awaiting your approval.';
             $title = 'Approval Required';
             $ModuleName = "Incident";
-            
+
             event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, 
-                10, 
-                $title, 
-                $msg, 
-                0, 
-                $gm->id, 
+                $this->resort->resort_id,
+                10,
+                $title,
+                $msg,
+                0,
+                $gm->id,
                 $ModuleName
-            )));       
+            )));
+
+            // Also notify GM's delegate if GM is on leave
+            $gmDelegateIds = Common::getDelegatedEmployeeIds($gm->id, $this->resort->resort_id);
+            // getDelegatedEmployeeIds returns IDs of employees on leave, we need the reverse — delegates FOR the GM
+            $today = now()->format('Y-m-d');
+            $gmDelegates = \App\Models\EmployeeLeave::where('emp_id', $gm->id)
+                ->where('status', 'Approved')
+                ->where('from_date', '<=', $today)
+                ->where('to_date', '>=', $today)
+                ->whereNotNull('task_delegation')
+                ->pluck('task_delegation')->unique();
+            foreach ($gmDelegates as $delegateId) {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id, 10, $title,
+                    $msg . ' (Delegated from GM)',
+                    0, $delegateId, $ModuleName
+                )));
+            }
         }
 
         return response()->json(['message' => 'Approval request sent to GM.']);
@@ -630,9 +648,26 @@ class IncidentController extends Controller
     public function approveOrReject(Request $request)
     {
         $incident = Incidents::findOrFail($request->id);
-        $incident->approved_by = $this->resort->getEmployee->id;
+        $currentEmpId = $this->resort->getEmployee->id ?? null;
+
+        // Only GM (rank 8) or delegate of GM can approve/reject incidents
+        $currentRank = $this->resort->getEmployee->rank ?? null;
+        $isGM = ($currentRank == 8);
+        $isDelegateForGM = false;
+        if (!$isGM) {
+            $gm = Employee::where('rank', 8)->where('resort_id', $this->resort->resort_id)->first();
+            if ($gm && \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $gm->id, $this->resort->resort_id)) {
+                $isDelegateForGM = true;
+            }
+        }
+
+        if (!$isGM && !$isDelegateForGM) {
+            return response()->json(['success' => false, 'message' => 'Only GM or their delegate can approve/reject incidents.'], 403);
+        }
+
+        $incident->approved_by = $currentEmpId;
         $incident->approved_at = now();
-        $incident->approval_remarks = $request->remarks;
+        $incident->approval_remarks = $request->remarks . ($isDelegateForGM ? ' (Acted by delegate)' : '');
 
         if ($request->status === 'approved') {
             $incident->status = 'Approved';
