@@ -98,6 +98,19 @@
                                                                                                                         <span class="badge badge-white">{{ $r->Emp_id }}</span>
                                                                                                                     </p>
                                                                                                                     <span>{{ ucfirst($r->position_title) }}</span>
+                                                                                                                    @if(!empty($r->geofence_zone_id))
+                                                                                                                        @php
+                                                                                                                            $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
+                                                                                                                            $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
+                                                                                                                        @endphp
+                                                                                                                        <div class="mt-1">
+                                                                                                                        @foreach($zones as $zone)
+                                                                                                                            <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:9px;">
+                                                                                                                                <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
+                                                                                                                            </span>
+                                                                                                                        @endforeach
+                                                                                                                        </div>
+                                                                                                                    @endif
                                                                                                                 </div>
                                                                                                             </div>
                                                                                                         </td>
@@ -303,6 +316,19 @@
                                                                                                 <span class="badge badge-white">{{ $r->Emp_id }}</span>
                                                                                             </p>
                                                                                             <span>{{ ucfirst($r->position_title) }}</span>
+                                                                                            @if(!empty($r->geofence_zone_id))
+                                                                                                @php
+                                                                                                    $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
+                                                                                                    $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
+                                                                                                @endphp
+                                                                                                <div class="mt-1">
+                                                                                                @foreach($zones as $zone)
+                                                                                                    <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:9px;">
+                                                                                                        <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
+                                                                                                    </span>
+                                                                                                @endforeach
+                                                                                                </div>
+                                                                                            @endif
                                                                                         </div>
                                                                                     </div>
                                                                                 </td>

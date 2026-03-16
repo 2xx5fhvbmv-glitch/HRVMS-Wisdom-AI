@@ -124,7 +124,7 @@
                                                             $currentDate = isset($h['date']) ? $h['date'] : date('Y-m-d', strtotime($h['day']));
                                                             $isPublicHoliday = isset($publicHolidays) && in_array($currentDate, $publicHolidays);
                                                         @endphp
-                                                        <th class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span></th>
+                                                        <th class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span> <span style="font-size:9px; opacity:0.7; display:block;">{{ $h['month'] ?? '' }}</span></th>
                                                     @endforeach
                                                 @endif
                                                 <th>Holiday OT</th>

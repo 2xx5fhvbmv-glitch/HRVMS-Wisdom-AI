@@ -334,7 +334,7 @@ class AttandanceRegisterController extends Controller
                     {
                         $dayName = $headerDate->format('D');
                         $newdate = $headerDate->format('d-m-Y');
-                        $monthwiseheaders[] = ["day"=>$headerDate->format('d'),"dayname" => $dayName,'newdate'=>$newdate];
+                        $monthwiseheaders[] = ["day"=>$headerDate->format('d'),"dayname" => $dayName,'newdate'=>$newdate,'month'=>$headerDate->format('M')];
                         $headerDate->addDay();
                     }
                     $resort_id  = $this->resort->resort_id;

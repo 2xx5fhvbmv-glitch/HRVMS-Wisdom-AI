@@ -89,9 +89,23 @@ class EmployeeController extends Controller
             DB::raw("
                 (
                     SELECT CONCAT(
-                        FLOOR(COALESCE(SUM(CAST(pa.DayWiseTotalHours AS DECIMAL(10,2))), 0)),
+                        FLOOR(COALESCE(SUM(
+                            CASE
+                                WHEN pa.DayWiseTotalHours LIKE '%:%' THEN
+                                    CAST(SUBSTRING_INDEX(pa.DayWiseTotalHours, ':', 1) AS SIGNED) +
+                                    CAST(SUBSTRING_INDEX(pa.DayWiseTotalHours, ':', -1) AS SIGNED) / 60.0
+                                ELSE CAST(IFNULL(pa.DayWiseTotalHours, 0) AS DECIMAL(10,2))
+                            END
+                        ), 0)),
                         ':',
-                        LPAD(ROUND((COALESCE(SUM(CAST(pa.DayWiseTotalHours AS DECIMAL(10,2))), 0) - FLOOR(COALESCE(SUM(CAST(pa.DayWiseTotalHours AS DECIMAL(10,2))), 0))) * 60), 2, '0')
+                        LPAD(ROUND(MOD(COALESCE(SUM(
+                            CASE
+                                WHEN pa.DayWiseTotalHours LIKE '%:%' THEN
+                                    CAST(SUBSTRING_INDEX(pa.DayWiseTotalHours, ':', 1) AS SIGNED) * 60 +
+                                    CAST(SUBSTRING_INDEX(pa.DayWiseTotalHours, ':', -1) AS SIGNED)
+                                ELSE CAST(IFNULL(pa.DayWiseTotalHours, 0) AS DECIMAL(10,2)) * 60
+                            END
+                        ), 0), 60)), 2, '0')
                     )
                     FROM parent_attendaces pa
                     WHERE pa.Emp_id = employees.id
@@ -103,13 +117,28 @@ class EmployeeController extends Controller
             DB::raw("
                 (
                     SELECT CONCAT(
-                        FLOOR(COALESCE(SUM(CAST(pa.OverTime AS DECIMAL(10,2))), 0)),
+                        FLOOR(COALESCE(SUM(
+                            CASE
+                                WHEN pa.OverTime LIKE '%:%' THEN
+                                    CAST(SUBSTRING_INDEX(pa.OverTime, ':', 1) AS SIGNED) +
+                                    CAST(SUBSTRING_INDEX(pa.OverTime, ':', -1) AS SIGNED) / 60.0
+                                ELSE CAST(IFNULL(pa.OverTime, 0) AS DECIMAL(10,2))
+                            END
+                        ), 0)),
                         ':',
-                        LPAD(ROUND((COALESCE(SUM(CAST(pa.OverTime AS DECIMAL(10,2))), 0) - FLOOR(COALESCE(SUM(CAST(pa.OverTime AS DECIMAL(10,2))), 0))) * 60), 2, '0')
+                        LPAD(ROUND(MOD(COALESCE(SUM(
+                            CASE
+                                WHEN pa.OverTime LIKE '%:%' THEN
+                                    CAST(SUBSTRING_INDEX(pa.OverTime, ':', 1) AS SIGNED) * 60 +
+                                    CAST(SUBSTRING_INDEX(pa.OverTime, ':', -1) AS SIGNED)
+                                ELSE CAST(IFNULL(pa.OverTime, 0) AS DECIMAL(10,2)) * 60
+                            END
+                        ), 0), 60)), 2, '0')
                     )
                     FROM parent_attendaces pa
                     WHERE pa.Emp_id = employees.id
                     AND pa.resort_id = {$resortId}
+                    AND pa.OTStatus = 'Approved'
                     AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                 ) as TotalOverTime
             "),
@@ -222,8 +251,18 @@ class EmployeeController extends Controller
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
             ->where('t1.resort_id', $this->resort->resort_id);
 
-            if($Rank != '3'){
-                $employeesQuery->whereIn('employees.id', $this->underEmp_id);
+            $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+            $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM']);
+
+            if (!$canViewAll) {
+                $Dept_id = $this->resort->GetEmployee->Dept_id ?? '';
+                if ($employeeRankPosition['position'] == 'HOD' || $employeeRankPosition['position'] == 'MGR') {
+                    // HOD/MGR see their own department
+                    $employeesQuery->where('employees.Dept_id', $Dept_id);
+                } else {
+                    // Others see only subordinates
+                    $employeesQuery->whereIn('employees.id', $this->underEmp_id);
+                }
             }
            $employees = $employeesQuery->paginate(10);
                 $today = Carbon::today()->format('Y-m-d');
@@ -247,7 +286,8 @@ class EmployeeController extends Controller
 
 
         $page_title = "Employees";
-        return  view('resorts.timeandattendance.employee.index',compact('page_title','ResortDepartment','employees'));
+        $showDepartmentFilter = $canViewAll;
+        return  view('resorts.timeandattendance.employee.index',compact('page_title','ResortDepartment','employees','showDepartmentFilter'));
     }
 
     public function SearchEmployeegird(Request $request)
@@ -277,8 +317,15 @@ class EmployeeController extends Controller
         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
         ->where('t1.resort_id', $this->resort->resort_id);
 
-        if($Rank != '3'){
-            $employees->whereIn('employees.id', $this->underEmp_id);
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+        $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM']);
+
+        if (!$canViewAll) {
+            if ($employeeRankPosition['position'] == 'HOD' || $employeeRankPosition['position'] == 'MGR') {
+                $employees->where('employees.Dept_id', $Dept_id);
+            } else {
+                $employees->whereIn('employees.id', $this->underEmp_id);
+            }
         }
         if ($search) {
             $employees->where(function ($query) use ($search) {
@@ -565,7 +612,11 @@ class EmployeeController extends Controller
 
 
             $leave_categories = ResortBenifitGridChild::select(
-                'resort_benefit_grid_child.*',
+                DB::raw('MAX(resort_benefit_grid_child.id) as id'),
+                'resort_benefit_grid_child.leave_cat_id',
+                'resort_benefit_grid_child.rank',
+                DB::raw('MAX(resort_benefit_grid_child.allocated_days) as allocated_days'),
+                'resort_benefit_grid_child.eligible_emp_type',
                             'lc.leave_type',
                             'lc.color',
                             'lc.leave_category',
@@ -585,7 +636,7 @@ class EmployeeController extends Controller
                                 }
 
                             })
-
+                        ->groupBy('lc.id')
                         ->get()
                         ->map(function ($i) use ($id) {
                             $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;
@@ -1166,7 +1217,7 @@ class EmployeeController extends Controller
             $AttendanceHistroy =  ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
-                ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
+                ->whereIn('parent_attendaces.Status',['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave','FullDayLeave'])
                 ->where('t1.id', $id)
                 ->where('parent_attendaces.resort_id', $this->resort->resort_id)
                 ->whereBetween('parent_attendaces.date', [$previousMonthStart, $previousMonthEnd])
@@ -1189,7 +1240,7 @@ class EmployeeController extends Controller
                             'parent_attendaces.created_at'
                         ])
 
-                ->map(function($h)use($currentMonthDays){
+                ->map(function($h)use($currentMonthDays, $id){
                     $h->raw_date = Carbon::parse($h->date)->format('Y-m-d');
                     $h->date = Carbon::parse($h->date)->format('d M Y');
                     $h->shift = ucfirst($h->ShiftName) ;
@@ -1239,8 +1290,8 @@ class EmployeeController extends Controller
 
                     $h->CheckInTimeOne = $h->CheckingTime ;
                     $h->CheckOutTimeOne = $h->CheckingOutTime;
-                    $h->TotalHours =isset($h->DayWiseTotalHours) ?  $h->DayWiseTotalHours : '-';
-                    $h->OverTime =isset($h->OverTime) ?  $h->OverTime : '-';
+                    $h->TotalHours = (!empty($h->DayWiseTotalHours) && $h->DayWiseTotalHours !== '0:00') ? $h->DayWiseTotalHours : '-';
+                    $h->OverTime = (!empty($h->OverTime) && !in_array($h->OverTime, ['', '0', '00:00', '0:00', '0:0'])) ? $h->OverTime : '-';
 
                     if ($h->CheckingTime && $h->StartTime)
                     {
@@ -1303,21 +1354,51 @@ class EmployeeController extends Controller
                     {
                         if($h->Status == 'Absent')
                         {
-                            $h->Status = '<span class="badge badge-themeDanger">Absent</span>';
+                            // Check if this is a leave day (Unpaid Leave etc.)
+                            $noteText = trim($h->note ?? '');
+                            if ($noteText && stripos($noteText, 'leave') !== false) {
+                                $h->Status = '<span class="badge badge-themeDanger">Absent</span> <small class="text-muted d-block">' . e($noteText) . '</small>';
+                            } else {
+                                $h->Status = '<span class="badge badge-themeDanger">Absent</span>';
+                            }
                         }
                         elseif($h->Status == "DayOff")
                         {
-                            $h->Status = '<span class="badge badge-themeDanger">'.$h->Status.'</span>';
-
+                            $h->Status = '<span class="badge badge-themeWarning">Day Off</span>';
+                        }
+                        elseif($h->Status == "FullDayLeave")
+                        {
+                            // Look up the actual leave type for this date
+                            $leaveInfo = EmployeeLeave::join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
+                                ->where('employees_leaves.Emp_id', $id)
+                                ->where('employees_leaves.from_date', '<=', $h->raw_date)
+                                ->where('employees_leaves.to_date', '>=', $h->raw_date)
+                                ->first(['lc.leave_type', 'lc.color']);
+                            if ($leaveInfo) {
+                                $h->Status = '<span class="badge" style="background-color:' . ($leaveInfo->color ?? '#9C27B0') . '22; color:' . ($leaveInfo->color ?? '#9C27B0') . '; border:1px solid ' . ($leaveInfo->color ?? '#9C27B0') . ';">' . e($leaveInfo->leave_type) . '</span>';
+                            } else {
+                                $noteText = trim($h->note ?? '');
+                                $h->Status = '<span class="badge badge-themePurple">Leave</span>' . ($noteText ? ' <small class="text-muted d-block">' . e($noteText) . '</small>' : '');
+                            }
                         }
                         else
                         {
-                            $h->Status;
+                            $h->Status = '<span class="badge badge-default">' . $h->Status . '</span>';
                         }
                     }
+                    // Check if there's an approved leave overlapping this date regardless of attendance status
+                    $leaveOnDate = EmployeeLeave::join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
+                        ->where('employees_leaves.Emp_id', $id)
+                        ->where('employees_leaves.status', 'Approved')
+                        ->where('employees_leaves.from_date', '<=', $h->raw_date)
+                        ->where('employees_leaves.to_date', '>=', $h->raw_date)
+                        ->first(['lc.leave_type', 'lc.color']);
+                    if ($leaveOnDate) {
+                        $h->Status .= ' <span class="badge" style="background-color:' . ($leaveOnDate->color ?? '#9C27B0') . '22; color:' . ($leaveOnDate->color ?? '#9C27B0') . '; border:1px solid ' . ($leaveOnDate->color ?? '#9C27B0') . '; font-size:10px;">' . e($leaveOnDate->leave_type) . '</span>';
+                    }
+
                     return $h;
                 });
-// dd($AttendanceHistroy->first()->toArray());
 
                 $edit_class = '';
                 if(Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.edit')) == false){
@@ -1346,7 +1427,6 @@ class EmployeeController extends Controller
                         return isset($row->Status) ? $row->Status : 0; // Default to 0
                     })
                     ->addColumn('Action', function ($row) use ($edit_class) {
-                        // Use JavaScript interpolation or direct value to pass PHP variables to JavaScript
                         return '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData" data-location="' . $row->InTime_Location . '" data-id="' . $row->id . '">
                             <i class="fa-regular fa-location-dot"></i>
                         </a>
@@ -1470,7 +1550,11 @@ class EmployeeController extends Controller
 
 
             $leave_categories = ResortBenifitGridChild::select(
-                'resort_benefit_grid_child.*',
+                DB::raw('MAX(resort_benefit_grid_child.id) as id'),
+                'resort_benefit_grid_child.leave_cat_id',
+                'resort_benefit_grid_child.rank',
+                DB::raw('MAX(resort_benefit_grid_child.allocated_days) as allocated_days'),
+                'resort_benefit_grid_child.eligible_emp_type',
                             'lc.leave_type',
                             'lc.color',
                             'lc.leave_category',
@@ -1490,7 +1574,7 @@ class EmployeeController extends Controller
                                 }
 
                             })
-
+                        ->groupBy('lc.id')
                         ->get()
                         ->map(function ($i) use ($id) {
                             $i->combine_with_other = isset($i->combine_with_other) ? $i->combine_with_other : 0;

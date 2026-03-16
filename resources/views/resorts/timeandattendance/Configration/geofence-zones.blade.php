@@ -138,13 +138,16 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Color</label>
-                            <div class="d-flex gap-2" id="zf-color-picker">
+                            <div class="d-flex gap-2 align-items-center flex-wrap" id="zf-color-picker">
                                 <span class="zf-color-dot active" data-color="#FF4444" style="background:#FF4444;"></span>
                                 <span class="zf-color-dot" data-color="#4CAF50" style="background:#4CAF50;"></span>
                                 <span class="zf-color-dot" data-color="#2196F3" style="background:#2196F3;"></span>
                                 <span class="zf-color-dot" data-color="#FF9800" style="background:#FF9800;"></span>
                                 <span class="zf-color-dot" data-color="#9C27B0" style="background:#9C27B0;"></span>
                                 <span class="zf-color-dot" data-color="#00BCD4" style="background:#00BCD4;"></span>
+                                <label class="zf-color-dot" style="position:relative; cursor:pointer; background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); border: 2px solid transparent;" title="Custom color">
+                                    <input type="color" id="zf-custom-color" value="#FF4444" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                                </label>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -260,7 +263,11 @@ $(document).ready(function() {
     }
 
     function getZfColor() {
-        return $('#zf-color-picker .zf-color-dot.active').data('color') || '#FF4444';
+        var activeDot = $('#zf-color-picker .zf-color-dot.active');
+        if (activeDot.find('#zf-custom-color').length) {
+            return $('#zf-custom-color').val();
+        }
+        return activeDot.data('color') || '#FF4444';
     }
 
     // ── Drawing Tools ──
@@ -487,9 +494,19 @@ $(document).ready(function() {
     $(document).on('click', '#zf-tool-undo', function() { zfUndoLastPoint(); });
     $(document).on('click', '#zf-tool-clear', function() { zfClearDrawing(); });
 
-    $(document).on('click', '.zf-color-dot', function() {
+    $(document).on('click', '.zf-color-dot', function(e) {
+        if ($(e.target).is('#zf-custom-color')) return;
         $('.zf-color-dot').removeClass('active');
         $(this).addClass('active');
+    });
+
+    $(document).on('input', '#zf-custom-color', function() {
+        var color = $(this).val();
+        var parentLabel = $(this).closest('.zf-color-dot');
+        parentLabel.data('color', color);
+        parentLabel.css('background', color);
+        $('.zf-color-dot').removeClass('active');
+        parentLabel.addClass('active');
     });
 
     $(document).on('dblclick', '#zoneMap', function() {
