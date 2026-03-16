@@ -185,38 +185,39 @@ class RealAttendanceSeeder extends Seeder
                     return sprintf('%d:%02d', $h, $m);
                 };
 
+                $shiftHours = 8; // Morning Shift = 8 hours
+
                 switch ($attStatus) {
                     case 'P':
                         $status = 'Present';
+                        // Standard shift: 8 hours
+                        $totalHours = sprintf('%d:00', $shiftHours);
+
                         if ($ot > 0) {
-                            // Present with OT: regular shift + OT hours
-                            $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 30));
-                            $extraMinutes = $ot * 60 + rand(0, 30);
-                            $checkOutHour = 17 + intdiv($extraMinutes, 60);
-                            $checkOutMin = $extraMinutes % 60;
-                            $checkOut = sprintf('%02d:%02d:00', min($checkOutHour, 23), $checkOutMin);
-                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
-                            $totalHours = $toHMM($decimalHrs);
+                            // Present with explicit OT from xlsx
+                            $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 15));
+                            $totalMinutes = ($shiftHours + $ot) * 60 + rand(0, 15);
+                            $checkOutTs = strtotime($checkIn) + ($totalMinutes * 60);
+                            $checkOut = date('H:i:00', $checkOutTs);
                             $overtime = sprintf('%02d:00', $ot);
                             $otStatusVal = 'Approved';
                         } else {
-                            // Regular present
-                            $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 59));
-                            $checkOut = sprintf('%02d:%02d:00', rand(16, 17), rand(0, 59));
-                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
-                            $totalHours = $toHMM($decimalHrs);
+                            // Regular present — exactly 8h shift, minor variation in check-in/out
+                            $checkInMinOffset = rand(0, 15); // 0-15 min after shift start
+                            $checkIn = sprintf('%02d:%02d:00', 4 + intdiv($checkInMinOffset, 60), $checkInMinOffset % 60);
+                            $checkOutTs = strtotime($checkIn) + ($shiftHours * 3600) + rand(0, 10) * 60;
+                            $checkOut = date('H:i:00', $checkOutTs);
                         }
                         break;
 
                     case 'DO':
                         $status = 'DayOff';
                         if ($ot > 0) {
-                            // Day Off with OT
-                            $checkIn = sprintf('%02d:%02d:00', rand(8, 9), rand(0, 59));
-                            $checkOutHour = 8 + $ot + rand(0, 1);
-                            $checkOut = sprintf('%02d:%02d:00', min($checkOutHour, 20), rand(0, 59));
-                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
-                            $totalHours = $toHMM($decimalHrs);
+                            // Day Off with OT — only OT hours worked
+                            $checkIn = sprintf('%02d:%02d:00', rand(8, 9), rand(0, 15));
+                            $checkOutTs = strtotime($checkIn) + ($ot * 3600) + rand(0, 10) * 60;
+                            $checkOut = date('H:i:00', $checkOutTs);
+                            $totalHours = sprintf('%d:00', $ot);
                             $overtime = sprintf('%02d:00', $ot);
                             $otStatusVal = 'Approved';
                             $note = 'Day off overtime';

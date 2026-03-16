@@ -31,6 +31,7 @@
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
+                        @if(isset($showDepartmentFilter) && $showDepartmentFilter)
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
                             <select class="form-select Department" id="department" name="department">
                                 <option ></option>
@@ -39,6 +40,7 @@
                                 @endforeach
                             </select>
                         </div>
+                        @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select Position" name="position" id="position">
 

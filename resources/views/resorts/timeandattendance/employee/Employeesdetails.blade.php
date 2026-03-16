@@ -71,11 +71,6 @@
                                     <h6>Present Days</h6>
                                     <strong>{{ $employee->PresentCount }}</strong>
                                 </div>
-                                <div>
-                                    {{-- <a href="#">
-                                        <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                    </a> --}}
-                                </div>
                             </div>
                         </div>
                         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
@@ -84,10 +79,21 @@
                                     <h6>Absent Days</h6>
                                     <strong>{{ $employee->AbsentCount }}</strong>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
+                            <div class="empDetail-block">
                                 <div>
-                                    {{-- <a href="#">
-                                        <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                    </a> --}}
+                                    <h6>Day Off</h6>
+                                    <strong>{{ $employee->DayOffCount ?? 0 }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
+                            <div class="empDetail-block">
+                                <div>
+                                    <h6>Leave Days</h6>
+                                    <strong>{{ $employee->LeaveCount ?? 0 }}</strong>
                                 </div>
                             </div>
                         </div>
@@ -97,23 +103,18 @@
                                     <h6>Total Hours Worked</h6>
                                     <strong>{{ $employee->TotalHoursWorked ?? '00:00' }}</strong>
                                 </div>
-                                <div>
-                                    {{-- <a href="#">
-                                        <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                    </a> --}}
-                                </div>
                             </div>
                         </div>
                         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
                             <div class="empDetail-block">
                                 <div>
                                     <h6>OT Hours</h6>
-                                    <strong>{{ $employee->TotalOverTime ?? '00:00' }}</strong>
-                                </div>
-                                <div>
-                                    {{-- <a href="#">
-                                        <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                    </a> --}}
+                                    @if(in_array($employee->rank, [5, 6, '5', '6']))
+                                        <strong>{{ $employee->TotalOverTime ?? '00:00' }}</strong>
+                                    @else
+                                        <strong class="text-muted">N/A</strong>
+                                        <small class="text-muted d-block">OT applies to Line Workers & Supervisors only</small>
+                                    @endif
                                 </div>
                             </div>
                         </div>

@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\Compliance;
 use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
+use App\Models\PayrollConfig;
 class DutyRosterController extends Controller
 {
     protected $resort;
@@ -136,7 +137,7 @@ class DutyRosterController extends Controller
         $Rosterdata1 = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
                                 ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
-                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
+                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
                                 ->where('t1.resort_id', $this->resort->resort_id)
                                 ->where('t3.resort_id', $this->resort->resort_id);
 
@@ -181,7 +182,10 @@ class DutyRosterController extends Controller
         // Get public holidays (including Fridays) - use month range to include all Fridays in the month
         $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
 
-        return view('resorts.timeandattendance.dutyroster.CreateDutyRoster',compact('endOfMonth','startOfMonth','WeekstartDate','WeekendDate','days','page_title','headers','employees','ShiftSettings','resort_id','Rosterdata','ResortPosition','totalDays','monthwiseheaders','LeaveCategory','statusCount','publicHolidays'));
+        // Get active geofence zones for this resort
+        $geofenceZones = \App\Models\ResortGeofence::where('resort_id', $resort_id)->where('status', 'active')->orderBy('name')->get();
+
+        return view('resorts.timeandattendance.dutyroster.CreateDutyRoster',compact('endOfMonth','startOfMonth','WeekstartDate','WeekendDate','days','page_title','headers','employees','ShiftSettings','resort_id','Rosterdata','ResortPosition','totalDays','monthwiseheaders','LeaveCategory','statusCount','publicHolidays','geofenceZones'));
     }
 
     public function DutyRosterandLeave(Request $request)
@@ -308,6 +312,8 @@ class DutyRosterController extends Controller
         $hiddenInput = $request->hiddenInput; // total Week are Selected
         $DayOfDate = $request->DayOfDate;
 
+        $geofenceZoneIds = $request->input('geofence_zone_ids', []);
+
         // Handle day off dates - parse comma-separated dates from DayOffDates field
         $DayOffDates = $request->DayOffDates ?? '';
         $dayOffDatesArray = [];
@@ -433,6 +439,7 @@ class DutyRosterController extends Controller
                     "ShiftDate"=> $hiddenInput,
                     "Year"=>date('Y'),
                     "DayOfDate"=> $DayOfDate,
+                    "geofence_zone_id" => !empty($geofenceZoneIds) ? json_encode($geofenceZoneIds) : null,
                 ]);
                 if(isset($DutyRoster))
                 {
@@ -1107,19 +1114,31 @@ class DutyRosterController extends Controller
                                 $Rosterdata=$Rosterdata->groupBy('employees.id');
                                 $Rosterdata=$Rosterdata->paginate(10);
 
-        $year = now()->year; // Current year
-        $month = now()->month; // Current month
-        $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
+        $year = now()->year;
+        $month = now()->month;
 
-        $monthwiseheaders=[];
-        for ($day = 1; $day <= $totalDays; $day++)
-        {
-            $date = Carbon::createFromDate($year, $month, $day); // Create a date for each day
-            $dayName = $date->format('D'); // Get the day name (e.g., Mon, Tue)
+        // Get cutoff day from payroll configuration
+        $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
 
-            $monthwiseheaders[] = ["day"=>str_pad($day, 2, '0', STR_PAD_LEFT),"dayname" => $dayName,'date'=>$date->format('Y-m-d')];
+        // Calculate cutoff period based on current month/year
+        $baseDate = Carbon::createFromDate($year, $month, 1);
+        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
+        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
 
+        // Build monthwise headers for the cutoff period
+        $monthwiseheaders = [];
+        $headerDate = $startOfMonth->copy();
+        for ($i = 0; $i < $totalDays; $i++) {
+            $monthwiseheaders[] = [
+                "day" => $headerDate->format('d'),
+                "dayname" => $headerDate->format('D'),
+                'date' => $headerDate->format('Y-m-d'),
+                'month' => $headerDate->format('M'),
+            ];
+            $headerDate->addDay();
         }
+
         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)
         ->where("resort_id",$this->resort->resort_id)->get();
         $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
@@ -1127,15 +1146,11 @@ class DutyRosterController extends Controller
                         ->where("employees.status","Active");
 
         if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM") {
-            // Non-HR/EXCOM users only see their own department
             $employees = $employees->where('employees.Dept_id', $Dept_id);
         }
 
         $employees = $employees->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
         $ShiftSettings = ShiftSettings::where("resort_id", $this->resort->resort_id)->get(['id','ShiftName','TotalHours']);
-
-        $startOfMonth = Carbon::now()->startOfMonth(); // Get the first day of the month
-        $endOfMonth =Carbon::now()->endOfMonth(); // Get the last day of the month
 
         // Get public holidays (including Fridays)
         $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
@@ -1251,12 +1266,15 @@ class DutyRosterController extends Controller
                         $year = now()->year;
                     }
 
+                    // Get cutoff day from payroll configuration
+                    $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+
                     if (!isset($filterDate))
                     {
                         $baseDate = Carbon::createFromDate($year, $month, 1);
-                        $totalDays = $baseDate->daysInMonth;
-                        $startOfMonth = $baseDate->copy()->startOfMonth();
-                        $endOfMonth = $baseDate->copy()->endOfMonth();
+                        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
+                        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+                        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
                         $WeekstartDate = $startOfMonth->copy()->startOfWeek();
                         $WeekendDate = $endOfMonth->copy()->endOfWeek();
                     }
@@ -1265,21 +1283,25 @@ class DutyRosterController extends Controller
                         $filterDate1 = Carbon::createFromFormat('d/m/Y', $filterDate);
                         $year = (int) $filterDate1->format('Y');
                         $month = (int) $filterDate1->format('n');
-                        $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth;
-                        $startOfMonth = $filterDate1->copy()->startOfMonth();
-                        $endOfMonth = $startOfMonth->copy()->endOfMonth();
-                        $WeekstartDate = Carbon::createFromFormat('d/m/Y',$filterDate)->startOfWeek();
-                        $WeekendDate = Carbon::createFromFormat('d/m/Y',$filterDate)->endOfWeek();
+                        $baseDate = Carbon::createFromDate($year, $month, 1);
+                        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
+                        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+                        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+                        $WeekstartDate = $startOfMonth->copy()->startOfWeek();
+                        $WeekendDate = $endOfMonth->copy()->endOfWeek();
                     }
 
-                    // dd($startOfMonth ,$endOfMonth);
-
                     $monthwiseheaders=[];
-                    for ($day = 1; $day <= $totalDays; $day++)
+                    $headerDate = $startOfMonth->copy();
+                    for ($i = 0; $i < $totalDays; $i++)
                     {
-                        $date = Carbon::createFromDate($year, $month, $day); // Create a date for each day
-                        $dayName = $date->format('D'); // Get the day name (e.g., Mon, Tue)
-                        $monthwiseheaders[] = ["day"=>str_pad($day, 2, '0', STR_PAD_LEFT),"dayname" => $dayName,'date'=>$date->format('Y-m-d')];
+                        $monthwiseheaders[] = [
+                            "day" => $headerDate->format('d'),
+                            "dayname" => $headerDate->format('D'),
+                            'date' => $headerDate->format('Y-m-d'),
+                            'month' => $headerDate->format('M'),
+                        ];
+                        $headerDate->addDay();
                     }
                     $resort_id   = $this->resort->resort_id;
 
@@ -1321,6 +1343,13 @@ class DutyRosterController extends Controller
 
         if (empty($entries)) {
             return response()->json(['success' => false, 'message' => 'Please provide at least one overtime entry.']);
+        }
+
+        // Department validation: everyone can only approve OT for their own department
+        $loggedInDeptId = $this->resort->GetEmployee->Dept_id ?? '';
+        $targetEmpDeptId = Employee::where('id', $Emp_id)->value('Dept_id');
+        if ($loggedInDeptId != $targetEmpDeptId) {
+            return response()->json(['success' => false, 'message' => 'You can only manage overtime for employees in your own department.']);
         }
 
         $dateCarbon = Carbon::parse($date);
@@ -1468,7 +1497,7 @@ class DutyRosterController extends Controller
                                 ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
                                 ->leftJoin('resort_departments as t4',"t4.id","=","employees.Dept_id")
                                 ->leftJoin('resort_sections as t5',"t5.id","=","t2.section_id")
-                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
+                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
                                 ->where('t1.resort_id', $this->resort->resort_id)
                                 ->where('t3.resort_id', $this->resort->resort_id);
 

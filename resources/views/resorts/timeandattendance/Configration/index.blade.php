@@ -551,13 +551,16 @@
                                 <div class="row g-2 mb-2">
                                     <div class="col-7">
                                         <label class="form-label small mb-0">Color</label>
-                                        <div class="d-flex gap-1" id="gf-color-picker">
+                                        <div class="d-flex gap-1 align-items-center flex-wrap" id="gf-color-picker">
                                             <span class="gf-color-dot active" data-color="#FF4444" style="background:#FF4444;"></span>
                                             <span class="gf-color-dot" data-color="#4CAF50" style="background:#4CAF50;"></span>
                                             <span class="gf-color-dot" data-color="#2196F3" style="background:#2196F3;"></span>
                                             <span class="gf-color-dot" data-color="#FF9800" style="background:#FF9800;"></span>
                                             <span class="gf-color-dot" data-color="#9C27B0" style="background:#9C27B0;"></span>
                                             <span class="gf-color-dot" data-color="#00BCD4" style="background:#00BCD4;"></span>
+                                            <label class="gf-color-dot" style="position:relative; cursor:pointer; background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); border: 2px solid transparent;" title="Custom color">
+                                                <input type="color" id="gf-custom-color" value="#FF4444" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                                            </label>
                                         </div>
                                     </div>
                                     <div class="col-5">
@@ -1702,7 +1705,11 @@
             }
 
             function getSelectedColor() {
-                return $('#gf-color-picker .gf-color-dot.active').data('color') || '#FF4444';
+                var activeDot = $('#gf-color-picker .gf-color-dot.active');
+                if (activeDot.find('#gf-custom-color').length) {
+                    return $('#gf-custom-color').val();
+                }
+                return activeDot.data('color') || '#FF4444';
             }
 
             function gfUpdateSaveButton() {
@@ -1737,9 +1744,22 @@
             $(document).on('click', '#gf-tool-undo', function() { gfUndoLastPoint(); });
             $(document).on('click', '#gf-tool-clear', function() { gfClearDrawing(); });
 
-            $(document).on('click', '.gf-color-dot', function() {
+            $(document).on('click', '.gf-color-dot', function(e) {
+                // Don't handle if clicking inside the color input
+                if ($(e.target).is('#gf-custom-color')) return;
                 $('.gf-color-dot').removeClass('active');
                 $(this).addClass('active');
+            });
+
+            // Custom color picker
+            $(document).on('input', '#gf-custom-color', function() {
+                var color = $(this).val();
+                var parentLabel = $(this).closest('.gf-color-dot');
+                parentLabel.data('color', color);
+                parentLabel.css('background', color);
+                // Activate this dot
+                $('.gf-color-dot').removeClass('active');
+                parentLabel.addClass('active');
             });
 
             // Open Geofence Manager

@@ -324,6 +324,7 @@
                                                 <th class="date-col {{ $isPublicHoliday ? 'public-holiday-header' : '' }}">
                                                     <div>{{ $h['dayname'] }}</div>
                                                     <div>{{ $h['day'] }}</div>
+                                                    <div style="font-size:9px; opacity:0.7;">{{ $h['month'] ?? '' }}</div>
                                                 </th>
                                             @endforeach
                                             <th class="leave-stat-col">Present</th>

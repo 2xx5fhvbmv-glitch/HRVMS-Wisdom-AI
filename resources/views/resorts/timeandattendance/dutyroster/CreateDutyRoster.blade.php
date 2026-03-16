@@ -91,6 +91,38 @@
                                         <input type="text" class="form-control" id="DayOffDates" name="DayOffDates" placeholder="Click to select day off dates" readonly style="background-color: white; cursor: pointer;">
                                         <small class="text-muted">Click to select multiple dates</small>
                                     </div>
+
+                                    {{-- Geofence Zone Selection --}}
+                                    @if(isset($geofenceZones) && $geofenceZones->count())
+                                    <div class="col-lg-12 col-sm-6">
+                                        <label class="form-label">Assign Geo-Fence Zone</label>
+                                        <div class="geofence-zone-list" style="max-height:180px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; background:#fff;">
+                                            <div class="p-2">
+                                                <input type="text" class="form-control form-control-sm mb-2" id="gfZoneSearch" placeholder="Search zones...">
+                                            </div>
+                                            <div id="gfZoneItems">
+                                                @foreach($geofenceZones as $zone)
+                                                <label class="d-flex align-items-center px-3 py-2 gf-zone-item border-bottom" style="cursor:pointer; gap:8px;" data-name="{{ strtolower($zone->name) }}">
+                                                    <input type="checkbox" name="geofence_zone_ids[]" value="{{ $zone->id }}" class="form-check-input mt-0 gf-zone-checkbox">
+                                                    <span style="width:10px; height:10px; border-radius:50%; background:{{ $zone->color }}; flex-shrink:0;"></span>
+                                                    <span class="small flex-grow-1">{{ $zone->name }}</span>
+                                                    <span class="badge bg-light text-muted" style="font-size:10px;">
+                                                        <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }}"></i>
+                                                        {{ $zone->shape_type }}
+                                                    </span>
+                                                </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">Select zones where employees can check in/out</small>
+                                    </div>
+                                    @else
+                                    <div class="col-lg-12 col-sm-6">
+                                        <label class="form-label text-muted">Geo-Fence Zone</label>
+                                        <p class="small text-muted mb-0">No active zones configured. <a href="{{ route('resort.timeandattendance.Configration') }}">Configure zones</a></p>
+                                    </div>
+                                    @endif
+
                                     <div class="col-12">
                                         <div class="bg-white">
                                             <p>Net Shift Hours:</p>
@@ -202,6 +234,17 @@
                                                                         <span class="badge badge-white">{{ $r->Emp_id }}</span>
                                                                     </p>
                                                                     <span>{{ ucfirst($r->position_title) }}</span>
+                                                                    @if(!empty($r->geofence_zone_id))
+                                                                        @php
+                                                                            $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
+                                                                            $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
+                                                                        @endphp
+                                                                        @foreach($zones as $zone)
+                                                                            <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:10px;">
+                                                                                <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
+                                                                            </span>
+                                                                        @endforeach
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -749,6 +792,15 @@
     });
 });
         $('[data-bs-toggle="tooltip"]').tooltip();
+
+        // Geofence zone search filter
+        $(document).on('keyup', '#gfZoneSearch', function() {
+            var search = $(this).val().toLowerCase();
+            $('.gf-zone-item').each(function() {
+                var name = $(this).data('name');
+                $(this).toggle(name.indexOf(search) > -1);
+            });
+        });
 
         // Overtime inputs are now handled in the modal, so this is removed
         var shiftOverTimePicker =  flatpickr(".shiftdate", {

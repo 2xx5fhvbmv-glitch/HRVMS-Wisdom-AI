@@ -12,7 +12,7 @@ class DutyRoster extends Model
 {
     use HasFactory;
     public $table = 'duty_rosters';
-    public $fillable = ['Parent_attd_id','resort_id','Shift_id','Emp_id','ShiftDate','Year','DayOfDate','created_by','modified_by'];
+    public $fillable = ['Parent_attd_id','resort_id','Shift_id','Emp_id','ShiftDate','Year','DayOfDate','geofence_zone_id','created_by','modified_by'];
 
     public static function boot(){
         parent::boot();

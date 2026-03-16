@@ -1613,15 +1613,18 @@ class TimeandAttendanceDashboardController extends Controller
     $todoList = collect();
 
     /**
-     * STEP 1: Get duty rosters (past + today)
+     * STEP 1: Get duty rosters (last 7 days + today)
+     * Skip DayOff and FullDayLeave entries — they don't need check-in/out
      */
+    $sevenDaysAgo = $today->copy()->subDays(7);
     $dutyRosterQuery = DB::table('duty_roster_entries as t2')
         ->join('employees', 'employees.id', '=', 't2.Emp_id')
         ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
         ->join('shift_settings as t4', 't4.id', '=', 't2.Shift_id')
         ->where('t1.resort_id', $this->resort->resort_id)
         ->where('employees.status', 'Active')
-        ->whereDate('t2.date', '<=', $today);
+        ->whereBetween('t2.date', [$sevenDaysAgo->format('Y-m-d'), $today->format('Y-m-d')])
+        ->whereNotIn('t2.Status', ['DayOff', 'FullDayLeave']);
 
     // Department Filters
     if (!$canViewAll && !$isDeptHOD) {
@@ -1645,7 +1648,8 @@ class TimeandAttendanceDashboardController extends Controller
         'employees.id as employee_id',
         'employees.Emp_id as Emp_code',
         't2.date',
-        't2.OverTime'
+        't2.OverTime',
+        't2.Status as roster_status'
     ])->get();
 
     if ($dutyRosters->isEmpty()) {
