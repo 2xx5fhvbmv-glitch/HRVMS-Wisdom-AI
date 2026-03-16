@@ -43,27 +43,82 @@ class RealAttendanceSeeder extends Seeder
             '2026-03-21', '2026-03-22', '2026-03-23', '2026-03-24',
         ];
 
-        // Attendance data per employee (in order of dates above)
-        // P=Present, F=DayOff, A=Absent, OT=Present+OT, FOT=DayOff+OT, HOT=DayOff+OT(Holiday), UL=Absent(Unpaid Leave), AL=Absent(Annual Leave)
+        // ── Attendance Sheet Data (P=Present, A=Absent, DO=DayOff, AL=Annual Leave, UL=Unpaid Leave) ──
         $attendance = [
-            'DR-1'  => ['P','P','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-2'  => ['P','P','P','FOT','HOT','P','P','P','P','P','FOT','P','P','P','P','P','P','FOT','P','P','P','P','P','P','FOT','P','P','P'],
-            'DR-4'  => ['P','P','P','F','HOT','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-5'  => ['P','P','OT','F','P','P','P','P','OT','P','F','P','P','P','P','P','P','F','P','P','OT','P','P','P','F','P','P','P'],
-            'DR-7'  => ['P','P','P','FOT','P','P','P','P','P','P','F','P','P','P','P','P','P','FOT','P','P','P','P','P','P','F','P','P','P'],
-            'DR-8'  => ['P','A','P','F','P','P','P','A','P','P','F','P','A','P','P','P','P','F','P','P','P','A','P','P','F','P','P','P'],
-            'DR-10' => ['P','P','A','F','P','P','P','P','P','P','F','P','P','P','A','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-11' => ['P','P','P','F','P','P','P','P','A','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-13' => ['P','UL','UL','F','P','P','P','P','P','P','F','P','P','P','UL','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-14' => ['UL','UL','P','F','P','P','P','UL','P','P','F','P','P','P','UL','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-15' => ['UL','UL','UL','F','UL','UL','UL','UL','P','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-17' => ['AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-18' => ['P','P','P','F','AL','AL','AL','AL','AL','AL','F','AL','AL','AL','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-19' => ['P','OT','P','F','P','P','P','OT','P','P','FOT','P','P','P','P','OT','P','F','P','P','P','P','P','P','F','P','P','P'],
-            'DR-20' => ['P','P','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P','P','P','P','F','P','P','P'],
+            'DR-1'  => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-2'  => ['P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P','P'],
+            'DR-4'  => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-5'  => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-7'  => ['P','P','P','P','P','P','P','P','P','P','DO','P','P','P','P','P','P','P','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-8'  => ['P','A','P','DO','P','P','P','A','P','P','DO','P','A','P','P','P','P','DO','P','P','P','A','P','P','DO','P','P','P'],
+            'DR-10' => ['P','P','A','DO','P','P','P','P','P','P','DO','P','P','P','A','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-11' => ['P','P','P','DO','P','P','P','P','A','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-13' => ['P','UL','UL','DO','P','P','P','P','P','P','DO','P','P','P','UL','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-14' => ['UL','UL','P','DO','P','P','P','UL','P','P','DO','P','P','P','UL','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-15' => ['UL','UL','UL','DO','UL','UL','UL','UL','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-17' => ['AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','AL','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-18' => ['P','P','P','DO','AL','AL','AL','AL','AL','AL','DO','AL','AL','AL','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-19' => ['P','P','P','DO','P','P','P','P','P','P','P','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-20' => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
         ];
 
-        // First create/find a duty roster for this date range
+        // ── OT Sheet Data (overtime hours per day, 0 = no overtime) ──
+        $otHours = [
+            'DR-1'  => [0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0],
+            'DR-2'  => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-4'  => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-5'  => [0,0,2,0,0,3,0,0,2,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,2],
+            'DR-7'  => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-8'  => [0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,3,0,0,0,3,0,0,0,0,0],
+            'DR-10' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-11' => [0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0],
+            'DR-13' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-14' => [0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1],
+            'DR-15' => [0,0,2,0,0,2,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,2,0,0,0,0],
+            'DR-17' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0],
+            'DR-18' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-19' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-20' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        ];
+
+        // ── Delete old seeded data for these employees in this date range ──
+        $empIds = array_values($empMap);
+
+        // Delete existing attendance records
+        $existingIds = DB::table('parent_attendaces')
+            ->where('resort_id', $resortId)
+            ->whereIn('Emp_id', $empIds)
+            ->whereBetween('date', ['2026-02-25', '2026-03-24'])
+            ->pluck('id');
+
+        if ($existingIds->isNotEmpty()) {
+            DB::table('child_attendaces')->whereIn('Parent_attd_id', $existingIds)->delete();
+            DB::table('break_attendaces')->whereIn('Parent_attd_id', $existingIds)->delete();
+            DB::table('parent_attendaces')->whereIn('id', $existingIds)->delete();
+            $this->command->info("Deleted " . $existingIds->count() . " old attendance records.");
+        }
+
+        // Delete old employee_overtimes for these employees
+        DB::table('employee_overtimes')
+            ->where('resort_id', $resortId)
+            ->whereIn('Emp_id', $empIds)
+            ->whereBetween('date', ['2026-02-25', '2026-03-24'])
+            ->delete();
+
+        // Delete old duty roster entries for these employees
+        DB::table('duty_roster_entries')
+            ->where('resort_id', $resortId)
+            ->whereIn('Emp_id', $empIds)
+            ->whereBetween('date', ['2026-02-25', '2026-03-24'])
+            ->delete();
+
+        // Delete old duty rosters created by this seeder
+        DB::table('duty_rosters')
+            ->where('resort_id', $resortId)
+            ->where('ShiftDate', '02/25/2026 - 03/24/2026')
+            ->delete();
+
+        // ── Create duty roster ──
         $rosterId = DB::table('duty_rosters')->insertGetId([
             'resort_id'  => $resortId,
             'Shift_id'   => $shiftId,
@@ -76,85 +131,127 @@ class RealAttendanceSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
+        // ── Create duty roster entries ──
+        $rosterEntries = [];
+        foreach ($empMap as $empCode => $empId) {
+            foreach ($dates as $index => $date) {
+                $attStatus = $attendance[$empCode][$index];
+                $rosterStatus = 'Working';
+                if ($attStatus === 'DO') $rosterStatus = 'DayOff';
+                elseif ($attStatus === 'AL') $rosterStatus = 'FullDayLeave';
+
+                $rosterEntries[] = [
+                    'resort_id'   => $resortId,
+                    'roster_id'   => $rosterId,
+                    'Emp_id'      => $empId,
+                    'Shift_id'    => $shiftId,
+                    'date'        => $date,
+                    'Status'      => $rosterStatus,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ];
+            }
+        }
+        // Insert in chunks
+        foreach (array_chunk($rosterEntries, 100) as $chunk) {
+            DB::table('duty_roster_entries')->insert($chunk);
+        }
+        $this->command->info("Inserted " . count($rosterEntries) . " duty roster entries.");
+
+        // ── Create attendance records ──
         $count = 0;
         $now = now();
 
         foreach ($attendance as $empCode => $dailyStatuses) {
             $empId = $empMap[$empCode];
+            $empOt = $otHours[$empCode];
 
-            foreach ($dailyStatuses as $index => $rawStatus) {
+            foreach ($dailyStatuses as $index => $attStatus) {
                 $date = $dates[$index];
+                $ot = $empOt[$index];
 
-                // Delete existing record and its child records first
-                $existingIds = DB::table('parent_attendaces')
-                    ->where('resort_id', $resortId)
-                    ->where('Emp_id', $empId)
-                    ->where('date', $date)
-                    ->pluck('id');
-
-                if ($existingIds->isNotEmpty()) {
-                    DB::table('child_attendaces')->whereIn('Parent_attd_id', $existingIds)->delete();
-                    DB::table('break_attendaces')->whereIn('Parent_attd_id', $existingIds)->delete();
-                    DB::table('parent_attendaces')->whereIn('id', $existingIds)->delete();
-                }
-
-                // Map raw status to DB values
                 $status = 'Present';
                 $overtime = null;
-                $otStatus = null;
+                $otStatusVal = null;
                 $checkIn = null;
                 $checkOut = null;
                 $totalHours = null;
                 $note = null;
 
-                switch ($rawStatus) {
+                // Helper: convert decimal hours to H:MM format
+                $toHMM = function($decimalHours) {
+                    $h = intdiv((int)round($decimalHours * 60), 60);
+                    $m = ((int)round($decimalHours * 60)) % 60;
+                    return sprintf('%d:%02d', $h, $m);
+                };
+
+                switch ($attStatus) {
                     case 'P':
                         $status = 'Present';
-                        $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 59));
-                        $checkOut = sprintf('%02d:%02d:00', rand(16, 17), rand(0, 59));
-                        $totalHours = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
+                        if ($ot > 0) {
+                            // Present with OT: regular shift + OT hours
+                            $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 30));
+                            $extraMinutes = $ot * 60 + rand(0, 30);
+                            $checkOutHour = 17 + intdiv($extraMinutes, 60);
+                            $checkOutMin = $extraMinutes % 60;
+                            $checkOut = sprintf('%02d:%02d:00', min($checkOutHour, 23), $checkOutMin);
+                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
+                            $totalHours = $toHMM($decimalHrs);
+                            $overtime = sprintf('%02d:00', $ot);
+                            $otStatusVal = 'Approved';
+                        } else {
+                            // Regular present
+                            $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 59));
+                            $checkOut = sprintf('%02d:%02d:00', rand(16, 17), rand(0, 59));
+                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
+                            $totalHours = $toHMM($decimalHrs);
+                        }
                         break;
 
-                    case 'OT':
-                        $status = 'Present';
-                        $checkIn = sprintf('%02d:%02d:00', rand(7, 8), rand(0, 59));
-                        $checkOut = sprintf('%02d:%02d:00', rand(19, 21), rand(0, 59));
-                        $totalHours = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
-                        $overtime = rand(2, 4);
-                        $otStatus = 'Approved';
-                        break;
-
-                    case 'F':
+                    case 'DO':
                         $status = 'DayOff';
-                        break;
-
-                    case 'FOT':
-                        $status = 'DayOff';
-                        $overtime = rand(4, 8);
-                        $otStatus = 'Approved';
-                        $checkIn = sprintf('%02d:%02d:00', rand(8, 9), rand(0, 59));
-                        $checkOut = sprintf('%02d:%02d:00', rand(16, 18), rand(0, 59));
-                        $totalHours = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
-                        $note = 'Day off overtime';
-                        break;
-
-                    case 'HOT':
-                        $status = 'DayOff';
-                        $overtime = rand(4, 8);
-                        $otStatus = 'Approved';
-                        $checkIn = sprintf('%02d:%02d:00', rand(8, 9), rand(0, 59));
-                        $checkOut = sprintf('%02d:%02d:00', rand(16, 18), rand(0, 59));
-                        $totalHours = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
-                        $note = 'Holiday overtime';
+                        if ($ot > 0) {
+                            // Day Off with OT
+                            $checkIn = sprintf('%02d:%02d:00', rand(8, 9), rand(0, 59));
+                            $checkOutHour = 8 + $ot + rand(0, 1);
+                            $checkOut = sprintf('%02d:%02d:00', min($checkOutHour, 20), rand(0, 59));
+                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
+                            $totalHours = $toHMM($decimalHrs);
+                            $overtime = sprintf('%02d:00', $ot);
+                            $otStatusVal = 'Approved';
+                            $note = 'Day off overtime';
+                        }
                         break;
 
                     case 'A':
                         $status = 'Absent';
+                        if ($ot > 0) {
+                            // Absent but did OT work
+                            $checkIn = sprintf('%02d:%02d:00', rand(14, 16), rand(0, 59));
+                            $checkOutHour = 16 + $ot;
+                            $checkOut = sprintf('%02d:%02d:00', min($checkOutHour, 22), rand(0, 59));
+                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
+                            $totalHours = $toHMM($decimalHrs);
+                            $overtime = sprintf('%02d:00', $ot);
+                            $otStatusVal = 'Approved';
+                            $note = 'Absent from shift, worked OT';
+                        }
                         break;
 
                     case 'UL':
                         $status = 'Absent';
                         $note = 'Unpaid Leave';
+                        if ($ot > 0) {
+                            // UL but called in for OT
+                            $checkIn = sprintf('%02d:%02d:00', rand(14, 16), rand(0, 59));
+                            $checkOutHour = 16 + $ot;
+                            $checkOut = sprintf('%02d:%02d:00', min($checkOutHour, 22), rand(0, 59));
+                            $decimalHrs = round((strtotime($checkOut) - strtotime($checkIn)) / 3600, 2);
+                            $totalHours = $toHMM($decimalHrs);
+                            $overtime = sprintf('%02d:00', $ot);
+                            $otStatusVal = 'Approved';
+                            $note = 'Unpaid Leave, worked OT';
+                        }
                         break;
 
                     case 'AL':
@@ -164,21 +261,21 @@ class RealAttendanceSeeder extends Seeder
                 }
 
                 DB::table('parent_attendaces')->insert([
-                    'resort_id'          => $resortId,
-                    'roster_id'          => $rosterId,
-                    'Shift_id'           => $shiftId,
-                    'Emp_id'             => $empId,
-                    'date'               => $date,
-                    'Status'             => $status,
-                    'CheckingTime'       => $checkIn,
-                    'CheckingOutTime'    => $checkOut,
-                    'DayWiseTotalHours'  => $totalHours,
-                    'OverTime'           => $overtime,
-                    'OTStatus'           => $otStatus,
-                    'note'               => $note,
+                    'resort_id'            => $resortId,
+                    'roster_id'            => $rosterId,
+                    'Shift_id'             => $shiftId,
+                    'Emp_id'               => $empId,
+                    'date'                 => $date,
+                    'Status'               => $status,
+                    'CheckingTime'         => $checkIn,
+                    'CheckingOutTime'      => $checkOut,
+                    'DayWiseTotalHours'    => $totalHours,
+                    'OverTime'             => $overtime,
+                    'OTStatus'             => $otStatusVal,
+                    'note'                 => $note,
                     'CheckInCheckOut_Type' => 'Manual',
-                    'created_at'         => $now,
-                    'updated_at'         => $now,
+                    'created_at'           => $now,
+                    'updated_at'           => $now,
                 ]);
 
                 $count++;
@@ -186,5 +283,65 @@ class RealAttendanceSeeder extends Seeder
         }
 
         $this->command->info("Inserted {$count} attendance records for 15 employees (Feb 25 - Mar 24, 2026).");
+
+        // ── Create employee_overtimes records from OT sheet data ──
+        $otCount = 0;
+        foreach ($otHours as $empCode => $dailyOt) {
+            $empId = $empMap[$empCode];
+
+            foreach ($dailyOt as $index => $otHrs) {
+                if ($otHrs <= 0) continue;
+
+                $date = $dates[$index];
+                $attStatus = $attendance[$empCode][$index];
+
+                // Determine overtime type (enum: before_shift, after_shift, split)
+                $overtimeType = 'after_shift';
+
+                // Generate realistic start/end times
+                $startHour = ($attStatus === 'DO' || $attStatus === 'A' || $attStatus === 'UL')
+                    ? rand(8, 10)
+                    : 17; // after shift
+                $startMin = rand(0, 30);
+                $endHour = $startHour + $otHrs;
+                $endMin = $startMin + rand(0, 29);
+                if ($endMin >= 60) { $endHour++; $endMin -= 60; }
+
+                $startTime = sprintf('%02d:%02d', $startHour, $startMin);
+                $endTime = sprintf('%02d:%02d', min($endHour, 23), $endMin);
+                $totalTime = sprintf('%02d:00', $otHrs);
+
+                // Get parent_attendance_id for linking
+                $parentId = DB::table('parent_attendaces')
+                    ->where('resort_id', $resortId)
+                    ->where('Emp_id', $empId)
+                    ->where('date', $date)
+                    ->value('id');
+
+                DB::table('employee_overtimes')->insert([
+                    'resort_id'             => $resortId,
+                    'Emp_id'                => $empId,
+                    'Shift_id'              => $shiftId,
+                    'roster_id'             => $rosterId,
+                    'parent_attendance_id'  => $parentId,
+                    'date'                  => $date,
+                    'start_time'            => $startTime,
+                    'end_time'              => $endTime,
+                    'total_time'            => $totalTime,
+                    'status'                => 'approved',
+                    'approved_by'           => 259,
+                    'approved_at'           => $now,
+                    'overtime_type'         => $overtimeType,
+                    'notes'                 => 'Seeded from payroll xlsx',
+                    'created_by'            => 259,
+                    'created_at'            => $now,
+                    'updated_at'            => $now,
+                ]);
+
+                $otCount++;
+            }
+        }
+
+        $this->command->info("Inserted {$otCount} employee_overtimes records.");
     }
 }

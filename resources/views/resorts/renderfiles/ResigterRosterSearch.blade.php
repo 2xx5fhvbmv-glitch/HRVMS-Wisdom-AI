@@ -81,16 +81,23 @@
 
 
                                     if (isset($shiftData) && $shiftData->Status == "Present") {
-                                        list($hours, $minutes) = explode(':', $shiftData->DayWiseTotalHours ?? '0:0');
-
-
-                                        $toatalHoursForDay = (int)$hours + ((int)$minutes / 60);
-
+                                        $dayHoursRaw = $shiftData->DayWiseTotalHours ?? '0:0';
+                                        if (strpos($dayHoursRaw, ':') !== false) {
+                                            list($hours, $minutes) = explode(':', $dayHoursRaw);
+                                            $toatalHoursForDay = (int)$hours + ((int)$minutes / 60);
+                                        } else {
+                                            $toatalHoursForDay = (float)$dayHoursRaw;
+                                        }
 
                                         $totalHours += $toatalHoursForDay;
 
-                                        list($Othours, $Otminutes) = explode(':', $shiftData->OverTime ?? '0:0');
-                                        $TotalweeklyOt +=  (int)$Othours + ((int)$Otminutes / 60);
+                                        $otRaw = $shiftData->OverTime ?? '0:0';
+                                        if (strpos($otRaw, ':') !== false) {
+                                            list($Othours, $Otminutes) = explode(':', $otRaw);
+                                            $TotalweeklyOt += (int)$Othours + ((int)$Otminutes / 60);
+                                        } else {
+                                            $TotalweeklyOt += (float)$otRaw;
+                                        }
 
                                         }
 
@@ -275,12 +282,26 @@
         if ($LeaveCategory->isNotEmpty() && $attandanceregister->isNotEmpty()) {
             foreach ($attandanceregister as $empRow) {
                 $rosterData = Common::GetAttandanceRegister($resort_id, $empRow->duty_roster_id, $empRow->emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, "Monthwise");
+                // Get LeaveData from first roster record only (it's the same on all records for the employee)
+                $leaveDataChecked = false;
                 foreach ($rosterData as $shiftData) {
-                    if (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData)) {
+                    if (!$leaveDataChecked && isset($shiftData->LeaveData) && is_array($shiftData->LeaveData)) {
+                        $leaveDataChecked = true;
                         foreach ($shiftData->LeaveData as $leaveData) {
-                            $catId = isset($leaveData['leave_cat_id']) ? $leaveData['leave_cat_id'] : (isset($leaveData->leave_cat_id) ? $leaveData->leave_cat_id : null);
+                            $catId = is_array($leaveData) ? ($leaveData['leave_cat_id'] ?? null) : ($leaveData->leave_cat_id ?? null);
                             if ($catId !== null && $catId !== '') {
-                                $leaveCategoryTotalCount[(int)$catId] = ($leaveCategoryTotalCount[(int)$catId] ?? 0) + 1;
+                                // Calculate days that overlap with the current month
+                                $leaveFrom = is_array($leaveData) ? ($leaveData['from_date'] ?? null) : ($leaveData->from_date ?? null);
+                                $leaveTo = is_array($leaveData) ? ($leaveData['to_date'] ?? null) : ($leaveData->to_date ?? null);
+                                if ($leaveFrom && $leaveTo) {
+                                    $overlapStart = max(strtotime($startOfMonth), strtotime($leaveFrom));
+                                    $overlapEnd = min(strtotime($endOfMonth), strtotime($leaveTo));
+                                    $overlapDays = max(0, floor(($overlapEnd - $overlapStart) / 86400) + 1);
+                                } else {
+                                    $totalDays = is_array($leaveData) ? ($leaveData['total_days'] ?? 1) : ($leaveData->total_days ?? 1);
+                                    $overlapDays = (int)$totalDays;
+                                }
+                                $leaveCategoryTotalCount[(int)$catId] = ($leaveCategoryTotalCount[(int)$catId] ?? 0) + $overlapDays;
                             }
                         }
                     }
@@ -311,11 +332,7 @@
                                             @if($LeaveCategory->isNotEmpty())
                                                 @foreach ($LeaveCategory as $l)
                                                     @if(in_array((int)$l->id, $leaveCategoriesWithData))
-                                                    <th class="leave-stat-col">
-                                                        <span class="leave-stat-badge" style="background-color: {{ $l->color }}">
-                                                            {{ substr($l->leave_type, 0, 1) }}
-                                                        </span>
-                                                    </th>
+                                                    <th class="leave-stat-col">{{ $l->leave_type }}</th>
                                                     @endif
                                                 @endforeach
                                             @endif
@@ -335,10 +352,9 @@
                                                         $d = is_object($sd->date) ? $sd->date->format('Y-m-d') : $sd->date;
                                                         if (isset($seenDates[$d])) continue;
                                                         $seenDates[$d] = true;
-                                                        $hasCheckIn = !empty($sd->CheckingTime) && trim($sd->CheckingTime ?? '') !== '' && !in_array(trim($sd->CheckingTime ?? ''), ['00:00', '00:00:00']);
                                                         if (isset($sd->Status)) {
-                                                            if ($sd->Status == 'Present' && $hasCheckIn) $presentDates[$d] = true;
-                                                            elseif ($sd->Status == 'Absent' && !$hasCheckIn) $absentDates[$d] = true;
+                                                            if ($sd->Status == 'Present') $presentDates[$d] = true;
+                                                            elseif ($sd->Status == 'Absent') $absentDates[$d] = true;
                                                             elseif ($sd->Status == 'DayOff') $dayOffDates[$d] = true;
                                                         }
                                                     }
@@ -492,17 +508,32 @@
                                                     <td class="leave-stat-cell"><span>{{ $absentCountRow }}</span></td>
                                                     <td class="leave-stat-cell"><span>{{ $dayOffCountRow }}</span></td>
                                                     @if($LeaveCategory->isNotEmpty())
+                                                        @php
+                                                            // Get LeaveData once from the first roster record (same on all records for employee)
+                                                            $empLeaveData = [];
+                                                            foreach ($RosterInternalDataMonth as $sd) {
+                                                                if (isset($sd->LeaveData) && is_array($sd->LeaveData) && !empty($sd->LeaveData)) {
+                                                                    $empLeaveData = $sd->LeaveData;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        @endphp
                                                         @foreach ($LeaveCategory as $l)
                                                             @if(in_array((int)$l->id, $leaveCategoriesWithData))
                                                             @php
                                                                 $leaveTypeCount = 0;
-                                                                foreach ($RosterInternalDataMonth as $shiftData) {
-                                                                    if (isset($shiftData->LeaveData) && is_array($shiftData->LeaveData)) {
-                                                                        foreach ($shiftData->LeaveData as $leaveData) {
-                                                                            $lid = is_array($leaveData) ? ($leaveData['leave_cat_id'] ?? null) : (isset($leaveData->leave_cat_id) ? $leaveData->leave_cat_id : null);
-                                                                            if ($lid !== null && (int)$lid == (int)$l->id) {
-                                                                                $leaveTypeCount++;
-                                                                            }
+                                                                foreach ($empLeaveData as $leaveData) {
+                                                                    $lid = is_array($leaveData) ? ($leaveData['leave_cat_id'] ?? null) : ($leaveData->leave_cat_id ?? null);
+                                                                    if ($lid !== null && (int)$lid == (int)$l->id) {
+                                                                        $leaveFrom = is_array($leaveData) ? ($leaveData['from_date'] ?? null) : ($leaveData->from_date ?? null);
+                                                                        $leaveTo = is_array($leaveData) ? ($leaveData['to_date'] ?? null) : ($leaveData->to_date ?? null);
+                                                                        if ($leaveFrom && $leaveTo) {
+                                                                            $overlapStart = max(strtotime($startOfMonth), strtotime($leaveFrom));
+                                                                            $overlapEnd = min(strtotime($endOfMonth), strtotime($leaveTo));
+                                                                            $leaveTypeCount += max(0, floor(($overlapEnd - $overlapStart) / 86400) + 1);
+                                                                        } else {
+                                                                            $td = is_array($leaveData) ? ($leaveData['total_days'] ?? 1) : ($leaveData->total_days ?? 1);
+                                                                            $leaveTypeCount += (int)$td;
                                                                         }
                                                                     }
                                                                 }
