@@ -609,12 +609,7 @@ class DutyRosterController extends Controller
 
         try{
 
-            $shift_Date = Carbon::createFromFormat('d/m/Y', $shiftdate);
-            if ($shift_Date->isPast()) {
-                return response()->json(['success' => false, 'message' => "Sorry you can't updated past data"]);
-            }
-            else
-            {
+            $shift_Date = Carbon::createFromFormat('d/m/Y', $shiftdate)->startOfDay();
                 DB::beginTransaction();
                     // Normalize overtime to HH:MM (store on duty_roster_entries so view shows it)
                     $overtimeValue = '00:00';
@@ -681,8 +676,6 @@ class DutyRosterController extends Controller
 
                 DutyRoster::where("id",$DutyRosterEntry->roster_id)->update(["DayOfDate"=>$DayOfDateModel]);
                 return response()->json(['success' => true, 'message' => "Duty roster updated successfully"]);
-            }
-            return response()->json(['success' => true, 'message' => 'Step data saved successfully.']);
         }
         catch (\Exception $e) {
             DB::rollBack();
@@ -1102,16 +1095,15 @@ class DutyRosterController extends Controller
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
         $Rosterdata = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
-                                ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
-                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
-                                ->where("t1.resort_id",$this->resort->resort_id);
+                                ->select('t1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 'employees.Emp_id', 't2.position_title')
+                                ->where("t1.resort_id",$this->resort->resort_id)
+                                ->where('employees.status', 'Active');
 
                                 if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM")
                                 {
                                     // Non-HR/EXCOM users only see their own department
                                     $Rosterdata=$Rosterdata->where('employees.Dept_id', $Dept_id);
                                 }
-                                $Rosterdata=$Rosterdata->groupBy('employees.id');
                                 $Rosterdata=$Rosterdata->paginate(10);
 
         $year = now()->year;
@@ -1161,163 +1153,110 @@ class DutyRosterController extends Controller
 
     public function OverTimeFilter(Request $request)
     {
-
-
         $searchTerm = $request->input('search');
         $Poitions  =  $request->input('Poitions');
-        $filterDate = $request->input('date');
-        $sendclass = $request->input('sendclass');
         $overtime_type = $request->input('overtime_type');
-        $Dept_id = $this->resort->GetEmployee->Dept_id;
-        $Rank =  $this->resort->GetEmployee->rank;
+        $Dept_id = $this->resort->GetEmployee->Dept_id ?? '';
+        $Rank =  $this->resort->GetEmployee->rank ?? '';
         $month = $request->month;
         $year  = $request->year;
-    
-        // If month/year not selected
+
+        // If month/year not selected, default to current
         if (empty($month)) $month = now()->month;
         if (empty($year)) $year = now()->year;
-        $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
-        if ($overtime_type == 'actual') {
+        $month = (int) $month;
+        $year = (int) $year;
+        if ($month < 1 || $month > 12) $month = now()->month;
+        if ($year < 2000 || $year > 2100) $year = now()->year;
 
+        // Calculate cutoff period based on selected month/year
+        $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+        $baseDate = Carbon::createFromDate($year, $month, 1);
+        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
+        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
+
+        $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+
+        if ($overtime_type == 'actual') {
+            // Actual OT: get active employees (OT data comes from employee_overtimes in the view)
             $Rosterdata1 = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-                        ->join('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
-                        ->leftjoin('duty_roster_entries as t4', 't4.roster_id', '=', 't3.id')
                         ->select(
-                            't3.id as duty_roster_id',
-                            't3.DayOfDate',
                             't1.id as Parentid',
                             't1.first_name',
                             't1.last_name',
                             't1.profile_picture',
                             'employees.id as emp_id',
-                            't2.position_title',
-                            't4.date'
+                            'employees.Emp_id',
+                            't2.position_title'
                         )
-                        ->groupBy('employees.id')
-                        ->where('t1.resort_id', $this->resort->resort_id);
-
-            }else{
-                $Rosterdata1 = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-                        ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-                        ->join('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
-                        ->groupBy('employees.id')
                         ->where('t1.resort_id', $this->resort->resort_id)
-                        ->join('duty_roster_entries as t4', function($join){
-                            $join->on('t4.roster_id', '=', 't3.id')
+                        ->where('employees.status', 'Active');
+        } else {
+            // Pre-Planned OT: get employees who have pre-planned OT in the cutoff period
+            $Rosterdata1 = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                        ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+                        ->join('duty_roster_entries as t4', function($join) use ($startOfMonth, $endOfMonth) {
+                            $join->on('t4.Emp_id', '=', 'employees.id')
                                  ->where('t4.resort_id', $this->resort->resort_id)
-                                 ->where('t4.OverTime', '!=', '00:00');
+                                 ->where('t4.OverTime', '!=', '00:00')
+                                 ->whereBetween('t4.date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')]);
                         })
                         ->select(
-                            't3.id as duty_roster_id',
-                            't3.DayOfDate',
                             't1.id as Parentid',
                             't1.first_name',
                             't1.last_name',
                             't1.profile_picture',
                             'employees.id as emp_id',
+                            'employees.Emp_id as Emp_code',
                             't2.position_title',
                             DB::raw("COALESCE(t4.OTStatus, 'pending') as status")
                         )
-                        ->where("t1.resort_id",$this->resort->resort_id)
-                        ->where('t3.Year', $year)
-                        ->whereRaw("
-                            MONTH(STR_TO_DATE(SUBSTRING_INDEX(t3.ShiftDate, ' - ', 1), '%m/%d/%Y')) = ?
-                        ", [$month]);
-                    }
-                            
+                        ->where('t1.resort_id', $this->resort->resort_id)
+                        ->where('employees.status', 'Active')
+                        ->groupBy('employees.id');
+        }
 
+        if ($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM") {
+            $Rosterdata1->where('employees.Dept_id', $Dept_id);
+        }
 
-        
+        if (!empty($Poitions)) {
+            $Rosterdata1->where('employees.Position_id', $Poitions);
+        }
 
-                        if($employeeRankPosition['position'] != "HR" && $employeeRankPosition['position'] != "EXCOM")
-                        {
-                            // Non-HR/EXCOM users only see their own department
-                            $Rosterdata1->where('employees.Dept_id', $Dept_id);
-                        }
+        if (!empty($searchTerm)) {
+            $Rosterdata1->where('employees.id', $searchTerm);
+        }
 
-                    // Check for the `$Poitions` variable and apply the filter if set
-                    if (isset($Poitions)) {
-                        $Rosterdata1->where('employees.Position_id', $Poitions);
-                    }
-                    if (isset($filterDate))
-                    {
+        $Rosterdata = $Rosterdata1->paginate(10);
 
-                        $filterDate1 = Carbon::createFromFormat('d/m/Y', $filterDate);
+        // Build monthwise headers for the cutoff period
+        $monthwiseheaders = [];
+        $headerDate = $startOfMonth->copy();
+        for ($i = 0; $i < $totalDays; $i++) {
+            $monthwiseheaders[] = [
+                "day" => $headerDate->format('d'),
+                "dayname" => $headerDate->format('D'),
+                'date' => $headerDate->format('Y-m-d'),
+                'month' => $headerDate->format('M'),
+            ];
+            $headerDate->addDay();
+        }
+        $resort_id = $this->resort->resort_id;
 
-                        $Rosterdata1->whereBetween('t4.date', [ $filterDate1->copy()->startOfMonth()->format('Y-m-d'), $filterDate1->copy()->endOfMonth()->format('Y-m-d')]);
+        // Get public holidays (including Fridays)
+        $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
 
-                    }
-
-                   if (!empty($searchTerm)) {
-                        $Rosterdata1->where(function ($query) use ($searchTerm) {
-                            $query->where('employees.id', $searchTerm);
-                        });
-                    }
-
-                    $Rosterdata = $Rosterdata1->paginate(10);
-
-                    $year = (int) $year;
-                    $month = (int) $month;
-                    if ($month < 1 || $month > 12) {
-                        $month = now()->month;
-                    }
-                    if ($year < 2000 || $year > 2100) {
-                        $year = now()->year;
-                    }
-
-                    // Get cutoff day from payroll configuration
-                    $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
-
-                    if (!isset($filterDate))
-                    {
-                        $baseDate = Carbon::createFromDate($year, $month, 1);
-                        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-                        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
-                        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
-                        $WeekstartDate = $startOfMonth->copy()->startOfWeek();
-                        $WeekendDate = $endOfMonth->copy()->endOfWeek();
-                    }
-                    else
-                    {
-                        $filterDate1 = Carbon::createFromFormat('d/m/Y', $filterDate);
-                        $year = (int) $filterDate1->format('Y');
-                        $month = (int) $filterDate1->format('n');
-                        $baseDate = Carbon::createFromDate($year, $month, 1);
-                        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-                        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
-                        $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
-                        $WeekstartDate = $startOfMonth->copy()->startOfWeek();
-                        $WeekendDate = $endOfMonth->copy()->endOfWeek();
-                    }
-
-                    $monthwiseheaders=[];
-                    $headerDate = $startOfMonth->copy();
-                    for ($i = 0; $i < $totalDays; $i++)
-                    {
-                        $monthwiseheaders[] = [
-                            "day" => $headerDate->format('d'),
-                            "dayname" => $headerDate->format('D'),
-                            'date' => $headerDate->format('Y-m-d'),
-                            'month' => $headerDate->format('M'),
-                        ];
-                        $headerDate->addDay();
-                    }
-                    $resort_id   = $this->resort->resort_id;
-
-                    // Get public holidays (including Fridays)
-                    $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
-
-
-                    if(!$request->get('page'))
-                    {  if ($overtime_type == 'actual') {
-                        $view = view('resorts.renderfiles.OverTimeSearch', compact('Rosterdata','monthwiseheaders','resort_id','startOfMonth','endOfMonth','publicHolidays'))->render();
-                        return response()->json(['success' => true, 'view' => $view], 200);
-                        }else{
-                            $view = view('resorts.renderfiles.OverTimeSearch2', compact('Rosterdata','monthwiseheaders','resort_id','startOfMonth','endOfMonth','publicHolidays'))->render();
-                        return response()->json(['success' => true, 'view' => $view], 200);
-                        }
-                    }
+        if (!$request->get('page')) {
+            if ($overtime_type == 'actual') {
+                $view = view('resorts.renderfiles.OverTimeSearch', compact('Rosterdata','monthwiseheaders','resort_id','startOfMonth','endOfMonth','publicHolidays'))->render();
+            } else {
+                $view = view('resorts.renderfiles.OverTimeSearch2', compact('Rosterdata','monthwiseheaders','resort_id','startOfMonth','endOfMonth','publicHolidays'))->render();
+            }
+            return response()->json(['success' => true, 'view' => $view], 200);
+        }
                     else
                     {
                         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)

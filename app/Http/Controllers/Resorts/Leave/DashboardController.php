@@ -745,6 +745,7 @@ class DashboardController extends Controller
             'rp.position_title as position',
             'rd.code as code',
             'rd.name as department',
+            'e.Dept_id as applicant_dept_id',
             'el.from_date',
             'el.to_date',
             'el.total_days',
@@ -784,7 +785,8 @@ class DashboardController extends Controller
 
         $loggedInRankStr = trim((string)($loggedInEmployee->rank ?? ''));
         // Can approve: (1) applicant's reporting_to, or (2) applicant is GM (rank 8) and current user is HR(3)/EXCOM(1)/HOD(2)
-        $leave_requests = $leave_requests->map(function ($leaveRequest) use ($statusesGrouped, $rank, $loggedInEmployeeId, $loggedInRankStr, $approverIdToLabel) {
+        $loggedInDeptId = $loggedInEmployee->Dept_id ?? null;
+        $leave_requests = $leave_requests->map(function ($leaveRequest) use ($statusesGrouped, $rank, $loggedInEmployeeId, $loggedInRankStr, $approverIdToLabel, $loggedInDeptId) {
             $leaveRequest->from_date = Carbon::parse($leaveRequest->from_date)->format('d M');
             $leaveRequest->to_date = Carbon::parse($leaveRequest->to_date)->format('d M');
             $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
@@ -824,20 +826,14 @@ class DashboardController extends Controller
                 $leaveRequest->status_class = "badge-themeWarning";
             }
 
-            // Can approve: (1) applicant's reporting_to, (2) GM leave and current user is HR/EXCOM/HOD, (3) current user has a Pending row, (4) HR/EXCOM can approve any pending leave
-            $reportingToInt = (int)($leaveRequest->reporting_to ?? 0);
-            $applicantRankStr = trim((string)($leaveRequest->applicant_rank ?? ''));
-            $isReportingManager = $reportingToInt > 0 && $reportingToInt === (int)$loggedInEmployeeId;
-            $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($loggedInRankStr, ['1', '2', '3'], true);
-            $loggedInRankLabel = $rank[$loggedInRankStr] ?? '';
-            $isHROrExcomUser = in_array($loggedInRankLabel, ['HR', 'EXCOM', 'GM']);
+            // Can approve: only if current user has a Pending row in the approval chain or is a delegate
             $hasCurrentUserPendingRow = $statuses->contains(function ($row) use ($loggedInEmployeeId) {
                 return (int)($row->approver_id ?? 0) === (int)$loggedInEmployeeId && strtolower(trim((string)($row->status ?? ''))) === 'pending';
             });
 
             // Check if current user is a delegate for any pending approver
             $isDelegateForApprover = false;
-            if (!$hasCurrentUserPendingRow && !$isHROrExcomUser) {
+            if (!$hasCurrentUserPendingRow) {
                 $pendingApproverIds = $statuses->where('status', 'Pending')->pluck('approver_id')->filter()->toArray();
                 foreach ($pendingApproverIds as $pId) {
                     if (\App\Helpers\Common::hasDelegationAuthority($loggedInEmployeeId, $pId, $this->resort->resort_id)) {
@@ -847,7 +843,7 @@ class DashboardController extends Controller
                 }
             }
 
-            $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover || $hasCurrentUserPendingRow || $isHROrExcomUser || $isDelegateForApprover) && !$isFullyApproved && strtolower(trim($leaveRequest->status ?? '')) === 'pending');
+            $leaveRequest->can_approve = (bool)(($hasCurrentUserPendingRow || $isDelegateForApprover) && !$isFullyApproved && strtolower(trim($leaveRequest->status ?? '')) === 'pending');
 
             // Handle combined leaves
             if ($leaveRequest->combinedLeave) {

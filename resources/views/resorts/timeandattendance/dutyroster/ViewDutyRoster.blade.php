@@ -871,10 +871,6 @@
                     Shiftpopup: {
                         required: true,
                     }
-                   ,
-                    DayOffDatesModel: {
-                        required: true,
-                    }
                 },
                 messages :
                 {
@@ -883,10 +879,6 @@
                     },
                     Shiftpopup: {
                         required: "Please Select Shift ",
-                    }
-                    ,
-                    DayOffDatesModel: {
-                        required: "Please Select Day Off dates",
                     }
                 },
                 errorPlacement: function(error, element) {

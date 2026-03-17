@@ -43,7 +43,12 @@
                         @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select Position" name="position" id="position">
-
+                                <option></option>
+                                @if(isset($ResortPositions))
+                                    @foreach ($ResortPositions as $pos)
+                                        <option value="{{ $pos->id }}">{{ $pos->position_title }}</option>
+                                    @endforeach
+                                @endif
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -194,6 +199,17 @@
 
             $(document).on('change', '.Department', function() {
                 var deptId = $(this).val();
+                if (!deptId) {
+                    // Department cleared - restore all positions
+                    let allPositions = '<option></option>';
+                    @if(isset($ResortPositions))
+                        @foreach ($ResortPositions as $pos)
+                            allPositions += '<option value="{{ $pos->id }}">{{ $pos->position_title }}</option>';
+                        @endforeach
+                    @endif
+                    $(".Position").html(allPositions);
+                    return;
+                }
                 $.ajax({
                     url: "{{ route('resort.ta.PositionSections') }}",
                     type: "post",
@@ -201,11 +217,7 @@
                         deptId: deptId
                     },
                     success: function(d) {
-                        // Clear the dropdown and add a placeholder option
-
-
                         if (d.success == true) {
-
                             let string = '<option></option>';
                             $.each(d.data.ResortPosition, function(key, value) {
                                 string += '<option value="' + value.id + '">' + value
@@ -219,7 +231,6 @@
                                     .name + '</option>';
                             });
                             $(".Section").html(string1);
-
                         }
                     },
                     error: function(response) {

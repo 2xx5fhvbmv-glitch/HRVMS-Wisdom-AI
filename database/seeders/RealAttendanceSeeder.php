@@ -344,5 +344,116 @@ class RealAttendanceSeeder extends Seeder
         }
 
         $this->command->info("Inserted {$otCount} employee_overtimes records.");
+
+        // ── Clean up ALL conflicting leave records ──
+        // Delete any leave records where the employee has Present attendance (checked in) on those dates
+        $deletedLeaves = 0;
+        foreach ($empMap as $empCode => $empId) {
+            // Get all dates where this employee has Present attendance with check-in
+            $presentDatesForEmp = DB::table('parent_attendaces')
+                ->where('Emp_id', $empId)
+                ->where('resort_id', $resortId)
+                ->whereIn('Status', ['Present', 'On-Time', 'Late'])
+                ->whereNotNull('CheckingTime')
+                ->where('CheckingTime', '!=', '')
+                ->where('CheckingTime', '!=', '00:00:00')
+                ->pluck('date')
+                ->map(fn($d) => Carbon::parse($d)->format('Y-m-d'))
+                ->toArray();
+
+            if (empty($presentDatesForEmp)) continue;
+
+            // Find leave records that overlap with any present date
+            $conflicting = DB::table('employees_leaves')
+                ->where('Emp_id', $empId)
+                ->where('resort_id', $resortId)
+                ->where(function ($q) use ($presentDatesForEmp) {
+                    foreach ($presentDatesForEmp as $d) {
+                        $q->orWhere(function ($qq) use ($d) {
+                            $qq->where('from_date', '<=', $d)
+                               ->where('to_date', '>=', $d);
+                        });
+                    }
+                })
+                ->pluck('id');
+
+            if ($conflicting->isNotEmpty()) {
+                DB::table('employees_leaves_status')->whereIn('leave_request_id', $conflicting)->delete();
+                DB::table('employees_leaves')->whereIn('id', $conflicting)->delete();
+                $deletedLeaves += $conflicting->count();
+            }
+        }
+        $this->command->info("Deleted {$deletedLeaves} conflicting leave records (employee was present on those dates).");
+
+        // ── Create leave records for AL (Annual Leave) and UL (Unpaid Leave) days ──
+        $annualLeaveId = DB::table('leave_categories')
+            ->where('resort_id', $resortId)
+            ->where('leave_type', 'Annual Leave')
+            ->value('id');
+
+        $leaveCount = 0;
+        foreach ($attendance as $empCode => $dailyStatuses) {
+            $empId = $empMap[$empCode];
+
+            // Group consecutive AL days into single leave records
+            $alDates = [];
+            foreach ($dailyStatuses as $index => $attStatus) {
+                if ($attStatus === 'AL') {
+                    $alDates[] = $dates[$index];
+                }
+            }
+
+            if (empty($alDates)) continue;
+
+            // Group into consecutive ranges
+            $ranges = [];
+            $rangeStart = $alDates[0];
+            $rangePrev = $alDates[0];
+
+            for ($i = 1; $i < count($alDates); $i++) {
+                $prev = Carbon::parse($rangePrev);
+                $curr = Carbon::parse($alDates[$i]);
+
+                if ($curr->diffInDays($prev) == 1) {
+                    $rangePrev = $alDates[$i];
+                } else {
+                    $ranges[] = ['from' => $rangeStart, 'to' => $rangePrev];
+                    $rangeStart = $alDates[$i];
+                    $rangePrev = $alDates[$i];
+                }
+            }
+            $ranges[] = ['from' => $rangeStart, 'to' => $rangePrev];
+
+            foreach ($ranges as $range) {
+                $fromDate = Carbon::parse($range['from']);
+                $toDate = Carbon::parse($range['to']);
+                $totalDays = $fromDate->diffInDays($toDate) + 1;
+
+                // Check no existing leave record for this range
+                $exists = DB::table('employees_leaves')
+                    ->where('Emp_id', $empId)
+                    ->where('resort_id', $resortId)
+                    ->where('from_date', $range['from'])
+                    ->where('to_date', $range['to'])
+                    ->exists();
+
+                if (!$exists && $annualLeaveId) {
+                    DB::table('employees_leaves')->insert([
+                        'Emp_id'             => $empId,
+                        'resort_id'          => $resortId,
+                        'leave_category_id'  => $annualLeaveId,
+                        'from_date'          => $range['from'],
+                        'to_date'            => $range['to'],
+                        'total_days'         => $totalDays,
+                        'status'             => 'Approved',
+                        'reason'             => 'Seeded Annual Leave',
+                        'created_at'         => $now,
+                        'updated_at'         => $now,
+                    ]);
+                    $leaveCount++;
+                }
+            }
+        }
+        $this->command->info("Inserted {$leaveCount} leave records for AL days.");
     }
 }

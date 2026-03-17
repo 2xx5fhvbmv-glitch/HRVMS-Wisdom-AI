@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 use App\Models\PayrollConfig;
+use App\Models\ResortPosition;
 class EmployeeController extends Controller
 {
     protected $resort;
@@ -287,7 +288,19 @@ class EmployeeController extends Controller
 
         $page_title = "Employees";
         $showDepartmentFilter = $canViewAll;
-        return  view('resorts.timeandattendance.employee.index',compact('page_title','ResortDepartment','employees','showDepartmentFilter'));
+
+        // Pre-load positions for the position filter
+        if (!$canViewAll) {
+            // HOD/MGR/Others: load positions for their own department
+            $userDeptId = $this->resort->GetEmployee->Dept_id ?? '';
+            $ResortPositions = ResortPosition::where('resort_id', $this->resort->resort_id)
+                ->where('dept_id', $userDeptId)->get();
+        } else {
+            // HR/EXCOM/GM: load all positions initially
+            $ResortPositions = ResortPosition::where('resort_id', $this->resort->resort_id)->get();
+        }
+
+        return  view('resorts.timeandattendance.employee.index',compact('page_title','ResortDepartment','employees','showDepartmentFilter','ResortPositions'));
     }
 
     public function SearchEmployeegird(Request $request)
@@ -606,6 +619,9 @@ class EmployeeController extends Controller
                 $emp_grade = "6";
             }
 
+            // Get the viewed employee's gender (from their resort_admin record)
+            $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
+
             $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                     ->where('resort_id', $this->resort->resort_id)
                     ->first();
@@ -628,8 +644,10 @@ class EmployeeController extends Controller
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
                         ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                         ->where('lc.resort_id', $this->resort->resort_id)
-                        ->where(function ($query) use ($religion) {
-                                $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
+                        ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
+                        ->where('resort_benefit_grid_child.allocated_days', '>', 0)
+                        ->where(function ($query) use ($religion, $empGender) {
+                                $query->where('resort_benefit_grid_child.eligible_emp_type', $empGender)
                                     ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
                                 if ($religion == 'muslim') {
                                     $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
@@ -1037,6 +1055,9 @@ class EmployeeController extends Controller
                         ->where('resort_id', $this->resort->resort_id)
                         ->first();
 
+                // Get the viewed employee's gender (from their resort_admin record)
+                $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
+
                 $TotalSum=0;
                 $leave_categories = ResortBenifitGridChild::select(
                     'resort_benefit_grid_child.*',
@@ -1051,8 +1072,10 @@ class EmployeeController extends Controller
                     ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
                     ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                     ->where('lc.resort_id', $this->resort->resort_id)
-                    ->where(function ($query) use ($religion) {
-                        $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
+                    ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
+                        ->where('resort_benefit_grid_child.allocated_days', '>', 0)
+                    ->where(function ($query) use ($religion, $empGender) {
+                        $query->where('resort_benefit_grid_child.eligible_emp_type', $empGender)
                             ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
                         if ($religion == 'muslim') {
                             $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
@@ -1544,6 +1567,9 @@ class EmployeeController extends Controller
                 $emp_grade = "6";
             }
 
+            // Get the viewed employee's gender (from their resort_admin record)
+            $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
+
             $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                     ->where('resort_id', $this->resort->resort_id)
                     ->first();
@@ -1566,8 +1592,10 @@ class EmployeeController extends Controller
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
                         ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                         ->where('lc.resort_id', $this->resort->resort_id)
-                        ->where(function ($query) use ($religion) {
-                                $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
+                        ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
+                        ->where('resort_benefit_grid_child.allocated_days', '>', 0)
+                        ->where(function ($query) use ($religion, $empGender) {
+                                $query->where('resort_benefit_grid_child.eligible_emp_type', $empGender)
                                     ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
                                 if ($religion == 'muslim') {
                                     $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
