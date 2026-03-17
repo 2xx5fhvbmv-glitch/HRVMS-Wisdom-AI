@@ -42,13 +42,16 @@
                             </select>
                         </div>
                         @endif
-                        @if($show_department_filter ?? true)
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select id="position-filter" class="form-select select2t-none mb-2 Position" name="position" aria-label="Default select example">
                                 <option selected value="">Select Position</option>
+                                @if(isset($ResortPositions))
+                                    @foreach ($ResortPositions as $pos)
+                                        <option value="{{ $pos->id }}">{{ $pos->position_title }}</option>
+                                    @endforeach
+                                @endif
                             </select>
                         </div>
-                        @endif
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                             <select id="year-filter" class="form-select select2t-none" aria-label="Year">
                                 @if(isset($filter_years) && is_array($filter_years))
@@ -61,6 +64,9 @@
                             </select>
                         </div>
 
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                        </div>
                         <div class="col-auto ms-auto">
                             <a href="javascript:void(0);" class="btn btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
                             <a href="javascript:void(0);" class="btn btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
@@ -268,6 +274,17 @@
         // Handle Department change event
         $(document).on('change', '.Department', function () {
             const deptId = $(this).val();
+            if (!deptId) {
+                // Department cleared - restore all positions
+                let allPositions = '<option value="">Select Position</option>';
+                @if(isset($ResortPositions))
+                    @foreach ($ResortPositions as $pos)
+                        allPositions += '<option value="{{ $pos->id }}">{{ $pos->position_title }}</option>';
+                    @endforeach
+                @endif
+                $(".Position").html(allPositions);
+                return;
+            }
             $.ajax({
                 url: "{{ route('resort.ta.PositionSections') }}",
                 type: "POST",
@@ -409,7 +426,16 @@
 
         $(document).on('change', '#position-filter, #department-filter, #year-filter', function() {
             applyFilters();
-            datatablelist();  // Apply datatable list after filters are updated
+            datatablelist();
+        });
+
+        $(document).on('click', '#clearFilter', function() {
+            $('#search-box').val('');
+            $('#department-filter').val('').trigger('change');
+            $('#position-filter').val('').trigger('change');
+            $('#year-filter').val('{{ date("Y") }}').trigger('change');
+            applyFilters();
+            datatablelist();
         });
     });
 

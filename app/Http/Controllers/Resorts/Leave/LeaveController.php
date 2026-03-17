@@ -23,6 +23,8 @@ use App\Models\ResortBenifitGrid;
 use App\Models\ResortSiteSettings;
 use App\Models\EmployeeTravelPass;
 use App\Models\EmployeeLeaveStatus;
+use App\Models\ParentAttendace;
+use App\Models\ResortPosition;
 use App\Models\LeaveRecommendation;
 use App\Models\ResortTransportation;
 use App\Models\ResortBenifitGridChild;
@@ -80,15 +82,17 @@ class LeaveController extends Controller
                 $religion = "muslim";
             }
             $rank = $getEmployee->rank ?? 0;
-            $emp_grade = Common::getEmpGrade(1);
-            // dd($emp_grade );
+            $emp_grade = Common::getEmpGrade($rank);
             $excludedLeaveTypes = ['Absent', 'Present','DayOff'];
 
             $benefit_grid = Common::getBenefitGrid($emp_grade,$resort_id);
-            
+
             // Check if benefit grid exists and provide fallback values
             $benefit_grid_emp_grade = $benefit_grid->emp_grade ?? $emp_grade;
             $benefit_grid_id = $benefit_grid->id ?? null;
+
+            // Get the logged-in employee's gender
+            $empGender = $this->resort->gender ?? '';
 
             $leave_categories = ResortBenifitGridChild::select(
                 'resort_benefit_grid_child.*',
@@ -111,8 +115,10 @@ class LeaveController extends Controller
             ->when($benefit_grid_id, function($query) use ($benefit_grid_id) {
                 return $query->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid_id);
             })
-            ->where(function ($query) use ($religion) {
-                $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
+            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
+            ->where('resort_benefit_grid_child.allocated_days', '>', 0)
+            ->where(function ($query) use ($religion, $empGender) {
+                $query->where('resort_benefit_grid_child.eligible_emp_type', $empGender)
                         ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
                 if ($religion == 'muslim') {
                     $query->orWhere('resort_benefit_grid_child.eligible_emp_type', $religion);
@@ -175,6 +181,8 @@ class LeaveController extends Controller
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
             ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
+            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
+            ->where('resort_benefit_grid_child.allocated_days', '>', 0)
             ->where(function ($query) {
                 $query->where('resort_benefit_grid_child.eligible_emp_type', $this->resort->gender)
                         ->orWhere('resort_benefit_grid_child.eligible_emp_type', "all");
@@ -187,10 +195,6 @@ class LeaveController extends Controller
                 $item->total_leave_days = (int) ($item->total_leave_days ?? 0);
                 return $item;
             });
-
-
-            // dd($leave_categories);
-
 
             $delegations = DB::table('employees')
             ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
@@ -424,14 +428,14 @@ class LeaveController extends Controller
                     $leaveAllocation = Common::prorateLeaveByJoiningDate($leaveAllocation, $leaveRequest->joining_date ?? null);
                     $leaveRequest->available_balance = $leaveAllocation - $leavesTaken;
 
-                    // Can approve: (1) applicant's reporting_to (from employee profile; only they can approve), or (2) applicant is GM and current user is HR/EXCOM/HOD
-                    $applicantReportingTo = $leaveRequest->reporting_to ?? $leaveRequest->applicant_reporting_to ?? null;
-                    $isReportingManager = $applicantReportingTo !== null && $applicantReportingTo !== '' && (int)$applicantReportingTo === (int)$loggedInEmployeeId;
-                    $applicantRankStr = trim((string)($leaveRequest->rank ?? ''));
-                    $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
+                    // Can approve: only if current user has a Pending row in the approval chain
                     $statusVal = $leaveRequest->status ?? $leaveRequest->leave_status ?? '';
                     $leaveIsPending = strtolower(trim((string)$statusVal)) === 'pending';
-                    $leaveRequest->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover) && $leaveIsPending);
+                    $hasPendingRow = \App\Models\EmployeeLeaveStatus::where('leave_request_id', $leaveRequest->id)
+                        ->where('approver_id', $loggedInEmployeeId)
+                        ->where('status', 'Pending')
+                        ->exists();
+                    $leaveRequest->can_approve = (bool)($hasPendingRow && $leaveIsPending);
 
                     return $leaveRequest;
                 });
@@ -490,25 +494,29 @@ class LeaveController extends Controller
                 }
                 $finalLeaveRequests = $finalLeaveRequests->merge($separateLeaveRequests);
 
-                // can_approve: applicant's reporting_to, or GM leave and user is HR/EXCOM/HOD, or user has a Pending row (same as transform above)
+                // can_approve: only if current user has a Pending row in the approval chain
                 $finalLeaveIds = $finalLeaveRequests->pluck('id')->toArray();
                 $finalLeaveIdsWithPending = $finalLeaveIds ? EmployeeLeaveStatus::whereIn('leave_request_id', $finalLeaveIds)->where('approver_id', $loggedInEmployeeId)->where('status', 'Pending')->pluck('leave_request_id')->toArray() : [];
-                $currentUserRank = trim((string)($loggedInEmployee->rank ?? ''));
-                $finalLeaveRequests->each(function ($request) use ($loggedInEmployeeId, $currentUserRank, $finalLeaveIdsWithPending) {
-                    $reportingToInt = (int)($request->reporting_to ?? $request->applicant_reporting_to ?? 0);
-                    $isReportingManager = $reportingToInt > 0 && $reportingToInt === (int)$loggedInEmployeeId;
-                    $applicantRankStr = trim((string)($request->rank ?? ''));
-                    $isGMLeaveApprover = ($applicantRankStr === '8') && in_array($currentUserRank, ['1', '2', '3'], true);
+                $finalLeaveRequests->each(function ($request) use ($loggedInEmployeeId, $finalLeaveIdsWithPending) {
                     $hasPendingRow = in_array($request->id, $finalLeaveIdsWithPending);
                     $statusVal = $request->status ?? $request->leave_status ?? '';
                     $leaveIsPending = strtolower(trim((string)$statusVal)) === 'pending';
-                    $request->can_approve = (bool)(($isReportingManager || $isGMLeaveApprover || $hasPendingRow) && $leaveIsPending);
+                    $request->can_approve = (bool)($hasPendingRow && $leaveIsPending);
                 });
 
                 $show_department_filter = $canViewWholeResort;
                 $filter_year = $filterYear;
                 $filter_years = range(Carbon::now()->year - 2, Carbon::now()->year + 1);
-                return view('resorts.leaves.leave.request', compact('finalLeaveRequests', 'page_title', 'resort_departments', 'hodDeptId', 'show_department_filter', 'filter_year', 'filter_years'));
+
+                // Pre-load positions for filter
+                if ($canViewWholeResort) {
+                    $ResortPositions = ResortPosition::where('resort_id', $resort_id)->get();
+                } else {
+                    $ResortPositions = ResortPosition::where('resort_id', $resort_id)
+                        ->where('dept_id', $hodDeptId)->get();
+                }
+
+                return view('resorts.leaves.leave.request', compact('finalLeaveRequests', 'page_title', 'resort_departments', 'hodDeptId', 'show_department_filter', 'filter_year', 'filter_years', 'ResortPositions'));
         } catch (\Exception $e) {
             \Log::error('Leave Application Error', [
                 'message' => $e->getMessage(),
@@ -639,9 +647,9 @@ class LeaveController extends Controller
             $allStatuses = collect();
             if (!empty($allLeaveIds)) {
                 $allStatuses = DB::table('employees_leaves_status')
-                    ->whereIn('leave_id', $allLeaveIds)
+                    ->whereIn('leave_request_id', $allLeaveIds)
                     ->get()
-                    ->groupBy('leave_id');
+                    ->groupBy('leave_request_id');
             }
             $rankConfig = config('settings.Position_Rank');
 
@@ -892,6 +900,8 @@ class LeaveController extends Controller
             ->where('rbg.emp_grade', $emp_grade)
             ->where('rbg.resort_id', $resort_id)
             ->where('rbgc.rank',$leaveDetail->rank)
+            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$leaveDetail->rank])
+            ->where('rbgc.allocated_days', '>', 0)
             ->select(
                 'lc.id as leave_category_id',
                 'lc.leave_type',
@@ -1309,6 +1319,28 @@ class LeaveController extends Controller
                     ]);
                 }
 
+                // Check if employee is already marked Present on any of the requested leave dates
+                $presentOnDates = ParentAttendace::where('Emp_id', $emp_id)
+                    ->where('resort_id', $resort_id)
+                    ->whereIn('Status', ['Present', 'On-Time', 'Late', 'HalfDay', 'ShortLeave'])
+                    ->whereDate('date', '>=', $fromDate->format('Y-m-d'))
+                    ->whereDate('date', '<=', $toDate->format('Y-m-d'))
+                    ->where(function ($q) {
+                        $q->whereNotNull('CheckingTime')
+                          ->where('CheckingTime', '!=', '')
+                          ->where('CheckingTime', '!=', '00:00:00');
+                    })
+                    ->pluck('date')
+                    ->map(fn($d) => Carbon::parse($d)->format('d/m/Y'))
+                    ->implode(', ');
+
+                if ($presentOnDates) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Cannot apply leave. Employee is already marked present on: {$presentOnDates}",
+                    ]);
+                }
+
                 // Get the leave category details for the current category ID
                 $leaveCategory = DB::table('leave_categories')->where('id', $categoryId)->first();
                 if (!$leaveCategory) {
@@ -1362,6 +1394,15 @@ class LeaveController extends Controller
 
                 // Get the employee grade and leave balances
                 $emp_grade = Common::getEmpGrade($rank);
+
+                // Check if the leave type is eligible for this employee's rank
+                $leaveEligibility = DB::table('leave_categories')->where('id', $categoryId)->value('eligibility');
+                if ($leaveEligibility && !in_array((string)$rank, explode(',', $leaveEligibility))) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "This leave type is not available for your position.",
+                    ]);
+                }
 
                 // Fetch the benefit grid (allocated days) for the employee's grade and rank
                 $benefit_grid = DB::table('resort_benifit_grid as rbg')
@@ -1568,30 +1609,49 @@ class LeaveController extends Controller
                 }
 
                 // Leave approval chain based on applicant's rank:
-                // Line Worker (6) / Supervisor (5) → Reporting Manager only
-                // Manager (4) → Reporting Manager → GM
-                // HOD (2) → EXCOM → GM
-                // GM (8) → HR Department's EXCOM
+                // Line Worker (6) / Supervisor (5) → Reporting Manager only (1 approval)
+                // Manager (4) → HOD or EXCOM → then GM (2 approvals)
+                // HOD (2) → EXCOM → then GM (2 approvals)
+                // EXCOM (1) → GM only (1 approval)
+                // GM (8) → HR dept EXCOM, if not available then HOD of the department (1 approval)
                 $rank = trim((string)($applicantEmployee->rank ?? ''));
                 $approvalIds = $approvalFlow->pluck('id')->toArray();
 
                 if ($rank === '8') {
-                    // GM leave: HR Department's EXCOM approves
+                    // GM leave: HR Department's EXCOM approves (1 person)
                     $hrDeptId = \App\Models\ResortDepartment::where('resort_id', $this->resort->resort_id)
                         ->where('name', 'Human Resources')->value('id');
+                    $gmApproverFound = false;
                     if ($hrDeptId) {
+                        // Try HR dept EXCOM first
                         $hrExcom = Employee::select('id', 'rank', 'reporting_to')
                             ->where('resort_id', $this->resort->resort_id)
                             ->where('Dept_id', $hrDeptId)
                             ->where('rank', 1) // EXCOM
+                            ->where('id', '!=', $emp_id)
                             ->first();
                         if ($hrExcom && !in_array($hrExcom->id, $approvalIds)) {
                             $approvalFlow->push($hrExcom);
                             $approvalIds[] = $hrExcom->id;
+                            $gmApproverFound = true;
                         }
                     }
-                    // Fallback: if no HR EXCOM found, try any EXCOM
-                    if (empty($approvalIds) || count($approvalFlow) === 0) {
+                    // Fallback: if no HR EXCOM, try HOD of the HR department
+                    if (!$gmApproverFound && $hrDeptId) {
+                        $hrHod = Employee::select('id', 'rank', 'reporting_to')
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->where('Dept_id', $hrDeptId)
+                            ->where('rank', 2) // HOD
+                            ->where('id', '!=', $emp_id)
+                            ->first();
+                        if ($hrHod && !in_array($hrHod->id, $approvalIds)) {
+                            $approvalFlow->push($hrHod);
+                            $approvalIds[] = $hrHod->id;
+                            $gmApproverFound = true;
+                        }
+                    }
+                    // Last fallback: any EXCOM in the resort
+                    if (!$gmApproverFound) {
                         $anyExcom = Employee::select('id', 'rank', 'reporting_to')
                             ->where('resort_id', $this->resort->resort_id)
                             ->where('rank', 1)
@@ -1601,8 +1661,19 @@ class LeaveController extends Controller
                             $approvalFlow->push($anyExcom);
                         }
                     }
+                } elseif ($rank === '1') {
+                    // EXCOM leave: GM only (1 approval)
+                    $gmApprover = Employee::select('id', 'rank', 'reporting_to')
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->where('rank', 8) // GM
+                        ->where('id', '!=', $emp_id)
+                        ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
+                        $approvalIds[] = $gmApprover->id;
+                    }
                 } elseif ($rank === '2') {
-                    // HOD leave: EXCOM (reporting manager) approves → then GM approves
+                    // HOD leave: EXCOM → then GM (2 approvals)
                     if ($directReportingManager && $directReportingManager->rank) {
                         $approvalFlow->push($directReportingManager);
                         $approvalIds[] = $directReportingManager->id;
@@ -1621,27 +1692,45 @@ class LeaveController extends Controller
                     $gmApprover = Employee::select('id', 'rank', 'reporting_to')
                         ->where('resort_id', $this->resort->resort_id)
                         ->where('rank', 8) // GM
+                        ->where('id', '!=', $emp_id)
                         ->first();
                     if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
                         $approvalFlow->push($gmApprover);
                         $approvalIds[] = $gmApprover->id;
                     }
                 } elseif ($rank === '4') {
-                    // Manager leave: Reporting Manager → then GM
+                    // Manager leave: HOD or EXCOM (reporting manager) → then GM (2 approvals)
                     if ($directReportingManager && $directReportingManager->rank) {
                         $approvalFlow->push($directReportingManager);
                         $approvalIds[] = $directReportingManager->id;
+                    } else {
+                        // Fallback: find HOD of same department
+                        $applicantDeptId = $applicantEmployee->Dept_id ?? null;
+                        if (!$applicantDeptId) {
+                            $applicantDeptId = Employee::where('id', $emp_id)->value('Dept_id');
+                        }
+                        $hodApprover = Employee::select('id', 'rank', 'reporting_to')
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->where('Dept_id', $applicantDeptId)
+                            ->where('rank', 2) // HOD
+                            ->where('id', '!=', $emp_id)
+                            ->first();
+                        if ($hodApprover && !in_array($hodApprover->id, $approvalIds)) {
+                            $approvalFlow->push($hodApprover);
+                            $approvalIds[] = $hodApprover->id;
+                        }
                     }
                     $gmApprover = Employee::select('id', 'rank', 'reporting_to')
                         ->where('resort_id', $this->resort->resort_id)
                         ->where('rank', 8) // GM
+                        ->where('id', '!=', $emp_id)
                         ->first();
                     if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
                         $approvalFlow->push($gmApprover);
                         $approvalIds[] = $gmApprover->id;
                     }
                 } else {
-                    // Line Worker (6) / Supervisor (5) / others: Reporting Manager only
+                    // Line Worker (6) / Supervisor (5) / others: Reporting Manager only (1 approval)
                     if ($directReportingManager && $directReportingManager->rank) {
                         $approvalFlow->push($directReportingManager);
                     }
@@ -1967,6 +2056,8 @@ class LeaveController extends Controller
             ->where('rbg.emp_grade', $emp_grade)
             ->where('rbgc.rank', $employee->rank)
             ->where('rbg.resort_id', $resort_id)
+            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$employee->rank])
+            ->where('rbgc.allocated_days', '>', 0)
             ->select(
                 'lc.id as leave_category_id',
                 'lc.leave_type',
@@ -2069,11 +2160,6 @@ class LeaveController extends Controller
             ], 200);
         }
 
-        // Check if the current approver is authorized to take action
-        $rankConfig = config('settings.Position_Rank');
-        $currentApproverRank = array_key_exists($this->resort->GetEmployee->rank, $rankConfig) ? $rankConfig[$this->resort->GetEmployee->rank] : '';
-        $isHROrExcom = in_array($currentApproverRank, ['HR', 'EXCOM', 'GM']);
-
         // Check if current user has a pending approval row in the chain
         $currentUserPendingStatus = EmployeeLeaveStatus::where('leave_request_id', $leaveId)
             ->where('approver_id', $currentApproverId)
@@ -2082,7 +2168,7 @@ class LeaveController extends Controller
 
         // Check if current user is a delegate for any pending approver in this chain
         $delegateForApproverId = null;
-        if (!$currentUserPendingStatus && !$isHROrExcom) {
+        if (!$currentUserPendingStatus) {
             $pendingApproverIds = EmployeeLeaveStatus::where('leave_request_id', $leaveId)
                 ->where('status', 'Pending')
                 ->pluck('approver_id')
@@ -2097,9 +2183,10 @@ class LeaveController extends Controller
         }
 
         $isDelegateApprover = ($delegateForApproverId !== null);
+        $isHROrExcom = false; // Approval is now purely chain-based
 
-        // If the current user doesn't have a pending row, is not HR/EXCOM/GM, and is not a delegate — block
-        if (!$currentUserPendingStatus && !$isHROrExcom && !$isDelegateApprover) {
+        // If the current user doesn't have a pending row and is not a delegate — block
+        if (!$currentUserPendingStatus && !$isDelegateApprover) {
             $actionname = ($action == "Rejected") ? "reject" : "approve";
             return response()->json([
                 'status' => 'error',
@@ -2107,25 +2194,17 @@ class LeaveController extends Controller
             ], 403);
         }
 
-        // Can approve: (1) applicant's reporting_to, (2) GM leave approved by HR/EXCOM/HOD, (3) HR/EXCOM can approve any leave,
-        // (4) current user has a Pending row in the approval chain, (5) current user is a delegate for a pending approver
+        // Approval is chain-based only: user must have a Pending row or be a delegate for one
         $applicant = Employee::find($leave->emp_id);
-        $applicantReportingToStr = trim((string)($applicant->reporting_to ?? ''));
-        $currentApproverIdStr = trim((string)$currentApproverId);
-        $applicantRankStr = trim((string)($applicant->rank ?? ''));
-        $currentUserRankNum = trim((string)($this->resort->GetEmployee->rank ?? ''));
-        $isReportingManager = $applicantReportingToStr !== '' && $applicantReportingToStr !== '0' && $applicantReportingToStr === $currentApproverIdStr;
-        $isGMLeave = ($applicantRankStr === '8');
-        $isGMLeaveApprover = $isGMLeave && in_array($currentUserRankNum, ['1', '2', '3'], true);
         $hasCurrentUserPendingRow = EmployeeLeaveStatus::where('leave_request_id', $leave->id)
             ->where('approver_id', $currentApproverId)
             ->where('status', 'Pending')
             ->exists();
 
-        if (!$applicant || (!$isReportingManager && !$isGMLeaveApprover && !$isHROrExcom && !$hasCurrentUserPendingRow && !$isDelegateApprover)) {
+        if (!$applicant || (!$hasCurrentUserPendingRow && !$isDelegateApprover)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Only the employee\'s direct manager (or HR/EXCOM/HOD for GM leave) can approve or reject this leave. You can view it only.',
+                'message' => 'You are not in the approval chain for this leave request.',
             ], 403);
         }
 
@@ -2133,27 +2212,15 @@ class LeaveController extends Controller
         $effectiveApproverId = $isDelegateApprover ? $delegateForApproverId : $currentApproverId;
         $delegateComment = $isDelegateApprover ? ' (Acted by delegate)' : '';
 
-        // Update approval chain records
-        if ($isHROrExcom) {
-            // HR/EXCOM finalizes the entire chain
-            EmployeeLeaveStatus::where('leave_request_id', $leave->id)
-                ->where('status', 'Pending')
-                ->update([
-                    'status'     => $action,
-                    'comments'   => ($comments ?? '') . $delegateComment,
-                    'approved_at'=> now(),
-                ]);
-        } else {
-            // Other approvers (HOD, reporting manager, or delegate) update the effective approver's record
-            EmployeeLeaveStatus::where('leave_request_id', $leave->id)
-                ->where('approver_id', $effectiveApproverId)
-                ->where('status', 'Pending')
-                ->update([
-                    'status'     => $action,
-                    'comments'   => ($comments ?? '') . $delegateComment,
-                    'approved_at'=> now(),
-                ]);
-        }
+        // Update approval chain records — only the effective approver's row
+        EmployeeLeaveStatus::where('leave_request_id', $leave->id)
+            ->where('approver_id', $effectiveApproverId)
+            ->where('status', 'Pending')
+            ->update([
+                'status'     => $action,
+                'comments'   => ($comments ?? '') . $delegateComment,
+                'approved_at'=> now(),
+            ]);
 
         if ($action == 'Approved') {
             $pendingCount = EmployeeLeaveStatus::where('leave_request_id', $leave->id)->where('status', 'Pending')->count();

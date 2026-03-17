@@ -30,7 +30,7 @@
                                 <div>
                                     <p>
                                         <span class="fw-600">{{ ucfirst($r->first_name . ' ' . $r->last_name) }}</span>
-                                        <span class="badge badge-white">{{ $r->Emp_id }}</span>
+                                        <span class="badge badge-white">{{ $r->Emp_code ?? $r->Emp_id }}</span>
                                     </p>
                                     <span>{{ ucfirst($r->position_title) }}</span>
                                 </div>
@@ -88,10 +88,10 @@
                                 $hasApproved = false;
                                 
                                 foreach($dayOvertimes as $ot) {
-                                    list($hours, $minutes) = explode(':', $ot->total_time ?? '0:0');
+                                    list($hours, $minutes) = explode(':', $ot->OverTime ?? '0:0');
                                     $dayTotalMinutes += (int)$hours * 60 + (int)$minutes;
-                                    
-                                    if($ot->OTStatus == 'pending') $hasPending = true;
+
+                                    if($ot->OTStatus == 'pending' || empty($ot->OTStatus)) $hasPending = true;
                                     if($ot->OTStatus == 'rejected') $hasRejected = true;
                                     if($ot->OTStatus == 'approved') $hasApproved = true;
                                 }

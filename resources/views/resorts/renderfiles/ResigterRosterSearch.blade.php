@@ -182,7 +182,7 @@
                                         @endphp
                                     @elseif(isset($shiftData) && $shiftData->Status == "DayOff" )
 
-                                        <i class="fa-solid fa-xmark"></i>
+                                        <b>DO</b>
                                     @else
 
                                     -
@@ -470,7 +470,7 @@
                                                                     ]);
                                                                 } elseif($shiftData->Status == "DayOff" && $hasOT) {
                                                                     $cellClass .= ' bg-dayoffot';
-                                                                    $cellLabel = 'FOT';
+                                                                    $cellLabel = 'DOT';
                                                                     $cellStatus = 'DAY OFF + OVERTIME';
                                                                     $tooltipData = json_encode([
                                                                         'date' => $date,
@@ -481,7 +481,7 @@
                                                                     ]);
                                                                 } elseif($shiftData->Status == "DayOff") {
                                                                     $cellClass .= ' bg-dayoff';
-                                                                    $cellLabel = 'F';
+                                                                    $cellLabel = 'DO';
                                                                     $cellStatus = 'DAY OFF';
                                                                     $tooltipData = json_encode([
                                                                         'date' => $date,
