@@ -199,7 +199,7 @@
                             label: function (tooltipItem) {
                                 // const datasetLabel = tooltipItem.dataset.label || '';
                                 const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                                return ` $${value}`; // Custom tooltip format
+                                return ` ${currencySymbol} ${value}`; // Custom tooltip format
                             }
                         }
                     }

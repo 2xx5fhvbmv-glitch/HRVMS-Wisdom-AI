@@ -844,6 +844,9 @@
                     if (data.punchOut && data.punchOut !== '--:--' && data.punchOut !== null && data.punchOut !== '') {
                         tooltipHtml += '<div><span class="info-label">Punch Out:</span><span class="info-value">' + data.punchOut + '</span></div>';
                     }
+                    if (data.regularHours && data.regularHours !== '0:00' && data.regularHours !== '0' && data.regularHours !== null) {
+                        tooltipHtml += '<div><span class="info-label">Regular Hours:</span><span class="info-value">' + data.regularHours + '</span></div>';
+                    }
                     if (data.overtime && data.overtime !== '0h' && data.overtime !== '0:0' && data.overtime !== '-' && data.overtime !== null && data.overtime !== '' && data.overtime !== '00:00') {
                         // Format overtime properly
                         let overtimeText = data.overtime;

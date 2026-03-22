@@ -22,7 +22,7 @@
             <div class="col-xl-3 col-lg-4 col-md-6">
                 <div class="card dashboard-boxcard timeAttend-boxcard mb-30">
                     <p class="fw-600 mb-0">Total Payable Amount <span class="text-muted small">(by date range)</span></p>
-                    <strong id="total-payable-amount">$0.00</strong>
+                    <strong id="total-payable-amount">{{ Common::GetResortCurrencySymbol() }} 0.00</strong>
                 </div>
             </div>
         </div>
@@ -141,7 +141,7 @@
                 },
                 dataSrc: function (json) {
                     var total = (json.total_amount != null) ? parseFloat(json.total_amount) : json.data.reduce(function (sum, p) { return sum + parseFloat(p.price || 0); }, 0);
-                    $('#total-payable-amount').text('$' + total.toFixed(2));
+                    $('#total-payable-amount').text(currencySymbol + ' ' + total.toFixed(2));
                     return json.data;
                 }
             },

@@ -234,7 +234,7 @@
                                     <tfoot>
                                         <tr>
                                             <th colspan="6" class="text-end">Total Service Charge:</th>
-                                            <th colspan="1" id="total-service-charge" class="fw-bold">$0.00</th>
+                                            <th colspan="1" id="total-service-charge" class="fw-bold">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -891,7 +891,7 @@
             e.preventDefault();
 
             // Get the total service charge amount
-            var totalServiceCharge = parseFloat($("#total-ser").val().replace('$', '').replace(',', ''));
+            var totalServiceCharge = parseFloat($("#total-ser").val().replace(currencySymbol, '').replace(',', ''));
 
             if (isNaN(totalServiceCharge) || totalServiceCharge <= 0) {
                 toastr.error("Please enter a valid service charge amount.", {
@@ -1035,7 +1035,7 @@
                 var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
 
                 if ($row.find("td:eq(0)").text() === employeeId) {
-                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace('$', '')) || 0;
+                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace(currencySymbol, '')) || 0;
                     var newOther = currentOther + finalAmount;
                     $row.find("td:eq(8)").text(currencySymbol + newOther.toFixed(2)); // Store in USD
                     updateTotal($row); // Update the total column
@@ -1608,9 +1608,9 @@
                                     <td>${employee.regular_ot} hrs</td>
                                     <td>${employee.holiday_ot} hrs</td>
                                     <td>${employee.total_ot}</td>
-                                    <td>$${employee.basic_salary}</td>
-                                    <td>$120</td>
-                                    <td>$110</td>
+                                    <td>${currencySymbol} ${employee.basic_salary}</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 120</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 110</td>
                                 </tr>`;
                         $tableBody.append(row);
                     });

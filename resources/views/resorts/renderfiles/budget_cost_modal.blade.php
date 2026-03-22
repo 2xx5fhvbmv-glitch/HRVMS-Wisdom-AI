@@ -488,7 +488,7 @@ $(document).ready(function() {
                     const monthlyAmount = originalAmount * daysInMonth;
                     $amountInput.val(monthlyAmount.toFixed(2));
 
-                    console.log(`Daily cost "${$card.data('cost-name')}": $${originalAmount} × ${daysInMonth} days = $${monthlyAmount.toFixed(2)}`);
+                    console.log(`Daily cost "${$card.data('cost-name')}": ${currencySymbol} ${originalAmount} × ${daysInMonth} days = ${currencySymbol} ${monthlyAmount.toFixed(2)}`);
                 }
             }
         });
@@ -525,14 +525,14 @@ $(document).ready(function() {
         const totalAmount = overtimeHourlyRate * hours;
 
         console.log(`OT Calculation:
-            Basic Salary: $${basicSalary}
+            Basic Salary: ${currencySymbol} ${basicSalary}
             Month: ${month} (${daysInMonth} days)
-            Daily Salary: $${dailySalary.toFixed(4)}
-            Hourly Rate: $${hourlyRate.toFixed(4)}
+            Daily Salary: ${currencySymbol} ${dailySalary.toFixed(4)}
+            Hourly Rate: ${currencySymbol} ${hourlyRate.toFixed(4)}
             OT Multiplier: ${multiplier}x (NOT percentage)
-            OT Hourly Rate: $${overtimeHourlyRate.toFixed(4)}
+            OT Hourly Rate: ${currencySymbol} ${overtimeHourlyRate.toFixed(4)}
             Hours: ${hours}
-            Total OT Amount: $${totalAmount.toFixed(2)}`);
+            Total OT Amount: ${currencySymbol} ${totalAmount.toFixed(2)}`);
 
         return totalAmount;
     }
@@ -572,7 +572,7 @@ $(document).ready(function() {
                 const isPension = costName.toLowerCase().includes('pension');
                 if (isPension && calculatedAmount > 0) {
                     $card.find('.budget-cost-checkbox').prop('checked', true);
-                    console.log(`Auto-selected and calculated ${costName}: ${percentage}% of $${currentBasicSalary} = $${calculatedAmount.toFixed(2)}`);
+                    console.log(`Auto-selected and calculated ${costName}: ${percentage}% of ${currencySymbol} ${currentBasicSalary} = ${currencySymbol} ${calculatedAmount.toFixed(2)}`);
                 }
             }
         });
@@ -597,7 +597,7 @@ $(document).ready(function() {
                 const calculatedAmount = calculateOvertimeAmount(multiplier, defaultHours, basicSalary, month);
                 $card.find('.budget-cost-amount').val(calculatedAmount.toFixed(2));
 
-                console.log(`Auto-calculated ${costName}: ${defaultHours} hours × ${multiplier}x = $${calculatedAmount.toFixed(2)}`);
+                console.log(`Auto-calculated ${costName}: ${defaultHours} hours × ${multiplier}x = ${currencySymbol} ${calculatedAmount.toFixed(2)}`);
             }
         });
     }
@@ -760,14 +760,14 @@ $(document).ready(function() {
         const currentBasicSalary = parseFloat($('#formCurrentSalary').val() || 0);
         if (currentBasicSalary > 0) {
             total += currentBasicSalary;
-            console.log(`Current Basic Salary: $${currentBasicSalary.toFixed(2)} USD`);
+            console.log(`Current Basic Salary: ${currencySymbol} ${currentBasicSalary.toFixed(2)} USD`);
         }
 
         // Add Proposed Basic Salary to total
         const proposedBasicSalary = parseFloat($('#formBasicSalary').val() || 0);
         if (proposedBasicSalary > 0) {
             total += proposedBasicSalary;
-            console.log(`Proposed Basic Salary: $${proposedBasicSalary.toFixed(2)} USD`);
+            console.log(`Proposed Basic Salary: ${currencySymbol} ${proposedBasicSalary.toFixed(2)} USD`);
         }
 
         $('.budget-cost-checkbox:checked').each(function() {
@@ -784,15 +784,15 @@ $(document).ready(function() {
             // Example: If amount is 1000 MVR and rate is 0.065, then USD = 1000 × 0.065 = 65 USD
             if (currency === 'MVR') {
                 amountInUSD = amount * mvrToUsdRate;
-                console.log(`${costName}: ${amount} MVR × ${mvrToUsdRate} = $${amountInUSD.toFixed(2)} USD`);
+                console.log(`${costName}: ${amount} MVR × ${mvrToUsdRate} = ${currencySymbol} ${amountInUSD.toFixed(2)} USD`);
             } else {
-                console.log(`${costName}: $${amount} USD (no conversion)`);
+                console.log(`${costName}: ${currencySymbol} ${amount} USD (no conversion)`);
             }
 
             total += amountInUSD;
         });
 
-        console.log(`TOTAL (in USD): $${total.toFixed(2)}`);
+        console.log(`TOTAL (in USD): ${currencySymbol} ${total.toFixed(2)}`);
         console.log('=== End Modal Total ===');
 
         $('#totalSelectedAmount').text(total.toFixed(2));

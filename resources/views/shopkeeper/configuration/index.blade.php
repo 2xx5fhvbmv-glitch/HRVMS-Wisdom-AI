@@ -287,7 +287,7 @@
                     const productName = productNameInput.value.trim();
                     const productPrice = productPriceInput.value.trim();
                     if (productName && productPrice) {
-                        generateQRCode(`${productName} - $${productPrice}`, qrContainer);
+                        generateQRCode(`${productName} - ${currencySymbol} ${productPrice}`, qrContainer);
                     }
                 });
             });

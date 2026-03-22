@@ -85,7 +85,7 @@
                 <div class="col-xl-3 col-lg-4 col-md-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard mb-30">
                         <p class="fw-600 mb-0">Total Receivable Amount</p>
-                        <strong id="total-receivable-amount">$0.00</strong>
+                        <strong id="total-receivable-amount">{{ Common::GetResortCurrencySymbol() }} 0.00</strong>
                     </div>
                     <div class="card dashboard-boxcard timeAttend-boxcard  mb-30">
                         <div class="d-flex align-items-center justify-content-between">
@@ -308,7 +308,7 @@
                     // Calculate total price from fetched data
                     let total = json.data.reduce((sum, payment) => sum + parseFloat(payment.price || 0), 0);
                     // Update total amount in the UI
-                    $('#total-receivable-amount').text(`$${total.toFixed(2)}`);
+                    $('#total-receivable-amount').text(`${currencySymbol} ${total.toFixed(2)}`);
                     return json.data;
                 }
             },

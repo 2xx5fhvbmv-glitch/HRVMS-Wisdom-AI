@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Resorts\People\Liability;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
@@ -321,33 +322,33 @@ class LiabilityEstimationController extends Controller
             ->addColumn('employee_name', fn($row) => optional($row->resortAdmin)->full_name ?? 'N/A')
             ->addColumn('department', fn($row) => optional($row->department)->name ?? 'N/A')
             ->addColumn('position', fn($row) => optional($row->position)->position_title ?? 'N/A')
-            ->addColumn('salary', fn($row) => '$' . number_format($row->basic_salary, 2))
+            ->addColumn('salary', fn($row) => Common::GetResortCurrencySymbol() . ' ' . number_format($row->basic_salary, 2))
 
             ->addColumn('ot', function ($row) use ($currentYear) {
                 $totalOT = PayrollReview::where('employee_id', $row->id)
                     ->whereYear('created_at', $currentYear)
                     ->sum(DB::raw('regularOTPay + holidayOTPay'));
-                return '$' . number_format($totalOT, 2);
+                return Common::GetResortCurrencySymbol() . ' ' . number_format($totalOT, 2);
             })
 
             ->addColumn('service_charge', function ($row) use ($currentYear) {
                 $totalSC = PayrollReview::where('employee_id', $row->id)
                     ->whereYear('created_at', $currentYear)
                     ->sum('service_charge');
-                return '$' . number_format($totalSC, 2);
+                return Common::GetResortCurrencySymbol() . ' ' . number_format($totalSC, 2);
             })
 
             ->addColumn('insurance', function ($row) use ($currentYear) {
                 $insurance = $row->EmployeeInsurance()
                     ->whereYear('insurance_end_date', $currentYear)
                     ->sum('Premium');
-                return '$' . number_format($insurance, 2);
+                return Common::GetResortCurrencySymbol() . ' ' . number_format($insurance, 2);
             })
 
             ->addColumn('recruitment', function ($row) use ($currentYear) {
                 $isNewHire = $row->joining_date && Carbon::parse($row->joining_date)->year == $currentYear;
 
-                if (!$isNewHire) return '$0.00';
+                if (!$isNewHire) return Common::GetResortCurrencySymbol() . ' 0.00';
 
                 $recruitmentCost = DB::table('resort_budget_costs')
                     ->where('resort_id', $row->resort_id)
@@ -356,7 +357,7 @@ class LiabilityEstimationController extends Controller
                         'Work Visa Medical test fee', 'Medical Insurance'
                     ])->sum('amount');
 
-                return '$' . number_format($recruitmentCost, 2);
+                return Common::GetResortCurrencySymbol() . ' ' . number_format($recruitmentCost, 2);
             });
 
         // Add dynamic allowance columns
@@ -369,7 +370,7 @@ class LiabilityEstimationController extends Controller
                         $q->where('employee_id', $row->id)
                             ->whereYear('created_at', $currentYear);
                     })->sum('amount');
-                return '$' . number_format($amount, 2);
+                return Common::GetResortCurrencySymbol() . ' ' . number_format($amount, 2);
             });
         }
 
@@ -388,7 +389,7 @@ class LiabilityEstimationController extends Controller
                 $q->where('employee_id', $row->id)->whereYear('created_at', $currentYear);
             })->sum('amount');
 
-            return '$' . number_format($salary + $ot + $serviceCharge + $insurance + $allowance, 2);
+            return Common::GetResortCurrencySymbol() . ' ' . number_format($salary + $ot + $serviceCharge + $insurance + $allowance, 2);
         });
 
         $datatable->addColumn('details', fn($row) => '');

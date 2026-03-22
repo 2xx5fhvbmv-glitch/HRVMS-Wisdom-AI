@@ -183,7 +183,7 @@
                                             <th>Regular OT Hours</th>
                                             <th>Holiday OT Hours</th>
                                             <th>Total OT</th>
-                                            <th>Action</th>
+                                            {{-- <th>Action</th> --}}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -237,7 +237,7 @@
                                     <tfoot>
                                         <tr>
                                             <th colspan="6" class="text-end">Total Service Charge:</th>
-                                            <th colspan="1" id="total-service-charge" class="fw-bold">$0.00</th>
+                                            <th colspan="1" id="total-service-charge" class="fw-bold">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -488,6 +488,73 @@
 
 @section('import-css')
 <style>
+    /* Leave type tooltip */
+    .leave-tooltip {
+        position: fixed;
+        background: #2C2C2C;
+        color: #fff;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        z-index: 9999;
+        min-width: 180px;
+        max-width: 280px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        display: none;
+        pointer-events: none;
+    }
+    .leave-tooltip.show { display: block !important; }
+    .leave-tooltip::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid #2C2C2C;
+    }
+    .leave-tooltip.arrow-top::after {
+        bottom: auto;
+        top: -8px;
+        border-top: none;
+        border-bottom: 8px solid #2C2C2C;
+    }
+    .leave-tooltip .tooltip-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .leave-tooltip .tooltip-type {
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .leave-tooltip .tooltip-count {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .leave-tooltip .tooltip-info {
+        line-height: 1.8;
+    }
+    .leave-tooltip .tooltip-info div {
+        margin-bottom: 2px;
+        font-size: 12px;
+    }
+    .leave-tooltip .tooltip-info .info-label {
+        color: #ccc;
+        margin-right: 8px;
+    }
+    .leave-tooltip .tooltip-info .info-value {
+        color: #fff;
+        font-weight: 500;
+    }
+    .leave-type-badge { transition: transform 0.15s; }
+    .leave-type-badge:hover { transform: scale(1.05); }
+
     .dateRangeAb{position: relative;}
     .dateRangeAb .daterangepicker {
         position: absolute !important;
@@ -607,10 +674,6 @@
                                     <td>${employee.regular_ot}</td>
                                     <td>${employee.holiday_ot}</td>
                                     <td>${employee.total_ot}</td>
-                                    <td>
-                                        <a href="#" class="btn-lg-icon icon-bg-skyblue edit-btn"><i class="fa-regular fa-pen"></i></a>
-                                        <a href="#" class="a-link add_note" data-attendance-id=${employee.attendance_id}>+ Add Note</a>
-                                    </td>
                                 </tr>`;
                                 $tableBody.append(row);
                             });
@@ -623,6 +686,8 @@
                                 autoWidth: false,
                                 pageLength: 10
                             });
+                            // Initialize tooltips for leave type badges
+                            $('[data-bs-toggle="tooltip"]').tooltip();
                             updatePageLength() ;
                             moveToNextStep($currentFieldset);
                         } else {
@@ -831,7 +896,7 @@
             e.preventDefault();
 
             // Get the total service charge amount
-            var totalServiceCharge = parseFloat($("#total-ser").val().replace('$', '').replace(',', ''));
+            var totalServiceCharge = parseFloat($("#total-ser").val().replace(currencySymbol, '').replace(',', ''));
 
             if (isNaN(totalServiceCharge) || totalServiceCharge <= 0) {
                 toastr.error("Please enter a valid service charge amount.", {
@@ -869,7 +934,7 @@
             });
 
             // Update the total service charge row
-            $("#total-service-charge").text(`$${distributedTotal.toFixed(2)}`);
+            $("#total-service-charge").text(`${currencySymbol} ${distributedTotal.toFixed(2)}`);
             // console.log("Distributed Service Charge Data:", distributedServiceCharge); // Debugging
 
         });
@@ -971,7 +1036,7 @@
                 var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
 
                 if ($row.find("td:eq(0)").text() === employeeId) {
-                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace('$', '')) || 0;
+                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace(currencySymbol, '')) || 0;
                     var newOther = currentOther + finalAmount;
                     $row.find("td:eq(8)").text(currencySymbol + newOther.toFixed(2)); // Store in USD
                     updateTotal($row); // Update the total column
@@ -1463,9 +1528,9 @@
                                     <td>${employee.regular_ot} hrs</td>
                                     <td>${employee.holiday_ot} hrs</td>
                                     <td>${employee.total_ot}</td>
-                                    <td>$${employee.basic_salary}</td>
-                                    <td>$120</td>
-                                    <td>$110</td>
+                                    <td>${currencySymbol} ${employee.basic_salary}</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 120</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 110</td>
                                 </tr>`;
                         $tableBody.append(row);
                     });
@@ -1756,6 +1821,89 @@
 
         return totalPayrollAmount;
     }
+
+    // Leave type tooltip
+    function initLeaveTooltips() {
+        $(document).off('mouseenter mouseleave', '.leave-type-badge').on({
+            mouseenter: function(e) {
+                var raw = $(this).attr('data-leave-tooltip');
+                if (!raw) return;
+                var textarea = document.createElement('textarea');
+                textarea.innerHTML = raw;
+                raw = textarea.value;
+
+                try {
+                    var data = JSON.parse(raw);
+                    var color = data.color || '#000';
+
+                    var html = '<div class="leave-tooltip show">';
+                    html += '<div class="tooltip-header">';
+                    html += '<span class="tooltip-type" style="color:' + color + '">' + data.type + '</span>';
+                    html += '<span class="tooltip-count" style="background:' + color + '; color:#fff;">' + data.count + ' day' + (data.count > 1 ? 's' : '') + '</span>';
+                    html += '</div>';
+                    html += '<div class="tooltip-info">';
+
+                    if (data.from) {
+                        var fromDate = new Date(data.from);
+                        var toDate = data.to ? new Date(data.to) : fromDate;
+                        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                        var fromStr = fromDate.getDate() + ' ' + months[fromDate.getMonth()] + ' ' + fromDate.getFullYear();
+                        var toStr = toDate.getDate() + ' ' + months[toDate.getMonth()] + ' ' + toDate.getFullYear();
+                        html += '<div><span class="info-label">From:</span><span class="info-value">' + fromStr + '</span></div>';
+                        html += '<div><span class="info-label">To:</span><span class="info-value">' + toStr + '</span></div>';
+                    }
+
+                    if (data.dates && data.dates.length > 0 && data.dates.length <= 5) {
+                        html += '<div style="margin-top:4px; border-top:1px solid #444; padding-top:4px;">';
+                        html += '<span class="info-label">Dates:</span>';
+                        data.dates.forEach(function(d) {
+                            var dt = new Date(d);
+                            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                            html += '<span class="info-value" style="display:inline-block; margin:1px 3px; padding:1px 6px; background:#444; border-radius:3px; font-size:11px;">' + dt.getDate() + ' ' + months[dt.getMonth()] + '</span>';
+                        });
+                        html += '</div>';
+                    }
+
+                    html += '</div></div>';
+
+                    var $tip = $(html);
+                    $('body').append($tip);
+
+                    var $el = $(this);
+                    var off = $el.offset();
+                    var w = $el.outerWidth();
+                    var h = $el.outerHeight();
+                    var tw = $tip.outerWidth();
+                    var th = $tip.outerHeight();
+                    var st = $(window).scrollTop();
+                    var sl = $(window).scrollLeft();
+
+                    var left = (off.left - sl) + (w / 2) - (tw / 2);
+                    var top = (off.top - st) - th - 12;
+
+                    if (left < 10) left = 10;
+                    if (left + tw > $(window).width() - 10) left = $(window).width() - tw - 10;
+
+                    var arrowClass = '';
+                    if (top < 10) {
+                        top = (off.top - st) + h + 12;
+                        arrowClass = 'arrow-top';
+                    }
+
+                    $tip.addClass(arrowClass).css({ left: left + 'px', top: top + 'px' });
+                } catch(ex) {
+                    console.error('Leave tooltip error:', ex);
+                }
+            },
+            mouseleave: function() {
+                $('.leave-tooltip').remove();
+            }
+        }, '.leave-type-badge');
+    }
+
+    $(document).ready(function() {
+        initLeaveTooltips();
+    });
 
 </script>
 @endsection

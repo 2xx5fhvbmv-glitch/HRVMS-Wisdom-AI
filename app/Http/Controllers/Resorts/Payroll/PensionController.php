@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Resorts\Payroll;
 use App\Http\Controllers\Controller;
+use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Maatwebsite\Excel\Facades\Excel;
@@ -126,7 +127,7 @@ class PensionController extends Controller
     //             return $employee->position ?? 'N/A';
     //         })
     //         ->addColumn('basic_salary', function ($employee) {
-    //             return $employee->basic_salary ? '$' . number_format($employee->basic_salary, 2) : 'N/A';
+    //             return $employee->basic_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->basic_salary, 2) : 'N/A';
     //         })
     //         ->addColumn('time', function ($employee) {
     //             return $employee->month . " " . $employee->year ?? 'N/A';
@@ -243,7 +244,7 @@ class PensionController extends Controller
                 return $employee->position ?? 'N/A';
             })
             ->addColumn('basic_salary', function ($employee) {
-                return $employee->basic_salary ? '$' . number_format($employee->basic_salary, 2) : 'N/A';
+                return $employee->basic_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->basic_salary, 2) : 'N/A';
             })
             ->addColumn('time', function ($employee) {
                 return $employee->month . " " . $employee->year ?? 'N/A';
@@ -378,7 +379,7 @@ class PensionController extends Controller
                 return $employee->position ?? 'N/A';
             })
             ->addColumn('basic_salary', function ($employee) {
-                return $employee->basic_salary ? '$' . number_format($employee->basic_salary, 2) : 'N/A';
+                return $employee->basic_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->basic_salary, 2) : 'N/A';
             })
             ->addColumn('time', function ($employee) {
                 return $employee->month . " " . $employee->year ?? 'N/A';

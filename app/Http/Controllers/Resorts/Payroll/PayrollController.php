@@ -85,8 +85,8 @@ class PayrollController extends Controller
             $periodStart = \Carbon\Carbon::create($today->year, $today->month, $cutoffDay)->subMonths($i);
             $periodEnd = \Carbon\Carbon::create($today->year, $today->month, $cutoffDay)->subMonths($i - 1)->subDay();
 
-            // Validate dates
-            if (!$periodStart->day == $cutoffDay) {
+            // Validate dates — if the month has fewer days than cutoffDay, use end of month
+            if ($periodStart->day != $cutoffDay) {
                 $periodStart = $periodStart->endOfMonth();
             }
 
@@ -483,8 +483,14 @@ class PayrollController extends Controller
         $resortId = $this->resort->resort_id;
 
         $ids = collect($employeeIds)->map(function ($item) {
-            $decoded = json_decode($item, true);
-            return $decoded['id'] ?? null;
+            if (is_array($item)) {
+                return $item['id'] ?? null;
+            }
+            if (is_string($item)) {
+                $decoded = json_decode($item, true);
+                return is_array($decoded) ? ($decoded['id'] ?? null) : $item;
+            }
+            return $item;
         })->filter()->values()->toArray();
 
 
@@ -568,14 +574,14 @@ class PayrollController extends Controller
             {
                 $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->first();
             }
-                $payroll_service_charges = PayrollServiceCharge::where("Emp_id",$emp_detail->id)->where('payroll_id',$request->payroll_id)->get();
+                $payroll_service_charges = PayrollServiceCharge::where("employee_id",$emp_detail->id)->where('payroll_id',$request->payroll_id)->get();
                 foreach ($payroll_service_charges as $payroll) 
                 {
                     $employee           =  Employee::where('id', $payroll->employee_id)->where('resort_id', $this->resort->resort_id)->first();
                     $grade              =  Common::getEmpGrade($employee->rank);
                     $resortBenifitsGrid =  ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $grade)->where('service_charge', '1')->where('status','Active')->first();
                     
-                    if($resortBenifitsGrid && $payroll->service_charge_amount > 0) 
+                    if($resortBenifitsGrid && $payroll->service_charge_amount > 0)
                     {
                             Compliance::create([
                                 'resort_id' => $this->resort->resort_id,
@@ -586,16 +592,20 @@ class PayrollController extends Controller
                                 'reported_on' => Carbon::now(),
                                 'status' => 'Breached'
                             ]);
-                            event(new ResortNotificationEvent(Common::nofitication(
-                                $this->resort->resort_id,
-                                10,
-                                'Service Charge Compliance',
-                                "Employee " . $employee->resortAdmin->full_name . " is eligible for service charge but receiving less than the required amount. Expected: " . $resortBenifitsGrid->service_charge_amount . ", Received: " . $payroll->service_charge_amount,
-                                0,
-                                $notify_person->id,
-                                'Payroll Minimum Wage Complianc'
-                            )));
-                        
+                            try {
+                                event(new ResortNotificationEvent(Common::nofitication(
+                                    $this->resort->resort_id,
+                                    10,
+                                    'Service Charge Compliance',
+                                    "Employee " . $employee->resortAdmin->full_name . " is eligible for service charge but receiving less than the required amount. Expected: " . $resortBenifitsGrid->service_charge_amount . ", Received: " . $payroll->service_charge_amount,
+                                    0,
+                                    $notify_person->id ?? 0,
+                                    'Payroll'
+                                )));
+                            } catch (\Exception $notifyErr) {
+                                Log::warning('Service charge notification broadcast failed: ' . $notifyErr->getMessage());
+                            }
+
                     }
                 }
                
@@ -661,22 +671,26 @@ class PayrollController extends Controller
                     }
                     
                     $newemployee = Employee::with(['resortAdmin','position','department'])->where('resort_id', $this->resort->resort_id)->where('id',$emp_detail->id)->first();
-                      event(new ResortNotificationEvent(Common::nofitication(
-                            $this->resort->resort_id,
-                            10,
-                            'Payroll Pension Compliance',
-                            "Employee {$newemployee->resortAdmin->full_name}  ({$newemployee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.",
-                            $notify_person->id,
-                            'Payroll'
-                        
-                    )));
+                      try {
+                          event(new ResortNotificationEvent(Common::nofitication(
+                              $this->resort->resort_id,
+                              10,
+                              'Payroll Pension Compliance',
+                              "Employee {$newemployee->resortAdmin->full_name} ({$newemployee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.",
+                              0,
+                              $notify_person->id ?? 0,
+                              'Payroll'
+                          )));
+                      } catch (\Exception $notifyErr) {
+                          Log::warning('Pension compliance notification broadcast failed: ' . $notifyErr->getMessage());
+                      }
 
                     $compliance = Compliance::Create([
                             'resort_id' => $this->resort->resort_id,
-                            'employee_id' =>$newemployee->id,
+                            'employee_id' => $newemployee->id,
                             'module_name' => 'Payroll',
                             'compliance_breached_name' => 'Payroll Pension Compliance',
-                            "Employee {$newemployee->resortAdmin->full_name}  ({$newemployee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.",
+                            'description' => "Employee {$newemployee->resortAdmin->full_name} ({$newemployee->position->position_title}) is Maldivian but has no pension deduction applied. Maldivian regulations require a mandatory 7% pension contribution for all Maldivian employees.",
                             'reported_on' => Carbon::now(),
                             'status' => 'Breached'
                     ]);
@@ -1470,6 +1484,13 @@ class PayrollController extends Controller
         $invalidOTs = ParentAttendace::whereIn('Emp_id', $request->employees)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->whereNotNull('OverTime')
+            ->where('OverTime', '!=', '')
+            ->where('OverTime', '!=', '-')
+            ->where('OverTime', '!=', '0:00')
+            ->where('OverTime', '!=', '00:00')
+            ->where('OverTime', '!=', '0:0')
+            ->where('OverTime', '!=', '0')
+            ->where('OverTime', '!=', '00:00:00')
             ->where(function ($q) {
                 $q->whereNull('OTStatus')->orWhere('OTStatus', '');
             })->get();
@@ -1552,26 +1573,58 @@ class PayrollController extends Controller
             if (!isset($employees[$empId])) return null;
 
             $employee = $employees[$empId];
-            $currentMonth = Carbon::now()->month;
-            $currentYear = Carbon::now()->year;
 
-            $dayOffCount = $this->getDaysOffForEmployee($empId, $currentMonth, $currentYear);
-            $totalDaysInMonth = Carbon::parse($request->startDate)->daysInMonth;
-            $workingDays = max(1, $totalDaysInMonth - $dayOffCount);
+            // Count DayOffs within the actual payroll cutoff period
+            $dayOffCount = $records->where('Status', 'DayOff')->count();
+            $periodStart = Carbon::parse($request->startDate);
+            $periodEnd = Carbon::parse($request->endDate);
+            $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+            $workingDays = max(1, $totalDaysInPeriod - $dayOffCount);
 
             $totalHours = $regularOT = $holidayOT = 0;
             $attendance_id = null;
-            $presentCount = $records->where('Status', 'Present')->count();
+            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'])->count();
 
             $absentRecords = $records->where('Status', 'Absent');
-            $absentCount = $absentRecords->count(); // Total absents from attendance
-            $unpaidAbsentCount = 0; // Count of unpaid absents (for deduction)
+            $absentCount = $absentRecords->count();
+            $unpaidAbsentCount = 0;
             $absentDeduct = 0;
             $absentDates = $absentRecords->pluck('date');
-            // dd($absentDates);
             $paidLeaveDays = collect();
             $leaveDetails = collect();
 
+            // Process FullDayLeave records — these are approved leave days already in attendance
+            $fullDayLeaveRecords = $records->where('Status', 'FullDayLeave');
+            foreach ($fullDayLeaveRecords as $leaveRec) {
+                $paidLeave = EmployeeLeave::where('emp_id', $empId)
+                    ->where('status', 'Approved')
+                    ->where('from_date', '<=', $leaveRec->date)
+                    ->where('to_date', '>=', $leaveRec->date)
+                    ->first();
+
+                if ($paidLeave) {
+                    $leaveCategory = LeaveCategory::find($paidLeave->leave_category_id);
+                    $isPaidLeave = ($leaveCategory->is_paid ?? 'paid') === 'paid';
+
+                    $leaveDetails->push([
+                        'type'  => $leaveCategory->leave_type ?? 'Unknown',
+                        'color' => $leaveCategory->color ?? '#000000',
+                        'date'  => $leaveRec->date,
+                        'from'  => $paidLeave->from_date,
+                        'to'    => $paidLeave->to_date,
+                        'is_paid' => $isPaidLeave,
+                    ]);
+
+                    if ($isPaidLeave) {
+                        $paidLeaveDays->push($leaveRec->date);
+                        $presentCount++; // Only paid leave counts as present for salary
+                    } else {
+                        $unpaidAbsentCount++; // Unpaid leave = salary deduction
+                    }
+                }
+            }
+
+            // Process Absent records — check if covered by approved leave
             foreach ($absentDates as $date) {
                 $paidLeave = EmployeeLeave::where('emp_id', $empId)
                     ->where('status', 'Approved')
@@ -1581,8 +1634,7 @@ class PayrollController extends Controller
                     })
                     ->first();
 
-                $resort_benefitGrid = ResortBenifitGrid::where('emp_grade', $employee->benefit_grid_level)->where('status','Active')->first();
-                    // dd($paidLeave, $resort_benefitGrid);
+                $resort_benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $employee->benefit_grid_level)->where('status','Active')->first();
                 if ($paidLeave && $resort_benefitGrid) {
                     $benefitGrid = ResortBenifitGridChild::where('benefit_grid_id', optional($resort_benefitGrid)->id)
                         ->where('leave_cat_id', $paidLeave->leave_category_id)
@@ -1596,14 +1648,24 @@ class PayrollController extends Controller
                             ->sum('total_days');
 
                         if ($used < $benefitGrid->allocated_days) {
-                            $paidLeaveDays->push($date);
-                            $presentCount++; // Count paid leave as present for salary
                             $leaveCategory = LeaveCategory::find($paidLeave->leave_category_id);
+                            $isPaidLeave = ($leaveCategory->is_paid ?? 'paid') === 'paid';
+
                             $leaveDetails->push([
                                 'type'  => $leaveCategory->leave_type ?? 'Unknown',
                                 'color' => $leaveCategory->color ?? '#000000',
+                                'date'  => $date,
+                                'from'  => $paidLeave->from_date,
+                                'to'    => $paidLeave->to_date,
+                                'is_paid' => $isPaidLeave,
                             ]);
-                            continue; // Skip deduction
+
+                            if ($isPaidLeave) {
+                                $paidLeaveDays->push($date);
+                                $presentCount++;
+                            }
+                            // Unpaid leave falls through to unpaidAbsentCount below
+                            if ($isPaidLeave) continue;
                         }
                     }
                 }
@@ -1614,14 +1676,23 @@ class PayrollController extends Controller
             // dd($leaveDetails) ;
             foreach ($records as $rec) {
                 $attendance_id = $rec->id;
-                if (!empty($rec->OverTime)) {
+                if (!empty($rec->OverTime) && !in_array($rec->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)
+                    && strtolower(trim($rec->OTStatus ?? '')) === 'approved') {
                     $otParts = explode(':', $rec->OverTime);
                     $h = (int)($otParts[0] ?? 0);
                     $m = (int)($otParts[1] ?? 0);
                     $hours = $h + ($m / 60);
                     $totalHours += $hours;
 
-                    $isHoliday = PublicHoliday::where('holiday_date', date('d-m-Y', strtotime($rec->date)))->exists();
+                    // Check if it's a public holiday, resort holiday, or DayOff (all count as holiday OT)
+                    $dateFormatted = date('d-m-Y', strtotime($rec->date));
+                    $isPublicHoliday = PublicHoliday::where('holiday_date', $dateFormatted)->exists();
+                    $isResortHoliday = \DB::table('resortholidays')
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->where('PublicHolidaydate', $rec->date)
+                        ->exists();
+                    $isDayOff = $rec->Status === 'DayOff';
+                    $isHoliday = $isPublicHoliday || $isResortHoliday || $isDayOff;
                     $isHoliday ? $holidayOT += $hours : $regularOT += $hours;
                 }
             }
@@ -1645,17 +1716,17 @@ class PayrollController extends Controller
             } elseif ($currency === 'Dollar' && $employee->basic_salary_currency === 'MVR') {
                 $basic /= $settings->DollertoMVR;
             }
-            $perDay = $basic / $workingDays;
+            // Per day salary = basic / total days in cutoff period (e.g. 28 for Feb-Mar, 31 for Jan, etc.)
+            $perDay = $basic / $totalDaysInPeriod;
             $earnedSalary = round($perDay * $presentCount, 2); // presentCount already includes paid leave
             $absentDeduct = round($perDay * $unpaidAbsentCount, 2);
 
-            $regularOTPay = round(($basic / ($workingDays * 8) * 1.25) * $regularOT, 2);
-            $holidayOTPay = round(($basic / ($workingDays * 8) * 1.50) * $holidayOT, 2);
-            $totalOTPay = round(
-                ($basic / ($workingDays * 8) * 1.25) * $regularOT +
-                ($basic / ($workingDays * 8) * 1.50) * $holidayOT,
-                2
-            );
+            // OT formula: (monthly salary / total days in period / 8 hours) = per hour salary
+            // Normal OT = per hour × 1.25, Holiday OT = per hour × 1.50
+            $perHourSalary = $basic / $totalDaysInPeriod / 8;
+            $regularOTPay = round($perHourSalary * 1.25 * $regularOT, 2);
+            $holidayOTPay = round($perHourSalary * 1.50 * $holidayOT, 2);
+            $totalOTPay = round($regularOTPay + $holidayOTPay, 2);
 
             $allowanceDetails = EmployeeAllowance::with('allowanceName')
                 ->where('employee_id', $employee->id)
@@ -1699,6 +1770,10 @@ class PayrollController extends Controller
                 };
                 if ($eligible && $grid->ramadan_bonus) {
                     $ramadanBonus = floatval($grid->ramadan_bonus);
+                    // Ramadan bonus is stored in USD, convert if display currency is MVR
+                    if ($currency === 'MVR') {
+                        $ramadanBonus *= $settings->DollertoMVR;
+                    }
                 }
             }
 
@@ -1722,13 +1797,14 @@ class PayrollController extends Controller
                 'position_code' => $employee->position->code ?? 'Unknown',
                 'present' => $presentCount,
                 'absent' => $absentCount,
+                'day_off' => $dayOffCount,
                 'unpaid_absent' => $unpaidAbsentCount,
                 'absent_deduction' => round($absentDeduct, 2),
                 'section' => 'N/A',
                 'total_ot' => $totalHours,
                 'regular_ot' => $regularOT,
                 'holiday_ot' => $holidayOT,
-                'workdays' => $presentCount,
+                'workdays' => $presentCount, // Present + Paid Leave days
                 'per_day_salary' => round($perDay, 2),
                 'absent_deduction' => round($absentDeduct, 2),
                 'earned_salary' => $earnedSalary,
@@ -1796,7 +1872,6 @@ class PayrollController extends Controller
 
     private function formatLeaveTypes($leaveTypes)
     {
-        // dd($leaveTypes);
         if ($leaveTypes->isEmpty()) {
             return '-';
         }
@@ -1805,9 +1880,24 @@ class PayrollController extends Controller
             ->groupBy('type')
             ->map(function ($group, $type) {
                 $color = $group->first()['color'] ?? '#000000';
-                return "<span class='badge border-0' style='color:{$color}; background:{$color}1F;'>{$type} ({$group->count()})</span>";
+                $count = $group->count();
+
+                $dates = $group->pluck('date')->filter()->sort()->values();
+                $from = $group->first()['from'] ?? ($dates->first() ?? '');
+                $to = $group->first()['to'] ?? ($dates->last() ?? '');
+
+                $tooltipData = htmlspecialchars(json_encode([
+                    'type' => $type,
+                    'color' => $color,
+                    'count' => $count,
+                    'from' => $from,
+                    'to' => $to,
+                    'dates' => $dates->toArray(),
+                ]), ENT_QUOTES, 'UTF-8');
+
+                return "<span class='badge border-0 leave-type-badge' style='color:{$color}; background:{$color}1F; cursor:pointer;' data-leave-tooltip='{$tooltipData}'>{$type} ({$count})</span>";
             })
-            ->implode('<br>');
+            ->implode(' ');
     }
 
     public function fetchStaffShop(Request $request) {
@@ -1822,35 +1912,72 @@ class PayrollController extends Controller
         $conversionRate = floatval($request->input('conversionRate', 1)); // Default 1 (no conversion)
         $salary_currency = "Dollar"; // Assume salary is stored in Dollar
     
-        $staffShopData = Payment::whereIn('payments.emp_id', $employeeIds)
+        // Get individual transactions for tooltip details
+        $transactions = Payment::whereIn('payments.emp_id', $employeeIds)
             ->join('employees as e', 'e.id', '=', 'payments.emp_id')
-            ->whereIn('payments.status', ['Approved', 'Partial Paid'])
+            ->join('products as p', 'p.id', '=', 'payments.product_id')
+            ->whereIn('payments.status', ['Consented', 'Partial Paid'])
             ->whereBetween('payments.purchased_date', [$startDate, $endDate])
             ->select(
                 'e.Emp_id',
-                DB::raw("COALESCE(SUM(CASE 
-                            WHEN payments.status = 'Partial Paid' 
-                            THEN GREATEST(0, payments.price - payments.cash_paid) 
-                            ELSE payments.price 
-                        END), 0) as total_usd") // ✅ Stored as USD
+                'p.name as product_name',
+                'payments.quantity',
+                'payments.price',
+                'payments.cash_paid',
+                'payments.status',
+                'payments.purchased_date'
+            )
+            ->orderBy('payments.purchased_date')
+            ->get()
+            ->groupBy('Emp_id');
+
+        // Get totals per employee
+        $staffShopData = Payment::whereIn('payments.emp_id', $employeeIds)
+            ->join('employees as e', 'e.id', '=', 'payments.emp_id')
+            ->whereIn('payments.status', ['Consented', 'Partial Paid'])
+            ->whereBetween('payments.purchased_date', [$startDate, $endDate])
+            ->select(
+                'e.Emp_id',
+                DB::raw("COALESCE(SUM(CASE
+                            WHEN payments.status = 'Partial Paid'
+                            THEN GREATEST(0, payments.price - payments.cash_paid)
+                            ELSE payments.price
+                        END), 0) as total_usd")
             )
             ->groupBy('e.Emp_id')
             ->get()
-            ->mapWithKeys(function ($item) use ($currency, $conversionRate,$settings) {
-                // ✅ Convert currency correctly
-                // dd($currency,$settings->DollertoMVR,$item->total_usd);
-                if ($currency === 'MVR') {
-                    $total = $item->total_usd * $settings->DollertoMVR; // Convert USD to MVR
-                } else {
-                    $total = $item->total_usd; // Keep in USD
+            ->mapWithKeys(function ($item) use ($currency, $settings, $transactions) {
+                $convRate = $settings->DollertoMVR ?? 15.42;
+                $total = ($currency === 'MVR') ? $item->total_usd * $convRate : $item->total_usd;
+
+                // Build transaction details
+                $details = [];
+                if (isset($transactions[$item->Emp_id])) {
+                    foreach ($transactions[$item->Emp_id] as $txn) {
+                        $deductAmount = $txn->status === 'Partial Paid'
+                            ? max(0, $txn->price - $txn->cash_paid)
+                            : $txn->price;
+                        $deductDisplay = ($currency === 'MVR') ? $deductAmount * $convRate : $deductAmount;
+
+                        $details[] = [
+                            'product' => $txn->product_name,
+                            'qty' => $txn->quantity,
+                            'price' => round(($currency === 'MVR') ? $txn->price * $convRate : $txn->price, 2),
+                            'cash_paid' => round(($currency === 'MVR') ? $txn->cash_paid * $convRate : $txn->cash_paid, 2),
+                            'deduction' => round($deductDisplay, 2),
+                            'date' => Carbon::parse($txn->purchased_date)->format('d M Y'),
+                            'status' => $txn->status,
+                        ];
+                    }
                 }
-    
+
                 return [$item->Emp_id => [
                     'Emp_id' => $item->Emp_id,
-                    'total' => round($total, 2), // Keep numeric format
+                    'total' => round($total, 2),
+                    'transactions' => $details,
                 ]];
             });
-    
+
         return response()->json([
             'success' => true,
             'data' => $staffShopData->values()
@@ -2033,12 +2160,17 @@ class PayrollController extends Controller
             $basicSalary = floatval($employee->basic_salary);
             $basicCurrency = $employee->basic_salary_currency;
 
-            // Convert basic salary to MVR if in USD
+            // Convert basic salary to MVR for pension calculation
             $salaryInMVR = ($basicCurrency === 'USD') ? $basicSalary * $settings['DollertoMVR'] : $basicSalary;
+
+            // Get earned salary (prorated) — this is what the employee actually earns this period
+            $earnedSalaryDisplay = isset($employee->earned_salary) ? floatval($employee->earned_salary) : 0;
+            // Convert earned salary to MVR if display currency is Dollar
+            $earnedSalaryMVR = ($currency === 'Dollar') ? $earnedSalaryDisplay * $settings['DollertoMVR'] : $earnedSalaryDisplay;
 
             // Allowance in MVR
             $totalAllowanceMVR = 0;
-            foreach ($employee->allowance as $allowance) 
+            foreach ($employee->allowance as $allowance)
             {
                 $amount = floatval($allowance->amount);
                 if ($allowance->amount_unit === 'USD') {
@@ -2047,42 +2179,47 @@ class PayrollController extends Controller
                 $totalAllowanceMVR += $amount;
             }
 
-            // Service Charge
+            // Service Charge in MVR
             $serviceCharge = Common::getServiceCharge($employee->id, $resortId, $payrollId);
             $serviceChargeInMVR = ($currency === 'Dollar') ? $serviceCharge * $settings['DollertoMVR'] : $serviceCharge;
 
-            // ✅ Convert total OT pay to MVR if needed
+            // Total OT pay in MVR
             $totalOTPay = isset($employee->total_ot_pay) ? floatval($employee->total_ot_pay) : 0;
             $totalOTPayInMVR = ($currency === 'Dollar') ? $totalOTPay * $settings['DollertoMVR'] : $totalOTPay;
 
-            // ✅ Gross income includes OT
-            $grossIncomeMVR = $salaryInMVR + $totalAllowanceMVR + $serviceChargeInMVR + $totalOTPayInMVR;
+            // Total Earnings = Earned Salary + Allowances + Service Charge + OT
+            $totalEarningsMVR = $earnedSalaryMVR + $totalAllowanceMVR + $serviceChargeInMVR + $totalOTPayInMVR;
 
-            // Pension for Maldivian
+            // Pension for Maldivian — 7% of full basic salary (not earned)
             $isMaldivian = $employee->nationality === 'Maldivian';
             $pensionMVR = $isMaldivian ? Common::calculatePension($salaryInMVR) : 0;
 
-            $taxableIncomeMVR = max($grossIncomeMVR - $pensionMVR, 0);
+            // EWT is calculated on total earnings minus pension
+            $taxableIncomeMVR = max($totalEarningsMVR - $pensionMVR, 0);
 
             $ewtMVR = Common::calculateEWT($taxableIncomeMVR);
 
             if($employee->ewt_status =="Yes" && $taxableIncomeMVR > 60000)
             {
-                $notify_person = Employee::where('resort_id', $resort->resort_id)->where('rank','3')->first();
+                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
                 if (!$notify_person) {
-                    $notify_person = Employee::where('resort_id', $resort->resort_id)->where('rank','2')->first();
+                    $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->first();
                 }
                 if($ewtMVR === 0)
                 {
-                        //tax Kapavo joy to hto  compliance breached
-                    event(new ResortNotificationEvent(Common::nofitication(
-                            $this->resort->resort_id,
-                            10,
-                            'Payroll EWT Compliance',
-                            "Employee {$employee->resortAdmin->first_name} {$employee->resortAdmin->last_name} ({$employee->position->position_title}) has taxable income exceeding MVR 60,000 but no EWT deductions applied. Tax compliance requires applying standard EWT brackets.",
-                            $notify_person->id,
-                            'Payroll'
-                    )));
+                    try {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                                $this->resort->resort_id,
+                                10,
+                                'Payroll EWT Compliance',
+                                "Employee {$employee->resortAdmin->first_name} {$employee->resortAdmin->last_name} ({$employee->position->position_title}) has taxable income exceeding MVR 60,000 but no EWT deductions applied. Tax compliance requires applying standard EWT brackets.",
+                                0,
+                                $notify_person->id ?? 0,
+                                'Payroll'
+                        )));
+                    } catch (\Exception $notifyErr) {
+                        Log::warning('EWT compliance notification broadcast failed: ' . $notifyErr->getMessage());
+                    }
 
                     $compliance = Compliance::firstOrCreate([
                             'resort_id' => $this->resort->resort_id,
@@ -2112,17 +2249,20 @@ class PayrollController extends Controller
                             }
                         }
 
-                        if (round($expectedEWT, 2) !== round($calculatedEWT, 2)) {
-                                event(new ResortNotificationEvent(Common::nofitication(
-                                    $this->resort->resort_id,
-                                    10,
-                                    'Payroll EWT Compliance',
-                                    " EWT mismatch detected for Employee {$employee->resortAdmin->first_name} {$employee->resortAdmin->last_name} ({$employee->position->position_title}). 
-                                            Expected EWT: MVR " . round($expectedEWT, 2) . ", 
-                                            Calculated EWT: MVR " . round($calculatedEWT, 2) . ". 
-                                            Please review the applied tax brackets or salary components.",
-                                    'Payroll'
-                                )));
+                        if (round($expectedEWT, 2) !== round($ewtMVR, 2)) {
+                                try {
+                                    event(new ResortNotificationEvent(Common::nofitication(
+                                        $this->resort->resort_id,
+                                        10,
+                                        'Payroll EWT Compliance',
+                                        "EWT mismatch detected for Employee {$employee->resortAdmin->first_name} {$employee->resortAdmin->last_name} ({$employee->position->position_title}). Expected EWT: MVR " . round($expectedEWT, 2) . ", Calculated EWT: MVR " . round($ewtMVR, 2) . ". Please review the applied tax brackets or salary components.",
+                                        0,
+                                        $notify_person->id ?? 0,
+                                        'Payroll'
+                                    )));
+                                } catch (\Exception $notifyErr) {
+                                    Log::warning('EWT mismatch notification broadcast failed: ' . $notifyErr->getMessage());
+                                }
 
                                 $compliance = Compliance::firstOrCreate([
                                         'resort_id' => $this->resort->resort_id,
@@ -2131,7 +2271,7 @@ class PayrollController extends Controller
                                         'compliance_breached_name' => 'Payroll EWT Compliance',
                                         'description' => " EWT mismatch detected for Employee {$employee->resortAdmin->first_name} {$employee->resortAdmin->last_name} ({$employee->position->position_title}). 
                                             Expected EWT: MVR " . round($expectedEWT, 2) . ", 
-                                            Calculated EWT: MVR " . round($calculatedEWT, 2) . ". 
+                                            Calculated EWT: MVR " . round($ewtMVR, 2) . ". 
                                             Please review the applied tax brackets or salary components.",                                        
                                         'reported_on' => Carbon::now(),
                                         'status' => 'Breached'

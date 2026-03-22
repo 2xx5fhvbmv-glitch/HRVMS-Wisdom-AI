@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts\People\Promotion;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
@@ -110,8 +111,8 @@ class DashboardController extends Controller
             })
             ->addColumn('current_position', fn($row) => optional($row->currentPosition)->position_title ?? '—')
             ->addColumn('new_position', fn($row) => optional($row->newPosition)->position_title ?? '—')
-            ->addColumn('current_salary', fn($row) => '$' . number_format($row->current_salary))
-            ->addColumn('new_salary', fn($row) => '$' . number_format($row->new_salary))
+            ->addColumn('current_salary', fn($row) => Common::formatCurrency($row->current_salary, 'USD'))
+            ->addColumn('new_salary', fn($row) => Common::formatCurrency($row->new_salary, 'USD'))
             ->addColumn('effective_date', function ($row) {
                 return date('d M Y', strtotime($row->effective_date));
             })

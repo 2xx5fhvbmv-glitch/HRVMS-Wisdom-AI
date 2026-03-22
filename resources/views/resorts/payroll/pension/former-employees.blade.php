@@ -73,8 +73,8 @@
                     <tfoot>
                         <tr>
                             <th colspan="7">Total:</th>
-                            <th class="fw-600">$0.00</th>
-                            <th class="fw-600">$0.00</th>
+                            <th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                            <th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -136,10 +136,10 @@ function loadPensionTable() {
             if (json && json.totals) {
                 // Update footer cells directly (more reliable than recreating tfoot)
                 $(api.column(7).footer()).html(
-                    '$' + parseFloat(json.totals.employee_pension || 0).toFixed(2)
+                    currencySymbol + ' ' + parseFloat(json.totals.employee_pension || 0).toFixed(2)
                 );
                 $(api.column(8).footer()).html(
-                    '$' + parseFloat(json.totals.employer_pension || 0).toFixed(2)
+                    currencySymbol + ' ' + parseFloat(json.totals.employer_pension || 0).toFixed(2)
                 );
             }
         },
@@ -154,13 +154,13 @@ function loadPensionTable() {
             { 
                 data: 'employee_pension', 
                 render: function(data, type, row) {
-                    return data ? '$' + parseFloat(data).toFixed(2) : '$0.00';
+                    return data ? currencySymbol + ' ' + parseFloat(data).toFixed(2) : currencySymbol + ' 0.00';
                 }
             },
             { 
                 data: 'employer_pension',  // Note: Fix spelling to match server response
                 render: function(data, type, row) {
-                    return data ? '$' + parseFloat(data).toFixed(2) : '$0.00';
+                    return data ? currencySymbol + ' ' + parseFloat(data).toFixed(2) : currencySymbol + ' 0.00';
                 }
             },
             { data: 'created_at', visible: false, searchable: false }
@@ -171,8 +171,8 @@ function loadPensionTable() {
                 $('#table-pension').append(
                     '<tfoot><tr>' +
                     '<th colspan="7" class="text-end fw-600">Total:</th>' +
-                    '<th class="fw-600">$0.00</th>' +
-                    '<th class="fw-600">$0.00</th>' +
+                    '<th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>' +
+                    '<th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>' +
                     '</tr></tfoot>'
                 );
             }

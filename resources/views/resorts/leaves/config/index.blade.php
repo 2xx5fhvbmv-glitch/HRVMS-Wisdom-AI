@@ -208,6 +208,7 @@
                                                     data-number-of-times="{{ $category->number_of_times }}"
                                                     data-color="{{ $category->color }}"
                                                     data-combine-with-other="{{ $category->combine_with_other }}"
+                                                    data-is-paid="{{ $category->is_paid ?? 'paid' }}"
                                                     data-leave-category="{{ $category->leave_category }}">
                                                         <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                                                     </a>
@@ -314,6 +315,14 @@
                                         </div>
                                         <div id="add-color-error"></div>
                                     </div>
+                                    <div class="col-sm-6">
+                                        <label for="is_paid" class="form-label">LEAVE TYPE (PAID/UNPAID) <span class="red-mark">*</span></label>
+                                        <select class="form-select select2t-none" name="is_paid" id="is_paid">
+                                            <option value="paid">Paid Leave</option>
+                                            <option value="unpaid">Unpaid Leave</option>
+                                        </select>
+                                    </div>
+
                                     @if(count($LeaveCategories ?? []) >= 1)
                                         <div class="col-sm-6">
                                             <label for="combine_with_other" class="form-label">IS THIS LEAVE COMBINES WITH ANOTHER?</label>
@@ -443,6 +452,14 @@
                             </div>
                             <div id="edit-color-error"></div>
                         </div>
+                        <div class="col-sm-6">
+                            <label for="edit_is_paid" class="form-label">LEAVE TYPE (PAID/UNPAID) <span class="red-mark">*</span></label>
+                            <select class="form-select select2t-none" name="is_paid" id="edit_is_paid">
+                                <option value="paid">Paid Leave</option>
+                                <option value="unpaid">Unpaid Leave</option>
+                            </select>
+                        </div>
+
                         @if(!empty($LeaveCategories) && count($LeaveCategories) >= 1)
                             <div class="col-sm-6">
                                 <label for="edit_combine_with_other" class="form-label">IS THIS LEAVE COMBINES WITH
@@ -959,6 +976,7 @@
             const numberOfTimes = $(this).data("number-of-times");
             const color = $(this).data("color");
             const combineWithOther = $(this).data("combine-with-other");
+            const isPaid = $(this).data("is-paid") || 'paid';
             const leaveCategory = $(this).data("leave-category");
             var eligibilityValues = $(this).data('eligibility');
 
@@ -979,6 +997,7 @@
             $('#editLeave-modal #edit_frequency').val(frequency).trigger('change');
             $('#editLeave-modal #edit_number_of_times').val(numberOfTimes);
             $('#editLeave-modal #edit_color').val(color);
+            $('#editLeave-modal #edit_is_paid').val(isPaid).trigger('change');
             $('#editLeave-modal #edit_combine_with_other').val(combineWithOther).trigger('change');
             // leave_category: show wrap and set value when "Combine" is Yes so selected items show as tags
             var leaveCategoryArr = [];

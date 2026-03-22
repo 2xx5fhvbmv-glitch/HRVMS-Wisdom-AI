@@ -181,7 +181,7 @@
                               
                                 <tr>
                                     <th>Total</th>
-                                    <th>${{$payrollAdvance->payrollRecoverySchedule->sum('amount')}}</th>
+                                    <th>{{ Common::GetResortCurrencySymbol() }}{{$payrollAdvance->payrollRecoverySchedule->sum('amount')}}</th>
                                     <th></th>
                                 </tr>
                             </tbody>

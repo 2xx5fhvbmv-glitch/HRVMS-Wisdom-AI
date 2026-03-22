@@ -255,20 +255,20 @@
                                     <th></th>
                                     <th></th>
                                     <th></th>
-                                    <th id="total-current-basic-salary">$0</th>
-                                    <th id="total-proposed-basic-salary">$0</th>
-                                    <th id="total-jan-2024">$0</th>
-                                    <th id="total-feb-2024">$0</th>
-                                    <th id="total-mar-2024">$0</th>
-                                    <th id="total-apr-2024">$0</th>
-                                    <th id="total-may-2024">$0</th>
-                                    <th id="total-jun-2024">$0</th>
-                                    <th id="total-jul-2024">$0</th>
-                                    <th id="total-aug-2024">$0</th>
-                                    <th id="total-sep-2024">$0</th>
-                                    <th id="total-oct-2024">$0</th>
-                                    <th id="total-nov-2024">$0</th>
-                                    <th id="total-dec-2024">$0</th>
+                                    <th id="total-current-basic-salary">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-proposed-basic-salary">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-jan-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-feb-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-mar-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-apr-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-may-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-jun-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-jul-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-aug-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-sep-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-oct-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-nov-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                    <th id="total-dec-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
                                 </tr>
                             </tfoot>
                         </table>
@@ -469,11 +469,11 @@
             $('#total-positions').text(totalPositions);
             totalCurrentBasicSalary = Math.round(totalCurrentBasicSalary);
             totalProposedBasicSalary = Math.round(totalProposedBasicSalary);
-            $('#total-current-basic-salary').text('$' + totalCurrentBasicSalary.toLocaleString(undefined, {
+            $('#total-current-basic-salary').text(currencySymbol + ' ' + totalCurrentBasicSalary.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));
-            $('#total-proposed-basic-salary').text('$' + totalProposedBasicSalary.toLocaleString(undefined, {
+            $('#total-proposed-basic-salary').text(currencySymbol + ' ' + totalProposedBasicSalary.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));
@@ -481,7 +481,7 @@
             // Update monthly totals in the footer
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
             months.forEach((month, index) => {
-                $(`#total-${month}-2024`).text('$' + monthlyTotals[index].toLocaleString(undefined, {
+                $(`#total-${month}-2024`).text(currencySymbol + ' ' + monthlyTotals[index].toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 }));
@@ -489,7 +489,7 @@
 
             $('.grand_total').val( grandTotal);
 
-            $('#grand_total').text('$' + grandTotal.toLocaleString(undefined, {
+            $('#grand_total').text(currencySymbol + ' ' + grandTotal.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));

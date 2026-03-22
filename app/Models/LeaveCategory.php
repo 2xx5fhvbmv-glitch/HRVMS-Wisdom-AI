@@ -26,7 +26,8 @@ class LeaveCategory extends Model
         'number_of_times',
         'color',
         'leave_category',
-        'combine_with_other'
+        'combine_with_other',
+        'is_paid'
     ];
 
     public static function boot(){

@@ -19,13 +19,16 @@
                         data-number-of-times="{{ $category->number_of_times }}"
                         data-color="{{ $category->color }}"
                         data-combine-with-other="{{ $category->combine_with_other }}"
+                        data-is-paid="{{ $category->is_paid ?? 'paid' }}"
                         data-leave-category="{{ $category->leave_category }}">
                             <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                         </a>
                         <a href="#" data-leave-id="{{ $category->id }}" class="btn-lg-icon icon-bg-red delete-leave-btn"><img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="icon"></a>
                     </div>
                 </div>
-                <p>{{$category->number_of_days}} Days</p>
+                <p>{{$category->number_of_days}} Days
+                    <span class="badge {{ ($category->is_paid ?? 'paid') === 'paid' ? 'badge-themeSuccess' : 'badge-themeWarning' }}" style="font-size:10px;">{{ ucfirst($category->is_paid ?? 'paid') }}</span>
+                </p>
                 <p>Forwarded Next Year - {{$category->carry_max ?? 0}} Days</p>
             </div>
         </div>

@@ -177,7 +177,7 @@
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['bank_details']['total_amount']) ? '$' . $payrollArray['bank_details']['total_amount'] : '' }}
+                                                {{ !empty($payrollArray['bank_details']['total_amount']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['bank_details']['total_amount'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -211,7 +211,7 @@
                                             </td>
 
                                             <td style="padding: 0 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['earning_details']['basic_pay']) ? '$' . $payrollArray['earning_details']['basic_pay'] : '' }}
+                                                {{ !empty($payrollArray['earning_details']['basic_pay']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['earning_details']['basic_pay'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -220,7 +220,7 @@
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['earning_details']['allowance']) ? '$' . $payrollArray['earning_details']['allowance'] : '' }}
+                                                {{ !empty($payrollArray['earning_details']['allowance']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['earning_details']['allowance'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -229,7 +229,7 @@
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['earning_details']['bonus']) ? '$' . $payrollArray['earning_details']['bonus'] : '' }}
+                                                {{ !empty($payrollArray['earning_details']['bonus']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['earning_details']['bonus'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -238,7 +238,7 @@
                                             </td>
 
                                             <td style="font-weight: 500;padding: 16px 0 0 4px;text-align: right;vertical-align: top;">
-                                                ${{$payrollArray['earning_details']['earning_total_amount']}}
+                                                {{ Common::GetResortCurrencySymbol() }}{{$payrollArray['earning_details']['earning_total_amount']}}
                                             </td>
                                         </tr>
                                     </table>
@@ -262,7 +262,7 @@
                                             </td>
 
                                             <td style="padding: 0 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['deductions_details']['monthly_tax_deduction']) ? '$' . $payrollArray['deductions_details']['monthly_tax_deduction'] : '' }}
+                                                {{ !empty($payrollArray['deductions_details']['monthly_tax_deduction']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['deductions_details']['monthly_tax_deduction'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -271,7 +271,7 @@
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['deductions_details']['insurance']) ? '$' . $payrollArray['deductions_details']['insurance'] : '' }}
+                                                {{ !empty($payrollArray['deductions_details']['insurance']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['deductions_details']['insurance'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -280,7 +280,7 @@
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['deductions_details']['loans']) ? '$' . $payrollArray['deductions_details']['loans'] : '' }}
+                                                {{ !empty($payrollArray['deductions_details']['loans']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['deductions_details']['loans'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -289,7 +289,7 @@
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                {{ !empty($payrollArray['deductions_details']['city_ledger']) ? '$' . $payrollArray['deductions_details']['city_ledger'] : '' }}
+                                                {{ !empty($payrollArray['deductions_details']['city_ledger']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['deductions_details']['city_ledger'] : '' }}
                                             </td>
                                         </tr>
                                         <tr>
@@ -298,7 +298,7 @@
                                             </td>
 
                                             <td style="font-weight: 500;padding: 16px 0 0 4px;text-align: right;vertical-align: top;">
-                                                {{ !empty($payrollArray['deductions_details']['total_deductions']) ? '$' . $payrollArray['deductions_details']['total_deductions'] : '' }}
+                                                {{ !empty($payrollArray['deductions_details']['total_deductions']) ? Common::GetResortCurrencySymbol() . ' ' . $payrollArray['deductions_details']['total_deductions'] : '' }}
                                             </td>
                                         </tr>
                                     </table>
@@ -317,7 +317,7 @@
                                         </td>
 
                                         <td style="font-weight: 500;padding: 0 0 0 4px;text-align: right;vertical-align: top;">
-                                            ${{$payrollArray['net_salary']}}
+                                            {{ Common::GetResortCurrencySymbol() }}{{$payrollArray['net_salary']}}
                                         </td>
                                     </tr>
                                 </table>

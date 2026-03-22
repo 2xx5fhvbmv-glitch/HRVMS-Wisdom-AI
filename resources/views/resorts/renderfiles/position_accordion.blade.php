@@ -7,7 +7,7 @@
                     aria-controls="collapse{{ $accordionId }}">
                 <i class="fas fa-user-tie me-2"></i>
                 <span class="fw-normal">{{ $positionName }}</span>
-                <span class="badge badge-dark ms-2 small">Budget: $ 0.00</span>
+                <span class="badge badge-dark ms-2 small">Budget: {{ Common::GetResortCurrencySymbol() }} 0.00</span>
                 <span class="badge badge-info ms-2 small">Filled: {{ $positionData['max_counts']['max_filledcount'] }}</span>
                 <span class="badge badge-warning ms-1 small">Vacant: {{ $positionData['max_counts']['max_vacantcount'] }}</span>
             </button>
@@ -49,10 +49,10 @@
                                                 <span class="badge badge-secondary small">{{ $AvailableRank }}</span>
                                             </td>
                                             <td>{{ $employee->nationality ?? '-' }}</td>
-                                            <td class="text-center">${{ number_format($employee->basic_salary ?? 0, 2) }}</td>
-                                            <td class="text-center">${{ number_format($employee->basic_salary ?? 0, 2) }}</td>
+                                            <td class="text-center">{{ Common::GetResortCurrencySymbol() }} {{ number_format($employee->basic_salary ?? 0, 2) }}</td>
+                                            <td class="text-center">{{ Common::GetResortCurrencySymbol() }} {{ number_format($employee->basic_salary ?? 0, 2) }}</td>
                                             @foreach ($resortCosts as $cost)
-                                                <td class="text-center">${{ number_format($cost->amount, 2) }}</td>
+                                                <td class="text-center">{{ Common::GetResortCurrencySymbol() }} {{ number_format($cost->amount, 2) }}</td>
                                             @endforeach
                                             
                                         </tr>
@@ -101,7 +101,7 @@
                                             </td>
                                             <td class="text-muted">-</td>
                                             @foreach ($resortCosts as $cost)
-                                                <td class="text-end">${{ number_format($cost->amount, 2) }}</td>
+                                                <td class="text-end">{{ Common::GetResortCurrencySymbol() }} {{ number_format($cost->amount, 2) }}</td>
                                             @endforeach
                                         </tr>
                                     @endfor

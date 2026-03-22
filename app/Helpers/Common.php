@@ -1530,13 +1530,19 @@ class Common
         $resortexist =  ResortSiteSettings::where('resort_id', $resortid)->select('currency','MVR_img','Doller_img')->first();
         if(isset($resortexist))
         {
-            $img =  $resortexist->Doller_img;
+            $img = ($resortexist->currency === 'Dollar') ? $resortexist->Doller_img : $resortexist->MVR_img;
         }
         else{
             $img =  'maldives-currency-icon-new.svg';
         }
         $logo =  URL::asset(config('settings.Resort_currency').'/'.$img);
         return $logo;
+    }
+
+    public static function GetResortCurrencySymbol()
+    {
+        $currency = self::GetResortCurrentCurrency();
+        return ($currency === 'Dollar') ? '$' : 'MVR';
     }
 
 	public static function CheckemployeeBudgetCost($employeeType, $resort_id, $basic_salary,$getformated = 0) {
@@ -3554,6 +3560,40 @@ class Common
         return round(($salaryInMVR * $pensionRate) / 100, 2);
     }
 
+    /**
+     * Convert amount from stored currency (USD) to display currency based on resort settings.
+     * @param float $amount Amount in source currency
+     * @param string $sourceCurrency 'USD' or 'MVR' — the currency the amount is stored in
+     * @return float Converted amount in the resort's display currency
+     */
+    public static function convertToDisplayCurrency($amount, $sourceCurrency = 'USD')
+    {
+        $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
+        if (!$resortId) return $amount;
+
+        $settings = \App\Models\ResortSiteSettings::where('resort_id', $resortId)->first();
+        if (!$settings) return $amount;
+
+        $displayCurrency = $settings->currency; // 'MVR' or 'Dollar'
+
+        if ($displayCurrency === 'MVR' && strtoupper($sourceCurrency) === 'USD') {
+            return round($amount * $settings->DollertoMVR, 2);
+        } elseif ($displayCurrency !== 'MVR' && strtoupper($sourceCurrency) === 'MVR') {
+            return round($amount * $settings->MVRtoDoller, 2);
+        }
+
+        return round($amount, 2);
+    }
+
+    /**
+     * Format amount with currency symbol and conversion.
+     */
+    public static function formatCurrency($amount, $sourceCurrency = 'USD')
+    {
+        $converted = self::convertToDisplayCurrency($amount, $sourceCurrency);
+        return self::GetResortCurrencySymbol() . ' ' . number_format($converted, 2);
+    }
+
     public static function getServiceCharge($employee_id, $resortId,$payrollId){
         $service_charge = PayrollServiceCharge::where('payroll_id',$payrollId)->where('employee_id',$employee_id)->first();
 
@@ -3662,25 +3702,36 @@ class Common
 
     public static function ResortNotification($user_id,$resort_id)
     {
-        $r = ResortNotification::join('employees as t1',"t1.id","=","resort_notifications.user_id")
+        $query = ResortNotification::join('employees as t1',"t1.id","=","resort_notifications.user_id")
         ->join('resort_admins as t2',"t2.id","=","t1.Admin_Parent_id")
-        ->where("resort_notifications.user_id", $user_id)
         ->where("resort_notifications.resort_id", $resort_id)
-        ->where('resort_notifications.status', 'unread')
-        ->latest()
-        ->take(10)
-        ->get(['resort_notifications.*','t2.id as Parentid']);
+        ->where('resort_notifications.status', 'unread');
+
+        // HR/EXCOM/GM see all resort notifications; others see only their own
+        $employee = Employee::find($user_id);
+        if ($employee) {
+            $rank = config('settings.Position_Rank');
+            $userRank = $rank[$employee->rank] ?? '';
+            if (!in_array($userRank, ['HR', 'EXCOM', 'GM'])) {
+                $query->where("resort_notifications.user_id", $user_id);
+            }
+        } else {
+            $query->where("resort_notifications.user_id", $user_id);
+        }
+
+        $r = $query->latest()->take(10)->get(['resort_notifications.*','t2.id as Parentid']);
         $string='';
-        $time = Carbon::now()->format('Y-m-d H:i:s') ;
 
         if($r->isNotEmpty())
         {
             foreach($r as $ak)
             {
                 $url = Common::getResortUserPicture($ak->Parentid);
+                $notifUrl = Common::getNotificationUrl($ak);
+                $timeAgo = Carbon::parse($ak->created_at)->diffForHumans();
 
                     $string .= ' <div class="notification-box active class_remove_me_'.$ak->id.'">
-                                    <a href="#" class="d-flex  profile-dropdown ">
+                                    <a href="'.$notifUrl.'" class="d-flex  profile-dropdown ">
                                         <div class="flex-shrink-0 img-box " >
                                             <img src="'. $url .'" alt="..." class="img-fluid" />
                                         </div>
@@ -3688,7 +3739,7 @@ class Common
                                         <h5>'.$ak->type.'</h5>
                                         <p>' .$ak->message.' </p>
                                         <br>
-                                        <span>Current Date and Time:'.$time.'</span>
+                                        <span>'.$timeAgo.'</span>
                                     </div>
                                 </a>
                                     <a href="javascript:void(0);" class="btn-lg-icon btn-light-grey MarkNotification" data-id="'.$ak->id .'">
@@ -3702,6 +3753,44 @@ class Common
                         <p>No Notification</p>
                     </div>';
                     return $string;
+        }
+    }
+
+    public static function getNotificationUrl($notification)
+    {
+        $module = strtolower(trim($notification->module ?? ''));
+        $requestId = $notification->request_id ?? null;
+
+        switch ($module) {
+            case 'leave':
+                if ($requestId) {
+                    return url('resort/leave/details/' . base64_encode($requestId));
+                }
+                return url('resort/leave/request');
+
+            case 'boarding pass':
+                if ($requestId) {
+                    return url('resort/leaves/boarding-pass/details/' . base64_encode($requestId));
+                }
+                return url('resort/leaves/boarding-pass');
+
+            case 'resignation':
+                if ($requestId) {
+                    return url('resort/people/resignation/details/' . base64_encode($requestId));
+                }
+                return url('resort/people/resignation');
+
+            case 'people management (minimum wage)':
+                return url('resort/people/compliances');
+
+            case 'people - announcement':
+                return url('resort/people/announcement');
+
+            case 'workforce planning':
+                return url('resort/workforce-planning/hr-dashboard');
+
+            default:
+                return url('resort/mark/notification-list');
         }
     }
 
@@ -5875,10 +5964,22 @@ class Common
 
     public static function getNotificationCount($resort_id,$user_id){
 
-        $resortNotificationCount = ResortNotification::where('resort_id', $resort_id)
-                ->where('user_id', $user_id)
-                ->where('status', 'unread')
-                ->count();
+        $query = ResortNotification::where('resort_id', $resort_id)
+                ->where('status', 'unread');
+
+        // HR/EXCOM/GM see all resort notifications; others see only their own
+        $employee = Employee::find($user_id);
+        if ($employee) {
+            $rank = config('settings.Position_Rank');
+            $userRank = $rank[$employee->rank] ?? '';
+            if (!in_array($userRank, ['HR', 'EXCOM', 'GM'])) {
+                $query->where('user_id', $user_id);
+            }
+        } else {
+            $query->where('user_id', $user_id);
+        }
+
+        $resortNotificationCount = $query->count();
 
         if($resortNotificationCount > 100){
             return '99+';
