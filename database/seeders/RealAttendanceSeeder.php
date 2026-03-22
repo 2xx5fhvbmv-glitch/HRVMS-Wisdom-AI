@@ -518,5 +518,57 @@ class RealAttendanceSeeder extends Seeder
             DB::table('duty_roster_entries')->whereIn('id', $ancientIds)->delete();
             $this->command->info("Cleaned up {$ancientIds->count()} ancient roster entries.");
         }
+
+        // ── Activate all benefit grids with service charge enabled ──
+        DB::table('resort_benifit_grid')
+            ->where('resort_id', $resortId)
+            ->update(['service_charge' => 1, 'status' => 'active']);
+        $this->command->info("Activated all benefit grids with service charge enabled.");
+
+        // ── Seed shopkeeper payments for payroll period ──
+        $shopkeeperId = DB::table('shopkeepers')->where('resort_id', $resortId)->value('id');
+        if ($shopkeeperId) {
+            $productId = DB::table('products')->where('shopkeeper_id', $shopkeeperId)->value('id');
+
+            // Delete old seeded payments in this period
+            DB::table('payments')
+                ->where('shopkeeper_id', $shopkeeperId)
+                ->whereBetween('purchased_date', ['2026-02-19', '2026-03-18'])
+                ->whereIn('status', ['Consented', 'Partial Paid'])
+                ->delete();
+
+            if ($productId) {
+                $shopPayments = [
+                    ['emp_id' => 170, 'price' => 400, 'date' => '2026-03-01', 'status' => 'Consented', 'qty' => 2, 'cash_paid' => 0],
+                    ['emp_id' => 170, 'price' => 200, 'date' => '2026-03-10', 'status' => 'Consented', 'qty' => 1, 'cash_paid' => 0],
+                    ['emp_id' => 174, 'price' => 600, 'date' => '2026-02-25', 'status' => 'Consented', 'qty' => 3, 'cash_paid' => 0],
+                    ['emp_id' => 177, 'price' => 200, 'date' => '2026-03-05', 'status' => 'Consented', 'qty' => 1, 'cash_paid' => 0],
+                    ['emp_id' => 180, 'price' => 400, 'date' => '2026-03-08', 'status' => 'Partial Paid', 'qty' => 2, 'cash_paid' => 150],
+                    ['emp_id' => 189, 'price' => 200, 'date' => '2026-02-20', 'status' => 'Consented', 'qty' => 1, 'cash_paid' => 0],
+                ];
+
+                foreach ($shopPayments as $p) {
+                    DB::table('payments')->insert([
+                        'shopkeeper_id' => $shopkeeperId,
+                        'order_id' => 'ORD-SEED-' . $p['emp_id'] . '-' . str_replace('-', '', $p['date']),
+                        'emp_id' => $p['emp_id'],
+                        'product_id' => $productId,
+                        'quantity' => $p['qty'],
+                        'price' => $p['price'],
+                        'status' => $p['status'],
+                        'purchased_date' => $p['date'],
+                        'cash_paid' => $p['cash_paid'],
+                        'payroll_deducted' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+                $this->command->info("Inserted " . count($shopPayments) . " shopkeeper payments for payroll period.");
+            } else {
+                $this->command->warn("No products found for shopkeeper — skipped payments.");
+            }
+        } else {
+            $this->command->warn("No shopkeeper found for resort — skipped payments.");
+        }
     }
 }
