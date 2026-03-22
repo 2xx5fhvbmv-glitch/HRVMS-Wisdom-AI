@@ -49,13 +49,16 @@ class DashboardController extends Controller
 
         $today = now();
 
-        // Last Payroll = most recent payroll (any status), use end_date as the reference date
+        // Last Payroll = most recent completed/locked payroll, fallback to any status
         $lastPayroll = Payroll::where('resort_id', $resort_id)
             ->where('end_date', '<', $today)
+            ->whereIn('status', ['completed', 'locked', 'processed', 'paid'])
             ->orderBy('end_date', 'desc')
             ->first();
         if (!$lastPayroll) {
+            // Fallback: show most recent payroll regardless of status
             $lastPayroll = Payroll::where('resort_id', $resort_id)
+                ->where('end_date', '<', $today)
                 ->orderBy('end_date', 'desc')
                 ->first();
         }

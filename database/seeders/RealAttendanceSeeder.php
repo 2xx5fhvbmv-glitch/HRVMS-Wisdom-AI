@@ -30,6 +30,9 @@ class RealAttendanceSeeder extends Seeder
             'DR-18' => 187,
             'DR-19' => 188,
             'DR-20' => 189,
+            'DR-21' => 192,
+            'DR-22' => 191,
+            'DR-23' => 194,
         ];
 
         // Dates: Feb 25 to Mar 24, 2026
@@ -60,6 +63,9 @@ class RealAttendanceSeeder extends Seeder
             'DR-18' => ['P','P','P','DO','AL','AL','AL','AL','AL','AL','DO','AL','AL','AL','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
             'DR-19' => ['P','P','P','DO','P','P','P','P','P','P','P','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
             'DR-20' => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-21' => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-22' => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
+            'DR-23' => ['P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P','P','P','P','DO','P','P','P'],
         ];
 
         // ── OT Sheet Data (overtime hours per day, 0 = no overtime) ──
@@ -79,6 +85,9 @@ class RealAttendanceSeeder extends Seeder
             'DR-18' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             'DR-19' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             'DR-20' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            'DR-21' => [2,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0,0,0,2,0],
+            'DR-22' => [0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0],
+            'DR-23' => [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         ];
 
         // ── Delete old seeded data for these employees in this date range ──
@@ -455,5 +464,59 @@ class RealAttendanceSeeder extends Seeder
             }
         }
         $this->command->info("Inserted {$leaveCount} leave records for AL days.");
+
+        // ── Clean up junk records with empty Status (old garbage data) ──
+        $junkIds = DB::table('parent_attendaces')
+            ->where('resort_id', $resortId)
+            ->whereIn('Emp_id', $empIds)
+            ->where(function ($q) {
+                $q->whereNull('Status')->orWhere('Status', '');
+            })
+            ->pluck('id');
+
+        if ($junkIds->isNotEmpty()) {
+            DB::table('child_attendaces')->whereIn('Parent_attd_id', $junkIds)->delete();
+            DB::table('break_attendaces')->whereIn('Parent_attd_id', $junkIds)->delete();
+            DB::table('parent_attendaces')->whereIn('id', $junkIds)->delete();
+            $this->command->info("Cleaned up {$junkIds->count()} junk attendance records (empty Status).");
+        }
+
+        // ── Also delete old-format attendance for DR-21, DR-22, DR-23 outside seeder range ──
+        $extraEmpIds = [191, 192, 194];
+        $oldExtraIds = DB::table('parent_attendaces')
+            ->where('resort_id', $resortId)
+            ->whereIn('Emp_id', $extraEmpIds)
+            ->where(function ($q) {
+                $q->where('date', '<', '2026-02-25')
+                  ->orWhere('date', '>', '2026-03-24');
+            })
+            ->pluck('id');
+
+        if ($oldExtraIds->isNotEmpty()) {
+            DB::table('child_attendaces')->whereIn('Parent_attd_id', $oldExtraIds)->delete();
+            DB::table('break_attendaces')->whereIn('Parent_attd_id', $oldExtraIds)->delete();
+            DB::table('parent_attendaces')->whereIn('id', $oldExtraIds)->delete();
+            $this->command->info("Cleaned up {$oldExtraIds->count()} old-format records for DR-21/22/23.");
+        }
+
+        // ── Approve Elena's pending sick leave (seeder consistency) ──
+        $elenaEmpId = 182;
+        DB::table('employees_leaves')
+            ->where('Emp_id', $elenaEmpId)
+            ->where('resort_id', $resortId)
+            ->where('status', 'Pending')
+            ->whereBetween('from_date', ['2026-02-25', '2026-03-24'])
+            ->update(['status' => 'Approved']);
+        $this->command->info("Auto-approved Elena's pending leaves in seeder range.");
+
+        // ── Clean up 1970 date junk records ──
+        $ancientIds = DB::table('duty_roster_entries')
+            ->where('resort_id', $resortId)
+            ->where('date', '<', '2025-01-01')
+            ->pluck('id');
+        if ($ancientIds->isNotEmpty()) {
+            DB::table('duty_roster_entries')->whereIn('id', $ancientIds)->delete();
+            $this->command->info("Cleaned up {$ancientIds->count()} ancient roster entries.");
+        }
     }
 }

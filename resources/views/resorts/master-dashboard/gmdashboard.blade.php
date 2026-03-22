@@ -356,7 +356,7 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div>
                                             <p class="mb-0  fw-500">Total Budget</p>
-                                            <strong>$1.2M</strong>
+                                            <strong>${{ Common::GetResortCurrencySymbol() }} 1.2M</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -366,7 +366,7 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div>
                                             <p class="mb-0  fw-500">Spent</p>
-                                            <strong>$345K</strong>
+                                            <strong>${{ Common::GetResortCurrencySymbol() }} 345K</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -376,7 +376,7 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div>
                                             <p class="mb-0  fw-500">Remaining</p>
-                                            <strong>$855K</strong>
+                                            <strong>${{ Common::GetResortCurrencySymbol() }} 855K</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -422,8 +422,8 @@
                                 @foreach($serviceChargesData as $serviceCharge)
                                     <tr>
                                         <td>{{ $serviceCharge['month'] }}</td>
-                                        <td>${{ $serviceCharge['current_year_value'] ?? 0 }}</td>
-                                        <td>${{ $serviceCharge['last_year_value'] ?? 0}}</td>
+                                        <td>{{ Common::GetResortCurrencySymbol() }} {{ $serviceCharge['current_year_value'] ?? 0 }}</td>
+                                        <td>{{ Common::GetResortCurrencySymbol() }} {{ $serviceCharge['last_year_value'] ?? 0}}</td>
                                     </tr>
                                 @endforeach
                             </table>
@@ -497,18 +497,18 @@
                                 </tr>
                                 <tr>
                                     <td>January</td>
-                                    <td>$15,125</td>
-                                    <td>$14,525</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 15,125</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 14,525</td>
                                 </tr>
                                 <tr>
                                     <td>February</td>
-                                    <td>$15,125</td>
-                                    <td>$10,125</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 15,125</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 10,125</td>
                                 </tr>
                                 <tr>
                                     <td>March</td>
-                                    <td>$15,125</td>
-                                    <td>$17,145</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 15,125</td>
+                                    <td>{{ Common::GetResortCurrencySymbol() }} 17,145</td>
                                 </tr>
                             </table>
                         </div>

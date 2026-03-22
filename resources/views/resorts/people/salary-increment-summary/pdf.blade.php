@@ -55,10 +55,10 @@
         $dateFormat = Common::getDateFormateFromSettings();
     @endphp
     <div class="summary-section">
-        <h6>Current Basic Salary (Monthly): <strong>${{ number_format($currentBasicSalary, 2) }}</strong></h6>
-        <h6>New Basic Salary (Monthly): <strong>${{ number_format($newBasicSalary, 2) }}</strong></h6>
-        <h6>Monthly Payroll Increase: <strong>${{ number_format($monthlyPayrollIncrease, 2) }}</strong></h6>
-        <h6>Annual Payroll Increase: <strong>${{ number_format($annualPayrollIncrease, 2) }}</strong></h6>
+        <h6>Current Basic Salary (Monthly): <strong>{{ Common::GetResortCurrencySymbol() }} {{ number_format($currentBasicSalary, 2) }}</strong></h6>
+        <h6>New Basic Salary (Monthly): <strong>{{ Common::GetResortCurrencySymbol() }} {{ number_format($newBasicSalary, 2) }}</strong></h6>
+        <h6>Monthly Payroll Increase: <strong>{{ Common::GetResortCurrencySymbol() }} {{ number_format($monthlyPayrollIncrease, 2) }}</strong></h6>
+        <h6>Annual Payroll Increase: <strong>{{ Common::GetResortCurrencySymbol() }} {{ number_format($annualPayrollIncrease, 2) }}</strong></h6>
     </div>
 
     <table class="table">
@@ -90,9 +90,9 @@
                     <td>{{ $row->employee->resortAdmin->full_name }}</td>
                     <td>{{ $row->employee->position->position_title }}</td>
                     <td>{{ $row->employee->department->name }}</td>
-                    <td>${{ number_format($row->previous_salary, 2) }}</td>
-                    <td>${{ number_format($row->new_salary, 2) }}</td>
-                    <td>${{ number_format($row->increment_amount, 2) }}</td>
+                    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($row->previous_salary, 2) }}</td>
+                    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($row->new_salary, 2) }}</td>
+                    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($row->increment_amount, 2) }}</td>
                     <td>{{ $row->increment_type }}</td>
                     <td>{{ \Carbon\Carbon::parse($row->effective_date)->format($dateFormat) }}</td>
                     <td>{{ $row->remarks ?? " "}}</td>

@@ -31,22 +31,22 @@
                     </div>
                     <div class="col-xxl col-lg-3 col-md-4 col-sm-6">
                         <div class="bg-themeGrayLight">
-                            <h6>Current Basic Salary</h6><strong>${{$currentBasicSalary}}</strong>
+                            <h6>Current Basic Salary</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$currentBasicSalary}}</strong>
                         </div>
                     </div>
                     <div class="col-xxl col-lg-3 col-md-4 col-sm-6">
                         <div class="bg-themeGrayLight">
-                            <h6>New Basic Salary</h6><strong>${{$newSalary}}</strong>
+                            <h6>New Basic Salary</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$newSalary}}</strong>
                         </div>
                     </div>
                     <div class="col-xxl col-lg-3 col-md-4 col-sm-6">
                         <div class="bg-themeGrayLight">
-                            <h6>Monthly Difference</h6><strong>${{$monthlyDifference}}</strong>
+                            <h6>Monthly Difference</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$monthlyDifference}}</strong>
                         </div>
                     </div>
                     <div class="col-xxl col-lg-3 col-md-4 col-sm-6">
                         <div class="bg-themeGrayLight">
-                            <h6>Annual Difference</h6><strong>${{$yearlyDifference}}</strong>
+                            <h6>Annual Difference</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$yearlyDifference}}</strong>
                         </div>
                     </div>
                 </div>
@@ -82,8 +82,8 @@
                                 </td>
                                 <td>{{$employee['employee_position']}}</td>
                                 <td>{{$employee['employee_department']}}</td>
-                                <td>${{$employee['previous_salary']}}</td>
-                                <td>${{$employee['new_salary']}}</td>
+                                <td>{{ Common::GetResortCurrencySymbol() }}{{$employee['previous_salary']}}</td>
+                                <td>{{ Common::GetResortCurrencySymbol() }}{{$employee['new_salary']}}</td>
                                 <td>@if($employee['pay_increase_type'] == App\Models\PeopleSalaryIncrement::PAY_INCREASE_TYPE_FIXED) $@endif{{$employee['value']}} @if($employee['pay_increase_type'] == App\Models\PeopleSalaryIncrement::PAY_INCREASE_TYPE_PERCENTAGE) % @endif</td>
                                 <td>{{$employee['effective_date']}}</td>
                                 <td>{{$employee['remark']}}</td>

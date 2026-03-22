@@ -8,7 +8,7 @@
                <option value="{{$value['month']}}">{{$value['month']}}</option>
           </select>
      </td>
-     <td>${{$value['installment_amount']}}</td>
+     <td>{{ Common::formatCurrency($value['installment_amount'], 'USD') }}</td>
      <td>
           <div class="position-relative">
                <input type="text" class="form-control interest-input" 
@@ -21,6 +21,6 @@
                <i class="fa-solid fa-percent"></i>
           </div>
      </td>
-     <td>${{$value['remaining_balance']}}</td>
+     <td>{{ Common::formatCurrency($value['remaining_balance'], 'USD') }}</td>
 </tr>
 @endforeach

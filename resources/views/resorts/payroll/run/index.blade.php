@@ -197,15 +197,15 @@
                                             <th>Department </th>
                                             <th>Present</th>
                                             <th>Absent</th>
+                                            <th>Day Off</th>
                                             <th>Leave Types</th>
                                             <th>Regular OT Hours</th>
                                             <th>Holiday OT Hours</th>
                                             <th>Total OT</th>
-                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                       
+
                                     </tbody>
                                 </table>
                             </div>
@@ -255,7 +255,7 @@
                                     <tfoot>
                                         <tr>
                                             <th colspan="6" class="text-end">Total Service Charge:</th>
-                                            <th colspan="1" id="total-service-charge" class="fw-bold">$0.00</th>
+                                            <th colspan="1" id="total-service-charge" class="fw-bold">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -338,26 +338,23 @@
                                     <thead>
                                         <tr>
                                             <th colspan="4"></th>
-                                            <th colspan="3">Time & Attendance</th>
                                             <th colspan="3">Overtime</th>
+                                            <th colspan="1">Time & Attendance</th>
                                             <th colspan="3">Earnings</th>
                                         </tr>
                                         <tr>
                                             <th>ID</th>
-                                            <th>Employee Name </th>
-                                            <th>Department </th>
+                                            <th>Employee Name</th>
+                                            <th>Department</th>
                                             <th>Position</th>
-                                            <th>Present</th>
-                                            <th>Absent</th>
-                                            <th>Service Charge days</th>
                                             <th>Normal</th>
                                             <th>Holiday</th>
                                             <th>Total</th>
-                                            <th>Basic</th>
-                                            <th>Earned</th>
+                                            <th>Service Charge</th>
+                                            <th>Basic Earned</th>
                                             <th>Allowance</th>
+                                            <th>Total Earnings</th>
                                             <th>Deductions</th>
-                                            <th>Normal</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -512,6 +509,19 @@
 
 @section('import-css')
 <style>
+    .leave-tooltip{position:fixed;background:#2C2C2C;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;z-index:9999;min-width:180px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none;pointer-events:none}
+    .leave-tooltip.show{display:block!important}
+    .leave-tooltip::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #2C2C2C}
+    .leave-tooltip.arrow-top::after{bottom:auto;top:-8px;border-top:none;border-bottom:8px solid #2C2C2C}
+    .leave-tooltip .tooltip-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .leave-tooltip .tooltip-type{font-weight:600;font-size:14px}
+    .leave-tooltip .tooltip-count{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600}
+    .leave-tooltip .tooltip-info{line-height:1.8}
+    .leave-tooltip .tooltip-info div{margin-bottom:2px;font-size:12px}
+    .leave-tooltip .tooltip-info .info-label{color:#ccc;margin-right:8px}
+    .leave-tooltip .tooltip-info .info-value{color:#fff;font-weight:500}
+    .leave-type-badge{transition:transform .15s;cursor:pointer}
+    .leave-type-badge:hover{transform:scale(1.05)}
     .dateRangeAb{position: relative;}
     .dateRangeAb .daterangepicker {
         position: absolute !important;
@@ -595,6 +605,62 @@
 
         // dates are tracked via hiddenInput value only
         $(".select2t-none").select2();
+
+        // ── Restore step on page refresh ──
+        var savedStep = parseInt(localStorage.getItem("currentStep")) || 0;
+        var savedPayrollId = localStorage.getItem("payroll_id");
+        if (savedStep > 1 && savedPayrollId) {
+            // Jump to the saved step
+            $("fieldset").each(function(index) {
+                var stepNum = $(this).data('step');
+                if (stepNum < savedStep) {
+                    $(this).css({ 'visibility': 'hidden', 'position': 'absolute', 'opacity': 0 });
+                    $("#progressbar li").eq(index).addClass("active");
+                } else if (stepNum == savedStep) {
+                    $(this).css({ 'visibility': 'visible', 'opacity': 1, 'position': 'relative' });
+                    $("#progressbar li").eq(index).addClass("active current");
+                } else {
+                    $(this).css({ 'visibility': 'hidden', 'position': 'absolute', 'opacity': 0 });
+                }
+            });
+
+            // Restore selected employees (numeric IDs) from localStorage into the persistent Set
+            var savedNumericIds = localStorage.getItem("selectedEmployeeNumericIds");
+            if (savedNumericIds) {
+                try {
+                    var numIds = JSON.parse(savedNumericIds);
+                    numIds.forEach(function(id) {
+                        selectedEmployeeSet.add(String(id));
+                    });
+                } catch(e) {}
+            }
+
+            // Trigger data load for current step
+            setTimeout(function() {
+                if (savedStep === 3) {
+                    getstep3data('');
+                } else if (savedStep === 4) {
+                    getstep4data('', currency, 1);
+                } else if (savedStep === 5) {
+                    getstep5data(currency, 1);
+                } else if (savedStep === 6) {
+                    getstep6data(currency, 1);
+                }
+            }, 500);
+        }
+
+        // Helper: get selected employee IDs (numeric) — uses checkboxes or falls back to localStorage
+        function getSelectedEmployeeIds() {
+            var ids = [];
+            $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
+                ids.push($(this).val());
+            });
+            // Fallback: use persistent set from localStorage
+            if (ids.length === 0 && selectedEmployeeSet.size > 0) {
+                ids = Array.from(selectedEmployeeSet);
+            }
+            return ids;
+        }
 
         $(".next").click(async function (e) {
             e.preventDefault();
@@ -722,6 +788,8 @@
                             localStorage.setItem("selectedEmployees", JSON.stringify(selectedEmployees));
                             localStorage.setItem("currentStep", currentStep);
                             localStorage.setItem("selectedEmployeesIds", JSON.stringify(selectedEmployeesIds));
+                            // Save numeric IDs for API calls on restore
+                            localStorage.setItem("selectedEmployeeNumericIds", JSON.stringify(Array.from(selectedEmployeeSet)));
 
                             moveToNextStep($currentFieldset);
                         } else {
@@ -778,25 +846,28 @@
                         parseInt($row.find("td:eq(4) input").val().trim()) || 0 :
                         parseInt($row.find("td:eq(4)").text().trim()) || 0;
 
-                    let regularOT = $row.find("td:eq(6) input").length > 0 ?
-                        parseFloat($row.find("td:eq(6) input").val().trim()) || 0 :
-                        parseFloat($row.find("td:eq(6)").text().trim()) || 0;
+                    let dayOff = parseInt($row.find("td:eq(5)").text().trim()) || 0;
 
-                    let holidayOT = $row.find("td:eq(7) input").length > 0 ?
+                    let regularOT = $row.find("td:eq(7) input").length > 0 ?
                         parseFloat($row.find("td:eq(7) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(7)").text().trim()) || 0;
 
-                    let totalOT = $row.find("td:eq(8) input").length > 0 ?
+                    let holidayOT = $row.find("td:eq(8) input").length > 0 ?
                         parseFloat($row.find("td:eq(8) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(8)").text().trim()) || 0;
 
+                    let totalOT = $row.find("td:eq(9) input").length > 0 ?
+                        parseFloat($row.find("td:eq(9) input").val().trim()) || 0 :
+                        parseFloat($row.find("td:eq(9)").text().trim()) || 0;
+
                     AttendaceData.push({
                         id: employeeId,
-                        name: $row.find("td:eq(1)").text().trim(), // Employee Name
-                        department: $row.find("td:eq(2)").text().trim(), // Department
+                        name: $row.find("td:eq(1)").text().trim(),
+                        department: $row.find("td:eq(2)").text().trim(),
                         present: present,
                         absent: absent,
-                        leaveTypes: $row.find("td:eq(5)").text().trim(), // Leave Types
+                        dayOff: dayOff,
+                        leaveTypes: $row.find("td:eq(6)").text().trim(),
                         regularOT: regularOT,
                         holidayOT: holidayOT,
                         totalOT: totalOT
@@ -881,14 +952,19 @@
                 $("#table-serviceCharge tbody tr").each(function () {
                     // console.log($(this).find("td:eq(0)").text().trim());
 
+                    var empId = $(this).find("td:eq(0)").text().trim();
+                    // Get USD amount from distributedServiceCharge array (stored in USD)
+                    var scEntry = distributedServiceCharge.find(e => e.id === empId);
+                    var scAmountUSD = scEntry ? parseFloat(scEntry.amount) : 0;
+
                     ServiceChargesData.push({
-                        id: $(this).find("td:eq(0)").text().trim(), // Employee ID
-                        name: $(this).find("td:eq(1)").text().trim(), // Employee Name
-                        position: $(this).find("td:eq(2)").text().trim(), // Position
-                        department: $(this).find("td:eq(3)").text().trim(), // Department
-                        section: $(this).find("td:eq(4)").text().trim(), // Section
-                        totalWorkingDays: parseInt($(this).find("td:eq(5)").text().trim()) || 0, // Total Working Days
-                        serviceCharge : $(this).find("td:eq(6)").text().trim().replace("$", "") || 0,// Distributed Service Charge
+                        id: empId,
+                        name: $(this).find("td:eq(1)").text().trim(),
+                        position: $(this).find("td:eq(2)").text().trim(),
+                        department: $(this).find("td:eq(3)").text().trim(),
+                        section: $(this).find("td:eq(4)").text().trim(),
+                        totalWorkingDays: parseInt($(this).find("td:eq(5)").text().trim()) || 0,
+                        serviceCharge: scAmountUSD, // Always in USD for DB storage
                         totalServiceCharge: totalServiceCharge
                     });
                 });
@@ -911,7 +987,7 @@
                     },
                     success: function (response) {
                         if (response.success) {
-                            toastr.success("Service Charges added to payroll successfully!", 'Error',{
+                            toastr.success("Service Charges added to payroll successfully!", 'Success',{
                                 positionClass: 'toast-bottom-right'
                             });
                             
@@ -988,7 +1064,7 @@
                     },
                     success: function (response) {
                         if (response.success) {
-                            toastr.success("Deductions added to payroll successfully!",'Error', {
+                            toastr.success("Deductions added to payroll successfully!", 'Success', {
                                 positionClass: 'toast-bottom-right'
                             });
                             
@@ -1049,14 +1125,14 @@
                         name: $row.find("td:eq(1)").text().trim(),
                         department: $row.find("td:eq(2)").text().trim(),
                         position: $row.find("td:eq(3)").text().trim(),
-                        present: parseInt($row.find("td:eq(4)").text().trim()) || 0,
-                        absent: parseInt($row.find("td:eq(5)").text().trim()) || 0,
-                        serviceCharge: $row.find("td:eq(6)").text().trim().replace("$", "") || 0,
-                        overtimeNormal: $row.find("td:eq(7)").text().trim().replace("$", "") || 0,
-                        overtimeHoliday: $row.find("td:eq(8)").text().trim().replace("$", "") || 0,
-                        overtimeTotal: $row.find("td:eq(9)").text().trim().replace("$", "") || 0,
-                        earningsBasic: $row.find("td:eq(10)").text().trim().replace("$", "") || 0,
-                        earnedSalary: $row.find("td:eq(11)").text().trim().replace("$", "") || 0,
+                        present: 0,
+                        absent: 0,
+                        overtimeNormal: $row.find("td:eq(4)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        overtimeHoliday: $row.find("td:eq(5)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        overtimeTotal: $row.find("td:eq(6)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        serviceCharge: $row.find("td:eq(7)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        earningsBasic: 0,
+                        earnedSalary: $row.find("td:eq(8)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
                         earningsAllowance: 0, // will calculate below
                         earningsNormal: $row.find("td:eq(-2)").text().trim().replace("$", "") || 0,
                         totalDeductions: $row.find("td:eq(-1)").text().trim().replace("$", "") || 0,
@@ -1100,7 +1176,7 @@
                     },
                     success: function (response) {
                         if (response.success) {
-                            toastr.success("Earning Reviews added to payroll successfully!", 'Error',{
+                            toastr.success("Earning Reviews added to payroll successfully!", 'Success',{
                                 positionClass: 'toast-bottom-right'
                             });
                             
@@ -1137,6 +1213,9 @@
             var $nextFieldset = $currentFieldset.next("fieldset");
 
             if ($nextFieldset.length > 0) {
+                var nextStep = $nextFieldset.data('step');
+                localStorage.setItem("currentStep", nextStep);
+
                 $("#progressbar li").eq($("fieldset").index($currentFieldset)).removeClass("current");
                 $("#progressbar li").eq($("fieldset").index($nextFieldset)).addClass("active current");
 
@@ -1185,7 +1264,7 @@
         $("#distribute-service-charge").click(async function (e) {
             e.preventDefault();
 
-            var totalServiceCharge = parseFloat($("#total-ser").val().replace('$', '').replace(',', ''));
+            var totalServiceCharge = parseFloat($("#total-ser").val().replace(currencySymbol, '').replace(',', ''));
             if (isNaN(totalServiceCharge) || totalServiceCharge <= 0) {
                 toastr.error("Please enter a valid service charge amount.", 'Error', {
                     positionClass: 'toast-bottom-right'
@@ -1194,46 +1273,71 @@
             }
 
             var rates = await fetchRates(resortid);
-            var serviceCharge = (selectedCurrency === "MVR") 
-                ? totalServiceCharge * rates.usd_to_mvr 
+            // Service charge is entered in display currency — convert to USD for internal storage
+            var serviceChargeUSD = (currency === 'MVR')
+                ? totalServiceCharge * rates.mvr_to_usd
                 : totalServiceCharge;
+            // For display, use the entered amount directly (already in display currency)
+            var serviceCharge = totalServiceCharge;
 
             var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
-            var selectedEmployees = localStorage.getItem("selectedEmployeesIds")?.split(',') || [];
+            var selectedEmployees = JSON.parse(localStorage.getItem("selectedEmployeesIds") || '[]');
 
             distributedServiceCharge = [];
 
             // 🔽 Step 2: Gather only eligible employees based on benefit grid
-            const eligibleEmployees = await getEligibleEmployeesFromBackend(selectedEmployees); // Replace with actual API call
+            var eligibleEmployees = [];
+            try {
+                var result = await getEligibleEmployeesFromBackend(selectedEmployees);
+                if (Array.isArray(result)) eligibleEmployees = result;
+            } catch(err) {
+                console.error('Eligible employees fetch failed:', err);
+            }
+            console.log('Selected employees:', selectedEmployees);
+            console.log('Eligible employees:', eligibleEmployees);
+
+            // If no eligible employees found, fall back to all employees in table
+            var useAllEmployees = (!eligibleEmployees || eligibleEmployees.length === 0);
+            if (useAllEmployees) {
+                console.warn('No eligible employees from backend, distributing to all employees.');
+            }
 
             // Calculate total workdays for eligible employees only
             var totalWorkdays = 0;
             $("#table-serviceCharge tbody tr").each(function () {
                 var $row = $(this);
-                var employeeId = $row.find("td:eq(0)").text();
+                var employeeId = $row.find("td:eq(0)").text().trim();
 
-                if (eligibleEmployees.includes(employeeId)) {
-                    var workdays = parseFloat($row.find(".workdays").text());
+                if (useAllEmployees || eligibleEmployees.includes(employeeId)) {
+                    var workdays = parseFloat($row.find(".workdays").text()) || 0;
                     totalWorkdays += workdays;
                 }
             });
+
+            console.log('Total workdays:', totalWorkdays);
+
+            if (totalWorkdays === 0) {
+                toastr.error("No working days found. Cannot distribute service charge.", 'Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
 
             // Distribute service charge to eligible employees only
             var distributedTotal = 0;
             $("#table-serviceCharge tbody tr").each(function () {
                 var $row = $(this);
-                var employeeId = $row.find("td:eq(0)").text();
+                var employeeId = $row.find("td:eq(0)").text().trim();
 
-                if (eligibleEmployees.includes(employeeId)) {
-                    var workdays = parseFloat($row.find(".workdays").text());
+                if (useAllEmployees || eligibleEmployees.includes(employeeId)) {
+                    var workdays = parseFloat($row.find(".workdays").text()) || 0;
                     var employeeShare = (serviceCharge / totalWorkdays) * workdays;
+                    var employeeShareUSD = (serviceChargeUSD / totalWorkdays) * workdays;
                     $row.find(".service-charge").text(`${currencySymbol}${employeeShare.toFixed(2)}`);
                     distributedTotal += employeeShare;
 
                     distributedServiceCharge.push({
                         id: employeeId,
                         service_charge_days: workdays,
-                        amount: employeeShare.toFixed(2)
+                        amount: employeeShareUSD.toFixed(2) // Store in USD for backend
                     });
                 } else {
                     $row.find(".service-charge").text(`${currencySymbol}0.00`);
@@ -1247,33 +1351,77 @@
         $("#download-city-ledger-template").click(function (e) {
             e.preventDefault();
 
-            // Fetch selected employees
+            // Fetch selected employees from persistent set
             var selectedEmployees = [];
-            $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-                var employeeId = $(this).closest("tr").find("td:eq(1)").text();
-                var employeeName = $(this).closest("tr").find("td:eq(2)").text();
-                selectedEmployees.push({ id: employeeId, name: employeeName });
-            });
+            if (selectedEmployeeSet.size > 0) {
+                $("#payroll-employees tbody tr").each(function () {
+                    var empId = $(this).find("td:eq(1)").text().trim();
+                    var empName = $(this).find("td:eq(2)").text().trim();
+                    if (selectedEmployeeSet.has($(this).find("input[type='checkbox']").val())) {
+                        selectedEmployees.push({ id: empId, name: empName });
+                    }
+                });
+            }
+
+            // Fallback: try checked checkboxes
+            if (selectedEmployees.length === 0) {
+                $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
+                    var employeeId = $(this).closest("tr").find("td:eq(1)").text().trim();
+                    var employeeName = $(this).closest("tr").find("td:eq(2)").text().trim();
+                    selectedEmployees.push({ id: employeeId, name: employeeName });
+                });
+            }
+
+            // Fallback: use deductions table if on that step
+            if (selectedEmployees.length === 0) {
+                $("#table-deductions tbody tr").each(function () {
+                    var empId = $(this).find("td:eq(0)").text().trim();
+                    var empName = $(this).find("td:eq(1)").text().trim();
+                    if (empId) selectedEmployees.push({ id: empId, name: empName });
+                });
+            }
 
             if (selectedEmployees.length === 0) {
-                toastr.error("Please select at least one employee before downloading the template.", 'Error', {
+                toastr.error("No employees found. Please select employees first.", 'Error', {
                     positionClass: 'toast-bottom-right'
                 });
                 return;
             }
 
-            // Create Excel template
+            // Create Excel template with styling
             var workbook = XLSX.utils.book_new();
-            var worksheetData = [["Employee ID", "Employee Name", "City Ledger Amount"]];
+            var worksheetData = [
+                ["Employee ID", "Employee Name", "City Ledger Amount (USD)"]
+            ];
             selectedEmployees.forEach(function (employee) {
-                worksheetData.push([employee.id, employee.name, ""]);
+                worksheetData.push([employee.id, employee.name, 0]);
             });
 
             var worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-            XLSX.utils.book_append_sheet(workbook, worksheet, "City Ledger");
 
-            // Download the file
+            // Set column widths
+            worksheet['!cols'] = [
+                { wch: 15 },  // Employee ID
+                { wch: 30 },  // Employee Name
+                { wch: 25 }   // City Ledger Amount
+            ];
+
+            // Lock Employee ID and Name columns (read-only hint via cell protection)
+            // Note: SheetJS free doesn't support full cell styling, but we set number format for amount column
+            for (var i = 1; i <= selectedEmployees.length; i++) {
+                var amountCell = worksheet[XLSX.utils.encode_cell({r: i, c: 2})];
+                if (amountCell) {
+                    amountCell.t = 'n'; // Set as number type
+                    amountCell.v = 0;
+                }
+            }
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, "City Ledger");
             XLSX.writeFile(workbook, "City_Ledger_Template.xlsx");
+
+            toastr.success("Template downloaded with " + selectedEmployees.length + " employees.", 'Success', {
+                positionClass: 'toast-bottom-right'
+            });
         });
 
         $("#upload-city-ledger-button").click(function () {
@@ -1285,42 +1433,77 @@
             var file = e.target.files[0];
             if (!file) return;
 
+            // Validate file type
+            var validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'];
+            if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+                toastr.error("Please upload a valid Excel file (.xlsx, .xls, or .csv).", 'Error', { positionClass: 'toast-bottom-right' });
+                $(this).val('');
+                return;
+            }
+
+            var rates = await fetchRates(resortid);
+            var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
+
             var reader = new FileReader();
-            reader.onload = async function (e) {
-                var data = new Uint8Array(e.target.result);
-                var workbook = XLSX.read(data, { type: 'array' });
-                var worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                jsonData.slice(1).forEach(function (row) {
-                    var employeeId = row[0];
-                    var cityLedgerUSD = parseFloat(row[2]) || 0; // City Ledger in USD
-                    // console.log(cityLedgerUSD);
-                    // Store original USD value in global object
-                    cityLedgerData[employeeId] = cityLedgerUSD;
+            reader.onload = function (e) {
+                try {
+                    var data = new Uint8Array(e.target.result);
+                    var workbook = XLSX.read(data, { type: 'array' });
+                    var worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                    // Convert based on selected currency
-                    var cityLedgerFinal = (selectedCurrency === "MVR") 
-                        ? cityLedgerUSD * conversionRate 
-                        : cityLedgerUSD; 
+                    if (jsonData.length <= 1) {
+                        toastr.warning("Excel file is empty or has no data rows.", 'Warning', { positionClass: 'toast-bottom-right' });
+                        return;
+                    }
 
-                    // console.log(conversionRate,cityLedgerFinal);
+                    var updatedCount = 0;
+                    var notFoundIds = [];
 
-                    $("#table-deductions tbody tr").each(function () {
-                        var $row = $(this);
-                        var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
-                        var cityLedgerFinal1 = currencySymbol + cityLedgerFinal;
-                        // console.log(cityLedgerFinal1,"cityLedgerFinal");
-                        if ($row.find("td:eq(0)").text() === employeeId) {
-                            $row.find("td:eq(4)").text(cityLedgerFinal1); // Update displayed value
-                            updateTotal($row,employeeId);
-                        }
+                    jsonData.slice(1).forEach(function (row) {
+                        if (!row[0]) return;
+                        var employeeId = String(row[0]).trim();
+                        var cityLedgerUSD = parseFloat(row[2]) || 0;
+
+                        // Store original USD value
+                        cityLedgerData[employeeId] = cityLedgerUSD;
+
+                        // Convert based on selected currency
+                        var cityLedgerFinal = (selectedCurrency === "MVR")
+                            ? cityLedgerUSD * (rates.usd_to_mvr || 15.42)
+                            : cityLedgerUSD;
+
+                        var found = false;
+                        $("#table-deductions tbody tr").each(function () {
+                            var $row = $(this);
+                            if ($row.find("td:eq(0)").text().trim() === employeeId) {
+                                $row.find("td:eq(4)").text(currencySymbol + cityLedgerFinal.toFixed(2));
+                                updateTotal($row, employeeId);
+                                found = true;
+                                updatedCount++;
+                            }
+                        });
+
+                        if (!found) notFoundIds.push(employeeId);
                     });
-                });
+
+                    if (updatedCount > 0) {
+                        toastr.success(updatedCount + " employee(s) city ledger updated successfully!", 'Success', { positionClass: 'toast-bottom-right' });
+                    }
+                    if (notFoundIds.length > 0) {
+                        toastr.warning("Employee IDs not found in table: " + notFoundIds.join(', '), 'Warning', { positionClass: 'toast-bottom-right' });
+                    }
+                } catch (err) {
+                    console.error('Excel parse error:', err);
+                    toastr.error("Failed to parse Excel file. Please check the format.", 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            };
+            reader.onerror = function () {
+                toastr.error("Failed to read the file.", 'Error', { positionClass: 'toast-bottom-right' });
             };
             reader.readAsArrayBuffer(file);
-            toastr.success("File Uploaded Successfully!", 'Success', {
-                positionClass: 'toast-bottom-right'
-            });
+            // Reset file input so same file can be re-uploaded
+            $(this).val('');
         });
 
         $("#addDeductionForm").submit(async function (e) {
@@ -1332,30 +1515,38 @@
             var rates = await fetchRates(resortid);
             var amountInUSD = deductionUnit === "Rufiyaa" ? (deductionAmount * rates.mvr_to_usd ) : deductionAmount;
 
-            otherData[employeeId] = amountInUSD;
+            otherData[employeeId] = (otherData[employeeId] || 0) + amountInUSD;
 
-            var finalAmount = (selectedCurrency === "MVR") 
-                        ? amountInUSD * usd_to_mvr  
-                        : amountInUSD; 
-            // Convert to USD if needed
+            var finalAmount = (selectedCurrency === "MVR")
+                        ? amountInUSD * rates.usd_to_mvr
+                        : amountInUSD;
+
+            var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
+            var updated = false;
 
             $("#table-deductions tbody tr").each(function () {
                 var $row = $(this);
-                var currencySymbol = (selectedCurrency === 'Dollar') ? '$' : 'MVR ';
-
-                if ($row.find("td:eq(0)").text() === employeeId) {
-                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace('$', '')) || 0;
+                if ($row.find("td:eq(0)").text().trim() === employeeId) {
+                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace(currencySymbol, '').trim()) || 0;
                     var newOther = currentOther + finalAmount;
-                    $row.find("td:eq(8)").text(currencySymbol + newOther.toFixed(2)); // Store in USD
-                    updateTotal($row,employeeId);// Update the total column
+                    $row.find("td:eq(8)").text(currencySymbol + newOther.toFixed(2));
+                    updateTotal($row, employeeId);
+                    updated = true;
                 }
             });
-            $('#addDeductionForm')[0].reset(); // Correct way
 
+            $('#addDeductionForm')[0].reset();
             $("#addDeduction-modal").modal("hide");
-            toastr.success("Deduction added successfully!", 'Success', {
-                positionClass: 'toast-bottom-right'
-            });
+
+            if (updated) {
+                toastr.success("Deduction of " + currencySymbol + finalAmount.toFixed(2) + " added for " + employeeId + ".", 'Success', {
+                    positionClass: 'toast-bottom-right'
+                });
+            } else {
+                toastr.warning("Employee " + employeeId + " not found in deductions table.", 'Warning', {
+                    positionClass: 'toast-bottom-right'
+                });
+            }
         });
 
         $('#addDeduction-modal').on('hidden.bs.modal', function () {
@@ -1399,10 +1590,11 @@
                         }
                     }
 
-                    // Update progress bar
+                    // Update progress bar and save step
                     var index = $("fieldset").index($currentFieldset);
                     $("#progressbar li").eq(index).removeClass("current active");
                     $("#progressbar li").eq(index - 1).addClass("current");
+                    localStorage.setItem("currentStep", $previousFieldset.data('step'));
 
                     // Animate transition
                     $currentFieldset.animate({ opacity: 0 }, {
@@ -1528,7 +1720,14 @@
                             positionClass: 'toast-bottom-right'
                         });
 
-                        // Optional: Redirect to a confirmation page or refresh
+                        // Clear payroll state from localStorage
+                        localStorage.removeItem("currentStep");
+                        localStorage.removeItem("payroll_id");
+                        localStorage.removeItem("selectedEmployees");
+                        localStorage.removeItem("selectedEmployeesIds");
+                        localStorage.removeItem("selectedEmployeeNumericIds");
+
+                        // Redirect to confirmation page
                         setTimeout(function () {
                             window.location.href = response.redirect_url;
                         }, 2000);
@@ -1665,15 +1864,14 @@
     });
 
     function getstep3data(searchTerm) {
-        var payrollId = localStorage.getItem("payroll_id"); // Retrieve stored payroll ID
+        var payrollId = localStorage.getItem("payroll_id");
 
         var dateRange = $("#hiddenInput").val();
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
         var endDate = moment(dates[1], "DD-MM-YYYY", true);
 
-        // Use persistent Set for cross-page selection
-        var selectedEmployees = Array.from(selectedEmployeeSet);
+        var selectedEmployees = getSelectedEmployeeIds();
 
         if (selectedEmployees.length === 0) {
             toastr.error("Please select at least one employee before proceeding.", 'Error',{ positionClass: 'toast-bottom-right' });
@@ -1717,24 +1915,11 @@
                             <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
                             <td class="editable">${employee.present}</td>
                             <td class="editable">${employee.absent}</td>
+                            <td>${employee.day_off || 0}</td>
                             <td>${employee.leave_types}</td>
                             <td class="editable">${employee.regular_ot}</td>
                             <td class="editable">${employee.holiday_ot}</td>
-                            <td >${employee.total_ot}</td>
-                            <td>
-                                <a href="#" class="btn-lg-icon icon-bg-skyblue edit-btn"><i class="fa-regular fa-pen"></i></a>
-                                <a href="#" 
-                                    class="a-link add_note" 
-                                    data-employee-id='${employee.employee_id}'
-                                    data-emp-id="${employee.empid}" 
-                                    data-payroll-id="${payrollId}"
-                                    data-present="${employee.present}"
-                                    data-absent="${employee.absent}" 
-                                    data-leave-type="${employee.leave_types}" 
-                                    data-regular-ot="${employee.regular_ot}" 
-                                    data-holiday-ot="${employee.holiday_ot}" 
-                                    data-totel="${employee.total_ot}">+ Add Note</a>
-                            </td>
+                            <td>${employee.total_ot}</td>
                         </tr>`;
                         $tableBody.append(row);
                     });
@@ -1769,17 +1954,11 @@
     }
 
     function getstep4data(searchTerm,currency, conversionRate = 1) {
-        // console.log('step4');
-        // console.log(searchTerm,currency, conversionRate);
         var dateRange = $("#hiddenInput").val();
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
         var endDate = moment(dates[1], "DD-MM-YYYY", true);
-        var selectedEmployees = [];
-
-        $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-            selectedEmployees.push($(this).val());
-        });
+        var selectedEmployees = getSelectedEmployeeIds();
 
         if (selectedEmployees.length === 0) {
             toastr.error("Please select at least one employee before proceeding.", 'Error', { positionClass: 'toast-bottom-right' });
@@ -1990,14 +2169,10 @@
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
         var endDate = moment(dates[1], "DD-MM-YYYY", true);
-        var selectedEmployees = [];
+        var selectedEmployees = getSelectedEmployeeIds();
         var payrollId = localStorage.getItem("payroll_id");
         let resortid = "{{ Auth::guard('resort-admin')->user()->resort_id }}";
         var rates = await fetchRates(resortid);
-
-        $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-            selectedEmployees.push($(this).val());
-        });
 
         if (selectedEmployees.length === 0) {
             toastr.error("Please select at least one employee before proceeding.", 'Error', { positionClass: 'toast-bottom-right' });
@@ -2053,7 +2228,7 @@
                             <td class="attendance">${currencySymbol}${employee.absent_deduction}</td>
                             <td class="city-ladger">${currencySymbol}0.00</td>
                             <td class="staff-shop">${currencySymbol}0.00</td>
-                            <td class="advance-loan">${currencySymbol}${repaymentAmountFinal.toFixed(2)}</td>
+                            <td class="advance-loan">${repaymentAmountFinal > 0 ? currencySymbol + repaymentAmountFinal.toFixed(2) : 'NA'}</td>
                             <td class="pension">${currencySymbol}0.00</td>
                             <td class="ewt">${currencySymbol}0.00</td>
                             <td class="other">${currencySymbol}0.00</td>
@@ -2386,9 +2561,9 @@
 
                     $table.find("thead tr:eq(0)").html(`
                         <th colspan="4"></th>
-                        <th colspan="3">Time & Attendance</th>
                         <th colspan="3">Overtime</th>
-                        <th colspan="${2 + allowanceList.length + 2}">Earnings</th>
+                        <th colspan="1">Time & Attendance</th>
+                        <th colspan="${1 + allowanceList.length + 2}">Earnings</th>
                     `);
 
                     $table.find("thead tr:eq(1)").html(`
@@ -2396,14 +2571,11 @@
                         <th>Employee Name</th>
                         <th>Department</th>
                         <th>Position</th>
-                        <th>Present</th>
-                        <th>Absent</th>
-                        <th>Service Charge</th>
                         <th>Normal</th>
                         <th>Holiday</th>
                         <th>Total</th>
-                        <th>Basic</th>
-                        <th>Earned</th>
+                        <th>Service Charge</th>
+                        <th>Basic Earned</th>
                         ${allowanceHeaderHtml}
                         <th>Total Earnings</th>
                         <th>Deductions</th>
@@ -2454,18 +2626,15 @@
                                 </td>
                                 <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
                                 <td>${employee.position}</td>
-                                <td>${employee.present}</td>
-                                <td>${employee.absent}</td>
-                                <td>${currencySymbol}${employee.service_charge}</td>
                                 <td>${currencySymbol}${employee.regularOTPay}</td>
                                 <td>${currencySymbol}${employee.holidayOTPay}</td>
                                 <td>${currencySymbol}${employee.totalOTPay}</td>
-                                <td>${currencySymbol}${employee.basic_salary.toFixed(2)}</td>
+                                <td>${currencySymbol}${employee.service_charge}</td>
                                 <td>${currencySymbol}${employee.earned_salary.toFixed(2)}</td>
                                 ${allowanceCols}
                                 <td>${currencySymbol}${employee.normal_pay.toFixed(2)}</td>
                                 <td>${currencySymbol}${(employee.total_deduction || 0).toFixed(2)}</td>
-                                
+
                             </tr>`;
                         $tableBody.append(row);
                     });
@@ -2473,13 +2642,10 @@
                     // Generate footer row
                     let footerHtml = `
                         <td colspan="4" class="text-end fw-bold">Total</td>
-                        <td>${footerTotals.present}</td>
-                        <td>${footerTotals.absent}</td>
+                        <td>${currencySymbol}${footerTotals.regularOTPay.toFixed(2)}</td>
+                        <td>${currencySymbol}${footerTotals.holidayOTPay.toFixed(2)}</td>
+                        <td>${currencySymbol}${footerTotals.totalOTPay.toFixed(2)}</td>
                         <td>${currencySymbol}${footerTotals.service_charge}</td>
-                        <td>${currencySymbol}${footerTotals.regularOTPay.toFixed(2)} </td>
-                        <td>${currencySymbol}${footerTotals.holidayOTPay.toFixed(2)} </td>
-                        <td>${currencySymbol}${footerTotals.totalOTPay.toFixed(2)} </td>
-                        <td>${currencySymbol}${footerTotals.basic_salary.toFixed(2)}</td>
                         <td>${currencySymbol}${footerTotals.earned_salary.toFixed(2)}</td>
                     `;
                     allowanceList.forEach(a => {
@@ -2658,36 +2824,91 @@
         $.ajax({
             url: '{{route("payroll.fetch.staffshop")}}',
             method: 'POST',
-            data: {  
+            data: {
                 employees: employeeIds,
-                startDate: startDate.format("YYYY-MM-DD"), 
+                startDate: startDate.format("YYYY-MM-DD"),
                 endDate: endDate.format("YYYY-MM-DD"),
-                currency: currency, // Pass currency
+                currency: currency,
                 conversionRate: conversionRate,
-                _token: '{{ csrf_token() }}' 
+                _token: '{{ csrf_token() }}'
             },
             success: function (response) {
-                // console.log(response); // Debugging: Check response data
                 if (response.success) {
+                    var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
                     response.data.forEach(function (employee) {
                         $("#table-deductions tbody tr").each(function () {
                             var $row = $(this);
-                            var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
-                            var staffshop = currencySymbol + employee.total;
-                            // console.log(staffshop);
-                            
-                            if ($row.find("td:eq(0)").text() === employee.Emp_id) {
-                                $row.find("td:eq(5)").text(staffshop || "-");
-                                updateTotal($row,employee.Emp_id); // Update total column
+                            if ($row.find("td:eq(0)").text().trim() === employee.Emp_id) {
+                                var $td = $row.find("td:eq(5)");
+                                $td.text(currencySymbol + employee.total.toFixed(2));
+
+                                // Build tooltip with transaction details
+                                if (employee.transactions && employee.transactions.length > 0) {
+                                    var tooltipHtml = '<div class="leave-tooltip" style="min-width:280px;">' +
+                                        '<div class="p-2 border-bottom" style="background:#f0f4ff;border-radius:8px 8px 0 0;">' +
+                                            '<strong>Staff Shop Transactions</strong>' +
+                                        '</div>' +
+                                        '<div class="p-2">' +
+                                        '<table class="table table-sm table-borderless mb-0" style="font-size:11px;">' +
+                                        '<thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th></tr></thead><tbody>';
+
+                                    employee.transactions.forEach(function(txn) {
+                                        var statusBadge = txn.status === 'Partial Paid'
+                                            ? '<span class="badge badge-themeWarning" style="font-size:9px;">Partial</span>'
+                                            : '';
+                                        tooltipHtml += '<tr>' +
+                                            '<td>' + txn.date + '</td>' +
+                                            '<td>' + txn.product + ' ' + statusBadge + '</td>' +
+                                            '<td>' + txn.qty + '</td>' +
+                                            '<td>' + currencySymbol + txn.deduction.toFixed(2) + '</td>' +
+                                        '</tr>';
+                                        if (txn.cash_paid > 0) {
+                                            tooltipHtml += '<tr><td colspan="4" style="font-size:10px;color:#888;">Cash paid: ' + currencySymbol + txn.cash_paid.toFixed(2) + '</td></tr>';
+                                        }
+                                    });
+
+                                    tooltipHtml += '</tbody></table>' +
+                                        '<div class="border-top pt-1 mt-1 text-end"><strong>Total: ' + currencySymbol + employee.total.toFixed(2) + '</strong></div>' +
+                                        '</div></div>';
+
+                                    $td.css('cursor', 'pointer').attr('data-staff-tooltip', tooltipHtml);
+                                }
+
+                                updateTotal($row, employee.Emp_id);
                             }
                         });
                     });
-                } else {
-                    console.error("response.data is not an array:", response.data);
                 }
             }
         });
     }
+
+    // Staff shop tooltip hover
+    $(document).on('mouseenter', 'td[data-staff-tooltip]', function(e) {
+        // Remove any existing tooltip
+        $('#staff-shop-tooltip').remove();
+
+        var htmlContent = $(this).attr('data-staff-tooltip');
+        var $tooltip = $('<div id="staff-shop-tooltip"></div>').html(htmlContent).css({
+            position: 'absolute',
+            zIndex: 9999,
+            background: '#fff',
+            borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            border: '1px solid #e0e0e0',
+            maxWidth: '350px'
+        }).appendTo('body');
+
+        var top = $(this).offset().top - $tooltip.outerHeight() - 8;
+        var left = $(this).offset().left;
+
+        // If tooltip goes above viewport, show below
+        if (top < 0) top = $(this).offset().top + $(this).outerHeight() + 8;
+
+        $tooltip.css({ top: top, left: left });
+    }).on('mouseleave', 'td[data-staff-tooltip]', function() {
+        $('#staff-shop-tooltip').remove();
+    });
 
     // function calculatePensionAndEWT(employeeIds, currency, conversionRate = 1,payrollId) {
     //     $.ajax({
@@ -2913,6 +3134,50 @@
         $('#select_emp').val(empId).trigger('change.select2'); // Set employee in select
         $("#addDeduction-modal").modal("show");
     });
+
+    // Leave type tooltip
+    $(document).on({
+        mouseenter: function(e) {
+            var raw = $(this).attr('data-leave-tooltip');
+            if (!raw) return;
+            var ta = document.createElement('textarea');
+            ta.innerHTML = raw;
+            raw = ta.value;
+            try {
+                var data = JSON.parse(raw);
+                var color = data.color || '#000';
+                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                var html = '<div class="leave-tooltip show">';
+                html += '<div class="tooltip-header">';
+                html += '<span class="tooltip-type" style="color:'+color+'">'+data.type+'</span>';
+                html += '<span class="tooltip-count" style="background:'+color+';color:#fff;">'+data.count+' day'+(data.count>1?'s':'')+'</span>';
+                html += '</div><div class="tooltip-info">';
+                if (data.from) {
+                    var fd = new Date(data.from), td = new Date(data.to || data.from);
+                    html += '<div><span class="info-label">From:</span><span class="info-value">'+fd.getDate()+' '+months[fd.getMonth()]+' '+fd.getFullYear()+'</span></div>';
+                    html += '<div><span class="info-label">To:</span><span class="info-value">'+td.getDate()+' '+months[td.getMonth()]+' '+td.getFullYear()+'</span></div>';
+                }
+                if (data.dates && data.dates.length > 0 && data.dates.length <= 5) {
+                    html += '<div style="margin-top:4px;border-top:1px solid #444;padding-top:4px;"><span class="info-label">Dates:</span>';
+                    data.dates.forEach(function(d) { var dt=new Date(d); html += '<span class="info-value" style="display:inline-block;margin:1px 3px;padding:1px 6px;background:#444;border-radius:3px;font-size:11px;">'+dt.getDate()+' '+months[dt.getMonth()]+'</span>'; });
+                    html += '</div>';
+                }
+                html += '</div></div>';
+                var $tip = $(html);
+                $('body').append($tip);
+                var $el = $(this), off = $el.offset(), w = $el.outerWidth(), h = $el.outerHeight();
+                var tw = $tip.outerWidth(), th = $tip.outerHeight(), st = $(window).scrollTop();
+                var left = (off.left - $(window).scrollLeft()) + (w/2) - (tw/2);
+                var top = (off.top - st) - th - 12;
+                if (left < 10) left = 10;
+                if (left + tw > $(window).width() - 10) left = $(window).width() - tw - 10;
+                var ac = '';
+                if (top < 10) { top = (off.top - st) + h + 12; ac = 'arrow-top'; }
+                $tip.addClass(ac).css({left:left+'px',top:top+'px'});
+            } catch(ex) { console.error('Leave tooltip error:', ex); }
+        },
+        mouseleave: function() { $('.leave-tooltip').remove(); }
+    }, '.leave-type-badge');
 
 </script>
 @endsection

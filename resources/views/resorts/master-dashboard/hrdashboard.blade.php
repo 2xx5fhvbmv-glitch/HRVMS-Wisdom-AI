@@ -1311,22 +1311,22 @@
                                                             <div
                                                                 class="d-flex justify-content-between align-items-center">
                                                                 <label>Total Paid:</label>
-                                                                <span>$150,000</span>
+                                                                <span>{{ Common::GetResortCurrencySymbol() }} 150,000</span>
                                                             </div>
                                                             <div
                                                                 class="d-flex justify-content-between align-items-center">
                                                                 <label>Today:</label>
-                                                                <span>$5,000</span>
+                                                                <span>{{ Common::GetResortCurrencySymbol() }} 5,000</span>
                                                             </div>
                                                             <div
                                                                 class="d-flex justify-content-between align-items-center">
                                                                 <label>This Week:</label>
-                                                                <span>$15,000</span>
+                                                                <span>{{ Common::GetResortCurrencySymbol() }} 15,000</span>
                                                             </div>
                                                             <div
                                                                 class="d-flex justify-content-between align-items-center">
                                                                 <label>This Month:</label>
-                                                                <span>$45,000</span>
+                                                                <span>{{ Common::GetResortCurrencySymbol() }} 45,000</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1464,8 +1464,8 @@
                                                                     </div>
                                                                 </td>
                                                                 <td>Indian</td>
-                                                                <td>$5,000</td>
-                                                                <td>$5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
 
                                                                 <td><span class="badge badge-themeBlue">Requested</span>
                                                                 </td>
@@ -1483,8 +1483,8 @@
                                                                     </div>
                                                                 </td>
                                                                 <td>Filipino</td>
-                                                                <td>$5,000</td>
-                                                                <td>$5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
 
                                                                 <td><span class="badge badge-themeSkyblue">Not
                                                                         Requested</span></td>
@@ -1502,8 +1502,8 @@
                                                                     </div>
                                                                 </td>
                                                                 <td>Indian</td>
-                                                                <td>$5,000</td>
-                                                                <td>$5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
 
                                                                 <td><span class="badge badge-themeBlue">Requested</span>
                                                                 </td>
@@ -1522,8 +1522,8 @@
                                                                     </div>
                                                                 </td>
                                                                 <td>Indian</td>
-                                                                <td>$5,000</td>
-                                                                <td>$5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
 
                                                                 <td><span class="badge badge-themeSkyblue">Not
                                                                         Requested</span></td>
@@ -1541,8 +1541,8 @@
                                                                     </div>
                                                                 </td>
                                                                 <td>Filipino</td>
-                                                                <td>$5,000</td>
-                                                                <td>$5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
 
                                                                 <td><span class="badge badge-themeBlue">Requested</span>
                                                                 </td>
@@ -2403,7 +2403,7 @@
                                                 <div class="leaveUser-bgBlock mb-2">
                                                     <h6>Total Estimated Liability</h6>
                                                     <div>
-                                                        <strong>$100,000</strong>
+                                                        <strong>{{ Common::GetResortCurrencySymbol() }} 100,000</strong>
                                                         <span>(2026)</span>
                                                     </div>
                                                 </div>
@@ -2416,11 +2416,11 @@
                                                                     <tbody>
                                                                         <tr>
                                                                             <td>January</td>
-                                                                            <th>$1,000</th>
+                                                                            <th>{{ Common::GetResortCurrencySymbol() }} 1,000</th>
                                                                         </tr>
                                                                         <tr>
                                                                             <td>February</td>
-                                                                            <th>$2,000</th>
+                                                                            <th>{{ Common::GetResortCurrencySymbol() }} 2,000</th>
                                                                         </tr>
                                                                     </tbody>
                                                                 </table>
@@ -2436,7 +2436,7 @@
                                                                     style="width: 65%" aria-valuenow="65"
                                                                     aria-valuemin="0" aria-valuemax="100"></div>
                                                             </div>
-                                                            <span>$20,000</span>
+                                                            <span>{{ Common::GetResortCurrencySymbol() }} 20,000</span>
                                                         </div>
                                                         <h6 class="fw-600 mb-2">Manual Adjustments</h6>
                                                         <p>3 Adjustments, Total: $1,500</p>
@@ -2459,17 +2459,17 @@
                                                                 <tbody>
                                                                     <tr>
                                                                         <td>Overtime</td>
-                                                                        <td>$5,000</td>
-                                                                        <td>$4,500</td>
-                                                                        <td>$500</td>
-                                                                        <td><span class="text-themeSuccess">$500</span>
+                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                                        <td><span class="text-themeSuccess">{{ Common::GetResortCurrencySymbol() }} 500</span>
                                                                         </td>
                                                                     </tr>
                                                                     <tr>
                                                                         <td>Loans</td>
-                                                                        <td>$10,000</td>
-                                                                        <td>$8,000</td>
-                                                                        <td>$2,000</td>
+                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 10,000</td>
+                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 8,000</td>
+                                                                        <td>{{ Common::GetResortCurrencySymbol() }} 2,000</td>
                                                                         <td><span class="text-themeDanger">-$600</span>
                                                                         </td>
                                                                     </tr>
@@ -2790,7 +2790,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                 return tooltipItem.dataset.label;
                             },
                             afterLabel: function (tooltipItem) {
-                                return '$' + tooltipItem.raw;
+                                return currencySymbol + ' ' + tooltipItem.raw;
                             }
                         },
                         displayColors: false
@@ -3019,7 +3019,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` $${value}`; // Custom tooltip format
+                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
                         }
                     }
                 }
@@ -3045,7 +3045,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     },
                     ticks: {
                         callback: function (value) {
-                            return `$${value.toLocaleString()}`; // Format y-axis labels as currency
+                            return `${currencySymbol} ${value.toLocaleString()}`; // Format y-axis labels as currency
                         }
                     }
                 }
@@ -3303,7 +3303,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
 
                 // Format the total as a currency value
-                const formattedTotal = '$' + total.toLocaleString();
+                const formattedTotal = currencySymbol + ' ' + total.toLocaleString();
 
                 // Text configuration
                 ctx.textBaseline = 'middle';
@@ -3381,14 +3381,14 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     labelsHTML += `
                         <div class="col-6">
                             <div class="doughnut-label">
-                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>$${item.service_charge}
+                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${currencySymbol} ${item.service_charge}
                             </div>
                         </div>
                     `;
                 });
                 // Add total row
                 labelsHTML += `
-                    <div class="fw-500">Total: $${total}</div>
+                    <div class="fw-500">Total: ${currencySymbol} ${total}</div>
                 `;
 
                 // Insert into the DOM

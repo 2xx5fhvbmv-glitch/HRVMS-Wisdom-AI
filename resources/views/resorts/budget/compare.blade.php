@@ -77,36 +77,36 @@
                                     <td>Consultant (Owners Representative)</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,526</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,526</td>
                                     <td class="text-nowrap text-center">01</td>
-                                    <td class="text-nowrap text-center">$1,526</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,526</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>Company Secretary</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">02</a></td>
-                                    <td class="text-nowrap text-center">$2,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,100</td>
                                     <td class="text-nowrap text-center">02</td>
-                                    <td class="text-nowrap text-center">$2,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,100</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>Office Assistant</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td class="text-nowrap text-center">01</td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>Purchasing executive</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td class="text-nowrap text-center text-success">02</td>
-                                    <td class="text-nowrap text-center text-success">$1,500</td>
+                                    <td class="text-nowrap text-center text-success">{{ Common::GetResortCurrencySymbol() }} 1,500</td>
                                     <td>
                                         <div class="d-flex align-items-end">
                                             <p class="m-0">HOD requested 03 Safety & Security Managers, but Wisdom AI
@@ -122,18 +122,18 @@
                                     <td>Logistics Executive</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td class="text-nowrap text-center ">01</td>
-                                    <td class="text-nowrap text-center ">$1,100</td>
+                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>Customs Coordinator</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">03</a></td>
-                                    <td class="text-nowrap text-center">$2,500</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,500</td>
                                     <td class="text-nowrap text-center text-danger">02</td>
-                                    <td class="text-nowrap text-center text-danger">$2,000</td>
+                                    <td class="text-nowrap text-center text-danger">{{ Common::GetResortCurrencySymbol() }} 2,000</td>
                                     <td>
                                         <div class="d-flex align-items-end">
                                             <p class="m-0">HOD requested 03 Safety & Security Managers, but Wisdom AI
@@ -149,27 +149,27 @@
                                     <td>Male' Office Administrator</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td class="text-nowrap  text-center">01</td>
-                                    <td class="text-nowrap  text-center">$1,100</td>
+                                    <td class="text-nowrap  text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>Assistant Accountant/Accountant</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$3,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 3,100</td>
                                     <td class="text-nowrap text-center ">01</td>
-                                    <td class="text-nowrap text-center ">$3,100</td>
+                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 3,100</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>General Manager</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">02</a></td>
-                                    <td class="text-nowrap text-center">$2,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,100</td>
                                     <td class="text-nowrap text-center text-danger">01</td>
-                                    <td class="text-nowrap text-center text-danger">$1,400</td>
+                                    <td class="text-nowrap text-center text-danger">{{ Common::GetResortCurrencySymbol() }} 1,400</td>
                                     <td>
                                         <div class="d-flex align-items-end">
                                             <p class="m-0">Due to forecasted low occupancy, we may not need a Safety &
@@ -184,18 +184,18 @@
                                     <td>Island Manager</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td class="text-nowrap  text-center">01</td>
-                                    <td class="text-nowrap text-center ">$1,100</td>
+                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td>Safety and Security Manager</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">02</a></td>
-                                    <td class="text-nowrap text-center">$1,500</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,500</td>
                                     <td class="text-nowrap text-center text-danger">01</td>
-                                    <td class="text-nowrap text-center text-danger">$900</td>
+                                    <td class="text-nowrap text-center text-danger">{{ Common::GetResortCurrencySymbol() }} 900</td>
                                     <td>
                                         <div class="d-flex align-items-end">
                                             <p class="m-0">Due to forecasted low occupancy, we may not need a Safety &
@@ -210,9 +210,9 @@
                                     <td>Island Manager</td>
                                     <td class="text-nowrap text-center"><a href="#"
                                             class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">$1,100</td>
+                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td class="text-nowrap text-center ">01</td>
-                                    <td class="text-nowrap text-center ">$1,100</td>
+                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
                                     <td></td>
                                 </tr>
                             </tbody>
@@ -220,9 +220,9 @@
                                 <tr>
                                     <th>Total:</th>
                                     <th class="text-center">17</th>
-                                    <th class="text-center">$12,241</th>
+                                    <th class="text-center">{{ Common::GetResortCurrencySymbol() }} 12,241</th>
                                     <th class="text-lightblue text-center">15</th>
-                                    <th class="text-lightblue text-center">$11,985</th>
+                                    <th class="text-lightblue text-center">{{ Common::GetResortCurrencySymbol() }} 11,985</th>
                                     <th></th>
                                 </tr>
                             </tfoot>

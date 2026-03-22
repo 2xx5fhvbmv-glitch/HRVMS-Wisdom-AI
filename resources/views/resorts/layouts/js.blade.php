@@ -40,6 +40,7 @@
 
 <script>
     var dt_format = "{{Common::getDateAndSetFormateToDatepicker()}}";
+    var currencySymbol = "{{ Common::GetResortCurrencySymbol() }}";
 </script>
 
 
@@ -1210,7 +1211,6 @@
                 {
                     getstep4data(searchTerm="",updatedCurrency, conversionRate1);
                 }
-                // console.log(conversionRate);
                 else if(currentStep == 5)
                 {
                     getstep5data(updatedCurrency, conversionRate1);
@@ -1223,7 +1223,12 @@
                 {
                     calculatePayrollSummary(updatedCurrency, conversionRate);
                 }
-                
+                else
+                {
+                    // Reload page for all other pages to update currency symbols
+                    location.reload();
+                }
+
             } else {
                 console.log('Currency update failed.');
             }
@@ -1362,10 +1367,10 @@
                     url: "{{ route('resort.Mark.Notification') }}",
                     type: "POST",
                     data: {"_token":"{{ csrf_token() }}","id":id},
-                  
+
                     success: function(response) {
                         if (response.success) {
-                            
+
                             $(".class_remove_me_"+id).remove();
 
                         } else {
@@ -1375,6 +1380,20 @@
                         }
                     }
                 });
+        });
+
+        // Auto mark-as-read when clicking notification link
+        $(document).on("click",".notification-box a.profile-dropdown",function(e){
+            var $box = $(this).closest('.notification-box');
+            var markBtn = $box.find('.MarkNotification');
+            if (markBtn.length) {
+                var id = markBtn.data('id');
+                $.ajax({
+                    url: "{{ route('resort.Mark.Notification') }}",
+                    type: "POST",
+                    data: {"_token":"{{ csrf_token() }}","id":id},
+                });
+            }
         });
 
          $(document).on("click", "#container_menuType", function () {

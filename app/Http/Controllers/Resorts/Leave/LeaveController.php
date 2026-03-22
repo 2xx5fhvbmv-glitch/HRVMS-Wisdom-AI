@@ -399,8 +399,44 @@ class LeaveController extends Controller
                 $currentUserRank = trim((string)($loggedInEmployee->rank ?? ''));
                 $leaveIds = $leaveRequests->getCollection()->pluck('id')->toArray();
                 $leaveIdsWithCurrentUserPending = $leaveIds ? EmployeeLeaveStatus::whereIn('leave_request_id', $leaveIds)->where('approver_id', $loggedInEmployeeId)->where('status', 'Pending')->pluck('leave_request_id')->toArray() : [];
-                $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($resort_id, $loggedInEmployeeId, $currentUserRank, $leaveIdsWithCurrentUserPending) {
+                // Fetch all leave statuses for status_text computation
+                $allLeaveIds = $leaveRequests->getCollection()->pluck('id')->toArray();
+                $allStatuses = collect();
+                if (!empty($allLeaveIds)) {
+                    $allStatuses = DB::table('employees_leaves_status')
+                        ->whereIn('leave_request_id', $allLeaveIds)
+                        ->get()
+                        ->groupBy('leave_request_id');
+                }
+                $rankConfig = config('settings.Position_Rank');
+
+                $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($resort_id, $loggedInEmployeeId, $currentUserRank, $leaveIdsWithCurrentUserPending, $allStatuses, $rankConfig) {
                     $leaveRequest->profile_picture = Common::getResortUserPicture($leaveRequest->Admin_Parent_id);
+
+                    // Compute status_text and status_class
+                    $statuses = $allStatuses[$leaveRequest->id] ?? collect();
+                    if ($leaveRequest->leave_status === 'Approved') {
+                        $leaveRequest->status_text = "Approved";
+                        $leaveRequest->status_class = "badge-themeSuccess";
+                    } elseif ($leaveRequest->leave_status === 'Rejected') {
+                        $rejected = $statuses->firstWhere('status', 'Rejected');
+                        if ($rejected) {
+                            $rejectedBy = $rankConfig[$rejected->approver_rank] ?? $rejected->approver_rank;
+                            $leaveRequest->status_text = "Rejected by {$rejectedBy}";
+                        } else {
+                            $leaveRequest->status_text = "Rejected";
+                        }
+                        $leaveRequest->status_class = "badge-themeDanger";
+                    } else {
+                        $lastApproved = $statuses->where('status', 'Approved')->last();
+                        if ($lastApproved) {
+                            $approvedBy = $rankConfig[$lastApproved->approver_rank] ?? $lastApproved->approver_rank;
+                            $leaveRequest->status_text = "Pending - {$approvedBy} Approved";
+                        } else {
+                            $leaveRequest->status_text = "Pending";
+                        }
+                        $leaveRequest->status_class = "badge-themeWarning";
+                    }
 
                     // Fetch employee grade and benefit grid
                     $emp_grade = Common::getEmpGrade($leaveRequest->rank);
@@ -1091,7 +1127,17 @@ class LeaveController extends Controller
             if ($combinedLeave && $combinedLeave->to_date) {
                 $usage->to_date = Carbon::parse($combinedLeave->to_date)->format('d M');
             }
-            $usage->status_text = $usage->last_status ? "{$usage->last_status} by {$role}" : 'Pending';
+            // Compute status text: check actual leave status first, then chain details
+            $leaveStatus = strtolower(trim($usage->status ?? ''));
+            if ($leaveStatus === 'approved') {
+                $usage->status_text = 'Approved';
+            } elseif ($leaveStatus === 'rejected') {
+                $usage->status_text = $usage->last_status ? "Rejected by {$role}" : 'Rejected';
+            } elseif ($usage->last_status && strtolower($usage->last_status) === 'approved') {
+                $usage->status_text = "Pending - {$role} Approved";
+            } else {
+                $usage->status_text = 'Pending';
+            }
             $usage->total_days = ($combinedLeave && isset($combinedLeave->total_days)) ? ((int) $combinedLeave->total_days + (int) $usage->total_days) : (int) $usage->total_days;
 
             // Return only plain data for JSON (no Eloquent models) to avoid DataTables serialization issues

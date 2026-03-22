@@ -141,7 +141,7 @@
 				<div class="col-lg-3 col-6">
 					<div class="small-box bg-success">
 						<div class="inner">
-							<h3>$250</h3>
+							<h3>{{ Common::GetResortCurrencySymbol() }} 250</h3>
 							<p>Total Payment</p>
 							<span>Pending : $100 | </span>
 							<span>Received : $150</span>

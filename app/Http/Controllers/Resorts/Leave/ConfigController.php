@@ -59,6 +59,7 @@ class ConfigController extends Controller
             'frequency' => 'required|in:Weekly,Monthly,Quarterly,Yearly',
             'number_of_times' => 'nullable|integer|min:1',
             'color' => 'nullable|string|max:7',
+            'is_paid' => 'required|in:paid,unpaid',
             'combine_with_other' => 'nullable|in:1,0',
             'leave_category' => [
                 'nullable',
@@ -134,6 +135,7 @@ class ConfigController extends Controller
             'frequency' => 'required|in:Weekly,Monthly,Quarterly,Yearly',
             'number_of_times' => 'nullable|integer|min:1',
             'color' => 'nullable|string|max:7',
+            'is_paid' => 'required|in:paid,unpaid',
             'combine_with_other' => 'required|in:1,0',
             'leave_category' => [
                 'nullable',
@@ -156,7 +158,7 @@ class ConfigController extends Controller
         } else {
             $validatedData['leave_category'] = '';
         }
-        $validatedData['eligibility'] = implode(',', $request->eligibility); // Convert array to comma-separated string
+        $validatedData['eligibility'] = implode(',', $request->eligibility);
 
         $leaveCategory = LeaveCategory::findOrFail($id);
         $leaveCategory->update($validatedData);

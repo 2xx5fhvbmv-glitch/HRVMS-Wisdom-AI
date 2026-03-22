@@ -968,7 +968,7 @@
                         <div class="leaveUser-bgBlock mb-md-3 mb-2">
                             <h6>Total Estimated Liability</h6>
                             <div>
-                                <strong>$100,000</strong>
+                                <strong>{{ Common::GetResortCurrencySymbol() }} 100,000</strong>
                                 <span>(2026)</span>
                             </div>
                         </div>
@@ -982,11 +982,11 @@
                                             <tbody>
                                                 <tr>
                                                     <td>January</td>
-                                                    <th>$1,000</th>
+                                                    <th>{{ Common::GetResortCurrencySymbol() }} 1,000</th>
                                                 </tr>
                                                 <tr>
                                                     <td>February</td>
-                                                    <th>$2,000</th>
+                                                    <th>{{ Common::GetResortCurrencySymbol() }} 2,000</th>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -1000,7 +1000,7 @@
                                         <div class="progress-bar" role="progressbar" style="width: 65%"
                                             aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"></div>
                                     </div>
-                                    <span>$20,000</span>
+                                    <span>{{ Common::GetResortCurrencySymbol() }} 20,000</span>
                                 </div>
                                 <h6 class="fw-600 mb-2">Manual Adjustments</h6>
                                 <p>3 Adjustments, Total: $1,500</p>
@@ -1021,16 +1021,16 @@
                                         <tbody>
                                             <tr>
                                                 <td>Overtime</td>
-                                                <td>$5,000</td>
-                                                <td>$4,500</td>
-                                                <td>$500</td>
-                                                <td><span class="text-themeSuccess">$500</span></td>
+                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                <td><span class="text-themeSuccess">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                             </tr>
                                             <tr>
                                                 <td>Loans</td>
-                                                <td>$10,000</td>
-                                                <td>$8,000</td>
-                                                <td>$2,000</td>
+                                                <td>{{ Common::GetResortCurrencySymbol() }} 10,000</td>
+                                                <td>{{ Common::GetResortCurrencySymbol() }} 8,000</td>
+                                                <td>{{ Common::GetResortCurrencySymbol() }} 2,000</td>
                                                 <td><span class="text-themeDanger">-$600</span></td>
                                             </tr>
                                         </tbody>

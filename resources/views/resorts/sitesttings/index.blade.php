@@ -38,7 +38,7 @@
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="radio" id="currency" name="currency"
                             value="MVR" {{ (isset($SiteSettings->currency ) && $SiteSettings->currency =="MVR" ?'checked': '') }} >
-                            <label class="form-check-label" for="currency">MVC</label>
+                            <label class="form-check-label" for="currency">MVR</label>
                         </div>
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="radio" id="currency1" name="currency" value="Dollar"  {{ (isset($SiteSettings->currency ) && $SiteSettings->currency =="Dollar" ?'checked': '') }} >

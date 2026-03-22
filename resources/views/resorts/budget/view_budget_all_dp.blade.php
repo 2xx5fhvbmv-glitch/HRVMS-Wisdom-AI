@@ -97,7 +97,7 @@
                                             <input type="hidden" id="grand_total_department_{{$incrementKey}}" value="0" >
                                                 <span class="badge badge-dark grand_total_department_{{$incrementKey}}">
 
-                                                    Budget: $ 0
+                                                    Budget: {{ Common::GetResortCurrencySymbol() }} 0
                                                 </span>
 
 
@@ -339,7 +339,7 @@
                                                                                 @if($vacantCost > 0)
                                                                                     <input type="hidden" class="vacant" name="vacant[{{ $incrementKey }}][{{ $month }}][{{ $vacantIndex }}]" value="{{ $vacantCost }}">
                                                                                     <span style="word-wrap: break-word; white-space: break-spaces;" class="badge badge-success">
-                                                                                        ${{ number_format($vacantCost, 2) }}
+                                                                                        {{ Common::GetResortCurrencySymbol() }} {{ number_format($vacantCost, 2) }}
                                                                                     </span>
                                                                                 @endif
                                                                             </td>
@@ -369,20 +369,20 @@
                                                 <th></th>
                                                 <th></th>
                                                 <th></th>
-                                                <th id="{{ $incrementKey}}-total-current-basic-salary">$0</th>
-                                                <th id="{{ $incrementKey}}-total-proposed-basic-salary">$0</th>
-                                                <th id="{{ $incrementKey}}-total-jan">$0</th>
-                                                <th id="{{ $incrementKey}}-total-feb">$0</th>
-                                                <th id="{{ $incrementKey}}-total-mar">$0</th>
-                                                <th id="{{ $incrementKey}}-total-apr">$0</th>
-                                                <th id="{{ $incrementKey}}-total-may">$0</th>
-                                                <th id="{{ $incrementKey}}-total-jun">$0</th>
-                                                <th id="{{ $incrementKey}}-total-jul">$0</th>
-                                                <th id="{{ $incrementKey}}-total-aug">$0</th>
-                                                <th id="{{ $incrementKey}}-total-sep">$0</th>
-                                                <th id="{{ $incrementKey}}-total-oct">$0</th>
-                                                <th id="{{ $incrementKey}}-total-nov">$0</th>
-                                                <th id="{{ $incrementKey}}-total-dec">$0</th>
+                                                <th id="{{ $incrementKey}}-total-current-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-proposed-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-jan">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-feb">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-mar">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-apr">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-may">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-jun">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-jul">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-aug">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-sep">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-oct">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-nov">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                                <th id="{{ $incrementKey}}-total-dec">{{ Common::GetResortCurrencySymbol() }} 0</th>
                                             </tr>
                                         </tfoot>
 
@@ -912,17 +912,17 @@
 
             // Update footer totals for the department
             $(`#total-positions-${Finding_id}`).text(totalPositions);
-            $(`#${Finding_id}-total-current-basic-salary`).text('$' + totalCurrentBasicSalary.toLocaleString(undefined, {
+            $(`#${Finding_id}-total-current-basic-salary`).text(currencySymbol + ' ' + totalCurrentBasicSalary.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));
-            $(`#${Finding_id}-total-proposed-basic-salary`).text('$' + totalProposedBasicSalary.toLocaleString(undefined, {
+            $(`#${Finding_id}-total-proposed-basic-salary`).text(currencySymbol + ' ' + totalProposedBasicSalary.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
             months.forEach((month, index) => {
-                $(`#${Finding_id}-total-${month}`).text('$' +  Math.round(combinedMonthlyTotals[index]).toLocaleString(undefined, {
+                $(`#${Finding_id}-total-${month}`).text(currencySymbol + ' ' +  Math.round(combinedMonthlyTotals[index]).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 }));
@@ -933,7 +933,7 @@
             grandTotal= Math.round(grandTotal);
             $(`#grand_total_department_${Finding_id}`).val(grandTotal); // grand_total_department_
 
-            $(`.grand_total_department_${Finding_id}`).text('$' + grandTotal.toLocaleString(undefined, {
+            $(`.grand_total_department_${Finding_id}`).text(currencySymbol + ' ' + grandTotal.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));

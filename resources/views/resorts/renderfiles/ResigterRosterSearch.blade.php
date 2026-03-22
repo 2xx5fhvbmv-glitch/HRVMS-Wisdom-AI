@@ -398,14 +398,16 @@
                                                             if ($shiftData) {
                                                                 $hasOT = !empty($shiftData->OverTime) && !in_array($shiftData->OverTime, ['0', '0:0', '00:00', '0:00', '00:00:00'], true);
                                                                 if($shiftData->Status == "Present" && !empty($shiftData->CheckingTime) && $hasOT) {
-                                                                    $cellClass .= ' bg-overtime';
-                                                                    $cellLabel = 'OT';
+                                                                    $cellClass .= ' bg-present';
+                                                                    $cellLabel = 'P';
                                                                     $cellStatus = 'PRESENT + OVERTIME';
+                                                                    $regularHours = $shiftData->DayWiseTotalHours ?? '0:00';
                                                                     $tooltipData = json_encode([
                                                                         'date' => $date,
                                                                         'status' => 'PRESENT + OVERTIME',
                                                                         'punchIn' => $shiftData->CheckingTime ?? '--:--',
                                                                         'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
+                                                                        'regularHours' => $regularHours,
                                                                         'overtime' => $overtimeValue
                                                                     ]);
                                                                 } elseif($shiftData->Status == "Present" && !empty($shiftData->CheckingTime)) {
@@ -417,6 +419,7 @@
                                                                         'status' => 'PRESENT',
                                                                         'punchIn' => $shiftData->CheckingTime ?? '--:--',
                                                                         'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
+                                                                        'regularHours' => $shiftData->DayWiseTotalHours ?? '0:00',
                                                                         'overtime' => $overtimeValue
                                                                     ]);
                                                                 } elseif($shiftData->Status == "Present") {

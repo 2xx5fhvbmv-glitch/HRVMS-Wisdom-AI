@@ -192,7 +192,7 @@
                                 <p class="mb-0">
                                     Exceeding Budgeted Amounts:
                                 </p>
-                                <span class="d-inline-block w-25 text-end text-danger">$0</span>
+                                <span class="d-inline-block w-25 text-end text-danger">{{ Common::GetResortCurrencySymbol() }} 0</span>
                             </div> -->
                         </div>
 
@@ -914,7 +914,7 @@
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` $${value}`; // Custom tooltip format
+                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
                         }
                     }
                 }
@@ -940,7 +940,7 @@
                     },
                     ticks: {
                         callback: function (value) {
-                            return `$${value.toLocaleString()}`; // Format y-axis labels as currency
+                            return `${currencySymbol} ${value.toLocaleString()}`; // Format y-axis labels as currency
                         }
                     }
                 }

@@ -226,7 +226,7 @@
                                     </tr>
                                     <tr>
                                         <th>Salary Expectation:</th>
-                                        <td>$1000</td>
+                                        <td>{{ Common::GetResortCurrencySymbol() }} 1000</td>
                                     </tr>
                                     <tr>
                                         <th>Languages Spoken:</th>

@@ -239,12 +239,24 @@ class SitesettignsController extends Controller
         $page_title = "Notifications";
 
         if ($request->ajax()) {
-            $resort = Auth::guard('resort-admin')->user()->resort;
+            $resort = Auth::guard('resort-admin')->user();
+            $employee = $resort->GetEmployee;
+            $resortId = $resort->resort_id;
 
             $query = ResortNotification::select([
-                    'id', 'module', 'type', 'message', 'status', 'created_at'
+                    'id', 'module', 'type', 'message', 'status', 'created_at', 'user_id'
                 ])
-                ->where('resort_id', $resort->id);
+                ->where('resort_id', $resortId)
+                ->where('status', '!=', 'deleted');
+
+            // HR/EXCOM/GM see all resort notifications; others see only their own
+            if ($employee) {
+                $rank = config('settings.Position_Rank');
+                $userRank = $rank[$employee->rank] ?? '';
+                if (!in_array($userRank, ['HR', 'EXCOM', 'GM'])) {
+                    $query->where('user_id', $employee->id);
+                }
+            }
 
             return datatables()->of($query)
                 ->order(function ($query) use ($request) {

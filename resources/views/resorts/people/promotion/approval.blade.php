@@ -119,8 +119,8 @@
                                     </tr>
                                     <tr>
                                         <th>Salary Increment:</th>
-                                        <td>${{$promotion->current_salary}}<i class="fa-regular fa-arrow-right mx-2"></i>
-                                        <b>${{$promotion->new_salary}}</b>
+                                        <td>{{ Common::GetResortCurrencySymbol() }}{{$promotion->current_salary}}<i class="fa-regular fa-arrow-right mx-2"></i>
+                                        <b>{{ Common::GetResortCurrencySymbol() }}{{$promotion->new_salary}}</b>
                                             <span class="badge badge-themeNew1">{{$promotion->salary_increment_percent}}% increase</span>
                                         </td>
                                     </tr>

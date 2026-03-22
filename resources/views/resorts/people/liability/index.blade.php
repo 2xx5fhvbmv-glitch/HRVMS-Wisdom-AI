@@ -24,17 +24,17 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>${{$estimated_liability}}</strong>
+                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$estimated_liability}}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Current Liability</h6><strong>${{$current_liability}}</strong>
+                            <h6>Current Liability</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$current_liability}}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Liability Reduction</h6><strong>${{$liability_reduction}}</strong>
+                            <h6>Liability Reduction</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$liability_reduction}}</strong>
                         </div>
                     </div>
                 </div>
@@ -189,45 +189,45 @@
                                                 <tbody>
                                                     <tr>
                                                         <td>Salaries</td>
-                                                        <td>$5,000</td>
-                                                        <td>$4,500</td>
-                                                        <td>$500</td>
-                                                        <td><span class="text-success">$500</span></td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-success">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Overtime</td>
-                                                        <td>$5,000</td>
-                                                        <td>$4,500</td>
-                                                        <td>$500</td>
-                                                        <td><span class="text-danger">$500</span></td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-danger">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Salaries</td>
-                                                        <td>$5,000</td>
-                                                        <td>$4,500</td>
-                                                        <td>$500</td>
-                                                        <td><span class="text-success">$500</span></td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-success">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Overtime</td>
-                                                        <td>$5,000</td>
-                                                        <td>$4,500</td>
-                                                        <td>$500</td>
-                                                        <td><span class="text-danger">$500</span></td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-danger">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Salaries</td>
-                                                        <td>$5,000</td>
-                                                        <td>$4,500</td>
-                                                        <td>$500</td>
-                                                        <td><span class="text-success">$500</span></td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-success">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Overtime</td>
-                                                        <td>$5,000</td>
-                                                        <td>$4,500</td>
-                                                        <td>$500</td>
-                                                        <td><span class="text-danger">$500</span></td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-danger">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                 </tbody>
                                             </table>
@@ -470,7 +470,7 @@
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return '$' + context.formattedValue;
+                            return currencySymbol + ' ' + context.formattedValue;
                         }
                     }
                 }
@@ -522,7 +522,7 @@
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` $${value}`; // Custom tooltip format
+                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
                         }
                     }
                 }

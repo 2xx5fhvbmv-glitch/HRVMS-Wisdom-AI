@@ -56,7 +56,7 @@
                         <div>
                             <p class="mb-0 fw-500">Last Payroll</p>
                             <strong>
-                                ${{ number_format($lastPayroll->total_payroll ?? 0, 2) }}
+                                {{ Common::GetResortCurrencySymbol() }} {{ number_format($lastPayroll->total_payroll ?? 0, 2) }}
                             </strong>
                         </div>
                         <div class="text-end">
@@ -76,9 +76,9 @@
                             <p class="mb-0 fw-500">Upcoming Payroll</p>
                             <strong>
                                 @if(($upcomingPayroll->total_payroll ?? 0) > 0)
-                                    ${{ number_format($upcomingPayroll->total_payroll, 2) }}
+                                    {{ Common::GetResortCurrencySymbol() }} {{ number_format($upcomingPayroll->total_payroll, 2) }}
                                 @else
-                                    ${{ number_format($upcomingEstimated ?? 0, 2) }}
+                                    {{ Common::GetResortCurrencySymbol() }} {{ number_format($upcomingEstimated ?? 0, 2) }}
                                 @endif
                             </strong>
                         </div>
@@ -262,12 +262,12 @@
                     <div class="row g-2 justify-content-center" id="payroll-distribution-container">
                         <div class="col-auto">
                             <div class="doughnut-label" id="cash_payment">
-                                <span class="bg-theme"></span>Cash Payments <br>$<span id="cashPaymentsText">0.00</span>
+                                <span class="bg-theme"></span>Cash Payments <br>{{ Common::GetResortCurrencySymbol() }} <span id="cashPaymentsText">0.00</span>
                             </div>
                         </div>
                         <div class="col-auto">
                             <div class="doughnut-label"  id="bank_TransfersText" >
-                                <span class="bg-themeLightBlue"></span>Bank Transfers <br>$<span id="bankTransfersText">0.00</span>
+                                <span class="bg-themeLightBlue"></span>Bank Transfers <br>{{ Common::GetResortCurrencySymbol() }} <span id="bankTransfersText">0.00</span>
                             </div>
                         </div>
                     </div>
@@ -455,11 +455,11 @@
                 </div>
                 <div class="mb-3">
                     <label for="normal_ot" class="form-label">Normal OT</label>
-                    <input type="text" id="normal_ot" class="form-control" value="$1,110.00 (120 Hrs)">
+                    <input type="text" id="normal_ot" class="form-control" value="{{ Common::GetResortCurrencySymbol() }} 1,110.00 (120 Hrs)">
                 </div>
                 <div>
                     <label for="holiday_ot" class="form-label">Holiday OT</label>
-                    <input type="text" id="holiday_ot" class="form-control" value="$142.00 (70Hrs)">
+                    <input type="text" id="holiday_ot" class="form-control" value="{{ Common::GetResortCurrencySymbol() }} 142.00 (70Hrs)">
                 </div>
 
             </div>
@@ -606,7 +606,7 @@
             ctx.restore();
 
             // Use the real average service charge (not sum of percentages)
-            const formattedTotal = '$' + serviceChargeAvg.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const formattedTotal = currencySymbol + ' ' + serviceChargeAvg.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
             // Text configuration
             ctx.textBaseline = 'middle';
@@ -687,14 +687,14 @@
                     labelsHTML += `
                         <div class="col-6">
                             <div class="doughnut-label">
-                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>$${item.service_charge}
+                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${currencySymbol} ${item.service_charge}
                             </div>
                         </div>
                     `;
                 });
                 // Add total row
                 labelsHTML += `
-                    <div class="fw-500">Total: $${total}</div>
+                    <div class="fw-500">Total: ${currencySymbol} ${total}</div>
                 `;
 
                 // Insert into the DOM
@@ -766,12 +766,12 @@
                 labelContainer.innerHTML = `
                     <div class="col-auto">
                         <div class="doughnut-label">
-                            <span class="bg-theme"></span>Cash Payments <br>$${cashPayments.toLocaleString()}
+                            <span class="bg-theme"></span>Cash Payments <br>${currencySymbol} ${cashPayments.toLocaleString()}
                         </div>
                     </div>
                     <div class="col-auto">
                         <div class="doughnut-label">
-                            <span class="bg-themeLightBlue"></span>Bank Transfers <br>$${bankTransfers.toLocaleString()}
+                            <span class="bg-themeLightBlue"></span>Bank Transfers <br>${currencySymbol} ${bankTransfers.toLocaleString()}
                         </div>
                     </div>
                 `;
@@ -1012,7 +1012,7 @@
                             return tooltipItem.dataset.label;
                         },
                         afterLabel: function (tooltipItem) {
-                            return '$' + tooltipItem.raw;
+                            return currencySymbol + ' ' + tooltipItem.raw;
                         }
                     },
                     displayColors: false
@@ -1214,7 +1214,7 @@
                         enabled: true,
                         callbacks: {
                             label: function (tooltipItem) {
-                                return ` $${tooltipItem.raw.toLocaleString()}`;
+                                return ` ${currencySymbol} ${tooltipItem.raw.toLocaleString()}`;
                             }
                         }
                     }
