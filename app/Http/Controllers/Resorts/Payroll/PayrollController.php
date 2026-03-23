@@ -1433,6 +1433,24 @@ class PayrollController extends Controller
 
     public function fetchTimeAttendance(Request $request)
     {
+        // Quick lookup: return employee IDs + dates from saved payroll (for page refresh recovery)
+        if ($request->has('getEmployeesOnly') && $request->payrollId) {
+            $empIds = DB::table('payroll_employees')
+                ->where('payroll_id', $request->payrollId)
+                ->pluck('employee_id')
+                ->toArray();
+            $payroll = DB::table('payroll')->where('id', $request->payrollId)->first(['start_date', 'end_date']);
+            $dateRange = '';
+            if ($payroll) {
+                $dateRange = \Carbon\Carbon::parse($payroll->start_date)->format('d-m-Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d-m-Y');
+            }
+            return response()->json([
+                'success' => !empty($empIds),
+                'employee_ids' => $empIds,
+                'date_range' => $dateRange,
+            ]);
+        }
+
         $request->validate([
             'employees' => 'required|array',
             'startDate' => 'required|date',

@@ -548,6 +548,20 @@
     var currency = "{{$currency}}";
     let employeeData = {}; // Store employee details
     var selectedEmployeeSet = new Set(); // Persist selection across pages
+
+    // Helper: get selected employee IDs (numeric) — uses checkboxes or falls back to localStorage
+    function getSelectedEmployeeIds() {
+        var ids = [];
+        $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
+            ids.push($(this).val());
+        });
+        // Fallback: use persistent set from localStorage
+        if (ids.length === 0 && selectedEmployeeSet.size > 0) {
+            ids = Array.from(selectedEmployeeSet);
+        }
+        return ids;
+    }
+
     //  console.log(currency);
     $(document).ready(function () {
         // Ensure Parsley is loaded
@@ -591,7 +605,13 @@
             });
         }
 
-        initDateRangePicker(startDate, endDate);
+        // Only init daterangepicker with dropdown value if NOT restoring a saved step
+        // (restore logic will set hiddenInput from localStorage/DB instead)
+        var _savedStep = parseInt(localStorage.getItem("currentStep")) || 0;
+        var _savedPayrollId = localStorage.getItem("payroll_id");
+        if (_savedStep <= 1 || !_savedPayrollId) {
+            initDateRangePicker(startDate, endDate);
+        }
 
         // Update daterangepicker when period dropdown changes
         $('#payrollPeriodSelect').on('change', function() {
@@ -635,6 +655,32 @@
                 } catch(e) {}
             }
 
+            // Restore date range from localStorage into hidden input (overwrite dropdown default)
+            var savedDateRange = localStorage.getItem("payroll_dateRange");
+            if (savedDateRange) {
+                $("#hiddenInput").val(savedDateRange);
+            }
+
+            // If no employees in Set or no date range, fetch from DB before loading step data
+            if ((selectedEmployeeSet.size === 0 || !savedDateRange) && savedPayrollId) {
+                $.ajax({
+                    url: '{{ route("fetch.time.attendance") }}',
+                    method: 'POST',
+                    async: false,
+                    data: { payrollId: savedPayrollId, _token: '{{ csrf_token() }}', getEmployeesOnly: true },
+                    success: function(res) {
+                        if (res.success && res.employee_ids) {
+                            res.employee_ids.forEach(function(id) { selectedEmployeeSet.add(String(id)); });
+                            localStorage.setItem("selectedEmployeeNumericIds", JSON.stringify(res.employee_ids));
+                        }
+                        if (res.date_range) {
+                            $("#hiddenInput").val(res.date_range);
+                            localStorage.setItem("payroll_dateRange", res.date_range);
+                        }
+                    }
+                });
+            }
+
             // Trigger data load for current step
             setTimeout(function() {
                 if (savedStep === 3) {
@@ -649,18 +695,7 @@
             }, 500);
         }
 
-        // Helper: get selected employee IDs (numeric) — uses checkboxes or falls back to localStorage
-        function getSelectedEmployeeIds() {
-            var ids = [];
-            $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-                ids.push($(this).val());
-            });
-            // Fallback: use persistent set from localStorage
-            if (ids.length === 0 && selectedEmployeeSet.size > 0) {
-                ids = Array.from(selectedEmployeeSet);
-            }
-            return ids;
-        }
+        // getSelectedEmployeeIds() is defined in outer scope above $(document).ready
 
         $(".next").click(async function (e) {
             e.preventDefault();
@@ -704,6 +739,7 @@
                             // Store payroll ID for future use
                             localStorage.setItem("payroll_id", response.payroll_id);
                             localStorage.setItem("currentStep", currentStep);
+                            localStorage.setItem("payroll_dateRange", $("#hiddenInput").val());
 
                             moveToNextStep($currentFieldset);
                         } else {
@@ -1723,6 +1759,7 @@
                         // Clear payroll state from localStorage
                         localStorage.removeItem("currentStep");
                         localStorage.removeItem("payroll_id");
+                        localStorage.removeItem("payroll_dateRange");
                         localStorage.removeItem("selectedEmployees");
                         localStorage.removeItem("selectedEmployeesIds");
                         localStorage.removeItem("selectedEmployeeNumericIds");
@@ -1866,29 +1903,85 @@
     function getstep3data(searchTerm) {
         var payrollId = localStorage.getItem("payroll_id");
 
+        if (!payrollId) {
+            toastr.error("Payroll session expired. Please start again.", 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
         var dateRange = $("#hiddenInput").val();
+        // Fallback: restore from localStorage if hidden input is empty (page refresh)
+        if (!dateRange) {
+            dateRange = localStorage.getItem("payroll_dateRange") || '';
+            if (dateRange) {
+                $("#hiddenInput").val(dateRange);
+            }
+        }
+        if (!dateRange) {
+            toastr.error("Please select a payroll period first.", 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
         var endDate = moment(dates[1], "DD-MM-YYYY", true);
 
+        if (!startDate.isValid() || !endDate.isValid()) {
+            toastr.error("Invalid date range. Please go back to step 1.", 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
         var selectedEmployees = getSelectedEmployeeIds();
 
         if (selectedEmployees.length === 0) {
-            toastr.error("Please select at least one employee before proceeding.", 'Error',{ positionClass: 'toast-bottom-right' });
+            toastr.info("Restoring session...", '', { positionClass: 'toast-bottom-right', timeOut: 2000 });
+            // Synchronous fetch from DB
+            var xhr = $.ajax({
+                url: '{{ route("fetch.time.attendance") }}',
+                method: 'POST',
+                async: false,
+                data: { payrollId: payrollId, _token: '{{ csrf_token() }}', getEmployeesOnly: 1 }
+            });
+            try {
+                var res = JSON.parse(xhr.responseText);
+                if (res.success && res.employee_ids && res.employee_ids.length > 0) {
+                    selectedEmployees = res.employee_ids;
+                    res.employee_ids.forEach(function(id) { selectedEmployeeSet.add(String(id)); });
+                    localStorage.setItem("selectedEmployeeNumericIds", JSON.stringify(selectedEmployees));
+                }
+                if (res.date_range && !dateRange) {
+                    dateRange = res.date_range;
+                    $("#hiddenInput").val(dateRange);
+                    localStorage.setItem("payroll_dateRange", dateRange);
+                    // Re-parse dates
+                    dates = dateRange.split(' - ');
+                    startDate = moment(dates[0], "DD-MM-YYYY", true);
+                    endDate = moment(dates[1], "DD-MM-YYYY", true);
+                }
+            } catch(e) {
+                console.error('Session restore failed:', e);
+            }
+        }
+
+        if (selectedEmployees.length === 0) {
+            toastr.error("Session expired. Please start payroll again from step 1.", 'Error',{ positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        if (!startDate.isValid() || !endDate.isValid()) {
+            toastr.error("Invalid date range. Please start payroll again from step 1.", 'Error', { positionClass: 'toast-bottom-right' });
             return;
         }
 
         $.ajax({
             url: '{{ route("fetch.time.attendance") }}',
             method: 'POST',
-            data: { 
+            data: {
                 employees: selectedEmployees,
-                startDate: startDate.format("YYYY-MM-DD"), 
+                startDate: startDate.format("YYYY-MM-DD"),
                 endDate: endDate.format("YYYY-MM-DD"),
                 searchTerm :  searchTerm,
                 payrollId:payrollId,
-                _token: '{{ csrf_token() }}' 
-            }, // CSRF token required
+                _token: '{{ csrf_token() }}'
+            },
             success: function (response) {
                 if (response.success) {
 

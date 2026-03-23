@@ -124,19 +124,17 @@ class RedirectIfNotCorrectDashboard
                 // dd(str_contains($currentRoute, 'leave'), !$request->routeIs('leave.admindashboard'));
             }
 
-            // HR (rank 3), Finance (rank 7), and GM (rank 8) should always get HR-level dashboard access
-            $isHrOrFinance = in_array($employeeRank, [3, 7, 8]);
+            // Determine dashboard level based on RANK only (not department/position name)
+            // HR (rank 3), Finance (rank 7) → HR-level dashboards
+            // GM (rank 8) → GM dashboard (handled separately)
+            // EXCOM (rank 1) → HR-level dashboards
+            // HOD (rank 2), MGR (rank 4), SUP (rank 5), Line Workers (rank 6) → HOD/lower dashboards
+            $isHrOrFinance = in_array($employeeRank, [1, 3, 7]); // EXCOM, HR, Finance
 
-            // Also check if user is in Finance/Accounting/HR department or has related position title
-            if (!$isHrOrFinance && $employee) {
-                $empDeptName = $employee->department->name ?? '';
-                $empPositionTitle = $employee->position->position_title ?? '';
-                if (stripos($empDeptName, 'Accounting') !== false || stripos($empDeptName, 'Finance') !== false
-                    || stripos($empPositionTitle, 'Finance') !== false
-                    || stripos($empDeptName, 'Human Resources') !== false || stripos($empPositionTitle, 'Human Resources') !== false) {
+                // GM (rank 8) gets HR-level dashboards (same as EXCOM/HR) for all modules
+                if ($employeeRank == 8) {
                     $isHrOrFinance = true;
                 }
-            }
 
                 $position_name = $employee->position->position_title ?? null;
                 $position_access = $Resort->resort->Position_access ?? null;
