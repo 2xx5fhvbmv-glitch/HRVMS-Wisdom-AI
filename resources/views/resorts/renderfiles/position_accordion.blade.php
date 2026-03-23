@@ -49,10 +49,10 @@
                                                 <span class="badge badge-secondary small">{{ $AvailableRank }}</span>
                                             </td>
                                             <td>{{ $employee->nationality ?? '-' }}</td>
-                                            <td class="text-center">{{ Common::GetResortCurrencySymbol() }} {{ number_format($employee->basic_salary ?? 0, 2) }}</td>
-                                            <td class="text-center">{{ Common::GetResortCurrencySymbol() }} {{ number_format($employee->basic_salary ?? 0, 2) }}</td>
+                                            <td class="text-center">{!! Common::formatCurrency($employee->basic_salary ?? 0, 'USD') !!}</td>
+                                            <td class="text-center">{!! Common::formatCurrency($employee->basic_salary ?? 0, 'USD') !!}</td>
                                             @foreach ($resortCosts as $cost)
-                                                <td class="text-center">{{ Common::GetResortCurrencySymbol() }} {{ number_format($cost->amount, 2) }}</td>
+                                                <td class="text-center">{!! Common::formatCurrency($cost->amount, 'USD') !!}</td>
                                             @endforeach
                                             
                                         </tr>
@@ -101,7 +101,7 @@
                                             </td>
                                             <td class="text-muted">-</td>
                                             @foreach ($resortCosts as $cost)
-                                                <td class="text-end">{{ Common::GetResortCurrencySymbol() }} {{ number_format($cost->amount, 2) }}</td>
+                                                <td class="text-end">{!! Common::formatCurrency($cost->amount, 'USD') !!}</td>
                                             @endforeach
                                         </tr>
                                     @endfor

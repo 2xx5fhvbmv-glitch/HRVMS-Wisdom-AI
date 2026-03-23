@@ -56,7 +56,7 @@
                         <div>
                             <p class="mb-0 fw-500">Last Payroll</p>
                             <strong>
-                                {{ Common::GetResortCurrencySymbol() }} {{ number_format($lastPayroll->total_payroll ?? 0, 2) }}
+                                {!! Common::formatCurrency($lastPayroll->total_payroll ?? 0, 'USD') !!}
                             </strong>
                         </div>
                         <div class="text-end">
@@ -76,9 +76,9 @@
                             <p class="mb-0 fw-500">Upcoming Payroll</p>
                             <strong>
                                 @if(($upcomingPayroll->total_payroll ?? 0) > 0)
-                                    {{ Common::GetResortCurrencySymbol() }} {{ number_format($upcomingPayroll->total_payroll, 2) }}
+                                    {!! Common::formatCurrency($upcomingPayroll->total_payroll, 'USD') !!}
                                 @else
-                                    {{ Common::GetResortCurrencySymbol() }} {{ number_format($upcomingEstimated ?? 0, 2) }}
+                                    {!! Common::formatCurrency($upcomingEstimated ?? 0, 'USD') !!}
                                 @endif
                             </strong>
                         </div>
@@ -606,7 +606,7 @@
             ctx.restore();
 
             // Use the real average service charge (not sum of percentages)
-            const formattedTotal = currencySymbol + ' ' + serviceChargeAvg.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const formattedTotal = formatAmount(serviceChargeAvg, 'USD');
 
             // Text configuration
             ctx.textBaseline = 'middle';
@@ -641,7 +641,7 @@
                 const data = response.data;
                 const total = response.total;
                 const labels = data.map(item => item.label);
-                const serviceCharges = data.map(item => item.service_charge);
+                const serviceCharges = data.map(item => convertAmount(item.service_charge, 'USD'));
                 const serviceChargespercentage = data.map(item => item.percentage);
                 // Set average for center text (total / number of months)
                 serviceChargeAvg = data.length > 0 ? parseFloat(total.replace(/,/g, '')) / data.length : 0;
@@ -687,14 +687,14 @@
                     labelsHTML += `
                         <div class="col-6">
                             <div class="doughnut-label">
-                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${currencySymbol} ${item.service_charge}
+                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${formatAmount(item.service_charge, 'USD')}
                             </div>
                         </div>
                     `;
                 });
                 // Add total row
                 labelsHTML += `
-                    <div class="fw-500">Total: ${currencySymbol} ${total}</div>
+                    <div class="fw-500">Total: ${formatAmount(parseFloat(total.replace(/,/g, '')), 'USD')}</div>
                 `;
 
                 // Insert into the DOM
@@ -766,12 +766,12 @@
                 labelContainer.innerHTML = `
                     <div class="col-auto">
                         <div class="doughnut-label">
-                            <span class="bg-theme"></span>Cash Payments <br>${currencySymbol} ${cashPayments.toLocaleString()}
+                            <span class="bg-theme"></span>Cash Payments <br>${formatAmount(cashPayments, 'USD')}
                         </div>
                     </div>
                     <div class="col-auto">
                         <div class="doughnut-label">
-                            <span class="bg-themeLightBlue"></span>Bank Transfers <br>${currencySymbol} ${bankTransfers.toLocaleString()}
+                            <span class="bg-themeLightBlue"></span>Bank Transfers <br>${formatAmount(bankTransfers, 'USD')}
                         </div>
                     </div>
                 `;
@@ -1012,7 +1012,7 @@
                             return tooltipItem.dataset.label;
                         },
                         afterLabel: function (tooltipItem) {
-                            return currencySymbol + ' ' + tooltipItem.raw;
+                            return formatAmount(tooltipItem.raw, 'USD');
                         }
                     },
                     displayColors: false
@@ -1214,7 +1214,7 @@
                         enabled: true,
                         callbacks: {
                             label: function (tooltipItem) {
-                                return ` ${currencySymbol} ${tooltipItem.raw.toLocaleString()}`;
+                                return ` ${formatAmount(tooltipItem.raw, 'USD')}`;
                             }
                         }
                     }
