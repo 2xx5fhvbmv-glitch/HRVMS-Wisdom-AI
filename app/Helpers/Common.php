@@ -1545,20 +1545,6 @@ class Common
         return ($currency === 'Dollar') ? '$' : 'MVR';
     }
 
-    public static function getDisplayCurrency()
-    {
-        $currency = self::GetResortCurrentCurrency();
-        return ($currency === 'Dollar') ? 'USD' : 'MVR';
-    }
-
-    public static function getUsdToMvrRate()
-    {
-        $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
-        if (!$resortId) return 15.42;
-        $settings = \App\Models\ResortSiteSettings::where('resort_id', $resortId)->first();
-        return $settings->DollertoMVR ?? 15.42;
-    }
-
 	public static function CheckemployeeBudgetCost($employeeType, $resort_id, $basic_salary,$getformated = 0) {
 		// Start with basic salary as the base cost
 		$totalCost = $basic_salary;

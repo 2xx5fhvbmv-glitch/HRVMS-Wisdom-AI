@@ -41,18 +41,6 @@
 <script>
     var dt_format = "{{Common::getDateAndSetFormateToDatepicker()}}";
     var currencySymbol = "{{ Common::GetResortCurrencySymbol() }}";
-    var displayCurrency = "{{ Common::getDisplayCurrency() }}";
-    var usdToMvrRate = parseFloat("{{ Common::getUsdToMvrRate() }}") || 15.42;
-    function convertAmount(amount, sourceCurrency) {
-        sourceCurrency = (sourceCurrency || 'USD').toUpperCase();
-        if (displayCurrency === 'MVR' && sourceCurrency === 'USD') return amount * usdToMvrRate;
-        if (displayCurrency !== 'MVR' && sourceCurrency === 'MVR') return amount / usdToMvrRate;
-        return amount;
-    }
-    function formatAmount(amount, sourceCurrency) {
-        var converted = convertAmount(amount, sourceCurrency);
-        return currencySymbol + ' ' + converted.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    }
 </script>
 
 

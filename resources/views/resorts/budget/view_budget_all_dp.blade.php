@@ -339,7 +339,7 @@
                                                                                 @if($vacantCost > 0)
                                                                                     <input type="hidden" class="vacant" name="vacant[{{ $incrementKey }}][{{ $month }}][{{ $vacantIndex }}]" value="{{ $vacantCost }}">
                                                                                     <span style="word-wrap: break-word; white-space: break-spaces;" class="badge badge-success">
-                                                                                        {!! Common::formatCurrency($vacantCost, 'USD') !!}
+                                                                                        {{ Common::GetResortCurrencySymbol() }} {{ number_format($vacantCost, 2) }}
                                                                                     </span>
                                                                                 @endif
                                                                             </td>

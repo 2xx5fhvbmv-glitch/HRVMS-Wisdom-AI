@@ -4,15 +4,16 @@
     <td></td>
     <td></td>
     <td></td>
-    <td>{!! Common::formatCurrency($salary, 'USD') !!}</td>
-    <td>{!! Common::formatCurrency($ot, 'USD') !!}</td>
-    <td>{!! Common::formatCurrency($insurance, 'USD') !!}</td>
-    <td>{!! Common::formatCurrency($recruitment ?? 0, 'USD') !!}</td>
+    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($salary, 2) }}</td>
+    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($ot, 2) }}</td>
+    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($insurance, 2) }}</td>
+    <td>{{ Common::GetResortCurrencySymbol() }} {{ number_format($recruitment ?? 0, 2) }}</td>
     <td>
-        {!! Common::formatCurrency(
+        {{ Common::GetResortCurrencySymbol() }} {{ number_format(
             $salary + $ot + $insurance + ($recruitment ?? 0) +
             $visa + $work_permit + $medical + $quota +
-            $allowances->sum('amount'), 'USD') !!}
+            $allowances->sum('amount'), 2)
+        }}
     </td>
     <td></td>
 </tr>
