@@ -310,7 +310,7 @@
                         callbacks: {
                             label: function (tooltipItem) {
                                 const value = tooltipItem.raw.toLocaleString();
-                                return ` ${currencySymbol} ${value}`;
+                                return formatAmount(value, 'USD');
                             }
                         }
                     }

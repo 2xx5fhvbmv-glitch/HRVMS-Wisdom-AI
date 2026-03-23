@@ -216,10 +216,10 @@
                                 url: '{{ route("people.salary-increment.summary-list") }}',
                                 dataSrc: function (json) {
 
-                                $('.current-basic-salary').text(`${currencySymbol} ${json.currentBasicSalary.toLocaleString()}`);
-                                $('.new-basic-salary').text(`${currencySymbol} ${json.newBasicSalary.toLocaleString()}`);
-                                $('.monthly-payroll-increase').text(`${currencySymbol} ${json.monthlyPayrollIncrease.toLocaleString()}`);
-                                $('.annual-payroll-increase').text(`${currencySymbol} ${json.annualPayrollIncrease.toLocaleString()}`);
+                                $('.current-basic-salary').text(formatAmount(json.currentBasicSalary, 'USD'));
+                                $('.new-basic-salary').text(formatAmount(json.newBasicSalary, 'USD'));
+                                $('.monthly-payroll-increase').text(formatAmount(json.monthlyPayrollIncrease, 'USD'));
+                                $('.annual-payroll-increase').text(formatAmount(json.annualPayrollIncrease, 'USD'));
                                 return json.data;
                               }     
                           },
