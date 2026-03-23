@@ -102,7 +102,7 @@
                                                     <tr>
                                                         <td>{{ $balance['leave_type'] }}</td>
                                                         <td>{{ $balance['available_days'] }}</td>
-                                                        <td>MVR {{ number_format($leaveSalary, 2) }}</td>
+                                                        <td>{!! Common::formatCurrency($leaveSalary, 'MVR') !!}</td>
                                                     </tr>
                                                 @endforeach
                                             @endif
@@ -110,13 +110,13 @@
                                             <tr>
                                                 <td>Leave Encashment</td>
                                                 <td>{{ $leaveBalances['total_days'] ?? 0 }} days</td>
-                                                <td>MVR {{ number_format($calculated['leave_encashment'], 2) }}</td>
+                                                <td>{!! Common::formatCurrency($calculated['leave_encashment'], 'MVR') !!}</td>
                                             </tr>
 
                                             <tr>
                                                 <td>Basic Salary</td>
                                                 <td>{{ $finalSettlement->total_days }} days</td>
-                                                <td>MVR {{ number_format($finalSettlement->proratedBasic, 2) }}</td>
+                                                <td>{!! Common::formatCurrency($finalSettlement->proratedBasic, 'MVR') !!}</td>
                                             </tr>
 
                                             @php
@@ -133,7 +133,7 @@
                                                     <tr>
                                                         <td>{{ $earnings->earning->allowanceName->particulars }}</td>
                                                         <td>-</td>
-                                                        <td>MVR {{ number_format($earnings->amount, 2) }}</td>
+                                                        <td>{!! Common::formatCurrency($earnings->amount, 'MVR') !!}</td>
                                                     </tr>
                                                 @endforeach
                                             @endif
@@ -141,34 +141,34 @@
                                             <tr>
                                                     <td>Regular OT</td>
                                                     <td>{{ $calculated['regular_ot_hours'] }} hrs</td>
-                                                    <td>MVR {{ number_format($calculated['regular_ot_amount'], 2) }}</td>
+                                                    <td>{!! Common::formatCurrency($calculated['regular_ot_amount'], 'MVR') !!}</td>
                                                 </tr>
                                                 @php $totalEarnings += $calculated['regular_ot_amount']; @endphp
 
                                                 <tr>
                                                     <td>Holiday OT</td>
                                                     <td>{{ $calculated['holiday_ot_hours'] }} hrs</td>
-                                                    <td>MVR {{ number_format($calculated['holiday_ot_amount'], 2) }}</td>
+                                                    <td>{!! Common::formatCurrency($calculated['holiday_ot_amount'], 'MVR') !!}</td>
                                                 </tr>
                                                 @php $totalEarnings += $calculated['holiday_ot_amount']; @endphp
 
                                                 <tr>
                                                     <td>Total OT</td>
                                                     <td>{{ $calculated['holiday_ot_hours'] + $calculated['regular_ot_hours'] }} hrs</td>
-                                                    <td>MVR {{ number_format($calculated['total_ot_amount'], 2) }}</td>
+                                                    <td>{!! Common::formatCurrency($calculated['total_ot_amount'], 'MVR') !!}</td>
                                                 </tr>
 
                                                 <tr>
                                                     <td>Ramadan Bonus</td>
                                                     <td>-</td>
-                                                    <td>MVR {{ number_format($calculated['ramadan_bonus'], 2) }}</td>
+                                                    <td>{!! Common::formatCurrency($calculated['ramadan_bonus'], 'MVR') !!}</td>
                                                 </tr>
                                                 @php $totalEarnings += $calculated['ramadan_bonus']; @endphp
 
                                                 <tr>
                                                     <td>Service Charge</td>
                                                     <td>-</td>
-                                                    <td>MVR {{ number_format($finalSettlement->service_charge, 2) }}</td>
+                                                    <td>{!! Common::formatCurrency($finalSettlement->service_charge, 'MVR') !!}</td>
                                                 </tr>
                                                 @php $totalEarnings += $finalSettlement->service_charge; @endphp
                                             </tbody>
@@ -176,7 +176,7 @@
                                             <tfoot>
                                                 <tr>
                                                     <td colspan="2">Total Gross Pay</td>
-                                                    <td>MVR {{ number_format($totalEarnings, 2) }}</td>
+                                                    <td>{!! Common::formatCurrency($totalEarnings, 'MVR') !!}</td>
                                                 </tr>
                                             </tfoot>
 
@@ -240,7 +240,7 @@
                                             <tfoot>
                                                 <tr>
                                                     <td>Total Deductions</td>
-                                                    <td id="totalDeductions">MVR{{ number_format($totalDeductions, 2) }}</td>  
+                                                    <td id="totalDeductions">{!! Common::formatCurrency($totalDeductions, 'MVR') !!}</td>  
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -259,19 +259,19 @@
                                 <tbody>
                                     <tr>
                                         <td>Gross Earning</td>
-                                        <td class="fw-600" id="grossEarnings">MVR {{ number_format($totalEarnings, 2) }}</td>
+                                        <td class="fw-600" id="grossEarnings">{!! Common::formatCurrency($totalEarnings, 'MVR') !!}</td>
                                         <input type="hidden" name="total_earnings" id="totalEarningsInput" value="{{ number_format($totalEarnings, 2) }}">
                                     </tr>
                                     <tr>
                                         <td>Total Deductions</td>
-                                        <td class="fw-600" id="totalDeductions1">(-) MVR {{ number_format($totalDeductions, 2) }}</td>
+                                        <td class="fw-600" id="totalDeductions1">(-) {!! Common::formatCurrency($totalDeductions, 'MVR') !!}</td>
                                         <input type="hidden" name="total_deductions" id="totalDeductionsInput" value="{{ number_format($totalDeductions, 2) }}">
                                     </tr>
                                 </tbody>
                                 <tfoot>
                                     <tr>
                                         <td>Total Net Payable</td>
-                                        <td id="netPayable">MVR {{ number_format($totalEarnings - $totalDeductions, 2) }}</td>
+                                        <td id="netPayable">{!! Common::formatCurrency($totalEarnings - $totalDeductions, 'MVR') !!}</td>
                                         <input type="hidden" name="net_pay" id="netPayInput" value="{{ number_format($totalEarnings - $totalDeductions, 2) }}">
                                         <input type="hidden" name="final_settlement_id" id="final_settlement_id" value="{{ $finalSettlement->id }}">
                                     </tr>

@@ -914,7 +914,7 @@
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
+                            return formatAmount(tooltipItem.raw, 'USD'); // Custom tooltip format
                         }
                     }
                 }
@@ -940,7 +940,7 @@
                     },
                     ticks: {
                         callback: function (value) {
-                            return `${currencySymbol} ${value.toLocaleString()}`; // Format y-axis labels as currency
+                            return formatAmount(value, 'USD'); // Format y-axis labels as currency
                         }
                     }
                 }

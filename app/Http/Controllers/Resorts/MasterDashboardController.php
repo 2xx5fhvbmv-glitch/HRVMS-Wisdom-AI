@@ -1765,18 +1765,72 @@ class MasterDashboardController extends Controller
         $page_route = $request->page_route;
         $device = $request->input('deviceType');
         $resort = Auth::guard('resort-admin')->user();
-        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
-        $auth_id = isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->id : 26;
+        $resort_id = $resort->resort_id;
+        $auth_id = isset($resort->GetEmployee) ? $resort->GetEmployee->id : 26;
+        $active_url = $page_route ?: Route::currentRouteName();
 
-        $menu = Common::GetResortMenu($resort_id, $page_route ?: Route::currentRouteName());
+        // ── Optimized: Load everything in 3 queries instead of 70+ ──
 
+        // 1. All modules (1 query)
+        $modules = \App\Models\Modules::get(['id as ModuleId', 'module_name as ModuleName']);
 
-        foreach ($menu['menu'] as &$module) {
-            $module['submenu'] = Common::GetResortMenuPage($module['ModuleId']);
-            // Filter submenu items based on permissions
-            $module['submenu'] = array_filter($module['submenu'], function($sub) use ($auth_id, $module) {
-                return Common::resortHasPermissions($module['ModuleId'], $sub['Page_id'], config('settings.resort_permissions.view'));
-            });
+        // 2. All menu pages (1 query)
+        $allPages = \App\Models\ModulePages::where('TypeOfPage', 'InsideOfMenu')
+            ->where('type', 'normal')
+            ->where('status', 'Active')
+            ->whereNull('deleted_at')
+            ->orderBy('place_order', 'asc')
+            ->get(['page_name', 'id as Page_id', 'Module_Id', 'internal_route', 'type', 'TypeOfPage'])
+            ->groupBy('Module_Id');
+
+        // 3. All permissions for this user's position (1 query)
+        $Position_id = $resort->GetEmployee->Position_id ?? null;
+        $Permission_id = config('settings.resort_permissions.view');
+        $allowedPages = collect();
+        if ($Position_id) {
+            $allowedPages = \App\Models\ResortPagewisePermission::where('resort_id', $resort_id)
+                ->whereHas('resort_internal_pages', function ($query) use ($Permission_id, $Position_id) {
+                    $query->where('permission_id', $Permission_id)
+                        ->where('position_id', $Position_id);
+                })
+                ->get(['Module_id', 'page_permission_id'])
+                ->map(function ($p) {
+                    return $p->Module_id . '_' . $p->page_permission_id;
+                })
+                ->toArray();
+        }
+
+        // Check if active URL matches any page
+        $activePageModuleId = \App\Models\ModulePages::where('internal_route', $active_url)->value('Module_Id');
+
+        // Build menu in-memory (0 additional queries)
+        $menu = ['menu' => [], 'resort_id' => $resort_id];
+        $isSuperAdmin = ($resort->type === 'super');
+
+        foreach ($modules as $m) {
+            $PageIsActive = ($activePageModuleId == $m->ModuleId) ? 'active' : 'inactive';
+
+            $modulePages = $allPages->get($m->ModuleId, collect());
+            $submenu = [];
+            foreach ($modulePages as $page) {
+                $permKey = $m->ModuleId . '_' . $page->Page_id;
+                if ($isSuperAdmin || in_array($permKey, $allowedPages)) {
+                    $submenu[] = [
+                        'Page_id' => $page->Page_id,
+                        'PageName' => $page->page_name,
+                        'route' => $page->internal_route,
+                        'Type' => $page->type,
+                        'TypeOfPage' => $page->TypeOfPage,
+                    ];
+                }
+            }
+
+            $menu['menu'][] = [
+                'ModuleId' => $m->ModuleId,
+                'ModuleName' => $m->ModuleName,
+                'PageIsActive' => $PageIsActive,
+                'submenu' => $submenu,
+            ];
         }
 
         if ($device === 'mobile') {
@@ -1785,7 +1839,6 @@ class MasterDashboardController extends Controller
             if($resort->menu_type == 'horizontal'){
                 $html = view('resorts.layouts.desktop-menu', compact('menu', 'auth_id','device','page_route'))->render();
             }else{
-
                 $html = view('resorts.layouts.vertical-menu', compact('menu', 'auth_id','device','page_route'))->render();
             }
         }

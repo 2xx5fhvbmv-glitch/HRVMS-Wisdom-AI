@@ -24,17 +24,17 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$estimated_liability}}</strong>
+                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{!! Common::formatCurrency($estimated_liability, 'USD') !!}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Current Liability</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$current_liability}}</strong>
+                            <h6>Current Liability</h6><strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Liability Reduction</h6><strong>{{ Common::GetResortCurrencySymbol() }}{{$liability_reduction}}</strong>
+                            <h6>Liability Reduction</h6><strong>{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
                         </div>
                     </div>
                 </div>
@@ -522,7 +522,7 @@
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
+                            return formatAmount(value, 'USD'); // Custom tooltip format
                         }
                     }
                 }

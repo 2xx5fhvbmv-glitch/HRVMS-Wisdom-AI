@@ -766,12 +766,12 @@
                 labelContainer.innerHTML = `
                     <div class="col-auto">
                         <div class="doughnut-label">
-                            <span class="bg-theme"></span>Cash Payments <br>${currencySymbol} ${cashPayments.toLocaleString()}
+                            <span class="bg-theme"></span>Cash Payments <br>${formatAmount(cashPayments, 'USD')}
                         </div>
                     </div>
                     <div class="col-auto">
                         <div class="doughnut-label">
-                            <span class="bg-themeLightBlue"></span>Bank Transfers <br>${currencySymbol} ${bankTransfers.toLocaleString()}
+                            <span class="bg-themeLightBlue"></span>Bank Transfers <br>${formatAmount(bankTransfers, 'USD')}
                         </div>
                     </div>
                 `;
@@ -1214,7 +1214,7 @@
                         enabled: true,
                         callbacks: {
                             label: function (tooltipItem) {
-                                return ` ${currencySymbol} ${tooltipItem.raw.toLocaleString()}`;
+                                return formatAmount(tooltipItem.raw, 'USD');
                             }
                         }
                     }

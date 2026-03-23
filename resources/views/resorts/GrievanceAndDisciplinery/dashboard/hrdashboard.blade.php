@@ -607,7 +607,7 @@
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
+                            return formatAmount(value, 'USD'); // Custom tooltip format
                         }
                     }
                 }
@@ -748,7 +748,7 @@
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
+                            return formatAmount(value, 'USD'); // Custom tooltip format
                         }
                     }
                 }

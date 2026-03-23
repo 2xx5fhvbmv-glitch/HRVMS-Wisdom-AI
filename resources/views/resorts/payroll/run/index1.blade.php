@@ -934,7 +934,7 @@
             });
 
             // Update the total service charge row
-            $("#total-service-charge").text(`${currencySymbol} ${distributedTotal.toFixed(2)}`);
+            $("#total-service-charge").text(`${formatAmount(distributedTotal, 'USD')}`);
             // console.log("Distributed Service Charge Data:", distributedServiceCharge); // Debugging
 
         });
@@ -1038,7 +1038,7 @@
                 if ($row.find("td:eq(0)").text() === employeeId) {
                     var currentOther = parseFloat($row.find("td:eq(8)").text().replace(currencySymbol, '')) || 0;
                     var newOther = currentOther + finalAmount;
-                    $row.find("td:eq(8)").text(currencySymbol + newOther.toFixed(2)); // Store in USD
+                    $row.find("td:eq(8)").text(formatAmount(newOther, 'USD')); // Store in USD
                     updateTotal($row); // Update the total column
                 }
             });
@@ -1435,8 +1435,8 @@
                             var $row = $(this);
                             if ($row.find("td:eq(0)").text().trim() === employee.Emp_id.toString()) {
                                 var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
-                                var pensionFormatted = currencySymbol + employee.pension.toFixed(2);
-                                var ewtFormatted = currencySymbol + employee.ewt.toFixed(2);
+                                var pensionFormatted = formatAmount(employee.pension, 'USD');
+                                var ewtFormatted = formatAmount(employee.ewt, 'USD');
 
                                 $row.find("td:eq(6)").text(pensionFormatted);
                                 $row.find("td:eq(7)").text(ewtFormatted);
@@ -1467,7 +1467,7 @@
         // console.log(other,"22222");
 
         var total = attendance + cityLedger + staffShop + pension + ewt + other;
-        $row.find("td:eq(9)").text(currencySymbol + total.toFixed(2));
+        $row.find("td:eq(9)").text(formatAmount(total, 'USD'));
     }
 
     function GetSixthStep(currency, conversionRate = 1) {
@@ -1528,7 +1528,7 @@
                                     <td>${employee.regular_ot} hrs</td>
                                     <td>${employee.holiday_ot} hrs</td>
                                     <td>${employee.total_ot}</td>
-                                    <td>${currencySymbol} ${employee.basic_salary}</td>
+                                    <td>${formatAmount(employee.basic_salary, 'USD')}</td>
                                     <td>{{ Common::GetResortCurrencySymbol() }} 120</td>
                                     <td>{{ Common::GetResortCurrencySymbol() }} 110</td>
                                 </tr>`;

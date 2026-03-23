@@ -84,10 +84,8 @@
         });
     });
     
-    $(window).on('load', function () {
-        requestAnimationFrame(function() {
-            loadMenu();
-        });
+    $(document).ready(function () {
+        loadMenu();
     }); 
      function getDeviceType() {
             const width = window.innerWidth;
@@ -1211,7 +1209,7 @@
             let resortid = "{{ Auth::guard('resort-admin')->user()->resort_id }}";
             let currency, conversionRate;
             let currentStep = $("fieldset[style*='visibility: visible']").attr("data-step");
-                      
+
             if ($(this).hasClass('select-left')) {
                 currency = 'Dollar';
                 $(this).removeClass('select-left').addClass('select-right');
@@ -1219,6 +1217,12 @@
                 currency = 'MVR';
                 $(this).removeClass('select-right').addClass('select-left');
             }
+
+            // Show immediate feedback
+            toastr.info('Switching to ' + (currency === 'Dollar' ? 'USD ($)' : 'MVR') + '...', 'Currency', {
+                positionClass: 'toast-bottom-right',
+                timeOut: 2000
+            });
 
             const updatedCurrency = await updateCurrency(currency, resortid);
            
@@ -1245,7 +1249,10 @@
                 }
                 else
                 {
-                    // Reload page for all other pages to update currency symbols
+                    // Show loading overlay before reload
+                    if (!$('#currency-loading-overlay').length) {
+                        $('body').append('<div id="currency-loading-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;"><div style="text-align:center;"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 fw-500">Updating currency...</p></div></div>');
+                    }
                     location.reload();
                 }
 

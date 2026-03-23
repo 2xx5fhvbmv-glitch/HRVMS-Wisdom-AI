@@ -10,7 +10,7 @@
                             aria-controls="collapseDiv{{ $divisionIteration }}">
                         <i class="fas fa-building me-2"></i>
                         <h3>{{ $divisionName }}</h3>
-                        <span class="badge badge-dark ms-2 small divisionGrandTotal">Budget: {{ Common::GetResortCurrencySymbol() }} {{ number_format($divisionData['calculated_total'] ?? 0, 2) }}</span>
+                        <span class="badge badge-dark ms-2 small divisionGrandTotal">Budget: {!! Common::formatCurrency($divisionData['calculated_total'] ?? 0, 'USD') !!}</span>
                     </button>
                 </h2>
                 <div id="collapseDiv{{ $divisionIteration }}" class="collapse"
@@ -29,7 +29,7 @@
                                                         aria-expanded="false" aria-controls="collapseDept{{ $divisionIteration }}_{{ $deptIteration }}">
                                                     <i class="fas fa-sitemap me-2"></i>
                                                     <span>{{ $departmentName }}</span>
-                                                    <span class="badge badge-dark ms-2 small departmentGrandTotal">Budget: {{ Common::GetResortCurrencySymbol() }} {{ number_format($departmentData['calculated_total'] ?? 0, 2) }}</span>
+                                                    <span class="badge badge-dark ms-2 small departmentGrandTotal">Budget: {!! Common::formatCurrency($departmentData['calculated_total'] ?? 0, 'USD') !!}</span>
                                                 </button>
                                             </h2>
                                         </div>
@@ -66,7 +66,7 @@
                                                                         aria-expanded="false" aria-controls="collapseSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}">
                                                                     <i class="fas fa-layer-group me-2"></i>
                                                                     <span>{{ $sectionName }}</span>
-                                                                    <span class="badge badge-dark ms-2 small sectionGrandTotal">Budget: {{ Common::GetResortCurrencySymbol() }} {{ number_format($sectionData['calculated_total'] ?? 0, 2) }}</span>
+                                                                    <span class="badge badge-dark ms-2 small sectionGrandTotal">Budget: {!! Common::formatCurrency($sectionData['calculated_total'] ?? 0, 'USD') !!}</span>
                                                                 </button>
                                                             </h2>
 
