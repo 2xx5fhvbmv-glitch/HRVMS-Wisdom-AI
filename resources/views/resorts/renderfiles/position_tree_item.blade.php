@@ -9,7 +9,7 @@
                 <span>{{ $positionName }}</span>
                 <span class="badge badge-info ms-2 small">Filled: {{ $positionData['max_counts']['max_filledcount'] }}</span>
                 <span class="badge badge-warning ms-1 small">Vacant: {{ $positionData['max_counts']['max_vacantcount'] }}</span>
-                <span class="badge badge-dark ms-2 small positionGrandTotal">Budget: {!! Common::formatCurrency($positionGrandTotal ?? 0, 'USD') !!}</span>
+                <span class="badge badge-dark ms-2 small positionGrandTotal">Budget: {{ Common::GetResortCurrencySymbol() }} {{ number_format($positionGrandTotal ?? 0, 2) }}</span>
             </button>
         </h2>
 
@@ -75,8 +75,8 @@
                                             {{ $AvailableRank }}
                                         </td>
                                         <td class="sticky-col sticky-col-4">{{ $employee->nationality ?? '-' }}</td>
-                                        <td class="text-end sticky-col sticky-col-5 basic-salary-cell" data-value="{{ $displayBasicSalary }}">{!! Common::formatCurrency($displayBasicSalary, 'USD') !!}</td>
-                                        <td class="text-end sticky-col sticky-col-6 current-salary-cell" data-value="{{ $displayCurrentSalary }}">{!! Common::formatCurrency($displayCurrentSalary, 'USD') !!}</td>
+                                        <td class="text-end sticky-col sticky-col-5 basic-salary-cell" data-value="{{ $displayBasicSalary }}">{{ Common::GetResortCurrencySymbol() }} {{ number_format($displayBasicSalary, 2) }}</td>
+                                        <td class="text-end sticky-col sticky-col-6 current-salary-cell" data-value="{{ $displayCurrentSalary }}">{{ Common::GetResortCurrencySymbol() }} {{ number_format($displayCurrentSalary, 2) }}</td>
                                         @foreach ($resortCosts as $cost)
                                             @php
                                                 // Use yearly aggregated value or 0 if not configured
@@ -145,10 +145,10 @@
                                         </td>
                                         <td class="text-muted sticky-col sticky-col-4">-</td>
                                         <td class="text-end sticky-col sticky-col-5 basic-salary-cell {{ $vacantBasicSalary > 0 ? '' : 'text-muted' }}" data-value="{{ $vacantBasicSalary }}">
-                                            {!! Common::formatCurrency($vacantBasicSalary, 'USD') !!}
+                                            {{ Common::GetResortCurrencySymbol() }} {{ number_format($vacantBasicSalary, 2) }}
                                         </td>
                                         <td class="text-end sticky-col sticky-col-6 current-salary-cell {{ $vacantCurrentSalary > 0 ? '' : 'text-muted' }}" data-value="{{ $vacantCurrentSalary }}">
-                                            {!! Common::formatCurrency($vacantCurrentSalary, 'USD') !!}
+                                            {{ Common::GetResortCurrencySymbol() }} {{ number_format($vacantCurrentSalary, 2) }}
                                         </td>
                                         @foreach ($resortCosts as $cost)
                                             @php
@@ -263,10 +263,10 @@
                                     <td class="sticky-col sticky-col-2"></td>
                                     <td class="sticky-col sticky-col-3"></td>
                                     <td class="sticky-col sticky-col-4 text-end"><small>{{ $totalRows }} Position(s)</small></td>
-                                    <td class="text-end sticky-col sticky-col-5 fw-bold">{!! Common::formatCurrency($totalBasicSalary, 'USD') !!}</td>
-                                    <td class="text-end sticky-col sticky-col-6 fw-bold">{!! Common::formatCurrency($totalCurrentSalary, 'USD') !!}</td>
+                                    <td class="text-end sticky-col sticky-col-5 fw-bold">{{ Common::GetResortCurrencySymbol() }} {{ number_format($totalBasicSalary, 2) }}</td>
+                                    <td class="text-end sticky-col sticky-col-6 fw-bold">{{ Common::GetResortCurrencySymbol() }} {{ number_format($totalCurrentSalary, 2) }}</td>
                                     @foreach ($resortCosts as $cost)
-                                        <td class="text-end scrollable-col fw-bold">{!! Common::formatCurrency($costTotals[$cost->id], 'USD') !!}</td>
+                                        <td class="text-end scrollable-col fw-bold">{{ Common::GetResortCurrencySymbol() }} {{ number_format($costTotals[$cost->id], 2) }}</td>
                                     @endforeach
                                 </tr>
                             @endif
