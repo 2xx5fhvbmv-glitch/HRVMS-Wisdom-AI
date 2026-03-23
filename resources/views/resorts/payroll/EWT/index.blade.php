@@ -166,8 +166,8 @@
                 render: function(data, type, row) {
                     return `
                         <div class="text-end">
-                            <span class="d-block">${currencySymbol} ${parseFloat(data).toFixed(2)}</span>
-                            <small class="text-muted">Tax: ${currencySymbol} ${parseFloat(row.total_ewt).toFixed(2)}</small>
+                            <span class="d-block">${formatAmount(parseFloat(data), 'USD')}</span>
+                            <small class="text-muted">Tax: ${formatAmount(parseFloat(row.total_ewt), 'USD')}</small>
                         </div>
                     `;
                 },
@@ -225,8 +225,8 @@
                                         
                                         return `
                                             <div class="text-end">
-                                                <span class="d-block">${currencySymbol} ${parseFloat(data.earnings).toFixed(2)}</span>
-                                                <span class="d-block text-danger">${currencySymbol} ${parseFloat(data.ewt).toFixed(2)}</span>
+                                                <span class="d-block">${formatAmount(parseFloat(data.earnings), 'USD')}</span>
+                                                <span class="d-block text-danger">${formatAmount(parseFloat(data.ewt), 'USD')}</span>
                                                 <small class="text-muted">${data.tax_rate}% (${data.tax_slab})</small>
                                             </div>
                                         `;

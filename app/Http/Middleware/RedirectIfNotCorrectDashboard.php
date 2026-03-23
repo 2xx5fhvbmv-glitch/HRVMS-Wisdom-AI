@@ -201,9 +201,17 @@ class RedirectIfNotCorrectDashboard
                                 Log::info("Redirecting HR to People HR Dashboard");
                                 return redirect()->route('people.hr.dashboard');
                             }
-                            elseif(str_contains($currentRoute, 'master') && !$request->routeIs('resort.master.hr_dashboard')) {
-                                Log::info("Redirecting HR to Master Dashboard");
-                                return redirect()->route('resort.master.hr_dashboard');
+                            elseif(str_contains($currentRoute, 'master')) {
+                                // GM gets GM dashboard, others get HR dashboard
+                                if ($employeeRank == 8) {
+                                    if (!$request->routeIs('resort.master.gm_dashboard')) {
+                                        Log::info("Redirecting GM to GM Master Dashboard");
+                                        return redirect()->route('resort.master.gm_dashboard');
+                                    }
+                                } elseif (!$request->routeIs('resort.master.hr_dashboard')) {
+                                    Log::info("Redirecting HR to Master Dashboard");
+                                    return redirect()->route('resort.master.hr_dashboard');
+                                }
                             }
 
 

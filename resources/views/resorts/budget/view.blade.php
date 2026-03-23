@@ -469,11 +469,11 @@
             $('#total-positions').text(totalPositions);
             totalCurrentBasicSalary = Math.round(totalCurrentBasicSalary);
             totalProposedBasicSalary = Math.round(totalProposedBasicSalary);
-            $('#total-current-basic-salary').text(currencySymbol + ' ' + totalCurrentBasicSalary.toLocaleString(undefined, {
+            $('#total-current-basic-salary').text(formatAmount(totalCurrentBasicSalary, 'USD'))
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));
-            $('#total-proposed-basic-salary').text(currencySymbol + ' ' + totalProposedBasicSalary.toLocaleString(undefined, {
+            $('#total-proposed-basic-salary').text(formatAmount(totalProposedBasicSalary, 'USD'))
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));
@@ -481,7 +481,7 @@
             // Update monthly totals in the footer
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
             months.forEach((month, index) => {
-                $(`#total-${month}-2024`).text(currencySymbol + ' ' + monthlyTotals[index].toLocaleString(undefined, {
+                $(`#total-${month}-2024`).text(formatAmount(monthlyTotals[index], 'USD'))
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                 }));
@@ -489,7 +489,7 @@
 
             $('.grand_total').val( grandTotal);
 
-            $('#grand_total').text(currencySymbol + ' ' + grandTotal.toLocaleString(undefined, {
+            $('#grand_total').text(formatAmount(grandTotal, 'USD'))
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }));

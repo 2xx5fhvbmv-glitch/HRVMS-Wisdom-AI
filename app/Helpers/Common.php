@@ -3568,6 +3568,9 @@ class Common
      */
     public static function convertToDisplayCurrency($amount, $sourceCurrency = 'USD')
     {
+        // Sanitize: remove commas and cast to float
+        $amount = (float) str_replace(',', '', (string) $amount);
+
         $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
         if (!$resortId) return $amount;
 
@@ -3577,9 +3580,9 @@ class Common
         $displayCurrency = $settings->currency; // 'MVR' or 'Dollar'
 
         if ($displayCurrency === 'MVR' && strtoupper($sourceCurrency) === 'USD') {
-            return round($amount * $settings->DollertoMVR, 2);
+            return round($amount * (float) $settings->DollertoMVR, 2);
         } elseif ($displayCurrency !== 'MVR' && strtoupper($sourceCurrency) === 'MVR') {
-            return round($amount * $settings->MVRtoDoller, 2);
+            return round($amount * (float) $settings->MVRtoDoller, 2);
         }
 
         return round($amount, 2);

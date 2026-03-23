@@ -136,10 +136,10 @@ function loadPensionTable() {
             if (json && json.totals) {
                 // Update footer cells directly (more reliable than recreating tfoot)
                 $(api.column(7).footer()).html(
-                    currencySymbol + ' ' + parseFloat(json.totals.employee_pension || 0).toFixed(2)
+                    formatAmount(parseFloat(json.totals.employee_pension || 0), 'USD')
                 );
                 $(api.column(8).footer()).html(
-                    currencySymbol + ' ' + parseFloat(json.totals.employer_pension || 0).toFixed(2)
+                    formatAmount(parseFloat(json.totals.employer_pension || 0), 'USD')
                 );
             }
         },
@@ -154,13 +154,13 @@ function loadPensionTable() {
             { 
                 data: 'employee_pension', 
                 render: function(data, type, row) {
-                    return data ? currencySymbol + ' ' + parseFloat(data).toFixed(2) : currencySymbol + ' 0.00';
+                    return data ? formatAmount(parseFloat(data), 'USD') : currencySymbol + ' 0.00';
                 }
             },
             { 
                 data: 'employer_pension',  // Note: Fix spelling to match server response
                 render: function(data, type, row) {
-                    return data ? currencySymbol + ' ' + parseFloat(data).toFixed(2) : currencySymbol + ' 0.00';
+                    return data ? formatAmount(parseFloat(data), 'USD') : currencySymbol + ' 0.00';
                 }
             },
             {data:'created_at',visible:false,searchable:false},

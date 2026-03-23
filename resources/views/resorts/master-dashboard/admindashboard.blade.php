@@ -2985,7 +2985,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         label: function (tooltipItem) {
                             // const datasetLabel = tooltipItem.dataset.label || '';
                             const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` ${currencySymbol} ${value}`; // Custom tooltip format
+                            return formatAmount(value, 'USD'); // Custom tooltip format
                         }
                     }
                 }
@@ -3011,7 +3011,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     },
                     ticks: {
                         callback: function (value) {
-                            return `${currencySymbol} ${value.toLocaleString()}`; // Format y-axis labels as currency
+                            return formatAmount(value, 'USD'); // Format y-axis labels as currency
                         }
                     }
                 }
@@ -3269,7 +3269,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
 
                 // Format the total as a currency value
-                const formattedTotal = currencySymbol + ' ' + total.toLocaleString();
+                const formattedTotal = formatAmount(total, 'USD');
 
                 // Text configuration
                 ctx.textBaseline = 'middle';
@@ -3347,14 +3347,14 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     labelsHTML += `
                         <div class="col-6">
                             <div class="doughnut-label">
-                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${currencySymbol} ${item.service_charge}
+                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${formatAmount(item.service_charge, 'USD')}
                             </div>
                         </div>
                     `;
                 });
                 // Add total row
                 labelsHTML += `
-                    <div class="fw-500">Total: ${currencySymbol} ${total}</div>
+                    <div class="fw-500">Total: ${formatAmount(parseFloat(String(total).replace(/,/g,'')), 'USD')}</div>
                 `;
 
                 // Insert into the DOM

@@ -549,13 +549,13 @@ aria-hidden="true">
             const basicSalaryCell = row.querySelector('.basic-salary-cell');
             if (basicSalaryCell && data.basic_salary) {
                 basicSalaryCell.setAttribute('data-value', data.basic_salary);
-                basicSalaryCell.textContent = currencySymbol + ' ' + parseFloat(data.basic_salary).toFixed(2);
+                basicSalaryCell.textContent = formatAmount(parseFloat(data.basic_salary), 'USD');
             }
 
             const currentSalaryCell = row.querySelector('.current-salary-cell');
             if (currentSalaryCell && data.current_salary) {
                 currentSalaryCell.setAttribute('data-value', data.current_salary);
-                currentSalaryCell.textContent = currencySymbol + ' ' + parseFloat(data.current_salary).toFixed(2);
+                currentSalaryCell.textContent = formatAmount(parseFloat(data.current_salary), 'USD');
             }
 
             if (data.costs && Array.isArray(data.costs)) {
@@ -628,8 +628,8 @@ aria-hidden="true">
                 const totalBasicCell = totalRow.querySelector('.sticky-col-5');
                 const totalCurrentCell = totalRow.querySelector('.sticky-col-6');
 
-                if (totalBasicCell) totalBasicCell.textContent = currencySymbol + ' ' + totalBasicSalary.toFixed(2);
-                if (totalCurrentCell) totalCurrentCell.textContent = currencySymbol + ' ' + totalCurrentSalary.toFixed(2);
+                if (totalBasicCell) totalBasicCell.textContent = formatAmount(totalBasicSalary, 'USD');
+                if (totalCurrentCell) totalCurrentCell.textContent = formatAmount(totalCurrentSalary, 'USD');
 
                 const costCells = totalRow.querySelectorAll('.scrollable-col');
                 const firstRowCostCells = table.querySelector('tr:not(.table-secondary)')?.querySelectorAll('.cost-cell');
@@ -639,7 +639,7 @@ aria-hidden="true">
                         if (firstRowCostCells[index]) {
                             const costId = firstRowCostCells[index].getAttribute('data-cost-id');
                             if (costId && costTotals[costId] !== undefined) {
-                                cell.textContent = currencySymbol + ' ' + costTotals[costId].toFixed(2);
+                                cell.textContent = formatAmount(costTotals[costId], 'USD');
                             }
                         }
                     });

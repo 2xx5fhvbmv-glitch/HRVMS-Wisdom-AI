@@ -184,7 +184,7 @@
                 },
                 dataSrc: function (json) {
                     var total = (json.total_amount != null) ? parseFloat(json.total_amount) : json.data.reduce(function (sum, p) { return sum + parseFloat(p.price || 0); }, 0);
-                    $('#total-payable-amount').text(currencySymbol + ' ' + total.toFixed(2));
+                    $('#total-payable-amount').text(formatAmount(total, 'USD'));
                     return json.data;
                 }
             },

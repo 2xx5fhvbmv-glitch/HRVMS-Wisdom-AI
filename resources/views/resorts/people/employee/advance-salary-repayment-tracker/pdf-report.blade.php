@@ -55,7 +55,7 @@
                 @endforeach
                 <tr>
                     <th>Total</th>
-                    <th>{{ Common::GetResortCurrencySymbol() }} {{ $payrollAdvance->payrollRecoverySchedule->sum('amount') }}</th>
+                    <th>{!! Common::formatCurrency($payrollAdvance->payrollRecoverySchedule->sum('amount') , 'USD') !!}</th>
                 </tr>
             </tbody>
         </table>

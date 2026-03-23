@@ -78,7 +78,7 @@
                                     </tr>
                                     <tr>
                                         <th>New Salary:</th>
-                                        <td><b>{{ Common::GetResortCurrencySymbol() }}{{$promotion->new_salary}}</b></td>
+                                        <td><b>{!! Common::formatCurrency($promotion->new_salary, 'USD') !!}</b></td>
                                     </tr>
                                     <tr>
                                         <th>Updated Job Description:</th>
@@ -100,7 +100,7 @@
                                     </tr>
                                     <tr>
                                         <th>Current Salary:</th>
-                                        <td>{{ Common::GetResortCurrencySymbol() }}{{$promotion->current_salary}}</td>
+                                        <td>{!! Common::formatCurrency($promotion->current_salary, 'USD') !!}</td>
                                     </tr>
                                     <tr>
                                         <th>Effective Date:</th>

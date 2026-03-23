@@ -401,7 +401,7 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <h6>{{$VisaWallet->WalletName}}</h6>
-                                                                <strong>MVR {{number_format($VisaWallet->Amt,2)}}</strong>
+                                                                <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'MVR') !!}</strong>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -428,7 +428,7 @@
                                                                     </a> </h6>
                                                                 </div>
                                                             
-                                                                <strong>MVR {{number_format($VisaWallet->Xpact_Amt,2)}}</strong>
+                                                                <strong>{!! Common::formatCurrency($VisaWallet->Xpact_Amt, 'MVR') !!}</strong>
                                                             </div>
                                                             
                                                         </div>

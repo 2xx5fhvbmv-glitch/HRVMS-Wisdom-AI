@@ -422,8 +422,8 @@
                                 @foreach($serviceChargesData as $serviceCharge)
                                     <tr>
                                         <td>{{ $serviceCharge['month'] }}</td>
-                                        <td>{{ Common::GetResortCurrencySymbol() }} {{ $serviceCharge['current_year_value'] ?? 0 }}</td>
-                                        <td>{{ Common::GetResortCurrencySymbol() }} {{ $serviceCharge['last_year_value'] ?? 0}}</td>
+                                        <td>{!! Common::formatCurrency($serviceCharge['current_year_value'] ?? 0 , 'USD') !!}</td>
+                                        <td>{!! Common::formatCurrency($serviceCharge['last_year_value'] ?? 0, 'USD') !!}</td>
                                     </tr>
                                 @endforeach
                             </table>

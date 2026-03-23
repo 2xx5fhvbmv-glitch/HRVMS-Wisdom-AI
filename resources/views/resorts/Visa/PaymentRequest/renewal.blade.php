@@ -223,7 +223,7 @@
                                         @if($QuotaSlotVariable)
                                             <tr>
                                                 <th>{{$QuotaSlotVariable->Month}}</th>
-                                                <td>MVR {{ number_format($QuotaSlotVariable->Amt,2)}}</td>    
+                                                <td>{!! Common::formatCurrency($QuotaSlotVariable->Amt, 'MVR') !!}</td>    
                                                 <td>{{$QuotaSlotVariable->Due_Date}}</td>
                                                 <td>
                                                     <span class="badge badge-themeDanger">Pending</span>
@@ -243,8 +243,8 @@
                             </div>
                             <div class="listing-box badge-themeNew1 border-0">
                                 <ul class="nav ">
-                                    <li>Total Amount (Payable): MVR {{ number_format($QuotaSlotPayableAmt,2)}}</li>
-                                    <li>Amount Paid: MVR {{ number_format($QuotaSlotPaidAmt,2)}}</li>
+                                    <li>Total Amount (Payable): {!! Common::formatCurrency($QuotaSlotPayableAmt, 'MVR') !!}</li>
+                                    <li>Amount Paid: {!! Common::formatCurrency($QuotaSlotPaidAmt, 'MVR') !!}</li>
                                     <li>Balance Amount: {{ number_format($QuotaSlotUnPaidAmt,2)}}</li>
                                 </ul>
                             </div>
@@ -280,7 +280,7 @@
                                     <tbody>
                                         <tr>
                                             <th>{{$WorkPermitCommonVariable->Month}}</th>
-                                            <td>MVR {{ number_format($WorkPermitCommonVariable->Amt,2)}}</td>    
+                                            <td>{!! Common::formatCurrency($WorkPermitCommonVariable->Amt, 'MVR') !!}</td>    
                                             <td>{{$WorkPermitCommonVariable->Due_Date}}</td>
                                             <td>
                                                     <span class="badge badge-themeDanger">Pending</span>
@@ -298,8 +298,8 @@
                             </div>
                             <div class="listing-box badge-themeNew1 border-0">
                                 <ul class="nav ">
-                                    <li>Total Amount (Payable): MVR {{ number_format($WorkPermitPayableAmt,2)}}</li>
-                                    <li>Amount Paid: MVR {{ number_format($WorkPermitPaidAmt,2)}}</li>
+                                    <li>Total Amount (Payable): {!! Common::formatCurrency($WorkPermitPayableAmt, 'MVR') !!}</li>
+                                    <li>Amount Paid: {!! Common::formatCurrency($WorkPermitPaidAmt, 'MVR') !!}</li>
                                     <li>Balance Amount: {{ number_format($WorkPermitUnPaidAmt,2)}}</li>
                                 </ul>
                             </div>

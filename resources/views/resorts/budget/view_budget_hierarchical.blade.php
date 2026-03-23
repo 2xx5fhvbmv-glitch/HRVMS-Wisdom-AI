@@ -1250,8 +1250,8 @@ $(document).ready(function() {
                         html += `
                             <tr style="transition: all 0.2s;">
                                 <td class="text-center" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${currencySymbol} ${parseFloat(currentBasicSalary).toFixed(2)}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${currencySymbol} ${parseFloat(proposedBasicSalary).toFixed(2)}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(currentBasicSalary), 'USD')}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(proposedBasicSalary), 'USD')}</td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-primary btn-edit-month-budget"
                                             data-month="${m}"
@@ -1300,7 +1300,7 @@ $(document).ready(function() {
                                     data-original-value="${originalValue}"
                                     data-usd-value="${costValue.toFixed(2)}"
                                     style="font-size: 0.813rem;">
-                                    ${currencySymbol} ${parseFloat(costValue).toFixed(2)}
+                                    ${formatAmount(parseFloat(costValue), 'USD')}
                                 </td>`;
                         });
 
@@ -1311,12 +1311,12 @@ $(document).ready(function() {
                     html += `
                         <tr class="table-total-row" style="background-color: #f8f9fa; font-weight: 600; border-top: 2px solid #dee2e6;">
                             <td class="text-center" style="font-weight: 700;">TOTAL</td>
-                            <td class="text-end text-primary total-current-salary" style="font-weight: 700;">${currencySymbol} ${totals.currentSalary.toFixed(2)}</td>
-                            <td class="text-end text-success total-proposed-salary" style="font-weight: 700;">${currencySymbol} ${totals.proposedSalary.toFixed(2)}</td>
+                            <td class="text-end text-primary total-current-salary" style="font-weight: 700;">${formatAmount(totals.currentSalary, 'USD')}</td>
+                            <td class="text-end text-success total-proposed-salary" style="font-weight: 700;">${formatAmount(totals.proposedSalary, 'USD')}</td>
                             <td></td>`;
 
                     resortCosts.forEach(cost => {
-                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" style="font-weight: 700;">${currencySymbol} ${totals.costs[cost.id].toFixed(2)}</td>`;
+                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" style="font-weight: 700;">${formatAmount(totals.costs[cost.id], 'USD')}</td>`;
                     });
 
                     html += `</tr></tbody></table></div>`;
@@ -1363,11 +1363,11 @@ $(document).ready(function() {
             });
         }
 
-        $('#total-current-salary').text(currencySymbol + ' ' + totalCurrentSalary.toFixed(2));
-        $('#total-proposed-salary').text(currencySymbol + ' ' + totalProposedSalary.toFixed(2));
+        $('#total-current-salary').text(formatAmount(totalCurrentSalary, 'USD'));
+        $('#total-proposed-salary').text(formatAmount(totalProposedSalary, 'USD'));
 
         resortCosts.forEach(cost => {
-            $(`#total-cost-${cost.id}`).text(currencySymbol + ' ' + (costTotals[cost.id] || 0).toFixed(2));
+            $(`#total-cost-${cost.id}`).text(formatAmount(costTotals[cost.id] || 0, 'USD'));
         });
     }
 
@@ -1428,8 +1428,8 @@ $(document).ready(function() {
                         html += `
                             <tr style="transition: all 0.2s;">
                                 <td class="text-center" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${currencySymbol} ${parseFloat(currentBasicSalary).toFixed(2)}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${currencySymbol} ${parseFloat(proposedBasicSalary).toFixed(2)}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(currentBasicSalary), 'USD')}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(proposedBasicSalary), 'USD')}</td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-warning btn-edit-month-budget"
                                             data-month="${m}"
@@ -1479,7 +1479,7 @@ $(document).ready(function() {
                                     data-original-value="${originalValue}"
                                     data-usd-value="${costValue.toFixed(2)}"
                                     style="font-size: 0.813rem;">
-                                    ${currencySymbol} ${parseFloat(costValue).toFixed(2)}
+                                    ${formatAmount(parseFloat(costValue), 'USD')}
                                 </td>`;
                         });
 
@@ -1490,12 +1490,12 @@ $(document).ready(function() {
                     html += `
                         <tr class="table-total-row" style="background-color: #f8f9fa; font-weight: 600; border-top: 2px solid #dee2e6;">
                             <td class="text-center" style="font-weight: 700;">TOTAL</td>
-                            <td class="text-end text-primary total-current-salary" style="font-weight: 700;">${currencySymbol} ${totals.currentSalary.toFixed(2)}</td>
-                            <td class="text-end text-success total-proposed-salary" style="font-weight: 700;">${currencySymbol} ${totals.proposedSalary.toFixed(2)}</td>
+                            <td class="text-end text-primary total-current-salary" style="font-weight: 700;">${formatAmount(totals.currentSalary, 'USD')}</td>
+                            <td class="text-end text-success total-proposed-salary" style="font-weight: 700;">${formatAmount(totals.proposedSalary, 'USD')}</td>
                             <td></td>`;
 
                     resortCosts.forEach(cost => {
-                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" style="font-weight: 700;">${currencySymbol} ${totals.costs[cost.id].toFixed(2)}</td>`;
+                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" style="font-weight: 700;">${formatAmount(totals.costs[cost.id], 'USD')}</td>`;
                     });
 
                     html += `</tr></tbody></table></div>`;
@@ -1994,8 +1994,8 @@ $(document).ready(function() {
         const mvrToUsdRate = parseFloat($('#mvrToDollarRate').val() || 1/15.42);
 
         // Update salary columns
-        $row.find('td:eq(1)').text(currencySymbol + ' ' + parseFloat(basicSalary).toFixed(2));
-        $row.find('td:eq(2)').text(currencySymbol + ' ' + parseFloat(currentSalary).toFixed(2));
+        $row.find('td:eq(1)').text(formatAmount(parseFloat(basicSalary), 'USD'));
+        $row.find('td:eq(2)').text(formatAmount(parseFloat(currentSalary), 'USD'));
 
         // Update cost configuration columns
         costConfigurations.forEach(config => {
@@ -2013,7 +2013,7 @@ $(document).ready(function() {
                 }
 
                 // Store both USD value and original MVR value as data attributes
-                $cell.text(currencySymbol + ' ' + valueInUSD.toFixed(2));
+                $cell.text(formatAmount(valueInUSD, 'USD'));
                 $cell.attr('data-currency', config.currency);
                 $cell.attr('data-original-value', originalMvrValue.toFixed(2));
                 $cell.attr('data-usd-value', valueInUSD.toFixed(2));
@@ -2048,20 +2048,20 @@ $(document).ready(function() {
                 costTotals[costId] = (costTotals[costId] || 0) + value;
 
                 if (currency === 'MVR') {
-                    console.log(`Cost ${costId}: MVR converted to USD: ${currencySymbol} ${value.toFixed(2)}`);
+                    console.log(`Cost ${costId}: MVR converted to USD: ${formatAmount(value, 'USD')}`);
                 }
             });
         });
 
         // Update total row using class names
-        $totalRow.find('.total-current-salary').text(currencySymbol + ' ' + totalCurrent.toFixed(2));
-        $totalRow.find('.total-proposed-salary').text(currencySymbol + ' ' + totalProposed.toFixed(2));
+        $totalRow.find('.total-current-salary').text(formatAmount(totalCurrent, 'USD'));
+        $totalRow.find('.total-proposed-salary').text(formatAmount(totalProposed, 'USD'));
 
         // Update cost configuration totals using data-cost-id
         Object.keys(costTotals).forEach(costId => {
             const $costCell = $totalRow.find(`td[data-cost-id="${costId}"]`);
             if ($costCell.length) {
-                $costCell.text(currencySymbol + ' ' + costTotals[costId].toFixed(2));
+                $costCell.text(formatAmount(costTotals[costId], 'USD'));
             }
         });
 
@@ -2128,8 +2128,8 @@ $(document).ready(function() {
         const mvrToUsdRate = parseFloat($('#mvrToDollarRate').val() || 1/15.42);
 
         // Update salary columns
-        $row.find('td:eq(1)').text(currencySymbol + ' ' + parseFloat(basicSalary).toFixed(2));
-        $row.find('td:eq(2)').text(currencySymbol + ' ' + parseFloat(currentSalary).toFixed(2));
+        $row.find('td:eq(1)').text(formatAmount(parseFloat(basicSalary), 'USD'));
+        $row.find('td:eq(2)').text(formatAmount(parseFloat(currentSalary), 'USD'));
 
         // Update cost configuration columns
         costConfigurations.forEach(config => {
@@ -2147,7 +2147,7 @@ $(document).ready(function() {
                 }
 
                 // Store both USD value and original MVR value as data attributes
-                $cell.text(currencySymbol + ' ' + valueInUSD.toFixed(2));
+                $cell.text(formatAmount(valueInUSD, 'USD'));
                 $cell.attr('data-currency', config.currency);
                 $cell.attr('data-original-value', originalMvrValue.toFixed(2));
                 $cell.attr('data-usd-value', valueInUSD.toFixed(2));
@@ -2179,14 +2179,14 @@ $(document).ready(function() {
         });
 
         // Update total row using class names
-        $totalRow.find('.total-current-salary').text(currencySymbol + ' ' + totalCurrent.toFixed(2));
-        $totalRow.find('.total-proposed-salary').text(currencySymbol + ' ' + totalProposed.toFixed(2));
+        $totalRow.find('.total-current-salary').text(formatAmount(totalCurrent, 'USD'));
+        $totalRow.find('.total-proposed-salary').text(formatAmount(totalProposed, 'USD'));
 
         // Update cost configuration totals using data-cost-id
         Object.keys(costTotals).forEach(costId => {
             const $costCell = $totalRow.find(`td[data-cost-id="${costId}"]`);
             if ($costCell.length) {
-                $costCell.text(currencySymbol + ' ' + costTotals[costId].toFixed(2));
+                $costCell.text(formatAmount(costTotals[costId], 'USD'));
             }
         });
 

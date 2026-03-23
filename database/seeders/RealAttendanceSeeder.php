@@ -127,22 +127,26 @@ class RealAttendanceSeeder extends Seeder
             ->where('ShiftDate', '02/25/2026 - 03/24/2026')
             ->delete();
 
-        // ── Create duty roster ──
-        $rosterId = DB::table('duty_rosters')->insertGetId([
-            'resort_id'  => $resortId,
-            'Shift_id'   => $shiftId,
-            'Emp_id'     => $empMap['DR-1'],
-            'ShiftDate'  => '02/25/2026 - 03/24/2026',
-            'Year'       => '2026',
-            'created_by' => 259,
-            'modified_by'=> 259,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // ── Create per-employee duty rosters ──
+        $empRosterIds = [];
+        foreach ($empMap as $empCode => $empId) {
+            $empRosterIds[$empId] = DB::table('duty_rosters')->insertGetId([
+                'resort_id'  => $resortId,
+                'Shift_id'   => $shiftId,
+                'Emp_id'     => $empId,
+                'ShiftDate'  => '02/25/2026 - 03/24/2026',
+                'Year'       => '2026',
+                'created_by' => 259,
+                'modified_by'=> 259,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         // ── Create duty roster entries ──
         $rosterEntries = [];
         foreach ($empMap as $empCode => $empId) {
+            $rosterId = $empRosterIds[$empId];
             foreach ($dates as $index => $date) {
                 $attStatus = $attendance[$empCode][$index];
                 $rosterStatus = 'Working';

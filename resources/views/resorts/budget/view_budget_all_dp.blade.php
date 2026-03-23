@@ -339,7 +339,7 @@
                                                                                 @if($vacantCost > 0)
                                                                                     <input type="hidden" class="vacant" name="vacant[{{ $incrementKey }}][{{ $month }}][{{ $vacantIndex }}]" value="{{ $vacantCost }}">
                                                                                     <span style="word-wrap: break-word; white-space: break-spaces;" class="badge badge-success">
-                                                                                        {{ Common::GetResortCurrencySymbol() }} {{ number_format($vacantCost, 2) }}
+                                                                                        {!! Common::formatCurrency($vacantCost, 'USD') !!}
                                                                                     </span>
                                                                                 @endif
                                                                             </td>
@@ -912,20 +912,11 @@
 
             // Update footer totals for the department
             $(`#total-positions-${Finding_id}`).text(totalPositions);
-            $(`#${Finding_id}-total-current-basic-salary`).text(currencySymbol + ' ' + totalCurrentBasicSalary.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }));
-            $(`#${Finding_id}-total-proposed-basic-salary`).text(currencySymbol + ' ' + totalProposedBasicSalary.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }));
+            $(`#${Finding_id}-total-current-basic-salary`).text(formatAmount(totalCurrentBasicSalary, 'USD'));
+            $(`#${Finding_id}-total-proposed-basic-salary`).text(formatAmount(totalProposedBasicSalary, 'USD'));
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
             months.forEach((month, index) => {
-                $(`#${Finding_id}-total-${month}`).text(currencySymbol + ' ' +  Math.round(combinedMonthlyTotals[index]).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }));
+                $(`#${Finding_id}-total-${month}`).text(formatAmount(Math.round(combinedMonthlyTotals[index]), 'USD'));
             });
 
             // Update grand total display and hidden input
@@ -933,9 +924,7 @@
             grandTotal= Math.round(grandTotal);
             $(`#grand_total_department_${Finding_id}`).val(grandTotal); // grand_total_department_
 
-            $(`.grand_total_department_${Finding_id}`).text(currencySymbol + ' ' + grandTotal.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+            $(`.grand_total_department_${Finding_id}`).text(formatAmount(grandTotal, 'USD'));
             }));
 
             $(`#grand_total_department_${Finding_id}`).val(grandTotal);
