@@ -2,9 +2,12 @@
 /public/hot
 /public/storage
 /public/talent_acquisition
+/public/uploads/
+/public/public/uploads/
+/public/resorts_assets/JobAdvertisement/
 /storage/*.key
-/storage/app/public/offer_letters/
-/storage/app/public/contracts/
+/storage/app/
+!/storage/app/.gitignore
 /storage/framework/sessions
 /storage/framework/views
 /storage/framework/cache
@@ -13,6 +16,8 @@
 .env
 .env.backup
 .env.production
+backup.sql
+.htaccess
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
