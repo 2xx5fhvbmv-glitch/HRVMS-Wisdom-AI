@@ -3594,6 +3594,22 @@ class Common
         return self::GetResortCurrencySymbol() . ' ' . number_format($converted, 2);
     }
 
+    public static function getDisplayCurrency()
+    {
+        $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
+        if (!$resortId) return 'USD';
+        $settings = \App\Models\ResortSiteSettings::where('resort_id', $resortId)->first();
+        return ($settings && $settings->currency === 'MVR') ? 'MVR' : 'USD';
+    }
+
+    public static function getUsdToMvrRate()
+    {
+        $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
+        if (!$resortId) return 15.42;
+        $settings = \App\Models\ResortSiteSettings::where('resort_id', $resortId)->first();
+        return $settings ? (float) $settings->DollertoMVR : 15.42;
+    }
+
     public static function getServiceCharge($employee_id, $resortId,$payrollId){
         $service_charge = PayrollServiceCharge::where('payroll_id',$payrollId)->where('employee_id',$employee_id)->first();
 
