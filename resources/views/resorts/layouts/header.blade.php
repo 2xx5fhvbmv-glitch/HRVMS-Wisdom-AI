@@ -4,15 +4,28 @@
         <div class="container-fluid">
             <div class="row g-sm-3 g-1 justify-content-between align-items-center">
                 <div class="col-xl-auto col-auto ">
-                    <a href="{{ route('resort.workforceplan.dashboard') }}" class="brand-logo"><img src="{{ URL::asset('resorts_assets/images/wisdom-ai.png')}}" /></a>
+                    @php
+                        $resort_admin = Auth::guard('resort-admin')->user();
+                        $resort_id = $resort_admin->resort_id;
+                        $auth_id = isset($resort_admin->GetEmployee) ? $resort_admin->GetEmployee->id : 26;
+                        $current_route = Route::currentRouteName();
+                        $_empRank = $resort_admin->GetEmployee->rank ?? null;
+                        $_hrDeptId = \App\Models\ResortDepartment::where('resort_id', $resort_id)->where('name', 'Human Resources')->value('id');
+                        $_empDeptId = $resort_admin->GetEmployee->Dept_id ?? null;
+                        if ($resort_admin->is_master_admin == 1) {
+                            $_logoRoute = route('resort.Page.Permission');
+                        } elseif ($_empRank == 8) {
+                            $_logoRoute = route('resort.master.gm_dashboard');
+                        } elseif (in_array($_empRank, [3, 7]) || ($_empRank == 1 && $_empDeptId == $_hrDeptId)) {
+                            $_logoRoute = route('resort.master.hr_dashboard');
+                        } elseif ($_empRank == 1) {
+                            $_logoRoute = route('resort.master.excom_dashboard');
+                        } else {
+                            $_logoRoute = route('resort.master.hod_dashboard');
+                        }
+                    @endphp
+                    <a href="{{ $_logoRoute }}" class="brand-logo"><img src="{{ URL::asset('resorts_assets/images/wisdom-ai.png')}}" /></a>
                 </div>
-                @php 
-                    $resort_admin = Auth::guard('resort-admin')->user();
-                    $resort_id = Auth::guard('resort-admin')->user()->resort_id;
-                    $auth_id = isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->id : 26;
-                    $current_route = Route::currentRouteName();
-                    
-                @endphp
 
                 
                     <div class="col-xl-auto col-auto ">
@@ -183,7 +196,7 @@
                     </div>
 
                 <div class="col-xl-auto col-auto">
-                    <a href="{{ route('resort.workforceplan.dashboard') }}" class="tooltip-left brand-logo resort-logo">
+                    <a href="{{ $_logoRoute }}" class="tooltip-left brand-logo resort-logo">
                         <img src="{{ Common::GetResortLogo(Auth::guard('resort-admin')->user()->resort_id) }}" class="resort-image-header" />
                         <span class="tooltip-text-left">{{ Auth::guard('resort-admin')->user()->resort->resort_name }}</span>
                     </a>

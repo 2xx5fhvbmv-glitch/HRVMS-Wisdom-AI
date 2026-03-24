@@ -942,6 +942,8 @@ class TimeandAttendanceDashboardController extends Controller
     public function hod_dashboard()
     {
         $page_title ='Time And Attendance';
+        $dashboardLabel = request('dashboard_label', 'HOD');
+        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
         $Dept_id = $this->resort->GetEmployee->Dept_id ?? null;
         $Rank =  $this->resort->GetEmployee->rank ?? null;
         $hod = $this->resort->GetEmployee->id ?? null;
@@ -1037,7 +1039,13 @@ class TimeandAttendanceDashboardController extends Controller
         $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $totalAbsantEmployee;
         $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
-        return view('resorts.timeandattendance.dashboard.hoddashboard', compact('attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee', 'totalunknown_status_Employee'));
+        return view('resorts.timeandattendance.dashboard.hoddashboard', compact('page_header','attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee', 'totalunknown_status_Employee'));
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
     }
 
     public function HodDashboardCount($date)

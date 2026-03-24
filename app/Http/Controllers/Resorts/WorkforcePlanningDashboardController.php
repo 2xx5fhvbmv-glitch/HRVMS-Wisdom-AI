@@ -449,7 +449,8 @@ class WorkforcePlanningDashboardController extends Controller
 
         try {
                 $page_title ='Workforce Planning Dashboard';
-                $page_header = '<span class="arca-font">HOD</span> Dashboard';
+                $dashboardLabel = request('dashboard_label', 'HOD');
+                $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
                 $resort= Auth::guard('resort-admin')->user();
                 $resort_id =$resort->resort_id;
                 $id = Auth::guard('resort-admin')->user()->id;
@@ -624,13 +625,19 @@ class WorkforcePlanningDashboardController extends Controller
                     // ->where('rank','others')
                     ->get(['first_name', 'last_name','Admin_Parent_id','rank','nationality']); // Adjust according to your employee table fields
             }
-            return view('resorts.workforce_planning.hoddashboard',compact('totalemployees','BudgetRejactedStatus','BudgetStatus','getNotifications','employees','LeftemployeesCount','HODpendingResponse','ManningPendingRequestCount','resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','total_emp','positions','department_details','positionsWithEmployees','nextYear','Dept_id','vacant_positions'));
+            return view('resorts.workforce_planning.hoddashboard',compact('page_header','totalemployees','BudgetRejactedStatus','BudgetStatus','getNotifications','employees','LeftemployeesCount','HODpendingResponse','ManningPendingRequestCount','resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','total_emp','positions','department_details','positionsWithEmployees','nextYear','Dept_id','vacant_positions'));
         }
         catch( \Exception $e ) {
             \Log::emergency("File: ".$e->getFile());
             \Log::emergency("Line: ".$e->getLine());
             \Log::emergency("Message: ".$e->getMessage());
         }
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
     }
 
     public function GetYearBasePositions(Request $request)

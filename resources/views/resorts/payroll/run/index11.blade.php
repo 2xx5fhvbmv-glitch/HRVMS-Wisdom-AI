@@ -234,7 +234,7 @@
                                     <tfoot>
                                         <tr>
                                             <th colspan="6" class="text-end">Total Service Charge:</th>
-                                            <th colspan="1" id="total-service-charge" class="fw-bold">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                            <th colspan="1" id="total-service-charge" class="fw-bold">{{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                         </tr>
                                     </tfoot>
                                 </table>

@@ -341,6 +341,19 @@ class AttandanceRegisterController extends Controller
 
                     $LeaveCategory = LeaveCategory::where('resort_id',$this->resort->resort_id)->get();
 
+                    // Pre-compute which leave categories have data across ALL employees (not just current page)
+                    $leaveCategoriesWithData = DB::table('employees_leaves as el')
+                        ->where('el.resort_id', $this->resort->resort_id)
+                        ->where('el.status', 'Approved')
+                        ->where(function($q) use ($startOfMonth, $endOfMonth) {
+                            $q->where('el.from_date', '<=', $endOfMonth->format('Y-m-d'))
+                              ->where('el.to_date', '>=', $startOfMonth->format('Y-m-d'));
+                        })
+                        ->distinct()
+                        ->pluck('el.leave_category_id')
+                        ->map(function($id) { return (int)$id; })
+                        ->toArray();
+
                     // Get public holidays (including Fridays)
                     $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
 
@@ -363,14 +376,14 @@ class AttandanceRegisterController extends Controller
 
                 // AJAX (filter or pagination): always return partial so page does not reload
                 if ($request->ajax()) {
-                    $view = view('resorts.renderfiles.ResigterRosterSearch',compact('LeaveCategory','sendclass','monthwiseheaders','headers',
+                    $view = view('resorts.renderfiles.ResigterRosterSearch',compact('LeaveCategory','leaveCategoriesWithData','sendclass','monthwiseheaders','headers',
                                                         'attandanceregister','resort_id','WeekstartDate','WeekendDate','startOfMonth','endOfMonth','publicHolidays','overtimeData'))->render();
                     return response()->json(['success'=>true,'view' => $view]);
                 }
                 // Non-AJAX (e.g. opened pagination link in new tab): return full page
                 $page_title = 'Attandance Register';
                 $ResortDepartment = ResortDepartment::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
-                return view('resorts.timeandattendance.attandanceregister.index',compact('LeaveCategory','sendclass','monthwiseheaders','headers',
+                return view('resorts.timeandattendance.attandanceregister.index',compact('LeaveCategory','leaveCategoriesWithData','sendclass','monthwiseheaders','headers',
                                                     'attandanceregister','resort_id','WeekstartDate','WeekendDate','startOfMonth','endOfMonth','page_title','ResortDepartment','publicHolidays','overtimeData'));
 
 

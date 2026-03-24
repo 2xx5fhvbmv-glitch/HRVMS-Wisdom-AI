@@ -278,39 +278,8 @@
     </div> -->
     <div class="table-responsive mb-4">
     @php
-        $leaveCategoryTotalCount = [];
-        if ($LeaveCategory->isNotEmpty() && $attandanceregister->isNotEmpty()) {
-            foreach ($attandanceregister as $empRow) {
-                $rosterData = Common::GetAttandanceRegister($resort_id, $empRow->duty_roster_id, $empRow->emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, "Monthwise");
-                // Get LeaveData from first roster record only (it's the same on all records for the employee)
-                $leaveDataChecked = false;
-                foreach ($rosterData as $shiftData) {
-                    if (!$leaveDataChecked && isset($shiftData->LeaveData) && is_array($shiftData->LeaveData)) {
-                        $leaveDataChecked = true;
-                        foreach ($shiftData->LeaveData as $leaveData) {
-                            $catId = is_array($leaveData) ? ($leaveData['leave_cat_id'] ?? null) : ($leaveData->leave_cat_id ?? null);
-                            if ($catId !== null && $catId !== '') {
-                                // Calculate days that overlap with the current month
-                                $leaveFrom = is_array($leaveData) ? ($leaveData['from_date'] ?? null) : ($leaveData->from_date ?? null);
-                                $leaveTo = is_array($leaveData) ? ($leaveData['to_date'] ?? null) : ($leaveData->to_date ?? null);
-                                if ($leaveFrom && $leaveTo) {
-                                    $overlapStart = max(strtotime($startOfMonth), strtotime($leaveFrom));
-                                    $overlapEnd = min(strtotime($endOfMonth), strtotime($leaveTo));
-                                    $overlapDays = max(0, floor(($overlapEnd - $overlapStart) / 86400) + 1);
-                                } else {
-                                    $totalDays = is_array($leaveData) ? ($leaveData['total_days'] ?? 1) : ($leaveData->total_days ?? 1);
-                                    $overlapDays = (int)$totalDays;
-                                }
-                                $leaveCategoryTotalCount[(int)$catId] = ($leaveCategoryTotalCount[(int)$catId] ?? 0) + $overlapDays;
-                            }
-                        }
-                    }
-                }
-            }
-            $leaveCategoriesWithData = array_keys(array_filter($leaveCategoryTotalCount, function ($count) { return $count > 0; }));
-        } else {
-            $leaveCategoriesWithData = [];
-        }
+        // $leaveCategoriesWithData is now passed from the controller (computed across ALL employees, not just current page)
+        $leaveCategoriesWithData = $leaveCategoriesWithData ?? [];
     @endphp
     <table class="table table-bordered attendance-grid-table mb-0">
                                     <thead>
@@ -329,6 +298,7 @@
                                             @endforeach
                                             <th class="leave-stat-col">Present</th>
                                             <th class="leave-stat-col">Absent</th>
+                                            <th class="leave-stat-col">Unpaid Leave</th>
                                             <th class="leave-stat-col">Day-off</th>
                                             @if($LeaveCategory->isNotEmpty())
                                                 @foreach ($LeaveCategory as $l)
@@ -346,6 +316,7 @@
                                                     $RosterInternalDataMonth = Common::GetAttandanceRegister($resort_id, $a->duty_roster_id, $a->emp_id, $WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth, "Monthwise");
                                                     $presentDates = [];
                                                     $absentDates = [];
+                                                    $unpaidLeaveDates = [];
                                                     $dayOffDates = [];
                                                     $seenDates = [];
                                                     foreach ($RosterInternalDataMonth as $sd) {
@@ -355,12 +326,20 @@
                                                         $seenDates[$d] = true;
                                                         if (isset($sd->Status)) {
                                                             if ($sd->Status == 'Present') $presentDates[$d] = true;
-                                                            elseif ($sd->Status == 'Absent') $absentDates[$d] = true;
+                                                            elseif ($sd->Status == 'Absent') {
+                                                                $note = $sd->note ?? '';
+                                                                if (stripos($note, 'Unpaid Leave') !== false) {
+                                                                    $unpaidLeaveDates[$d] = true;
+                                                                } else {
+                                                                    $absentDates[$d] = true;
+                                                                }
+                                                            }
                                                             elseif ($sd->Status == 'DayOff') $dayOffDates[$d] = true;
                                                         }
                                                     }
                                                     $presentCountRow = count($presentDates);
                                                     $absentCountRow = count($absentDates);
+                                                    $unpaidLeaveCountRow = count($unpaidLeaveDates);
                                                     $dayOffCountRow = count($dayOffDates);
                                                 @endphp
                                                 <tr>
@@ -433,7 +412,7 @@
                                                                         'punchOut' => $shiftData->CheckingOutTime ?? '--:--',
                                                                         'overtime' => $overtimeValue
                                                                     ]);
-                                                                } elseif($shiftData->Status == "Absent" && isset($shiftData->note) && $shiftData->note == 'Unpaid Leave') {
+                                                                } elseif($shiftData->Status == "Absent" && isset($shiftData->note) && stripos($shiftData->note, 'Unpaid Leave') !== false) {
                                                                     $cellClass .= ' bg-unpaidleave';
                                                                     $cellLabel = 'UL';
                                                                     $cellStatus = 'UNPAID LEAVE';
@@ -510,6 +489,7 @@
                                                     @endforeach
                                                     <td class="leave-stat-cell"><span>{{ $presentCountRow }}</span></td>
                                                     <td class="leave-stat-cell"><span>{{ $absentCountRow }}</span></td>
+                                                    <td class="leave-stat-cell"><span>{{ $unpaidLeaveCountRow }}</span></td>
                                                     <td class="leave-stat-cell"><span>{{ $dayOffCountRow }}</span></td>
                                                     @if($LeaveCategory->isNotEmpty())
                                                         @php

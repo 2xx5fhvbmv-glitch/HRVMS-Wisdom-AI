@@ -197,6 +197,7 @@
                                             <th>Department </th>
                                             <th>Present</th>
                                             <th>Absent</th>
+                                            <th>Unpaid Leave</th>
                                             <th>Day Off</th>
                                             <th>Leave Types</th>
                                             <th>Regular OT Hours</th>
@@ -255,7 +256,7 @@
                                     <tfoot>
                                         <tr>
                                             <th colspan="6" class="text-end">Total Service Charge:</th>
-                                            <th colspan="1" id="total-service-charge" class="fw-bold">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                            <th colspan="1" id="total-service-charge" class="fw-bold">{{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -322,6 +323,7 @@
                             <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
                             <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
+
                         <fieldset data-step="6">
                             <div class="card-header mb-2">
                                 <div class="row justify-content-start align-items-center g-2">
@@ -338,8 +340,8 @@
                                     <thead>
                                         <tr>
                                             <th colspan="4"></th>
-                                            <th colspan="3">Overtime</th>
                                             <th colspan="1">Time & Attendance</th>
+                                            <th colspan="3">Overtime</th>
                                             <th colspan="3">Earnings</th>
                                         </tr>
                                         <tr>
@@ -347,10 +349,10 @@
                                             <th>Employee Name</th>
                                             <th>Department</th>
                                             <th>Position</th>
+                                            <th>Service Charge</th>
                                             <th>Normal</th>
                                             <th>Holiday</th>
                                             <th>Total</th>
-                                            <th>Service Charge</th>
                                             <th>Basic Earned</th>
                                             <th>Allowance</th>
                                             <th>Total Earnings</th>
@@ -505,12 +507,28 @@
             </div>
         </div>
     </div>
+
+    {{-- Staff Shop Transaction Details Modal --}}
+    <div class="modal fade" id="staffShopModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">Staff Shop Details</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0"></div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('import-css')
 <style>
     .leave-tooltip{position:fixed;background:#2C2C2C;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;z-index:9999;min-width:180px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none;pointer-events:none}
     .leave-tooltip.show{display:block!important}
+    .modal-body .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:0!important}
+    .staff-shop-popover{position:fixed;z-index:99999;background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.18);border:1px solid #e0e0e0;max-width:380px;pointer-events:none}
+    .staff-shop-popover .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:8px!important}
     .leave-tooltip::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #2C2C2C}
     .leave-tooltip.arrow-top::after{bottom:auto;top:-8px;border-top:none;border-bottom:8px solid #2C2C2C}
     .leave-tooltip .tooltip-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -1066,21 +1084,28 @@
 
                 var DeductionData = [];
 
+                function stripCurrency(val) {
+                    return parseFloat(val.replace(/[^0-9.\-]/g, '')) || 0;
+                }
+
                 $("#table-deductions tbody tr").each(function () {
+                    if ($(this).find("td.dataTables_empty").length > 0) return;
                     DeductionData.push({
                         id: $(this).find("td:eq(0)").text().trim(),
                         name: $(this).find("td:eq(1)").text().trim(),
                         department: $(this).find("td:eq(2)").text().trim(),
-                        attendanceDeduction: $(this).find("td:eq(3)").text().trim().replace("$", "") || 0,
-                        cityLedger: $(this).find("td:eq(4)").text().trim().replace("$", "") || 0,
-                        staffShop: $(this).find("td:eq(5)").text().trim().replace("$", "") || 0,
-                        advanceLoan : $(this).find("td:eq(6)").text().trim().replace("$", "") || 0,
-                        pension: $(this).find("td:eq(7)").text().trim().replace("$", "") || 0,
-                        ewt: $(this).find("td:eq(8)").text().trim().replace("$", "") || 0,
-                        other: $(this).find("td:eq(9)").text().trim().replace("$", "") || 0,
-                        total: $(this).find("td:eq(10)").text().trim().replace("$", "") || 0
+                        attendanceDeduction: stripCurrency($(this).find("td:eq(3)").text()),
+                        cityLedger: stripCurrency($(this).find("td:eq(4)").text()),
+                        staffShop: stripCurrency($(this).find("td:eq(5)").text()),
+                        advanceLoan: stripCurrency($(this).find("td:eq(6)").text()),
+                        pension: stripCurrency($(this).find("td:eq(7)").text()),
+                        ewt: stripCurrency($(this).find("td:eq(8)").text()),
+                        other: stripCurrency($(this).find("td:eq(9)").text()),
+                        total: stripCurrency($(this).find("td:eq(10)").text())
                     });
                 });
+
+                console.log('Deduction data count:', DeductionData.length, 'Sample:', DeductionData[0]);
 
                 if (DeductionData.length === 0) {
                     toastr.error("Something is wrong.some data are missing", 'Error', {
@@ -1089,9 +1114,10 @@
                     return;
                 }
 
-                // Send AJAX request to save employees in payroll
+                // Send AJAX request to save deductions
+                console.log('Saving deductions...', DeductionData.length, 'records');
                 $.ajax({
-                    url: '{{ route("payroll.saveDeductions") }}', // Laravel route
+                    url: '{{ route("payroll.saveDeductions") }}',
                     method: 'POST',
                     data: {
                         payroll_id: payrollId,
@@ -1099,29 +1125,23 @@
                         _token: '{{ csrf_token() }}'
                     },
                     success: function (response) {
+                        console.log('Save deductions response:', response);
                         if (response.success) {
-                            toastr.success("Deductions added to payroll successfully!", 'Success', {
+                            toastr.success("Deductions saved!", 'Success', {
                                 positionClass: 'toast-bottom-right'
                             });
-                            
-                           // Load currency rates before moving to the next step
-                            loadCurrencyRates(searchTerm = "",resortid, currency, currentStep).then(() => {
-                                moveToNextStep($currentFieldset);
-                            }).catch(error => {
-                                console.error("Error loading currency rates:", error);
-                                toastr.error("Failed to load currency rates.", 'Error', {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            });
-                            
+                            moveToNextStep($currentFieldset);
+                            // Load review data for step 6
+                            getstep6data(currency, 1);
                         } else {
-                            toastr.error(response.message, 'Error', {
+                            toastr.error(response.message || "Failed to save deductions.", 'Error', {
                                 positionClass: 'toast-bottom-right'
                             });
                         }
                     },
-                    error: function () {
-                        toastr.error("Error saving employees.", 'Error', {
+                    error: function (xhr) {
+                        console.error('Save deductions error:', xhr.status, xhr.responseText);
+                        toastr.error("Error saving deductions.", 'Error', {
                             positionClass: 'toast-bottom-right'
                         });
                     }
@@ -1163,15 +1183,15 @@
                         position: $row.find("td:eq(3)").text().trim(),
                         present: 0,
                         absent: 0,
-                        overtimeNormal: $row.find("td:eq(4)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        overtimeHoliday: $row.find("td:eq(5)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        overtimeTotal: $row.find("td:eq(6)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        serviceCharge: $row.find("td:eq(7)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        serviceCharge: $row.find("td:eq(4)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        overtimeNormal: $row.find("td:eq(5)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        overtimeHoliday: $row.find("td:eq(6)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
+                        overtimeTotal: $row.find("td:eq(7)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
                         earningsBasic: 0,
                         earnedSalary: $row.find("td:eq(8)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
                         earningsAllowance: 0, // will calculate below
-                        earningsNormal: $row.find("td:eq(-2)").text().trim().replace("$", "") || 0,
-                        totalDeductions: $row.find("td:eq(-1)").text().trim().replace("$", "") || 0,
+                        earningsNormal: parseFloat($row.find("td:eq(-2)").text().replace(/[^0-9.\-]/g, '')) || 0,
+                        totalDeductions: parseFloat($row.find("td:eq(-1)").text().replace(/[^0-9.\-]/g, '')) || 0,
                         allowances: []
                     };
                     
@@ -1896,8 +1916,8 @@
     }
 
     $("#attedsearchInput").on("keyup", function () {
-        searchTerm = $('#attedsearchInput').val();
-        getstep3data(searchTerm);
+        var table = $('#table-timeAttendance').DataTable();
+        table.search($(this).val()).draw();
     });
 
     function getstep3data(searchTerm) {
@@ -2008,6 +2028,7 @@
                             <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
                             <td class="editable">${employee.present}</td>
                             <td class="editable">${employee.absent}</td>
+                            <td>${employee.unpaid_absent || 0}</td>
                             <td>${employee.day_off || 0}</td>
                             <td>${employee.leave_types}</td>
                             <td class="editable">${employee.regular_ot}</td>
@@ -2020,10 +2041,11 @@
                     $("#table-timeAttendance").DataTable({
                         responsive: true,
                         paging: false,
-                        searching: false,
+                        searching: true,
                         ordering: true,
                         autoWidth: false,
-                        pageLength: 10
+                        pageLength: 10,
+                        dom: 'lrtip' // hide default search box, keep table+info+pagination
                     });
                     // ✅ Implement Search Filtering
                     
@@ -2654,8 +2676,8 @@
 
                     $table.find("thead tr:eq(0)").html(`
                         <th colspan="4"></th>
-                        <th colspan="3">Overtime</th>
                         <th colspan="1">Time & Attendance</th>
+                        <th colspan="3">Overtime</th>
                         <th colspan="${1 + allowanceList.length + 2}">Earnings</th>
                     `);
 
@@ -2664,10 +2686,10 @@
                         <th>Employee Name</th>
                         <th>Department</th>
                         <th>Position</th>
+                        <th>Service Charge</th>
                         <th>Normal</th>
                         <th>Holiday</th>
                         <th>Total</th>
-                        <th>Service Charge</th>
                         <th>Basic Earned</th>
                         ${allowanceHeaderHtml}
                         <th>Total Earnings</th>
@@ -2719,10 +2741,10 @@
                                 </td>
                                 <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
                                 <td>${employee.position}</td>
+                                <td>${currencySymbol}${employee.service_charge}</td>
                                 <td>${currencySymbol}${employee.regularOTPay}</td>
                                 <td>${currencySymbol}${employee.holidayOTPay}</td>
                                 <td>${currencySymbol}${employee.totalOTPay}</td>
-                                <td>${currencySymbol}${employee.service_charge}</td>
                                 <td>${currencySymbol}${employee.earned_salary.toFixed(2)}</td>
                                 ${allowanceCols}
                                 <td>${currencySymbol}${employee.normal_pay.toFixed(2)}</td>
@@ -2735,10 +2757,10 @@
                     // Generate footer row
                     let footerHtml = `
                         <td colspan="4" class="text-end fw-bold">Total</td>
+                        <td>${currencySymbol}${footerTotals.service_charge}</td>
                         <td>${currencySymbol}${footerTotals.regularOTPay.toFixed(2)}</td>
                         <td>${currencySymbol}${footerTotals.holidayOTPay.toFixed(2)}</td>
                         <td>${currencySymbol}${footerTotals.totalOTPay.toFixed(2)}</td>
-                        <td>${currencySymbol}${footerTotals.service_charge}</td>
                         <td>${currencySymbol}${footerTotals.earned_salary.toFixed(2)}</td>
                     `;
                     allowanceList.forEach(a => {
@@ -2913,6 +2935,9 @@
         $(this).replaceWith('<a href="#" class="btn-lg-icon icon-bg-skyblue edit-btn"><i class="fa-regular fa-pen"></i></a>');
     });
 
+    var staffShopTooltips = {}; // Store tooltip HTML by Emp_id
+    var ewtTooltips = {}; // Store EWT tooltip HTML by Emp_id
+
     function fetchStaffShopData(employeeIds, startDate, endDate, currency,conversionRate =1) {
         $.ajax({
             url: '{{route("payroll.fetch.staffshop")}}',
@@ -2932,12 +2957,12 @@
                         $("#table-deductions tbody tr").each(function () {
                             var $row = $(this);
                             if ($row.find("td:eq(0)").text().trim() === employee.Emp_id) {
-                                var $td = $row.find("td:eq(5)");
+                                var $td = $row.find("td.staff-shop");
                                 $td.text(currencySymbol + employee.total.toFixed(2));
 
                                 // Build tooltip with transaction details
                                 if (employee.transactions && employee.transactions.length > 0) {
-                                    var tooltipHtml = '<div class="leave-tooltip" style="min-width:280px;">' +
+                                    var tooltipHtml = '<div style="min-width:280px;">' +
                                         '<div class="p-2 border-bottom" style="background:#f0f4ff;border-radius:8px 8px 0 0;">' +
                                             '<strong>Staff Shop Transactions</strong>' +
                                         '</div>' +
@@ -2964,7 +2989,9 @@
                                         '<div class="border-top pt-1 mt-1 text-end"><strong>Total: ' + currencySymbol + employee.total.toFixed(2) + '</strong></div>' +
                                         '</div></div>';
 
-                                    $td.css('cursor', 'pointer').attr('data-staff-tooltip', tooltipHtml);
+                                    $td.css('cursor', 'pointer');
+                                    staffShopTooltips[employee.Emp_id] = tooltipHtml;
+                                    console.log('Stored tooltip for', employee.Emp_id, 'length:', tooltipHtml.length);
                                 }
 
                                 updateTotal($row, employee.Emp_id);
@@ -2976,31 +3003,80 @@
         });
     }
 
-    // Staff shop tooltip hover
-    $(document).on('mouseenter', 'td[data-staff-tooltip]', function(e) {
-        // Remove any existing tooltip
-        $('#staff-shop-tooltip').remove();
+    // Staff shop tooltip — hover to show transaction details
+    var $staffTooltip = null;
 
-        var htmlContent = $(this).attr('data-staff-tooltip');
-        var $tooltip = $('<div id="staff-shop-tooltip"></div>').html(htmlContent).css({
-            position: 'absolute',
-            zIndex: 9999,
-            background: '#fff',
-            borderRadius: '8px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-            border: '1px solid #e0e0e0',
-            maxWidth: '350px'
-        }).appendTo('body');
+    function getEmpIdFromRow($row) {
+        var empId = $row.find('td:eq(0)').text().trim();
+        if (!empId || !empId.match(/^DR-/)) {
+            $row.find('td').each(function() {
+                var t = $(this).text().trim();
+                if (t.match(/^DR-\d+$/)) { empId = t; return false; }
+            });
+        }
+        return empId;
+    }
 
-        var top = $(this).offset().top - $tooltip.outerHeight() - 8;
-        var left = $(this).offset().left;
+    $(document).on('mouseenter', 'td.staff-shop', function(e) {
+        if ($staffTooltip) { $staffTooltip.remove(); $staffTooltip = null; }
 
-        // If tooltip goes above viewport, show below
-        if (top < 0) top = $(this).offset().top + $(this).outerHeight() + 8;
+        var empId = getEmpIdFromRow($(this).closest('tr'));
+        var htmlContent = staffShopTooltips[empId];
+        if (!htmlContent) return;
 
-        $tooltip.css({ top: top, left: left });
-    }).on('mouseleave', 'td[data-staff-tooltip]', function() {
-        $('#staff-shop-tooltip').remove();
+        var amount = $(this).text().trim();
+        if (!amount || amount.indexOf('0.00') !== -1) return;
+
+        $staffTooltip = $('<div id="staff-shop-tooltip" class="staff-shop-popover"></div>');
+        $staffTooltip[0].innerHTML = htmlContent;
+        $('body').append($staffTooltip);
+
+        var rect = this.getBoundingClientRect();
+        var ttHeight = $staffTooltip.outerHeight();
+        var ttWidth = $staffTooltip.outerWidth();
+        var top = rect.top - ttHeight - 10;
+        var left = rect.left + (rect.width / 2) - (ttWidth / 2);
+
+        if (top < 10) top = rect.bottom + 10;
+        if (left < 10) left = 10;
+        if (left + ttWidth > window.innerWidth - 10) left = window.innerWidth - ttWidth - 10;
+
+        $staffTooltip.css({ top: top, left: left });
+    });
+
+    $(document).on('mouseleave', 'td.staff-shop', function() {
+        if ($staffTooltip) { $staffTooltip.remove(); $staffTooltip = null; }
+    });
+
+    // EWT tooltip — hover to show tax breakdown
+    var $ewtTooltip = null;
+
+    $(document).on('mouseenter', 'td.ewt', function(e) {
+        if ($ewtTooltip) { $ewtTooltip.remove(); $ewtTooltip = null; }
+
+        var empId = getEmpIdFromRow($(this).closest('tr'));
+        var htmlContent = ewtTooltips[empId];
+        if (!htmlContent) return;
+
+        $ewtTooltip = $('<div class="staff-shop-popover"></div>');
+        $ewtTooltip[0].innerHTML = htmlContent;
+        $('body').append($ewtTooltip);
+
+        var rect = this.getBoundingClientRect();
+        var ttHeight = $ewtTooltip.outerHeight();
+        var ttWidth = $ewtTooltip.outerWidth();
+        var top = rect.top - ttHeight - 10;
+        var left = rect.left + (rect.width / 2) - (ttWidth / 2);
+
+        if (top < 10) top = rect.bottom + 10;
+        if (left < 10) left = 10;
+        if (left + ttWidth > window.innerWidth - 10) left = window.innerWidth - ttWidth - 10;
+
+        $ewtTooltip.css({ top: top, left: left });
+    });
+
+    $(document).on('mouseleave', 'td.ewt', function() {
+        if ($ewtTooltip) { $ewtTooltip.remove(); $ewtTooltip = null; }
     });
 
     // function calculatePensionAndEWT(employeeIds, currency, conversionRate = 1,payrollId) {
@@ -3064,7 +3140,32 @@
                                 var ewtFormatted = currencySymbol + employee.ewt.toFixed(2);
 
                                 $row.find("td:eq(7)").text(pensionFormatted);
-                                $row.find("td:eq(8)").text(ewtFormatted);
+                                var $ewtTd = $row.find("td:eq(8)");
+                                $ewtTd.text(ewtFormatted);
+
+                                // Store EWT tooltip data
+                                if (employee.ewt > 0 && employee.ewt_breakdown && employee.ewt_breakdown.length > 0) {
+                                    var ewtHtml = '<div style="min-width:300px;">' +
+                                        '<div class="p-2 border-bottom" style="background:#fff3e0;border-radius:8px 8px 0 0;">' +
+                                            '<strong>EWT Calculation</strong>' +
+                                        '</div>' +
+                                        '<div class="p-2">' +
+                                        '<div class="mb-2" style="font-size:11px;">' +
+                                            '<div class="d-flex justify-content-between"><span>Total Earnings:</span><strong>' + currencySymbol + employee.total_earnings.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) + '</strong></div>' +
+                                            '<div class="d-flex justify-content-between"><span>Taxable Income:</span><strong>' + currencySymbol + employee.taxable_income.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) + '</strong></div>' +
+                                        '</div>' +
+                                        '<table class="table table-sm table-borderless mb-0" style="font-size:11px;">' +
+                                        '<thead><tr><th>Tax Slab</th><th>Rate</th><th>Taxable</th><th>Tax</th></tr></thead><tbody>';
+                                    employee.ewt_breakdown.forEach(function(slab) {
+                                        ewtHtml += '<tr><td>' + slab.slab + '</td><td>' + slab.rate + '</td><td>' + currencySymbol + slab.taxable.toLocaleString(undefined, {minimumFractionDigits:2}) + '</td><td>' + currencySymbol + slab.tax.toFixed(2) + '</td></tr>';
+                                    });
+                                    ewtHtml += '</tbody></table>' +
+                                        '<div class="border-top pt-1 mt-1 text-end"><strong>Total EWT: ' + ewtFormatted + '</strong></div>' +
+                                        '</div></div>';
+                                    ewtTooltips[employee.Emp_id] = ewtHtml;
+                                    $ewtTd.css('cursor', 'pointer');
+                                }
+
                                 updateTotal($row, employee.Emp_id);
                             }
                         });
@@ -3195,9 +3296,9 @@
        
         if (isChecked) {
             var table = $('#payroll-employees').DataTable();
-            var newtable =  $("#table-timeAttendance").DataTable();
-            var servicechargetable =  $("#table-serviceCharge").DataTable();
-            var deductiontable = $("#table-deductions").DataTable();
+            if ($.fn.DataTable.isDataTable("#table-timeAttendance")) var newtable = $("#table-timeAttendance").DataTable();
+            if ($.fn.DataTable.isDataTable("#table-serviceCharge")) var servicechargetable = $("#table-serviceCharge").DataTable();
+            if ($.fn.DataTable.isDataTable("#table-deductions")) var deductiontable = $("#table-deductions").DataTable();
             // var reviewtable = $("#table-review").DataTable();
             $.ajax({
                 url: '{{ route("payroll.employee.list") }}',
@@ -3211,10 +3312,10 @@
                 },
                 success: function (response) {
                     var totalRecords = response.recordsTotal;
-                    table.page.len(totalRecords).draw();
-                    newtable.page.len(totalRecords).draw();
-                    servicechargetable.page.len(totalRecords).draw();
-                    deductiontable.page.len(totalRecords).draw();
+                    if (table && table.page) table.page.len(totalRecords).draw();
+                    if (newtable && newtable.page) newtable.page.len(totalRecords).draw();
+                    if (servicechargetable && servicechargetable.page) servicechargetable.page.len(totalRecords).draw();
+                    if (deductiontable && deductiontable.page) deductiontable.page.len(totalRecords).draw();
                     // reviewtable.page.len(totalRecords).draw();
                 }
             });

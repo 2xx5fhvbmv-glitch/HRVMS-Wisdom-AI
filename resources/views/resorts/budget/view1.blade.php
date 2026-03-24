@@ -182,20 +182,20 @@
                                 <th></th>
                                 <th></th>
                                 <th></th>
-                                <th id="total-current-basic-salary">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-proposed-basic-salary">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-jan-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-feb-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-mar-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-apr-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-may-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-jun-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-jul-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-aug-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-sep-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-oct-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-nov-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
-                                <th id="total-dec-2024">${{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-current-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-proposed-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-jan-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-feb-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-mar-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-apr-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-may-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-jun-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-jul-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-aug-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-sep-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-oct-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-nov-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
+                                <th id="total-dec-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
                             </tr>
                         </tfoot>
                     </table>

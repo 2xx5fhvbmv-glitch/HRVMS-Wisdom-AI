@@ -356,7 +356,7 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div>
                                             <p class="mb-0  fw-500">Total Budget</p>
-                                            <strong>${{ Common::GetResortCurrencySymbol() }} 1.2M</strong>
+                                            <strong>{{ Common::GetResortCurrencySymbol() }} 1.2M</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -366,7 +366,7 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div>
                                             <p class="mb-0  fw-500">Spent</p>
-                                            <strong>${{ Common::GetResortCurrencySymbol() }} 345K</strong>
+                                            <strong>{{ Common::GetResortCurrencySymbol() }} 345K</strong>
                                         </div>
                                     </div>
                                 </div>
@@ -376,7 +376,7 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <div>
                                             <p class="mb-0  fw-500">Remaining</p>
-                                            <strong>${{ Common::GetResortCurrencySymbol() }} 855K</strong>
+                                            <strong>{{ Common::GetResortCurrencySymbol() }} 855K</strong>
                                         </div>
                                     </div>
                                 </div>

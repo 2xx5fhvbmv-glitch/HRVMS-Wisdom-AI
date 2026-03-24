@@ -76,24 +76,24 @@
                                     <h3>Financial Impact Analysis</h3>
                                 </div>
                                 <div class="bg-themeGrayLight d-flex">
-                                    <h6>Current Basic Salary (Monthly)</h6><strong class="current-basic-salary">${{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                    <h6>Current Basic Salary (Monthly)</h6><strong class="current-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</strong>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                  <div class="bg-themeGrayLight d-flex">
-                                      <h6>New Basic Salary (Monthly)</h6><strong class="new-basic-salary">${{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                      <h6>New Basic Salary (Monthly)</h6><strong class="new-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</strong>
                                  </div>
                             </div>
                       </div>
                       <div class="row g-md-4 g-2 mt-2 align-items-end">
                             <div class="col-md-6">
                                  <div class="bg-themeGrayLight d-flex">
-                                      <h6>Payroll Cost Increase(Monthly)</h6><strong class="monthly-payroll-increase">${{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                      <h6>Payroll Cost Increase(Monthly)</h6><strong class="monthly-payroll-increase">{{ Common::GetResortCurrencySymbol() }} 0</strong>
                                  </div>
                             </div>
                             <div class="col-md-6">
                                  <div class="bg-themeGrayLight d-flex">
-                                      <h6>Payroll Cost Increase (Annual)</h6><strong class="annual-payroll-increase">${{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                      <h6>Payroll Cost Increase (Annual)</h6><strong class="annual-payroll-increase">{{ Common::GetResortCurrencySymbol() }} 0</strong>
                                  </div>
                             </div>
                       </div>

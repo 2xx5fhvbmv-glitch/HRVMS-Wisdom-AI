@@ -124,16 +124,51 @@ class RedirectIfNotCorrectDashboard
                 // dd(str_contains($currentRoute, 'leave'), !$request->routeIs('leave.admindashboard'));
             }
 
-            // Determine dashboard level based on RANK only (not department/position name)
-            // HR (rank 3), Finance (rank 7) → HR-level dashboards
-            // GM (rank 8) → GM dashboard (handled separately)
-            // EXCOM (rank 1) → HR-level dashboards
+            // Determine dashboard level based on RANK and DEPARTMENT
+            // HR dept EXCOM (rank 1), HR (rank 3), Finance (rank 7) → HR-level dashboards
+            // Non-HR EXCOM (rank 1) → HOD-level dashboards (department-scoped)
+            // GM (rank 8) → GM/HR-level dashboards
             // HOD (rank 2), MGR (rank 4), SUP (rank 5), Line Workers (rank 6) → HOD/lower dashboards
-            $isHrOrFinance = in_array($employeeRank, [1, 3, 7]); // EXCOM, HR, Finance
+            $hrDeptId = \App\Models\ResortDepartment::where('resort_id', $Resort->resort_id)
+                ->where('name', 'Human Resources')->value('id');
+            $employeeDeptId = $employee->Dept_id ?? null;
+            $isHrDeptExcom = ($employeeRank == 1 && $employeeDeptId == $hrDeptId);
 
-                // GM (rank 8) gets HR-level dashboards (same as EXCOM/HR) for all modules
+            // Only HR dept EXCOM, HR rank, Finance rank, and GM get HR-level dashboards
+            $isHrOrFinance = in_array($employeeRank, [3, 7]) || $isHrDeptExcom; // HR, Finance, HR-dept EXCOM
+            $isNonHrExcom = ($employeeRank == 1 && !$isHrDeptExcom); // EXCOM but not in HR dept
+
+                // GM (rank 8) gets HR-level dashboards (same as HR) for all modules
                 if ($employeeRank == 8) {
                     $isHrOrFinance = true;
+                }
+
+                // Non-HR EXCOM gets EXCOM dashboards (same data as HOD but different title)
+                if ($isNonHrExcom) {
+                    if (str_contains($currentRoute, 'workforceplan') && !$request->routeIs('resort.workforceplan.excomdashboard')) {
+                        return redirect()->route('resort.workforceplan.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'recruitement') && !$request->routeIs('resort.recruitement.excomdashboard')) {
+                        return redirect()->route('resort.recruitement.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'timeandattendance') && !$request->routeIs('resort.timeandattendance.excomdashboard')) {
+                        return redirect()->route('resort.timeandattendance.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'leave') && !$request->routeIs('leave.excomdashboard')) {
+                        return redirect()->route('leave.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'accommodation') && !$request->routeIs('resort.accommodation.excomdashboard')) {
+                        return redirect()->route('resort.accommodation.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'payroll') && !$request->routeIs('payroll.dashboard')) {
+                        return redirect()->route('payroll.dashboard');
+                    } elseif (str_contains($currentRoute, 'Performance') && !$request->routeIs('Performance.excomdashboard')) {
+                        return redirect()->route('Performance.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'learning') && !$request->routeIs('learning.excom.dashboard')) {
+                        return redirect()->route('learning.excom.dashboard');
+                    } elseif (str_contains($currentRoute, 'GrievanceAndDisciplinery') && !$request->routeIs('GrievanceAndDisciplinery.excomdashboard')) {
+                        return redirect()->route('GrievanceAndDisciplinery.excomdashboard');
+                    } elseif (str_contains($currentRoute, 'incident') && !$request->routeIs('incident.excom.dashboard')) {
+                        return redirect()->route('incident.excom.dashboard');
+                    } elseif (str_contains($currentRoute, 'master') && !$request->routeIs('resort.master.excom_dashboard')) {
+                        return redirect()->route('resort.master.excom_dashboard');
+                    }
+                    return $next($request);
                 }
 
                 $position_name = $employee->position->position_title ?? null;

@@ -148,6 +148,18 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
         Route::get('/master/gm-dashboard','MasterDashboardController@gm_dashboard')->name('resort.master.gm_dashboard');
         Route::get('/master/admin-dashboard','MasterDashboardController@admin_dashboard')->name('resort.master.admin_dashboard');
 
+        // XCOM Dashboard Routes (reuse HOD dashboards with XCOM title)
+        Route::get('workforce-planning/xcom-dashboard', 'WorkforcePlanningDashboardController@excom_dashboard')->name('resort.workforceplan.excomdashboard');
+        Route::get('talent-acquisition/xcom-dashboard', 'TalentAcquisitionDashboardController@excom_dashboard')->name('resort.recruitement.excomdashboard');
+        Route::get('time-and-attendance/xcom-dashboard', 'TimeandAttendanceDashboardController@excom_dashboard')->name('resort.timeandattendance.excomdashboard');
+        Route::get('leave/xcom-dashboard', 'Leave\DashboardController@excom_dashboard')->name('leave.excomdashboard');
+        Route::get('accommodation/xcom-dashboard', 'Accommodation\AccommodationDashboardController@excom_dashboard')->name('resort.accommodation.excomdashboard');
+        Route::get('performance/xcom-dashboard', 'Performance\PerformanceDashboardController@excom_dashboard')->name('Performance.excomdashboard');
+        Route::get('learning/xcom-dashboard', 'Learning\DashboardController@excom_dashboard')->name('learning.excom.dashboard');
+        Route::get('grievance-and-disciplinary/xcom-dashboard', 'GrievanceAndDisciplinery\DashboardController@excom_dashboard')->name('GrievanceAndDisciplinery.excomdashboard');
+        Route::get('incident/xcom-dashboard', 'Incident\DashboardController@excom_dashboard')->name('incident.excom.dashboard');
+        Route::get('/master/xcom-dashboard','MasterDashboardController@excom_dashboard')->name('resort.master.excom_dashboard');
+
     });
 
     Route::get('/people/exit/clearance-staticstics', 'People\DashboardController@exitClearanceStaticstics')->name('people.exit-interview.staticstics');

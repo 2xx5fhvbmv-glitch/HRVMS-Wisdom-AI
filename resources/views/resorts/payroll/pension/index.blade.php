@@ -73,8 +73,8 @@
                     <tfoot>
                         <tr>
                             <th colspan="7">Total:</th>
-                            <th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
-                            <th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                            <th class="fw-600">{{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                            <th class="fw-600">{{ Common::GetResortCurrencySymbol() }} 0.00</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -171,8 +171,8 @@ function loadPensionTable() {
                 $('#table-pension').append(
                     '<tfoot><tr>' +
                     '<th colspan="7" class="text-end fw-600">Total:</th>' +
-                    '<th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>' +
-                    '<th class="fw-600">${{ Common::GetResortCurrencySymbol() }} 0.00</th>' +
+                    '<th class="fw-600">{{ Common::GetResortCurrencySymbol() }} 0.00</th>' +
+                    '<th class="fw-600">{{ Common::GetResortCurrencySymbol() }} 0.00</th>' +
                     '</tr></tfoot>'
                 );
             }
