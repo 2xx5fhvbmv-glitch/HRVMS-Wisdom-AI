@@ -44,7 +44,14 @@ class PerformanceDashboardController extends Controller
 
     public function Hod_dashboard(Request $request)
     {
+        $dashboardLabel = request('dashboard_label', 'HOD');
+        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
+    }
 
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->Hod_dashboard(request());
     }
 }
 

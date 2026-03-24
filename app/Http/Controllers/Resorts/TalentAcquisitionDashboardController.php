@@ -419,7 +419,8 @@ class TalentAcquisitionDashboardController extends Controller
     {
         try {
             $page_title = 'Talent Acquisition Dashboard';
-            $page_header = '<span class="arca-font">My</span> Dashboard';
+            $dashboardLabel = request('dashboard_label', 'HOD');
+            $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
             $currentYear = date('Y');
             $nextYear = $currentYear + 1;
             $resort_id = $this->globalUser->resort_id;
@@ -604,6 +605,7 @@ class TalentAcquisitionDashboardController extends Controller
 
 
             return view('resorts.talentacquisition.dashboard.hoddashboard', compact(
+                'page_header',
                 'resort_id',
                 'resort_divisions',
                 'resort_departments',
@@ -627,6 +629,7 @@ class TalentAcquisitionDashboardController extends Controller
             $Hired = 0;
 
             return view('resorts.talentacquisition.dashboard.hoddashboard', compact(
+                'page_header',
                 'resort_id',
                 'resort_divisions',
                 'resort_departments',
@@ -640,6 +643,12 @@ class TalentAcquisitionDashboardController extends Controller
                 'drafts'
             ));
         }
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
     }
 
     public function getTopCountriesPositionData(Request $request)

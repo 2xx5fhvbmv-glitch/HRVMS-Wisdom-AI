@@ -755,7 +755,8 @@ class MasterDashboardController extends Controller
 
         // try {
             $page_title = 'Talent Acquisition Dashboard';
-            $page_header = '<span class="arca-font">My</span> Dashboard';
+            $dashboardLabel = request('dashboard_label', 'HOD');
+            $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
             $currentYear = date('Y');
             $nextYear = $currentYear + 1;
             $resort_id = $this->globalUser->resort_id;
@@ -1328,7 +1329,7 @@ class MasterDashboardController extends Controller
                 ->limit(10)->get();
 
             return view('resorts.master-dashboard.hoddashboard', compact(
-                'resort_id','resort_divisions','resort_departments','resort_positions',
+                'page_header','resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
                 'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning'
@@ -1353,6 +1354,12 @@ class MasterDashboardController extends Controller
         //         'vacancies'
         //     ));
         // }
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
     }
 
 

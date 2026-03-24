@@ -453,6 +453,8 @@ class DashboardController extends Controller
     public function hod_dashboard()
     {
         $page_title ='Incident';
+        $dashboardLabel = request('dashboard_label', 'HOD');
+        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
         $resort_id= $this->resort->resort_id;
         $department_id = $this->resort->GetEmployee->Dept_id;
         // dd($department_id);
@@ -553,8 +555,15 @@ class DashboardController extends Controller
         $totalIncidents = array_sum($categoryData);
 
         // dd($severityCounts);
-        return view('resorts.incident.dashboard.hoddashboard',compact('page_title','total_incidents','pending_incidents','under_investigation_incidents','averageResolutionDays','committeeSummary','severityCounts','resolvedCount','unresolvedCount','categoryLabels','categoryData','totalIncidents'));
-    } 
+        return view('resorts.incident.dashboard.hoddashboard',compact('page_header','page_header','
+page_title','total_incidents','pending_incidents','under_investigation_incidents','averageResolutionDays','committeeSummary','severityCounts','resolvedCount','unresolvedCount','categoryLabels','categoryData','totalIncidents'));
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
+    }
 
     public function getIncidentStatusStats(Request $request)
     {

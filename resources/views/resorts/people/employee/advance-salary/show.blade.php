@@ -318,7 +318,7 @@
                                                   <div class="col-lg-12 col-sm-6">
                                                   <div class="bg-white">
                                                        <h6>Interest</h6>
-                                                       <strong id="interest_amount">${{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                                       <strong id="interest_amount">{{ Common::GetResortCurrencySymbol() }} 0</strong>
                                                   </div>
                                                   </div>
                                                   <div class="col-lg-12 col-sm-6">

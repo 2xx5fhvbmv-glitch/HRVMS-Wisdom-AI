@@ -189,45 +189,45 @@
                                                 <tbody>
                                                     <tr>
                                                         <td>Salaries</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-success">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-success">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Overtime</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-danger">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-danger">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Salaries</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-success">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-success">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Overtime</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-danger">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-danger">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Salaries</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-success">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-success">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                     <tr>
                                                         <td>Overtime</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>${{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-danger">${{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
+                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
+                                                        <td><span class="text-danger">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
                                                     </tr>
                                                 </tbody>
                                             </table>

@@ -1,5 +1,5 @@
 @extends('resorts.layouts.app')
-@section('page_tab_title' ,"HOD-Dashboard")
+@section('page_tab_title' , ($page_header ?? 'HOD') . "-Dashboard")
 
 @if ($message = Session::get('success'))
 <div class="alert alert-success">
@@ -16,7 +16,7 @@
                     <div class="col-auto">
                         <div class="page-title">
                             <span>WORKFORCE PLANNING</span>
-                            <h1>HOD Dashboard</h1>
+                            <h1>{!! $page_header ?? '<span class="arca-font">HOD</span> Dashboard' !!}</h1>
                         </div>
                     </div>
                 </div>

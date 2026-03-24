@@ -736,7 +736,9 @@ class AccommodationDashboardController extends Controller
     {
 
         $page_title="Accommodation Dashboard";
-      
+        $dashboardLabel = request('dashboard_label', 'HOD');
+        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
+
         $ResortDepartment= ResortDepartment::where("resort_id",$this->globalUser->resort_id)->get();
         $currentHod = Auth::guard('resort-admin')->user()->GetEmployee->id;
         $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
@@ -883,7 +885,14 @@ class AccommodationDashboardController extends Controller
                                 ->where('employees.resort_id', $this->globalUser->resort_id)
                                 ->whereIn('employees.id',$this->underEmp_id)
                                 ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
-        return view('resorts.Accommodation.dashboard.hoddashboard',compact('Employee','Totalnumberofopenrequests','TotalnumberofHighrequests','TotalnumberofInProgressrequests','page_title','ResortDepartment'));
+        return view('resorts.Accommodation.dashboard.hoddashboard',compact('page_header','page_header','
+Employee','Totalnumberofopenrequests','TotalnumberofHighrequests','TotalnumberofInProgressrequests','page_title','ResortDepartment'));
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->Hod_dashboard(request());
     }
 
 

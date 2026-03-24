@@ -265,6 +265,8 @@ class DashboardController extends Controller
     public function hod_dashboard()
     {
         $page_title = 'Leave';
+        $dashboardLabel = request('dashboard_label', 'HOD');
+        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
         $loggedInEmployee = $this->resort->getEmployee ?? $this->resort->GetEmployee ?? null;
         $loggedInEmployeeId = $loggedInEmployee->id ?? null;
         $hodDeptId = $loggedInEmployee->Dept_id ?? null;
@@ -330,7 +332,13 @@ class DashboardController extends Controller
             return substr($employee->dob, 5, 5) === $tomorrowMd;
         });
 
-        return view('resorts.leaves.dashboard.hoddashboard', compact('page_title', 'upcomingHolidays', 'todayBirthdays', 'tomorrowBirthdays', 'resort_departments', 'total_applied_leaves', 'total_approved_leaves', 'total_pending_leaves', 'total_rejected_leaves', 'show_department_filter'));
+        return view('resorts.leaves.dashboard.hoddashboard', compact('page_header','page_title', 'upcomingHolidays', 'todayBirthdays', 'tomorrowBirthdays', 'resort_departments', 'total_applied_leaves', 'total_approved_leaves', 'total_pending_leaves', 'total_rejected_leaves', 'show_department_filter'));
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
     }
 
     public function get_upcomimg_holidays(Request $request){

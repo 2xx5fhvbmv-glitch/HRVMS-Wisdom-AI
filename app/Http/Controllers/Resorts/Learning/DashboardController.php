@@ -119,6 +119,8 @@ class DashboardController extends Controller
     public function hod_dashboard()
     {
         $page_title ='Learning';
+        $dashboardLabel = request('dashboard_label', 'HOD');
+        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
         $resort_id= $this->resort->resort_id;
         // dd($this->resort->GetEmployee->Admin_Parent_id);
         $ongoing_trainings_count = TrainingSchedule::where('status','Ongoing')->where('resort_id', $resort_id)->count();
@@ -134,7 +136,14 @@ class DashboardController extends Controller
         ->limit(5)
         ->get();
         
-        return view('resorts.learning.dashboard.hoddashboard',compact('page_title','ongoing_trainings_count','completed_trainings_count','scheduled_trainings_count','pending_trainings_count','pending_learning_request','trainings'));
+        return view('resorts.learning.dashboard.hoddashboard',compact('page_header','page_header','
+page_title','ongoing_trainings_count','completed_trainings_count','scheduled_trainings_count','pending_trainings_count','pending_learning_request','trainings'));
+    }
+
+    public function excom_dashboard()
+    {
+        request()->merge(['dashboard_label' => 'XCOM']);
+        return $this->hod_dashboard();
     }
 
     public function manager_dashboard()

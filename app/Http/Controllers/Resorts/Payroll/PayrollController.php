@@ -1604,8 +1604,15 @@ class PayrollController extends Controller
             $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'])->count();
 
             $absentRecords = $records->where('Status', 'Absent');
-            $absentCount = $absentRecords->count();
-            $unpaidAbsentCount = 0;
+            // Split absent into regular absent and unpaid leave (based on note field)
+            $unpaidLeaveRecords = $absentRecords->filter(function($r) {
+                return stripos($r->note ?? '', 'Unpaid Leave') !== false;
+            });
+            $regularAbsentRecords = $absentRecords->filter(function($r) {
+                return stripos($r->note ?? '', 'Unpaid Leave') === false;
+            });
+            $absentCount = $regularAbsentRecords->count();
+            $unpaidAbsentCount = $unpaidLeaveRecords->count();
             $absentDeduct = 0;
             $absentDates = $absentRecords->pluck('date');
             $paidLeaveDays = collect();
@@ -1642,8 +1649,10 @@ class PayrollController extends Controller
                 }
             }
 
-            // Process Absent records — check if covered by approved leave
-            foreach ($absentDates as $date) {
+            // Process only regular absent records — check if covered by approved leave
+            // (Unpaid leave dates already counted via note field above)
+            $regularAbsentDates = $regularAbsentRecords->pluck('date');
+            foreach ($regularAbsentDates as $date) {
                 $paidLeave = EmployeeLeave::where('emp_id', $empId)
                     ->where('status', 'Approved')
                     ->where(function ($q) use ($date) {
@@ -1736,7 +1745,7 @@ class PayrollController extends Controller
             }
             // Per day salary = basic / total days in cutoff period (e.g. 28 for Feb-Mar, 31 for Jan, etc.)
             $perDay = $basic / $totalDaysInPeriod;
-            $earnedSalary = round($perDay * $presentCount, 2); // presentCount already includes paid leave
+            $earnedSalary = round($perDay * ($presentCount + $dayOffCount), 2); // present + paid leave + day-off
             $absentDeduct = round($perDay * $unpaidAbsentCount, 2);
 
             // OT formula: (monthly salary / total days in period / 8 hours) = per hour salary
@@ -1745,6 +1754,7 @@ class PayrollController extends Controller
             $regularOTPay = round($perHourSalary * 1.25 * $regularOT, 2);
             $holidayOTPay = round($perHourSalary * 1.50 * $holidayOT, 2);
             $totalOTPay = round($regularOTPay + $holidayOTPay, 2);
+            \Log::info("OT Calc for {$employee->Emp_id}: basic={$basic}, period={$totalDaysInPeriod}, perHour={$perHourSalary}, regOT_hrs={$regularOT}, holOT_hrs={$holidayOT}, regOTPay={$regularOTPay}, holOTPay={$holidayOTPay}");
 
             $allowanceDetails = EmployeeAllowance::with('allowanceName')
                 ->where('employee_id', $employee->id)
@@ -1822,7 +1832,7 @@ class PayrollController extends Controller
                 'total_ot' => $totalHours,
                 'regular_ot' => $regularOT,
                 'holiday_ot' => $holidayOT,
-                'workdays' => $presentCount, // Present + Paid Leave days
+                'workdays' => $presentCount + $dayOffCount, // Present + Paid Leave + Day Off
                 'per_day_salary' => round($perDay, 2),
                 'absent_deduction' => round($absentDeduct, 2),
                 'earned_salary' => $earnedSalary,
@@ -2208,9 +2218,9 @@ class PayrollController extends Controller
             // Total Earnings = Earned Salary + Allowances + Service Charge + OT
             $totalEarningsMVR = $earnedSalaryMVR + $totalAllowanceMVR + $serviceChargeInMVR + $totalOTPayInMVR;
 
-            // Pension for Maldivian — 7% of full basic salary (not earned)
+            // Pension for Maldivian — 7% of earned salary (prorated based on actual working days)
             $isMaldivian = $employee->nationality === 'Maldivian';
-            $pensionMVR = $isMaldivian ? Common::calculatePension($salaryInMVR) : 0;
+            $pensionMVR = $isMaldivian ? Common::calculatePension($earnedSalaryMVR) : 0;
 
             // EWT is calculated on total earnings minus pension
             $taxableIncomeMVR = max($totalEarningsMVR - $pensionMVR, 0);
@@ -2303,11 +2313,40 @@ class PayrollController extends Controller
             $pensionFinal = ($currency === 'Dollar') ? $pensionMVR * $settings['MVRtoDoller'] : $pensionMVR;
             $ewtFinal = ($currency === 'Dollar') ? $ewtMVR * $settings['MVRtoDoller'] : $ewtMVR;
 
+            // Build EWT breakdown for tooltip
+            $ewtBreakdown = [];
+            if ($ewtMVR > 0) {
+                $brackets = DB::table('ewt_tax_brackets')->orderBy('min_salary')->get();
+                foreach ($brackets as $bracket) {
+                    $min = $bracket->min_salary;
+                    $max = is_null($bracket->max_salary) ? PHP_INT_MAX : $bracket->max_salary;
+                    $rate = $bracket->tax_rate;
+                    if ($taxableIncomeMVR > $min && $rate > 0) {
+                        $taxableAmount = min($taxableIncomeMVR, $max) - $min;
+                        if ($taxableAmount > 0) {
+                            $slabTax = $taxableAmount * ($rate / 100);
+                            $maxDisplay = is_null($bracket->max_salary) ? 'Above' : number_format($max);
+                            $ewtBreakdown[] = [
+                                'slab' => 'MVR ' . number_format($min) . ' - ' . ($bracket->max_salary ? 'MVR ' . number_format($max) : 'Above'),
+                                'rate' => $rate . '%',
+                                'taxable' => round(($currency === 'Dollar') ? $taxableAmount * $settings['MVRtoDoller'] : $taxableAmount, 2),
+                                'tax' => round(($currency === 'Dollar') ? $slabTax * $settings['MVRtoDoller'] : $slabTax, 2),
+                            ];
+                        }
+                    }
+                }
+            }
+
+            $totalEarningsFinal = ($currency === 'Dollar') ? $totalEarningsMVR * $settings['MVRtoDoller'] : $totalEarningsMVR;
+
             $responseData[] = [
                 'Emp_id' => $employee->emp_id,
                 'pension' => round($pensionFinal, 2),
                 'ewt' => round($ewtFinal, 2),
                 'currency' => $currency,
+                'total_earnings' => round($totalEarningsFinal, 2),
+                'taxable_income' => round(($currency === 'Dollar') ? $taxableIncomeMVR * $settings['MVRtoDoller'] : $taxableIncomeMVR, 2),
+                'ewt_breakdown' => $ewtBreakdown,
             ];
         }
 
