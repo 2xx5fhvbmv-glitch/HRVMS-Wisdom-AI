@@ -3024,8 +3024,8 @@
         var htmlContent = staffShopTooltips[empId];
         if (!htmlContent) return;
 
-        var amount = $(this).text().trim();
-        if (!amount || amount.indexOf('0.00') !== -1) return;
+        var amountText = $(this).text().trim().replace(/[^0-9.]/g, '');
+        if (!amountText || parseFloat(amountText) === 0) return;
 
         $staffTooltip = $('<div id="staff-shop-tooltip" class="staff-shop-popover"></div>');
         $staffTooltip[0].innerHTML = htmlContent;
