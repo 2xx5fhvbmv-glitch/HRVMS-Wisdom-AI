@@ -1583,9 +1583,9 @@
             $("#table-deductions tbody tr").each(function () {
                 var $row = $(this);
                 if ($row.find("td:eq(0)").text().trim() === employeeId) {
-                    var currentOther = parseFloat($row.find("td:eq(8)").text().replace(currencySymbol, '').trim()) || 0;
+                    var currentOther = parseFloat($row.find("td:eq(9)").text().replace(currencySymbol, '').trim()) || 0;
                     var newOther = currentOther + finalAmount;
-                    $row.find("td:eq(8)").text(currencySymbol + newOther.toFixed(2));
+                    $row.find("td:eq(9)").text(currencySymbol + newOther.toFixed(2));
                     updateTotal($row, employeeId);
                     updated = true;
                 }
