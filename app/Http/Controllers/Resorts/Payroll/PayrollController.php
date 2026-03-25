@@ -1592,8 +1592,9 @@ class PayrollController extends Controller
 
             $employee = $employees[$empId];
 
-            // Count DayOffs within the actual payroll cutoff period
-            $dayOffCount = $records->where('Status', 'DayOff')->count();
+            // Clone records array to prevent Laravel Collection where() mutation
+            $recordsArray = $records->values()->all();
+            $dayOffCount = collect($recordsArray)->where('Status', 'DayOff')->count();
             $periodStart = Carbon::parse($request->startDate);
             $periodEnd = Carbon::parse($request->endDate);
             $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
@@ -1601,9 +1602,9 @@ class PayrollController extends Controller
 
             $totalHours = $regularOT = $holidayOT = 0;
             $attendance_id = null;
-            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'])->count();
+            $presentCount = collect($recordsArray)->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'])->count();
 
-            $absentRecords = $records->where('Status', 'Absent');
+            $absentRecords = collect($recordsArray)->where('Status', 'Absent');
             // Split absent into regular absent and unpaid leave (based on note field)
             $unpaidLeaveRecords = $absentRecords->filter(function($r) {
                 return stripos($r->note ?? '', 'Unpaid Leave') !== false;
@@ -1619,7 +1620,7 @@ class PayrollController extends Controller
             $leaveDetails = collect();
 
             // Process FullDayLeave records — these are approved leave days already in attendance
-            $fullDayLeaveRecords = $records->where('Status', 'FullDayLeave');
+            $fullDayLeaveRecords = collect($recordsArray)->where('Status', 'FullDayLeave');
             foreach ($fullDayLeaveRecords as $leaveRec) {
                 $paidLeave = EmployeeLeave::where('emp_id', $empId)
                     ->where('status', 'Approved')
@@ -1690,18 +1691,23 @@ class PayrollController extends Controller
                             if ($isPaidLeave) {
                                 $paidLeaveDays->push($date);
                                 $presentCount++;
+                                $absentCount--; // Move from absent to present (paid leave covers it)
+                                continue;
+                            } else {
+                                // Approved unpaid leave — move from absent to unpaid leave
+                                $unpaidAbsentCount++;
+                                $absentCount--;
+                                continue;
                             }
-                            // Unpaid leave falls through to unpaidAbsentCount below
-                            if ($isPaidLeave) continue;
                         }
                     }
                 }
 
-                // Count as unpaid absent
-                $unpaidAbsentCount++;
+                // No approved leave covers this day — stays as regular absent
+                // Salary is still deducted for absent days (no show = no pay)
             }
             // dd($leaveDetails) ;
-            foreach ($records as $rec) {
+            foreach ($recordsArray as $rec) {
                 $attendance_id = $rec->id;
                 if (!empty($rec->OverTime) && !in_array($rec->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)
                     && strtolower(trim($rec->OTStatus ?? '')) === 'approved') {
@@ -1746,7 +1752,7 @@ class PayrollController extends Controller
             // Per day salary = basic / total days in cutoff period (e.g. 28 for Feb-Mar, 31 for Jan, etc.)
             $perDay = $basic / $totalDaysInPeriod;
             $earnedSalary = round($perDay * ($presentCount + $dayOffCount), 2); // present + paid leave + day-off
-            $absentDeduct = round($perDay * $unpaidAbsentCount, 2);
+            $absentDeduct = round($perDay * ($absentCount + $unpaidAbsentCount), 2); // both absent and unpaid leave get deducted
 
             // OT formula: (monthly salary / total days in period / 8 hours) = per hour salary
             // Normal OT = per hour × 1.25, Holiday OT = per hour × 1.50
@@ -1754,7 +1760,6 @@ class PayrollController extends Controller
             $regularOTPay = round($perHourSalary * 1.25 * $regularOT, 2);
             $holidayOTPay = round($perHourSalary * 1.50 * $holidayOT, 2);
             $totalOTPay = round($regularOTPay + $holidayOTPay, 2);
-            \Log::info("OT Calc for {$employee->Emp_id}: basic={$basic}, period={$totalDaysInPeriod}, perHour={$perHourSalary}, regOT_hrs={$regularOT}, holOT_hrs={$holidayOT}, regOTPay={$regularOTPay}, holOTPay={$holidayOTPay}");
 
             $allowanceDetails = EmployeeAllowance::with('allowanceName')
                 ->where('employee_id', $employee->id)
