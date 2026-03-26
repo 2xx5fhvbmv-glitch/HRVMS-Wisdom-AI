@@ -79,16 +79,19 @@ class PayrollController extends Controller
         $cutoffDay = $cut_off_date ? $cut_off_date->cutoff_day : 15;
 
         // Generate available payroll periods (check up to 6 previous months for unpaid)
+        // Cutoff day = last day of period. Period starts on cutoff+1 and ends on next month's cutoff day.
         $availablePeriods = [];
         $today = \Carbon\Carbon::now();
         for ($i = 1; $i <= 6; $i++) {
-            $periodStart = \Carbon\Carbon::create($today->year, $today->month, $cutoffDay)->subMonths($i);
-            $periodEnd = \Carbon\Carbon::create($today->year, $today->month, $cutoffDay)->subMonths($i - 1)->subDay();
+            // Period start = cutoff_day + 1 of (current month - i months)
+            $baseStart = \Carbon\Carbon::create($today->year, $today->month, 1)->subMonths($i);
+            $startDay = min($cutoffDay, $baseStart->daysInMonth);
+            $periodStart = $baseStart->copy()->day($startDay)->addDay(); // cutoff + 1
 
-            // Validate dates — if the month has fewer days than cutoffDay, use end of month
-            if ($periodStart->day != $cutoffDay) {
-                $periodStart = $periodStart->endOfMonth();
-            }
+            // Period end = cutoff_day of (current month - i + 1 months)
+            $baseEnd = \Carbon\Carbon::create($today->year, $today->month, 1)->subMonths($i - 1);
+            $endDay = min($cutoffDay, $baseEnd->daysInMonth);
+            $periodEnd = $baseEnd->copy()->day($endDay);
 
             // Check if payroll exists and is locked/completed for this period
             $existingPayroll = Payroll::where('resort_id', $resort_id)
@@ -836,15 +839,18 @@ class PayrollController extends Controller
         $payrollId = $request->payrollId;
 
         // Sum net salary from payroll_review table
-        $totalPayroll = PayrollReview::where('payroll_id', $payrollId)
-            ->sum('net_salary');
-
-        // Optional: Count employees
+        $totalPayroll = PayrollReview::where('payroll_id', $payrollId)->sum('net_salary');
+        $totalEarnedSalary = PayrollReview::where('payroll_id', $payrollId)->sum('earned_salary');
+        $totalServiceCharge = PayrollReview::where('payroll_id', $payrollId)->sum('service_charge');
+        $totalDeductions = PayrollReview::where('payroll_id', $payrollId)->sum('total_deductions');
         $totalEmployees = PayrollReview::where('payroll_id', $payrollId)->count();
 
         return response()->json([
             'success' => true,
             'total_payroll' => round($totalPayroll, 2),
+            'total_earned_salary' => round($totalEarnedSalary, 2),
+            'total_service_charge' => round($totalServiceCharge, 2),
+            'total_deductions' => round($totalDeductions, 2),
             'total_employees' => $totalEmployees,
         ]);
     }
@@ -1451,6 +1457,23 @@ class PayrollController extends Controller
             ]);
         }
 
+        // Return saved service charge data for step restore
+        if ($request->has('getServiceChargeOnly') && $request->payrollId) {
+            $scData = DB::table('payroll_service_charges')
+                ->where('payroll_id', $request->payrollId)
+                ->get(['Emp_id', 'total_working_days', 'service_charge_amount']);
+            $totalAmount = DB::table('payroll_service_charges')
+                ->where('payroll_id', $request->payrollId)
+                ->sum('service_charge_amount');
+            // Get the total entered amount from the payroll record or sum
+            $payrollTotalSC = $scData->sum('service_charge_amount');
+            return response()->json([
+                'success' => $scData->isNotEmpty(),
+                'data' => $scData,
+                'total_amount' => round($payrollTotalSC, 2),
+            ]);
+        }
+
         $request->validate([
             'employees' => 'required|array',
             'startDate' => 'required|date',
@@ -1600,7 +1623,7 @@ class PayrollController extends Controller
             $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
             $workingDays = max(1, $totalDaysInPeriod - $dayOffCount);
 
-            $totalHours = $regularOT = $holidayOT = 0;
+            $totalHours = $regularOT = $fridayOT = $holidayOT = 0;
             $attendance_id = null;
             $presentCount = collect($recordsArray)->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'])->count();
 
@@ -1717,16 +1740,34 @@ class PayrollController extends Controller
                     $hours = $h + ($m / 60);
                     $totalHours += $hours;
 
-                    // Check if it's a public holiday, resort holiday, or DayOff (all count as holiday OT)
+                    // Classify OT: Friday OT, Holiday OT (public/resort holiday or DayOff), Regular OT
                     $dateFormatted = date('d-m-Y', strtotime($rec->date));
+                    $isFriday = Carbon::parse($rec->date)->isFriday();
                     $isPublicHoliday = PublicHoliday::where('holiday_date', $dateFormatted)->exists();
                     $isResortHoliday = \DB::table('resortholidays')
                         ->where('resort_id', $this->resort->resort_id)
                         ->where('PublicHolidaydate', $rec->date)
                         ->exists();
                     $isDayOff = $rec->Status === 'DayOff';
-                    $isHoliday = $isPublicHoliday || $isResortHoliday || $isDayOff;
-                    $isHoliday ? $holidayOT += $hours : $regularOT += $hours;
+
+                    if ($isFriday) {
+                        $fridayOT += $hours;
+                    } elseif ($isPublicHoliday || $isResortHoliday || $isDayOff) {
+                        $holidayOT += $hours;
+                    } else {
+                        $regularOT += $hours;
+                    }
+                }
+
+                // Friday present = entire shift counts as Friday OT (Friday is non-working day)
+                if (Carbon::parse($rec->date)->isFriday()
+                    && in_array($rec->Status, ['Present', 'On-Time', 'Late'])
+                    && !empty($rec->DayWiseTotalHours)
+                    && !in_array($rec->DayWiseTotalHours, ['0', '0:0', '0:00', '00:00'], true)) {
+                    $dayParts = explode(':', $rec->DayWiseTotalHours);
+                    $dayHours = (int)($dayParts[0] ?? 0) + ((int)($dayParts[1] ?? 0) / 60);
+                    $fridayOT += $dayHours;
+                    $totalHours += $dayHours;
                 }
             }
 
@@ -1755,11 +1796,12 @@ class PayrollController extends Controller
             $absentDeduct = round($perDay * ($absentCount + $unpaidAbsentCount), 2); // both absent and unpaid leave get deducted
 
             // OT formula: (monthly salary / total days in period / 8 hours) = per hour salary
-            // Normal OT = per hour × 1.25, Holiday OT = per hour × 1.50
+            // Normal OT = per hour × 1.25, Friday OT = per hour × 1.50, Holiday OT = per hour × 1.50
             $perHourSalary = $basic / $totalDaysInPeriod / 8;
             $regularOTPay = round($perHourSalary * 1.25 * $regularOT, 2);
+            $fridayOTPay = round($perHourSalary * 1.50 * $fridayOT, 2);
             $holidayOTPay = round($perHourSalary * 1.50 * $holidayOT, 2);
-            $totalOTPay = round($regularOTPay + $holidayOTPay, 2);
+            $totalOTPay = round($regularOTPay + $fridayOTPay + $holidayOTPay, 2);
 
             $allowanceDetails = EmployeeAllowance::with('allowanceName')
                 ->where('employee_id', $employee->id)
@@ -1836,6 +1878,7 @@ class PayrollController extends Controller
                 'section' => 'N/A',
                 'total_ot' => $totalHours,
                 'regular_ot' => $regularOT,
+                'friday_ot' => $fridayOT,
                 'holiday_ot' => $holidayOT,
                 'workdays' => $presentCount + $dayOffCount, // Present + Paid Leave + Day Off
                 'per_day_salary' => round($perDay, 2),
@@ -1864,6 +1907,7 @@ class PayrollController extends Controller
                 'leave_types' => $this->formatLeaveTypes($leaveDetails),
                 'totalOTPay' => round($totalOTPay, 2),
                 'regularOTPay' => round($regularOTPay, 2),
+                'fridayOTPay' => round($fridayOTPay, 2),
                 'holidayOTPay' => round($holidayOTPay, 2),
             ];
         })
@@ -3118,5 +3162,119 @@ class PayrollController extends Controller
         foreach (range('A', 'D') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
+    }
+
+    public function exportReview($payrollId, $type)
+    {
+        $resortId = $this->resort->resort_id;
+        $payroll = Payroll::where('id', $payrollId)->where('resort_id', $resortId)->firstOrFail();
+        $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
+        $currency = Common::getDisplayCurrency();
+        $symbol = Common::GetResortCurrencySymbol();
+
+        $reviews = PayrollReview::where('payroll_id', $payrollId)
+            ->get();
+
+        $deductions = PayrollDeduction::where('payroll_id', $payrollId)
+            ->get()
+            ->keyBy('Emp_id');
+
+        $timeAttendance = PayrollTimeAndAttendance::where('payroll_id', $payrollId)
+            ->get()
+            ->keyBy('Emp_id');
+
+        $employees = Employee::whereIn('Emp_id', $reviews->pluck('Emp_id'))
+            ->where('resort_id', $resortId)
+            ->with(['resortAdmin', 'department', 'position'])
+            ->get()
+            ->keyBy('Emp_id');
+
+        // Build data rows
+        $rows = [];
+        foreach ($reviews as $review) {
+            $emp = $employees[$review->Emp_id] ?? null;
+            $ded = $deductions[$review->Emp_id] ?? null;
+            $ta = $timeAttendance[$review->Emp_id] ?? null;
+
+            $rows[] = [
+                'emp_id' => $review->Emp_id,
+                'name' => $emp ? ($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name) : '',
+                'department' => $emp ? ($emp->department->name ?? '') : '',
+                'position' => $emp ? ($emp->position->position_title ?? '') : '',
+                'present' => $ta->present_days ?? 0,
+                'absent' => $ta->absent_days ?? 0,
+                'regular_ot' => $ta->regular_ot_hours ?? 0,
+                'friday_ot' => $ta->friday_ot_hours ?? 0,
+                'holiday_ot' => $ta->holiday_ot_hours ?? 0,
+                'service_charge' => round($review->service_charge ?? 0, 2),
+                'earned_salary' => round($review->earned_salary ?? 0, 2),
+                'overtime_pay' => round($review->earnings_overtime ?? 0, 2),
+                'total_earnings' => round($review->total_earnings ?? 0, 2),
+                'attendance_ded' => round($ded->attendance_deduction ?? 0, 2),
+                'city_ledger' => round($ded->city_ledger ?? 0, 2),
+                'staff_shop' => round($ded->staff_shop ?? 0, 2),
+                'pension' => round($ded->pension ?? 0, 2),
+                'ewt' => round($ded->ewt ?? 0, 2),
+                'other_ded' => round($ded->other ?? 0, 2),
+                'total_deductions' => round($review->total_deductions ?? 0, 2),
+                'net_salary' => round($review->net_salary ?? 0, 2),
+            ];
+        }
+
+        if ($type === 'excel') {
+            return $this->exportReviewExcel($rows, $payroll, $symbol);
+        } else {
+            return $this->exportReviewPDF($rows, $payroll, $symbol, $resortId);
+        }
+    }
+
+    private function exportReviewExcel($rows, $payroll, $symbol)
+    {
+        $filename = 'Payroll_Review_' . $payroll->start_date . '_to_' . $payroll->end_date . '.xlsx';
+
+        return Excel::download(new class($rows, $symbol) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+            private $rows;
+            private $symbol;
+
+            public function __construct($rows, $symbol) {
+                $this->rows = $rows;
+                $this->symbol = $symbol;
+            }
+
+            public function headings(): array {
+                return ['ID', 'Name', 'Department', 'Position', 'Present', 'Absent', 'Regular OT', 'Friday OT', 'Holiday OT', 'Service Charge', 'Earned Salary', 'OT Pay', 'Total Earnings', 'Att. Deduction', 'City Ledger', 'Staff Shop', 'Pension', 'EWT', 'Other', 'Total Deductions', 'Net Salary'];
+            }
+
+            public function array(): array {
+                return array_map(function($r) {
+                    return [
+                        $r['emp_id'], $r['name'], $r['department'], $r['position'],
+                        $r['present'], $r['absent'], $r['regular_ot'], $r['friday_ot'], $r['holiday_ot'],
+                        $r['service_charge'], $r['earned_salary'], $r['overtime_pay'], $r['total_earnings'],
+                        $r['attendance_ded'], $r['city_ledger'], $r['staff_shop'], $r['pension'], $r['ewt'], $r['other_ded'],
+                        $r['total_deductions'], $r['net_salary']
+                    ];
+                }, $this->rows);
+            }
+
+            public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) {
+                return [1 => ['font' => ['bold' => true]]];
+            }
+        }, $filename);
+    }
+
+    private function exportReviewPDF($rows, $payroll, $symbol, $resortId)
+    {
+        $data = [
+            'rows' => $rows,
+            'payroll' => $payroll,
+            'symbol' => $symbol,
+            'resortId' => $resortId,
+        ];
+
+        $pdf = \PDF::loadView('resorts.payroll.run.review_pdf', $data)
+            ->setPaper('a3', 'landscape');
+
+        return $pdf->download('Payroll_Review_' . $payroll->start_date . '_to_' . $payroll->end_date . '.pdf');
     }
 }

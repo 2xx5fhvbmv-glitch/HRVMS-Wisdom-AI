@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-white @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
-                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.create')) == false) d-none @endif">Run Payroll</a></div>
+                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.create')) == false) d-none @endif" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
             </div>
         </div>
 
@@ -273,6 +273,53 @@
                     </div>
                 </div>
             </div>
+
+            {{-- Draft Payrolls --}}
+            <div class="col-12 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card">
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-2">
+                            <div class="col"><h3>Draft Payrolls</h3></div>
+                            <div class="col-auto"><a href="{{ route('payroll.drafts.list') }}" class="a-link">View All</a></div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Period</th>
+                                    <th>Employees</th>
+                                    <th>Total Amount</th>
+                                    <th>Created</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($draftPayrolls as $index => $draft)
+                                    <tr>
+                                        <td>{{ $index + 1 }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($draft->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($draft->end_date)->format('d M Y') }}</td>
+                                        <td>{{ $draft->employee_count }}</td>
+                                        <td>{!! Common::formatCurrency($draft->total_payroll ?? 0, 'USD') !!}</td>
+                                        <td>{{ \Carbon\Carbon::parse($draft->created_at)->format('d M Y') }}</td>
+                                        <td><span class="badge badge-themeWarning">{{ ucfirst($draft->status) }}</span></td>
+                                        <td>
+                                            <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm btn-themeBlue" onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
+                                                <i class="fa-solid fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="text-center text-muted py-3">No draft payrolls</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- <div class="col-xl-3 col-md-6">
                 <div class="card  card-activityLog" id="card-activityLog">
                     <div class=" card-title">

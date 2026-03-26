@@ -747,7 +747,7 @@
                                             <span>${employee.name}</span>
                                         </div>
                                     </td>
-                                    <td>${employee.position} <span class="badge badge-themeLight">${employee.position_code}</span></td>
+                                    <td>${employee.position}</td>
                                     <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
                                     <td>${employee.section}</td>
                                     <td class="workdays">${employee.workdays}</td>
@@ -1607,7 +1607,7 @@
                 { 
                     data: 'position', 
                     render: function(data, type, row) {
-                        return ` ${data.postion_title} <span class="badge badge-themeLight">${data.position_code}</span>`;
+                        return ` ${data.postion_title}`;
                     }
                 },
                 { 

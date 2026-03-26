@@ -307,10 +307,12 @@ class AttandanceRegisterController extends Controller
                         $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
 
                         // Calculate cutoff period based on selected month/year
-                        // If cutoff is 25 and month is March 2026: period = 25 Mar 2026 → 24 Apr 2026
+                        // Cutoff day = last day of period. Period starts on cutoff+1
+                        // If cutoff is 25 and month is March 2026: period = 26 Feb 2026 → 25 Mar 2026
                         $baseDate = Carbon::createFromDate($year, $month, 1);
-                        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-                        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+                        $prevMonth = $baseDate->copy()->subMonthNoOverflow();
+                        $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay(); // cutoff + 1
+                        $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth)); // cutoff day of selected month
 
                         // Total days in the cutoff period
                         $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;

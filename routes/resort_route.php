@@ -96,6 +96,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          //Payroll Module
          Route::get('payroll/hr-dashboard', 'Payroll\DashboardController@HR_Dashobard')->name('payroll.dashboard');
          Route::get('payroll/admin-dashboard', 'Payroll\DashboardController@admin_dashboard')->name('payroll.admindashboard');
+         Route::get('payroll/drafts', 'Payroll\DashboardController@draftsList')->name('payroll.drafts.list');
          //Performance Module
          Route::get('performance/hr-dashboard', 'Performance\PerformanceDashboardController@HR_Dashobard')->name('Performance.Hrdashboard');
          Route::get('performance/hod-dashboard', 'Performance\PerformanceDashboardController@Hod_dashboard')->name('Performance.HODdashboard');
@@ -777,6 +778,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('payroll/fetch-time-attendance', 'Payroll\PayrollController@fetchTimeAttendance')->name('fetch.time.attendance');
     Route::post('payroll/fetch-service-charges', 'Payroll\PayrollController@fetchServiceCharge')->name('fetch.service.charge');
     Route::get('payroll/city-ladger/download-template', 'Payroll\PayrollController@downloadCityLadgerTemplate')->name('payroll.download-cityladger.template');
+    Route::get('payroll/export-review/{payrollId}/{type}', 'Payroll\PayrollController@exportReview')->name('payroll.export.review');
     Route::post('payroll/fetch-staff-shop', 'Payroll\PayrollController@fetchStaffShop')->name('payroll.fetch.staffshop');
     Route::post('payroll/fetch-pension-ewt', 'Payroll\PayrollController@calculatePensionAndEWT')->name('payroll.calculate.pensionandewt');
     Route::post('payroll/fetch-advanced-recovery', 'Payroll\PayrollController@fetchAdvanceRecovery')->name('fetch.advance.recovery');

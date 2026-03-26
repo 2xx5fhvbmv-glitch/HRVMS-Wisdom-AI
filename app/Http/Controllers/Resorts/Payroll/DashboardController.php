@@ -102,12 +102,41 @@ class DashboardController extends Controller
             $upcomingEstimated = round($upcomingEstimated, 2);
         }
 
+        // Only show drafts that have review data (saved from step 7)
+        $draftPayrolls = Payroll::where('resort_id', $resort_id)
+            ->where('status', 'draft')
+            ->whereHas('reviews')
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(function($p) {
+                $p->employee_count = \DB::table('payroll_employees')->where('payroll_id', $p->id)->count();
+                return $p;
+            });
+
         return view('resorts.payroll.dashboard.dashboard', compact(
             'page_title', 'total_employees', 'total_paid_employees',
             'lastPayroll', 'upcomingPayroll', 'upcomingEstimated',
-            'payrollData', 'upcomingCutoffDate'
+            'payrollData', 'upcomingCutoffDate', 'draftPayrolls'
         ));
     }
+    public function draftsList()
+    {
+        $page_title = 'Draft Payrolls';
+        $resort_id = $this->resort->resort_id;
+        $drafts = Payroll::where('resort_id', $resort_id)
+            ->where('status', 'draft')
+            ->whereHas('reviews')
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->through(function($p) {
+                $p->employee_count = \DB::table('payroll_employees')->where('payroll_id', $p->id)->count();
+                return $p;
+            });
+
+        return view('resorts.payroll.dashboard.drafts', compact('page_title', 'drafts'));
+    }
+
     public function getServiceCharges(Request $request)
     {
         $currentYear = $request->YearWiseServichCharges;
