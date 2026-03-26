@@ -31,8 +31,8 @@
                                 <li class="active current"> <span>Payroll Period Selection</span></li>
                                 <li><span>Employee Selection</span></li>
                                 <li><span>Time & Attendance</span></li>
-                                <li><span>Service Charge Distribution</span></li>
                                 <li><span>Deductions</span></li>
+                                <li><span>Service Charge Distribution</span></li>
                                 <li><span>Review</span></li>
                                 <!-- <li><span>Statistics</span></li> -->
                                 <li><span>Payroll Confirmation</span></li>
@@ -53,15 +53,18 @@
                                             <div class="text-start mb-md-5 mb-4">
                                                 <div class="mb-3">
                                                     <label for="payrollPeriodSelect" class="form-label fw-600">Select Payroll Period</label>
-                                                    @php $firstUnpaidSelected = false; @endphp
+                                                    @php
+                                                        // Find the last (most recent) unpaid period index
+                                                        $latestUnpaidIndex = null;
+                                                        foreach ($availablePeriods as $idx => $p) {
+                                                            if (!$p['is_paid']) $latestUnpaidIndex = $idx;
+                                                        }
+                                                    @endphp
                                                     <select id="payrollPeriodSelect" class="form-select">
                                                         @foreach($availablePeriods as $index => $period)
                                                             <option value="{{ $period['start_date'] }}|{{ $period['end_date'] }}"
                                                                 {{ $period['is_paid'] ? 'disabled' : '' }}
-                                                                @if(!$period['is_paid'] && !$firstUnpaidSelected)
-                                                                    selected
-                                                                    @php $firstUnpaidSelected = true; @endphp
-                                                                @endif>
+                                                                @if($index === $latestUnpaidIndex) selected @endif>
                                                                 {{ $period['label'] }}
                                                                 @if($period['is_paid'])
                                                                     (Paid)
@@ -194,13 +197,14 @@
                                         <tr>
                                             <th>ID</th>
                                             <th>Employee Name </th>
-                                            <th>Department </th>
+                                            <th>Position</th>
                                             <th>Present</th>
                                             <th>Absent</th>
                                             <th>Unpaid Leave</th>
                                             <th>Day Off</th>
-                                            <th>Leave Types</th>
+                                            <th>Other Leaves</th>
                                             <th>Regular OT Hours</th>
+                                            <th>Friday OT Hours</th>
                                             <th>Holiday OT Hours</th>
                                             <th>Total OT</th>
                                         </tr>
@@ -216,58 +220,6 @@
                             <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset data-step="4">
-                            <div class="card-header">
-                                <div class="row justify-content-start align-items-center g-2">
-                                    <div class="col">
-                                        <div class="card-title m-0 p-0 border-0">
-                                            <h3>Service Charge Distribution</h3>
-                                            <p>Distribute the service charge amount among employees</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-4">
-                                <label for="total-ser" class="form-label">TOTAL SERVICE CHARGE AMOUNT</label>
-                                <div class="row g-md-4 g-2">
-                                    <div class="col-lg-6 col-md-8 col-sm">
-                                        <input type="text" class="form-control" id="total-ser" placeholder="ENTER TOTAL SERVICE CHARGE AMOUNT" maxlength="10" required>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="#" id="distribute-service-charge" class="btn btn-themeSkyblue">Distribute Amount</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="table-responsive">
-                                <table id="table-serviceCharge" class="table  table-serviceCharge w-100 mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Employee Name </th>
-                                            <th>Position</th>
-                                            <th>Department</th>
-                                            <th>Section</th>
-                                            <th>Total Working Days</th>
-                                            <th>Service Charge</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th colspan="6" class="text-end">Total Service Charge:</th>
-                                            <th colspan="1" id="total-service-charge" class="fw-bold">{{ Common::GetResortCurrencySymbol() }} 0.00</th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                            <div class="d-none d-md-block" style="height: 136px;"></div>
-                            <hr class="hr-footer">
-                            <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
-                        </fieldset>
-                        <fieldset data-step="5">
                             <div class="card-header">
                                 <div class="row justify-content-start align-items-center g-2">
                                     <div class="col-auto">
@@ -322,6 +274,54 @@
                             <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
                             <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
                             <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                        </fieldset>
+
+                        <fieldset data-step="5">
+                            <div class="card-header">
+                                <div class="row justify-content-start align-items-center g-2">
+                                    <div class="col">
+                                        <div class="card-title m-0 p-0 border-0">
+                                            <h3>Service Charge Distribution</h3>
+                                            <p>Distribute the service charge amount among employees</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="total-ser" class="form-label">TOTAL SERVICE CHARGE AMOUNT</label>
+                                <div class="row g-md-4 g-2">
+                                    <div class="col-lg-6 col-md-8 col-sm">
+                                        <input type="text" class="form-control" id="total-ser" placeholder="ENTER TOTAL SERVICE CHARGE AMOUNT" maxlength="10" required>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="#" id="distribute-service-charge" class="btn btn-themeSkyblue">Distribute Amount</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table id="table-serviceCharge" class="table table-serviceCharge w-100 mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Employee Name</th>
+                                            <th>Position</th>
+                                            <th>Total Working Days</th>
+                                            <th>Service Charge</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="4" class="text-end">Total Service Charge:</th>
+                                            <th colspan="1" id="total-service-charge" class="fw-bold">{{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <hr class="hr-footer border-0">
+                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
+                            <a href="#" class="btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
 
                         <fieldset data-step="6">
@@ -386,8 +386,16 @@
                             <div class="row g-4 mb-3">
                                 <div class="col-lg-6">
                                     <div class="bg-themeGrayLight payrollConf-block">
-                                        <h6>Total Payroll</h6>
-                                        <div class="value" id="total_payroll_amount"></div>
+                                        <h6>Basic Earned Salary</h6>
+                                        <div class="value" id="total_earned_salary"></div>
+                                    </div>
+                                    <div class="bg-themeGrayLight payrollConf-block">
+                                        <h6>Total Service Charge</h6>
+                                        <div class="value" id="total_service_charge_conf"></div>
+                                    </div>
+                                    <div class="bg-themeGrayLight payrollConf-block">
+                                        <h6>Total Deductions</h6>
+                                        <div class="value" id="total_deductions_conf"></div>
                                     </div>
                                     <div class="bg-themeGrayLight payrollConf-block">
                                         <h6>Total Employees</h6>
@@ -397,10 +405,10 @@
                                         <h6>Payroll Draft Date</h6>
                                         <div class="value" id="payroll-darft-date"></div>
                                     </div>
-                                    <!-- <div class="bg-themeGrayLight payrollConf-block">
-                                        <h6>Payroll Payment Date</h6>
-                                        <div class="value" id="payroll-payment-date"></div>
-                                    </div> -->
+                                    <div class="bg-themeGrayLight payrollConf-block" style="border-top:2px solid #0d6efd; background:#f0f4ff;">
+                                        <h6 style="color:#0d6efd;">Total Payroll</h6>
+                                        <div class="value" id="total_payroll_amount" style="font-size:1.5rem; font-weight:700; color:#0d6efd;"></div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-6">
                                     <div class="bg-themeGrayLight payrollConfStep-block">
@@ -413,12 +421,12 @@
                                                     <li>Payroll Period Selection</li>
                                                     <li>Employee Selection</li>
                                                     <li>Time & Attendance Data</li>
-                                                    <li>Service Charge Distribution</li>
+                                                    <li>Deductions</li>
                                                 </ul>
                                             </div>
                                             <div class="col-xxl-6 col-xl-5 col-lg-12 col-sm-6">
                                                 <ul class="listing-wrapper ">
-                                                    <li>Deductions</li>
+                                                    <li>Service Charge Distribution</li>
                                                     <li>Review</li>
                                                     <!-- <li>Statistics</li> -->
                                                     <li>Payroll Confirmation</li>
@@ -428,10 +436,18 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="d-flex gap-2 mb-3">
+                                <button type="button" class="btn btn-themeSkyblue btn-sm" id="downloadPayrollPDF">
+                                    <i class="fa-solid fa-file-pdf me-1"></i> Download PDF
+                                </button>
+                                <button type="button" class="btn btn-themeSkyblue btn-sm" id="downloadPayrollExcel">
+                                    <i class="fa-solid fa-file-excel me-1"></i> Download Excel
+                                </button>
+                            </div>
                             <hr class="hr-footer border-0">
-                            <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
                             <button type="submit" class="btn btn-themeBlue btn-sm float-end mb-1" style="margin-right: 10px;" id="submit">Confirm and Lock Payroll</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="button" class="btn btn-themeGray btn-sm float-end mb-1 me-2" id="saveAsDraft">Save as Draft</button>
+                            <a href="#" class="btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                     </form>
                 </div>
@@ -527,6 +543,7 @@
     .leave-tooltip{position:fixed;background:#2C2C2C;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;z-index:9999;min-width:180px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none;pointer-events:none}
     .leave-tooltip.show{display:block!important}
     .modal-body .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:0!important}
+    @keyframes payroll-spin{to{transform:rotate(360deg)}}
     .staff-shop-popover{position:fixed;z-index:99999;background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.18);border:1px solid #e0e0e0;max-width:380px;pointer-events:none}
     .staff-shop-popover .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:8px!important}
     .leave-tooltip::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #2C2C2C}
@@ -573,20 +590,47 @@
         $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
             ids.push($(this).val());
         });
-        // Fallback: use persistent set from localStorage
+        // Fallback 1: use persistent set
         if (ids.length === 0 && selectedEmployeeSet.size > 0) {
             ids = Array.from(selectedEmployeeSet);
+        }
+        // Fallback 2: use localStorage
+        if (ids.length === 0) {
+            try {
+                var saved = JSON.parse(localStorage.getItem("selectedEmployeeNumericIds") || "[]");
+                if (saved.length > 0) {
+                    ids = saved.map(String);
+                    saved.forEach(function(id) { selectedEmployeeSet.add(String(id)); });
+                }
+            } catch(e) {}
+        }
+        // Fallback 3: fetch from payroll DB
+        if (ids.length === 0) {
+            var payrollId = localStorage.getItem("payroll_id");
+            if (payrollId) {
+                $.ajax({
+                    url: '{{ route("fetch.time.attendance") }}',
+                    method: 'POST',
+                    async: false,
+                    data: { payrollId: payrollId, _token: '{{ csrf_token() }}', getEmployeesOnly: true },
+                    success: function(res) {
+                        if (res.success && res.employee_ids) {
+                            ids = res.employee_ids.map(String);
+                            res.employee_ids.forEach(function(id) { selectedEmployeeSet.add(String(id)); });
+                            localStorage.setItem("selectedEmployeeNumericIds", JSON.stringify(res.employee_ids));
+                        }
+                    }
+                });
+            }
         }
         return ids;
     }
 
     //  console.log(currency);
     $(document).ready(function () {
-        // Ensure Parsley is loaded
         let resortid = "{{ Auth::guard('resort-admin')->user()->resort_id }}";
         if (typeof $.fn.parsley !== 'function') {
-            console.error('Parsley.js is not loaded correctly');
-            return;
+            console.warn('Parsley.js is not loaded — form validation may not work');
         }
 
         // Set the cutoff day (from Laravel config)
@@ -704,11 +748,14 @@
                 if (savedStep === 3) {
                     getstep3data('');
                 } else if (savedStep === 4) {
-                    getstep4data('', currency, 1);
+                    getstep5data(currency, 1); // Step 4 = Deductions
                 } else if (savedStep === 5) {
-                    getstep5data(currency, 1);
+                    getstep4data('', currency, 1); // Step 5 = Service Charge
                 } else if (savedStep === 6) {
                     getstep6data(currency, 1);
+                } else if (savedStep === 7) {
+                    // Load confirmation summary
+                    calculatePayrollSummary(currency, 1);
                 }
             }, 500);
         }
@@ -717,13 +764,31 @@
 
         $(".next").click(async function (e) {
             e.preventDefault();
-
+            try {
             var $currentFieldset = $(this).closest("fieldset");
             var currentStep = $currentFieldset.data('step');
+            console.log('Next clicked, step:', currentStep);
 
             if (currentStep === 1) {
                 var dateRange = $("#hiddenInput").val();
-                var dates = dateRange.split(' - ');
+                console.log('Step 1 Continue - hiddenInput value:', dateRange);
+
+                // If hiddenInput is empty, try to get from dropdown
+                if (!dateRange || dateRange.trim() === '') {
+                    var selectedPeriod = $('#payrollPeriodSelect').val();
+                    if (selectedPeriod) {
+                        var parts = selectedPeriod.split('|');
+                        if (parts.length === 2) {
+                            var s = moment(parts[0], "YYYY-MM-DD");
+                            var e = moment(parts[1], "YYYY-MM-DD");
+                            dateRange = s.format("DD-MM-YYYY") + ' - ' + e.format("DD-MM-YYYY");
+                            $("#hiddenInput").val(dateRange);
+                            console.log('Fallback from dropdown:', dateRange);
+                        }
+                    }
+                }
+
+                var dates = dateRange ? dateRange.split(' - ') : [];
 
                 if (!dateRange || dates.length !== 2) {
                     toastr.error("Please select a valid payroll period before proceeding.", 'Error', {
@@ -892,6 +957,7 @@
                         return; // continue to next row
                     }
 
+                    // T&A columns: 0:ID, 1:Name, 2:Position, 3:Present, 4:Absent, 5:UnpaidLeave, 6:DayOff, 7:LeaveTypes, 8:RegOT, 9:FridayOT, 10:HolOT, 11:TotalOT
                     let present = $row.find("td:eq(3) input").length > 0 ?
                         parseInt($row.find("td:eq(3) input").val().trim()) || 0 :
                         parseInt($row.find("td:eq(3)").text().trim()) || 0;
@@ -900,29 +966,36 @@
                         parseInt($row.find("td:eq(4) input").val().trim()) || 0 :
                         parseInt($row.find("td:eq(4)").text().trim()) || 0;
 
-                    let dayOff = parseInt($row.find("td:eq(5)").text().trim()) || 0;
+                    let unpaidLeave = parseInt($row.find("td:eq(5)").text().trim()) || 0;
+                    let dayOff = parseInt($row.find("td:eq(6)").text().trim()) || 0;
 
-                    let regularOT = $row.find("td:eq(7) input").length > 0 ?
-                        parseFloat($row.find("td:eq(7) input").val().trim()) || 0 :
-                        parseFloat($row.find("td:eq(7)").text().trim()) || 0;
-
-                    let holidayOT = $row.find("td:eq(8) input").length > 0 ?
+                    let regularOT = $row.find("td:eq(8) input").length > 0 ?
                         parseFloat($row.find("td:eq(8) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(8)").text().trim()) || 0;
 
-                    let totalOT = $row.find("td:eq(9) input").length > 0 ?
+                    let fridayOT = $row.find("td:eq(9) input").length > 0 ?
                         parseFloat($row.find("td:eq(9) input").val().trim()) || 0 :
                         parseFloat($row.find("td:eq(9)").text().trim()) || 0;
+
+                    let holidayOT = $row.find("td:eq(10) input").length > 0 ?
+                        parseFloat($row.find("td:eq(10) input").val().trim()) || 0 :
+                        parseFloat($row.find("td:eq(10)").text().trim()) || 0;
+
+                    let totalOT = $row.find("td:eq(11) input").length > 0 ?
+                        parseFloat($row.find("td:eq(11) input").val().trim()) || 0 :
+                        parseFloat($row.find("td:eq(11)").text().trim()) || 0;
 
                     AttendaceData.push({
                         id: employeeId,
                         name: $row.find("td:eq(1)").text().trim(),
-                        department: $row.find("td:eq(2)").text().trim(),
+                        position: $row.find("td:eq(2)").text().trim(),
                         present: present,
                         absent: absent,
+                        unpaidLeave: unpaidLeave,
                         dayOff: dayOff,
-                        leaveTypes: $row.find("td:eq(6)").text().trim(),
+                        leaveTypes: $row.find("td:eq(7)").text().trim(),
                         regularOT: regularOT,
+                        fridayOT: fridayOT,
                         holidayOT: holidayOT,
                         totalOT: totalOT
                     });
@@ -977,9 +1050,9 @@
                 return;
             }
             
-            // Step 4: Save Service charges for employees
-            if (currentStep === 4) {
-                
+            // Step 5: Save Service charges for employees
+            if (currentStep === 5) {
+
                 var payrollId = localStorage.getItem("payroll_id"); // Retrieve stored payroll ID
                 var selectedEmployees = localStorage.getItem("selectedEmployees"); // Retrieve stored payroll ID
 
@@ -1015,9 +1088,7 @@
                         id: empId,
                         name: $(this).find("td:eq(1)").text().trim(),
                         position: $(this).find("td:eq(2)").text().trim(),
-                        department: $(this).find("td:eq(3)").text().trim(),
-                        section: $(this).find("td:eq(4)").text().trim(),
-                        totalWorkingDays: parseInt($(this).find("td:eq(5)").text().trim()) || 0,
+                        totalWorkingDays: parseInt($(this).find("td:eq(3)").text().trim()) || 0,
                         serviceCharge: scAmountUSD, // Always in USD for DB storage
                         totalServiceCharge: totalServiceCharge
                     });
@@ -1071,8 +1142,8 @@
                 return;
             }
 
-            // Step 5: Save Deductions for employees
-            if (currentStep === 5) {
+            // Step 4: Save Deductions for employees
+            if (currentStep === 4) {
                 var payrollId = localStorage.getItem("payroll_id"); // Retrieve stored payroll ID
                 var selectedEmployees = localStorage.getItem("selectedEmployees"); // Retrieve stored payroll ID
                 if (!payrollId) {
@@ -1130,8 +1201,13 @@
                             toastr.success("Deductions saved!", 'Success', {
                                 positionClass: 'toast-bottom-right'
                             });
-                            moveToNextStep($currentFieldset);
-                            // Load review data for step 6
+                            // Load service charge data for step 5, then move
+                            loadCurrencyRates(searchTerm = "", resortid, currency, currentStep).then(() => {
+                                moveToNextStep($currentFieldset);
+                            }).catch(error => {
+                                console.error("Error loading currency rates:", error);
+                                moveToNextStep($currentFieldset);
+                            });
                             getstep6data(currency, 1);
                         } else {
                             toastr.error(response.message || "Failed to save deductions.", 'Error', {
@@ -1262,6 +1338,10 @@
                 return;
 
             }
+            } catch(err) {
+                console.error('Payroll next step error:', err);
+                toastr.error('An error occurred: ' + err.message, 'Error', { positionClass: 'toast-bottom-right' });
+            }
         });
 
         // Function to transition to the next step
@@ -1297,17 +1377,15 @@
             var conversionRate = updatedCurrency === 'Dollar' ? rates.usd_to_mvr : rates.mvr_to_usd;
             if(currentStep == 3)
             {
-                getstep4data(searchTerm,updatedCurrency, conversionRate);
+                getstep5data(updatedCurrency, conversionRate); // Step 3 → Step 4 (Deductions)
             }
-            // console.log(conversionRate);
             else if(currentStep == 4)
             {
-                getstep5data(updatedCurrency, conversionRate);
+                getstep4data(searchTerm, updatedCurrency, conversionRate); // Step 4 → Step 5 (Service Charge)
             }
-            
             else if(currentStep == 5)
             {
-                getstep6data(updatedCurrency, conversionRate);
+                getstep6data(updatedCurrency, conversionRate); // Step 5 → Step 6 (Review)
             }
 
             else if(currentStep == 6)
@@ -1626,47 +1704,39 @@
             var $currentFieldset = $(this).closest("fieldset");
             var $previousFieldset = $currentFieldset.prev("fieldset");
 
-            if ($previousFieldset.length === 0) return; // Stop if there is no previous step
+            if ($previousFieldset.length === 0) return;
 
-            var step = $previousFieldset.data('step'); // Step identifier for the previous fieldset
+            var step = $previousFieldset.data('step');
 
-            // Fetch draft data for the step via AJAX
-            $.ajax({
-                url: '{{ route("get.payroll.draft") }}',
-                method: 'POST',
-                data: { step: step },
-                success: function (response) {
-                    if (response.success) {
-                        // Populate the previous fieldset with retrieved data
-                        for (const [key, value] of Object.entries(response.data)) {
-                            const input = $previousFieldset.find(`[name="${key}"]`);
-                            if (input.length) {  
-                                input.val(value);
-                            }
+            // Update progress bar and save step
+            var index = $("fieldset").index($currentFieldset);
+            $("#progressbar li").eq(index).removeClass("current active");
+            $("#progressbar li").eq(index - 1).addClass("current");
+            localStorage.setItem("currentStep", step);
+
+            // Animate transition
+            $currentFieldset.animate({ opacity: 0 }, {
+                duration: 300,
+                complete: function () {
+                    $currentFieldset.css({ visibility: 'hidden', position: 'absolute' });
+                    $previousFieldset.css({ visibility: 'visible', opacity: 1, position: 'relative' });
+
+                    // Reload data for the step we're going back to
+                    setTimeout(async function() {
+                        var resortid = "{{ Auth::guard('resort-admin')->user()->resort_id }}";
+                        var rates = await fetchRates(resortid);
+                        var conv = (currency === 'Dollar') ? rates.usd_to_mvr : rates.mvr_to_usd;
+
+                        if (step === 3) {
+                            getstep3data('');
+                        } else if (step === 4) {
+                            getstep5data(currency, conv); // Step 4 = Deductions
+                        } else if (step === 5) {
+                            getstep4data('', currency, conv); // Step 5 = Service Charge
+                        } else if (step === 6) {
+                            getstep6data(currency, conv);
                         }
-                    }
-
-                    // Update progress bar and save step
-                    var index = $("fieldset").index($currentFieldset);
-                    $("#progressbar li").eq(index).removeClass("current active");
-                    $("#progressbar li").eq(index - 1).addClass("current");
-                    localStorage.setItem("currentStep", $previousFieldset.data('step'));
-
-                    // Animate transition
-                    $currentFieldset.animate({ opacity: 0 }, {
-                        duration: 500,
-                        step: function (now) {
-                            var opacity = 1 - now;
-                            $currentFieldset.css({ opacity: opacity });
-                        },
-                        complete: function () {
-                            $currentFieldset.css({ visibility: 'hidden', position: 'absolute' });
-                            $previousFieldset.css({ visibility: 'visible', opacity: 1, position: 'relative' });
-                        }
-                    });
-                },
-                error: function () {
-                    alert('Error retrieving draft data.');
+                    }, 200);
                 }
             });
         });
@@ -1826,6 +1896,72 @@
 
     });
 
+    // Save as Draft — keeps payroll in draft status, redirects to dashboard
+    $('#saveAsDraft').on('click', function() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) {
+            toastr.error("No payroll found to save.", 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving...');
+
+        $.ajax({
+            url: '{{ route("payroll.save.draft") }}',
+            method: 'POST',
+            data: {
+                payroll_id: payrollId,
+                status: 'draft',
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    toastr.success("Payroll saved as draft successfully!", 'Success', { positionClass: 'toast-bottom-right' });
+                    // Clear localStorage
+                    localStorage.removeItem('currentStep');
+                    localStorage.removeItem('payroll_id');
+                    localStorage.removeItem('selectedEmployees');
+                    localStorage.removeItem('selectedEmployeesIds');
+                    localStorage.removeItem('selectedEmployeeNumericIds');
+                    localStorage.removeItem('deductions');
+                    localStorage.removeItem('payroll_dateRange');
+                    // Redirect to dashboard after short delay
+                    setTimeout(function() {
+                        window.location.href = '{{ route("payroll.dashboard") }}';
+                    }, 1000);
+                } else {
+                    toastr.error(response.message || "Failed to save draft.", 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function() {
+                toastr.error("Error saving draft.", 'Error', { positionClass: 'toast-bottom-right' });
+            },
+            complete: function() {
+                $('#saveAsDraft').prop('disabled', false).html('Save as Draft');
+            }
+        });
+    });
+
+    // Download PDF
+    $('#downloadPayrollPDF').on('click', function() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) {
+            toastr.error("No payroll found.", 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        window.open("{{ url('resort/payroll/export-review') }}/" + payrollId + "/pdf", '_blank');
+    });
+
+    // Download Excel
+    $('#downloadPayrollExcel').on('click', function() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) {
+            toastr.error("No payroll found.", 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        window.open("{{ url('resort/payroll/export-review') }}/" + payrollId + "/excel", '_blank');
+    });
+
     // Handle note submission
     $('#submit_note').on('click', function () {
         let noteText = $('#addNote').val().trim();
@@ -1920,7 +2056,26 @@
         table.search($(this).val()).draw();
     });
 
+    function showTableLoader(tableId) {
+        var $table = $(tableId);
+        var colCount = $table.find('thead th').length || 5;
+        var loaderRow = '<tr class="payroll-loader-row"><td colspan="' + colCount + '" class="text-center py-5">' +
+            '<div class="d-flex flex-column align-items-center">' +
+            '<div style="width:40px;height:40px;border:3px solid #e0e0e0;border-top-color:#0d6efd;border-radius:50%;animation:payroll-spin 0.7s linear infinite;"></div>' +
+            '<span class="text-muted mt-2 small">Loading data...</span>' +
+            '</div></td></tr>';
+        if ($.fn.DataTable.isDataTable(tableId)) {
+            $(tableId).DataTable().destroy();
+        }
+        $table.find('tbody').html(loaderRow);
+    }
+
+    function hideTableLoader(tableId) {
+        $(tableId).find('.payroll-loader-row').remove();
+    }
+
     function getstep3data(searchTerm) {
+        showTableLoader('#table-timeAttendance');
         var payrollId = localStorage.getItem("payroll_id");
 
         if (!payrollId) {
@@ -2025,13 +2180,14 @@
                                     <span>${employee.name}</span>
                                 </div>
                             </td>
-                            <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
+                            <td>${employee.position}</td>
                             <td class="editable">${employee.present}</td>
                             <td class="editable">${employee.absent}</td>
                             <td>${employee.unpaid_absent || 0}</td>
                             <td>${employee.day_off || 0}</td>
                             <td>${employee.leave_types}</td>
                             <td class="editable">${employee.regular_ot}</td>
+                            <td class="editable">${employee.friday_ot || 0}</td>
                             <td class="editable">${employee.holiday_ot}</td>
                             <td>${employee.total_ot}</td>
                         </tr>`;
@@ -2062,13 +2218,16 @@
                     toastr.error("Error fetching attendance data.", 'Error', { positionClass: 'toast-bottom-right' });
                 }
             },
-
+            complete: function() {
+                hideTableLoader('#table-timeAttendance');
+            }
         });
 
         return;
     }
 
     function getstep4data(searchTerm,currency, conversionRate = 1) {
+        showTableLoader('#table-serviceCharge');
         var dateRange = $("#hiddenInput").val();
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
@@ -2098,10 +2257,38 @@
                         $("#table-serviceCharge").DataTable().destroy();
                     }
                     $tableBody.empty(); // Clear existing rows
+                    // Try to load saved service charge from DB if distributedServiceCharge is empty
+                    var payrollId = localStorage.getItem("payroll_id");
+                    if (distributedServiceCharge.length === 0 && payrollId) {
+                        try {
+                            var scResult = $.ajax({
+                                url: '{{ route("fetch.time.attendance") }}',
+                                method: 'POST',
+                                async: false,
+                                data: { payrollId: payrollId, _token: '{{ csrf_token() }}', getServiceChargeOnly: true }
+                            }).responseJSON;
+                            if (scResult.success && scResult.data) {
+                                scResult.data.forEach(function(sc) {
+                                    distributedServiceCharge.push({
+                                        id: sc.Emp_id,
+                                        service_charge_days: sc.total_working_days,
+                                        amount: sc.service_charge_amount
+                                    });
+                                });
+                                if (scResult.total_amount) {
+                                    $('#total-ser').val(scResult.total_amount);
+                                }
+                            }
+                        } catch(e) { console.log('No saved SC data'); }
+                    }
+
+                    var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
                     response.data.forEach(function (employee) {
                         let serviceCharge = getServiceChargeamountForEmployee(employee.employee_id);
-
-                        var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR '; // Adjust currency symbol
+                        // If we have saved SC and currency is MVR, convert for display
+                        if (serviceCharge !== "0" && currency === 'MVR' && conversionRate > 1) {
+                            serviceCharge = (parseFloat(serviceCharge) * conversionRate).toFixed(2);
+                        }
 
                         var row = `<tr>
                             <td>${employee.employee_id}</td>
@@ -2111,14 +2298,22 @@
                                     <span>${employee.name}</span>
                                 </div>
                             </td>
-                            <td>${employee.position} <span class="badge badge-themeLight">${employee.position_code}</span></td>
-                            <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
-                            <td>${employee.section}</td>
+                            <td>${employee.position}</td>
                             <td class="workdays">${employee.workdays}</td>
                             <td class="service-charge">${currencySymbol}${serviceCharge}</td>
                         </tr>`;
                         $tableBody.append(row);
                     });
+
+                    // Update total footer if SC was restored
+                    if (distributedServiceCharge.length > 0) {
+                        var scTotal = 0;
+                        $("#table-serviceCharge tbody .service-charge").each(function() {
+                            scTotal += parseFloat($(this).text().replace(/[^0-9.-]/g, '')) || 0;
+                        });
+                        var cs = (currency === 'Dollar') ? '$' : 'MVR ';
+                        $("#total-service-charge").text(cs + scTotal.toFixed(2));
+                    }
 
                     $("#table-serviceCharge").DataTable({
                         responsive: true,
@@ -2141,8 +2336,10 @@
                 } else {
                     toastr.error("Error fetching attendance data.", 'Error', { positionClass: 'toast-bottom-right' });
                 }
+            },
+            complete: function() {
+                hideTableLoader('#table-serviceCharge');
             }
-
         });
 
         return;
@@ -2197,7 +2394,7 @@
     //                                 <span>${employee.name}</span>
     //                             </div>
     //                         </td>
-    //                         <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
+    //                         <td>${employee.department}</td>
     //                         <td class="attendance">${currencySymbol}${employee.absent_deduction}</td>
     //                         <td class="city-ladger">${currencySymbol}0.00</td>
     //                         <td class="staff-shop">${currencySymbol}0.00</td>
@@ -2280,6 +2477,7 @@
     // }
 
     async function getstep5data(currency, conversionRate = 1) {
+        showTableLoader('#table-deductions');
         var dateRange = $("#hiddenInput").val();
         var dates = dateRange.split(' - ');
         var startDate = moment(dates[0], "DD-MM-YYYY", true);
@@ -2339,7 +2537,7 @@
                                     <span>${employee.name}</span>
                                 </div>
                             </td>
-                            <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
+                            <td>${employee.department}</td>
                             <td class="attendance">${currencySymbol}${employee.absent_deduction}</td>
                             <td class="city-ladger">${currencySymbol}0.00</td>
                             <td class="staff-shop">${currencySymbol}0.00</td>
@@ -2399,8 +2597,8 @@
 
                 } else {
                     toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
-                    return;
                 }
+                hideTableLoader('#table-deductions');
             },
             error: function (xhr) {
                 if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.message) {
@@ -2408,6 +2606,7 @@
                 } else {
                     toastr.error("Error fetching attendance data.", 'Error', { positionClass: 'toast-bottom-right' });
                 }
+                hideTableLoader('#table-deductions');
             }
 
         });
@@ -2540,7 +2739,7 @@
     //                                 <span>${employee.name}</span>
     //                             </div>
     //                         </td>
-    //                         <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
+    //                         <td>${employee.department}</td>
     //                         <td>${employee.position}</td>
     //                         <td>${employee.present}</td>
     //                         <td>${employee.absent}</td>
@@ -2613,6 +2812,7 @@
     // }
 
     async function getstep6data(currency, conversionRate = 1) {
+        showTableLoader('#table-review');
         var payrollId = localStorage.getItem("payroll_id");
         var dateRange = $("#hiddenInput").val();
         var dates = dateRange.split(' - ');
@@ -2739,7 +2939,7 @@
                                         <span>${employee.name}</span>
                                     </div>
                                 </td>
-                                <td>${employee.department} <span class="badge badge-themeLight">${employee.code}</span></td>
+                                <td>${employee.department}</td>
                                 <td>${employee.position}</td>
                                 <td>${currencySymbol}${employee.service_charge}</td>
                                 <td>${currencySymbol}${employee.regularOTPay}</td>
@@ -2805,6 +3005,7 @@
                 } else {
                     toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
                 }
+                hideTableLoader('#table-review');
             },
             error: function (xhr) {
                 if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.message) {
@@ -2812,6 +3013,7 @@
                 } else {
                     toastr.error("Error fetching attendance data.", 'Error', { positionClass: 'toast-bottom-right' });
                 }
+                hideTableLoader('#table-review');
             }
         });
     }
@@ -2863,6 +3065,9 @@
                     document.getElementById("total_payroll_amount").innerText = currencySymbol + parseFloat(response.total_payroll).toFixed(2);
                     document.getElementById("total_employees").innerText = response.total_employees;
                     document.getElementById("payroll-darft-date").innerText = draftDate;
+                    document.getElementById("total_earned_salary").innerText = currencySymbol + parseFloat(response.total_earned_salary || 0).toFixed(2);
+                    document.getElementById("total_service_charge_conf").innerText = currencySymbol + parseFloat(response.total_service_charge || 0).toFixed(2);
+                    document.getElementById("total_deductions_conf").innerText = currencySymbol + parseFloat(response.total_deductions || 0).toFixed(2);
                 } else {
                     toastr.error("Failed to fetch total payroll.", 'Error', { positionClass: 'toast-bottom-right' });
                 }
@@ -3265,7 +3470,7 @@
                 { 
                     data: 'position', 
                     render: function(data, type, row) {
-                        return ` ${data.postion_title} <span class="badge badge-themeLight">${data.position_code}</span>`;
+                        return ` ${data.postion_title}`;
                     }
                 },
                 { 

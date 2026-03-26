@@ -1113,9 +1113,11 @@ class DutyRosterController extends Controller
         $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
 
         // Calculate cutoff period based on current month/year
+        // Cutoff day = last day of period. Period starts on cutoff+1
         $baseDate = Carbon::createFromDate($year, $month, 1);
-        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+        $prevMonth = $baseDate->copy()->subMonthNoOverflow();
+        $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
+        $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
         $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
 
         // Build monthwise headers for the cutoff period
@@ -1170,10 +1172,12 @@ class DutyRosterController extends Controller
         if ($year < 2000 || $year > 2100) $year = now()->year;
 
         // Calculate cutoff period based on selected month/year
+        // Cutoff day = last day of period. Period starts on cutoff+1
         $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
         $baseDate = Carbon::createFromDate($year, $month, 1);
-        $startOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
-        $endOfMonth = $startOfMonth->copy()->addMonth()->subDay();
+        $prevMonth = $baseDate->copy()->subMonthNoOverflow();
+        $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
+        $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
         $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
 
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);

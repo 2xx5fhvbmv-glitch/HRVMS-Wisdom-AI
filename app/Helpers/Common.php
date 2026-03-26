@@ -5963,11 +5963,18 @@ class Common
     {
         $today = now();
 
-        $cutoffStart = now()->day >= $cutoff_day
-            ? now()->copy()->day($cutoff_day)
-            : now()->subMonth()->copy()->day($cutoff_day);
-
-        $cutoffEnd = $cutoffStart->copy()->addMonth()->subDay(); // e.g., 10 July → 9 August
+        // Cutoff day = last day of previous period
+        // Period starts on cutoff_day + 1 and ends on next month's cutoff_day
+        // e.g., if cutoff=25: period = 26th prev month to 25th current month
+        if ($today->day > $cutoff_day) {
+            // We're past the cutoff — current period started on cutoff+1 of this month
+            $cutoffStart = $today->copy()->day($cutoff_day)->addDay(); // 26th this month
+            $cutoffEnd = $today->copy()->addMonthNoOverflow()->day(min($cutoff_day, $today->copy()->addMonthNoOverflow()->daysInMonth));
+        } else {
+            // We're before or on the cutoff — current period started on cutoff+1 of last month
+            $cutoffStart = $today->copy()->subMonthNoOverflow()->day(min($cutoff_day, $today->copy()->subMonthNoOverflow()->daysInMonth))->addDay();
+            $cutoffEnd = $today->copy()->day(min($cutoff_day, $today->daysInMonth));
+        }
 
         return [
             'start' => $cutoffStart->startOfDay(),

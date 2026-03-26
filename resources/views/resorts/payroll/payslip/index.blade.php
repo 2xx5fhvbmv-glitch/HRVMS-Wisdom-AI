@@ -295,7 +295,7 @@
                 { 
                     data: 'position', 
                     render: function(data, type, row) {
-                        return ` ${data.postion_title} <span class="badge badge-themeLight">${data.position_code}</span>`;
+                        return ` ${data.postion_title}`;
                     }
                 },
                 { 

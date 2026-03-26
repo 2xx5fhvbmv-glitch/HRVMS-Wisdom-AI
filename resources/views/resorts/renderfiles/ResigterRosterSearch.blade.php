@@ -300,6 +300,7 @@
                                             <th class="leave-stat-col">Absent</th>
                                             <th class="leave-stat-col">Unpaid Leave</th>
                                             <th class="leave-stat-col">Day-off</th>
+                                            <th class="leave-stat-col">Friday OT</th>
                                             @if($LeaveCategory->isNotEmpty())
                                                 @foreach ($LeaveCategory as $l)
                                                     @if(in_array((int)$l->id, $leaveCategoriesWithData))
@@ -318,6 +319,7 @@
                                                     $absentDates = [];
                                                     $unpaidLeaveDates = [];
                                                     $dayOffDates = [];
+                                                    $fridayOtHours = 0;
                                                     $seenDates = [];
                                                     foreach ($RosterInternalDataMonth as $sd) {
                                                         if (!isset($sd->date)) continue;
@@ -335,6 +337,12 @@
                                                                 }
                                                             }
                                                             elseif ($sd->Status == 'DayOff') $dayOffDates[$d] = true;
+                                                        }
+                                                        // Count Friday OT hours — entire shift on Friday counts as OT
+                                                        if (\Carbon\Carbon::parse($d)->isFriday() && in_array($sd->Status, ['Present','On-Time','Late'])) {
+                                                            $dayHours = $sd->DayWiseTotalHours ?? '0:00';
+                                                            $dhParts = explode(':', $dayHours);
+                                                            $fridayOtHours += (int)($dhParts[0] ?? 0) + ((int)($dhParts[1] ?? 0) / 60);
                                                         }
                                                     }
                                                     $presentCountRow = count($presentDates);
@@ -491,6 +499,7 @@
                                                     <td class="leave-stat-cell"><span>{{ $absentCountRow }}</span></td>
                                                     <td class="leave-stat-cell"><span>{{ $unpaidLeaveCountRow }}</span></td>
                                                     <td class="leave-stat-cell"><span>{{ $dayOffCountRow }}</span></td>
+                                                    <td class="leave-stat-cell"><span>{{ $fridayOtHours > 0 ? round($fridayOtHours) : 0 }}</span></td>
                                                     @if($LeaveCategory->isNotEmpty())
                                                         @php
                                                             // Get LeaveData once from the first roster record (same on all records for employee)
