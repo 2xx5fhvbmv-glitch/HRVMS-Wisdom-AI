@@ -308,7 +308,7 @@
                     // Calculate total price from fetched data
                     let total = json.data.reduce((sum, payment) => sum + parseFloat(payment.price || 0), 0);
                     // Update total amount in the UI
-                    $('#total-receivable-amount').text(`${currencySymbol} ${total.toFixed(2)}`);
+                    $('#total-receivable-amount').text(formatAmount(total, 'USD'));
                     return json.data;
                 }
             },

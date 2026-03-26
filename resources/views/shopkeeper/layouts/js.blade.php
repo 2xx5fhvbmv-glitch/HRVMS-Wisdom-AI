@@ -26,6 +26,23 @@
 
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
+        // Global currency helpers for shopkeeper
+        var displayCurrency = '{{ Common::getDisplayCurrency() }}';
+        var currencySymbol = (displayCurrency === 'MVR') ? 'MVR ' : '$';
+        var usdToMvrRate = {{ Common::getUsdToMvrRate() }};
+
+        function convertAmount(amount, sourceCurrency) {
+            amount = parseFloat(amount) || 0;
+            sourceCurrency = (sourceCurrency || 'USD').toUpperCase();
+            if (displayCurrency === 'MVR' && sourceCurrency === 'USD') return amount * usdToMvrRate;
+            if (displayCurrency === 'Dollar' && sourceCurrency === 'MVR') return amount / usdToMvrRate;
+            return amount;
+        }
+
+        function formatAmount(amount, sourceCurrency) {
+            var converted = convertAmount(amount, sourceCurrency);
+            return currencySymbol + converted.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
 
         $(window).on('load', function () {
             $('#nav-staffShop').show(100);
@@ -73,6 +90,35 @@
                 $notificationBtn.has(e.target).length === 0
             ) {
                 $notificationWrapper.removeClass("end-0");
+            }
+        });
+    });
+
+    // Load notifications on page load
+    function loadShopkeeperNotifications() {
+        $.ajax({
+            url: "{{ route('shopkeeper.notifications') }}",
+            type: "GET",
+            success: function(response) {
+                if (response.success) {
+                    $(".notification-body").html(response.html);
+                }
+            }
+        });
+    }
+    loadShopkeeperNotifications();
+
+    // Mark notification as read
+    $(document).on("click", ".MarkShopNotification", function() {
+        var id = $(this).data('id');
+        $.ajax({
+            url: "{{ route('shopkeeper.notifications.mark') }}",
+            type: "POST",
+            data: {"_token": "{{ csrf_token() }}", "id": id},
+            success: function(response) {
+                if (response.success) {
+                    $(".class_remove_me_" + id).remove();
+                }
             }
         });
     });
