@@ -205,8 +205,83 @@ class DashboardController extends Controller
             $payment->status = 'Partial Paid';
         }
         $payment->save();
-       
+
         return response()->json(['success' => 'Cash payment recorded.']);
+    }
+
+    /**
+     * Get shopkeeper notifications (sidebar AJAX)
+     */
+    public function getNotifications()
+    {
+        $shopkeeperId = $this->shopkeeper->id;
+        $resortId = $this->shopkeeper->resort_id;
+
+        $notifications = DB::table('resort_notifications')
+            ->where('resort_id', $resortId)
+            ->where('user_id', $shopkeeperId)
+            ->where('module', 'Staff Shop')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get(['id', 'type', 'message', 'status', 'request_id', 'created_at']);
+
+        $html = '';
+        if ($notifications->isNotEmpty()) {
+            foreach ($notifications as $notif) {
+                $timeAgo = \Carbon\Carbon::parse($notif->created_at)->diffForHumans();
+                $activeClass = $notif->status === 'unread' ? 'active' : '';
+                $html .= '<div class="notification-box ' . $activeClass . ' class_remove_me_' . $notif->id . '">
+                    <a href="javascript:void(0);" class="d-flex profile-dropdown">
+                        <div class="flex-shrink-0 img-box">
+                            <i class="fa-solid fa-shop fa-2x text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5>' . e($notif->type) . '</h5>
+                            <p>' . e($notif->message) . '</p>
+                            <br><span>' . $timeAgo . '</span>
+                        </div>
+                    </a>
+                    <a href="javascript:void(0);" class="btn-lg-icon btn-light-grey MarkShopNotification" data-id="' . $notif->id . '">
+                        <i class="fas fa-envelope-open" aria-hidden="true"></i>
+                    </a>
+                </div>';
+            }
+        } else {
+            $html = '<div class="notification-box"><p>No Notifications</p></div>';
+        }
+
+        return response()->json(['success' => true, 'html' => $html]);
+    }
+
+    /**
+     * Mark shopkeeper notification as read
+     */
+    public function markNotification(Request $request)
+    {
+        DB::table('resort_notifications')
+            ->where('id', $request->id)
+            ->update(['status' => 'read']);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Notification list page
+     */
+    public function notificationList()
+    {
+        $page_title = 'Notifications';
+        $shopkeeperId = $this->shopkeeper->id;
+        $resortId = $this->shopkeeper->resort_id;
+
+        $notifications = DB::table('resort_notifications')
+            ->where('resort_id', $resortId)
+            ->where('user_id', $shopkeeperId)
+            ->where('module', 'Staff Shop')
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        return view('shopkeeper.notifications.index', compact('page_title', 'notifications'));
     }
 
 }

@@ -53,5 +53,9 @@ Route::prefix('shopkeeper')->middleware(['auth:shopkeeper','revalidate'])->names
 
     Route::get('/dashboard/payment/download', 'PaymentController@downloadPayments')->name('dashboard.payment.download');
 
+    // Notifications
+    Route::get('/notifications', 'DashboardController@getNotifications')->name('shopkeeper.notifications');
+    Route::post('/notifications/mark', 'DashboardController@markNotification')->name('shopkeeper.notifications.mark');
+    Route::get('/notifications/list', 'DashboardController@notificationList')->name('shopkeeper.notifications.list');
 
 });

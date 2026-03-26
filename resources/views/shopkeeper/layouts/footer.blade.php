@@ -35,7 +35,7 @@
 <div class="notification-wrapper ">
     <div class="notification-title d-flex justify-content-between">
         <h5>Notifications</h5>
-        <a href="#" class="text-underline btn-link-yellow">View All</a>
+        <a href="{{ route('shopkeeper.notifications.list') }}" class="text-underline btn-link-yellow">View All</a>
     </div>
     <div class="notification-body">
     </div>

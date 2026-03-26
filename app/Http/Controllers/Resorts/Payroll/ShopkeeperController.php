@@ -67,7 +67,11 @@ class ShopkeeperController extends Controller
 
         $page_title ='Create Shopkeeper';
         $resort_id = $this->resort->resort_id;
-        return view('resorts.payroll.shopkeeper.create',compact('page_title'));
+        $recentShopkeepers = Shopkeeper::where('resort_id', $resort_id)
+            ->orderBy('updated_at', 'DESC')
+            ->limit(5)
+            ->get();
+        return view('resorts.payroll.shopkeeper.create',compact('page_title','recentShopkeepers'));
     }
 
     public function list(Request $request)
@@ -345,10 +349,34 @@ class ShopkeeperController extends Controller
         }
 
         $resort_id = $this->resort->resort_id;
+
+        // Get payments before update to send notifications
+        $payments = Payment::whereIn('id', $request->payment_ids)
+            ->whereHas('shopKeeper', fn ($q) => $q->where('resort_id', $resort_id))
+            ->whereIn('status', ['Consented', 'Partial Paid'])
+            ->with(['shopKeeper', 'employee.resortAdmin'])
+            ->get();
+
         $updated = Payment::whereIn('id', $request->payment_ids)
             ->whereHas('shopKeeper', fn ($q) => $q->where('resort_id', $resort_id))
             ->whereIn('status', ['Consented', 'Partial Paid'])
             ->update(['status' => 'Paid']);
+
+        // Create notifications for shopkeepers
+        foreach ($payments->groupBy('shopkeeper_id') as $shopkeeperId => $shopPayments) {
+            $empNames = $shopPayments->map(fn($p) => $p->employee->resortAdmin->first_name ?? 'Employee')->unique()->implode(', ');
+            $totalAmount = $shopPayments->sum('price');
+            \DB::table('resort_notifications')->insert([
+                'resort_id' => $resort_id,
+                'user_id' => $shopkeeperId,
+                'module' => 'Staff Shop',
+                'type' => 'Payment Approved',
+                'message' => $shopPayments->count() . ' payment(s) totalling $' . number_format($totalAmount, 2) . ' marked as Paid for ' . $empNames,
+                'status' => 'unread',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return response()->json([
             'success' => true,

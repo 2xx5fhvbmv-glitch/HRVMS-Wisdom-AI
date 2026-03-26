@@ -23,21 +23,14 @@
 
         <div>
             <div class="row g-4">
-                <div class="col-lg-6 ">
+                <div class="col-lg-5">
                     <div class="card mb-30">
                         <div class="card-title">
-                            <div class="row g-1">
-                                <div class="col">
-                                    <h3>Add Shopkeeper</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="{{route('shopkeepers.index')}}" class="a-link">View all</a>
-                                </div>
-                            </div>
+                            <h3>Add Shopkeeper</h3>
                         </div>
-                                            
+
                         <form id="shopkeeperForm">
-                            <div class="earnings-main  ">
+                            <div class="earnings-main">
                                 <div class="earnings-block mb-md-4 mb-3">
                                     <div class="row align-items-end g-md-4 g-2 earnings-row">
                                         <div class="col-sm-6">
@@ -54,17 +47,60 @@
                                             <label for="contact_no" class="form-label">Contact No <span class="red-mark"> * </span></label>
                                             <input type="tel" class="form-control" id="contact_no" name="contact_no" pattern="[0-9]{10}" maxlength="10" placeholder="Contact No" oninput="this.value = this.value.replace(/[^0-9]/g, '');" >
                                         </div>
-                                        <!-- <div class="col-auto">
-                                            <button type="button" class="btn btn-danger remove-earnings">Remove</button>
-                                        </div> -->
                                     </div>
                                 </div>
-                            </div> 
-                            <!-- <button type="button" class="btn btn-themeSkyblue btn-sm mb-3 add-earnings">Add More</button> -->
+                            </div>
                             <div class="card-footer text-end">
                                 <button type="submit" class="checkprogress btn btn-themeBlue btn-sm">Submit</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card mb-30">
+                        <div class="card-title">
+                            <div class="row g-1">
+                                <div class="col">
+                                    <h3>Recent Shopkeepers</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{route('shopkeepers.index')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Contact</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($recentShopkeepers as $index => $shopkeeper)
+                                        <tr>
+                                            <td>{{ $index + 1 }}</td>
+                                            <td>{{ $shopkeeper->name }}</td>
+                                            <td>{{ $shopkeeper->email }}</td>
+                                            <td>{{ $shopkeeper->contact_no }}</td>
+                                            <td>
+                                                <a href="{{ route('resort.shopkeeper.payments', $shopkeeper->id) }}" class="btn btn-sm btn-themeBlue">
+                                                    <i class="fa-solid fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted py-3">No shopkeepers added yet</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
