@@ -348,6 +348,9 @@
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" data-review-tab="deductions" type="button">Deductions</button>
                                 </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-review-tab="summary" type="button">Summary</button>
+                                </li>
                             </ul>
                             <div class="table-responsive">
                                 <table id="table-review" class="table table-review   w-100 mb-0">
@@ -439,6 +442,28 @@
                                     </div>
                                 </div>
                             </div>
+
+                            {{-- Approval Timeline --}}
+                            <div class="col-lg-12 mb-3" id="approval-timeline-wrapper">
+                                <div class="bg-themeGrayLight p-3 rounded">
+                                    <h6 class="fw-600 mb-3">Approval Status</h6>
+                                    <ul class="manning-timeline text-start" id="approval-timeline">
+                                        <li id="approval-step-1" class="">
+                                            <span>Reviewed by Finance EXCOM</span>
+                                            <small class="d-block text-muted" id="approval-step-1-info"></small>
+                                        </li>
+                                        <li id="approval-step-2" class="">
+                                            <span>Reviewed by HR EXCOM</span>
+                                            <small class="d-block text-muted" id="approval-step-2-info"></small>
+                                        </li>
+                                        <li id="approval-step-3" class="">
+                                            <span>Approved by GM</span>
+                                            <small class="d-block text-muted" id="approval-step-3-info"></small>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
                             <div class="d-flex gap-2 mb-3">
                                 <button type="button" class="btn btn-themeSkyblue btn-sm" id="downloadPayrollPDF">
                                     <i class="fa-solid fa-file-pdf me-1"></i> Download PDF
@@ -448,7 +473,30 @@
                                 </button>
                             </div>
                             <hr class="hr-footer border-0">
-                            <button type="submit" class="btn btn-themeBlue btn-sm float-end mb-1" style="margin-right: 10px;" id="submit">Confirm and Lock Payroll</button>
+
+                            {{-- Supervisor: Send for Approval --}}
+                            <button type="button" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="sendForApproval">
+                                <i class="fa-solid fa-paper-plane me-1"></i> Send Payroll for Approval
+                            </button>
+
+                            {{-- Approver: Approve/Reject --}}
+                            <button type="button" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="approvePayroll">
+                                <i class="fa-solid fa-check me-1"></i> Approve
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm float-end mb-1 me-2 d-none" id="rejectPayroll">
+                                <i class="fa-solid fa-times me-1"></i> Reject
+                            </button>
+
+                            {{-- Supervisor: Confirm and Lock (only after all approvals) --}}
+                            <button type="submit" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="submit">
+                                <i class="fa-solid fa-lock me-1"></i> Confirm and Lock Payroll
+                            </button>
+
+                            {{-- After locked --}}
+                            <div class="alert alert-success d-none text-center" id="payrollLockedMessage">
+                                <i class="fa-solid fa-circle-check me-1"></i> This payroll has been approved and locked. Thank you.
+                            </div>
+
                             <button type="button" class="btn btn-themeGray btn-sm float-end mb-1 me-2" id="saveAsDraft">Save as Draft</button>
                             <a href="#" class="btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
@@ -547,7 +595,7 @@
     .leave-tooltip.show{display:block!important}
     .modal-body .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:0!important}
     @keyframes payroll-spin{to{transform:rotate(360deg)}}
-    #table-review .col-overtime, #table-review .col-earnings, #table-review .col-deductions { display: none; }
+    #table-review .col-overtime, #table-review .col-earnings, #table-review .col-deductions, #table-review .col-summary { display: none; }
     #table-review.show-overtime .col-attendance { display: none; }
     #table-review.show-overtime .col-overtime { display: table-cell; }
     #table-review.show-earnings .col-attendance { display: none; }
@@ -556,6 +604,9 @@
     #table-review.show-deductions .col-attendance { display: none; }
     #table-review.show-deductions .col-overtime { display: none; }
     #table-review.show-deductions .col-deductions { display: table-cell; }
+    #table-review.show-summary .col-attendance { display: none; }
+    #table-review.show-summary .col-overtime { display: none; }
+    #table-review.show-summary .col-summary { display: table-cell; }
     .staff-shop-popover{position:fixed;z-index:99999;background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.18);border:1px solid #e0e0e0;max-width:380px;pointer-events:none}
     .staff-shop-popover .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:8px!important}
     .leave-tooltip::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #2C2C2C}
@@ -595,6 +646,12 @@
     var currency = "{{$currency}}";
     let employeeData = {}; // Store employee details
     var selectedEmployeeSet = new Set(); // Persist selection across pages
+
+    // Format number with commas: 9999.98 → 9,999.98
+    function fmtNum(val) {
+        var num = parseFloat(val) || 0;
+        return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     // Helper: get selected employee IDs (numeric) — uses checkboxes or falls back to localStorage
     function getSelectedEmployeeIds() {
@@ -638,11 +695,32 @@
         return ids;
     }
 
-    //  console.log(currency);
+    // Check if view-only mode (approvers viewing payroll)
+    var isViewOnly = new URLSearchParams(window.location.search).get('viewonly') === '1';
+    var resumePayrollId = new URLSearchParams(window.location.search).get('resume');
+
+    // If resuming a payroll, set localStorage
+    if (resumePayrollId) {
+        localStorage.setItem('payroll_id', resumePayrollId);
+        if (!localStorage.getItem('currentStep')) {
+            localStorage.setItem('currentStep', '7');
+        }
+    }
+
     $(document).ready(function () {
         let resortid = "{{ Auth::guard('resort-admin')->user()->resort_id }}";
         if (typeof $.fn.parsley !== 'function') {
             console.warn('Parsley.js is not loaded — form validation may not work');
+        }
+
+        // View-only mode: disable all editable elements
+        if (isViewOnly) {
+            setTimeout(function() {
+                $('input, select, textarea').not('#searchField, #review-search').prop('disabled', true);
+                $('.editable').off('dblclick click');
+                $('.next:not([data-step="7"] .next), .add-deduction-btn, #distribute-service-charge, #upload-city-ledger-button, #OverTimeform').hide();
+                $('.previous').show(); // Keep back button for navigation
+            }, 1000);
         }
 
         // Set the cutoff day (from Laravel config)
@@ -1278,6 +1356,7 @@
                         overtimeFriday: stripVal($tds.eq(8)),
                         overtimeHoliday: stripVal($tds.eq(9)),
                         overtimeTotal: stripVal($tds.eq(10)),
+                        earningsBasic: stripVal($tds.eq(11)),
                         earnedSalary: stripVal($tds.eq(11)),
                         earningsAllowance: 0,
                         earningsNormal: stripVal($tds.eq($tds.length - 3)),
@@ -1480,7 +1559,7 @@
                     var workdays = parseFloat($row.find(".workdays").text()) || 0;
                     var employeeShare = (serviceCharge / totalWorkdays) * workdays;
                     var employeeShareUSD = (serviceChargeUSD / totalWorkdays) * workdays;
-                    $row.find(".service-charge").text(`${currencySymbol}${employeeShare.toFixed(2)}`);
+                    $row.find(".service-charge").text(`${currencySymbol}${fmtNum(employeeShare)}`);
                     distributedTotal += employeeShare;
 
                     distributedServiceCharge.push({
@@ -1493,7 +1572,7 @@
                 }
             });
 
-            $("#total-service-charge").text(`${currencySymbol}${distributedTotal.toFixed(2)}`);
+            $("#total-service-charge").text(`${currencySymbol}${fmtNum(distributedTotal)}`);
         });
 
 
@@ -1626,7 +1705,7 @@
                         $("#table-deductions tbody tr").each(function () {
                             var $row = $(this);
                             if ($row.find("td:eq(0)").text().trim() === employeeId) {
-                                $row.find("td:eq(4)").text(currencySymbol + cityLedgerFinal.toFixed(2));
+                                $row.find("td:eq(4)").text(currencySymbol + fmtNum(cityLedgerFinal));
                                 updateTotal($row, employeeId);
                                 found = true;
                                 updatedCount++;
@@ -1678,7 +1757,7 @@
                 if ($row.find("td:eq(0)").text().trim() === employeeId) {
                     var currentOther = parseFloat($row.find("td:eq(9)").text().replace(currencySymbol, '').trim()) || 0;
                     var newOther = currentOther + finalAmount;
-                    $row.find("td:eq(9)").text(currencySymbol + newOther.toFixed(2));
+                    $row.find("td:eq(9)").text(currencySymbol + fmtNum(newOther));
                     updateTotal($row, employeeId);
                     updated = true;
                 }
@@ -1688,7 +1767,7 @@
             $("#addDeduction-modal").modal("hide");
 
             if (updated) {
-                toastr.success("Deduction of " + currencySymbol + finalAmount.toFixed(2) + " added for " + employeeId + ".", 'Success', {
+                toastr.success("Deduction of " + currencySymbol + fmtNum(finalAmount) + " added for " + employeeId + ".", 'Success', {
                     positionClass: 'toast-bottom-right'
                 });
             } else {
@@ -1957,16 +2036,167 @@
         });
     });
 
+    // ===== PAYROLL APPROVAL WORKFLOW =====
+    function loadApprovalStatus() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) return;
+
+        $.ajax({
+            url: '{{ route("payroll.approval.status") }}',
+            method: 'POST',
+            data: { payroll_id: payrollId, _token: '{{ csrf_token() }}' },
+            success: function(res) {
+                if (!res.success) return;
+
+                var approvals = res.approvals || [];
+                var status = res.payroll_status;
+
+                // Update timeline
+                approvals.forEach(function(a) {
+                    var $li = $('#approval-step-' + a.step_order);
+                    var $info = $('#approval-step-' + a.step_order + '-info');
+                    if (a.status === 'approved') {
+                        $li.addClass('active');
+                        $info.html('<i class="fa-solid fa-check text-success"></i> Approved by ' + a.approver_name + ' on ' + new Date(a.approved_at).toLocaleDateString());
+                    } else if (a.status === 'rejected') {
+                        $li.addClass('text-danger');
+                        $info.html('<i class="fa-solid fa-times text-danger"></i> Rejected by ' + a.approver_name);
+                    } else {
+                        $info.html('Pending');
+                    }
+                });
+
+                // Show/hide buttons based on status and user role
+                $('#sendForApproval, #approvePayroll, #rejectPayroll, #submit, #payrollLockedMessage, #saveAsDraft').addClass('d-none');
+
+                if (status === 'draft') {
+                    // Supervisor can send for approval or save as draft
+                    $('#sendForApproval').removeClass('d-none');
+                    $('#saveAsDraft').removeClass('d-none');
+                } else if (status === 'pending_approval') {
+                    // Check if current user has an approval step pending
+                    if (res.user_approval_step) {
+                        var pendingStep = approvals.find(a => a.step_order == res.user_approval_step && a.status === 'pending');
+                        var prevApproved = approvals.filter(a => a.step_order < res.user_approval_step).every(a => a.status === 'approved');
+                        if (pendingStep && prevApproved) {
+                            $('#approvePayroll, #rejectPayroll').removeClass('d-none');
+                        }
+                    }
+                } else if (status === 'approved') {
+                    // Supervisor can lock
+                    if (res.is_supervisor) {
+                        $('#submit').removeClass('d-none');
+                    } else {
+                        $('#payrollLockedMessage').removeClass('d-none').html('<i class="fa-solid fa-circle-check me-1"></i> All approvals completed. Waiting for supervisor to lock the payroll.');
+                    }
+                } else if (status === 'locked') {
+                    $('#payrollLockedMessage').removeClass('d-none');
+                    $('.previous').addClass('d-none');
+                }
+            }
+        });
+    }
+
+    // Load approval status when step 7 is visible
+    var observer = new MutationObserver(function() {
+        var step7 = $('fieldset[data-step="7"]');
+        if (step7.css('visibility') === 'visible') {
+            loadApprovalStatus();
+        }
+    });
+    $('fieldset[data-step="7"]').each(function() {
+        observer.observe(this, { attributes: true, attributeFilter: ['style'] });
+    });
+
+    // Send for Approval
+    $('#sendForApproval').on('click', function() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) return;
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Sending...');
+
+        $.ajax({
+            url: '{{ route("payroll.send.approval") }}',
+            method: 'POST',
+            data: { payroll_id: payrollId, _token: '{{ csrf_token() }}' },
+            success: function(res) {
+                if (res.success) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    loadApprovalStatus();
+                } else {
+                    toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            complete: function() {
+                $('#sendForApproval').prop('disabled', false).html('<i class="fa-solid fa-paper-plane me-1"></i> Send Payroll for Approval');
+            }
+        });
+    });
+
+    // Approve Payroll
+    $('#approvePayroll').on('click', function() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) return;
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Approving...');
+
+        $.ajax({
+            url: '{{ route("payroll.approve") }}',
+            method: 'POST',
+            data: { payroll_id: payrollId, action: 'approve', _token: '{{ csrf_token() }}' },
+            success: function(res) {
+                if (res.success) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    loadApprovalStatus();
+                } else {
+                    toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            complete: function() {
+                $('#approvePayroll').prop('disabled', false).html('<i class="fa-solid fa-check me-1"></i> Approve');
+            }
+        });
+    });
+
+    // Reject Payroll
+    $('#rejectPayroll').on('click', function() {
+        var payrollId = localStorage.getItem("payroll_id");
+        if (!payrollId) return;
+
+        var remarks = prompt("Please enter a reason for rejection:");
+        if (remarks === null) return;
+
+        $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Rejecting...');
+
+        $.ajax({
+            url: '{{ route("payroll.approve") }}',
+            method: 'POST',
+            data: { payroll_id: payrollId, action: 'reject', remarks: remarks, _token: '{{ csrf_token() }}' },
+            success: function(res) {
+                if (res.success) {
+                    toastr.warning(res.message, 'Warning', { positionClass: 'toast-bottom-right' });
+                    loadApprovalStatus();
+                } else {
+                    toastr.error(res.message, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            complete: function() {
+                $('#rejectPayroll').prop('disabled', false).html('<i class="fa-solid fa-times me-1"></i> Reject');
+            }
+        });
+    });
+
     // Review tab switching
     $(document).on('click', '#reviewTabs .nav-link', function() {
         $('#reviewTabs .nav-link').removeClass('active');
         $(this).addClass('active');
         var tab = $(this).data('review-tab');
         var $table = $('#table-review');
-        $table.removeClass('show-overtime show-earnings show-deductions');
+        $table.removeClass('show-overtime show-earnings show-deductions show-summary');
         if (tab === 'overtime') $table.addClass('show-overtime');
         else if (tab === 'earnings') $table.addClass('show-earnings');
         else if (tab === 'deductions') $table.addClass('show-deductions');
+        else if (tab === 'summary') $table.addClass('show-summary');
         // 'attendance' is default — no class needed
     });
 
@@ -2315,7 +2545,7 @@
                         let serviceCharge = getServiceChargeamountForEmployee(employee.employee_id);
                         // If we have saved SC and currency is MVR, convert for display
                         if (serviceCharge !== "0" && currency === 'MVR' && conversionRate > 1) {
-                            serviceCharge = (parseFloat(serviceCharge) * conversionRate).toFixed(2);
+                            serviceCharge = fmtNum(parseFloat(serviceCharge) * conversionRate);
                         }
 
                         var row = `<tr>
@@ -2340,7 +2570,7 @@
                             scTotal += parseFloat($(this).text().replace(/[^0-9.-]/g, '')) || 0;
                         });
                         var cs = (currency === 'Dollar') ? '$' : 'MVR ';
-                        $("#total-service-charge").text(cs + scTotal.toFixed(2));
+                        $("#total-service-charge").text(cs + fmtNum(scTotal));
                     }
 
                     $("#table-serviceCharge").DataTable({
@@ -2483,7 +2713,7 @@
     //                         // console.log($row.find("td:eq(0)").text() ,employeeId );
     //                         if ($row.find("td:eq(0)").text() === employeeId) {
                                
-    //                             $row.find("td:eq(8)").text(currencySymbol + FinalOtherAMount.toFixed(2)); // Update displayed value
+    //                             $row.find("td:eq(8)").text(currencySymbol + fmtNum(FinalOtherAMount)); // Update displayed value
                                 
     //                         }
 
@@ -2569,7 +2799,7 @@
                             <td class="attendance">${currencySymbol}${employee.absent_deduction}</td>
                             <td class="city-ladger">${currencySymbol}0.00</td>
                             <td class="staff-shop">${currencySymbol}0.00</td>
-                            <td class="advance-loan">${repaymentAmountFinal > 0 ? currencySymbol + repaymentAmountFinal.toFixed(2) : 'NA'}</td>
+                            <td class="advance-loan">${repaymentAmountFinal > 0 ? currencySymbol + fmtNum(repaymentAmountFinal) : 'NA'}</td>
                             <td class="pension">${currencySymbol}0.00</td>
                             <td class="ewt">${currencySymbol}0.00</td>
                             <td class="other">${currencySymbol}0.00</td>
@@ -2607,7 +2837,7 @@
                             var cityLedgerFinal = (currency === "MVR") 
                                 ? cityLedgerUSD * rates.usd_to_mvr 
                                 : cityLedgerUSD;
-                            $row.find("td:eq(4)").text(currencySymbol + cityLedgerFinal.toFixed(2));
+                            $row.find("td:eq(4)").text(currencySymbol + fmtNum(cityLedgerFinal));
                         }
 
                         // Other deduction update
@@ -2616,7 +2846,7 @@
                             var FinalOtherAmount = (currency === "MVR") 
                                 ? amountInUSD * rates.usd_to_mvr 
                                 : amountInUSD;
-                            $row.find("td:eq(9)").text(currencySymbol + FinalOtherAmount.toFixed(2));
+                            $row.find("td:eq(9)").text(currencySymbol + fmtNum(FinalOtherAmount));
                         }
                     });
 
@@ -2745,7 +2975,7 @@
     //                     let allowanceCols = '';
     //                     allowanceList.forEach(name => {
     //                         let val = allowanceMap[name] || 0;
-    //                         allowanceCols += `<td>${currencySymbol}${val.toFixed(2)}</td>`;
+    //                         allowanceCols += `<td>${currencySymbol}${fmtNum(val)}</td>`;
     //                         allowanceSums[name] += val;
     //                     });
 
@@ -2775,12 +3005,12 @@
     //                         <td>${currencySymbol}${employee.regularOTPay}</td>
     //                         <td>${currencySymbol}${employee.holidayOTPay}</td>
     //                         <td>${currencySymbol}${employee.totalOTPay}</td>
-    //                         <td>${currencySymbol}${employee.basic_salary.toFixed(2)}</td>
-    //                         <td>${currencySymbol}${employee.earned_salary.toFixed(2)}</td>
+    //                         <td>${currencySymbol}${fmtNum(employee.basic_salary)}</td>
+    //                         <td>${currencySymbol}${fmtNum(employee.earned_salary)}</td>
     //                         ${allowanceCols}
     //                         <td>
-    //                         <td>${currencySymbol}${(employee.total_deduction || 0).toFixed(2)}</td>
-    //                         <td>${currencySymbol}${employee.normal_pay.toFixed(2)}</td>
+    //                         <td>${currencySymbol}${fmtNum((employee.total_deduction || 0))}</td>
+    //                         <td>${currencySymbol}${fmtNum(employee.normal_pay)}</td>
     //                     </tr>`;
     //                     $tableBody.append(row);
     //                 });
@@ -2791,22 +3021,22 @@
     //                     <td>${footerTotals.present}</td>
     //                     <td>${footerTotals.absent}</td>
     //                     <td>-</td>
-    //                     <td>${footerTotals.regular_ot.toFixed(2)} hrs</td>
-    //                     <td>${footerTotals.holiday_ot.toFixed(2)} hrs</td>
-    //                     <td>${footerTotals.total_ot.toFixed(2)} hrs</td>
-    //                     <td>${currencySymbol}${footerTotals.basic_salary.toFixed(2)}</td>
-    //                     <td>${currencySymbol}${footerTotals.earned_salary.toFixed(2)}</td>
+    //                     <td>${fmtNum(footerTotals.regular_ot)} hrs</td>
+    //                     <td>${fmtNum(footerTotals.holiday_ot)} hrs</td>
+    //                     <td>${fmtNum(footerTotals.total_ot)} hrs</td>
+    //                     <td>${currencySymbol}${fmtNum(footerTotals.basic_salary)}</td>
+    //                     <td>${currencySymbol}${fmtNum(footerTotals.earned_salary)}</td>
     //                 `;
 
     //                 // Add dynamic allowance totals
     //                 allowanceList.forEach(name => {
-    //                     footerHtml += `<td>${currencySymbol}${allowanceSums[name].toFixed(2)}</td>`;
+    //                     footerHtml += `<td>${currencySymbol}${fmtNum(allowanceSums[name])}</td>`;
     //                 });
 
     //                 // Add deductions and normal pay total
     //                 footerHtml += `
-    //                     <td>${currencySymbol}${footerTotals.total_deductions.toFixed(2)}</td>
-    //                     <td>${currencySymbol}${footerTotals.normal_pay.toFixed(2)}</td>
+    //                     <td>${currencySymbol}${fmtNum(footerTotals.total_deductions)}</td>
+    //                     <td>${currencySymbol}${fmtNum(footerTotals.normal_pay)}</td>
     //                 `;
 
     //                 if (!$("#table-review tfoot").length) {
@@ -2907,11 +3137,12 @@
                         <th class="col-attendance">Present</th>
                         <th class="col-attendance">Absent</th>
                         <th class="col-attendance">Day Off</th>
-                        <th class="col-attendance">Service Charge</th>
+                        <th class="col-attendance">Other Leaves</th>
                         <th class="col-overtime">Regular OT</th>
                         <th class="col-overtime">Friday OT</th>
                         <th class="col-overtime">Holiday OT</th>
                         <th class="col-overtime">Total OT Pay</th>
+                        <th class="col-earnings">Service Charge</th>
                         <th class="col-earnings">Basic Earned</th>
                         ${allowanceHeaderHtml.replace(/<th /g, '<th class="col-earnings" ')}
                         <th class="col-earnings">Total Earnings</th>
@@ -2923,6 +3154,9 @@
                         <th class="col-deductions">Other</th>
                         <th class="col-deductions">Total Deductions</th>
                         <th class="col-deductions">Net Salary</th>
+                        <th class="col-summary">Total Earnings</th>
+                        <th class="col-summary">Total Deductions</th>
+                        <th class="col-summary">Net Salary</th>
                     </tr>`);
 
                     let footerTotals = {
@@ -2938,13 +3172,13 @@
                         let allowanceCols = '';
                         // allowanceList.forEach(name => {
                         //     let val = allowanceMap[name] || 0;
-                        //     allowanceCols += `<td>${currencySymbol}${val.toFixed(2)}</td>`;
+                        //     allowanceCols += `<td>${currencySymbol}${fmtNum(val)}</td>`;
                         //     allowanceSums[name] += val;
                         // });
 
                         allowanceList.forEach(a => {
                             let val = allowanceMap[a.name] || 0;
-                            allowanceCols += `<td>${currencySymbol}${val.toFixed(2)}</td>`;
+                            allowanceCols += `<td>${currencySymbol}${fmtNum(val)}</td>`;
                             allowanceSums[a.name] += val;
                         });
 
@@ -2952,6 +3186,7 @@
                         footerTotals.absent += employee.absent;
                         footerTotals.service_charge += employee.service_charge;
                         footerTotals.regularOTPay += employee.regularOTPay;
+                        footerTotals.fridayOTPay += (employee.fridayOTPay || 0);
                         footerTotals.holidayOTPay += employee.holidayOTPay;
                         footerTotals.totalOTPay += employee.totalOTPay;
                         footerTotals.basic_salary += employee.basic_salary;
@@ -2981,22 +3216,26 @@
                                 <td class="col-attendance">${employee.present}</td>
                                 <td class="col-attendance">${employee.absent}</td>
                                 <td class="col-attendance">${employee.day_off}</td>
-                                <td class="col-attendance">${currencySymbol}${employee.service_charge}</td>
-                                <td class="col-overtime">${currencySymbol}${employee.regularOTPay}</td>
-                                <td class="col-overtime">${currencySymbol}${(employee.fridayOTPay || 0)}</td>
-                                <td class="col-overtime">${currencySymbol}${employee.holidayOTPay}</td>
-                                <td class="col-overtime">${currencySymbol}${employee.totalOTPay}</td>
-                                <td class="col-earnings">${currencySymbol}${employee.earned_salary.toFixed(2)}</td>
+                                <td class="col-attendance">${employee.leave_types || '-'}</td>
+                                <td class="col-overtime">${currencySymbol}${fmtNum(employee.regularOTPay)}</td>
+                                <td class="col-overtime">${currencySymbol}${fmtNum(employee.fridayOTPay || 0)}</td>
+                                <td class="col-overtime">${currencySymbol}${fmtNum(employee.holidayOTPay)}</td>
+                                <td class="col-overtime">${currencySymbol}${fmtNum(employee.totalOTPay)}</td>
+                                <td class="col-earnings">${currencySymbol}${fmtNum(employee.service_charge)}</td>
+                                <td class="col-earnings">${currencySymbol}${fmtNum(employee.earned_salary)}</td>
                                 ${allowanceCols.replace(/<td>/g, '<td class="col-earnings">')}
-                                <td class="col-earnings">${currencySymbol}${employee.normal_pay.toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.absent_deduction || 0).toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.city_ledger || 0).toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.staff_shop || 0).toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.pension || 0).toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.ewt || 0).toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.other_deduction || 0).toFixed(2)}</td>
-                                <td class="col-deductions">${currencySymbol}${(employee.total_deduction || 0).toFixed(2)}</td>
-                                <td class="col-deductions"><strong>${currencySymbol}${netSalary.toFixed(2)}</strong></td>
+                                <td class="col-earnings">${currencySymbol}${fmtNum(employee.normal_pay)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.absent_deduction || 0)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.city_ledger || 0)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.staff_shop || 0)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.pension || 0)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.ewt || 0)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.other_deduction || 0)}</td>
+                                <td class="col-deductions">${currencySymbol}${fmtNum(employee.total_deduction || 0)}</td>
+                                <td class="col-deductions"><strong>${currencySymbol}${fmtNum(netSalary)}</strong></td>
+                                <td class="col-summary">${currencySymbol}${fmtNum(employee.normal_pay)}</td>
+                                <td class="col-summary">${currencySymbol}${fmtNum(employee.total_deduction || 0)}</td>
+                                <td class="col-summary"><strong>${currencySymbol}${fmtNum(netSalary)}</strong></td>
                             </tr>`;
                         $tableBody.append(row);
                     });
@@ -3008,26 +3247,30 @@
                         <td class="col-attendance">${footerTotals.present}</td>
                         <td class="col-attendance">${footerTotals.absent}</td>
                         <td class="col-attendance">-</td>
-                        <td class="col-attendance">${currencySymbol}${footerTotals.service_charge.toFixed(2)}</td>
-                        <td class="col-overtime">${currencySymbol}${footerTotals.regularOTPay.toFixed(2)}</td>
-                        <td class="col-overtime">-</td>
-                        <td class="col-overtime">${currencySymbol}${footerTotals.holidayOTPay.toFixed(2)}</td>
-                        <td class="col-overtime">${currencySymbol}${footerTotals.totalOTPay.toFixed(2)}</td>
-                        <td class="col-earnings">${currencySymbol}${footerTotals.earned_salary.toFixed(2)}</td>
+                        <td class="col-attendance">-</td>
+                        <td class="col-overtime">${currencySymbol}${fmtNum(footerTotals.regularOTPay)}</td>
+                        <td class="col-overtime">${currencySymbol}${fmtNum(footerTotals.fridayOTPay || 0)}</td>
+                        <td class="col-overtime">${currencySymbol}${fmtNum(footerTotals.holidayOTPay)}</td>
+                        <td class="col-overtime">${currencySymbol}${fmtNum(footerTotals.totalOTPay)}</td>
+                        <td class="col-earnings">${currencySymbol}${fmtNum(footerTotals.service_charge)}</td>
+                        <td class="col-earnings">${currencySymbol}${fmtNum(footerTotals.earned_salary)}</td>
                     `;
                     allowanceList.forEach(a => {
-                        footerHtml += `<td class="col-earnings">${currencySymbol}${allowanceSums[a.name].toFixed(2)}</td>`;
+                        footerHtml += `<td class="col-earnings">${currencySymbol}${fmtNum(allowanceSums[a.name])}</td>`;
                     });
                     footerHtml += `
-                        <td class="col-earnings">${currencySymbol}${footerTotals.normal_pay.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.absent_deduction.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.city_ledger.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.staff_shop.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.pension.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.ewt.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.other_deduction.toFixed(2)}</td>
-                        <td class="col-deductions">${currencySymbol}${footerTotals.total_deductions.toFixed(2)}</td>
-                        <td class="col-deductions"><strong>${currencySymbol}${totalNet.toFixed(2)}</strong></td>
+                        <td class="col-earnings">${currencySymbol}${fmtNum(footerTotals.normal_pay)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.absent_deduction)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.city_ledger)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.staff_shop)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.pension)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.ewt)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.other_deduction)}</td>
+                        <td class="col-deductions">${currencySymbol}${fmtNum(footerTotals.total_deductions)}</td>
+                        <td class="col-deductions"><strong>${currencySymbol}${fmtNum(totalNet)}</strong></td>
+                        <td class="col-summary">${currencySymbol}${fmtNum(footerTotals.normal_pay)}</td>
+                        <td class="col-summary">${currencySymbol}${fmtNum(footerTotals.total_deductions)}</td>
+                        <td class="col-summary"><strong>${currencySymbol}${fmtNum(totalNet)}</strong></td>
                     `;
 
                     // Make sure the table has the right structure before manipulating it
@@ -3075,54 +3318,31 @@
 
 
     function calculatePayrollSummary(currency, conversionRate = 1) {
-        var payrollId = localStorage.getItem("payroll_id"); // Retrieve stored payroll ID
+        var payrollId = localStorage.getItem("payroll_id");
         if (!payrollId) {
             toastr.error("Payroll ID not found.", 'Error', { positionClass: 'toast-bottom-right' });
             return;
         }
-        var dateRange = $("#hiddenInput").val();
-        var dates = dateRange.split(' - ');
-        var startDate = moment(dates[0], "DD-MM-YYYY", true);
-        var endDate = moment(dates[1], "DD-MM-YYYY", true);
 
-        var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR '; // Adjust currency symbol
-
-
-        var selectedEmployees = []; // Fix: Declare selectedEmployees
-        $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-            selectedEmployees.push($(this).val());
-        });
-
-        if (selectedEmployees.length === 0) {
-            toastr.error("Please select at least one employee before proceeding.", 'Error', { positionClass: 'toast-bottom-right' });
-            return;
-        }
-
-        var deductions = JSON.parse(localStorage.getItem("deductions")) || {}; // Get stored deductions
-        // console.log(deductions);
-
-        let totalEmployees = selectedEmployees.length;
-        let draftDate = new Date().toISOString().split("T")[0]; // Current date as draft date
-        console.log("Draft Date:", draftDate);
-        let paymentDate = new Date();
-        paymentDate.setDate(paymentDate.getDate() + 7); // Example: Payroll payment after 7 days
+        var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
+        let draftDate = new Date().toISOString().split("T")[0];
 
         $.ajax({
             url: '{{ route("fetch.totalPayroll.data") }}',
             method: 'POST',
-            data: { 
-                payrollId: payrollId, 
-                _token: '{{ csrf_token() }}' 
+            data: {
+                payrollId: payrollId,
+                _token: '{{ csrf_token() }}'
             },
            success: function (response) {
                 if (response.success) {
 
-                    document.getElementById("total_payroll_amount").innerText = currencySymbol + parseFloat(response.total_payroll).toFixed(2);
+                    document.getElementById("total_payroll_amount").innerText = currencySymbol + fmtNum(parseFloat(response.total_payroll));
                     document.getElementById("total_employees").innerText = response.total_employees;
                     document.getElementById("payroll-darft-date").innerText = draftDate;
-                    document.getElementById("total_earned_salary").innerText = currencySymbol + parseFloat(response.total_earned_salary || 0).toFixed(2);
-                    document.getElementById("total_service_charge_conf").innerText = currencySymbol + parseFloat(response.total_service_charge || 0).toFixed(2);
-                    document.getElementById("total_deductions_conf").innerText = currencySymbol + parseFloat(response.total_deductions || 0).toFixed(2);
+                    document.getElementById("total_earned_salary").innerText = currencySymbol + fmtNum(parseFloat(response.total_earned_salary || 0));
+                    document.getElementById("total_service_charge_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_service_charge || 0));
+                    document.getElementById("total_deductions_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_deductions || 0));
                 } else {
                     toastr.error("Failed to fetch total payroll.", 'Error', { positionClass: 'toast-bottom-right' });
                 }
@@ -3218,7 +3438,7 @@
                             var $row = $(this);
                             if ($row.find("td:eq(0)").text().trim() === employee.Emp_id) {
                                 var $td = $row.find("td.staff-shop");
-                                $td.text(currencySymbol + employee.total.toFixed(2));
+                                $td.text(currencySymbol + fmtNum(employee.total));
 
                                 // Build tooltip with transaction details
                                 if (employee.transactions && employee.transactions.length > 0) {
@@ -3238,15 +3458,15 @@
                                             '<td>' + txn.date + '</td>' +
                                             '<td>' + txn.product + ' ' + statusBadge + '</td>' +
                                             '<td>' + txn.qty + '</td>' +
-                                            '<td>' + currencySymbol + txn.deduction.toFixed(2) + '</td>' +
+                                            '<td>' + currencySymbol + fmtNum(txn.deduction) + '</td>' +
                                         '</tr>';
                                         if (txn.cash_paid > 0) {
-                                            tooltipHtml += '<tr><td colspan="4" style="font-size:10px;color:#888;">Cash paid: ' + currencySymbol + txn.cash_paid.toFixed(2) + '</td></tr>';
+                                            tooltipHtml += '<tr><td colspan="4" style="font-size:10px;color:#888;">Cash paid: ' + currencySymbol + fmtNum(txn.cash_paid) + '</td></tr>';
                                         }
                                     });
 
                                     tooltipHtml += '</tbody></table>' +
-                                        '<div class="border-top pt-1 mt-1 text-end"><strong>Total: ' + currencySymbol + employee.total.toFixed(2) + '</strong></div>' +
+                                        '<div class="border-top pt-1 mt-1 text-end"><strong>Total: ' + currencySymbol + fmtNum(employee.total) + '</strong></div>' +
                                         '</div></div>';
 
                                     $td.css('cursor', 'pointer');
@@ -3359,8 +3579,8 @@
     //                         var $row = $(this);
     //                         if ($row.find("td:eq(0)").text().trim() === employee.Emp_id.toString()) {
     //                             var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
-    //                             var pensionFormatted = currencySymbol + employee.pension.toFixed(2);
-    //                             var ewtFormatted = currencySymbol + employee.ewt.toFixed(2);
+    //                             var pensionFormatted = currencySymbol + fmtNum(employee.pension);
+    //                             var ewtFormatted = currencySymbol + fmtNum(employee.ewt);
 
     //                             $row.find("td:eq(7)").text(pensionFormatted);
     //                             $row.find("td:eq(8)").text(ewtFormatted);
@@ -3396,8 +3616,8 @@
                             var $row = $(this);
                             if ($row.find("td:eq(0)").text().trim() === employee.Emp_id.toString()) {
                                 var currencySymbol = (currency === 'Dollar') ? '$' : 'MVR ';
-                                var pensionFormatted = currencySymbol + employee.pension.toFixed(2);
-                                var ewtFormatted = currencySymbol + employee.ewt.toFixed(2);
+                                var pensionFormatted = currencySymbol + fmtNum(employee.pension);
+                                var ewtFormatted = currencySymbol + fmtNum(employee.ewt);
 
                                 $row.find("td:eq(7)").text(pensionFormatted);
                                 var $ewtTd = $row.find("td:eq(8)");
@@ -3417,7 +3637,7 @@
                                         '<table class="table table-sm table-borderless mb-0" style="font-size:11px;">' +
                                         '<thead><tr><th>Tax Slab</th><th>Rate</th><th>Taxable</th><th>Tax</th></tr></thead><tbody>';
                                     employee.ewt_breakdown.forEach(function(slab) {
-                                        ewtHtml += '<tr><td>' + slab.slab + '</td><td>' + slab.rate + '</td><td>' + currencySymbol + slab.taxable.toLocaleString(undefined, {minimumFractionDigits:2}) + '</td><td>' + currencySymbol + slab.tax.toFixed(2) + '</td></tr>';
+                                        ewtHtml += '<tr><td>' + slab.slab + '</td><td>' + slab.rate + '</td><td>' + currencySymbol + slab.taxable.toLocaleString(undefined, {minimumFractionDigits:2}) + '</td><td>' + currencySymbol + fmtNum(slab.tax) + '</td></tr>';
                                     });
                                     ewtHtml += '</tbody></table>' +
                                         '<div class="border-top pt-1 mt-1 text-end"><strong>Total EWT: ' + ewtFormatted + '</strong></div>' +
@@ -3462,7 +3682,7 @@
         deductions[employeeId] = total;
         localStorage.setItem("deductions", JSON.stringify(deductions));
 
-        $row.find("td:eq(10)").text(currencySymbol + total.toFixed(2));
+        $row.find("td:eq(10)").text(currencySymbol + fmtNum(total));
     }
 
     function getServiceChargedayForEmployee(employeeId) {

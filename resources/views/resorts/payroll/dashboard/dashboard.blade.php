@@ -19,7 +19,14 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-white @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
-                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.create')) == false) d-none @endif" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
+                @php
+                    $currentEmployee = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
+                    $rankPos = $currentEmployee ? App\Helpers\Common::getEmployeeRankPosition($currentEmployee) : ['rank' => null];
+                    $isSupervisor = ($rankPos['rank'] ?? '') === 'SUP';
+                @endphp
+                @if($isSupervisor)
+                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
+                @endif
             </div>
         </div>
 

@@ -26,6 +26,7 @@ use App\Models\Payroll;
 use App\Models\PayrollAttendanceActivityLog;
 use App\Models\PayrollDeduction;
 use App\Models\PayrollEmployees;
+use App\Models\PayrollApproval;
 use App\Models\PayrollReview;
 use App\Models\PayrollReviewAllowances;
 use App\Models\PayrollServiceCharge;
@@ -64,7 +65,36 @@ class PayrollController extends Controller
     {
         $page_title ='Payroll Run';
         $resort_id = $this->resort->resort_id;
-       
+
+        // Access control: only supervisor (HOD) and approvers can view this page
+        $currentUser = \Auth::guard('resort-admin')->user();
+        $employee = $currentUser->GetEmployee ?? null;
+
+        if ($employee) {
+            $rankPosition = Common::getEmployeeRankPosition($employee);
+            $rank = $rankPosition['rank'] ?? null;
+            $position = $rankPosition['position'] ?? null;
+
+            $isSupervisor = ($rank === 'SUP');
+            $isFinanceExcom = ($rank === 'EXCOM' && $position === 'Finance');
+            $isHRExcom = ($rank === 'EXCOM' && $position === 'HR');
+            $isGM = ($rank === 'GM');
+
+            // If approver, check if there's a pending payroll for their step
+            $isApproverWithPending = false;
+            if ($isFinanceExcom || $isHRExcom || $isGM) {
+                $stepOrder = $isFinanceExcom ? 1 : ($isHRExcom ? 2 : 3);
+                $isApproverWithPending = PayrollApproval::where('resort_id', $resort_id)
+                    ->where('step_order', $stepOrder)
+                    ->where('status', 'pending')
+                    ->exists();
+            }
+
+            if (!$isSupervisor && !$isApproverWithPending) {
+                return abort(403, 'You do not have permission to access this page.');
+            }
+        }
+
         $settings = ResortSiteSettings::where('resort_id', $resort_id)->first();
         $currency = $settings['currency'];
         // dd($settings);
@@ -753,13 +783,14 @@ class PayrollController extends Controller
                     ],
                     [
                         'Emp_id' => $review['id'],
-                        'service_charge' => $review['serviceCharge'],
-                        'regularOTPay' => $review['overtimeNormal'],
-                        'holidayOTPay' => $review['overtimeHoliday'],
-                        'earnings_basic' => $review['earningsBasic'],
-                        'earned_salary' => $review['earnedSalary'],
-                        'earnings_allowance' => $review['earningsAllowance'],
-                        'earnings_overtime' => $review['overtimeTotal'],
+                        'service_charge' => $review['serviceCharge'] ?? 0,
+                        'regularOTPay' => $review['overtimeNormal'] ?? 0,
+                        'fridayOTPay' => $review['overtimeFriday'] ?? 0,
+                        'holidayOTPay' => $review['overtimeHoliday'] ?? 0,
+                        'earnings_basic' => $review['earningsBasic'] ?? 0,
+                        'earned_salary' => $review['earnedSalary'] ?? 0,
+                        'earnings_allowance' => $review['earningsAllowance'] ?? 0,
+                        'earnings_overtime' => $review['overtimeTotal'] ?? 0,
                         'total_earnings' => $total_earnings,
                         'total_deductions' => $total_deductions,
                         'net_salary' => $total_earnings - $total_deductions,
@@ -918,6 +949,201 @@ class PayrollController extends Controller
                 'success' => false,
                 'message' => 'Error locking Payroll. Please try again.'
             ], 500);
+        }
+    }
+
+    /**
+     * Send payroll for approval — creates approval chain entries
+     */
+    public function sendForApproval(Request $request)
+    {
+        $payrollId = $request->payroll_id;
+        $resortId = $this->resort->resort_id;
+
+        $payroll = Payroll::where('id', $payrollId)->where('resort_id', $resortId)->firstOrFail();
+
+        // Define the 3-step approval chain
+        $approvalChain = [
+            ['step_order' => 1, 'role_title' => 'Finance EXCOM'],
+            ['step_order' => 2, 'role_title' => 'HR EXCOM'],
+            ['step_order' => 3, 'role_title' => 'GM'],
+        ];
+
+        // Create approval entries (only if not already created)
+        foreach ($approvalChain as $step) {
+            PayrollApproval::firstOrCreate(
+                ['payroll_id' => $payrollId, 'step_order' => $step['step_order']],
+                ['resort_id' => $resortId, 'role_title' => $step['role_title'], 'status' => 'pending']
+            );
+        }
+
+        // Update payroll status
+        $payroll->update(['status' => 'pending_approval']);
+
+        // Send notification to the first approver (Finance EXCOM)
+        $this->notifyApprover($payrollId, $resortId, 1);
+
+        return response()->json(['success' => true, 'message' => 'Payroll sent for approval.']);
+    }
+
+    /**
+     * Approve or reject payroll at current step
+     */
+    public function approvePayroll(Request $request)
+    {
+        $payrollId = $request->payroll_id;
+        $resortId = $this->resort->resort_id;
+        $currentUser = \Auth::guard('resort-admin')->user();
+        $employee = $currentUser->GetEmployee ?? null;
+
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 403);
+        }
+
+        $rankPosition = Common::getEmployeeRankPosition($employee);
+
+        // Find which approval step this user can approve
+        $approvalStep = $this->getApprovalStepForUser($rankPosition, $employee);
+        if (!$approvalStep) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to approve this payroll.'], 403);
+        }
+
+        $approval = PayrollApproval::where('payroll_id', $payrollId)
+            ->where('step_order', $approvalStep)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$approval) {
+            return response()->json(['success' => false, 'message' => 'This step is not pending your approval.'], 400);
+        }
+
+        // Check that previous steps are approved
+        $previousPending = PayrollApproval::where('payroll_id', $payrollId)
+            ->where('step_order', '<', $approvalStep)
+            ->where('status', '!=', 'approved')
+            ->exists();
+
+        if ($previousPending) {
+            return response()->json(['success' => false, 'message' => 'Previous approval steps must be completed first.'], 400);
+        }
+
+        $approval->update([
+            'status' => $request->action === 'reject' ? 'rejected' : 'approved',
+            'approver_id' => $employee->id,
+            'approver_name' => $currentUser->first_name . ' ' . $currentUser->last_name,
+            'remarks' => $request->remarks,
+            'approved_at' => now(),
+        ]);
+
+        if ($request->action === 'reject') {
+            $payroll = Payroll::find($payrollId);
+            $payroll->update(['status' => 'draft']);
+            return response()->json(['success' => true, 'message' => 'Payroll has been rejected.']);
+        }
+
+        // If all 3 steps approved, update payroll status
+        $allApproved = PayrollApproval::where('payroll_id', $payrollId)
+            ->where('status', '!=', 'approved')
+            ->doesntExist();
+
+        if ($allApproved) {
+            Payroll::find($payrollId)->update(['status' => 'approved']);
+        } else {
+            // Notify next approver
+            $this->notifyApprover($payrollId, $resortId, $approvalStep + 1);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Payroll approved successfully.']);
+    }
+
+    /**
+     * Get approval status for a payroll
+     */
+    public function getApprovalStatus(Request $request)
+    {
+        $payrollId = $request->payroll_id;
+        $approvals = PayrollApproval::where('payroll_id', $payrollId)
+            ->orderBy('step_order')
+            ->get();
+
+        $payroll = Payroll::find($payrollId);
+
+        // Determine current user's role
+        $currentUser = \Auth::guard('resort-admin')->user();
+        $employee = $currentUser->GetEmployee ?? null;
+        $rankPosition = $employee ? Common::getEmployeeRankPosition($employee) : ['rank' => null, 'position' => null];
+        $userApprovalStep = $this->getApprovalStepForUser($rankPosition, $employee);
+
+        // Check if current user is the supervisor (person who ran the payroll)
+        $isSupervisor = $employee && $employee->rank == 5; // SUP rank
+
+        return response()->json([
+            'success' => true,
+            'approvals' => $approvals,
+            'payroll_status' => $payroll->status ?? 'draft',
+            'user_approval_step' => $userApprovalStep,
+            'is_supervisor' => $isSupervisor,
+            'can_lock' => $payroll->status === 'approved' && $isSupervisor,
+        ]);
+    }
+
+    /**
+     * Determine which approval step a user can approve based on their role
+     */
+    private function getApprovalStepForUser($rankPosition, $employee)
+    {
+        if (!$rankPosition || !$employee) return null;
+
+        $rank = $rankPosition['rank'];
+        $position = $rankPosition['position'];
+
+        // Step 1: Finance EXCOM (rank=EXCOM + Finance department)
+        if ($rank === 'EXCOM' && $position === 'Finance') return 1;
+
+        // Step 2: HR EXCOM (rank=EXCOM + HR department)
+        if ($rank === 'EXCOM' && $position === 'HR') return 2;
+
+        // Step 3: GM
+        if ($rank === 'GM') return 3;
+
+        return null;
+    }
+
+    /**
+     * Send notification to the approver at a specific step
+     */
+    private function notifyApprover($payrollId, $resortId, $stepOrder)
+    {
+        $payroll = Payroll::find($payrollId);
+        $period = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
+
+        $stepTitles = [1 => 'Finance EXCOM', 2 => 'HR EXCOM', 3 => 'GM'];
+        $roleTitle = $stepTitles[$stepOrder] ?? '';
+
+        // Find the approver employee
+        $approver = null;
+        if ($stepOrder == 1) {
+            $approver = Employee::where('resort_id', $resortId)->where('rank', 1)
+                ->whereHas('department', fn($q) => $q->whereIn('name', ['Accounting', 'Finance']))->first();
+        } elseif ($stepOrder == 2) {
+            $approver = Employee::where('resort_id', $resortId)->where('rank', 1)
+                ->whereHas('department', fn($q) => $q->whereIn('name', ['Human Resources', 'HR']))->first();
+        } elseif ($stepOrder == 3) {
+            $approver = Employee::where('resort_id', $resortId)->where('rank', 8)->first();
+        }
+
+        if ($approver) {
+            \DB::table('resort_notifications')->insert([
+                'resort_id' => $resortId,
+                'user_id' => $approver->id, // employee.id, not Admin_Parent_id
+                'module' => 'Payroll Approval',
+                'type' => 'Payroll Approval Required',
+                'message' => "Payroll for period {$period} requires your approval as {$roleTitle}.",
+                'status' => 'unread',
+                'request_id' => $payrollId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 

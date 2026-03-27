@@ -783,6 +783,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('payroll/fetch-pension-ewt', 'Payroll\PayrollController@calculatePensionAndEWT')->name('payroll.calculate.pensionandewt');
     Route::post('payroll/fetch-advanced-recovery', 'Payroll\PayrollController@fetchAdvanceRecovery')->name('fetch.advance.recovery');
     Route::post('/payroll/total-amount-from-review', 'Payroll\PayrollController@fetchTotalPayrollAmount')->name('fetch.totalPayroll.data');
+    Route::post('/payroll/send-for-approval', 'Payroll\PayrollController@sendForApproval')->name('payroll.send.approval');
+    Route::post('/payroll/approve', 'Payroll\PayrollController@approvePayroll')->name('payroll.approve');
+    Route::post('/payroll/approval-status', 'Payroll\PayrollController@getApprovalStatus')->name('payroll.approval.status');
 
     Route::get('/payroll/view/{payroll_id}', 'Payroll\PayrollController@viewPayroll')->name('payroll.view');
     Route::get('/payroll/data/{payroll_id}', 'Payroll\PayrollController@getPayrollData')->name('payroll.getData');

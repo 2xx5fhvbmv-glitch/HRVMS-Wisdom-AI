@@ -1328,11 +1328,40 @@ class MasterDashboardController extends Controller
                 ->with(['learningProgram', 'trainingAttendances','participants.employee'])
                 ->limit(10)->get();
 
+            // Pending payroll approvals for this user
+            $currentEmployee = $this->globalUser->GetEmployee ?? null;
+            $pendingPayrollApprovals = collect();
+            if ($currentEmployee) {
+                $rankPos = Common::getEmployeeRankPosition($currentEmployee);
+                $rank = $rankPos['rank'] ?? null;
+                $position = $rankPos['position'] ?? null;
+                $approvalStep = null;
+                if ($rank === 'EXCOM' && $position === 'Finance') $approvalStep = 1;
+                elseif ($rank === 'EXCOM' && $position === 'HR') $approvalStep = 2;
+                elseif ($rank === 'GM') $approvalStep = 3;
+
+                if ($approvalStep) {
+                    $pendingPayrollApprovals = \App\Models\PayrollApproval::where('resort_id', $resort_id)
+                        ->where('step_order', $approvalStep)
+                        ->where('status', 'pending')
+                        ->with('payroll')
+                        ->get()
+                        ->filter(function ($a) use ($approvalStep) {
+                            // Only show if all previous steps are approved
+                            if ($approvalStep <= 1) return true;
+                            return \App\Models\PayrollApproval::where('payroll_id', $a->payroll_id)
+                                ->where('step_order', '<', $approvalStep)
+                                ->where('status', '!=', 'approved')
+                                ->doesntExist();
+                        });
+                }
+            }
+
             return view('resorts.master-dashboard.hoddashboard', compact(
                 'page_header','resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
-                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning'
+                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning','pendingPayrollApprovals'
             ));
 
         // } catch (\Exception $e) {
