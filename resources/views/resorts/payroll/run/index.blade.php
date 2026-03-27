@@ -335,28 +335,31 @@
                                     </div>
                                 </div>
                             </div>
+                            <ul class="nav nav-tabs mb-3" id="reviewTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" data-review-tab="attendance" type="button">Time & Attendance</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-review-tab="overtime" type="button">Overtime</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-review-tab="earnings" type="button">Earnings</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" data-review-tab="deductions" type="button">Deductions</button>
+                                </li>
+                            </ul>
                             <div class="table-responsive">
                                 <table id="table-review" class="table table-review   w-100 mb-0">
                                     <thead>
                                         <tr>
-                                            <th colspan="4"></th>
-                                            <th colspan="1">Time & Attendance</th>
-                                            <th colspan="3">Overtime</th>
-                                            <th colspan="3">Earnings</th>
-                                        </tr>
-                                        <tr>
                                             <th>ID</th>
                                             <th>Employee Name</th>
-                                            <th>Department</th>
                                             <th>Position</th>
+                                            <th>Present</th>
+                                            <th>Absent</th>
+                                            <th>Day Off</th>
                                             <th>Service Charge</th>
-                                            <th>Normal</th>
-                                            <th>Holiday</th>
-                                            <th>Total</th>
-                                            <th>Basic Earned</th>
-                                            <th>Allowance</th>
-                                            <th>Total Earnings</th>
-                                            <th>Deductions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -544,6 +547,15 @@
     .leave-tooltip.show{display:block!important}
     .modal-body .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:0!important}
     @keyframes payroll-spin{to{transform:rotate(360deg)}}
+    #table-review .col-overtime, #table-review .col-earnings, #table-review .col-deductions { display: none; }
+    #table-review.show-overtime .col-attendance { display: none; }
+    #table-review.show-overtime .col-overtime { display: table-cell; }
+    #table-review.show-earnings .col-attendance { display: none; }
+    #table-review.show-earnings .col-overtime { display: none; }
+    #table-review.show-earnings .col-earnings { display: table-cell; }
+    #table-review.show-deductions .col-attendance { display: none; }
+    #table-review.show-deductions .col-overtime { display: none; }
+    #table-review.show-deductions .col-deductions { display: table-cell; }
     .staff-shop-popover{position:fixed;z-index:99999;background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.18);border:1px solid #e0e0e0;max-width:380px;pointer-events:none}
     .staff-shop-popover .leave-tooltip{position:static!important;display:block!important;background:#fff!important;color:#333!important;padding:0!important;box-shadow:none!important;pointer-events:auto!important;max-width:100%!important;min-width:auto!important;border-radius:8px!important}
     .leave-tooltip::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #2C2C2C}
@@ -1252,22 +1264,25 @@
 
                 $("#table-review tbody tr").each(function () {
                     const $row = $(this);
+                    // Cols: 0:ID, 1:Name, 2:Position, 3:Present, 4:Absent, 5:DayOff, 6:SC, 7:RegOT, 8:FriOT, 9:HolOT, 10:TotalOT, 11:Earned, [allowances...], TotalEarnings, Deductions, NetSalary
+                    function stripVal(td) { return parseFloat($(td).text().replace(/[^0-9.\-]/g, '')) || 0; }
+                    var $tds = $row.find("td");
                     const rowData = {
-                        id: $row.find("td:eq(0)").text().trim(),
-                        name: $row.find("td:eq(1)").text().trim(),
-                        department: $row.find("td:eq(2)").text().trim(),
-                        position: $row.find("td:eq(3)").text().trim(),
-                        present: 0,
-                        absent: 0,
-                        serviceCharge: $row.find("td:eq(4)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        overtimeNormal: $row.find("td:eq(5)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        overtimeHoliday: $row.find("td:eq(6)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        overtimeTotal: $row.find("td:eq(7)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        earningsBasic: 0,
-                        earnedSalary: $row.find("td:eq(8)").text().trim().replace(currencySymbol, "").replace("$", "").trim() || 0,
-                        earningsAllowance: 0, // will calculate below
-                        earningsNormal: parseFloat($row.find("td:eq(-2)").text().replace(/[^0-9.\-]/g, '')) || 0,
-                        totalDeductions: parseFloat($row.find("td:eq(-1)").text().replace(/[^0-9.\-]/g, '')) || 0,
+                        id: $tds.eq(0).text().trim(),
+                        name: $tds.eq(1).text().trim(),
+                        position: $tds.eq(2).text().trim(),
+                        present: stripVal($tds.eq(3)),
+                        absent: stripVal($tds.eq(4)),
+                        serviceCharge: stripVal($tds.eq(6)),
+                        overtimeNormal: stripVal($tds.eq(7)),
+                        overtimeFriday: stripVal($tds.eq(8)),
+                        overtimeHoliday: stripVal($tds.eq(9)),
+                        overtimeTotal: stripVal($tds.eq(10)),
+                        earnedSalary: stripVal($tds.eq(11)),
+                        earningsAllowance: 0,
+                        earningsNormal: stripVal($tds.eq($tds.length - 3)),
+                        totalDeductions: stripVal($tds.eq($tds.length - 2)),
+                        netSalary: stripVal($tds.eq($tds.length - 1)),
                         allowances: []
                     };
                     
@@ -1940,6 +1955,19 @@
                 $('#saveAsDraft').prop('disabled', false).html('Save as Draft');
             }
         });
+    });
+
+    // Review tab switching
+    $(document).on('click', '#reviewTabs .nav-link', function() {
+        $('#reviewTabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        var tab = $(this).data('review-tab');
+        var $table = $('#table-review');
+        $table.removeClass('show-overtime show-earnings show-deductions');
+        if (tab === 'overtime') $table.addClass('show-overtime');
+        else if (tab === 'earnings') $table.addClass('show-earnings');
+        else if (tab === 'deductions') $table.addClass('show-deductions');
+        // 'attendance' is default — no class needed
     });
 
     // Download PDF
@@ -2815,17 +2843,14 @@
         showTableLoader('#table-review');
         var payrollId = localStorage.getItem("payroll_id");
         var dateRange = $("#hiddenInput").val();
-        var dates = dateRange.split(' - ');
-        var startDate = moment(dates[0], "DD-MM-YYYY", true);
-        var endDate = moment(dates[1], "DD-MM-YYYY", true);
-        var selectedEmployees = [];
-
-        $("#payroll-employees tbody input[type='checkbox']:checked").each(function () {
-            selectedEmployees.push($(this).val());
-        });
+        var dates = dateRange ? dateRange.split(' - ') : [];
+        var startDate = dates.length === 2 ? moment(dates[0], "DD-MM-YYYY", true) : moment();
+        var endDate = dates.length === 2 ? moment(dates[1], "DD-MM-YYYY", true) : moment();
+        var selectedEmployees = getSelectedEmployeeIds();
 
         if (selectedEmployees.length === 0) {
-            toastr.error("Please select at least one employee before proceeding.", { positionClass: 'toast-bottom-right' });
+            hideTableLoader('#table-review');
+            toastr.error("Please select at least one employee before proceeding.", 'Error', { positionClass: 'toast-bottom-right' });
             return;
         }
 
@@ -2874,31 +2899,36 @@
                     ).join('');
                     // console.log(allowanceHeaderHtml);
 
-                    $table.find("thead tr:eq(0)").html(`
-                        <th colspan="4"></th>
-                        <th colspan="1">Time & Attendance</th>
-                        <th colspan="3">Overtime</th>
-                        <th colspan="${1 + allowanceList.length + 2}">Earnings</th>
-                    `);
-
-                    $table.find("thead tr:eq(1)").html(`
+                    // Remove the section header row, use only one header row
+                    $table.find("thead").html(`<tr>
                         <th>ID</th>
                         <th>Employee Name</th>
-                        <th>Department</th>
                         <th>Position</th>
-                        <th>Service Charge</th>
-                        <th>Normal</th>
-                        <th>Holiday</th>
-                        <th>Total</th>
-                        <th>Basic Earned</th>
-                        ${allowanceHeaderHtml}
-                        <th>Total Earnings</th>
-                        <th>Deductions</th>
-                    `);
+                        <th class="col-attendance">Present</th>
+                        <th class="col-attendance">Absent</th>
+                        <th class="col-attendance">Day Off</th>
+                        <th class="col-attendance">Service Charge</th>
+                        <th class="col-overtime">Regular OT</th>
+                        <th class="col-overtime">Friday OT</th>
+                        <th class="col-overtime">Holiday OT</th>
+                        <th class="col-overtime">Total OT Pay</th>
+                        <th class="col-earnings">Basic Earned</th>
+                        ${allowanceHeaderHtml.replace(/<th /g, '<th class="col-earnings" ')}
+                        <th class="col-earnings">Total Earnings</th>
+                        <th class="col-deductions">Attendance</th>
+                        <th class="col-deductions">City Ledger</th>
+                        <th class="col-deductions">Staff Shop</th>
+                        <th class="col-deductions">Pension</th>
+                        <th class="col-deductions">EWT</th>
+                        <th class="col-deductions">Other</th>
+                        <th class="col-deductions">Total Deductions</th>
+                        <th class="col-deductions">Net Salary</th>
+                    </tr>`);
 
                     let footerTotals = {
-                        present: 0, absent: 0, service_charge:0, regularOTPay: 0, holidayOTPay: 0, totalOTPay: 0,
-                        basic_salary: 0, earned_salary: 0,  normal_pay: 0, total_deductions: 0,
+                        present: 0, absent: 0, service_charge: 0, regularOTPay: 0, fridayOTPay: 0, holidayOTPay: 0, totalOTPay: 0,
+                        basic_salary: 0, earned_salary: 0, normal_pay: 0, total_deductions: 0,
+                        absent_deduction: 0, city_ledger: 0, staff_shop: 0, pension: 0, ewt: 0, other_deduction: 0,
                     };
                     let allowanceSums = Object.fromEntries(allowanceList.map(a => [a.name, 0]));
 
@@ -2928,7 +2958,15 @@
                         footerTotals.earned_salary += employee.earned_salary;
                         footerTotals.normal_pay += employee.normal_pay;
                         footerTotals.total_deductions += (employee.total_deduction || 0);
+                        footerTotals.absent_deduction += (employee.absent_deduction || 0);
+                        footerTotals.city_ledger += (employee.city_ledger || 0);
+                        footerTotals.staff_shop += (employee.staff_shop || 0);
+                        footerTotals.pension += (employee.pension || 0);
+                        footerTotals.ewt += (employee.ewt || 0);
+                        footerTotals.other_deduction += (employee.other_deduction || 0);
                         
+
+                        let netSalary = (employee.normal_pay || 0) - (employee.total_deduction || 0);
 
                         let row = `
                             <tr>
@@ -2939,40 +2977,57 @@
                                         <span>${employee.name}</span>
                                     </div>
                                 </td>
-                                <td>${employee.department}</td>
                                 <td>${employee.position}</td>
-                                <td>${currencySymbol}${employee.service_charge}</td>
-                                <td>${currencySymbol}${employee.regularOTPay}</td>
-                                <td>${currencySymbol}${employee.holidayOTPay}</td>
-                                <td>${currencySymbol}${employee.totalOTPay}</td>
-                                <td>${currencySymbol}${employee.earned_salary.toFixed(2)}</td>
-                                ${allowanceCols}
-                                <td>${currencySymbol}${employee.normal_pay.toFixed(2)}</td>
-                                <td>${currencySymbol}${(employee.total_deduction || 0).toFixed(2)}</td>
-
+                                <td class="col-attendance">${employee.present}</td>
+                                <td class="col-attendance">${employee.absent}</td>
+                                <td class="col-attendance">${employee.day_off}</td>
+                                <td class="col-attendance">${currencySymbol}${employee.service_charge}</td>
+                                <td class="col-overtime">${currencySymbol}${employee.regularOTPay}</td>
+                                <td class="col-overtime">${currencySymbol}${(employee.fridayOTPay || 0)}</td>
+                                <td class="col-overtime">${currencySymbol}${employee.holidayOTPay}</td>
+                                <td class="col-overtime">${currencySymbol}${employee.totalOTPay}</td>
+                                <td class="col-earnings">${currencySymbol}${employee.earned_salary.toFixed(2)}</td>
+                                ${allowanceCols.replace(/<td>/g, '<td class="col-earnings">')}
+                                <td class="col-earnings">${currencySymbol}${employee.normal_pay.toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.absent_deduction || 0).toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.city_ledger || 0).toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.staff_shop || 0).toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.pension || 0).toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.ewt || 0).toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.other_deduction || 0).toFixed(2)}</td>
+                                <td class="col-deductions">${currencySymbol}${(employee.total_deduction || 0).toFixed(2)}</td>
+                                <td class="col-deductions"><strong>${currencySymbol}${netSalary.toFixed(2)}</strong></td>
                             </tr>`;
                         $tableBody.append(row);
                     });
 
                     // Generate footer row
+                    let totalNet = footerTotals.normal_pay - footerTotals.total_deductions;
                     let footerHtml = `
-                        <td colspan="4" class="text-end fw-bold">Total</td>
-                        <td>${currencySymbol}${footerTotals.service_charge}</td>
-                        <td>${currencySymbol}${footerTotals.regularOTPay.toFixed(2)}</td>
-                        <td>${currencySymbol}${footerTotals.holidayOTPay.toFixed(2)}</td>
-                        <td>${currencySymbol}${footerTotals.totalOTPay.toFixed(2)}</td>
-                        <td>${currencySymbol}${footerTotals.earned_salary.toFixed(2)}</td>
+                        <td colspan="3" class="text-end fw-bold">Total</td>
+                        <td class="col-attendance">${footerTotals.present}</td>
+                        <td class="col-attendance">${footerTotals.absent}</td>
+                        <td class="col-attendance">-</td>
+                        <td class="col-attendance">${currencySymbol}${footerTotals.service_charge.toFixed(2)}</td>
+                        <td class="col-overtime">${currencySymbol}${footerTotals.regularOTPay.toFixed(2)}</td>
+                        <td class="col-overtime">-</td>
+                        <td class="col-overtime">${currencySymbol}${footerTotals.holidayOTPay.toFixed(2)}</td>
+                        <td class="col-overtime">${currencySymbol}${footerTotals.totalOTPay.toFixed(2)}</td>
+                        <td class="col-earnings">${currencySymbol}${footerTotals.earned_salary.toFixed(2)}</td>
                     `;
                     allowanceList.forEach(a => {
-                        footerHtml += `<td>${currencySymbol}${allowanceSums[a.name].toFixed(2)}</td>`;
+                        footerHtml += `<td class="col-earnings">${currencySymbol}${allowanceSums[a.name].toFixed(2)}</td>`;
                     });
-                    // allowanceList.forEach(a => {
-                    //     footerHtml += `<td>${a.unit === 'USD' ? '$' : 'MVR '}${allowanceSums[a.name].toFixed(2)}</td>`;
-                    // });
                     footerHtml += `
-                        <td>${currencySymbol}${footerTotals.normal_pay.toFixed(2)}</td>
-                        <td>${currencySymbol}${footerTotals.total_deductions.toFixed(2)}</td>
-                        
+                        <td class="col-earnings">${currencySymbol}${footerTotals.normal_pay.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.absent_deduction.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.city_ledger.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.staff_shop.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.pension.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.ewt.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.other_deduction.toFixed(2)}</td>
+                        <td class="col-deductions">${currencySymbol}${footerTotals.total_deductions.toFixed(2)}</td>
+                        <td class="col-deductions"><strong>${currencySymbol}${totalNet.toFixed(2)}</strong></td>
                     `;
 
                     // Make sure the table has the right structure before manipulating it

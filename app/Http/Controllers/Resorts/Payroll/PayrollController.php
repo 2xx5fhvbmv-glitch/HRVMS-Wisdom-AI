@@ -1909,10 +1909,35 @@ class PayrollController extends Controller
                 'regularOTPay' => round($regularOTPay, 2),
                 'fridayOTPay' => round($fridayOTPay, 2),
                 'holidayOTPay' => round($holidayOTPay, 2),
+                // Deduction breakdown from saved payroll deductions
+                'city_ledger' => 0,
+                'staff_shop' => 0,
+                'pension' => 0,
+                'ewt' => 0,
+                'other_deduction' => 0,
             ];
         })
         ->filter()
         ->values();
+
+        // Merge deduction breakdown from payroll_deductions table
+        if ($request->payrollId) {
+            $savedDeductions = PayrollDeduction::where('payroll_id', $request->payrollId)
+                ->get()
+                ->keyBy('Emp_id');
+
+            $grouped = $grouped->map(function ($item) use ($savedDeductions) {
+                if ($item && isset($savedDeductions[$item['employee_id']])) {
+                    $ded = $savedDeductions[$item['employee_id']];
+                    $item['city_ledger'] = round(floatval($ded->city_ledger ?? 0), 2);
+                    $item['staff_shop'] = round(floatval($ded->staff_shop ?? 0), 2);
+                    $item['pension'] = round(floatval($ded->pension ?? 0), 2);
+                    $item['ewt'] = round(floatval($ded->ewt ?? 0), 2);
+                    $item['other_deduction'] = round(floatval($ded->other ?? 0), 2);
+                }
+                return $item;
+            });
+        }
 
         return response()->json(['success' => true, 'data' => $grouped]);
     }
@@ -2268,8 +2293,10 @@ class PayrollController extends Controller
             $totalEarningsMVR = $earnedSalaryMVR + $totalAllowanceMVR + $serviceChargeInMVR + $totalOTPayInMVR;
 
             // Pension for Maldivian — 7% of earned salary (prorated based on actual working days)
+            // Calculate directly in display currency to avoid rounding errors from double conversion
             $isMaldivian = $employee->nationality === 'Maldivian';
-            $pensionMVR = $isMaldivian ? Common::calculatePension($earnedSalaryMVR) : 0;
+            $pensionDisplay = $isMaldivian ? round($earnedSalaryDisplay * 0.07, 2) : 0;
+            $pensionMVR = ($currency === 'Dollar') ? $pensionDisplay * $settings['DollertoMVR'] : $pensionDisplay;
 
             // EWT is calculated on total earnings minus pension
             $taxableIncomeMVR = max($totalEarningsMVR - $pensionMVR, 0);
@@ -2359,7 +2386,7 @@ class PayrollController extends Controller
 
             }
 
-            $pensionFinal = ($currency === 'Dollar') ? $pensionMVR * $settings['MVRtoDoller'] : $pensionMVR;
+            $pensionFinal = $pensionDisplay; // Already in display currency, no double conversion needed
             $ewtFinal = ($currency === 'Dollar') ? $ewtMVR * $settings['MVRtoDoller'] : $ewtMVR;
 
             // Build EWT breakdown for tooltip
