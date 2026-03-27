@@ -13,8 +13,9 @@
                             <th class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span> <span style="font-size:9px; opacity:0.7; display:block;">{{ $h['month'] ?? '' }}</span></th>
                         @endforeach
                     @endif
-                    <th>Holiday OT</th>
                     <th>Regular OT</th>
+                    <th>Friday OT</th>
+                    <th>Holiday OT</th>
                     <th>Total OT</th>
                 </tr>
             </thead>
@@ -53,15 +54,19 @@
                             });
                             
                             $totalMonthWiseHours = 0;
+                            $fridayOtMonthly = 0;
                             $holidayOtMonthly = 0;
                             $regularOtMonthly = 0;
-                            
+
                             foreach($overtimeData as $ot) {
-                                $dayName = $ot->date->format('D');
+                                $isFriday = $ot->date->isFriday();
+                                $isHoliday = isset($publicHolidays) && in_array($ot->date->format('Y-m-d'), $publicHolidays);
                                 list($hours, $minutes) = explode(':', $ot->total_time ?? '0:0');
                                 $totalOtHours = (int)$hours + ((int)$minutes / 60);
-                                
-                                if($dayName == "Fri" || (isset($publicHolidays) && in_array($ot->date->format('Y-m-d'), $publicHolidays))) {
+
+                                if ($isFriday) {
+                                    $fridayOtMonthly += $totalOtHours;
+                                } elseif ($isHoliday) {
                                     $holidayOtMonthly += $totalOtHours;
                                 } else {
                                     $regularOtMonthly += $totalOtHours;
@@ -129,11 +134,10 @@
                                 @endif
                             </td>
                         @endforeach
-                        <td>{{ sprintf('%02d:%02d', floor($holidayOtMonthly), round(($holidayOtMonthly - floor($holidayOtMonthly)) * 60)) }}</td>
                         <td>{{ sprintf('%02d:%02d', floor($regularOtMonthly), round(($regularOtMonthly - floor($regularOtMonthly)) * 60)) }}</td>
-
-                        <td>{{ sprintf('%02d:%02d', floor($totalMonthWiseHours), round(($totalMonthWiseHours - floor($totalMonthWiseHours)) * 60)) }}
-                        </td>
+                        <td>{{ sprintf('%02d:%02d', floor($fridayOtMonthly), round(($fridayOtMonthly - floor($fridayOtMonthly)) * 60)) }}</td>
+                        <td>{{ sprintf('%02d:%02d', floor($holidayOtMonthly), round(($holidayOtMonthly - floor($holidayOtMonthly)) * 60)) }}</td>
+                        <td>{{ sprintf('%02d:%02d', floor($totalMonthWiseHours), round(($totalMonthWiseHours - floor($totalMonthWiseHours)) * 60)) }}</td>
                     </tr>
                 @endforeach
             @endif

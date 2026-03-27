@@ -544,6 +544,48 @@
                                         </div>
                                     </div>
                                 </div>
+                                @if(isset($pendingPayrollApprovals) && $pendingPayrollApprovals->isNotEmpty())
+                                <div class="card-body pb-0">
+                                    <div class="card mb-3" style="border: 1px solid #0d6efd; border-radius: 8px;">
+                                        <div class="card-title px-3 pt-3 pb-0 mb-0">
+                                            <h3><i class="fa-solid fa-file-invoice-dollar me-1 text-primary"></i> Payroll Approval Requests</h3>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>#</th>
+                                                        <th>Period</th>
+                                                        <th>Employees</th>
+                                                        <th>Status</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($pendingPayrollApprovals as $index => $approval)
+                                                        @if($approval->payroll)
+                                                        <tr>
+                                                            <td>{{ $index + 1 }}</td>
+                                                            <td>{{ \Carbon\Carbon::parse($approval->payroll->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($approval->payroll->end_date)->format('d M Y') }}</td>
+                                                            <td>{{ $approval->payroll->total_employees ?? '-' }}</td>
+                                                            <td><span class="badge badge-themeWarning">Pending Your Approval</span></td>
+                                                            <td>
+                                                                <a href="{{ route('payroll.run') }}?resume={{ $approval->payroll_id }}&viewonly=1"
+                                                                   class="btn btn-sm btn-themeBlue"
+                                                                   onclick="localStorage.setItem('payroll_id','{{ $approval->payroll_id }}');localStorage.setItem('currentStep','7');">
+                                                                    <i class="fa-solid fa-eye me-1"></i> Review & Approve
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                        @endif
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
+
                                 <div class="card-body">
                                     <div class="row g-md-3 g-2">
                                         <div class="col-sm-6">

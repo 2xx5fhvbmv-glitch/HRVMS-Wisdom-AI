@@ -3808,6 +3808,12 @@ class Common
             case 'workforce planning':
                 return url('resort/workforce-planning/hr-dashboard');
 
+            case 'payroll approval':
+                if ($requestId) {
+                    return url('resort/payroll/run-payroll?resume=' . $requestId . '&viewonly=1');
+                }
+                return url('resort/payroll/hr-dashboard');
+
             default:
                 return url('resort/mark/notification-list');
         }
