@@ -80,17 +80,46 @@ class PayrollController extends Controller
             $isHRExcom = ($rank === 'EXCOM' && $position === 'HR');
             $isGM = ($rank === 'GM');
 
-            // If approver, check if there's a pending payroll for their step
-            $isApproverWithPending = false;
+            // Approvers can access when:
+            // 1. Their step is pending and previous steps approved (can approve)
+            // 2. They already approved and viewonly=1 (readonly view)
+            $isApproverWithAccess = false;
             if ($isFinanceExcom || $isHRExcom || $isGM) {
                 $stepOrder = $isFinanceExcom ? 1 : ($isHRExcom ? 2 : 3);
-                $isApproverWithPending = PayrollApproval::where('resort_id', $resort_id)
+                $isViewOnly = $request->has('viewonly') || $request->has('resume');
+
+                // Check if they have any approval record for any payroll
+                $hasApprovalRecord = PayrollApproval::where('resort_id', $resort_id)
                     ->where('step_order', $stepOrder)
-                    ->where('status', 'pending')
                     ->exists();
+
+                if ($hasApprovalRecord || $isViewOnly) {
+                    if ($isViewOnly) {
+                        // Viewonly — any of the 3 approvers can view
+                        $isApproverWithAccess = true;
+                    } else {
+                        // Check if it's their turn to approve
+                        $pendingApprovals = PayrollApproval::where('resort_id', $resort_id)
+                            ->where('step_order', $stepOrder)
+                            ->where('status', 'pending')
+                            ->get();
+
+                        foreach ($pendingApprovals as $pa) {
+                            $previousPending = PayrollApproval::where('payroll_id', $pa->payroll_id)
+                                ->where('step_order', '<', $stepOrder)
+                                ->where('status', '!=', 'approved')
+                                ->exists();
+
+                            if (!$previousPending) {
+                                $isApproverWithAccess = true;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
-            if (!$isSupervisor && !$isApproverWithPending) {
+            if (!$isSupervisor && !$isApproverWithAccess) {
                 return abort(403, 'You do not have permission to access this page.');
             }
         }
@@ -123,25 +152,41 @@ class PayrollController extends Controller
             $endDay = min($cutoffDay, $baseEnd->daysInMonth);
             $periodEnd = $baseEnd->copy()->day($endDay);
 
-            // Check if payroll exists and is locked/completed for this period
+            // Check payroll status for this period
             $existingPayroll = Payroll::where('resort_id', $resort_id)
                 ->where('start_date', $periodStart->format('Y-m-d'))
                 ->where('end_date', $periodEnd->format('Y-m-d'))
-                ->whereIn('status', ['locked', 'completed'])
-                ->exists();
+                ->first(['id', 'status']);
+
+            $isPaid = $existingPayroll && in_array($existingPayroll->status, ['locked', 'completed']);
+            $isPendingApproval = $existingPayroll && in_array($existingPayroll->status, ['pending_approval', 'approved']);
+
+            $statusLabel = '';
+            if ($isPaid) $statusLabel = '(Paid)';
+            elseif ($isPendingApproval) $statusLabel = '(Pending Approval)';
+            else $statusLabel = '(Unpaid)';
 
             $availablePeriods[] = [
                 'start_date' => $periodStart->format('Y-m-d'),
                 'end_date' => $periodEnd->format('Y-m-d'),
                 'label' => $periodStart->format('d M Y') . ' - ' . $periodEnd->format('d M Y'),
-                'is_paid' => $existingPayroll,
+                'is_paid' => $isPaid,
+                'is_pending_approval' => $isPendingApproval,
+                'status_label' => $statusLabel,
+                'payroll_id' => $existingPayroll->id ?? null,
             ];
         }
 
         // Reverse so oldest period appears first (process oldest unpaid first)
         $availablePeriods = array_reverse($availablePeriods);
 
-        return view('resorts.payroll.run.index',compact('page_title','positions','departments','sections','deductions','employees','currency','cutoffDay','availablePeriods'));
+        // Get payrolls pending approval or approved (for the dropdown)
+        $pendingApprovalPayrolls = Payroll::where('resort_id', $resort_id)
+            ->whereIn('status', ['pending_approval', 'approved'])
+            ->orderByDesc('created_at')
+            ->get(['id', 'start_date', 'end_date', 'status']);
+
+        return view('resorts.payroll.run.index',compact('page_title','positions','departments','sections','deductions','employees','currency','cutoffDay','availablePeriods','pendingApprovalPayrolls'));
     }
 
     public function getEmployees(Request $request)
@@ -876,11 +921,18 @@ class PayrollController extends Controller
         $totalDeductions = PayrollReview::where('payroll_id', $payrollId)->sum('total_deductions');
         $totalEmployees = PayrollReview::where('payroll_id', $payrollId)->count();
 
+        $totalEarnings = PayrollReview::where('payroll_id', $payrollId)->sum('total_earnings');
+        $totalAllowances = PayrollReview::where('payroll_id', $payrollId)->sum('earnings_allowance');
+        $totalOT = PayrollReview::where('payroll_id', $payrollId)->sum('earnings_overtime');
+
         return response()->json([
             'success' => true,
             'total_payroll' => round($totalPayroll, 2),
             'total_earned_salary' => round($totalEarnedSalary, 2),
             'total_service_charge' => round($totalServiceCharge, 2),
+            'total_allowances' => round($totalAllowances, 2),
+            'total_ot' => round($totalOT, 2),
+            'total_earnings' => round($totalEarnings, 2),
             'total_deductions' => round($totalDeductions, 2),
             'total_employees' => $totalEmployees,
         ]);
@@ -969,11 +1021,19 @@ class PayrollController extends Controller
             ['step_order' => 3, 'role_title' => 'GM'],
         ];
 
-        // Create approval entries (only if not already created)
+        // Create or reset approval entries (reset all to pending when re-sending after rejection)
         foreach ($approvalChain as $step) {
-            PayrollApproval::firstOrCreate(
+            PayrollApproval::updateOrCreate(
                 ['payroll_id' => $payrollId, 'step_order' => $step['step_order']],
-                ['resort_id' => $resortId, 'role_title' => $step['role_title'], 'status' => 'pending']
+                [
+                    'resort_id' => $resortId,
+                    'role_title' => $step['role_title'],
+                    'status' => 'pending',
+                    'approver_id' => null,
+                    'approver_name' => null,
+                    'remarks' => null,
+                    'approved_at' => null,
+                ]
             );
         }
 

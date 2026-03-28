@@ -14,7 +14,13 @@ class CheckResortPermission
     {
         $resortAdmin = Auth::guard('resort-admin')->user();
         $currentRoute = Route::currentRouteName();
-        
+
+        // Allow approvers to access payroll run page with viewonly/resume parameters
+        // The controller handles its own access control for approvers
+        if ($currentRoute === 'payroll.run' && ($request->has('viewonly') || $request->has('resume'))) {
+            return $next($request);
+        }
+
         $check = Common::checkRouteWisePermission($currentRoute, config('settings.resort_permissions.view'));
 
         // Check if the user is authenticated as a resort admin

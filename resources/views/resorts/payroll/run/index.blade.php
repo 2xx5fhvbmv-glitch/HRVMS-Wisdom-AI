@@ -64,17 +64,34 @@
                                                         @foreach($availablePeriods as $index => $period)
                                                             <option value="{{ $period['start_date'] }}|{{ $period['end_date'] }}"
                                                                 {{ $period['is_paid'] ? 'disabled' : '' }}
-                                                                @if($index === $latestUnpaidIndex) selected @endif>
-                                                                {{ $period['label'] }}
-                                                                @if($period['is_paid'])
-                                                                    (Paid)
-                                                                @else
-                                                                    (Unpaid)
-                                                                @endif
+                                                                @if($index === $latestUnpaidIndex && !$period['is_pending_approval']) selected @endif
+                                                                data-payroll-id="{{ $period['payroll_id'] ?? '' }}"
+                                                                data-status="{{ $period['is_pending_approval'] ? 'pending_approval' : ($period['is_paid'] ? 'paid' : 'unpaid') }}">
+                                                                {{ $period['label'] }} {{ $period['status_label'] }}
                                                             </option>
                                                         @endforeach
                                                     </select>
                                                 </div>
+
+                                                @if(isset($pendingApprovalPayrolls) && $pendingApprovalPayrolls->isNotEmpty())
+                                                <div class="mb-3 mt-3 p-3 rounded" style="background:#fff3cd; border:1px solid #ffc107;">
+                                                    <label class="form-label fw-600"><i class="fa-solid fa-clock me-1 text-warning"></i> Payrolls Pending Approval</label>
+                                                    <div class="d-flex flex-column gap-2">
+                                                        @foreach($pendingApprovalPayrolls as $pp)
+                                                            <div class="d-flex justify-content-between align-items-center bg-white p-2 rounded border">
+                                                                <div>
+                                                                    <strong>{{ \Carbon\Carbon::parse($pp->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($pp->end_date)->format('d M Y') }}</strong>
+                                                                    <span class="badge {{ $pp->status === 'approved' ? 'badge-themeSuccess' : 'badge-themeWarning' }} ms-2">{{ ucfirst(str_replace('_', ' ', $pp->status)) }}</span>
+                                                                </div>
+                                                                <button type="button" class="btn btn-sm btn-themeBlue view-pending-payroll" data-payroll-id="{{ $pp->id }}">
+                                                                    <i class="fa-solid fa-eye me-1"></i> View
+                                                                </button>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                                @endif
+
                                                 <div id="datapicker">
                                                     <!-- Hidden input used by JS to read selected date range -->
                                                     <input type="text" class="dateRangeAb datepicker d-none" name="hiddenInput" id="hiddenInput" readonly>
@@ -396,12 +413,24 @@
                                         <div class="value" id="total_earned_salary"></div>
                                     </div>
                                     <div class="bg-themeGrayLight payrollConf-block">
+                                        <h6>Total Allowances</h6>
+                                        <div class="value" id="total_allowances_conf"></div>
+                                    </div>
+                                    <div class="bg-themeGrayLight payrollConf-block">
+                                        <h6>Total Overtime Pay</h6>
+                                        <div class="value" id="total_ot_conf"></div>
+                                    </div>
+                                    <div class="bg-themeGrayLight payrollConf-block">
                                         <h6>Total Service Charge</h6>
                                         <div class="value" id="total_service_charge_conf"></div>
                                     </div>
-                                    <div class="bg-themeGrayLight payrollConf-block">
-                                        <h6>Total Deductions</h6>
-                                        <div class="value" id="total_deductions_conf"></div>
+                                    <div class="bg-themeGrayLight payrollConf-block" style="border-top:1px solid #28a745; background:#f0fff4;">
+                                        <h6 style="color:#28a745;">Total Earnings</h6>
+                                        <div class="value" id="total_earnings_conf" style="font-weight:600; color:#28a745;"></div>
+                                    </div>
+                                    <div class="bg-themeGrayLight payrollConf-block" style="border-top:1px solid #dc3545; background:#fff5f5;">
+                                        <h6 style="color:#dc3545;">Total Deductions</h6>
+                                        <div class="value" id="total_deductions_conf" style="font-weight:600; color:#dc3545;"></div>
                                     </div>
                                     <div class="bg-themeGrayLight payrollConf-block">
                                         <h6>Total Employees</h6>
@@ -412,7 +441,7 @@
                                         <div class="value" id="payroll-darft-date"></div>
                                     </div>
                                     <div class="bg-themeGrayLight payrollConf-block" style="border-top:2px solid #0d6efd; background:#f0f4ff;">
-                                        <h6 style="color:#0d6efd;">Total Payroll</h6>
+                                        <h6 style="color:#0d6efd;">Net Payroll (Total Earnings - Total Deductions)</h6>
                                         <div class="value" id="total_payroll_amount" style="font-size:1.5rem; font-weight:700; color:#0d6efd;"></div>
                                     </div>
                                 </div>
@@ -718,9 +747,24 @@
             setTimeout(function() {
                 $('input, select, textarea').not('#searchField, #review-search').prop('disabled', true);
                 $('.editable').off('dblclick click');
-                $('.next:not([data-step="7"] .next), .add-deduction-btn, #distribute-service-charge, #upload-city-ledger-button, #OverTimeform').hide();
-                $('.previous').show(); // Keep back button for navigation
+                $('.add-deduction-btn, #distribute-service-charge, #upload-city-ledger-button, #OverTimeform, #download-city-ledger-template, #upload-city-ledger, #saveAsDraft').hide();
+                // Hide Action column in deductions table
+                $('#table-deductions th:last-child, #table-deductions td:last-child').hide();
+                // Disable checkboxes in employee selection
+                $('#payroll-employees input[type="checkbox"]').prop('disabled', true);
+                $('#selectAll, .unselect-all').hide();
+                $('.previous').show();
             }, 1000);
+
+            // Disable checkboxes when employee table reloads
+            $(document).on('draw.dt', '#payroll-employees', function() {
+                $('#payroll-employees input[type="checkbox"]').prop('disabled', true);
+            });
+
+            // Hide action column when deductions table reloads
+            $(document).on('draw.dt', '#table-deductions', function() {
+                $('#table-deductions th:last-child, #table-deductions td:last-child').hide();
+            });
         }
 
         // Set the cutoff day (from Laravel config)
@@ -859,6 +903,20 @@
             var currentStep = $currentFieldset.data('step');
             console.log('Next clicked, step:', currentStep);
 
+            // View-only mode: just navigate forward without saving
+            if (isViewOnly) {
+                var nextStep = currentStep + 1;
+                localStorage.setItem("currentStep", nextStep);
+                // Load data for next step
+                if (nextStep === 3) getstep3data('');
+                else if (nextStep === 4) getstep5data(currency, 1);
+                else if (nextStep === 5) getstep4data('', currency, 1);
+                else if (nextStep === 6) getstep6data(currency, 1);
+                else if (nextStep === 7) calculatePayrollSummary(currency, 1);
+                moveToNextStep($currentFieldset);
+                return;
+            }
+
             if (currentStep === 1) {
                 var dateRange = $("#hiddenInput").val();
                 console.log('Step 1 Continue - hiddenInput value:', dateRange);
@@ -890,12 +948,25 @@
                 var startDate = moment(dates[0], "DD-MM-YYYY", true).format("YYYY-MM-DD");
                 var endDate = moment(dates[1], "DD-MM-YYYY", true).format("YYYY-MM-DD");
 
+                // Check if this period has a payroll in pending_approval/approved state
+                var pendingPayrolls = @json($pendingApprovalPayrolls ?? []);
+                var matchingPending = pendingPayrolls.find(function(p) {
+                    return p.start_date === startDate && p.end_date === endDate;
+                });
+                if (matchingPending) {
+                    // Redirect to step 7 readonly
+                    localStorage.setItem('payroll_id', matchingPending.id);
+                    localStorage.setItem('currentStep', '7');
+                    window.location.href = "{{ route('payroll.run') }}?resume=" + matchingPending.id + "&viewonly=1";
+                    return;
+                }
+
                 // Prepare data for draft payroll entry
                 var payrollData = {
                     start_date: startDate,
                     end_date: endDate,
                     status: "draft",
-                    _token: '{{ csrf_token() }}' // CSRF Token for Laravel
+                    _token: '{{ csrf_token() }}'
                 };
 
                 // Save draft payroll data via AJAX
@@ -1342,26 +1413,28 @@
 
                 $("#table-review tbody tr").each(function () {
                     const $row = $(this);
-                    // Cols: 0:ID, 1:Name, 2:Position, 3:Present, 4:Absent, 5:DayOff, 6:SC, 7:RegOT, 8:FriOT, 9:HolOT, 10:TotalOT, 11:Earned, [allowances...], TotalEarnings, Deductions, NetSalary
                     function stripVal(td) { return parseFloat($(td).text().replace(/[^0-9.\-]/g, '')) || 0; }
-                    var $tds = $row.find("td");
+                    // Use class-based selectors to avoid column index issues with hidden tabs
+                    var $earningsCols = $row.find('td.col-earnings');
+                    var $deductionsCols = $row.find('td.col-deductions');
+                    var $summaryCols = $row.find('td.col-summary');
                     const rowData = {
-                        id: $tds.eq(0).text().trim(),
-                        name: $tds.eq(1).text().trim(),
-                        position: $tds.eq(2).text().trim(),
-                        present: stripVal($tds.eq(3)),
-                        absent: stripVal($tds.eq(4)),
-                        serviceCharge: stripVal($tds.eq(6)),
-                        overtimeNormal: stripVal($tds.eq(7)),
-                        overtimeFriday: stripVal($tds.eq(8)),
-                        overtimeHoliday: stripVal($tds.eq(9)),
-                        overtimeTotal: stripVal($tds.eq(10)),
-                        earningsBasic: stripVal($tds.eq(11)),
-                        earnedSalary: stripVal($tds.eq(11)),
+                        id: $row.find("td:eq(0)").text().trim(),
+                        name: $row.find("td:eq(1)").text().trim(),
+                        position: $row.find("td:eq(2)").text().trim(),
+                        present: stripVal($row.find("td:eq(3)")),
+                        absent: stripVal($row.find("td:eq(4)")),
+                        serviceCharge: stripVal($earningsCols.eq(0)), // SC is first earnings col
+                        overtimeNormal: stripVal($row.find("td.col-overtime:eq(0)")),
+                        overtimeFriday: stripVal($row.find("td.col-overtime:eq(1)")),
+                        overtimeHoliday: stripVal($row.find("td.col-overtime:eq(2)")),
+                        overtimeTotal: stripVal($row.find("td.col-overtime:eq(3)")),
+                        earningsBasic: stripVal($earningsCols.eq(1)), // Earned is second earnings col
+                        earnedSalary: stripVal($earningsCols.eq(1)),
                         earningsAllowance: 0,
-                        earningsNormal: stripVal($tds.eq($tds.length - 3)),
-                        totalDeductions: stripVal($tds.eq($tds.length - 2)),
-                        netSalary: stripVal($tds.eq($tds.length - 1)),
+                        earningsNormal: stripVal($earningsCols.last()), // Total Earnings is last earnings col
+                        totalDeductions: stripVal($deductionsCols.eq($deductionsCols.length - 2)), // Total Deductions
+                        netSalary: stripVal($deductionsCols.last()), // Net Salary
                         allowances: []
                     };
                     
@@ -2052,29 +2125,54 @@
                 var status = res.payroll_status;
 
                 // Update timeline
+                var hasRejection = false;
                 approvals.forEach(function(a) {
                     var $li = $('#approval-step-' + a.step_order);
                     var $info = $('#approval-step-' + a.step_order + '-info');
+                    $li.removeClass('active text-danger'); // Reset
                     if (a.status === 'approved') {
                         $li.addClass('active');
                         $info.html('<i class="fa-solid fa-check text-success"></i> Approved by ' + a.approver_name + ' on ' + new Date(a.approved_at).toLocaleDateString());
                     } else if (a.status === 'rejected') {
+                        hasRejection = true;
                         $li.addClass('text-danger');
-                        $info.html('<i class="fa-solid fa-times text-danger"></i> Rejected by ' + a.approver_name);
+                        var rejectHtml = '<i class="fa-solid fa-times text-danger"></i> Rejected by ' + a.approver_name;
+                        if (a.remarks) {
+                            rejectHtml += '<div class="mt-1 p-2 bg-white border border-danger rounded" style="font-size:12px;"><strong>Reason:</strong> ' + a.remarks + '</div>';
+                        }
+                        $info.html(rejectHtml);
                     } else {
-                        $info.html('Pending');
+                        $info.html('<span class="text-muted">Pending</span>');
                     }
                 });
 
                 // Show/hide buttons based on status and user role
                 $('#sendForApproval, #approvePayroll, #rejectPayroll, #submit, #payrollLockedMessage, #saveAsDraft').addClass('d-none');
+                $('.previous').show(); // Default: show back button
 
                 if (status === 'draft') {
-                    // Supervisor can send for approval or save as draft
-                    $('#sendForApproval').removeClass('d-none');
-                    $('#saveAsDraft').removeClass('d-none');
+                    // Check if there was a rejection (payroll sent back to draft)
+                    if (hasRejection) {
+                        // Supervisor can re-send after fixing issues
+                        if (res.is_supervisor) {
+                            $('#sendForApproval').removeClass('d-none');
+                            $('#saveAsDraft').removeClass('d-none');
+                        }
+                    } else if (approvals.length === 0) {
+                        // Never sent for approval yet — supervisor can send
+                        if (res.is_supervisor) {
+                            $('#sendForApproval').removeClass('d-none');
+                            $('#saveAsDraft').removeClass('d-none');
+                        }
+                    } else {
+                        // Draft with existing approvals but not rejected — supervisor can send
+                        if (res.is_supervisor) {
+                            $('#sendForApproval').removeClass('d-none');
+                            $('#saveAsDraft').removeClass('d-none');
+                        }
+                    }
                 } else if (status === 'pending_approval') {
-                    // Check if current user has an approval step pending
+                    // Approver: show approve/reject if it's their turn
                     if (res.user_approval_step) {
                         var pendingStep = approvals.find(a => a.step_order == res.user_approval_step && a.status === 'pending');
                         var prevApproved = approvals.filter(a => a.step_order < res.user_approval_step).every(a => a.status === 'approved');
@@ -2082,16 +2180,25 @@
                             $('#approvePayroll, #rejectPayroll').removeClass('d-none');
                         }
                     }
+                    // Supervisor sees "Waiting for approvals" message
+                    if (res.is_supervisor) {
+                        $('#payrollLockedMessage').removeClass('d-none')
+                            .removeClass('alert-success').addClass('alert-info')
+                            .html('<i class="fa-solid fa-clock me-1"></i> Payroll has been sent for approval. Waiting for approvers.');
+                    }
                 } else if (status === 'approved') {
-                    // Supervisor can lock
+                    // All 3 approved — supervisor can lock
                     if (res.is_supervisor) {
                         $('#submit').removeClass('d-none');
                     } else {
-                        $('#payrollLockedMessage').removeClass('d-none').html('<i class="fa-solid fa-circle-check me-1"></i> All approvals completed. Waiting for supervisor to lock the payroll.');
+                        $('#payrollLockedMessage').removeClass('d-none')
+                            .html('<i class="fa-solid fa-circle-check me-1"></i> All approvals completed. Waiting for supervisor to lock the payroll.');
                     }
                 } else if (status === 'locked') {
-                    $('#payrollLockedMessage').removeClass('d-none');
+                    $('#payrollLockedMessage').removeClass('d-none')
+                        .html('<i class="fa-solid fa-lock me-1"></i> This payroll has been approved and locked. Thank you.');
                     $('.previous').addClass('d-none');
+                    $('#saveAsDraft').addClass('d-none');
                 }
             }
         });
@@ -2184,6 +2291,14 @@
                 $('#rejectPayroll').prop('disabled', false).html('<i class="fa-solid fa-times me-1"></i> Reject');
             }
         });
+    });
+
+    // View pending approval payroll — jump to step 7 readonly
+    $(document).on('click', '.view-pending-payroll', function() {
+        var payrollId = $(this).data('payroll-id');
+        localStorage.setItem('payroll_id', payrollId);
+        localStorage.setItem('currentStep', '7');
+        window.location.href = "{{ route('payroll.run') }}?resume=" + payrollId + "&viewonly=1";
     });
 
     // Review tab switching
@@ -3341,7 +3456,10 @@
                     document.getElementById("total_employees").innerText = response.total_employees;
                     document.getElementById("payroll-darft-date").innerText = draftDate;
                     document.getElementById("total_earned_salary").innerText = currencySymbol + fmtNum(parseFloat(response.total_earned_salary || 0));
+                    document.getElementById("total_allowances_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_allowances || 0));
+                    document.getElementById("total_ot_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_ot || 0));
                     document.getElementById("total_service_charge_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_service_charge || 0));
+                    document.getElementById("total_earnings_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_earnings || 0));
                     document.getElementById("total_deductions_conf").innerText = currencySymbol + fmtNum(parseFloat(response.total_deductions || 0));
                 } else {
                     toastr.error("Failed to fetch total payroll.", 'Error', { positionClass: 'toast-bottom-right' });
@@ -3751,7 +3869,7 @@
                 { 
                     data: 'department', 
                     render: function(data, type, row) {
-                        return ` ${data.department_name} <span class="badge badge-themeLight">${data.department_code}</span>`;
+                        return ` ${data.department_name}`;
                     }
                 },
                 { data: 'section', defaultContent: 'N/A' },
