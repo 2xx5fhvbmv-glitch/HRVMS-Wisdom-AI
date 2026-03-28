@@ -1754,11 +1754,24 @@ class MasterDashboardController extends Controller
                 ->with(['learningProgram', 'trainingAttendances','participants.employee'])
                 ->limit(10)->get();
 
+            // Pending payroll approvals for GM (step 3)
+            $pendingPayrollApprovals = \App\Models\PayrollApproval::where('resort_id', $resort_id)
+                ->where('step_order', 3)
+                ->where('status', 'pending')
+                ->with('payroll')
+                ->get()
+                ->filter(function ($a) {
+                    return \App\Models\PayrollApproval::where('payroll_id', $a->payroll_id)
+                        ->where('step_order', '<', 3)
+                        ->where('status', '!=', 'approved')
+                        ->doesntExist();
+                });
+
             return view('resorts.master-dashboard.gmdashboard', compact(
                 'resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
-                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','grivance_data','disiplinary_data','EmployeeResignation','departmentEmployeeCounts','serviceChargesData','ongoing_tranning'
+                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','grivance_data','disiplinary_data','EmployeeResignation','departmentEmployeeCounts','serviceChargesData','ongoing_tranning','pendingPayrollApprovals'
             ));
     }
 

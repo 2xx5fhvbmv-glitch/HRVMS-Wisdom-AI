@@ -114,10 +114,24 @@ class DashboardController extends Controller
                 return $p;
             });
 
+        // Payrolls in approval process (pending_approval or approved)
+        $approvalPayrolls = Payroll::where('resort_id', $resort_id)
+            ->whereIn('status', ['pending_approval', 'approved'])
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(function($p) {
+                $p->employee_count = \DB::table('payroll_employees')->where('payroll_id', $p->id)->count();
+                $p->approvals = \App\Models\PayrollApproval::where('payroll_id', $p->id)
+                    ->orderBy('step_order')
+                    ->get();
+                return $p;
+            });
+
         return view('resorts.payroll.dashboard.dashboard', compact(
             'page_title', 'total_employees', 'total_paid_employees',
             'lastPayroll', 'upcomingPayroll', 'upcomingEstimated',
-            'payrollData', 'upcomingCutoffDate', 'draftPayrolls'
+            'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls'
         ));
     }
     public function draftsList()

@@ -327,6 +327,66 @@
                 </div>
             </div>
 
+            {{-- Payrolls In Approval --}}
+            @if(isset($approvalPayrolls) && $approvalPayrolls->isNotEmpty())
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-title">
+                        <h3><i class="fa-solid fa-clipboard-check me-1"></i> Payrolls In Approval</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Period</th>
+                                    <th>Employees</th>
+                                    <th>Total Amount</th>
+                                    <th>Finance EXCOM</th>
+                                    <th>HR EXCOM</th>
+                                    <th>GM</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($approvalPayrolls as $index => $ap)
+                                    <tr>
+                                        <td>{{ $index + 1 }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($ap->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($ap->end_date)->format('d M Y') }}</td>
+                                        <td>{{ $ap->employee_count }}</td>
+                                        <td>{!! Common::formatCurrency($ap->total_payroll ?? 0, 'USD') !!}</td>
+                                        @foreach($ap->approvals as $approval)
+                                            <td>
+                                                @if($approval->status === 'approved')
+                                                    <span class="badge badge-themeSuccess"><i class="fa-solid fa-check"></i> {{ $approval->approver_name }}</span>
+                                                @elseif($approval->status === 'rejected')
+                                                    <span class="badge badge-themeDanger"><i class="fa-solid fa-times"></i> Rejected</span>
+                                                @else
+                                                    <span class="badge badge-themeWarning">Pending</span>
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                        <td>
+                                            <span class="badge {{ $ap->status === 'approved' ? 'badge-themeSuccess' : 'badge-themeWarning' }}">
+                                                {{ ucfirst(str_replace('_', ' ', $ap->status)) }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm btn-themeBlue"
+                                               onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','7');">
+                                                <i class="fa-solid fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- <div class="col-xl-3 col-md-6">
                 <div class="card  card-activityLog" id="card-activityLog">
                     <div class=" card-title">
