@@ -29,7 +29,6 @@ use Illuminate\Support\Facades\Validator;
 use Auth;
 use Config;
 use DB;
-use Common;
 
 class PensionController extends Controller
 {
@@ -42,7 +41,7 @@ class PensionController extends Controller
 
     public function index(Request $request)
     {
-        $page_title ='Payroll Run';
+        $page_title ='Pension';
         $resort_id = $this->resort->resort_id;
        
         $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('status', ['Active'])->get();
