@@ -13,6 +13,7 @@ use App\Models\ResortDepartment;
 use App\Models\ServiceCharges;
 use App\Models\EwtTaxBracket;
 use App\Models\ResortSiteSettings;
+use App\Helpers\Common;
 use Auth;
 use Config;
 use DB;
@@ -63,43 +64,41 @@ class DashboardController extends Controller
                 ->first();
         }
 
-        // Upcoming Payroll: find current/upcoming payroll record
-        $currentMonthStart = $today->copy()->startOfMonth();
-        $currentMonthEnd = $today->copy()->endOfMonth();
-        $upcomingPayroll = Payroll::where('resort_id', $resort_id)
-            ->where(function($query) use ($currentMonthStart, $currentMonthEnd, $today) {
-                $query->where(function($q) use ($currentMonthStart, $currentMonthEnd) {
-                    $q->whereBetween('start_date', [$currentMonthStart, $currentMonthEnd])
-                      ->orWhereBetween('end_date', [$currentMonthStart, $currentMonthEnd])
-                      ->orWhere(function($q2) use ($currentMonthStart, $currentMonthEnd) {
-                          $q2->where('start_date', '<=', $currentMonthStart)
-                             ->where('end_date', '>=', $currentMonthEnd);
-                      });
-                })->orWhere('start_date', '>', $today);
-            })
-            ->orderBy('start_date')
-            ->first();
-
-        // Calculate upcoming cutoff date from PayrollConfig
+        // Calculate upcoming cutoff period
         $payrollConfig = \App\Models\PayrollConfig::where('resort_id', $resort_id)->first();
         $cutoffDay = $payrollConfig->cutoff_day ?? 1;
-        if ($today->day <= $cutoffDay) {
-            $upcomingCutoffDate = $today->copy()->setDay($cutoffDay);
-        } else {
-            $upcomingCutoffDate = $today->copy()->addMonthNoOverflow()->setDay($cutoffDay);
+        $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+        $upcomingCutoffDate = $cutoffPeriod['end'];
+
+        // Upcoming Payroll: find payroll for the current cutoff period
+        $upcomingPayroll = Payroll::where('resort_id', $resort_id)
+            ->where('start_date', $cutoffPeriod['start']->format('Y-m-d'))
+            ->where('end_date', $cutoffPeriod['end']->format('Y-m-d'))
+            ->first();
+
+        // If current period is already locked, look at the next period
+        if ($upcomingPayroll && $upcomingPayroll->status === 'locked') {
+            $nextStart = $cutoffPeriod['end']->copy()->addDay();
+            $nextEnd = $nextStart->copy()->addMonth()->subDay();
+            $upcomingPayroll = Payroll::where('resort_id', $resort_id)
+                ->where('start_date', $nextStart->format('Y-m-d'))
+                ->first();
+            $upcomingCutoffDate = $nextEnd;
         }
 
-        // If upcoming payroll has no total yet, estimate from attendance
+        // Estimate upcoming payroll from total monthly salaries + allowances of active employees
         $upcomingEstimated = 0;
-        if ($upcomingPayroll && $upcomingPayroll->total_payroll <= 0) {
-            $upcomingEstimated = DB::table('parent_attendaces as pa')
-                ->join('employees as e', 'e.id', '=', 'pa.Emp_id')
-                ->where('pa.resort_id', $resort_id)
-                ->where('pa.Status', 'Present')
-                ->whereBetween('pa.date', [$upcomingPayroll->start_date, $today->format('Y-m-d')])
-                ->selectRaw('SUM(e.basic_salary / 30) as estimated_total')
-                ->value('estimated_total') ?? 0;
-            $upcomingEstimated = round($upcomingEstimated, 2);
+        if (!$upcomingPayroll || $upcomingPayroll->total_payroll <= 0) {
+            $activeEmployees = Employee::where('resort_id', $resort_id)
+                ->whereIn('status', ['Active', 'Probationary'])
+                ->get();
+
+            $totalMonthlySalary = $activeEmployees->sum('basic_salary');
+            $totalMonthlyAllowances = DB::table('employees_allowance')
+                ->whereIn('employee_id', $activeEmployees->pluck('id'))
+                ->sum('amount');
+
+            $upcomingEstimated = round($totalMonthlySalary + $totalMonthlyAllowances, 2);
         }
 
         // Only show drafts that have review data (saved from step 7)
@@ -114,9 +113,16 @@ class DashboardController extends Controller
                 return $p;
             });
 
-        // Payrolls in approval process (pending_approval or approved)
+        // Payrolls in approval process (pending_approval, approved, or draft with rejection history)
         $approvalPayrolls = Payroll::where('resort_id', $resort_id)
-            ->whereIn('status', ['pending_approval', 'approved'])
+            ->where(function($q) {
+                $q->whereIn('status', ['pending_approval', 'approved'])
+                  ->orWhere(function($q2) {
+                      // Draft payrolls that have approval records (sent for approval before, possibly rejected)
+                      $q2->where('status', 'draft')
+                         ->whereHas('approvals');
+                  });
+            })
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
@@ -125,13 +131,21 @@ class DashboardController extends Controller
                 $p->approvals = \App\Models\PayrollApproval::where('payroll_id', $p->id)
                     ->orderBy('step_order')
                     ->get();
+                $p->has_rejection = $p->approvals->where('status', 'rejected')->isNotEmpty();
                 return $p;
             });
+
+        // Locked (completed) payrolls
+        $lockedPayrolls = Payroll::where('resort_id', $resort_id)
+            ->where('status', 'locked')
+            ->orderByDesc('end_date')
+            ->limit(5)
+            ->get();
 
         return view('resorts.payroll.dashboard.dashboard', compact(
             'page_title', 'total_employees', 'total_paid_employees',
             'lastPayroll', 'upcomingPayroll', 'upcomingEstimated',
-            'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls'
+            'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls', 'lockedPayrolls'
         ));
     }
     public function draftsList()
@@ -416,17 +430,26 @@ class DashboardController extends Controller
     {
         $resort_id = $this->resort->resort_id;
 
-        // Fetch department-wise payroll distribution
-        $departments = Payroll::join('payroll_employees as pe', 'payroll.id', '=', 'pe.payroll_id')
-        ->join('payroll_reviews as pr', function ($join) {
-            $join->on('pr.employee_id', '=', 'pe.employee_id')
-                 ->on('pr.payroll_id', '=', 'pe.payroll_id');
-        })
-        ->join('resort_departments as rd', 'rd.id', '=', 'pe.department')
-        ->where('payroll.resort_id', $resort_id)
-        ->selectRaw('rd.name as department, SUM(pr.net_salary) as total')
-        ->groupBy('pe.department', 'rd.name')
-        ->get();
+        // Fetch department-wise payroll distribution from the latest locked payroll only
+        $latestLocked = Payroll::where('resort_id', $resort_id)
+            ->where('status', 'locked')
+            ->orderByDesc('end_date')
+            ->first();
+
+        $departments = collect();
+        if ($latestLocked) {
+            $departments = Payroll::join('payroll_employees as pe', 'payroll.id', '=', 'pe.payroll_id')
+                ->join('payroll_reviews as pr', function ($join) {
+                    $join->on('pr.employee_id', '=', 'pe.employee_id')
+                         ->on('pr.payroll_id', '=', 'pe.payroll_id');
+                })
+                ->join('employees as e', 'e.id', '=', 'pe.employee_id')
+                ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
+                ->where('payroll.id', $latestLocked->id)
+                ->selectRaw('rd.name as department, SUM(pr.net_salary) as total')
+                ->groupBy('e.Dept_id', 'rd.name')
+                ->get();
+        }
 
         // Generate unique colors dynamically for each department
         $departmentColors = [];
@@ -509,15 +532,15 @@ class DashboardController extends Controller
 
         $usdToMvr = floatval($settings['DollertoMVR']);
 
-        // Load tax brackets
+        // Load tax brackets (stored in MVR)
         $brackets = EwtTaxBracket::orderBy('min_salary')->get();
 
-        // Prepare labels and initialize totals
+        // Prepare labels — brackets are always in MVR (Maldives tax law)
         $result = [];
         foreach ($brackets as $bracket) {
             $label = is_null($bracket->max_salary)
-                ? "{$bracket->min_salary}+ MVR"
-                : "{$bracket->min_salary} - {$bracket->max_salary} MVR";
+                ? "MVR " . number_format($bracket->min_salary, 0) . "+"
+                : "MVR " . number_format($bracket->min_salary, 0) . " - " . number_format($bracket->max_salary, 0);
 
             $result[$label] = 0;
         }
@@ -530,6 +553,7 @@ class DashboardController extends Controller
                      ->on('pr.employee_id', '=', 'pd.employee_id');
             })
             ->where('p.resort_id', $resortId)
+            ->where('p.status', 'locked')
             ->whereYear('p.start_date', $year)
             ->select('pd.ewt', DB::raw('(pr.total_earnings - pd.pension) as taxable_income'))
             ->get();
@@ -543,18 +567,21 @@ class DashboardController extends Controller
 
                 if ($taxableMvr >= $min && $taxableMvr <= $max) {
                     $label = is_null($bracket->max_salary)
-                        ? "{$bracket->min_salary}+ MVR"
-                        : "{$bracket->min_salary} - {$bracket->max_salary} MVR";
+                        ? "MVR " . number_format($bracket->min_salary, 0) . "+"
+                        : "MVR " . number_format($bracket->min_salary, 0) . " - " . number_format($bracket->max_salary, 0);
 
                     $result[$label] += floatval($rec->ewt);
-                    break; // Stop after first matching bracket
+                    break;
                 }
             }
         }
 
+        // Filter out zero brackets so chart only shows brackets with actual tax
+        $filtered = array_filter($result, fn($v) => $v > 0);
+
         return response()->json([
-            'labels' => array_keys($result),
-            'data' => array_map(fn($v) => round($v, 2), array_values($result)),
+            'labels' => array_keys($filtered),
+            'data' => array_map(fn($v) => round($v, 2), array_values($filtered)),
         ]);
     }
 

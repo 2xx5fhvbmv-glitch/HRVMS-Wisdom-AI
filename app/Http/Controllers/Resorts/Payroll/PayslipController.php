@@ -137,11 +137,17 @@ class PayslipController extends Controller
         $month = $request->month;
         $year = $request->year;
 
-        // Fetch payroll details for the selected employee, month, and year
+        // Fetch payroll details — prioritize locked/completed payrolls over drafts
         $payroll = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
             ->where('pe.employee_id', $employeeId)
-            ->whereMonth('payroll.start_date', $month)
-            ->whereYear('payroll.end_date', $year)
+            ->where(function($q) use ($month, $year) {
+                $q->where(function($q2) use ($month, $year) {
+                    $q2->whereMonth('payroll.end_date', $month)->whereYear('payroll.end_date', $year);
+                })->orWhere(function($q2) use ($month, $year) {
+                    $q2->whereMonth('payroll.start_date', $month)->whereYear('payroll.start_date', $year);
+                });
+            })
+            ->orderByRaw("FIELD(payroll.status, 'locked', 'completed', 'approved', 'pending_approval', 'draft')")
             ->first();
 
         if (!$payroll) {
@@ -238,11 +244,20 @@ class PayslipController extends Controller
                 $query->where('employee_id', $employeeId);
             }
         ])
-        ->whereMonth('start_date', $month)
-        ->whereYear('end_date', $year)
+        ->where(function($q) use ($month, $year) {
+            // Match by end_date month/year (payroll is identified by its end period)
+            $q->where(function($q2) use ($month, $year) {
+                $q2->whereMonth('end_date', $month)->whereYear('end_date', $year);
+            })
+            // Also try start_date in case user selected the start month
+            ->orWhere(function($q2) use ($month, $year) {
+                $q2->whereMonth('start_date', $month)->whereYear('start_date', $year);
+            });
+        })
         ->whereHas('employees', function($query) use ($employeeId) {
             $query->where('employee_id', $employeeId);
         })
+        ->orderByRaw("FIELD(status, 'locked', 'completed', 'approved', 'pending_approval', 'draft')")
         ->first();
         // dd($payroll);
         if (!$payroll) {

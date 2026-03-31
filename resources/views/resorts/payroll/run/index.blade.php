@@ -517,9 +517,10 @@
                             </button>
 
                             {{-- Supervisor: Confirm and Lock (only after all approvals) --}}
-                            <button type="submit" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="submit">
+                            <button type="button" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="showLockModal">
                                 <i class="fa-solid fa-lock me-1"></i> Confirm and Lock Payroll
                             </button>
+                            <button type="submit" class="d-none" id="submit"></button>
 
                             {{-- After locked --}}
                             <div class="alert alert-success d-none text-center" id="payrollLockedMessage">
@@ -534,6 +535,35 @@
             </div>
         </div>
     </div>
+    {{-- Confirm & Lock Payroll Modal --}}
+    <div class="modal fade" id="confirmLockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title"><i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>You are about to permanently lock this payroll.</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Once locked:</p>
+                    <ul class="mb-3" style="list-style: none; padding-left: 0;">
+                        <li class="mb-2"><i class="fa-solid fa-lock text-danger me-2"></i> Payroll data cannot be edited or reversed</li>
+                        <li class="mb-2"><i class="fa-solid fa-calculator text-danger me-2"></i> All earnings, deductions, and calculations become final</li>
+                        <li class="mb-2"><i class="fa-solid fa-money-bill-wave text-danger me-2"></i> This action may impact employee payments and financial records</li>
+                    </ul>
+                    <div class="alert alert-warning mb-0">
+                        <i class="fa-solid fa-circle-info me-1"></i> Ensure all entries are verified before proceeding.
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmLockBtn">
+                        <i class="fa-solid fa-lock me-1"></i> Confirm & Lock
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="addDeduction-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-small modal-lanTest">
             <div class="modal-content">
@@ -2063,6 +2093,17 @@
 
     });
 
+    // Show lock confirmation modal
+    $('#showLockModal').on('click', function() {
+        $('#confirmLockModal').modal('show');
+    });
+
+    // Confirm lock — trigger the original submit
+    $('#confirmLockBtn').on('click', function() {
+        $('#confirmLockModal').modal('hide');
+        $('#submit').trigger('click');
+    });
+
     // Save as Draft — keeps payroll in draft status, redirects to dashboard
     $('#saveAsDraft').on('click', function() {
         var payrollId = localStorage.getItem("payroll_id");
@@ -2147,7 +2188,7 @@
                 });
 
                 // Show/hide buttons based on status and user role
-                $('#sendForApproval, #approvePayroll, #rejectPayroll, #submit, #payrollLockedMessage, #saveAsDraft').addClass('d-none');
+                $('#sendForApproval, #approvePayroll, #rejectPayroll, #showLockModal, #payrollLockedMessage, #saveAsDraft').addClass('d-none');
                 $('.previous').show(); // Default: show back button
 
                 if (status === 'draft') {
@@ -2189,7 +2230,7 @@
                 } else if (status === 'approved') {
                     // All 3 approved — supervisor can lock
                     if (res.is_supervisor) {
-                        $('#submit').removeClass('d-none');
+                        $('#showLockModal').removeClass('d-none');
                     } else {
                         $('#payrollLockedMessage').removeClass('d-none')
                             .html('<i class="fa-solid fa-circle-check me-1"></i> All approvals completed. Waiting for supervisor to lock the payroll.');
@@ -3844,6 +3885,15 @@
                     d.position = $('#positionFilter').val();
                     d.section = $('#sectionFilter').val();
                     d.isChecked = isChecked;
+                    // Pass payroll period dates to filter employees with attendance data
+                    var dateRange = $('#hiddenInput').val();
+                    if (dateRange) {
+                        var dates = dateRange.split(' - ');
+                        if (dates.length === 2) {
+                            d.startDate = moment(dates[0], 'DD-MM-YYYY', true).format('YYYY-MM-DD');
+                            d.endDate = moment(dates[1], 'DD-MM-YYYY', true).format('YYYY-MM-DD');
+                        }
+                    }
                 },
                 dataSrc: function (json)
                 {

@@ -67,7 +67,7 @@
                             </strong>
                         </div>
                         <div class="text-end">
-                            <span>{{ $lastPayroll ? \Carbon\Carbon::parse($lastPayroll->end_date)->format('d M Y') : '-' }}</span><br>
+                            <span>{{ $lastPayroll ? \Carbon\Carbon::parse($lastPayroll->updated_at)->format('d M Y') : '-' }}</span><br>
                             <span class="badge badge-themeSuccess">
                                 {{ ucfirst($lastPayroll->status ?? 'N/A') }}
                             </span>
@@ -361,20 +361,70 @@
                                                 @if($approval->status === 'approved')
                                                     <span class="badge badge-themeSuccess"><i class="fa-solid fa-check"></i> {{ $approval->approver_name }}</span>
                                                 @elseif($approval->status === 'rejected')
-                                                    <span class="badge badge-themeDanger"><i class="fa-solid fa-times"></i> Rejected</span>
+                                                    <span class="badge badge-themeDanger" title="{{ $approval->remarks }}"><i class="fa-solid fa-times"></i> Rejected</span>
+                                                    @if($approval->remarks)
+                                                        <small class="d-block text-danger" style="font-size:10px;">{{ Str::limit($approval->remarks, 30) }}</small>
+                                                    @endif
                                                 @else
                                                     <span class="badge badge-themeWarning">Pending</span>
                                                 @endif
                                             </td>
                                         @endforeach
                                         <td>
-                                            <span class="badge {{ $ap->status === 'approved' ? 'badge-themeSuccess' : 'badge-themeWarning' }}">
-                                                {{ ucfirst(str_replace('_', ' ', $ap->status)) }}
-                                            </span>
+                                            @if($ap->has_rejection)
+                                                <span class="badge badge-themeDanger">Rejected</span>
+                                            @elseif($ap->status === 'approved')
+                                                <span class="badge badge-themeSuccess">Approved</span>
+                                            @elseif($ap->status === 'pending_approval')
+                                                <span class="badge badge-themeWarning">Pending Approval</span>
+                                            @else
+                                                <span class="badge badge-themeGray">Draft</span>
+                                            @endif
                                         </td>
                                         <td>
                                             <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm btn-themeBlue"
                                                onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','7');">
+                                                <i class="fa-solid fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- Completed (Locked) Payrolls --}}
+            @if(isset($lockedPayrolls) && $lockedPayrolls->isNotEmpty())
+            <div class="col-12 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card">
+                    <div class="card-title">
+                        <h3><i class="fa-solid fa-lock me-1"></i> Completed Payrolls</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Period</th>
+                                    <th>Employees</th>
+                                    <th>Total Payroll</th>
+                                    <th>Locked On</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($lockedPayrolls as $index => $lp)
+                                    <tr>
+                                        <td>{{ $index + 1 }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($lp->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($lp->end_date)->format('d M Y') }}</td>
+                                        <td>{{ $lp->total_employees }}</td>
+                                        <td>{!! Common::formatCurrency($lp->total_payroll ?? 0, 'USD') !!}</td>
+                                        <td>{{ \Carbon\Carbon::parse($lp->updated_at)->format('d M Y, h:i A') }}</td>
+                                        <td>
+                                            <a href="{{ route('payroll.view', ['payroll_id' => base64_encode($lp->id)]) }}" class="btn btn-sm btn-themeBlue">
                                                 <i class="fa-solid fa-eye"></i> View
                                             </a>
                                         </td>
@@ -1009,7 +1059,7 @@
                                 align: 'left',
                                 display: true,
                                 formatter(ctx) {
-                                    return ctx.type === 'data' ? [ctx.raw._data.what, 'Value: $' + ctx.raw.v.toLocaleString()] : '';
+                                    return ctx.type === 'data' ? [ctx.raw._data.what, formatAmount(ctx.raw.v, 'USD')] : '';
                                 },
                                 color: ['white', 'whiteSmoke'],
                                 font: [{ size: 16, weight: 'bold' }, { size: 13 }],
@@ -1126,7 +1176,7 @@
                             return tooltipItem.dataset.label;
                         },
                         afterLabel: function (tooltipItem) {
-                            return currencySymbol + ' ' + tooltipItem.raw;
+                            return formatAmount(tooltipItem.raw, 'USD');
                         }
                     },
                     displayColors: false
@@ -1134,7 +1184,7 @@
             },
             scales: {
                 x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, beginAtZero: true, grid: { display: false } }
+                y: { stacked: true, beginAtZero: true, grid: { display: false }, ticks: { callback: function(v) { return formatAmount(v, 'USD'); } } }
             }
         }
     });
@@ -1213,7 +1263,7 @@
                             y: {
                                 beginAtZero: true,
                                 grid: { display: false },
-                                ticks: { stepSize: 5 }
+                                ticks: { callback: function(v) { return formatAmount(v, 'USD'); } }
                             }
                         }
                     }
@@ -1262,7 +1312,7 @@
                     y: {
                         grid: { display: false },
                         beginAtZero: true,
-                        ticks: { stepSize: 5 }
+                        ticks: { callback: function(v) { return formatAmount(v, 'USD'); } }
                     }
                 }
             }
@@ -1340,7 +1390,9 @@
                     },
                     y: {
                         beginAtZero: true,
-                        ticks: { stepSize: 5 },
+                        ticks: {
+                            callback: function(value) { return formatAmount(value, 'USD'); }
+                        },
                         grid: { display: false },
                         border: { display: true }
                     }
@@ -1435,12 +1487,15 @@
 
                 if (window.taxChartInstance) window.taxChartInstance.destroy();
 
+                // Convert data to display currency
+                var chartData = res.data.map(function(v) { return convertAmount(v, 'USD'); });
+
                 window.taxChartInstance = new Chart(ctx, {
                     type: 'pie',
                     data: {
                         labels: res.labels,
                         datasets: [{
-                            data: res.data,
+                            data: chartData,
                             backgroundColor: res.labels.map(() => getRandomColor()),
                             borderWidth: 0
                         }]
@@ -1451,6 +1506,13 @@
                             legend: {
                                 display: true,
                                 position: 'bottom'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(tooltipItem) {
+                                        return tooltipItem.label + ': ' + currencySymbol + tooltipItem.raw.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                    }
+                                }
                             }
                         }
                     },

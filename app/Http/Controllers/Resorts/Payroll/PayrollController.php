@@ -193,9 +193,19 @@ class PayrollController extends Controller
     {
         $resort_id = auth()->user()->resort_id;
         $isChecked = $request->isChecked;
+        // Only show employees who have attendance data in the payroll period
+        $startDate = $request->startDate;
+        $endDate = $request->endDate;
+
         $query = Employee::with(['resortAdmin', 'position', 'department', 'section'])
             ->where('resort_id', $resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned']);
+
+        if ($startDate && $endDate) {
+            $query->whereHas('EmployeeAttandance', function($q) use ($startDate, $endDate) {
+                $q->whereBetween('date', [$startDate, $endDate]);
+            });
+        }
 
         if ($request->searchTerm) {
             $query->where(function ($q) use ($request) {
@@ -805,7 +815,12 @@ class PayrollController extends Controller
         // dd($request->reviewData);
         try {
             foreach ($request->reviewData as $review) {
-                $total_earnings = (float)($review['earnedSalary'] ?? 0) + (float)($review['overtimeTotal'] ?? 0) + (float)($review['serviceCharge'] ?? 0) + (float)($review['earningsAllowance'] ?? 0);
+                // Use earningsNormal (Total Earnings from DOM) directly — it already includes all components
+                $total_earnings = (float)($review['earningsNormal'] ?? 0);
+                // Fallback: if earningsNormal is 0, calculate from components
+                if ($total_earnings <= 0) {
+                    $total_earnings = (float)($review['earnedSalary'] ?? 0) + (float)($review['overtimeTotal'] ?? 0) + (float)($review['serviceCharge'] ?? 0) + (float)($review['earningsAllowance'] ?? 0);
+                }
                 $total_deductions = (float)($review['totalDeductions'] ?? 0);
                 // dd($review);
                 // ✅ Fetch Employee details
@@ -943,20 +958,23 @@ class PayrollController extends Controller
         DB::beginTransaction(); // ✅ Start transaction for data consistency
         // dd($request->all());
         try {
-            
+            $payrollId = $request->payroll_id;
+
+            // Calculate totals from DB (don't trust frontend values which may have comma formatting issues)
+            $totalPayroll = PayrollReview::where('payroll_id', $payrollId)->sum('net_salary');
+            $totalEmployees = PayrollReview::where('payroll_id', $payrollId)->count();
+
             Payroll::updateOrCreate(
                 [
-                    'id' => $request->payroll_id,
+                    'id' => $payrollId,
                 ],
                 [
-                    'total_payroll' => $request['summaryData']['totalPayrollAmount'],
-                    'total_employees' => $request['summaryData']['totalEmployees'],
-                    'draft_date' => $request['summaryData']['payrollDraftDate'],
-                    // 'payment_date' => $request['summaryData']['payrollPaymentDate'],
+                    'total_payroll' => round($totalPayroll, 2),
+                    'total_employees' => $totalEmployees,
+                    'draft_date' => $request['summaryData']['payrollDraftDate'] ?? now()->format('Y-m-d'),
                     'status' => 'locked'
                 ]
             );
-            $payrollId = $request->payroll_id;
             $payroll = Payroll::findOrFail($payrollId);
             $deductions = PayrollDeduction::where('payroll_id', $payrollId)->get();
             foreach ($deductions as $deduction) {
@@ -1095,9 +1113,29 @@ class PayrollController extends Controller
             'approved_at' => now(),
         ]);
 
+        $payroll = Payroll::find($payrollId);
+        $period = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
+        $approverName = $currentUser->first_name . ' ' . $currentUser->last_name;
+
         if ($request->action === 'reject') {
-            $payroll = Payroll::find($payrollId);
             $payroll->update(['status' => 'draft']);
+
+            // Notify supervisor (rank 5) about rejection
+            $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
+            if ($supervisor) {
+                \DB::table('resort_notifications')->insert([
+                    'resort_id' => $resortId,
+                    'user_id' => $supervisor->id,
+                    'module' => 'Payroll Approval',
+                    'type' => 'Payroll Rejected',
+                    'message' => "Payroll for period {$period} was rejected by {$approverName}. Reason: " . ($request->remarks ?? 'No reason provided'),
+                    'status' => 'unread',
+                    'request_id' => $payrollId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
             return response()->json(['success' => true, 'message' => 'Payroll has been rejected.']);
         }
 
@@ -1107,10 +1145,43 @@ class PayrollController extends Controller
             ->doesntExist();
 
         if ($allApproved) {
-            Payroll::find($payrollId)->update(['status' => 'approved']);
+            $payroll->update(['status' => 'approved']);
+
+            // Notify supervisor that all approvals are done
+            $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
+            if ($supervisor) {
+                \DB::table('resort_notifications')->insert([
+                    'resort_id' => $resortId,
+                    'user_id' => $supervisor->id,
+                    'module' => 'Payroll Approval',
+                    'type' => 'Payroll Fully Approved',
+                    'message' => "Payroll for period {$period} has been fully approved by all approvers. You can now lock the payroll.",
+                    'status' => 'unread',
+                    'request_id' => $payrollId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         } else {
             // Notify next approver
             $this->notifyApprover($payrollId, $resortId, $approvalStep + 1);
+
+            // Notify supervisor about partial approval progress
+            $supervisor = Employee::where('resort_id', $resortId)->where('rank', 5)->first();
+            if ($supervisor) {
+                $stepTitles = [1 => 'Finance EXCOM', 2 => 'HR EXCOM', 3 => 'GM'];
+                \DB::table('resort_notifications')->insert([
+                    'resort_id' => $resortId,
+                    'user_id' => $supervisor->id,
+                    'module' => 'Payroll Approval',
+                    'type' => 'Payroll Approval Progress',
+                    'message' => "Payroll for period {$period} has been approved by {$approverName} (" . ($stepTitles[$approvalStep] ?? '') . ").",
+                    'status' => 'unread',
+                    'request_id' => $payrollId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         return response()->json(['success' => true, 'message' => 'Payroll approved successfully.']);
@@ -3061,12 +3132,75 @@ class PayrollController extends Controller
     // Add this method in your PayrollController
     public function showActivityLog($encoded_payroll_id)
     {
-        $page_title ='Payroll Attendance Activity Log';
+        $page_title = 'Payroll Activity Log';
         $payroll_id = base64_decode($encoded_payroll_id);
 
-        // Pass the logs to the view
-        return view('resorts.payroll.run.activity-log',compact('page_title','payroll_id'));
+        $payroll = Payroll::find($payroll_id);
+        $approvals = PayrollApproval::where('payroll_id', $payroll_id)
+            ->orderBy('step_order')
+            ->get();
 
+        // Build workflow timeline
+        $timeline = collect();
+
+        // 1. Payroll created
+        if ($payroll) {
+            $creator = \DB::table('payroll_employees')
+                ->where('payroll_id', $payroll_id)
+                ->first();
+            $timeline->push([
+                'action' => 'Payroll Created',
+                'description' => 'Payroll period: ' . \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y'),
+                'user' => 'System',
+                'date' => $payroll->created_at,
+                'status' => 'completed',
+                'icon' => 'fa-file-invoice-dollar',
+            ]);
+        }
+
+        // 2. Sent for approval
+        $firstApproval = $approvals->first();
+        if ($firstApproval) {
+            $timeline->push([
+                'action' => 'Sent for Approval',
+                'description' => 'Payroll sent to approval chain',
+                'user' => 'Payroll Supervisor',
+                'date' => $firstApproval->created_at,
+                'status' => 'completed',
+                'icon' => 'fa-paper-plane',
+            ]);
+        }
+
+        // 3. Each approval step
+        foreach ($approvals as $approval) {
+            $statusClass = $approval->status === 'approved' ? 'completed' : ($approval->status === 'rejected' ? 'rejected' : 'pending');
+            $timeline->push([
+                'action' => $approval->role_title . ' Review',
+                'description' => $approval->status === 'approved'
+                    ? 'Approved by ' . $approval->approver_name
+                    : ($approval->status === 'rejected'
+                        ? 'Rejected by ' . $approval->approver_name . ($approval->remarks ? '. Reason: ' . $approval->remarks : '')
+                        : 'Awaiting approval'),
+                'user' => $approval->approver_name ?? 'Pending',
+                'date' => $approval->approved_at,
+                'status' => $statusClass,
+                'icon' => $approval->status === 'approved' ? 'fa-check-circle' : ($approval->status === 'rejected' ? 'fa-times-circle' : 'fa-clock'),
+            ]);
+        }
+
+        // 4. Locked
+        if ($payroll && $payroll->status === 'locked') {
+            $timeline->push([
+                'action' => 'Payroll Locked',
+                'description' => 'Payroll confirmed and locked by Supervisor',
+                'user' => 'Payroll Supervisor',
+                'date' => $payroll->updated_at,
+                'status' => 'completed',
+                'icon' => 'fa-lock',
+            ]);
+        }
+
+        return view('resorts.payroll.run.activity-log', compact('page_title', 'payroll_id', 'payroll', 'timeline'));
     }
 
     public function getNotes($payroll_id)
@@ -3397,49 +3531,33 @@ class PayrollController extends Controller
 
         $row = 2;
         $total = 0;
+        $employeeCount = 0;
+        $commissionPerEmployee = ($currency === 'USD') ? 5.00 : 77.10; // $5 USD or MVR equivalent
 
         foreach ($employees as $index => $employee) {
             $emp = $employee->employee;
             $review = $payroll->reviews->where('employee_id', $emp->id)->first();
             if (!$review) continue;
 
+            // Try to find account matching currency, fallback to any available account
             $bankAccount = optional($emp->bankDetails)->firstWhere('currency', $currency);
+            if (!$bankAccount) {
+                $bankAccount = optional($emp->bankDetails)->first();
+            }
             $accountNumber = $bankAccount?->account_no ?? 'N/A';
 
             $amount = 0;
-
-            // dd($currency);
+            $netSalary = $review->net_salary ?? 0;
 
             if ($currency === 'USD') {
-                // Basic salary (only if in USD)
-                if ($emp->basic_salary_currency === 'USD') {
-                    $amount += $emp->basic_salary ?? 0;
-                }
-                // dd($amount);
-                // Allowances in USD
-                $amount += $review->allowances
-                    ->where('amount_unit', 'USD')
-                    ->sum('amount');
-
-                // OT and SC always in USD
-                $amount += $review->earnings_overtime ?? 0;
-                $amount += $review->service_charge ?? 0;
-
-                // Subtract total deductions (in USD)
-                $amount -= $review->total_deductions ?? 0;
-
-                $commission = 3.25; 
-
-                // dd($amount);
+                $amount = $netSalary;
             }
 
             if ($currency === 'MVR') {
-                // Only include MVR allowances
-                $amount += $review->allowances
-                    ->where('amount_unit', 'MVR')
-                    ->sum('amount');
-                    // dd($amount);
-                $commission = 50.00; 
+                // Convert net salary from USD to MVR
+                $settings = ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first();
+                $rate = $settings->DollertoMVR ?? 15.42;
+                $amount = round($netSalary * $rate, 2);
             }
 
             // Skip if amount is zero or less
@@ -3451,6 +3569,7 @@ class PayrollController extends Controller
             $sheet->setCellValue("D$row", $amount);
 
             $total += $amount;
+            $employeeCount++;
             $row++;
         }
 
@@ -3459,11 +3578,12 @@ class PayrollController extends Controller
         $sheet->setCellValue("D$row", $total);
         $row++;
 
-        $sheet->setCellValue("C$row", 'Commission');
-        $sheet->setCellValue("D$row", $commission);
+        $totalCommission = $commissionPerEmployee * $employeeCount;
+        $sheet->setCellValue("C$row", 'Commission (' . $currency . ' ' . number_format($commissionPerEmployee, 2) . ' x ' . $employeeCount . ')');
+        $sheet->setCellValue("D$row", $totalCommission);
         $row++;
 
-        $grandTotal = $total + $commission;
+        $grandTotal = $total + $totalCommission;
         $sheet->setCellValue("C$row", 'Grand Total');
         $sheet->setCellValue("D$row", $grandTotal);
 
