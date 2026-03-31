@@ -42,9 +42,11 @@
                             <div class="col">
                                 <div class="four-progressbar">
                                     @foreach(['basicSalary' => 'blue', 'serviceCharge' => 'skyblue', 'normalOT' => 'blue', 'holidayOT' => 'skyblue'] as $key => $color)
-                                        
-
-                                        <div class="progress-container {{ $color }}" data-progress="{{ $payrollData[$previousMonth][$key]['percentage'] }}">
+                                        @php
+                                            $labelNames = ['basicSalary' => 'Basic Salary', 'serviceCharge' => 'Service Charge', 'normalOT' => 'Normal OT', 'holidayOT' => 'Holiday OT'];
+                                            $amt = $payrollData[$previousMonth][$key]['amount'] ?? 0;
+                                        @endphp
+                                        <div class="progress-container {{ $color }}" data-progress="{{ $payrollData[$previousMonth][$key]['percentage'] }}" data-bs-toggle="tooltip" title="{{ $labelNames[$key] }}: {{ Common::GetResortCurrencySymbol() }}{{ number_format($amt, 2) }}">
                                             <svg class="progress-circle" viewBox="0 0 120 120">
                                                 <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                                 <circle class="progress" cx="60" cy="60" r="54"></circle>
@@ -120,7 +122,11 @@
                             <div class="col">
                                 <div class="four-progressbar">
                                     @foreach(['basicSalary' => 'blue', 'serviceCharge' => 'skyblue', 'normalOT' => 'blue', 'holidayOT' => 'skyblue'] as $key => $color)
-                                        <div class="progress-container {{ $color }}" data-progress="{{ $payrollData[$currentMonth][$key]['percentage'] }}">
+                                        @php
+                                            $labelNames = ['basicSalary' => 'Basic Salary', 'serviceCharge' => 'Service Charge', 'normalOT' => 'Normal OT', 'holidayOT' => 'Holiday OT'];
+                                            $amt = $payrollData[$currentMonth][$key]['amount'] ?? 0;
+                                        @endphp
+                                        <div class="progress-container {{ $color }}" data-progress="{{ $payrollData[$currentMonth][$key]['percentage'] }}" data-bs-toggle="tooltip" title="{{ $labelNames[$key] }}: {{ Common::GetResortCurrencySymbol() }}{{ number_format($amt, 2) }}">
                                             <svg class="progress-circle" viewBox="0 0 120 120">
                                                 <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                                 <circle class="progress" cx="60" cy="60" r="54"></circle>

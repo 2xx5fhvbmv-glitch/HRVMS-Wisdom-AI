@@ -200,17 +200,23 @@ class DashboardController extends Controller
         $month = $request->query('month', now()->month);
         $year = $request->query('year', now()->year);
         $payroll_id = 0;
-        // Calculate start_date (first day of the month) and end_date (last day of the month)
-        $start_date = \Carbon\Carbon::create($year, $month, 1)->startOfMonth()->format('Y-m-d');
-        $end_date = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->format('Y-m-d');
 
-        // dd($start_date,$end_date,$positions,$departments);
-        // Fetch payroll record for the given month and year
+        // Find payroll matching this month/year (by start_date or end_date)
+        // Prioritize locked payrolls
         $payroll = Payroll::where('resort_id', $resort_id)
-            ->whereMonth('start_date', $month)
-            ->whereYear('start_date', $year)
+            ->where(function($q) use ($month, $year) {
+                $q->where(function($q2) use ($month, $year) {
+                    $q2->whereMonth('end_date', $month)->whereYear('end_date', $year);
+                })->orWhere(function($q2) use ($month, $year) {
+                    $q2->whereMonth('start_date', $month)->whereYear('start_date', $year);
+                });
+            })
             ->with(['employees', 'timeAndAttendances', 'serviceCharges', 'deductions', 'reviews'])
+            ->orderByRaw("FIELD(status, 'locked', 'completed', 'approved', 'pending_approval', 'draft')")
             ->first();
+
+        $start_date = $payroll ? $payroll->start_date : \Carbon\Carbon::create($year, $month, 1)->format('Y-m-d');
+        $end_date = $payroll ? $payroll->end_date : \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->format('Y-m-d');
 
         // If no payroll found, return a view with an empty dataset
         if (!$payroll) {
@@ -362,8 +368,14 @@ class DashboardController extends Controller
             $result = DB::table('payroll as p')
                 ->join('payroll_reviews as pr', 'p.id', '=', 'pr.payroll_id')
                 ->where('p.resort_id', $resort_id)
-                ->whereYear('p.start_date', $m['year'])
-                ->whereMonth('p.start_date', $m['month'])
+                ->where('p.status', 'locked')
+                ->where(function($q) use ($m) {
+                    $q->where(function($q2) use ($m) {
+                        $q2->whereYear('p.start_date', $m['year'])->whereMonth('p.start_date', $m['month']);
+                    })->orWhere(function($q2) use ($m) {
+                        $q2->whereYear('p.end_date', $m['year'])->whereMonth('p.end_date', $m['month']);
+                    });
+                })
                 ->selectRaw("
                     SUM(pr.earned_salary) as total_basic_salary,
                     SUM(pr.service_charge) as service_charge,
@@ -501,16 +513,24 @@ class DashboardController extends Controller
         $otData = DB::table('payroll_time_and_attandance')
             ->join('payroll', 'payroll_time_and_attandance.payroll_id', '=', 'payroll.id')
             ->where('payroll.resort_id', $resort_id)
-            ->whereYear('payroll.start_date', $year) // filter by selected year
-            ->selectRaw("DATE_FORMAT(payroll.start_date, '%b %Y') as month, SUM(total_ot) as total_ot")
-            ->groupBy('month')
-            ->orderByRaw("STR_TO_DATE(month, '%b %Y')")
-            ->limit(12)
-            ->get();
+            ->where('payroll.status', 'locked')
+            ->whereYear('payroll.start_date', $year)
+            ->selectRaw("MONTH(payroll.start_date) as month_num, SUM(total_ot) as total_ot")
+            ->groupBy('month_num')
+            ->get()
+            ->keyBy('month_num');
+
+        // Build full 12-month data starting from 0
+        $labels = [];
+        $data = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $labels[] = \Carbon\Carbon::create($year, $m, 1)->format('M');
+            $data[] = isset($otData[$m]) ? round(floatval($otData[$m]->total_ot), 1) : 0;
+        }
 
         return response()->json([
-            'labels' => $otData->pluck('month'),
-            'data' => $otData->pluck('total_ot')
+            'labels' => $labels,
+            'data' => $data
         ]);
     }
 
