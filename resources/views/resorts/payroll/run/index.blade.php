@@ -494,41 +494,40 @@
                             </div>
 
                             <div class="d-flex gap-2 mb-3">
-                                <button type="button" class="btn btn-themeSkyblue btn-sm" id="downloadPayrollPDF">
-                                    <i class="fa-solid fa-file-pdf me-1"></i> Download PDF
-                                </button>
                                 <button type="button" class="btn btn-themeSkyblue btn-sm" id="downloadPayrollExcel">
                                     <i class="fa-solid fa-file-excel me-1"></i> Download Excel
                                 </button>
                             </div>
                             <hr class="hr-footer border-0">
 
-                            {{-- Supervisor: Send for Approval --}}
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="sendForApproval">
-                                <i class="fa-solid fa-paper-plane me-1"></i> Send Payroll for Approval
-                            </button>
-
-                            {{-- Approver: Approve/Reject --}}
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="approvePayroll">
-                                <i class="fa-solid fa-check me-1"></i> Approve
-                            </button>
-                            <button type="button" class="btn btn-danger btn-sm float-end mb-1 me-2 d-none" id="rejectPayroll">
-                                <i class="fa-solid fa-times me-1"></i> Reject
-                            </button>
-
-                            {{-- Supervisor: Confirm and Lock (only after all approvals) --}}
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end mb-1 me-2 d-none" id="showLockModal">
-                                <i class="fa-solid fa-lock me-1"></i> Confirm and Lock Payroll
-                            </button>
-                            <button type="submit" class="d-none" id="submit"></button>
-
-                            {{-- After locked --}}
-                            <div class="alert alert-success d-none text-center" id="payrollLockedMessage">
+                            {{-- After locked / Rejection message --}}
+                            <div class="alert alert-success d-none text-center mb-3" id="payrollLockedMessage">
                                 <i class="fa-solid fa-circle-check me-1"></i> This payroll has been approved and locked. Thank you.
                             </div>
 
-                            <button type="button" class="btn btn-themeGray btn-sm float-end mb-1 me-2" id="saveAsDraft">Save as Draft</button>
-                            <a href="#" class="btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <a href="#" class="btn btn-themeSkyblue btn-sm previous">Back</a>
+                                <button type="button" class="btn btn-themeGray btn-sm" id="saveAsDraft">Save as Draft</button>
+
+                                {{-- Supervisor: Send for Approval --}}
+                                <button type="button" class="btn btn-themeBlue btn-sm d-none" id="sendForApproval">
+                                    <i class="fa-solid fa-paper-plane me-1"></i> Send Payroll for Approval
+                                </button>
+
+                                {{-- Approver: Approve/Reject --}}
+                                <button type="button" class="btn btn-themeBlue btn-sm d-none" id="approvePayroll">
+                                    <i class="fa-solid fa-check me-1"></i> Approve
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm d-none" id="rejectPayroll">
+                                    <i class="fa-solid fa-times me-1"></i> Reject
+                                </button>
+
+                                {{-- Supervisor: Confirm and Lock (only after all approvals) --}}
+                                <button type="button" class="btn btn-themeBlue btn-sm d-none" id="showLockModal">
+                                    <i class="fa-solid fa-lock me-1"></i> Confirm and Lock Payroll
+                                </button>
+                                <button type="submit" class="d-none" id="submit"></button>
+                            </div>
                         </fieldset>
                     </form>
                 </div>
@@ -920,6 +919,7 @@
                 } else if (savedStep === 7) {
                     // Load confirmation summary
                     calculatePayrollSummary(currency, 1);
+                    loadApprovalStatus();
                 }
             }, 500);
         }
@@ -1561,6 +1561,10 @@
                     complete: function () {
                         $currentFieldset.css({ 'visibility': 'hidden', 'position': 'absolute' });
                         $nextFieldset.css({ 'visibility': 'visible', 'opacity': 1, 'position': 'relative' });
+                        // Load approval status when arriving at step 7
+                        if (nextStep === 7) {
+                            loadApprovalStatus();
+                        }
                     }
                 });
             }
@@ -1654,25 +1658,43 @@
 
             // Distribute service charge to eligible employees only
             var distributedTotal = 0;
+            var distributedTotalUSD = 0;
+            var eligibleRows = [];
             $("#table-serviceCharge tbody tr").each(function () {
                 var $row = $(this);
                 var employeeId = $row.find("td:eq(0)").text().trim();
 
                 if (useAllEmployees || eligibleEmployees.includes(employeeId)) {
                     var workdays = parseFloat($row.find(".workdays").text()) || 0;
-                    var employeeShare = (serviceCharge / totalWorkdays) * workdays;
-                    var employeeShareUSD = (serviceChargeUSD / totalWorkdays) * workdays;
-                    $row.find(".service-charge").text(`${currencySymbol}${fmtNum(employeeShare)}`);
+                    var employeeShare = Math.floor(((serviceCharge / totalWorkdays) * workdays) * 100) / 100;
+                    var employeeShareUSD = Math.floor(((serviceChargeUSD / totalWorkdays) * workdays) * 100) / 100;
                     distributedTotal += employeeShare;
+                    distributedTotalUSD += employeeShareUSD;
 
-                    distributedServiceCharge.push({
-                        id: employeeId,
-                        service_charge_days: workdays,
-                        amount: employeeShareUSD.toFixed(2) // Store in USD for backend
-                    });
+                    eligibleRows.push({ $row: $row, employeeId: employeeId, workdays: workdays, share: employeeShare, shareUSD: employeeShareUSD });
                 } else {
                     $row.find(".service-charge").text(`${currencySymbol}0.00`);
                 }
+            });
+
+            // Adjust last eligible employee to absorb rounding difference
+            if (eligibleRows.length > 0) {
+                var lastRow = eligibleRows[eligibleRows.length - 1];
+                var roundingDiff = Math.round((serviceCharge - distributedTotal) * 100) / 100;
+                var roundingDiffUSD = Math.round((serviceChargeUSD - distributedTotalUSD) * 100) / 100;
+                lastRow.share += roundingDiff;
+                lastRow.shareUSD += roundingDiffUSD;
+                distributedTotal += roundingDiff;
+            }
+
+            // Apply values to rows
+            eligibleRows.forEach(function(item) {
+                item.$row.find(".service-charge").text(`${currencySymbol}${fmtNum(item.share)}`);
+                distributedServiceCharge.push({
+                    id: item.employeeId,
+                    service_charge_days: item.workdays,
+                    amount: item.shareUSD.toFixed(2)
+                });
             });
 
             $("#total-service-charge").text(`${currencySymbol}${fmtNum(distributedTotal)}`);
@@ -2192,25 +2214,20 @@
                 $('.previous').show(); // Default: show back button
 
                 if (status === 'draft') {
-                    // Check if there was a rejection (payroll sent back to draft)
                     if (hasRejection) {
-                        // Supervisor can re-send after fixing issues
+                        // Rejected: supervisor can edit and re-send
                         if (res.is_supervisor) {
                             $('#sendForApproval').removeClass('d-none');
                             $('#saveAsDraft').removeClass('d-none');
+                            // Show rejection alert with edit guidance
+                            $('#payrollLockedMessage').removeClass('d-none')
+                                .removeClass('alert-success alert-info').addClass('alert-danger')
+                                .html('<i class="fa-solid fa-triangle-exclamation me-1"></i> This payroll was rejected. You can go back to edit the payroll and resubmit for approval.');
                         }
-                    } else if (approvals.length === 0) {
-                        // Never sent for approval yet — supervisor can send
-                        if (res.is_supervisor) {
-                            $('#sendForApproval').removeClass('d-none');
-                            $('#saveAsDraft').removeClass('d-none');
-                        }
-                    } else {
-                        // Draft with existing approvals but not rejected — supervisor can send
-                        if (res.is_supervisor) {
-                            $('#sendForApproval').removeClass('d-none');
-                            $('#saveAsDraft').removeClass('d-none');
-                        }
+                    } else if (res.is_supervisor) {
+                        // Draft (no rejection) — supervisor can send
+                        $('#sendForApproval').removeClass('d-none');
+                        $('#saveAsDraft').removeClass('d-none');
                     }
                 } else if (status === 'pending_approval') {
                     // Approver: show approve/reject if it's their turn
@@ -2354,16 +2371,6 @@
         else if (tab === 'deductions') $table.addClass('show-deductions');
         else if (tab === 'summary') $table.addClass('show-summary');
         // 'attendance' is default — no class needed
-    });
-
-    // Download PDF
-    $('#downloadPayrollPDF').on('click', function() {
-        var payrollId = localStorage.getItem("payroll_id");
-        if (!payrollId) {
-            toastr.error("No payroll found.", 'Error', { positionClass: 'toast-bottom-right' });
-            return;
-        }
-        window.open("{{ url('resort/payroll/export-review') }}/" + payrollId + "/pdf", '_blank');
     });
 
     // Download Excel

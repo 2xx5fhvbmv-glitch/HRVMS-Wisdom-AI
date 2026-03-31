@@ -2944,11 +2944,68 @@ class PayrollController extends Controller
 
                 return optional($payroll->timeAndAttendances->where('employee_id', $emp_detail->id)->first())->present_days ?? 0;
             })
+            ->addColumn('absent_days', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return optional($payroll->timeAndAttendances->where('employee_id', $emp_detail->id)->first())->absent_days ?? 0;
+            })
+            ->addColumn('day_off', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                $ta = $payroll->timeAndAttendances->where('employee_id', $emp_detail->id)->first();
+                $present = optional($ta)->present_days ?? 0;
+                $absent = optional($ta)->absent_days ?? 0;
+                $periodStart = \Carbon\Carbon::parse($payroll->start_date);
+                $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
+                $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+                return max(0, $totalDays - $present - $absent);
+            })
+            ->addColumn('leave_types', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return optional($payroll->timeAndAttendances->where('employee_id', $emp_detail->id)->first())->leave_types ?? '-';
+            })
+            ->addColumn('regular_ot_pay', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->reviews->where('employee_id', $emp_detail->id)->first())->regularOTPay ?? 0, 2);
+            })
+            ->addColumn('friday_ot_pay', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                $review = $payroll->reviews->where('employee_id', $emp_detail->id)->first();
+                $totalOT = optional($review)->earnings_overtime ?? 0;
+                $regOT = optional($review)->regularOTPay ?? 0;
+                $holOT = optional($review)->holidayOTPay ?? 0;
+                return number_format($totalOT - $regOT - $holOT, 2);
+            })
+            ->addColumn('holiday_ot_pay', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->reviews->where('employee_id', $emp_detail->id)->first())->holidayOTPay ?? 0, 2);
+            })
             ->addColumn('total_OTPay', function ($employee) use ($payroll) {
                 $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
-
                 $earnings_overtime = ($payroll->reviews->where('employee_id', $emp_detail->id)->first())->earnings_overtime ?? 0;
-               return number_format($earnings_overtime , 2);            
+               return number_format($earnings_overtime , 2);
+            })
+            ->addColumn('attendance_deduction', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->deductions->where('employee_id', $emp_detail->id)->first())->attendance_deduction ?? 0, 2);
+            })
+            ->addColumn('city_ledger', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->deductions->where('employee_id', $emp_detail->id)->first())->city_ledger ?? 0, 2);
+            })
+            ->addColumn('staff_shop', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->deductions->where('employee_id', $emp_detail->id)->first())->staff_shop ?? 0, 2);
+            })
+            ->addColumn('pension', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->deductions->where('employee_id', $emp_detail->id)->first())->pension ?? 0, 2);
+            })
+            ->addColumn('ewt', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->deductions->where('employee_id', $emp_detail->id)->first())->ewt ?? 0, 2);
+            })
+            ->addColumn('other_deduction', function ($employee) use ($payroll) {
+                $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
+                return number_format(optional($payroll->deductions->where('employee_id', $emp_detail->id)->first())->other ?? 0, 2);
             })
             ->addColumn('service_charge', function ($employee) use ($payroll) {
                 $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
@@ -2999,11 +3056,51 @@ class PayrollController extends Controller
                     $allowanceAmount = 0;
                     if ($review && $review->allowances) {
                         $allowanceAmount = optional($review->allowances->firstWhere('allowance_type', $allowance))->amount ?? 0;
-                    }                   
+                    }
                     return number_format($allowanceAmount, 2);
-                });        
-            }   
-            return $query->make(true);
+                });
+            }
+
+            // Pre-compute grand totals across ALL employees for footer
+            $allEmployeeIds = $payroll->employees->pluck('employee_id');
+            $periodStart = \Carbon\Carbon::parse($payroll->start_date);
+            $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
+            $totalDaysInPeriod = $periodStart->diffInDays($periodEnd) + 1;
+
+            $totals = [
+                'present_days' => $payroll->timeAndAttendances->whereIn('employee_id', $allEmployeeIds)->sum('present_days'),
+                'absent_days' => $payroll->timeAndAttendances->whereIn('employee_id', $allEmployeeIds)->sum('absent_days'),
+                'regular_ot_pay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('regularOTPay'),
+                'holiday_ot_pay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('holidayOTPay'),
+                'total_OTPay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('earnings_overtime'),
+                'service_charge' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('service_charge'),
+                'earned_salary' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('earned_salary'),
+                'total_allowance' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('earnings_allowance'),
+                'total_pay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('total_earnings'),
+                'deductions' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('total_deductions'),
+                'net_pay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('net_salary'),
+                'attendance_deduction' => $payroll->deductions->whereIn('employee_id', $allEmployeeIds)->sum('attendance_deduction'),
+                'city_ledger' => $payroll->deductions->whereIn('employee_id', $allEmployeeIds)->sum('city_ledger'),
+                'staff_shop' => $payroll->deductions->whereIn('employee_id', $allEmployeeIds)->sum('staff_shop'),
+                'pension' => $payroll->deductions->whereIn('employee_id', $allEmployeeIds)->sum('pension'),
+                'ewt' => $payroll->deductions->whereIn('employee_id', $allEmployeeIds)->sum('ewt'),
+                'other_deduction' => $payroll->deductions->whereIn('employee_id', $allEmployeeIds)->sum('other'),
+            ];
+
+            // Friday OT = total OT - regular - holiday
+            $totals['friday_ot_pay'] = $totals['total_OTPay'] - $totals['regular_ot_pay'] - $totals['holiday_ot_pay'];
+
+            // Day off
+            $totals['day_off'] = ($totalDaysInPeriod * $allEmployeeIds->count()) - $totals['present_days'] - $totals['absent_days'];
+
+            // Allowance totals
+            foreach ($allowanceColumns as $allowance) {
+                $totals[$allowance] = $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum(function ($review) use ($allowance) {
+                    return optional($review->allowances->firstWhere('allowance_type', $allowance))->amount ?? 0;
+                });
+            }
+
+            return $query->with('totals', $totals)->make(true);
     }
 
     // public function getPayrollColumns($payroll_id)
@@ -3601,113 +3698,166 @@ class PayrollController extends Controller
     {
         $resortId = $this->resort->resort_id;
         $payroll = Payroll::where('id', $payrollId)->where('resort_id', $resortId)->firstOrFail();
-        $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
-        $currency = Common::getDisplayCurrency();
         $symbol = Common::GetResortCurrencySymbol();
 
-        $reviews = PayrollReview::where('payroll_id', $payrollId)
-            ->get();
-
-        $deductions = PayrollDeduction::where('payroll_id', $payrollId)
-            ->get()
-            ->keyBy('Emp_id');
-
-        $timeAttendance = PayrollTimeAndAttendance::where('payroll_id', $payrollId)
-            ->get()
-            ->keyBy('Emp_id');
-
+        $reviews = PayrollReview::where('payroll_id', $payrollId)->with('allowances')->get();
+        $deductions = \App\Models\PayrollDeduction::where('payroll_id', $payrollId)->get()->keyBy('Emp_id');
+        $timeAttendance = PayrollTimeAndAttendance::where('payroll_id', $payrollId)->get()->keyBy('Emp_id');
         $employees = Employee::whereIn('Emp_id', $reviews->pluck('Emp_id'))
             ->where('resort_id', $resortId)
             ->with(['resortAdmin', 'department', 'position'])
-            ->get()
-            ->keyBy('Emp_id');
+            ->get()->keyBy('Emp_id');
 
-        // Build data rows
+        // Get unique allowance types
+        $allowanceTypes = $reviews->flatMap(function ($r) {
+            return $r->allowances->pluck('allowance_type');
+        })->unique()->values()->toArray();
+
+        $periodStart = \Carbon\Carbon::parse($payroll->start_date);
+        $periodEnd = \Carbon\Carbon::parse($payroll->end_date);
+        $totalDays = $periodStart->diffInDays($periodEnd) + 1;
+
+        // Build complete data rows
         $rows = [];
         foreach ($reviews as $review) {
             $emp = $employees[$review->Emp_id] ?? null;
             $ded = $deductions[$review->Emp_id] ?? null;
             $ta = $timeAttendance[$review->Emp_id] ?? null;
 
-            $rows[] = [
+            $present = $ta->present_days ?? 0;
+            $absent = $ta->absent_days ?? 0;
+            $dayOff = max(0, $totalDays - $present - $absent);
+            $regOT = round($review->regularOTPay ?? 0, 2);
+            $holOT = round($review->holidayOTPay ?? 0, 2);
+            $totalOT = round($review->earnings_overtime ?? 0, 2);
+            $fridayOT = round($totalOT - $regOT - $holOT, 2);
+
+            $row = [
                 'emp_id' => $review->Emp_id,
                 'name' => $emp ? ($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name) : '',
-                'department' => $emp ? ($emp->department->name ?? '') : '',
                 'position' => $emp ? ($emp->position->position_title ?? '') : '',
-                'present' => $ta->present_days ?? 0,
-                'absent' => $ta->absent_days ?? 0,
-                'regular_ot' => $ta->regular_ot_hours ?? 0,
-                'friday_ot' => $ta->friday_ot_hours ?? 0,
-                'holiday_ot' => $ta->holiday_ot_hours ?? 0,
+                'present' => $present,
+                'absent' => $absent,
+                'day_off' => $dayOff,
+                'leave_types' => $ta->leave_types ?? '-',
+                'regular_ot' => $regOT,
+                'friday_ot' => $fridayOT,
+                'holiday_ot' => $holOT,
+                'total_ot_pay' => $totalOT,
                 'service_charge' => round($review->service_charge ?? 0, 2),
-                'earned_salary' => round($review->earned_salary ?? 0, 2),
-                'overtime_pay' => round($review->earnings_overtime ?? 0, 2),
-                'total_earnings' => round($review->total_earnings ?? 0, 2),
-                'attendance_ded' => round($ded->attendance_deduction ?? 0, 2),
-                'city_ledger' => round($ded->city_ledger ?? 0, 2),
-                'staff_shop' => round($ded->staff_shop ?? 0, 2),
-                'pension' => round($ded->pension ?? 0, 2),
-                'ewt' => round($ded->ewt ?? 0, 2),
-                'other_ded' => round($ded->other ?? 0, 2),
-                'total_deductions' => round($review->total_deductions ?? 0, 2),
-                'net_salary' => round($review->net_salary ?? 0, 2),
+                'basic_earned' => round($review->earned_salary ?? 0, 2),
             ];
+
+            // Add dynamic allowances
+            foreach ($allowanceTypes as $aType) {
+                $row['allowance_' . $aType] = round(optional($review->allowances->firstWhere('allowance_type', $aType))->amount ?? 0, 2);
+            }
+
+            $row['total_earnings'] = round($review->total_earnings ?? 0, 2);
+            $row['attendance_ded'] = round($ded->attendance_deduction ?? 0, 2);
+            $row['city_ledger'] = round($ded->city_ledger ?? 0, 2);
+            $row['staff_shop'] = round($ded->staff_shop ?? 0, 2);
+            $row['pension'] = round($ded->pension ?? 0, 2);
+            $row['ewt'] = round($ded->ewt ?? 0, 2);
+            $row['other_ded'] = round($ded->other ?? 0, 2);
+            $row['total_deductions'] = round($review->total_deductions ?? 0, 2);
+            $row['net_salary'] = round($review->net_salary ?? 0, 2);
+
+            $rows[] = $row;
         }
 
-        if ($type === 'excel') {
-            return $this->exportReviewExcel($rows, $payroll, $symbol);
-        } else {
-            return $this->exportReviewPDF($rows, $payroll, $symbol, $resortId);
-        }
+        $filename = 'Payroll_Review_' . $payroll->start_date . '_to_' . $payroll->end_date . '.xlsx';
+        return $this->exportReviewExcel($rows, $payroll, $symbol, $allowanceTypes, $filename);
     }
 
-    private function exportReviewExcel($rows, $payroll, $symbol)
+    private function exportReviewExcel($rows, $payroll, $symbol, $allowanceTypes, $filename)
     {
-        $filename = 'Payroll_Review_' . $payroll->start_date . '_to_' . $payroll->end_date . '.xlsx';
-
-        return Excel::download(new class($rows, $symbol) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+        return Excel::download(new class($rows, $symbol, $allowanceTypes, $payroll) implements \Maatwebsite\Excel\Concerns\WithMultipleSheets {
             private $rows;
             private $symbol;
+            private $allowanceTypes;
+            private $payroll;
 
-            public function __construct($rows, $symbol) {
+            public function __construct($rows, $symbol, $allowanceTypes, $payroll) {
                 $this->rows = $rows;
                 $this->symbol = $symbol;
+                $this->allowanceTypes = $allowanceTypes;
+                $this->payroll = $payroll;
             }
 
-            public function headings(): array {
-                return ['ID', 'Name', 'Department', 'Position', 'Present', 'Absent', 'Regular OT', 'Friday OT', 'Holiday OT', 'Service Charge', 'Earned Salary', 'OT Pay', 'Total Earnings', 'Att. Deduction', 'City Ledger', 'Staff Shop', 'Pension', 'EWT', 'Other', 'Total Deductions', 'Net Salary'];
-            }
+            public function sheets(): array
+            {
+                $rows = $this->rows;
+                $s = $this->symbol;
+                $aTypes = $this->allowanceTypes;
 
-            public function array(): array {
-                return array_map(function($r) {
-                    return [
-                        $r['emp_id'], $r['name'], $r['department'], $r['position'],
-                        $r['present'], $r['absent'], $r['regular_ot'], $r['friday_ot'], $r['holiday_ot'],
-                        $r['service_charge'], $r['earned_salary'], $r['overtime_pay'], $r['total_earnings'],
-                        $r['attendance_ded'], $r['city_ledger'], $r['staff_shop'], $r['pension'], $r['ewt'], $r['other_ded'],
-                        $r['total_deductions'], $r['net_salary']
-                    ];
-                }, $this->rows);
-            }
+                return [
+                    'Time & Attendance' => new class($rows) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+                        private $rows;
+                        public function __construct($rows) { $this->rows = $rows; }
+                        public function title(): string { return 'Time & Attendance'; }
+                        public function headings(): array { return ['ID', 'Employee Name', 'Position', 'Present', 'Absent', 'Day Off', 'Other Leaves']; }
+                        public function array(): array {
+                            return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['present'], $r['absent'], $r['day_off'], $r['leave_types']], $this->rows);
+                        }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                    },
 
-            public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) {
-                return [1 => ['font' => ['bold' => true]]];
+                    'Overtime' => new class($rows, $s) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+                        private $rows; private $s;
+                        public function __construct($rows, $s) { $this->rows = $rows; $this->s = $s; }
+                        public function title(): string { return 'Overtime'; }
+                        public function headings(): array { return ['ID', 'Employee Name', 'Position', 'Regular OT', 'Friday OT', 'Holiday OT', 'Total OT Pay']; }
+                        public function array(): array {
+                            return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['regular_ot'], $r['friday_ot'], $r['holiday_ot'], $r['total_ot_pay']], $this->rows);
+                        }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                    },
+
+                    'Earnings' => new class($rows, $s, $aTypes) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+                        private $rows; private $s; private $aTypes;
+                        public function __construct($rows, $s, $aTypes) { $this->rows = $rows; $this->s = $s; $this->aTypes = $aTypes; }
+                        public function title(): string { return 'Earnings'; }
+                        public function headings(): array {
+                            $h = ['ID', 'Employee Name', 'Position', 'Service Charge', 'Basic Earned'];
+                            foreach ($this->aTypes as $a) { $h[] = $a; }
+                            $h[] = 'Total Earnings';
+                            return $h;
+                        }
+                        public function array(): array {
+                            return array_map(function($r) {
+                                $row = [$r['emp_id'], $r['name'], $r['position'], $r['service_charge'], $r['basic_earned']];
+                                foreach ($this->aTypes as $a) { $row[] = $r['allowance_' . $a] ?? 0; }
+                                $row[] = $r['total_earnings'];
+                                return $row;
+                            }, $this->rows);
+                        }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                    },
+
+                    'Deductions' => new class($rows, $s) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+                        private $rows; private $s;
+                        public function __construct($rows, $s) { $this->rows = $rows; $this->s = $s; }
+                        public function title(): string { return 'Deductions'; }
+                        public function headings(): array { return ['ID', 'Employee Name', 'Position', 'Attendance', 'City Ledger', 'Staff Shop', 'Pension', 'EWT', 'Other', 'Total Deductions']; }
+                        public function array(): array {
+                            return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['attendance_ded'], $r['city_ledger'], $r['staff_shop'], $r['pension'], $r['ewt'], $r['other_ded'], $r['total_deductions']], $this->rows);
+                        }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                    },
+
+                    'Summary' => new class($rows, $s) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\WithTitle, \Maatwebsite\Excel\Concerns\WithStyles, \Maatwebsite\Excel\Concerns\ShouldAutoSize {
+                        private $rows; private $s;
+                        public function __construct($rows, $s) { $this->rows = $rows; $this->s = $s; }
+                        public function title(): string { return 'Summary'; }
+                        public function headings(): array { return ['ID', 'Employee Name', 'Position', 'Total Earnings', 'Total Deductions', 'Net Salary']; }
+                        public function array(): array {
+                            return array_map(fn($r) => [$r['emp_id'], $r['name'], $r['position'], $r['total_earnings'], $r['total_deductions'], $r['net_salary']], $this->rows);
+                        }
+                        public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet) { return [1 => ['font' => ['bold' => true]]]; }
+                    },
+                ];
             }
         }, $filename);
-    }
-
-    private function exportReviewPDF($rows, $payroll, $symbol, $resortId)
-    {
-        $data = [
-            'rows' => $rows,
-            'payroll' => $payroll,
-            'symbol' => $symbol,
-            'resortId' => $resortId,
-        ];
-
-        $pdf = \PDF::loadView('resorts.payroll.run.review_pdf', $data)
-            ->setPaper('a3', 'landscape');
-
-        return $pdf->download('Payroll_Review_' . $payroll->start_date . '_to_' . $payroll->end_date . '.pdf');
     }
 }
