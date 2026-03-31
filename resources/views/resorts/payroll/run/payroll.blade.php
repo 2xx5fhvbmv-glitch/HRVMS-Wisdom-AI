@@ -83,7 +83,7 @@
                                 <h6>{{ \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($payroll->end_date)->format('d M Y') }}</h6>
                             @endif
                         </div>
-                        <div class="col-auto ms-auto"><a href="#" class="a-link" id="notesBtn">Notes</a></div>
+                        {{-- <div class="col-auto ms-auto"><a href="#" class="a-link" id="notesBtn">Notes</a></div> --}}
                         <div class="col-auto">
                             <a href="{{ route('payroll.bankcashsheet.download', ['id' => $payroll_id]) }}" class="a-link">Cash And Bank Sheets</a>
                         </div>
@@ -92,13 +92,33 @@
                                 <a href="{{ route('payroll.activity-log', ['payroll_id' => base64_encode($payroll_id)]) }}" class="btn btn-themeSkyblue">Activity Log</a>
                             </div>
                         @endif
-                        <div class="col-auto"> <button id="btn-download" class="btn btn-themeBlue">Download</button> </div>
+                        <div class="col-auto">
+                            <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'pdf']) }}" class="btn btn-themeSkyblue btn-sm">
+                                <i class="fa-solid fa-file-pdf me-1"></i> Download PDF
+                            </a>
+                        </div>
+                        <div class="col-auto">
+                            <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'excel']) }}" class="btn btn-themeSkyblue btn-sm">
+                                <i class="fa-solid fa-file-excel me-1"></i> Download Excel
+                            </a>
+                        </div>
+                        {{-- <div class="col-auto"> <button id="btn-download" class="btn btn-themeBlue">Download</button> </div> --}}
                     </div>
                 </div>
 
                 <!-- data-Table  -->
                 <table id="table-payroll" class="table table-payroll w-100">
                     <thead>
+                        <tr id="table-payroll-section-header">
+                            <th colspan="5" class="text-center">Employee Info</th>
+                            <th class="text-center">Time & Attendance</th>
+                            <th class="text-center">Overtime</th>
+                            <th colspan="3" class="text-center">Earnings</th>
+                            <th id="allowance-section-header" class="text-center">Allowances</th>
+                            <th class="text-center">Earnings</th>
+                            <th class="text-center">Deductions</th>
+                            <th class="text-center">Summary</th>
+                        </tr>
                         <tr id="table-payroll-header">
                             <th class="text-nowrap">ID</th>
                             <th class="text-nowrap">Name</th>
@@ -113,11 +133,14 @@
                             <!-- Dynamic Columns Will be Inserted Here -->
                             <th class="text-nowrap">Total Allowances</th>
                             <th class="text-nowrap">Total Earnings</th>
-                            <th class="text-nowrap">Deduction</th>
+                            <th class="text-nowrap">Total Deductions</th>
                             <th class="text-nowrap">Net Pay</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
+                    <tfoot>
+                        <tr id="table-payroll-footer" style="font-weight:bold;"></tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
@@ -225,6 +248,12 @@
             success: function (response) {
                 if (response.success) {
                     let dynamicColumns = response.columns.map(col => ({ data: col, name: col }));
+                    var cs = currencySymbol;
+                    function fmtCol(data) {
+                        if (data === null || data === undefined || data === '') return cs + '0.00';
+                        var num = parseFloat(String(data).replace(/,/g, '')) || 0;
+                        return cs + num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    }
                     let tableColumns = [
                         { data: 'Emp_id', name: 'Emp_id' },
                         { data: 'employee_name', name: 'employee_name' },
@@ -232,15 +261,19 @@
                         { data: 'position', name: 'position' },
                         { data: 'hire_date', name: 'hire_date' },
                         { data: 'present_days', name: 'present_days' },
-                        { data: 'total_OTPay', name: 'total_OTPay' },
-                        { data: 'service_charge', name: 'service_charge' },
-                        { data: 'basic_pay', name: 'basic_pay' },
-                        { data: 'earned_salary', name: 'earned_salary' },
-                        ...dynamicColumns,
-                        { data: 'total_allowance', name: 'total_allowance' },
-                        { data: 'total_pay', name: 'total_pay' },
-                        { data: 'deductions', name: 'deductions' },
-                        { data: 'net_pay', name: 'net_pay' },
+                        { data: 'total_OTPay', name: 'total_OTPay', render: fmtCol },
+                        { data: 'service_charge', name: 'service_charge', render: fmtCol },
+                        { data: 'basic_pay', name: 'basic_pay', render: fmtCol },
+                        { data: 'earned_salary', name: 'earned_salary', render: fmtCol },
+                        ...dynamicColumns.map(function(col) {
+                            return { data: col.data, name: col.name, render: fmtCol };
+                        }),
+                        { data: 'total_allowance', name: 'total_allowance', render: fmtCol },
+                        { data: 'total_pay', name: 'total_pay', render: fmtCol },
+                        { data: 'deductions', name: 'deductions', render: fmtCol },
+                        { data: 'net_pay', name: 'net_pay', render: function(data) {
+                            return '<strong>' + fmtCol(data) + '</strong>';
+                        }},
                     ];
 
                     updateTableHeader(response.columns);
@@ -259,8 +292,12 @@
 
         let insertAfterIndex = 9; // 0-based index, 9th column = Earned Salary
         dynamicColumnNames.forEach(col => {
-            $('<th class="dynamic-column">' + col + '</th>').insertAfter(headerRow.children().eq(insertAfterIndex++));
+            $('<th class="dynamic-column text-nowrap">' + col + '</th>').insertAfter(headerRow.children().eq(insertAfterIndex++));
         });
+
+        // Update section header colspan for allowances
+        var allowanceCount = dynamicColumnNames.length || 1;
+        $('#allowance-section-header').attr('colspan', allowanceCount);
     }
 
     let payrollURL = "{{ $payroll_id ? route('payroll.getData', ['payroll_id' => $payroll_id]) : '' }}";
@@ -285,6 +322,27 @@
             iDisplayLength: 10,
             processing: true,
             serverSide: true,
+            footerCallback: function(row, data, start, end, display) {
+                var api = this.api();
+                var cs = currencySymbol;
+                var $footer = $('#table-payroll-footer');
+                $footer.empty();
+                var colCount = api.columns().count();
+
+                for (var i = 0; i < colCount; i++) {
+                    if (i < 5) {
+                        // Non-numeric columns (ID, Name, Dept, Position, Hire Date)
+                        $footer.append('<th>' + (i === 0 ? 'Total' : '') + '</th>');
+                    } else {
+                        // Sum numeric columns
+                        var total = api.column(i).data().reduce(function(a, b) {
+                            var val = parseFloat(String(b).replace(/[^0-9.\-]/g, '')) || 0;
+                            return a + val;
+                        }, 0);
+                        $footer.append('<th>' + cs + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</th>');
+                    }
+                }
+            },
             ajax: {
                 url: payrollURL,
                 data: function (d) {

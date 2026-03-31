@@ -66,6 +66,11 @@ class Payroll extends Model
         return $this->hasMany(PayrollReview::class);
     }
 
+    public function approvals()
+    {
+        return $this->hasMany(PayrollApproval::class);
+    }
+
     public function payrollSummary()
     {
         return $this->hasOne(PayrollSummary::class);

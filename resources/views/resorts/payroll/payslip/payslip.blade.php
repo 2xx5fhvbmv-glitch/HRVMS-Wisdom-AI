@@ -173,37 +173,37 @@
                                 <tbody>
                                     <tr>
                                         <td>Monthly Tax Deduction</td>
-                                        <td>{{$deductions->ewt}}</td>
+                                        <td>{{ $deductions->ewt ?? '0.00' }}</td>
                                     </tr>
                                     <tr>
                                         <td>Staff Shop</td>
-                                        <td>{{$deductions->staff_shop}}</td>
+                                        <td>{{ $deductions->staff_shop ?? '0.00' }}</td>
                                     </tr>
                                     <tr>
                                         <td>MRPS Employee Mandatory Contribution</td>
-                                        <td>{{$deductions->pension}}</td>
+                                        <td>{{ $deductions->pension ?? '0.00' }}</td>
                                     </tr>
                                     <tr>
                                         <td>Attendance Deduction</td>
-                                        <td>{{$deductions->attendance_deduction}}</td>
+                                        <td>{{ $deductions->attendance_deduction ?? '0.00' }}</td>
                                     </tr>
                                     <tr>
-                                        <td>City Ladger</td>
-                                        <td>{{$deductions->city_ledger}}</td>
+                                        <td>City Ledger</td>
+                                        <td>{{ $deductions->city_ledger ?? '0.00' }}</td>
                                     </tr>
                                     <tr>
-                                        <td>Advance Loan / Salary Reapayment</td>
-                                        <td>{{$deductions->city_ledger}}</td>
+                                        <td>Advance Loan / Salary Repayment</td>
+                                        <td>{{ $deductions->advance_loan ?? '0.00' }}</td>
                                     </tr>
                                     <tr>
                                         <td>Other</td>
-                                        <td>{{$deductions->other}}</td>
+                                        <td>{{ $deductions->other ?? '0.00' }}</td>
                                     </tr>
                                 </tbody>
                                 <tfoot>
                                     <tr>
                                         <td>Total Deductions</td>
-                                        <td>{{$deductions->total_deductions}}</td>
+                                        <td>{{ $deductions->total_deductions ?? '0.00' }}</td>
                                     </tr>
                                 </tfoot>
                             </table>
