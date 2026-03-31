@@ -50,7 +50,7 @@ use Carbon\Carbon;
 use Auth;
 use Config;
 use DB;
-use Common;
+use App\Helpers\Common;
 
 class PayrollController extends Controller
 {
