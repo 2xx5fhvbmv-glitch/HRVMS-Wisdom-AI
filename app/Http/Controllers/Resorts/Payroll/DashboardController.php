@@ -86,25 +86,44 @@ class DashboardController extends Controller
             $upcomingCutoffDate = $nextEnd;
         }
 
-        // Estimate upcoming payroll from total monthly salaries + allowances of active employees
+        // Estimate upcoming payroll only from employees who have attendance in the current cutoff period
         $upcomingEstimated = 0;
+        $isEstimated = false;
         if (!$upcomingPayroll || $upcomingPayroll->total_payroll <= 0) {
-            $activeEmployees = Employee::where('resort_id', $resort_id)
+            $isEstimated = true;
+            $activeEmployeeIds = Employee::where('resort_id', $resort_id)
                 ->whereIn('status', ['Active', 'Probationary'])
-                ->get();
+                ->pluck('id');
 
-            $totalMonthlySalary = $activeEmployees->sum('basic_salary');
-            $totalMonthlyAllowances = DB::table('employees_allowance')
-                ->whereIn('employee_id', $activeEmployees->pluck('id'))
-                ->sum('amount');
+            // Only include employees who have attendance records in the current cutoff period
+            $employeesWithAttendance = DB::table('parent_attendaces')
+                ->whereIn('Emp_id', $activeEmployeeIds)
+                ->whereBetween('date', [$cutoffPeriod['start']->format('Y-m-d'), $cutoffPeriod['end']->format('Y-m-d')])
+                ->distinct('Emp_id')
+                ->pluck('Emp_id');
 
-            $upcomingEstimated = round($totalMonthlySalary + $totalMonthlyAllowances, 2);
+            if ($employeesWithAttendance->isNotEmpty()) {
+                $totalMonthlySalary = Employee::whereIn('id', $employeesWithAttendance)->sum('basic_salary');
+                $totalMonthlyAllowances = DB::table('employees_allowance')
+                    ->whereIn('employee_id', $employeesWithAttendance)
+                    ->sum('amount');
+
+                $upcomingEstimated = round($totalMonthlySalary + $totalMonthlyAllowances, 2);
+            }
         }
 
-        // Only show drafts that have review data (saved from step 7)
+        // Only show drafts that have review data and no overlapping locked/completed payroll
         $draftPayrolls = Payroll::where('resort_id', $resort_id)
             ->where('status', 'draft')
             ->whereHas('reviews')
+            ->whereNotExists(function ($query) use ($resort_id) {
+                $query->select(DB::raw(1))
+                    ->from('payroll as locked_p')
+                    ->where('locked_p.resort_id', $resort_id)
+                    ->whereIn('locked_p.status', ['locked', 'completed', 'processed', 'paid'])
+                    ->whereRaw('locked_p.start_date <= payroll.end_date')
+                    ->whereRaw('locked_p.end_date >= payroll.start_date');
+            })
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
@@ -144,7 +163,7 @@ class DashboardController extends Controller
 
         return view('resorts.payroll.dashboard.dashboard', compact(
             'page_title', 'total_employees', 'total_paid_employees',
-            'lastPayroll', 'upcomingPayroll', 'upcomingEstimated',
+            'lastPayroll', 'upcomingPayroll', 'upcomingEstimated', 'isEstimated',
             'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls', 'lockedPayrolls'
         ));
     }
@@ -155,6 +174,14 @@ class DashboardController extends Controller
         $drafts = Payroll::where('resort_id', $resort_id)
             ->where('status', 'draft')
             ->whereHas('reviews')
+            ->whereNotExists(function ($query) use ($resort_id) {
+                $query->select(DB::raw(1))
+                    ->from('payroll as locked_p')
+                    ->where('locked_p.resort_id', $resort_id)
+                    ->whereIn('locked_p.status', ['locked', 'completed', 'processed', 'paid'])
+                    ->whereRaw('locked_p.start_date <= payroll.end_date')
+                    ->whereRaw('locked_p.end_date >= payroll.start_date');
+            })
             ->orderByDesc('created_at')
             ->paginate(20)
             ->through(function($p) {
@@ -241,52 +268,43 @@ class DashboardController extends Controller
         $year = $request->input('year', date('Y'));
         $resort_id = $this->resort->resort_id;
 
-        // Get payroll data for the selected year
+        // Only use locked payrolls for accurate data, group by end_date month
         $payrollData = DB::table('payroll')
             ->select(
-                DB::raw("MONTHNAME(start_date) as month"),
+                DB::raw("MONTH(end_date) as month_num"),
                 DB::raw("SUM(total_payroll) as payroll_cost")
             )
             ->where('resort_id', $resort_id)
-            ->whereYear('start_date', $year)
-            ->groupBy('month')
+            ->where('status', 'locked')
+            ->whereYear('end_date', $year)
+            ->groupBy('month_num')
             ->get();
 
+        // Use actual OT pay from payroll_reviews instead of recalculating from hours × salary
         $otData = DB::table('payroll as p')
-        ->join('payroll_time_and_attandance as pta', 'p.id', '=', 'pta.payroll_id')
-        ->join('employees as e', 'e.id', '=', 'pta.employee_id')
-        ->where('p.resort_id', $resort_id)
-        ->whereYear('start_date', $year)
-        ->where(function ($query) {
-            $query->where('pta.regular_ot_hours', '>', 0)
-                ->orWhere('pta.holiday_ot_hours', '>', 0);
-        }) // Only fetch employees with OT
-        ->selectRaw("
-            MONTHNAME(p.start_date) as month,
-            pta.employee_id,
-            e.basic_salary,
-            pta.regular_ot_hours,
-            pta.holiday_ot_hours,
-            (pta.regular_ot_hours * e.basic_salary * 1.25) as regular_ot_cost,
-            (pta.holiday_ot_hours * e.basic_salary * 1.50) as holiday_ot_cost,
-            ((pta.regular_ot_hours * e.basic_salary * 1.25) + 
-            (pta.holiday_ot_hours * e.basic_salary * 1.50)) as ot_cost
-        ")
-        ->get();
-
-        // Get service charge data
-        $serviceChargeData = DB::table('payroll_service_charges')
-            ->join('payroll','payroll.id','=','payroll_service_charges.payroll_id')
+            ->join('payroll_reviews as pr', 'p.id', '=', 'pr.payroll_id')
+            ->where('p.resort_id', $resort_id)
+            ->where('p.status', 'locked')
+            ->whereYear('p.end_date', $year)
             ->select(
-                DB::raw("MONTHNAME(payroll.start_date) as month"),
+                DB::raw("MONTH(p.end_date) as month_num"),
+                DB::raw("SUM(pr.earnings_overtime) as ot_cost")
+            )
+            ->groupBy('month_num')
+            ->get();
+
+        // Get service charge data from locked payrolls only
+        $serviceChargeData = DB::table('payroll_service_charges')
+            ->join('payroll', 'payroll.id', '=', 'payroll_service_charges.payroll_id')
+            ->select(
+                DB::raw("MONTH(payroll.end_date) as month_num"),
                 DB::raw("SUM(payroll_service_charges.service_charge_amount) as service_charge")
             )
             ->where('payroll.resort_id', $resort_id)
-            ->whereYear('payroll.start_date', $year)
-            ->groupBy('month')
+            ->where('payroll.status', 'locked')
+            ->whereYear('payroll.end_date', $year)
+            ->groupBy('month_num')
             ->get();
-
-        // dd($otData);
 
         // Generate labels (Months)
         $months = [
@@ -299,33 +317,18 @@ class DashboardController extends Controller
         $otCost = array_fill(0, 12, 0);
         $serviceCharge = array_fill(0, 12, 0);
 
-        // Map database results to correct month index
+        // Map database results to correct month index (month_num is 1-based)
         foreach ($payrollData as $row) {
-            $index = array_search($row->month, $months);
-            if ($index !== false) {
-                $payrollCost[$index] = $row->payroll_cost;
-            }
+            $payrollCost[$row->month_num - 1] = $row->payroll_cost;
         }
 
-        // dd($otData);
         foreach ($otData as $row) {
-            $index = array_search(strtolower($row->month), array_map('strtolower', $months));
-        
-            if ($index !== false) {
-                if (!isset($otCost[$index])) {
-                    $otCost[$index] = 0;
-                }
-                $otCost[$index] += $row->ot_cost; // Accumulate OT costs
-            }
+            $otCost[$row->month_num - 1] = $row->ot_cost;
         }
 
         foreach ($serviceChargeData as $row) {
-            $index = array_search($row->month, $months);
-            if ($index !== false) {
-                $serviceCharge[$index] = $row->service_charge;
-            }
+            $serviceCharge[$row->month_num - 1] = $row->service_charge;
         }
-        // dd($otCost);
 
         return response()->json([
             'success' => true,
@@ -418,19 +421,28 @@ class DashboardController extends Controller
     {
         $resort_id = $this->resort->resort_id;
 
-        // Fetch total net pay for employees grouped by payment method (Cash vs Bank)
-        $payments = DB::table('payroll_employees as pe')
-            ->join('payroll as p', 'p.id', '=', 'pe.payroll_id')
-            ->join('payroll_reviews as pr', function ($join) {
-                $join->on('pe.employee_id', '=', 'pr.employee_id')
-                     ->on('pe.payroll_id', '=', 'pr.payroll_id');
-            })
-            ->where('p.resort_id', $resort_id)
-            ->selectRaw("
-                SUM(CASE WHEN pe.paymentMethod = 'Cash' THEN pr.net_salary ELSE 0 END) as total_cash_pay,
-                SUM(CASE WHEN pe.paymentMethod = 'Bank' THEN pr.net_salary ELSE 0 END) as total_bank_pay
-            ")
+        // Get the latest locked payroll only
+        $latestLocked = Payroll::where('resort_id', $resort_id)
+            ->where('status', 'locked')
+            ->orderByDesc('end_date')
             ->first();
+
+        $payments = (object) ['total_cash_pay' => 0, 'total_bank_pay' => 0];
+
+        if ($latestLocked) {
+            // Fetch total net pay for employees grouped by payment method (Cash vs Bank)
+            $payments = DB::table('payroll_employees as pe')
+                ->join('payroll_reviews as pr', function ($join) {
+                    $join->on('pe.employee_id', '=', 'pr.employee_id')
+                         ->on('pe.payroll_id', '=', 'pr.payroll_id');
+                })
+                ->where('pe.payroll_id', $latestLocked->id)
+                ->selectRaw("
+                    SUM(CASE WHEN pe.paymentMethod = 'Cash' THEN pr.net_salary ELSE 0 END) as total_cash_pay,
+                    SUM(CASE WHEN pe.paymentMethod = 'Bank' THEN pr.net_salary ELSE 0 END) as total_bank_pay
+                ")
+                ->first();
+        }
 
         return response()->json([
             'cashPayments' => $payments->total_cash_pay ?? 0,

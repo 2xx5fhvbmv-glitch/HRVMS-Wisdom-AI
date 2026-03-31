@@ -737,9 +737,36 @@ class MasterDashboardController extends Controller
             $visa_deposited_total = VisaWallets::where('resort_id', $this->globalUser->resort_id)->where('WalletName', 'Deposited')->where('status','Active')->sum('Amt');
             $visa_withdraw_total = VisaWallets::where('resort_id', $this->globalUser->resort_id)->where('WalletName', 'Withdrawn')->where('status','Active')->sum('Amt');
 
+            // Pending payroll approvals for this user
+            $currentEmployee = $this->globalUser->GetEmployee ?? null;
+            $pendingPayrollApprovals = collect();
+            if ($currentEmployee) {
+                $rankPos = Common::getEmployeeRankPosition($currentEmployee);
+                $rank = $rankPos['rank'] ?? null;
+                $position = $rankPos['position'] ?? null;
+                $approvalStep = null;
+                if ($rank === 'EXCOM' && $position === 'Finance') $approvalStep = 1;
+                elseif ($rank === 'EXCOM' && $position === 'HR') $approvalStep = 2;
+                elseif ($rank === 'GM') $approvalStep = 3;
+
+                if ($approvalStep) {
+                    $pendingPayrollApprovals = \App\Models\PayrollApproval::where('resort_id', $resort_id)
+                        ->where('step_order', $approvalStep)
+                        ->where('status', 'pending')
+                        ->with('payroll')
+                        ->get()
+                        ->filter(function ($a) use ($approvalStep) {
+                            if ($approvalStep <= 1) return true;
+                            return \App\Models\PayrollApproval::where('payroll_id', $a->payroll_id)
+                                ->where('step_order', '<', $approvalStep)
+                                ->where('status', '!=', 'approved')
+                                ->doesntExist();
+                        });
+                }
+            }
 
             return view('resorts.master-dashboard.hrdashboard',
-                compact('resort_divisions_count','resort_departments_count','resort_positions_count','total_employees','resort_id','resort_divisions','resort_departments','resort_positions','page_title','page_header','currentYear','nextYear','present_employee_counts','absent_employee_counts','leave_employee_counts','total_application_for_job_in_review','total_selected_applications_with_interviews','Employees','total_hired_candidates','total_beds' ,'OccupiedBed','total_available_beds','completed_trainings_count','pending_trainings_count','total_survey_count','open_survey_count','pending_survey_count','complete_survey_count','open_grivance_count','pending_grivance_count','resolve_grivance_count','open_disciplinary_count','pending_disciplinary_count','resolve_disciplinary_count','UnassignedDocumentsCounts','TotalDocument','total_applied_leave','new_joining','grivanceSubmissionModel','todayleaveUsers','upcomingLeaveUsers','upcommingPublicHoliday','todayBirthdays','upcommingBirthdays','leaveRequests','resort_departments','occupancies','manning_response','vacant_positions','severityCounts','OngoingSurvey','SOSHistory','male_emp','female_emp','male_emp_percentage','female_emp_percentage','totalPublished','employeeInfoUpdateRequest','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','average_salary_increase','total_resignations','withdraw_resignation','pending_resignation','NewVacancies','TodoData','Vacancies','buildings','totalIncidentCounts','openIncidentCounts','underInvestigationIncidentCounts','monthlyCheckinPerformance','totalExitInitiated','visa_reserved_total','visa_available_total','visa_deposited_total','visa_withdraw_total')
+                compact('resort_divisions_count','resort_departments_count','resort_positions_count','total_employees','resort_id','resort_divisions','resort_departments','resort_positions','page_title','page_header','currentYear','nextYear','present_employee_counts','absent_employee_counts','leave_employee_counts','total_application_for_job_in_review','total_selected_applications_with_interviews','Employees','total_hired_candidates','total_beds' ,'OccupiedBed','total_available_beds','completed_trainings_count','pending_trainings_count','total_survey_count','open_survey_count','pending_survey_count','complete_survey_count','open_grivance_count','pending_grivance_count','resolve_grivance_count','open_disciplinary_count','pending_disciplinary_count','resolve_disciplinary_count','UnassignedDocumentsCounts','TotalDocument','total_applied_leave','new_joining','grivanceSubmissionModel','todayleaveUsers','upcomingLeaveUsers','upcommingPublicHoliday','todayBirthdays','upcommingBirthdays','leaveRequests','resort_departments','occupancies','manning_response','vacant_positions','severityCounts','OngoingSurvey','SOSHistory','male_emp','female_emp','male_emp_percentage','female_emp_percentage','totalPublished','employeeInfoUpdateRequest','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','average_salary_increase','total_resignations','withdraw_resignation','pending_resignation','NewVacancies','TodoData','Vacancies','buildings','totalIncidentCounts','openIncidentCounts','underInvestigationIncidentCounts','monthlyCheckinPerformance','totalExitInitiated','visa_reserved_total','visa_available_total','visa_deposited_total','visa_withdraw_total','pendingPayrollApprovals')
             );
 
         // } catch( \Exception $e ) {

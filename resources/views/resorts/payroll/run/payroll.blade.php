@@ -34,13 +34,12 @@
                             <div class="text-start">
                                 <div class="dateRangeAb datepicker"  id="datapicker">
                                     <div>
-                                        <!-- Hidden input field to attach the calendar to -->
                                         <input type="text" class="form-control dateRangeAb datepicker" name="hiddenInput" id="hiddenInput" data-start-date="{{ $start_date ?? now()->startOfMonth()->format('Y-m-d') }}"
                                         data-end-date="{{ $end_date ?? now()->endOfMonth()->format('Y-m-d') }}">
                                     </div>
                                     <p id="startDate" class="d-none">Start Date:</p>
                                     <p id="endDate" class="d-none">End Date:</p>
-                                </div>  
+                                </div>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -56,7 +55,6 @@
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select id="positionFilter" class="form-select select2t-none">
                                 <option value="">All Positions</option>
-                                <!-- Example: populate dynamically or statically -->
                                 @if($positions)
                                     @foreach($positions as $position)
                                         <option value="{{ $position->id }}">{{ $position->position_title }}</option>
@@ -64,16 +62,6 @@
                                 @endif
                             </select>
                         </div>
-                        <!-- <div class="col-auto ms-auto">
-                            <div class="d-flex align-items-center">
-                                <label for="flexSwitchCheckDefault" class="form-label mb-0 me-3">Rufiyaa</label>
-                                <div class="form-check form-switch form-switchTheme">
-                                    <input class="form-check-input" type="checkbox" role="switch"
-                                        id="flexSwitchCheckDefault">
-                                    <label class="form-check-label" for="flexSwitchCheckDefault">USD</label>
-                                </div>
-                            </div>
-                        </div> -->
                     </div>
                 </div>
                 <div class="bg-themeGrayLight mb-3">
@@ -83,78 +71,52 @@
                                 <h6>{{ \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($payroll->end_date)->format('d M Y') }}</h6>
                             @endif
                         </div>
-                        {{-- <div class="col-auto ms-auto"><a href="#" class="a-link" id="notesBtn">Notes</a></div> --}}
                         <div class="col-auto">
                             <a href="{{ route('payroll.bankcashsheet.download', ['id' => $payroll_id]) }}" class="a-link">Cash And Bank Sheets</a>
                         </div>
                         @if(isset($payroll_id) && !empty($payroll_id))
-                            <div class="col-auto"> 
+                            <div class="col-auto">
                                 <a href="{{ route('payroll.activity-log', ['payroll_id' => base64_encode($payroll_id)]) }}" class="btn btn-themeSkyblue">Activity Log</a>
                             </div>
                         @endif
-                        <div class="col-auto">
-                            <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'pdf']) }}" class="btn btn-themeSkyblue btn-sm">
-                                <i class="fa-solid fa-file-pdf me-1"></i> Download PDF
-                            </a>
-                        </div>
                         <div class="col-auto">
                             <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'excel']) }}" class="btn btn-themeSkyblue btn-sm">
                                 <i class="fa-solid fa-file-excel me-1"></i> Download Excel
                             </a>
                         </div>
-                        {{-- <div class="col-auto"> <button id="btn-download" class="btn btn-themeBlue">Download</button> </div> --}}
                     </div>
                 </div>
 
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" id="payrollViewTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-view-tab="attendance" type="button">Time & Attendance</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-view-tab="overtime" type="button">Overtime</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-view-tab="earnings" type="button">Earnings</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-view-tab="deductions" type="button">Deductions</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-view-tab="summary" type="button">Summary</button>
+                    </li>
+                </ul>
+
                 <!-- data-Table  -->
-                <table id="table-payroll" class="table table-payroll w-100">
-                    <thead>
-                        <tr id="table-payroll-section-header">
-                            <th colspan="5" class="text-center">Employee Info</th>
-                            <th class="text-center">Time & Attendance</th>
-                            <th class="text-center">Overtime</th>
-                            <th colspan="3" class="text-center">Earnings</th>
-                            <th id="allowance-section-header" class="text-center">Allowances</th>
-                            <th class="text-center">Earnings</th>
-                            <th class="text-center">Deductions</th>
-                            <th class="text-center">Summary</th>
-                        </tr>
-                        <tr id="table-payroll-header">
-                            <th class="text-nowrap">ID</th>
-                            <th class="text-nowrap">Name</th>
-                            <th class="text-nowrap">Department</th>
-                            <th class="text-nowrap">Position</th>
-                            <th class="text-nowrap">Hire Date</th>
-                            <th class="text-nowrap">No. of Days</th>
-                            <th class="text-nowrap">Total OT Amount</th>
-                            <th class="text-nowrap">Service Charge</th>
-                            <th class="text-nowrap">Basic Pay</th>
-                            <th class="text-nowrap">Earned Salary</th>
-                            <!-- Dynamic Columns Will be Inserted Here -->
-                            <th class="text-nowrap">Total Allowances</th>
-                            <th class="text-nowrap">Total Earnings</th>
-                            <th class="text-nowrap">Total Deductions</th>
-                            <th class="text-nowrap">Net Pay</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                    <tfoot>
-                        <tr id="table-payroll-footer" style="font-weight:bold;"></tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-    <!-- Modal -->
-    <div class="modal fade" id="payrollModal" tabindex="-1" aria-labelledby="payrollModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="payrollModalLabel">Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="modalContent">Loading...</div>
+                <div class="table-responsive">
+                    <table id="table-payroll" class="table table-payroll w-100">
+                        <thead>
+                            <tr id="table-payroll-header"></tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr id="table-payroll-footer" style="font-weight:bold;"></tr>
+                        </tfoot>
+                    </table>
                 </div>
             </div>
         </div>
@@ -169,23 +131,39 @@
         position: absolute !important;
         background-color: #fff;
         width: 100%;
-        /* min-width: 350px; */
     }
     .dateRangeAb .form-control {
         background-image: url('{{ URL::asset("resorts_assets/images/calendar.svg") }}');
         background-position: right 10px center;
         background-repeat: no-repeat;
     }
-    th{
-        white-space: nowrap!important;
-    }
+    th { white-space: nowrap!important; }
+
+    /* Tab-based column visibility via CSS — no DataTables redraw needed */
+    #table-payroll .grp-attendance,
+    #table-payroll .grp-overtime,
+    #table-payroll .grp-earnings,
+    #table-payroll .grp-deductions,
+    #table-payroll .grp-summary { display: none; }
+
+    #table-payroll.tab-attendance .grp-attendance { display: table-cell; }
+    #table-payroll.tab-overtime .grp-overtime { display: table-cell; }
+    #table-payroll.tab-earnings .grp-earnings { display: table-cell; }
+    #table-payroll.tab-deductions .grp-deductions { display: table-cell; }
+    #table-payroll.tab-summary .grp-summary { display: table-cell; }
 </style>
 @endsection
 
 @section('import-scripts')
 <script>
+    var currentTab = 'attendance';
+
     $(document).ready(function () {
         $('.select2t-none').select2();
+
+        // Set default tab class
+        $('#table-payroll').addClass('tab-attendance');
+
         fetchDynamicColumns();
 
         let startDate = moment($("#hiddenInput").data('start-date'), "YYYY-MM-DD");
@@ -203,19 +181,17 @@
             $('#table-payroll').DataTable().ajax.reload();
         });
 
-        $("#notesBtn").on("click", function (e) {
-            e.preventDefault();
-            openNotesModal();
-        });
-
         $("#searchInput, #departmentFilter, #positionFilter").on("input change", debounce(function () {
             $('#table-payroll').DataTable().ajax.reload();
         }, 300));
 
-        $('#btn-download').click(function (e) {
-            e.preventDefault();
-            $('#btn-download').prop('disabled', true);
-            handlePayrollDownload();
+        // Tab switching — CSS only, no DataTables API calls
+        $(document).on('click', '#payrollViewTabs .nav-link', function() {
+            $('#payrollViewTabs .nav-link').removeClass('active');
+            $(this).addClass('active');
+            currentTab = $(this).data('view-tab');
+            $('#table-payroll').removeClass('tab-attendance tab-overtime tab-earnings tab-deductions tab-summary')
+                .addClass('tab-' + currentTab);
         });
     });
 
@@ -228,9 +204,7 @@
             parentEl: '#datapicker',
             alwaysShowCalendars: true,
             linkedCalendars: false,
-            locale: {
-                format: "DD-MM-YYYY"
-            }
+            locale: { format: "DD-MM-YYYY" }
         });
     }
 
@@ -238,7 +212,7 @@
 
     function fetchDynamicColumns() {
         if (!dynamicURL) {
-            $("#table-payroll tbody").html('<tr><td colspan="15" class="text-center">No payroll found</td></tr>');
+            $("#table-payroll tbody").html('<tr><td colspan="6" class="text-center">No payroll found</td></tr>');
             return;
         }
 
@@ -247,101 +221,123 @@
             method: "GET",
             success: function (response) {
                 if (response.success) {
-                    let dynamicColumns = response.columns.map(col => ({ data: col, name: col }));
+                    var dynamicCols = response.columns || [];
                     var cs = currencySymbol;
+
                     function fmtCol(data) {
                         if (data === null || data === undefined || data === '') return cs + '0.00';
                         var num = parseFloat(String(data).replace(/,/g, '')) || 0;
                         return cs + num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     }
-                    let tableColumns = [
-                        { data: 'Emp_id', name: 'Emp_id' },
-                        { data: 'employee_name', name: 'employee_name' },
-                        { data: 'department', name: 'department' },
-                        { data: 'position', name: 'position' },
-                        { data: 'hire_date', name: 'hire_date' },
-                        { data: 'present_days', name: 'present_days' },
-                        { data: 'total_OTPay', name: 'total_OTPay', render: fmtCol },
-                        { data: 'service_charge', name: 'service_charge', render: fmtCol },
-                        { data: 'basic_pay', name: 'basic_pay', render: fmtCol },
-                        { data: 'earned_salary', name: 'earned_salary', render: fmtCol },
-                        ...dynamicColumns.map(function(col) {
-                            return { data: col.data, name: col.name, render: fmtCol };
-                        }),
-                        { data: 'total_allowance', name: 'total_allowance', render: fmtCol },
-                        { data: 'total_pay', name: 'total_pay', render: fmtCol },
-                        { data: 'deductions', name: 'deductions', render: fmtCol },
-                        { data: 'net_pay', name: 'net_pay', render: function(data) {
-                            return '<strong>' + fmtCol(data) + '</strong>';
-                        }},
+
+                    // Build column definitions matching step 6 review headings
+                    var tableColumns = [
+                        // Base (always visible)
+                        { data: 'Emp_id', name: 'Emp_id', title: 'ID', className: '' },
+                        { data: 'employee_name', name: 'employee_name', title: 'Employee Name', className: '' },
+                        { data: 'position', name: 'position', title: 'Position', className: '' },
+
+                        // Attendance: Present, Absent, Day Off, Other Leaves
+                        { data: 'present_days', name: 'present_days', title: 'Present', className: 'grp-attendance' },
+                        { data: 'absent_days', name: 'absent_days', title: 'Absent', className: 'grp-attendance' },
+                        { data: 'day_off', name: 'day_off', title: 'Day Off', className: 'grp-attendance' },
+                        { data: 'leave_types', name: 'leave_types', title: 'Other Leaves', className: 'grp-attendance' },
+
+                        // Overtime: Regular OT, Friday OT, Holiday OT, Total OT Pay
+                        { data: 'regular_ot_pay', name: 'regular_ot_pay', title: 'Regular OT', render: fmtCol, className: 'grp-overtime' },
+                        { data: 'friday_ot_pay', name: 'friday_ot_pay', title: 'Friday OT', render: fmtCol, className: 'grp-overtime' },
+                        { data: 'holiday_ot_pay', name: 'holiday_ot_pay', title: 'Holiday OT', render: fmtCol, className: 'grp-overtime' },
+                        { data: 'total_OTPay', name: 'total_OTPay', title: 'Total OT Pay', render: fmtCol, className: 'grp-overtime' },
+
+                        // Earnings: Service Charge, Basic Earned, [Allowances...], Total Earnings
+                        { data: 'service_charge', name: 'service_charge', title: 'Service Charge', render: fmtCol, className: 'grp-earnings' },
+                        { data: 'earned_salary', name: 'earned_salary', title: 'Basic Earned', render: fmtCol, className: 'grp-earnings' },
                     ];
 
-                    updateTableHeader(response.columns);
+                    // Dynamic allowance columns (earnings)
+                    dynamicCols.forEach(function(col) {
+                        tableColumns.push({ data: col, name: col, title: col, render: fmtCol, className: 'grp-earnings' });
+                    });
+
+                    // Total Earnings (shown in earnings, deductions, summary)
+                    tableColumns.push(
+                        { data: 'total_pay', name: 'total_pay', title: 'Total Earnings', render: fmtCol, className: 'grp-earnings grp-summary' }
+                    );
+
+                    // Deductions: Attendance, City Ledger, Staff Shop, Pension, EWT, Other, Total Deductions
+                    tableColumns.push(
+                        { data: 'attendance_deduction', name: 'attendance_deduction', title: 'Attendance', render: fmtCol, className: 'grp-deductions' },
+                        { data: 'city_ledger', name: 'city_ledger', title: 'City Ledger', render: fmtCol, className: 'grp-deductions' },
+                        { data: 'staff_shop', name: 'staff_shop', title: 'Staff Shop', render: fmtCol, className: 'grp-deductions' },
+                        { data: 'pension', name: 'pension', title: 'Pension', render: fmtCol, className: 'grp-deductions' },
+                        { data: 'ewt', name: 'ewt', title: 'EWT', render: fmtCol, className: 'grp-deductions' },
+                        { data: 'other_deduction', name: 'other_deduction', title: 'Other', render: fmtCol, className: 'grp-deductions' },
+                        { data: 'deductions', name: 'deductions', title: 'Total Deductions', render: fmtCol, className: 'grp-deductions grp-ded-sum' },
+                        { data: 'net_pay', name: 'net_pay', title: 'Net Salary', render: function(data) { return '<strong>' + fmtCol(data) + '</strong>'; }, className: 'grp-summary' }
+                    );
+
+                    // Build header with matching CSS classes
+                    var headerHtml = '';
+                    tableColumns.forEach(function(col) {
+                        headerHtml += '<th class="text-nowrap ' + (col.className || '') + '">' + col.title + '</th>';
+                    });
+                    $('#table-payroll-header').html(headerHtml);
+                    $('#table-payroll-footer').html(headerHtml);
+
                     initializeDataTable(tableColumns);
                 }
             },
             error: function () {
-                $("#table-payroll tbody").html('<tr><td colspan="15" class="text-center">Error loading columns</td></tr>');
+                $("#table-payroll tbody").html('<tr><td colspan="6" class="text-center">Error loading columns</td></tr>');
             }
         });
-    }
-
-    function updateTableHeader(dynamicColumnNames) {
-        let headerRow = $("#table-payroll-header");
-        headerRow.find("th.dynamic-column").remove();
-
-        let insertAfterIndex = 9; // 0-based index, 9th column = Earned Salary
-        dynamicColumnNames.forEach(col => {
-            $('<th class="dynamic-column text-nowrap">' + col + '</th>').insertAfter(headerRow.children().eq(insertAfterIndex++));
-        });
-
-        // Update section header colspan for allowances
-        var allowanceCount = dynamicColumnNames.length || 1;
-        $('#allowance-section-header').attr('colspan', allowanceCount);
     }
 
     let payrollURL = "{{ $payroll_id ? route('payroll.getData', ['payroll_id' => $payroll_id]) : '' }}";
 
     function initializeDataTable(tableColumns) {
-        if (!payrollURL) {
-            console.warn("Payroll URL is missing. Skipping DataTable initialization.");
-            return;
-        }
+        if (!payrollURL) return;
 
         if ($.fn.DataTable.isDataTable("#table-payroll")) {
             $("#table-payroll").DataTable().destroy();
         }
 
-        $("#table-payroll").DataTable({
+        var dtTable = $("#table-payroll").DataTable({
             searching: false,
             bLengthChange: false,
-            bFilter: true,
             bInfo: true,
             bAutoWidth: false,
-            scrollX: true,
             iDisplayLength: 10,
             processing: true,
             serverSide: true,
             footerCallback: function(row, data, start, end, display) {
                 var api = this.api();
                 var cs = currencySymbol;
-                var $footer = $('#table-payroll-footer');
-                $footer.empty();
-                var colCount = api.columns().count();
+                var json = api.ajax.json();
+                var totals = (json && json.totals) ? json.totals : {};
 
-                for (var i = 0; i < colCount; i++) {
-                    if (i < 5) {
-                        // Non-numeric columns (ID, Name, Dept, Position, Hire Date)
-                        $footer.append('<th>' + (i === 0 ? 'Total' : '') + '</th>');
+                api.columns().every(function(colIdx) {
+                    var col = tableColumns[colIdx];
+                    var footerNode = this.footer();
+                    if (!footerNode || !col) return;
+
+                    var cls = col.className || '';
+                    var colName = col.name || '';
+
+                    if (!cls) {
+                        $(footerNode).html(colIdx === 0 ? 'Total' : '');
+                    } else if (colName === 'leave_types') {
+                        $(footerNode).html('-');
+                    } else if (colName === 'day_off' || cls.indexOf('grp-attendance') !== -1) {
+                        var val = totals[colName] !== undefined ? totals[colName] : 0;
+                        $(footerNode).html(val);
                     } else {
-                        // Sum numeric columns
-                        var total = api.column(i).data().reduce(function(a, b) {
-                            var val = parseFloat(String(b).replace(/[^0-9.\-]/g, '')) || 0;
-                            return a + val;
-                        }, 0);
-                        $footer.append('<th>' + cs + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</th>');
+                        var val = totals[colName] !== undefined ? parseFloat(totals[colName]) : 0;
+                        $(footerNode).html(cs + val.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                     }
-                }
+
+                    $(footerNode).attr('class', cls);
+                });
             },
             ajax: {
                 url: payrollURL,
@@ -362,86 +358,9 @@
                 },
                 error: function (xhr, error, code) {
                     console.error("AJAX Error:", error);
-                    $("#table-payroll tbody").html('<tr><td colspan="' + tableColumns.length + '" class="text-center">Error loading data</td></tr>');
                 }
             },
             columns: tableColumns
-        });
-    }
-
-    let payrollnotesURL = @if($payroll_id)
-        "{{ route('payroll.getNotes', ['payroll_id' => $payroll_id]) }}"
-    @else
-        "#"
-    @endif;
-
-    function openNotesModal() {
-        $("#payrollModalLabel").text("Employee Notes");
-        $("#modalContent").html("Loading...");
-
-        $.ajax({
-            url: payrollnotesURL,
-            method: "GET",
-            success: function (response) {
-                if (response.success && response.data.length > 0) {
-                    let tableHtml = `<table class="table table-bordered">
-                        <thead><tr><th>Employee Name</th><th>Notes</th></tr></thead><tbody>`;
-                    response.data.forEach(note => {
-                        tableHtml += `<tr><td>${note.employee_name}</td><td>${note.notes}</td></tr>`;
-                    });
-                    tableHtml += `</tbody></table>`;
-                    $("#modalContent").html(tableHtml);
-                } else {
-                    $("#modalContent").html("<p>No Notes Available.</p>");
-                }
-            }
-        });
-
-        $("#payrollModal").modal("show");
-    }
-
-    function handlePayrollDownload() {
-        let payrollId = "{{ $payroll_id ?? '' }}";
-        if (!payrollId) return;
-
-        let downloadUrl = "{{ $payroll_id ? route('payroll.download', ['payroll_id' => $payroll_id]) : '#' }}";
-        const searchTerm = $('#searchInput').val();
-        const department = $('#departmentFilter').val();
-        const position = $('#positionFilter').val();
-        const dateRange = $('#hiddenInput').val();
-
-        const start_date = dateRange ? dateRange.split(' - ')[0] : '';
-        const end_date = dateRange ? dateRange.split(' - ')[1] : '';
-
-        $.ajax({
-            url: downloadUrl,
-            method: 'GET',
-            data: {
-                searchTerm,
-                department,
-                position,
-                start_date,
-                end_date
-            },
-            xhrFields: {
-                responseType: 'blob'
-            },
-            success: function (response) {
-                const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'Payroll_Report_' + new Date().toISOString().slice(0, 10) + '.xlsx';
-                document.body.appendChild(a);
-                a.click();
-
-                $("#btn-download").prop('disabled', false);
-                window.URL.revokeObjectURL(url);
-            },
-            error: function (xhr, status, error) {
-                console.error('Download failed:', error);
-                alert('Download failed. Please try again.');
-            }
         });
     }
 

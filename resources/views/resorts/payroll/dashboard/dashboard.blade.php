@@ -86,6 +86,9 @@
                                     {!! Common::formatCurrency($upcomingPayroll->total_payroll, 'USD') !!}
                                 @else
                                     {!! Common::formatCurrency($upcomingEstimated ?? 0, 'USD') !!}
+                                    @if($isEstimated ?? false)
+                                        <small class="text-muted d-block" style="font-size: 11px;">(Estimated)</small>
+                                    @endif
                                 @endif
                             </strong>
                         </div>
@@ -382,10 +385,17 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm btn-themeBlue"
-                                               onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','7');">
-                                                <i class="fa-solid fa-eye"></i> View
-                                            </a>
+                                            @if($ap->has_rejection && $ap->status === 'draft')
+                                                <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}" class="btn btn-sm btn-themeBlue"
+                                                   onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','1');">
+                                                    <i class="fa-solid fa-pen-to-square"></i> Edit & Resubmit
+                                                </a>
+                                            @else
+                                                <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm btn-themeBlue"
+                                                   onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','7');">
+                                                    <i class="fa-solid fa-eye"></i> View
+                                                </a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
