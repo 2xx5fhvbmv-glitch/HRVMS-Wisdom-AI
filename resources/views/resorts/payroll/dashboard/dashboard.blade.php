@@ -1246,11 +1246,12 @@
                             label: 'OT Hours',
                             data: data,
                             borderColor: '#2EACB3',
-                            backgroundColor: '#2EACB3',
+                            backgroundColor: 'rgba(46, 172, 179, 0.1)',
                             borderWidth: 2,
-                            fill: false,
+                            fill: true,
                             tension: 0.4,
-                            pointRadius: 0
+                            pointRadius: 5,
+                            pointBackgroundColor: '#2EACB3'
                         }]
                     },
                     options: {
@@ -1263,7 +1264,7 @@
                             y: {
                                 beginAtZero: true,
                                 grid: { display: false },
-                                ticks: { callback: function(v) { return formatAmount(v, 'USD'); } }
+                                ticks: { callback: function(v) { return v + ' hrs'; } }
                             }
                         }
                     }
@@ -1490,13 +1491,18 @@
                 // Convert data to display currency
                 var chartData = res.data.map(function(v) { return convertAmount(v, 'USD'); });
 
+                // Build labels with amounts for legend
+                var legendLabels = res.labels.map(function(label, i) {
+                    return label + ' (' + currencySymbol + chartData[i].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ')';
+                });
+
                 window.taxChartInstance = new Chart(ctx, {
                     type: 'pie',
                     data: {
-                        labels: res.labels,
+                        labels: legendLabels,
                         datasets: [{
                             data: chartData,
-                            backgroundColor: res.labels.map(() => getRandomColor()),
+                            backgroundColor: ['#014653', '#2EACB3', '#EFB408', '#50B9BF', '#333333'],
                             borderWidth: 0
                         }]
                     },
@@ -1510,13 +1516,29 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(tooltipItem) {
-                                        return tooltipItem.label + ': ' + currencySymbol + tooltipItem.raw.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                        return tooltipItem.label;
                                     }
                                 }
                             }
                         }
                     },
-                    plugins: [pieLabelsInside]
+                    plugins: [{
+                        id: 'taxLabelsInside',
+                        afterDraw(chart) {
+                            var ctx2 = chart.ctx;
+                            var dataset = chart.data.datasets[0];
+                            var meta = chart.getDatasetMeta(0);
+                            meta.data.forEach(function(element, i) {
+                                var value = dataset.data[i];
+                                var pos = element.tooltipPosition();
+                                ctx2.fillStyle = '#fff';
+                                ctx2.font = 'bold 12px Arial';
+                                ctx2.textAlign = 'center';
+                                ctx2.textBaseline = 'middle';
+                                ctx2.fillText(currencySymbol + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}), pos.x, pos.y);
+                            });
+                        }
+                    }]
                 });
             }
         });
