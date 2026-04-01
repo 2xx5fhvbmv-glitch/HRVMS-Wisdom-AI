@@ -901,7 +901,8 @@
 
     renderEwtTaxChart();
 
-        $('#monthSelector').trigger('change');
+        // Initialize progress bars for the initial server-rendered comparison card
+        window.initializeProgressBars();
 
 
     const defaultYear = $('#yearSelect').val();
@@ -1209,7 +1210,7 @@
         fetchChartData(selectedYear);
     });
 
-    $('#monthSelector').on('change', function () {
+    $(document).on('change', '#monthSelector', function () {
         const selectedMonth = $(this).val();
 
         $.ajax({
@@ -1217,12 +1218,13 @@
             method: 'GET',
             data: { month: selectedMonth },
             beforeSend: function() {
-                $('.comparison-wrapper').html('<p>Loading...</p>'); // Optional loading state
+                // Keep the dropdown visible, only replace the chart content
+                $('.comparison-wrapper .row.g-4').css('opacity', '0.5');
             },
             success: function (response) {
                 $('.comparison-wrapper').html(response.html);
-                window.initializeProgressBars(); // works globally
-
+                window.initializeProgressBars();
+                $('[data-bs-toggle="tooltip"]').tooltip();
             },
             error: function () {
                 $('.comparison-wrapper').html('<p class="text-danger">Error loading data.</p>');

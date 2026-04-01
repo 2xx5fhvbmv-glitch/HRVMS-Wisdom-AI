@@ -76,6 +76,53 @@
 @endsection
 
 @section('import-css')
+<style>
+    .ewt-cell {
+        position: relative;
+        cursor: pointer;
+    }
+    .ewt-cell .ewt-tooltip {
+        display: none;
+        position: absolute;
+        bottom: 100%;
+        right: 0;
+        background: #1a1a2e;
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        white-space: nowrap;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        min-width: 180px;
+    }
+    .ewt-cell .ewt-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        right: 20px;
+        border: 6px solid transparent;
+        border-top-color: #1a1a2e;
+    }
+    .ewt-cell:hover .ewt-tooltip {
+        display: block;
+    }
+    .ewt-tooltip .ewt-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 3px 0;
+    }
+    .ewt-tooltip .ewt-row + .ewt-row {
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .ewt-tooltip .ewt-label {
+        color: #a0a0b8;
+    }
+    .ewt-tooltip .ewt-value {
+        font-weight: 600;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -161,13 +208,16 @@
                 width: '150px'
             },
             {
-                data: 'total_earnings',
+                data: 'total_ewt',
                 title: 'Annual Total',
                 render: function(data, type, row) {
                     return `
-                        <div class="text-end">
-                            <span class="d-block">${formatAmount(parseFloat(data), 'USD')}</span>
-                            <small class="text-muted">Tax: ${formatAmount(parseFloat(row.total_ewt), 'USD')}</small>
+                        <div class="ewt-cell text-end">
+                            <span class="d-block fw-600" style="font-size:14px;">${formatAmount(parseFloat(data), 'USD')}</span>
+                            <div class="ewt-tooltip">
+                                <div class="ewt-row"><span class="ewt-label">Total Earnings</span><span class="ewt-value">${formatAmount(parseFloat(row.total_earnings), 'USD')}</span></div>
+                                <div class="ewt-row"><span class="ewt-label">Total Tax</span><span class="ewt-value">${formatAmount(parseFloat(data), 'USD')}</span></div>
+                            </div>
                         </div>
                     `;
                 },
@@ -222,16 +272,19 @@
                                     title: month,
                                     render: function(data) {
                                         if (!data || data.earnings === 0) return '<div class="text-center">-</div>';
-                                        
+
                                         return `
-                                            <div class="text-end">
-                                                <span class="d-block">${formatAmount(parseFloat(data.earnings), 'USD')}</span>
-                                                <span class="d-block text-danger">${formatAmount(parseFloat(data.ewt), 'USD')}</span>
-                                                <small class="text-muted">${data.tax_rate}% (${data.tax_slab})</small>
+                                            <div class="ewt-cell text-end">
+                                                <span class="d-block fw-600" style="font-size:14px;">${formatAmount(parseFloat(data.ewt), 'USD')}</span>
+                                                <div class="ewt-tooltip">
+                                                    <div class="ewt-row"><span class="ewt-label">Earnings</span><span class="ewt-value">${formatAmount(parseFloat(data.earnings), 'USD')}</span></div>
+                                                    <div class="ewt-row"><span class="ewt-label">Tax Rate</span><span class="ewt-value">${data.tax_rate}%</span></div>
+                                                    <div class="ewt-row"><span class="ewt-label">Slab</span><span class="ewt-value">${data.tax_slab}</span></div>
+                                                </div>
                                             </div>
                                         `;
                                     },
-                                    width: '150px',
+                                    width: '100px',
                                     className: 'text-end'
                                 }));
                                 
@@ -243,6 +296,9 @@
                     }
                 },
                 columns: columns,
+                drawCallback: function() {
+                    // tooltips handled via CSS hover
+                }
             });
         }
 
