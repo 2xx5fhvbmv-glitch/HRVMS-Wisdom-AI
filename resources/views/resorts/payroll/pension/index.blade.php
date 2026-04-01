@@ -41,10 +41,25 @@
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select  id="positionFilter" class="form-select select2t-none">
                                 <option value="">All Positions</option>
-                                <!-- Example: populate dynamically or statically -->
                                 @foreach($positions as $position)
                                     <option value="{{ $position->id }}">{{ $position->position_title }}</option>
                                 @endforeach
+                            </select>
+                        </div>
+                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
+                            <select id="monthFilter" class="form-select">
+                                <option value="">All Months</option>
+                                @for($i = 1; $i <= 12; $i++)
+                                    <option value="{{ $i }}" @if($i == now()->month) selected @endif>{{ date('F', mktime(0,0,0,$i,1)) }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
+                            <select id="yearFilter" class="form-select">
+                                <option value="">All Years</option>
+                                @for($y = now()->year; $y >= now()->year - 5; $y--)
+                                    <option value="{{ $y }}" @if($y == now()->year) selected @endif>{{ $y }}</option>
+                                @endfor
                             </select>
                         </div>
                         <div class="col-auto ms-auto">
@@ -90,21 +105,33 @@
 
 @section('import-scripts')
 <script>
+var pensionTable;
 $(document).ready(function () {
     $('.select2t-none').select2();
-    loadPensionTable();
+    initPensionTable();
 
-    $('#searchInput, #departmentFilter, #positionFilter').on('keyup change', function () {
-        loadPensionTable();
+    $('#searchInput').on('keyup', debounce(function () {
+        pensionTable.ajax.reload();
+    }, 300));
+
+    $('#departmentFilter, #positionFilter, #monthFilter, #yearFilter').on('change', function () {
+        pensionTable.ajax.reload();
     });
 });
 
-function loadPensionTable() {
+function debounce(func, delay) {
+    let timer;
+    return function () {
+        clearTimeout(timer);
+        timer = setTimeout(() => func.apply(this, arguments), delay);
+    };
+}
+
+function initPensionTable() {
     if ($.fn.DataTable.isDataTable('#table-pension')) {
         $('#table-pension').DataTable().destroy();
     }
-
-    $('#table-pension').DataTable({
+    pensionTable = $('#table-pension').DataTable({
         "searching": false,
         "bLengthChange": false,
         "bFilter": true,
@@ -121,6 +148,8 @@ function loadPensionTable() {
                 d.searchTerm = $('#searchInput').val();
                 d.department = $('#departmentFilter').val();
                 d.position = $('#positionFilter').val();
+                d.month = $('#monthFilter').val();
+                d.year = $('#yearFilter').val();
             },
             type: "GET",
         },
@@ -180,4 +209,5 @@ function loadPensionTable() {
     });
 }
 </script>
+
 @endsection

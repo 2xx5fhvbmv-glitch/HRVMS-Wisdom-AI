@@ -153,6 +153,7 @@ class PensionController extends Controller
             })
             ->where('e.status','Active')
             ->where('p.resort_id', $resort_id)
+            ->where('p.status', 'locked')
             ->select(
                 'e.id as employee_id',
                 'e.Emp_id as Emp_id',
@@ -194,10 +195,18 @@ class PensionController extends Controller
             $query->where('e.Position_id', $request->position);
         }
 
+        if ($request->month) {
+            $query->whereMonth('p.start_date', $request->month);
+        }
+
+        if ($request->year) {
+            $query->whereYear('p.start_date', $request->year);
+        }
+
         $totalQuery = clone $query;
         $totals = $totalQuery->select(
             DB::raw('SUM(pd.pension) as total_employee_pension'),
-            DB::raw('SUM(pd.pension) as total_employer_pension') // Are these really the same?
+            DB::raw('SUM(pd.pension) as total_employer_pension')
         )->first();
         return datatables()->of($query)
         ->addColumn('name', function ($employee) {
@@ -235,9 +244,7 @@ class PensionController extends Controller
                         </div>';
             })
             ->addColumn('department', function ($employee) {
-                $departmentName =  $employee->department ?? 'N/A';
-                $departmentCode =  $employee->department_code ?? 'N/A';
-                return $departmentName.'<span class="badge badge-themeLight">'.$departmentCode.'</span>';
+                return $employee->department ?? 'N/A';
             })
             ->addColumn('position', function ($employee) {
                 return $employee->position ?? 'N/A';
@@ -260,7 +267,7 @@ class PensionController extends Controller
                     'employer_pension' => $totals->total_employer_pension ?? 0
                 ]
             ])
-            ->rawColumns(['name', 'department', 'position', 'basic_salary', 'time', 'pension_percentage'])
+            ->rawColumns(['name'])
             ->make(true);
     }
 
@@ -287,6 +294,7 @@ class PensionController extends Controller
             });    
 
         $query->where('p.resort_id', $resort_id)
+            ->where('p.status', 'locked')
             ->whereIn('e.status', ['Resigned', 'Terminated', 'Inactive'])
             ->select(
                'e.id as employee_id',
