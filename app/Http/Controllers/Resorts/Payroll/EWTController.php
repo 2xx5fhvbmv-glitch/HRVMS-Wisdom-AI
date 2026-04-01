@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Validator;
 use Auth;
 use Config;
 use DB;
-use Common;
+use App\Helpers\Common;
 
 class EWTController extends Controller
 {
@@ -254,6 +254,7 @@ class EWTController extends Controller
                 }
             ])
             ->whereYear('start_date', $year)
+            ->where('status', 'locked')
             ->whereHas('employees.employee', function($q)  {
                 $q->where('status', 'Active');
             })
@@ -392,9 +393,7 @@ class EWTController extends Controller
                 'recordsFiltered' => $totalRecords,
                 'data' => $paginatedData,
                 'months' => $monthHeaders,
-                'success' => true,
-                  'sql' => $query->toSql(),
-                'bindings' => $query->getBindings()
+                'success' => true
             ]);
         } catch (\Exception $e) {
             Log::error("EWT Data Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
@@ -451,7 +450,10 @@ class EWTController extends Controller
                     }
                 ])
                 ->whereYear('start_date', $year)
-                ->whereIn('employees.employee.status', ['Inactive', 'Terminated', 'Resigned'])
+                ->where('status', 'locked')
+                ->whereHas('employees.employee', function($q) {
+                    $q->whereIn('status', ['Inactive', 'Terminated', 'Resigned']);
+                })
                 ->whereHas('employees.employee.resortAdmin', function($q) use ($resort_id) {
                     $q->where('resort_id', $resort_id);
                 });
