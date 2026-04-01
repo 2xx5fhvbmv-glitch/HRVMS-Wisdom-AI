@@ -294,6 +294,7 @@ class EWTController extends Controller
                 foreach ($payroll->employees as $payrollEmployee) {
 
                     $employee = $payrollEmployee->employee;
+                    if (!$employee || !$employee->resortAdmin) continue;
 
                     if ($request->filled('department') && $employee->Dept_id != $request->department) {
                         continue;

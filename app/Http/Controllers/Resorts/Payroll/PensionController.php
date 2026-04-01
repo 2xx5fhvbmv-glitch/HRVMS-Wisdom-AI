@@ -147,9 +147,13 @@ class PensionController extends Controller
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->join('resort_departments as rd', 'e.Dept_id', '=', 'rd.id')
             ->join('resort_positions as rp', 'e.Position_id', '=', 'rp.id')
+            ->leftJoin('payroll_reviews as pr', function($join) {
+                $join->on('pr.payroll_id', '=', 'pd.payroll_id')
+                     ->on('pr.employee_id', '=', 'pd.employee_id');
+            })
             ->leftJoin('employee_resignation as er', function($join) {
                 $join->on('er.employee_id', '=', 'e.id')
-                    ->where('er.status', 'approved'); // Only approved resignations
+                    ->where('er.status', 'approved');
             })
             ->where('e.status','Active')
             ->where('p.resort_id', $resort_id)
@@ -164,7 +168,7 @@ class PensionController extends Controller
                 'rd.name as department',
                 'rd.code as department_code',
                 'rp.position_title as position',
-                'e.basic_salary',
+                'pr.earned_salary',
                 DB::raw('DATE_FORMAT(p.start_date, "%b") as month'),
                 DB::raw('YEAR(p.start_date) as year'),
                 'pd.pension as employee_pension',
@@ -249,8 +253,8 @@ class PensionController extends Controller
             ->addColumn('position', function ($employee) {
                 return $employee->position ?? 'N/A';
             })
-            ->addColumn('basic_salary', function ($employee) {
-                return $employee->basic_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->basic_salary, 2) : 'N/A';
+            ->addColumn('earned_salary', function ($employee) {
+                return $employee->earned_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->earned_salary, 2) : Common::GetResortCurrencySymbol() . ' 0.00';
             })
             ->addColumn('time', function ($employee) {
                 return $employee->month . " " . $employee->year ?? 'N/A';
@@ -283,128 +287,134 @@ class PensionController extends Controller
 
         if($request->ajax()) {
             $query = DB::table('payroll_deductions as pd')
-            ->join('payroll as p', 'p.id', '=', 'pd.payroll_id')
-            ->join('employees as e', 'pd.employee_id', '=', 'e.id')
-            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-            ->join('resort_departments as rd', 'e.Dept_id', '=', 'rd.id')
-            ->join('resort_positions as rp', 'e.Position_id', '=', 'rp.id')
-            ->leftJoin('employee_resignation as er', function($join) {
-                $join->on('er.employee_id', '=', 'e.id')
-                    ->where('er.status', 'Approved');
-            });    
+                ->join('payroll as p', 'p.id', '=', 'pd.payroll_id')
+                ->join('employees as e', 'pd.employee_id', '=', 'e.id')
+                ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                ->join('resort_departments as rd', 'e.Dept_id', '=', 'rd.id')
+                ->join('resort_positions as rp', 'e.Position_id', '=', 'rp.id')
+                ->leftJoin('payroll_reviews as pr', function($join) {
+                    $join->on('pr.payroll_id', '=', 'pd.payroll_id')
+                         ->on('pr.employee_id', '=', 'pd.employee_id');
+                })
+                ->leftJoin('employee_resignation as er', function($join) {
+                    $join->on('er.employee_id', '=', 'e.id')
+                        ->where('er.status', 'Approved');
+                })
+                ->where('p.resort_id', $resort_id)
+                ->where('p.status', 'locked')
+                ->whereIn('e.status', ['Resigned', 'Terminated', 'Inactive'])
+                ->select(
+                    'e.id as employee_id',
+                    'e.Emp_id as Emp_id',
+                    'e.Admin_Parent_id',
+                    'ra.first_name',
+                    'ra.last_name',
+                    'ra.profile_picture',
+                    'rd.name as department',
+                    'rp.position_title as position',
+                    'pr.earned_salary',
+                    DB::raw('DATE_FORMAT(p.start_date, "%b") as month'),
+                    DB::raw('YEAR(p.start_date) as year'),
+                    'pd.pension as employee_pension',
+                    'pd.pension as employer_pension',
+                    'e.status',
+                    'er.resignation_date',
+                    'er.last_working_day'
+                );
 
-        $query->where('p.resort_id', $resort_id)
-            ->where('p.status', 'locked')
-            ->whereIn('e.status', ['Resigned', 'Terminated', 'Inactive'])
-            ->select(
-               'e.id as employee_id',
-                'e.Emp_id as Emp_id',
-                'e.Admin_Parent_id',
-                'ra.first_name',
-                'ra.last_name',
-                'ra.profile_picture',
-                'rd.name as department',
-                'rd.code as department_code',
-                'rp.position_title as position',
-                'e.basic_salary',
-                DB::raw('DATE_FORMAT(p.start_date, "%b") as month'),
-                DB::raw('YEAR(p.start_date) as year'),
-                'pd.pension as employee_pension',
-                'pd.pension as employer_pension',
-                'e.status',
-                'er.resignation_date',
-                'er.last_working_day'
-            );
+            if ($request->searchTerm) {
+                $searchTerm = $request->searchTerm;
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('ra.first_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('ra.last_name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('rd.name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('rp.position_title', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('pd.pension', 'LIKE', "%{$searchTerm}%");
+                });
+            }
 
-        if ($request->searchTerm) {
-            $searchTerm = $request->searchTerm;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('ra.first_name', 'LIKE', "%{$searchTerm}%")
-                ->orWhere('ra.last_name', 'LIKE', "%{$searchTerm}%")
-                ->orWhere('rd.name', 'LIKE', "%{$searchTerm}%")
-                ->orWhere('rp.position_title', 'LIKE', "%{$searchTerm}%")
-                ->orWhere('e.basic_salary', 'LIKE', "%{$searchTerm}%")
-                ->orWhere('pd.pension', 'LIKE', "%{$searchTerm}%");
-            });
-        }
+            if ($request->department) {
+                $query->where('e.Dept_id', $request->department);
+            }
 
-        if ($request->department) {
-            $query->where('e.Dept_id', $request->department);
-        }
+            if ($request->position) {
+                $query->where('e.Position_id', $request->position);
+            }
 
-        if ($request->position) {
-            $query->where('e.Position_id', $request->position);
-        }
+            if ($request->month) {
+                $query->whereMonth('p.start_date', $request->month);
+            }
 
-        $totalQuery = clone $query;
-        $totals = $totalQuery->select(
-            DB::raw('SUM(pd.pension) as total_employee_pension'),
-            DB::raw('SUM(pd.pension) as total_employer_pension') // Are these really the same?
-        )->first();
+            if ($request->year) {
+                $query->whereYear('p.start_date', $request->year);
+            }
 
-        return datatables()->of($query)
-            ->addColumn('name', function ($employee) {
-                $profilePicture = Common::getResortUserPicture($employee->Admin_Parent_id);
-                $fullName = ($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '');
-                $fullName = trim($fullName) !== '' ? trim($fullName) : 'N/A';
-                
-                // Resignation indicator
-                $resignedHtml = '';
-                if ($employee->resignation_date) {
-                    $resignDate = \Carbon\Carbon::parse($employee->resignation_date)->format('d M Y');
-                    $lastDay = \Carbon\Carbon::parse($employee->last_working_day)->format('d M Y');
+            $totalQuery = clone $query;
+            $totals = $totalQuery->select(
+                DB::raw('SUM(pd.pension) as total_employee_pension'),
+                DB::raw('SUM(pd.pension) as total_employer_pension')
+            )->first();
 
-                    $resignedHtml = '
-                        <span class="ttb-hover ttb-resigned ms-2" data-bs-toggle="tooltip"
-                                        data-bs-placement="top" data-bs-title="Resigned" data-bs-date="'.$lastDay.'">
-                            <i class="fa-regular fa-circle-exclamation"></i>
-                            <span class="ttb-main">
-                                <span class="ttb-inner">
-                                    <h6><span>Resigned</span> - ' . $resignDate . '</h6>
-                                    <p>Will be removed from the pension contributions starting ' . $lastDay . '</p>
+            return datatables()->of($query)
+                ->addColumn('name', function ($employee) {
+                    $profilePicture = Common::getResortUserPicture($employee->Admin_Parent_id);
+                    $fullName = ($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '');
+                    $fullName = trim($fullName) !== '' ? trim($fullName) : 'N/A';
+
+                    $resignedHtml = '';
+                    if ($employee->resignation_date) {
+                        $resignDate = \Carbon\Carbon::parse($employee->resignation_date)->format('d M Y');
+                        $lastDay = $employee->last_working_day ? \Carbon\Carbon::parse($employee->last_working_day)->format('d M Y') : 'N/A';
+
+                        $resignedHtml = '
+                            <span class="ttb-hover ttb-resigned ms-2" data-bs-toggle="tooltip"
+                                            data-bs-placement="top" data-bs-title="Resigned" data-bs-date="'.$lastDay.'">
+                                <i class="fa-regular fa-circle-exclamation"></i>
+                                <span class="ttb-main">
+                                    <span class="ttb-inner">
+                                        <h6><span>Resigned</span> - ' . $resignDate . '</h6>
+                                        <p>Removed from pension contributions since ' . $lastDay . '</p>
+                                    </span>
                                 </span>
                             </span>
-                        </span>
-                    ';
-                }
-                
-                return '<div class="tableUser-block">
-                            <div class="img-circle">
-                                <img src="' . $profilePicture . '" alt="' . htmlspecialchars($fullName) . '" 
-                                    onerror="this.src=\'/images/default-avatar.png\'">
-                            </div>
-                            <span>' . htmlspecialchars($fullName) . '</span>
-                            ' . $resignedHtml . '
-                        </div>';
-            })
-            ->addColumn('department', function ($employee) {
-                $departmentName =  $employee->department ?? 'N/A';
-                $departmentCode =  $employee->department_code ?? 'N/A';
-                return $departmentName.'<span class="badge badge-themeLight">'.$departmentCode.'</span>';
-            })
-            ->addColumn('position', function ($employee) {
-                return $employee->position ?? 'N/A';
-            })
-            ->addColumn('basic_salary', function ($employee) {
-                return $employee->basic_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->basic_salary, 2) : 'N/A';
-            })
-            ->addColumn('time', function ($employee) {
-                return $employee->month . " " . $employee->year ?? 'N/A';
-            })
-            ->addColumn('pension_percentage', function ($employee) {
-                return isset($employee->contribution) ? $employee->contribution . '%' : '7%';
-            })
-            ->addColumn('row_class', function ($employee) {
-                return $employee->resignation_date ? 'danger-tr' : '';
-            })
-            ->with([
-                'totals' => [
-                    'employee_pension' => $totals->total_employee_pension ?? 0,
-                    'employer_pension' => $totals->total_employer_pension ?? 0
-                ]
-            ])
-            ->rawColumns(['name', 'department', 'position', 'basic_salary', 'time', 'pension_percentage'])
-            ->make(true);
+                        ';
+                    }
+
+                    return '<div class="tableUser-block">
+                                <div class="img-circle">
+                                    <img src="' . $profilePicture . '" alt="' . htmlspecialchars($fullName) . '"
+                                        onerror="this.src=\'/images/default-avatar.png\'">
+                                </div>
+                                <span>' . htmlspecialchars($fullName) . '</span>
+                                ' . $resignedHtml . '
+                            </div>';
+                })
+                ->addColumn('department', function ($employee) {
+                    return $employee->department ?? 'N/A';
+                })
+                ->addColumn('position', function ($employee) {
+                    return $employee->position ?? 'N/A';
+                })
+                ->addColumn('earned_salary', function ($employee) {
+                    return $employee->earned_salary ? Common::GetResortCurrencySymbol() . ' ' . number_format($employee->earned_salary, 2) : Common::GetResortCurrencySymbol() . ' 0.00';
+                })
+                ->addColumn('time', function ($employee) {
+                    return $employee->month . " " . $employee->year ?? 'N/A';
+                })
+                ->addColumn('pension_percentage', function ($employee) {
+                    return isset($employee->contribution) ? $employee->contribution . '%' : '7%';
+                })
+                ->addColumn('row_class', function ($employee) {
+                    return $employee->resignation_date ? 'danger-tr' : '';
+                })
+                ->with([
+                    'totals' => [
+                        'employee_pension' => $totals->total_employee_pension ?? 0,
+                        'employer_pension' => $totals->total_employer_pension ?? 0
+                    ]
+                ])
+                ->rawColumns(['name'])
+                ->make(true);
         }                                  
         return view('resorts.payroll.pension.former-employees', compact('page_title', 'employees','positions', 'departments'));
     }

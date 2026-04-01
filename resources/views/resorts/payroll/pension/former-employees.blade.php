@@ -41,10 +41,25 @@
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select  id="positionFilter" class="form-select select2t-none">
                                 <option value="">All Positions</option>
-                                <!-- Example: populate dynamically or statically -->
                                 @foreach($positions as $position)
                                     <option value="{{ $position->id }}">{{ $position->position_title }}</option>
                                 @endforeach
+                            </select>
+                        </div>
+                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
+                            <select id="monthFilter" class="form-select">
+                                <option value="">All Months</option>
+                                @for($i = 1; $i <= 12; $i++)
+                                    <option value="{{ $i }}">{{ date('F', mktime(0,0,0,$i,1)) }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
+                            <select id="yearFilter" class="form-select">
+                                <option value="">All Years</option>
+                                @for($y = now()->year; $y >= now()->year - 5; $y--)
+                                    <option value="{{ $y }}">{{ $y }}</option>
+                                @endfor
                             </select>
                         </div>
                         <div class="col-auto ms-auto">
@@ -60,7 +75,7 @@
                             <th>Name </th>
                             <th>Department </th>
                             <th>Position</th>
-                            <th>Basic Salary</th>
+                            <th>Basic Earned</th>
                             <th>Time</th>
                             <th>Person Contribution</th>
                             <th>Employee </th>
@@ -94,7 +109,7 @@ $(document).ready(function () {
     $('.select2t-none').select2();
     loadPensionTable();
 
-    $('#searchInput, #departmentFilter, #positionFilter').on('keyup change', function () {
+    $('#searchInput, #departmentFilter, #positionFilter, #monthFilter, #yearFilter').on('keyup change', function () {
         loadPensionTable();
     });
 });
@@ -114,13 +129,15 @@ function loadPensionTable() {
         "iDisplayLength": 10,
         processing: true,
         serverSide: true,
-        order:[[9, 'desc']],
+        order:[[0, 'asc']],
         "ajax": {
             url: "{{ route('payroll.pension.former-employees') }}",
             data: function (d) {
                 d.searchTerm = $('#searchInput').val();
                 d.department = $('#departmentFilter').val();
                 d.position = $('#positionFilter').val();
+                d.month = $('#monthFilter').val();
+                d.year = $('#yearFilter').val();
             },
             type: "GET",
         },
@@ -148,7 +165,7 @@ function loadPensionTable() {
             { data: 'name' },
             { data: 'department' },
             { data: 'position' },
-            { data: 'basic_salary' },
+            { data: 'earned_salary' },
             { data: 'time' },
             { data: 'pension_percentage' },
             { 
@@ -163,7 +180,6 @@ function loadPensionTable() {
                     return data ? formatAmount(parseFloat(data), 'USD') : currencySymbol + ' 0.00';
                 }
             },
-            { data: 'created_at', visible: false, searchable: false }
         ],
         "initComplete": function() {
             // Initialize footer if it doesn't exist

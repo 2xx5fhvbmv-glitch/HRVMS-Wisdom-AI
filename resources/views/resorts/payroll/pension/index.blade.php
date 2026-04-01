@@ -75,7 +75,7 @@
                             <th>Name </th>
                             <th>Department </th>
                             <th>Position</th>
-                            <th>Basic Salary</th>
+                            <th>Basic Earned</th>
                             <th>Time</th>
                             <th>Person Contribution</th>
                             <th>Employee </th>
@@ -100,7 +100,14 @@
 @endsection
 
 @section('import-css')
-
+<style>
+    .danger-tr {
+        background-color: #ffe0e0 !important;
+    }
+    .danger-tr td {
+        background-color: #ffe0e0 !important;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -153,11 +160,11 @@ function initPensionTable() {
             },
             type: "GET",
         },
-        // "createdRow": function(row, data, dataIndex) {
-        //     if (data.row_class) {
-        //         $(row).addClass(data.row_class);
-        //     }
-        // },
+        "createdRow": function(row, data, dataIndex) {
+            if (data.row_class) {
+                $(row).addClass(data.row_class);
+            }
+        },
         "footerCallback": function (row, data, start, end, display) {
             var api = this.api();
             var json = api.ajax.json();
@@ -177,7 +184,7 @@ function initPensionTable() {
             { data: 'name' },
             { data: 'department' },
             { data: 'position' },
-            { data: 'basic_salary' },
+            { data: 'earned_salary' },
             { data: 'time' },
             { data: 'pension_percentage' },
             { 

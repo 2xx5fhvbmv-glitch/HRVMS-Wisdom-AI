@@ -151,6 +151,12 @@ class DashboardController extends Controller
                     ->orderBy('step_order')
                     ->get();
                 $p->has_rejection = $p->approvals->where('status', 'rejected')->isNotEmpty();
+                // If total_payroll is 0, calculate from reviews
+                if ($p->total_payroll <= 0) {
+                    $p->total_payroll = \DB::table('payroll_reviews')
+                        ->where('payroll_id', $p->id)
+                        ->sum('net_salary');
+                }
                 return $p;
             });
 
@@ -345,8 +351,7 @@ class DashboardController extends Controller
     {
         $selectedMonth = $request->input('month', now()->month);
         $payrollData = $this->buildPayrollComparison($selectedMonth);
-        // dd($payrollData);
-        $html = view('resorts.renderfiles.payroll_comparison_card', compact('payrollData'))->render();
+        $html = view('resorts.renderfiles.payroll_comparison_card', compact('payrollData', 'selectedMonth'))->render();
 
         return response()->json(['html' => $html]);
     }
@@ -356,11 +361,13 @@ class DashboardController extends Controller
         $selectedMonth = $selectedMonth ?? now()->month;
         $currentYear = now()->year;
         $previousYear = $currentYear - 1;
+        $twoYearsAgo = $currentYear - 2;
         $resort_id = $this->resort->resort_id;
 
         $months = [
             ['year' => $currentYear, 'month' => $selectedMonth],
-            ['year' => $previousYear, 'month' => $selectedMonth]
+            ['year' => $previousYear, 'month' => $selectedMonth],
+            ['year' => $twoYearsAgo, 'month' => $selectedMonth]
         ];
 
         $data = [];
