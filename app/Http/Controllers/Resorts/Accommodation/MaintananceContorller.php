@@ -43,7 +43,7 @@ class MaintananceContorller extends Controller
 
     public function CreateMaintenance()
     {
-        if(Common::checkRouteWisePermission('resort.accommodation.CreateMaintenance',config('settings.resort_permissions.create')) != false){
+        if(Common::checkRouteWisePermission('resort.accommodation.CreateMaintenance',config('settings.resort_permissions.create')) == false){
             return redirect()->route('resort.accommodation.MaintanaceRequestlist');
         }
         $page_title = 'Create Maintenance Request';
@@ -79,23 +79,26 @@ class MaintananceContorller extends Controller
             'descriptionIssues' => $descriptionIssues,
             'priority' => $priority,
             'date'=>$date,
-            'Raised_By' => Auth::guard('resort-admin')->user()->GetEmployee->id,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'Raised_By' => $request->raised_by ?? Auth::guard('resort-admin')->user()->GetEmployee->id,
         ];
 
         $validator = Validator::make($request->all(), [
-                'Video' => 'nullable|file|mimes:mp4,mov|max:7168', // in KB (7MB)
-                'Image' => 'nullable|file|mimes:jpg,jpeg,png|max:1024', // 1MB = 1024KB
-                'item_id' => 'required',
+                'Video' => 'nullable|file|mimes:mp4,mov|max:7168',
+                'Image' => 'nullable|file|mimes:jpg,jpeg,png|max:1024',
+                'item_id' => 'nullable',
                 'building_id' => 'required',
                 'descriptionIssues' => 'required',
                 'FloorNo' => 'required',
                 'RoomNo' => 'required',
+                'start_time' => 'nullable',
+                'end_time' => 'nullable',
             ], [
                 'Video.max' => 'The video size must not exceed 7 MB.',
                 'Video.mimes' => 'The video must be a file of type: mp4, mov.',
                 'Image.max' => 'The image size must not exceed 1 MB.',
                 'Image.mimes' => 'The image must be a file of type: jpg, jpeg, png.',
-                'item_id.required' => 'Please select an amenity.',
                 'descriptionIssues.required' => 'Please enter a description.',
                 'building_id.required' => 'Please select a building.',
                 'FloorNo.required' => 'Please select a floor number.',

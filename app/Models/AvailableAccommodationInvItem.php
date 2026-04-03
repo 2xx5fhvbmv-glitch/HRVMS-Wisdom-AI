@@ -11,7 +11,7 @@ class AvailableAccommodationInvItem extends Model
 
 
     protected $table='available_accommodation_inv_items';
-    public $fillable = ['Available_Acc_id','Item_id'];
+    public $fillable = ['Available_Acc_id','Item_id','quantity'];
 
     public function inventoryModule()
     {

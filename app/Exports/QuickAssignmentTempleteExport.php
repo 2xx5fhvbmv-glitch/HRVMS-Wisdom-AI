@@ -12,27 +12,27 @@ use App\Models\BulidngAndFloorAndRoom;
 use App\Models\AccommodationType;
 use App\Models\BuildingModel;
 use App\Models\AssingAccommodation;
-
+use App\Models\AvailableAccommodationModel;
 use App\Models\Employee;
 use App\Helpers\Common;
-use App\Models\InventoryModule;class QuickAssignmentTempleteExport implements FromCollection, WithHeadings, WithEvents
+
+class QuickAssignmentTempleteExport implements FromCollection, WithHeadings, WithEvents
 {
     public $resort;
 
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
-
     }
 
     public function headings(): array
     {
-        return ['Employee', 'BuildingName','BedNo'];
+        return ['Employee', 'Building', 'Floor', 'Room', 'Bed No'];
     }
 
     public function collection()
     {
-        return collect([]); // Empty collection for the Excel template
+        return collect([]);
     }
 
     public function registerEvents(): array
@@ -46,99 +46,150 @@ use App\Models\InventoryModule;class QuickAssignmentTempleteExport implements Fr
                 $hiddenSheet = $spreadsheet->createSheet();
                 $hiddenSheet->setTitle('DropdownData');
 
-                // Fetch Employee Names
-                $Employee = Employee::with('resortAdmin')
-                    ->where('resort_id', $this->resort->resort_id)
+                $resortId = $this->resort->resort_id;
+
+                // Fetch Employee Names - format: "Name / EmpID"
+                $employees = Employee::with('resortAdmin')
+                    ->where('resort_id', $resortId)
+                    ->where('status', 'Active')
                     ->get()
                     ->map(function ($e) {
-                        $ranks = Common::getEmpGrade($e->rank);
-                        $emp_grade = config('settings.eligibilty');
-                        return $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name . ' / ' . $e->Emp_id . ' (' . $emp_grade[$ranks] . ')';
+                        return $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name . ' / ' . $e->Emp_id;
                     })
+                    ->values()
                     ->toArray();
 
-                // Fetch Floors and Rooms
-                $available_id = []; // Initialize array
-
-                $floors = BulidngAndFloorAndRoom::join('building_models as t1', 't1.id', '=', 'bulidng_and_floor_and_rooms.building_id')
-                    ->join('available_accommodation_models as t2', 't2.BuildingName', '=', 't1.id')
-                    ->where('t1.resort_id', $this->resort->resort_id)
-                    ->groupBy('t2.id')
-                    ->get(['t1.BuildingName','t2.RoomNo','t2.Floor as AvailableFloor','t2.id as AvailableId', 't2.RoomType', 'bulidng_and_floor_and_rooms.Floor', 'bulidng_and_floor_and_rooms.Room'])
-                    ->map(function ($i) use (&$available_id) {  // Pass by reference
-                        $roomtypeConfig = config('settings.eligibilty');
-                        $room_Type = $roomtypeConfig[$i->RoomType] ?? '';
-                        $i->BuildingName = $i->BuildingName . ' / Floor - ' . $i->AvailableFloor . ' / Room - ' . $i->RoomNo . ' (' . $room_Type . ')';
-                        if(!in_array($i->AvailableId, $available_id))
-                        {
-                            $available_id[] = $i->AvailableId;
-                        }
-                        return $i;
-                    })
+                // Fetch Buildings
+                $buildings = BuildingModel::where('resort_id', $resortId)
+                    ->pluck('BuildingName')
                     ->toArray();
 
-                foreach ($Employee as $index => $value) {
-                    $hiddenSheet->setCellValue('A' . ($index + 1), $value);
+                // Fetch available beds (unassigned)
+                $beds = AssingAccommodation::join('available_accommodation_models as aa', 'aa.id', '=', 'assing_accommodations.available_a_id')
+                    ->join('building_models as b', 'b.id', '=', 'aa.BuildingName')
+                    ->where('b.resort_id', $resortId)
+                    ->where(function ($q) {
+                        $q->whereNull('assing_accommodations.emp_id')
+                          ->orWhere('assing_accommodations.emp_id', 0);
+                    })
+                    ->select('assing_accommodations.BedNo')
+                    ->distinct()
+                    ->pluck('BedNo')
+                    ->toArray();
+
+                // Fetch floors
+                $floors = AvailableAccommodationModel::where('resort_id', $resortId)
+                    ->select('Floor')
+                    ->distinct()
+                    ->pluck('Floor')
+                    ->map(fn($f) => (string) $f)
+                    ->toArray();
+
+                // Fetch rooms
+                $rooms = AvailableAccommodationModel::where('resort_id', $resortId)
+                    ->select('RoomNo')
+                    ->distinct()
+                    ->pluck('RoomNo')
+                    ->map(fn($r) => (string) $r)
+                    ->toArray();
+
+                // Write dropdown data to hidden sheet
+                foreach ($employees as $i => $val) {
+                    $hiddenSheet->setCellValue('A' . ($i + 1), $val);
+                }
+                foreach ($buildings as $i => $val) {
+                    $hiddenSheet->setCellValue('B' . ($i + 1), $val);
+                }
+                foreach ($floors as $i => $val) {
+                    $hiddenSheet->setCellValue('C' . ($i + 1), $val);
+                }
+                foreach ($rooms as $i => $val) {
+                    $hiddenSheet->setCellValue('D' . ($i + 1), $val);
+                }
+                foreach ($beds as $i => $val) {
+                    $hiddenSheet->setCellValue('E' . ($i + 1), $val);
                 }
 
-                $AssingAccommodation  = AssingAccommodation::join('available_accommodation_models as t1','t1.id','=','assing_accommodations.available_a_id')
-                                                            ->join('building_models as t2','t2.id','=','t1.BuildingName')
-                                                            ->where('t2.resort_id',$this->resort->resort_id)
-                                                            ->whereIn('assing_accommodations.available_a_id', $available_id)
-                                                            ->get(['t2.BuildingName as Bname','t1.RoomType','t1.Floor','t1.RoomNo','t1.id as AvailableId','assing_accommodations.BedNo'])
-                                                            ->map(function ($i) {
-                                                                $roomtypeConfig = config('settings.eligibilty');
-                                                                $room_Type = $roomtypeConfig[$i->RoomType] ?? '';
-                                                                    $i->BuildingName = $i->Bname . ' / F - ' . $i->Floor . ' / R - ' . $i->RoomNo .' / '.$i->BedNo .' / '.$room_Type;
+                // Create named ranges
+                if (count($employees) > 0) {
+                    $spreadsheet->addNamedRange(new \PhpOffice\PhpSpreadsheet\NamedRange('EmployeeList', $hiddenSheet, 'A1:A' . count($employees)));
+                }
+                if (count($buildings) > 0) {
+                    $spreadsheet->addNamedRange(new \PhpOffice\PhpSpreadsheet\NamedRange('BuildingList', $hiddenSheet, 'B1:B' . count($buildings)));
+                }
+                if (count($floors) > 0) {
+                    $spreadsheet->addNamedRange(new \PhpOffice\PhpSpreadsheet\NamedRange('FloorList', $hiddenSheet, 'C1:C' . count($floors)));
+                }
+                if (count($rooms) > 0) {
+                    $spreadsheet->addNamedRange(new \PhpOffice\PhpSpreadsheet\NamedRange('RoomList', $hiddenSheet, 'D1:D' . count($rooms)));
+                }
+                if (count($beds) > 0) {
+                    $spreadsheet->addNamedRange(new \PhpOffice\PhpSpreadsheet\NamedRange('BedList', $hiddenSheet, 'E1:E' . count($beds)));
+                }
 
-                                                                return $i;
-                                                            })
-                                                            ->pluck('BuildingName')->toArray();
-                    // Convert bed numbers array to string with proper formatting
-                    $BedNODropdown = array_map(function($bed) {
-                        return strval($bed);
-                    }, $AssingAccommodation);
-                    $BedNODropdown = implode(',', $BedNODropdown);
-                    $BuildingDropDown = array_map(function($building) {
-                        return str_replace(',', ' ', $building['BuildingName']); // Remove commas that could break dropdown
-                    }, $floors);
-                $BuildingDropDown = implode(',', $BuildingDropDown);
-                $spreadsheet->addNamedRange(new \PhpOffice\PhpSpreadsheet\NamedRange('EmployeeList', $hiddenSheet, 'A1:A' . count($Employee)));
+                // Set column widths
+                $worksheet->getColumnDimension('A')->setWidth(35);
+                $worksheet->getColumnDimension('B')->setWidth(20);
+                $worksheet->getColumnDimension('C')->setWidth(10);
+                $worksheet->getColumnDimension('D')->setWidth(10);
+                $worksheet->getColumnDimension('E')->setWidth(15);
 
-                for ($row = 2; $row <= 100; $row++)
-                {
-                    // Employee Dropdown
-                    $worksheet->getCell('A' . $row)->getDataValidation()
-                        ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-                        ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
-                        ->setAllowBlank(false)
-                        ->setShowDropDown(true)
-                        ->setFormula1('=EmployeeList');
+                // Apply dropdowns for rows 2-100
+                for ($row = 2; $row <= 100; $row++) {
+                    // Employee dropdown
+                    if (count($employees) > 0) {
+                        $worksheet->getCell('A' . $row)->getDataValidation()
+                            ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                            ->setAllowBlank(true)
+                            ->setShowDropDown(true)
+                            ->setFormula1('=EmployeeList');
+                    }
 
-                    $worksheet->getColumnDimension('A')->setWidth(30);
+                    // Building dropdown
+                    if (count($buildings) > 0) {
+                        $worksheet->getCell('B' . $row)->getDataValidation()
+                            ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                            ->setAllowBlank(true)
+                            ->setShowDropDown(true)
+                            ->setFormula1('=BuildingList');
+                    }
 
-                    // Building Dropdown
-                    $worksheet->getCell('B'.$row)->getDataValidation()
-                    ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-                    ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
-                    ->setAllowBlank(false)
-                    ->setShowDropDown(true)
-                    ->setFormula1('"' . $BuildingDropDown . '"');
-                    $worksheet->getColumnDimension('B')->setWidth(30);
+                    // Floor dropdown
+                    if (count($floors) > 0) {
+                        $worksheet->getCell('C' . $row)->getDataValidation()
+                            ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                            ->setAllowBlank(true)
+                            ->setShowDropDown(true)
+                            ->setFormula1('=FloorList');
+                    }
 
-                    $worksheet->getCell('C'.$row)->getDataValidation()
-                    ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-                    ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
-                    ->setAllowBlank(false)
-                    ->setShowDropDown(true)
-                    ->setFormula1('"' . $BedNODropdown . '"');
-                    $worksheet->getColumnDimension('C')->setWidth(30);
+                    // Room dropdown
+                    if (count($rooms) > 0) {
+                        $worksheet->getCell('D' . $row)->getDataValidation()
+                            ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                            ->setAllowBlank(true)
+                            ->setShowDropDown(true)
+                            ->setFormula1('=RoomList');
+                    }
 
+                    // Bed dropdown
+                    if (count($beds) > 0) {
+                        $worksheet->getCell('E' . $row)->getDataValidation()
+                            ->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                            ->setAllowBlank(true)
+                            ->setShowDropDown(true)
+                            ->setFormula1('=BedList');
+                    }
                 }
 
                 // Hide the dropdown data sheet
                 $spreadsheet->setActiveSheetIndex(0);
-                $spreadsheet->getSheetByName('DropdownData')->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_HIDDEN);
+                $hiddenSheet->setSheetState(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::SHEETSTATE_HIDDEN);
             }
         ];
     }

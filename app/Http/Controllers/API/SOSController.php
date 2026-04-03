@@ -123,7 +123,7 @@ class SOSController extends Controller
             $moduleName                                 =   'SOS';
             $sound                                      =   'siren_sound';
             $custom_sound_channel                       =   'custom_sound_channel';
-            $sosPushNotification                        =   Common::sendPushNotifictionForMobile([$smEmployee['device_token']], $title, $body, $moduleName,'Pending',$sound,$custom_sound_channel,NULL);
+            $sosPushNotification                        =   Common::sendPushNotificationForMobile([$smEmployee['device_token']], $title, $body, $moduleName,'Pending',$sound,$custom_sound_channel,NULL);
 
             $sosNotification                            =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$body,$moduleName,[$smEmployee['id']],null);
 
@@ -221,7 +221,7 @@ class SOSController extends Controller
             if (in_array($request->action, ['Rejected', 'Drill-Rejected'])) {
                 $sosStatus                              = 'Rejected';
                 $body                                   = "{$empName->first_name} {$empName->last_name} SOS {$sosStatus}";
-                Common::sendPushNotifictionForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName, $sosStatus, null, null,NULL);
+                Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName, $sosStatus, null, null,NULL);
                 Common::sendMobileNotification($this->resort_id,2,null, null, $title, $body, $moduleName, [$empInitiatedDeviceToken['id']], null);
                 return response()->json([
                     'success'                           =>  true, 
@@ -303,11 +303,11 @@ class SOSController extends Controller
             $empIds                                     =   $getTeamMemeber->pluck('id')->unique()->values()->toArray();
 
             //Send in app and push notification to the team member
-            Common::sendPushNotifictionForMobile($deviceTokens, $title, $request->team_message, $moduleName,$sosStatus,$sound,$custom_sound_channel,NULL);
+            Common::sendPushNotificationForMobile($deviceTokens, $title, $request->team_message, $moduleName,$sosStatus,$sound,$custom_sound_channel,NULL);
             Common::sendMobileNotification($this->resort_id,2,null,null, $title,$request->team_message,$moduleName,$empIds,null);
 
             //Send in app and push notification to the who initiated the SOS
-            Common::sendPushNotifictionForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName,'Active',$sound,$custom_sound_channel,NULL);
+            Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName,'Active',$sound,$custom_sound_channel,NULL);
             Common::sendMobileNotification($this->resort_id,2,null,null,$title, $body,$moduleName,[$empInitiatedDeviceToken['id']],null);
 
             //Send push notification to the employee same resort
@@ -322,7 +322,7 @@ class SOSController extends Controller
                                                                 ->where('id','!=',$employee_id)
                                                                 ->pluck('id');
 
-            Common::sendPushNotifictionForMobile($allEmpDeviceId->toArray(), $title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.', $moduleName,'Active',$sound,$custom_sound_channel,NULL);
+            Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.', $moduleName,'Active',$sound,$custom_sound_channel,NULL);
             Common::sendMobileNotification($this->resort_id,2,null,null,$title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.',$moduleName,$allEmpId,null);
 
             ChildSOSHistoryStatus::create([
@@ -1056,7 +1056,7 @@ class SOSController extends Controller
             
             //Send push notification to the employee same resort
             $allEmpDeviceId                         =   Employee::where('resort_id',$this->resort_id)->where('status','Active')->where('id','!=',$this->user->GetEmployee->id)->pluck('device_token');
-            $allEmpPushNotification                 =   Common::sendPushNotifictionForMobile($allEmpDeviceId->toArray(), $title, $body, $moduleName,'Completed',NULL,NULL,NULL);
+            $allEmpPushNotification                 =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $body, $moduleName,'Completed',NULL,NULL,NULL);
 
             // DB::commit();
             return response()->json([

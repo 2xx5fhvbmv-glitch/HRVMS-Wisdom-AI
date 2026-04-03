@@ -34,6 +34,11 @@ class AssignAccommodationController extends Controller
         if(Common::checkRouteWisePermission('resort.accommodation.AssignAccommation',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized access');
         }
+        // Only show employees who are NOT already assigned to a bed
+        $assignedEmpIds = AssingAccommodation::where('resort_id', $this->resort->resort_id)
+                            ->where('emp_id', '!=', 0)
+                            ->pluck('emp_id');
+
         $Employeelist = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                             ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
                             ->select(
@@ -47,6 +52,8 @@ class AssignAccommodationController extends Controller
                             )
                             ->groupBy('employees.id')
                             ->where("t1.resort_id", $this->resort->resort_id)
+                            ->where('employees.status', 'Active')
+                            ->whereNotIn('employees.id', $assignedEmpIds)
                             ->get()
                             ->map(function ($item) {
                                     $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
@@ -68,20 +75,16 @@ class AssignAccommodationController extends Controller
     {
         $Employeeid = $request->Employeeid;
 
-        $emp =Employee::with('resortAdmin')->find($Employeeid);
-
-        $rank = Common::getEmpGrade($emp->rank);
+        $emp = Employee::with('resortAdmin')->find($Employeeid);
 
         $gender = ucfirst($emp->resortAdmin->gender);
-
-
 
         $select_build = $request->select_build;
         if($request->ajax())
         {
             $data = AvailableAccommodationModel::where("BuildingName", $select_build)
                     ->where('resort_id', $this->resort->resort_id)
-                    ->where('RoomType', $rank)
+                    ->where('RoomType', $emp->rank)
                     ->where('blockFor', $gender)
                     ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType') // Eager load relationships
                     ->get()
@@ -155,8 +158,7 @@ class AssignAccommodationController extends Controller
                         return $d;
                     })
                     ->editColumn('Status', function ($row) {
-                        // Replace with the appropriate status logic
-                        return '<span class="badge" style="background-color: ' . e($row->Color) . ';">' . e($row->AccommodationName) . '</span>';
+                        return '<span class="badge" style="background-color: ' . e($row->Color) . '; color: #000;">' . e($row->AccommodationName) . '</span>';
                     })
                     ->rawColumns(['Status', 'Action']) // Mark 'Action' column as raw HTML
     ->make(true);
@@ -171,6 +173,7 @@ class AssignAccommodationController extends Controller
                                             ->leftJoin('employees as t2',"t2.id","=","t1.emp_id")
                                             ->leftJoin('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
                                             ->where('available_accommodation_models.id',$id)
+                                            ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
                                             ->get([
                                                             'available_accommodation_models.BuildingName',
                                                             'available_accommodation_models.Floor',
@@ -308,24 +311,10 @@ class AssignAccommodationController extends Controller
     public function GetAccmmodationwiseEmployee(Request $request)
     {
         $RoomType = base64_decode($request->RoomType);
-        $available_a_id =  base64_decode($request->available_a_id);
+        $available_a_id = base64_decode($request->available_a_id);
 
-
-        if($RoomType == 1 ){
-            $emp_grade = [1, 3 , 7 , 8];
-        }
-        else if($RoomType == 4){
-            $emp_grade = [4];
-        }
-        else if($RoomType == 2){
-            $emp_grade = [ 2];
-        }
-        else if($RoomType == 5){
-            $emp_grade = [ 5];
-        }
-        else{
-            $emp_grade =[6];
-        }
+        // Match employees by their exact rank to the room type
+        $emp_grade = [$RoomType];
 
         $AvailableAccommodationModel = AvailableAccommodationModel::where("id", $available_a_id)
                                                                     ->pluck('blockFor')
@@ -349,14 +338,14 @@ class AssignAccommodationController extends Controller
                         't2.position_title',
                         't3.available_a_id'
         )
+        ->where('employees.resort_id', $this->resort->resort_id)
         ->whereIn('t1.gender', $AvailableAccommodationModel)
-        ->whereIn('employees.rank',  $emp_grade) // Normal where for comparison with $RoomType
-
+        ->whereIn('employees.rank',  $emp_grade)
         ->whereNull('t3.available_a_id')
         ->get();
 
 
-        $AssingAccommodation = AssingAccommodation::where("emp_id",0)->where("available_a_id", $available_a_id)->get();
+        $AssingAccommodation = AssingAccommodation::where("emp_id",0)->where("available_a_id", $available_a_id)->where('resort_id', $this->resort->resort_id)->get();
 
 
         return response()->json(['success' =>true,'Employees'=>$Employees,'AssingAccommodation'=>$AssingAccommodation], 200);

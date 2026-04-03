@@ -359,7 +359,7 @@ class DashboardController extends Controller
                                                             ->pluck('device_token');
             $title                                  =   "SOS Mass Instruction";
             $moduleName                             =   'SOS';
-            $allEmpPushNotification             =   Common::sendPushNotifictionForMobile($allEmpDeviceId->toArray(), $title, $request->mass_instruction, $moduleName, NULL, NULL,NULL,'mass');
+            $allEmpPushNotification             =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->mass_instruction, $moduleName, NULL, NULL,NULL,'mass');
         }
         return response()->json(['success' => true, 'message' => 'Mass instruction updated successfully.']);
     }

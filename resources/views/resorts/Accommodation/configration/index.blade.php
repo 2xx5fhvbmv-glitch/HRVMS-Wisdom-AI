@@ -29,30 +29,55 @@
 
         <div class="row g-4">
 
-            <div class="col-lg-4 ">
-                <div class="card">
+            <div class="col-lg-6">
+                <div class="card h-100">
                     <div class="card-title">
-                        <h3> BUILDING NAME </h3>
+                        <h3>Building Name</h3>
                         <div class="text-end">
                             <a href="{{ route('resort.accommodation.config.BuildingIndex') }}" class="a-link">View All</a>
                         </div>
                     </div>
                     <form id="BuildingForm">
                         @csrf
-                        <div class="row g-xl-4 g-3 ">
+                        <div class="row g-xl-4 g-3">
                             <div class="col-md-12">
-                                <label for="typeAccom" class=" form-label">Building Name</label>
-                                <input type="text" class="form-control" name="BuildingName" id="BuildingName" placeholder="Building Name">
+                                <label for="BuildingName" class="form-label">Building Name</label>
+                                <input type="text" class="form-control" name="BuildingName" id="BuildingName" placeholder="Enter building name">
                             </div>
                         </div>
-
                         <div class="card-footer text-end mt-3">
                             <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
             </div>
-            <div class="col-lg-8 ">
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-title">
+                        <h3>Accommodation Type</h3>
+                        <div class="text-end">
+                            <a href="{{ route('resort.accommodation.config.AccommodationIndex') }}" class="a-link">View All</a>
+                        </div>
+                    </div>
+                    <form id="AccommodationTypeForm">
+                        @csrf
+                        <div class="row g-xl-4 g-3">
+                            <div class="col-md-6">
+                                <label for="AccommodationName" class="form-label">Accommodation Name</label>
+                                <input type="text" class="form-control" name="AccommodationName" id="AccommodationName" placeholder="Enter accommodation type">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="AccommodationColor" class="form-label">Color</label>
+                                <input type="color" class="form-control" name="Color" id="AccommodationColor">
+                            </div>
+                        </div>
+                        <div class="card-footer text-end mt-3">
+                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="col-lg-12">
                 <div class="card">
                     <div class="card-title">
                         <h3> Floor And Room Name </h3>
@@ -77,14 +102,11 @@
                             <div class="col-lg-4 col-md-4 col-sm-6">
                                 <label for="floor" class="form-label">FLOOR</label>
                                 <input type="number" min="0" class="form-control" id="Floor_1" name="Floor" placeholder="0 for Ground Floor">
-
                             </div>
                             <div class="col-lg-4 col-md-4 col-sm-6">
                                 <label for="roomNo" class=" form-label">ROOM NO.</label>
                                 <input type="number" min="1" class="form-control" id="Room" name="Room" placeholder="1st floort">
-
                             </div>
-
                         </div>
 
                         <div class="card-footer text-end mt-3">
@@ -97,6 +119,9 @@
                 <div class="card">
                     <div class="card-title">
                         <h3>Available Accommodation</h3>
+                        <div class="text-end">
+                            <a href="{{ route('resort.accommodation.AccommodationMaster') }}" class="a-link">View All</a>
+                        </div>
                     </div>
                     <div class="availabel-main">
                         <div class="availabel-block mb-3">
@@ -219,14 +244,14 @@
                                             <label class="form-check-label" for="female_1">Female</label>
                                         </div>
                                     </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
+                                    <div class="col-lg-6 col-md-6 col-sm-6">
                                         <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
-                                        <select class="form-select select2t-none" multiple id="Inv_Cat_id_1" name="Inv_Cat_id[1][]" 
-                                        aria-label=" Default select example" required 
+                                        <select class="form-select select2-inventory" multiple id="Inv_Cat_id_1" name="Inv_Cat_id[1][]"
+                                        aria-label="Default select example" required
                                         data-parsley-required-message="Please select an option."
-                                        data-parsley-errors-container="#type_accom_error_6">
+                                        data-parsley-errors-container="#type_accom_error_6"
+                                        data-placeholder="Select inventories">
 
-                                        <option value=""></option>
                                         @if($InventoryModule->isNotEmpty())
                                             @foreach ($InventoryModule as $a)
                                                 <option value="{{ $a->id }}">{{ $a->ItemName }} / {{ $a->ItemCode }}</option>
@@ -235,6 +260,10 @@
                                         </select>
                                         <div id="type_accom_error_6"></div>
 
+                                    </div>
+                                    <div class="col-lg-3 col-md-4 col-sm-6">
+                                        <label for="invQty" class="form-label">INVENTORY QUANTITY</label>
+                                        <input type="number" min="1" class="form-control" id="InvQuantity_1" name="InvQuantity[1]" placeholder="e.g. 2" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Inventory quantity is required.">
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
 
@@ -251,6 +280,7 @@
                                         </select>
                                     </div>
 
+                                    {{-- ROOM STATUS - Commented out
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="cleaning" class="form-label">ROOM STATUS</label>
                                         <select class="form-select select2t-none" name="RoomStatus[1]" id="RoomStatus_1" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
@@ -264,6 +294,7 @@
                                             @endif
                                         </select>
                                     </div>
+                                    --}}
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
                                         <input type="number" min="0" max="100" class="form-control" id="Occupancytheresold_1" name="Occupancytheresold[1]" placeholder="90%" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Occupancy threshold is required.">
@@ -416,33 +447,7 @@
                     </form>
                 </div>
             </div>
-            <div class="col-lg-6 ">
-                <div class="card">
-                    <div class="card-title">
-                        <h3>Accommodation Type</h3>
-                        <div class="text-end">
-                            <a href="{{ route('resort.accommodation.config.AccommodationIndex') }}" class="a-link">View All</a>
-                        </div>
-                    </div>
-                    <form id="AccommodationTypeForm">
-                        @csrf
-                        <div class="row g-xl-4 g-3 ">
-                            <div class="col-md-6">
-                                <input type="text" class="form-control" name="AccommodationName" id="AccommodationName" placeholder="Accommodation Type">
-
-                            </div>
-                            <div class="col-md-6">
-                                <input type="color" class="form-control" name="Color" id="AccommodationName" placeholder="color">
-
-                            </div>
-                        </div>
-
-                        <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+            {{-- Accommodation Type moved to top row alongside Building Name --}}
         </div>
 
     </div>
@@ -454,12 +459,46 @@
 @endsection
 
 @section('import-css')
+<style>
+    .select2-inventory + .select2-container {
+        width: 100% !important;
+    }
+    .select2-inventory + .select2-container .select2-selection--multiple {
+        min-height: 38px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        padding: 4px 8px;
+    }
+    .select2-inventory + .select2-container .select2-selection--multiple .select2-selection__choice {
+        background-color: #014653;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 2px 8px;
+        margin: 2px 4px 2px 0;
+        font-size: 12px;
+    }
+    .select2-inventory + .select2-container .select2-selection--multiple .select2-selection__choice__remove {
+        color: #fff;
+        margin-right: 4px;
+    }
+    .select2-inventory + .select2-container .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: #ff6b6b;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
 <script>
 $(document).ready(function()
 {
+    // Initialize inventory multi-select
+    $('.select2-inventory').select2({
+        placeholder: 'Select inventories',
+        allowClear: true,
+        width: '100%'
+    });
+
     $("#TypeAccommodation_1").select2({
        placeholder:'Type of Accommodation',
     });
@@ -1205,19 +1244,22 @@ $(document).ready(function()
                                             <label class="form-check-label" for="female_1">Female</label>
                                         </div>
                                     </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
+                                    <div class="col-lg-6 col-md-6 col-sm-6">
                                         <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
-                                        <select class="form-select select2t-none" multiple id="Inv_Cat_id_${AvailableCount}" name="Inv_Cat_id[${AvailableCount}][]" aria-label=" Default select example" data-parsley-errors-container="#type_accom_type_accom_inventory_error_{{$k}}" required data-parsley-required-message="Please select an option.">
+                                        <select class="form-select select2-inventory" multiple id="Inv_Cat_id_${AvailableCount}" name="Inv_Cat_id[${AvailableCount}][]" aria-label="Default select example" data-parsley-errors-container="#type_accom_type_accom_inventory_error_{{$k}}" required data-parsley-required-message="Please select an option." data-placeholder="Select inventories">
 
-                                        <option value=""></option>
                                         @if($InventoryModule->isNotEmpty())
                                             @foreach ($InventoryModule as $a)
                                                 <option value="{{ $a->id }}">{{ $a->ItemName }} / {{ $a->ItemCode }}</option>
                                             @endforeach
                                         @endif
                                         </select>
-                                                                                <div id="type_accom_type_accom_inventory_error_{{$k}}"></div>
+                                        <div id="type_accom_type_accom_inventory_error_{{$k}}"></div>
 
+                                    </div>
+                                    <div class="col-lg-3 col-md-4 col-sm-6">
+                                        <label for="invQty" class="form-label">INVENTORY QUANTITY</label>
+                                        <input type="number" min="1" class="form-control" id="InvQuantity_${AvailableCount}" name="InvQuantity[${AvailableCount}]" placeholder="e.g. 2" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Inventory quantity is required.">
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
 
@@ -1233,22 +1275,6 @@ $(document).ready(function()
                                                     @endif
                                         </select>
                                         <div id="type_accom_type_accom_cleaningschedule_error_{{$k}}"></div>
-                                    </div>
-
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="cleaning" class="form-label">ROOM STATUS</label>
-                                        <select class="form-select select2t-none" name="RoomStatus[${AvailableCount}]" data-parsley-errors-container="#type_accom_type_accom_Room_status_error_{{$k}}" id="RoomStatus_${AvailableCount}" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
-                                            <?php
-                                                    $RoomStatus = config('settings.RoomStatus');
-                                                ?>
-                                            @if($RoomStatus)
-                                                @foreach ($RoomStatus as $r)
-                                                    <option value="{{ $r }}">{{ $r }}</option>
-                                                @endforeach
-                                            @endif
-                                        </select>
-                                        <div id="type_accom_type_accom_Room_status_error_{{$k}}"></div>
-
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
@@ -1369,7 +1395,9 @@ $(document).ready(function()
        placeholder:'Type of Accommodation',
     });
     $("#Inv_Cat_id_"+AvailableCount).select2({
-       placeholder:'Type of Inventory',
+       placeholder:'Select inventories',
+       allowClear: true,
+       width: '100%'
     });
     $("#CleaningSchedule_"+AvailableCount).select2({
        placeholder:'Type of Cleaning Schedule',
