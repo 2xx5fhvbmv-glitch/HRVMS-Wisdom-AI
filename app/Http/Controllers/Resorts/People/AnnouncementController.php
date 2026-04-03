@@ -205,7 +205,7 @@ class AnnouncementController extends Controller
             $body = $msg;
 
             
-            Common::sendPushNotifictionForMobile([$deviceToken], $title, $body, $moduleName, NULL,NULL,NULL,NULL); 
+            Common::sendPushNotificationForMobile([$deviceToken], $title, $body, $moduleName, NULL,NULL,NULL,NULL); 
             
             event(new ResortNotificationEvent(Common::nofitication(
                 $announcement->resort_id,
@@ -304,7 +304,7 @@ class AnnouncementController extends Controller
             $deviceToken = $employee->device_token;
             $body = $msg;
 
-            Common::sendPushNotifictionForMobile([$deviceToken], $title, $body, $moduleName,NULL,NULL,NULL,NULL);
+            Common::sendPushNotificationForMobile([$deviceToken], $title, $body, $moduleName,NULL,NULL,NULL,NULL);
 
             event(new ResortNotificationEvent(Common::nofitication(
                 $announcement->resort_id,

@@ -5437,12 +5437,9 @@ class Common
 
     public static function FCMTokenPushNotification()
     {
-
-        // $pri_key = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDKZBKBWzljY7nQ\nhYteL5Xnfr6d3lzKphW7XE1BkLKY6yA1akMkM+LUL+fm8FwU8XOfyx0kucZ09R4p\nhtX1y4OUeiFIbBcYyRvp/XKpvGJD1AusvZqkl7nVQ2aQHzEfqpQCJnyLJXpKw3vs\nUaaCsdnCpDcjhn1Gb/RJQGBm+EEDjFXpa7g/aapG7gLX61IQbi8c1XiHyHAirpD4\nQOekZ16dzo3rGgIKAXWC9SOxkcv+IH0O4TkAIDFnR2D+Jrge/WzPp/iHxhp6A+4g\nv2IkXFH9ryJQAK79T7+iQizDwfm6+RDDKJxYo62+1n+z9EJvLcU0lFw18dgLIDLF\nks/hIqN/AgMBAAECggEATMbwxDS0jREwVLvMdnLr1ZFdw2qu3ctqlBR8VEKNlfgg\nVFMW3F14j5EK0q9c5y7/c19sk1mMQSMZiZxWf3NwW3uHM7+ZdXQZTEcy39QQnPWM\nZj/ZMdZDD3WNq1/B1Wby1ev+tBSIE2OcF7aTyaGpX67HIglrbbSbwcwTpgxIMY02\n1NSK1y9QQ+45ocFqUNCoy6pAvey6scfAm/972CkWIFjjl+59/QGcGhYhYWP9x5Cd\nEWsR5zjilOSQ/o6YbD3jK4xD9yF3PMMwZMfRUoGLyA8Ye3xGVdmuBe85aAyNuEXH\nw57MkshYg5nxrlOCyjow7F7n/7r/0ADO/HfTT4xBtQKBgQDtAG3kXxHjSVdL5O+G\nnprCGuOOEs3UIJUsmtTTAQgOpRkZ2pj7I4A2BegL3/Bw7kVp4Aa1/NgAECuKIWCe\nbjHC6NuFMR76rCfZ0inK26ziXRezmEFzeC6PO0gquAtyZIHGtHhhZTDcacuL5gTi\ncB4klcElWPiBIZZrShrd7xMTOwKBgQDanWMCgmLKXuK3bErmqZmfSOQhCi2j7TEL\npe2JZRdic0OazcXrj9AjQICLOlpCDMHoV4KRCM2rktnGTbC3/8KqO1KVuf6JhtYp\nfQGjBOv6zmYyXa5mD51M+GDtuMKqhkkTZYMvET0a8kItewVyDLxX5uvsZL7l7txL\nckZ0YnpkjQKBgQCiS8v1OoFWYu/r4f+A8XXK/Hzd2tSmshVVcUXSpP8ugDKbOM3Q\nFPSEijDoiNbvjstsAGS4FUiZanlWYxr2A0ICVlGVeRjc0i2MBVZnO129ucA0VUxk\n1WUU4qS91EDKejdAqm9RSulV1wDzcXXg1qRdq0uT1sR+MVD/ccTKPCCU5wKBgF8g\nHuYHoD8YvKQ9rfXilKMXz5SE3kk3O6Eq6Upgv6UqLJ+erGGM6W99cLGkiYO2E2Yr\nNfgwEXZ35uUAB0Z5NtZmC9B050ombugMqfqqeJhg2V1PIETuxG6qoVqvi50x43ha\nMpP3d1RTV/J8VmlDG21QYRYy3FIm9pqptfiMpV89AoGALxCI/2rdUOtxCh/a3+rZ\nAouEsVpoqYYGPLoRCn8jDppnPviONnTs0I9wi9cv2s/vHh0RoytvIYEQo+LnlTRy\nh9AwzwT4rAjatnOT0L2mEjJKYwz8qMB5hNvV0iSLLlvGj3PJtqj9wOSLsA/Koc3G\nIFG75ik7dQn+fD+yqoDe5vc=";
-
-        $pri_key = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDKZBKBWzljY7nQ\nhYteL5Xnfr6d3lzKphW7XE1BkLKY6yA1akMkM+LUL+fm8FwU8XOfyx0kucZ09R4p\nhtX1y4OUeiFIbBcYyRvp/XKpvGJD1AusvZqkl7nVQ2aQHzEfqpQCJnyLJXpKw3vs\nUaaCsdnCpDcjhn1Gb/RJQGBm+EEDjFXpa7g/aapG7gLX61IQbi8c1XiHyHAirpD4\nQOekZ16dzo3rGgIKAXWC9SOxkcv+IH0O4TkAIDFnR2D+Jrge/WzPp/iHxhp6A+4g\nv2IkXFH9ryJQAK79T7+iQizDwfm6+RDDKJxYo62+1n+z9EJvLcU0lFw18dgLIDLF\nks/hIqN/AgMBAAECggEATMbwxDS0jREwVLvMdnLr1ZFdw2qu3ctqlBR8VEKNlfgg\nVFMW3F14j5EK0q9c5y7/c19sk1mMQSMZiZxWf3NwW3uHM7+ZdXQZTEcy39QQnPWM\nZj/ZMdZDD3WNq1/B1Wby1ev+tBSIE2OcF7aTyaGpX67HIglrbbSbwcwTpgxIMY02\n1NSK1y9QQ+45ocFqUNCoy6pAvey6scfAm/972CkWIFjjl+59/QGcGhYhYWP9x5Cd\nEWsR5zjilOSQ/o6YbD3jK4xD9yF3PMMwZMfRUoGLyA8Ye3xGVdmuBe85aAyNuEXH\nw57MkshYg5nxrlOCyjow7F7n/7r/0ADO/HfTT4xBtQKBgQDtAG3kXxHjSVdL5O+G\nnprCGuOOEs3UIJUsmtTTAQgOpRkZ2pj7I4A2BegL3/Bw7kVp4Aa1/NgAECuKIWCe\nbjHC6NuFMR76rCfZ0inK26ziXRezmEFzeC6PO0gquAtyZIHGtHhhZTDcacuL5gTi\ncB4klcElWPiBIZZrShrd7xMTOwKBgQDanWMCgmLKXuK3bErmqZmfSOQhCi2j7TEL\npe2JZRdic0OazcXrj9AjQICLOlpCDMHoV4KRCM2rktnGTbC3/8KqO1KVuf6JhtYp\nfQGjBOv6zmYyXa5mD51M+GDtuMKqhkkTZYMvET0a8kItewVyDLxX5uvsZL7l7txL\nckZ0YnpkjQKBgQCiS8v1OoFWYu/r4f+A8XXK/Hzd2tSmshVVcUXSpP8ugDKbOM3Q\nFPSEijDoiNbvjstsAGS4FUiZanlWYxr2A0ICVlGVeRjc0i2MBVZnO129ucA0VUxk\n1WUU4qS91EDKejdAqm9RSulV1wDzcXXg1qRdq0uT1sR+MVD/ccTKPCCU5wKBgF8g\nHuYHoD8YvKQ9rfXilKMXz5SE3kk3O6Eq6Upgv6UqLJ+erGGM6W99cLGkiYO2E2Yr\nNfgwEXZ35uUAB0Z5NtZmC9B050ombugMqfqqeJhg2V1PIETuxG6qoVqvi50x43ha\nMpP3d1RTV/J8VmlDG21QYRYy3FIm9pqptfiMpV89AoGALxCI/2rdUOtxCh/a3+rZ\nAouEsVpoqYYGPLoRCn8jDppnPviONnTs0I9wi9cv2s/vHh0RoytvIYEQo+LnlTRy\nh9AwzwT4rAjatnOT0L2mEjJKYwz8qMB5hNvV0iSLLlvGj3PJtqj9wOSLsA/Koc3G\nIFG75ik7dQn+fD+yqoDe5vc=\n-----END PRIVATE KEY-----\n";
+        $pri_key = env('FCM_PRIVATE_KEY');
         $payload = [
-            'iss' => 'test-101b0@appspot.gserviceaccount.com',
+            'iss' => env('FCM_SERVICE_ACCOUNT_EMAIL'),
             'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
             'aud' => 'https://oauth2.googleapis.com/token',
             'exp' => time() + 3600,
@@ -5477,7 +5474,7 @@ class Common
 
     }
 
-     public static function sendPushNotifictionForMobile($deviceTokens, $title, $body, $module, $status, $sound,$custom_sound_channel,$mass)
+     public static function sendPushNotificationForMobile($deviceTokens, $title, $body, $module, $status, $sound,$custom_sound_channel,$mass)
     {
         // Convert to array if it's a collection
         $tokens = is_array($deviceTokens) ? $deviceTokens : $deviceTokens->toArray();
@@ -5487,7 +5484,7 @@ class Common
         $tokens = array_unique($tokens);
 
         $token = Common::FCMTokenPushNotification();
-        $url = 'https://fcm.googleapis.com/v1/projects/test-101b0/messages:send';
+        $url = 'https://fcm.googleapis.com/v1/projects/' . env('FCM_PROJECT_ID') . '/messages:send';
         $responses = [];
 
         foreach ($tokens as $deviceToken) {

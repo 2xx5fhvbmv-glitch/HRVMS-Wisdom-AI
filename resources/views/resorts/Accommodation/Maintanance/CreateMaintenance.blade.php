@@ -19,12 +19,39 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                <div class="col-auto">
+                    <a href="{{ route('resort.accommodation.MaintanaceRequestlist') }}" class="btn btn-theme">View All</a>
+                </div>
             </div>
         </div>
 
         <div class="card">
         <form id="CreateMaintenanceForm" data-parsley-validate enctype="multipart/form-data">   
             <div class="row gx-4 g-3 mb-3">
+                <div class="col-lg-6">
+                    <label for="raised_by" class="form-label">RAISED BY (EMPLOYEE)<span class="red-mark">*</span></label>
+                    <select class="form-select select2t-none" name="raised_by" id="raised_by"
+                        required
+                        data-parsley-trigger="submit"
+                        data-parsley-required-message="Please select an employee."
+                        data-parsley-errors-container="#raised_by_error">
+                        <option></option>
+                        @php
+                            $employees = \App\Models\Employee::with('resortAdmin')
+                                ->where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
+                                ->where('status', 'Active')
+                                ->get();
+                        @endphp
+                        @foreach($employees as $emp)
+                            <option value="{{ $emp->id }}"
+                                @if($emp->Admin_Parent_id == Auth::guard('resort-admin')->user()->id) selected @endif>
+                                {{ $emp->resortAdmin->first_name }} {{ $emp->resortAdmin->last_name }} ({{ $emp->Emp_id }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <div id="raised_by_error"></div>
+                </div>
+
                 <div class="col-lg-6">
                     <label for="amenity" class="form-label">AFFECTED AMENITY<span class="red-mark">*</span></label>
                     <select class="form-select select2t-none" name="item_id" id="amenity"
@@ -167,6 +194,10 @@ $(document).ready(function() {
                 const fileName = this.files[0]?.name || '';
                 $('#video_filename').text(fileName);
             });
+    $("#raised_by").select2({
+        placeholder: "Select Employee",
+        allowClear: true
+    });
     $("#amenity").select2({
         placeholder: "Select Amenity",
         allowClear: true

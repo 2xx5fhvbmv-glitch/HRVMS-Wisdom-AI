@@ -73,7 +73,7 @@ class CalenderPushNotification extends Command
                                             $data['body']       = "You have an upcoming event.";
                                             $data['moduleName'] = "Calendar";
                                             // Uncomment to send notification
-                                            // Common::sendPushNotifictionForMobile($childEvent->device_token, $title, $body, $moduleName,NULL,NULL);
+                                            // Common::sendPushNotificationForMobile($childEvent->device_token, $title, $body, $moduleName,NULL,NULL);
                                             return $data;
                                         });
                                     return $event;

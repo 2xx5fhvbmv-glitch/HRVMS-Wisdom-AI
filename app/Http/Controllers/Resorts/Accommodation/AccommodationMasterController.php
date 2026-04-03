@@ -48,20 +48,14 @@ class AccommodationMasterController extends Controller
 
 
 
-        $accommodations = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
-                                ->join('employees as t2', 't2.id', '=', 't1.emp_id')
-                                ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
-                                ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
+        $accommodations = AvailableAccommodationModel::where('available_accommodation_models.resort_id', $this->resort->resort_id)
                                 ->where("BuildingName", $building->id)
                                 ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
-                                ->get(['t1.emp_id','t3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*'])
+                                ->get()
                                 ->map(function ($accommodation)
                                 {
-                                    $assignedAccommodations = AssingAccommodation::where("available_a_id", $accommodation->id)->get();
-                                    $accommodation->EmployeeName = ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
-                                    $accommodation->profileImg = Common::getResortUserPicture($accommodation->Parentid);
-                                    $accommodation->AssingAccommodationCount = $assignedAccommodations->where("emp_id", 0)->count();
-                                    $accommodation->bedAvailable = ($accommodation->Capacity == $accommodation->AssingAccommodationCount) ? $accommodation->Capacity : $accommodation->AssingAccommodationCount;
+                                    $accommodation->AssingAccommodationCount = AssingAccommodation::where("available_a_id", $accommodation->id)->where('resort_id', $this->resort->resort_id)->where('emp_id', 0)->count();
+                                    $accommodation->bedAvailable = $accommodation->AssingAccommodationCount;
                                     return $accommodation;
                                 });
                                 $a = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
@@ -131,11 +125,9 @@ class AccommodationMasterController extends Controller
         {
             $bedsType = $request->beds;
 
-            $data = AvailableAccommodationModel::where("BuildingName", $id)
-                ->join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
+            $data = AvailableAccommodationModel::where("available_accommodation_models.BuildingName", $id)
                 ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
-                ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
-                ->groupby('available_accommodation_models.RoomNo');
+                ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType');
             if ($bedsType != "all")
             {
                 $data->where('available_accommodation_models.blockFor', $bedsType);
@@ -151,16 +143,20 @@ class AccommodationMasterController extends Controller
                     $accommodation->items = $itemData;
                     $accommodation->Color = $accommodation->accommodationType->Color ?? '#000000';
                     $accommodation->AccommodationName = $accommodation->accommodationType->AccommodationName ?? 'Not Available';
-                    $AssingAccommodation = AssingAccommodation::where("available_a_id", $accommodation->id)
+                    $resortId = $this->resort->resort_id;
+                    $AssingAccommodation = AssingAccommodation::where('assing_accommodations.available_a_id', $accommodation->id)
+                                                            ->where('assing_accommodations.resort_id', $resortId)
+                                                            ->where('assing_accommodations.emp_id', '!=', 0)
                                                             ->join('employees as t2', 't2.id', '=', 'assing_accommodations.emp_id')
+                                                            ->where('t2.resort_id', $resortId)
                                                             ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
                                                             ->get(['t3.first_name', 't3.last_name', 't3.id as Parentid'])->map(function ($row) {
                                                                 $row->EmployeeName = ucfirst($row->first_name . ' ' . $row->last_name);
                                                                 $row->profileImg = Common::getResortUserPicture($row->Parentid);
                                                                 return $row;
                                                             });
-                    $accommodation->AssingAccommodation =$AssingAccommodation;
-                    $accommodation->AssingAccommodationCount = $AssingAccommodation->where("assing_accommodations.emp_id", 0)->count();
+                    $accommodation->AssingAccommodation = $AssingAccommodation;
+                    $accommodation->AssingAccommodationCount = AssingAccommodation::where('available_a_id', $accommodation->id)->where('resort_id', $resortId)->where('emp_id', 0)->count();
                     return $accommodation;
                 });
 

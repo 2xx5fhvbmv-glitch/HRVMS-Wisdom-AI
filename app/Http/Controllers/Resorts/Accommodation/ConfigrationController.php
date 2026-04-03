@@ -478,25 +478,28 @@ class ConfigrationController extends Controller
                             "blockFor"=>array_key_exists($i,$request->blockFor)?$request->blockFor[$i]:"",
                             // "Inv_Cat_id"=>array_key_exists($i,$request->Inv_Cat_id)?$request->Inv_Cat_id[$i]:"",
                             "CleaningSchedule"=>array_key_exists($i,$request->CleaningSchedule)?$request->CleaningSchedule[$i]:"",
-                            "RoomStatus"=>array_key_exists($i,$request->RoomStatus)?$request->RoomStatus[$i]:"",
+                            "RoomStatus"=>($request->RoomStatus && array_key_exists($i,$request->RoomStatus))?$request->RoomStatus[$i]:"Available",
                             "Occupancytheresold"=>array_key_exists($i,$request->Occupancytheresold)?$request->Occupancytheresold[$i]:"",
                             "resort_id"=>$resort_id,
                         ]);
 
                 if(array_key_exists($i,$request->Inv_Cat_id))
                 {
+                    $invQuantity = ($request->InvQuantity && array_key_exists($i, $request->InvQuantity)) ? $request->InvQuantity[$i] : 1;
 
                     foreach( $request->Inv_Cat_id[$i] as $item)
                     {
-                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item]);
+                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$invQuantity]);
                     }
 
 
-                    for ($i = 0; $i < $capacity; $i++)
+                    $bedCount = intval($capacity);
+                    for ($b = 0; $b < $bedCount; $b++)
                     {
                         AssingAccommodation::create([
                             "resort_id"=>$resort_id,
-                            'available_a_id'=> $parent_id->id
+                            'available_a_id'=> $parent_id->id,
+                            'BedNo' => 'BedNo-' . ($b + 1),
                         ]);
                     }
 
@@ -1023,18 +1026,30 @@ class ConfigrationController extends Controller
             $import = new ImportQuickAssignment();
             Excel::import($import, $request->file('QuickAssignmentFile'));
 
+            $hasErrors = !empty($import->errorMessages);
+            $hasSuccess = !empty($import->successMessages);
 
-            if (!empty($import->errorMessages)) {
+            if ($hasErrors && !$hasSuccess) {
                 return response()->json([
                     'success' => false,
                     'errors' => $import->errorMessages,
-                    'message' => 'Some rooms already exist in the database.',
+                    'message' => 'Import failed. Please check the errors.',
                 ], 422);
+            }
+
+            if ($hasErrors && $hasSuccess) {
+                return response()->json([
+                    'success' => true,
+                    'errors' => $import->errorMessages,
+                    'successMessages' => $import->successMessages,
+                    'message' => count($import->successMessages) . ' assigned successfully. ' . count($import->errorMessages) . ' failed.',
+                ], 200);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Import successful!',
+                'successMessages' => $import->successMessages ?? [],
+                'message' => 'All assignments imported successfully!',
             ], 200);
 
 

@@ -48,7 +48,7 @@
                             <td>{{ $data->AccommodationName ?? "-"}}</td>
                         </tr>
                         <tr>
-                            <th>Location:</th>
+                            <th>Building Name:</th>
                             <td>{{ $data->BName ?? "-" }}</td>
                         </tr>
                         <tr>
@@ -160,7 +160,7 @@
                                     @foreach ($InventoryModule as $a)
 
                                     <option value="{{ $a->id }}"
-                                        @if(in_array($a->id, $data->item_id)) selected @endif>
+                                        @if($data && $data->item_id && in_array($a->id, $data->item_id)) selected @endif>
                                         {{ $a->ItemName }}
                                     </option>
                                     @endforeach
@@ -444,10 +444,15 @@
                                             </table>
                                         </div>
                                     `);
-                                $("#reviewDetails-modal").modal('show')
+                                // Hide selectBed first, then show review
+                                goingToReview = true;
+                                $("#selectBed-modal").modal('hide');
+                                setTimeout(function() {
+                                    $("#reviewDetails-modal").modal('show');
+                                }, 300);
 
-                               
-                            } 
+
+                            }
                             else
                             {
                                 toastr.error(response.message, "Error", {
@@ -557,7 +562,11 @@
                             $(".AppnedBed").html(row);
                             $('[data-bs-toggle="tooltip"]').tooltip();
 
-                            $("#selectBed-modal").modal('show');
+                            // Hide the parent modal first, then show bed selection
+                            $("#EmployeeMove-modal").modal('hide');
+                            setTimeout(function() {
+                                $("#selectBed-modal").modal('show');
+                            }, 300);
 
                     } else {
                         toastr.error(response.message, "Error", {
@@ -582,6 +591,15 @@
             $(".bed-block").removeClass("active");
             $(this).addClass("active");
             $("#assignId").val($(this).data('id'));
+        });
+
+        // When selectBed modal is closed, reopen parent modal only if not going to review
+        var goingToReview = false;
+        $('#selectBed-modal').on('hidden.bs.modal', function () {
+            if (!goingToReview) {
+                $("#EmployeeMove-modal").modal('show');
+            }
+            goingToReview = false;
         });
         $(document).on("change","#EmployeeList",function()
         {
@@ -613,7 +631,7 @@
                     type: 'GET',
                     data: function(d) {
                         d.select_build = $("#Building_id").val();
-                        d.Employeeid = "{{ $employee->Emp_id }}";
+                        d.Employeeid = "{{ $employee->id }}";
                         d.flag="change";
                     }
                 },

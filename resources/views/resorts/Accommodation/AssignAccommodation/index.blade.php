@@ -351,16 +351,15 @@ $(document).ready(function()
     });
     $(document).on("change","#EmployeeList",function(){
 
-    var name = $(this).val();
-
     var selectedOption = $(this).find(':selected');
+    var empName = selectedOption.text().trim();
     var position = selectedOption.data('position');
     var pic = selectedOption.data('pic');
     var EmpId = selectedOption.data('emp_id');
     $(".empDetails-user").html(`<div class="img-circle"><img src="${pic}" alt="user">
                             </div>
                             <div>
-                                <h4>${name}<span class="badge badge-themeNew">${EmpId}</span></h4>
+                                <h4>${empName} <span class="badge badge-themeNew">${EmpId}</span></h4>
                                 <p>${position}</p>
                             </div>`);
 

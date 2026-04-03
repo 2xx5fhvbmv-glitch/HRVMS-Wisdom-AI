@@ -314,7 +314,7 @@ class AccommodationDashboardController extends Controller
                             ->where('emp_id','!=',0)->count();
 
             $TotalBed = AssingAccommodation::where("resort_id",$this->globalUser->resort_id)->count();
-            $EmployeesCount =$TotalBed - $OccupiedBed;
+            $EmployeesCount = Employee::where('resort_id', $this->globalUser->resort_id)->where('status', 'Active')->count();
 
             $AvailableAccomodation =AssingAccommodation::where("resort_id",$this->globalUser->resort_id)->where('emp_id',0)->count();
 
@@ -330,33 +330,11 @@ class AccommodationDashboardController extends Controller
             $BedStatistics = AvailableAccommodationModel::join('assing_accommodations', 'assing_accommodations.available_a_id', '=', 'available_accommodation_models.id')
                                             ->where('available_accommodation_models.resort_id', $this->globalUser->resort_id)
                                             ->select(
-                                                'available_accommodation_models.BuildingName',
-                                                DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id != 0
-                                                        THEN assing_accommodations.id
-                                                        ELSE NULL
-                                                    END) as MaleOccupiedBeds'),
-                                                DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id = 0
-                                                        THEN available_accommodation_models.id
-                                                        ELSE NULL
-                                                    END) as MaleAvailableBeds'),
-                                                    DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id != 0
-                                                        THEN available_accommodation_models.Capacity
-                                                        ELSE NULL
-                                                    END) as FemaleOccupiedBeds'),
-                                                DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id = 0
-                                                        THEN available_accommodation_models.id
-                                                        ELSE NULL
-                                                    END) as FemaleAvailableBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id != 0 THEN 1 END) as MaleOccupiedBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id = 0 THEN 1 END) as MaleAvailableBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id != 0 THEN 1 END) as FemaleOccupiedBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id = 0 THEN 1 END) as FemaleAvailableBeds')
                                             )
-                                            ->groupBy('available_accommodation_models.resort_id')
                                             ->first();
 
             $ResortDepartment= ResortDepartment::where("resort_id",$this->globalUser->resort_id)->get();
@@ -686,7 +664,7 @@ class AccommodationDashboardController extends Controller
             $TotalBed = AssingAccommodation::where("resort_id",$this->globalUser->resort_id)->count();
             $AvailableAccomodation =AssingAccommodation::where("resort_id",$this->globalUser->resort_id)->where('emp_id',0)->count();
 
-            $EmployeesCount =$TotalBed - $OccupiedBed;
+            $EmployeesCount = Employee::where('resort_id', $this->globalUser->resort_id)->where('status', 'Active')->count();
             $Totalnumberofopenrequests= MaintanaceRequest::where("resort_id",$this->globalUser->resort_id)->where('Status','pending')->count();
             $TotalnumberofHighrequests= MaintanaceRequest::where("resort_id",$this->globalUser->resort_id)->where('priority','High')->count();
             $TotalnumberofInProgressrequests= MaintanaceRequest::where("resort_id",$this->globalUser->resort_id)->where('Status','In-Progress')->count();
@@ -698,33 +676,11 @@ class AccommodationDashboardController extends Controller
             $BedStatistics = AvailableAccommodationModel::join('assing_accommodations', 'assing_accommodations.available_a_id', '=', 'available_accommodation_models.id')
                                             ->where('available_accommodation_models.resort_id', $this->globalUser->resort_id)
                                             ->select(
-                                                'available_accommodation_models.BuildingName',
-                                                DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id != 0
-                                                        THEN assing_accommodations.id
-                                                        ELSE NULL
-                                                    END) as MaleOccupiedBeds'),
-                                                DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id = 0
-                                                        THEN available_accommodation_models.id
-                                                        ELSE NULL
-                                                    END) as MaleAvailableBeds'),
-                                                    DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id != 0
-                                                        THEN available_accommodation_models.Capacity
-                                                        ELSE NULL
-                                                    END) as FemaleOccupiedBeds'),
-                                                DB::raw('
-                                                    COUNT(CASE
-                                                        WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id = 0
-                                                        THEN available_accommodation_models.id
-                                                        ELSE NULL
-                                                    END) as FemaleAvailableBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id != 0 THEN 1 END) as MaleOccupiedBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male" AND assing_accommodations.emp_id = 0 THEN 1 END) as MaleAvailableBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id != 0 THEN 1 END) as FemaleOccupiedBeds'),
+                                                DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND assing_accommodations.emp_id = 0 THEN 1 END) as FemaleAvailableBeds')
                                             )
-                                            ->groupBy('available_accommodation_models.resort_id')
                                             ->first();
                                  
             $ResortDepartment= ResortDepartment::where("resort_id",$this->globalUser->resort_id)->get();
@@ -885,8 +841,7 @@ class AccommodationDashboardController extends Controller
                                 ->where('employees.resort_id', $this->globalUser->resort_id)
                                 ->whereIn('employees.id',$this->underEmp_id)
                                 ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
-        return view('resorts.Accommodation.dashboard.hoddashboard',compact('page_header','page_header','
-Employee','Totalnumberofopenrequests','TotalnumberofHighrequests','TotalnumberofInProgressrequests','page_title','ResortDepartment'));
+        return view('resorts.Accommodation.dashboard.hoddashboard',compact('page_header','Employee','Totalnumberofopenrequests','TotalnumberofHighrequests','TotalnumberofInProgressrequests','page_title','ResortDepartment'));
     }
 
     public function excom_dashboard()

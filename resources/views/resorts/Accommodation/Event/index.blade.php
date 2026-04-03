@@ -101,23 +101,33 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="inventory" class="form-label">Inventory <span class="red-mark">*</span></label>
-                        <select class="form-select select2t-none"
-                                name="item_id"
-                                id="inventory"
-                                required
-                                data-parsley-required-message="Please select inventory."
-                                data-parsley-errors-container="#inventory_error">
-                            <option value="">-- Select Inventory --</option>
-                            @foreach ($InventoryModule as $b)
-                                <option value="{{ $b->id }}">{{ $b->ItemName }}</option>
-                            @endforeach
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label for="start_time" class="form-label">START TIME <span class="red-mark">*</span></label>
+                                <input type="time" class="form-control" name="start_time" id="start_time"
+                                    required data-parsley-required-message="Please select start time." />
+                            </div>
+                            <div class="col-6">
+                                <label for="end_time" class="form-label">END TIME <span class="red-mark">*</span></label>
+                                <input type="time" class="form-control" name="end_time" id="end_time"
+                                    required data-parsley-required-message="Please select end time." />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">PRIORITY <span class="red-mark">*</span></label>
+                        <select class="form-select" name="priority" id="priority"
+                            required data-parsley-required-message="Please select priority.">
+                            <option value="">-- Select Priority --</option>
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
                         </select>
-                        <div id="inventory_error"></div>
                     </div>
 
                     <div class="mb-0">
-                        <label for="description" class="form-label">DESCRIPTION</label>
+                        <label for="description" class="form-label">DESCRIPTION <span class="red-mark">*</span></label>
                         <input type="text"
                             class="form-control"
                             name="descriptionIssues"
@@ -167,9 +177,6 @@
 
         $('#CreateMaintenanceForm').validate({
             rules: {
-                item_id: {
-                    required: true,
-                },
                 date: {
                     required: true,
                 },
@@ -180,6 +187,12 @@
                     required: true,
                 },
                 FloorNo: {
+                    required: true,
+                },
+                start_time: {
+                    required: true,
+                },
+                end_time: {
                     required: true,
                 },
                 descriptionIssues:
@@ -192,9 +205,6 @@
                 },
             },
             messages: {
-                item_id: {
-                    required: "Please Select amenity.",
-                },
                 date: {
                     required: "Please Select date.",
                 },
@@ -207,7 +217,12 @@
                 FloorNo: {
                     required: "Please Select Floor No.",
                 },
-
+                start_time: {
+                    required: "Please Select Start Time.",
+                },
+                end_time: {
+                    required: "Please Select End Time.",
+                },
                 descriptionIssues: {
                     required: "Please Enter description.",
                 },
@@ -219,7 +234,7 @@
                 var formData = new FormData(form);
 
                 $.ajax({
-                    url: "{{ route('resort.accommodation.CreateMaintenanceRequest') }}", // Your route for file upload
+                    url: "{{ route('resort.accommodation.StoreMaintenanceRequest') }}",
                     type: "POST",
                     data: formData,
                     processData: false,

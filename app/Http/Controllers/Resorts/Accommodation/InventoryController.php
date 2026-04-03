@@ -134,7 +134,7 @@ class InventoryController extends Controller
 
         }
 
-        $page_title ="Invenotry category";
+        $page_title ="Inventory";
         $InventoryItems = InventoryModule::where('resort_id',$this->resort->resort_id)->orderBy('id', 'DESC')->get(['id','ItemName']);
         $InventoryCategory = InventoryCategoryModel::where('resort_id',$this->resort->resort_id)->orderBy('id', 'DESC')->get();
 
@@ -218,7 +218,7 @@ class InventoryController extends Controller
         $validator = Validator::make($request->all(), [
             'ItemName.*' => 'required|max:50', // Validate each ItemName in the array
             'Quantity.*' => 'required|integer|min:1', // Validate each Quantity in the array
-            'PurchageDate.*' => 'required|date', // Validate each PurchageDate in the array
+            'PurchageDate.*' => 'required|date_format:d/m/Y', // Validate each PurchageDate in the array
             'ItemCode.*' => [
                 'required',
                 Rule::unique('inventory_modules', 'ItemCode')->where(function ($query) use ($resort_id) {
@@ -257,7 +257,8 @@ class InventoryController extends Controller
                     $ItemName = array_key_exists($key, $request->ItemName) ? $request->ItemName[$key]: "";
                     $Inv_Cat_id = array_key_exists($key, $request->Inv_Cat_id) ?  $request->Inv_Cat_id[$key]: "";
                     $Quantity = array_key_exists($key, $request->Quantity) ? $request->Quantity[$key]: "";
-                    $PurchageDate =array_key_exists($key, $request->PurchageDate) ? $request->PurchageDate[$key]: "";
+                    $PurchageDateRaw = array_key_exists($key, $request->PurchageDate) ? $request->PurchageDate[$key] : "";
+                    $PurchageDate = $PurchageDateRaw ? \Carbon\Carbon::createFromFormat('d/m/Y', $PurchageDateRaw)->format('Y-m-d') : null;
                     $ItemCode = array_key_exists($key, $request->ItemCode) ? $request->ItemCode[$key]: "";
                     $MinStock = array_key_exists($key, $request->MinStock) ?  $request->MinStock[$key]: "";
                     InventoryModule::create([
@@ -328,7 +329,7 @@ class InventoryController extends Controller
                 $edit_class = 'd-none';
             }
             $inventoryModule = $query->orderBy('inventory_modules.id', 'DESC')
-                ->get(['inventory_modules.id', 'ItemName', 'ItemCode', 'inventory_modules.created_at','t3.BuildingName','t2.Floor','t2.RoomNo','t1.Available_Acc_id'])
+                ->get(['inventory_modules.id', 'ItemName', 'ItemCode', 'inventory_modules.created_at','t3.BuildingName','t2.Floor','t2.RoomNo','t1.Available_Acc_id','t2.RoomType'])
                 ->map(function($ak) use ($edit_class) {
                     $b = BuildingModel::where("resort_id", $this->resort->resort_id)
                          ->where("BuildingName", $ak->BuildingName)
@@ -364,7 +365,7 @@ class InventoryController extends Controller
 
                     if($AssingAccommodation->count() ==  0)
                     {
-                        $ak->action = '<button type="button" data-flag="assign"  class="btn btn-sm btn-themeSkyblueLight '.$edit_class.'">Please Assign Employee</button>';
+                        $ak->action = '<button type="button" data-flag="assign" data-available-id="'.base64_encode($ak->Available_Acc_id).'" data-item-id="'.base64_encode($ak->id).'" data-resort-id="'.base64_encode($this->resort->resort_id).'" data-room-type="'.base64_encode($ak->RoomType).'" class="btn btn-sm btn-themeSkyblueLight assign-employee-btn '.$edit_class.'">Please Assign Employee</button>';
                     }
                     else
                     {
@@ -446,30 +447,79 @@ class InventoryController extends Controller
     public function Inventoryupdated(Request $request)
     {
         $id = base64_decode($request->id);
-        $qty= $request->qty;
-        InventoryModule::where("resort_id",$this->resort->resort_id)->where("id",$id)->update([
-            'Quantity' => $qty,
-        ]);
-        return response()->json(['success' =>true,'message'=>'Invenotry Updated  successfully' ], 200);
+        $updateData = ['Quantity' => $request->qty];
+
+        if ($request->filled('ItemName')) {
+            $updateData['ItemName'] = $request->ItemName;
+        }
+        if ($request->filled('ItemCode')) {
+            $updateData['ItemCode'] = $request->ItemCode;
+        }
+        if ($request->filled('Inv_Cat_id')) {
+            $updateData['Inv_Cat_id'] = $request->Inv_Cat_id;
+        }
+        if ($request->has('Occupied')) {
+            $updateData['Occupied'] = $request->Occupied;
+        }
+
+        InventoryModule::where("resort_id", $this->resort->resort_id)->where("id", $id)->update($updateData);
+        return response()->json(['success' => true, 'message' => 'Inventory updated successfully'], 200);
     }
 
     public function UnassignItem(Request $request)
     {
         $availableAccId = base64_decode($request->availableAccId);
         $resort_id = base64_decode($request->resort_id);
-        $item = base64_decode($request->item);
-        
 
-        $AvailableAccommodationInvItem = AvailableAccommodationInvItem::where("Available_Acc_id", $availableAccId)
-            ->where("Item_id", $item)
-            ->first();
-        
-        if ($AvailableAccommodationInvItem)
-        {
-            $AvailableAccommodationInvItem->delete();
-            return response()->json(['success' => true, 'message' => 'In Accommodation Item unassigned successfully'], 200);
+        // If a specific bed/employee is selected, unassign only that one
+        if ($request->filled('assignId')) {
+            $assignId = base64_decode($request->assignId);
+            $updated = AssingAccommodation::where('id', $assignId)
+                ->where('resort_id', $resort_id)
+                ->where('emp_id', '!=', 0)
+                ->update(['emp_id' => 0, 'effected_date' => null]);
+
+            if ($updated > 0) {
+                return response()->json(['success' => true, 'message' => 'Employee unassigned successfully'], 200);
+            }
+            return response()->json(['success' => false, 'message' => 'No assigned employee found'], 404);
         }
 
-        return response()->json(['success' => false, 'message' => 'Item not found'], 404);
+        // Get all assigned employees in this room
+        $assignedBeds = AssingAccommodation::where('available_a_id', $availableAccId)
+            ->where('resort_id', $resort_id)
+            ->where('emp_id', '!=', 0)
+            ->join('employees as e', 'e.id', '=', 'assing_accommodations.emp_id')
+            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.BedNo', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
+            ->get();
+
+        if ($assignedBeds->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No assigned employee found'], 404);
+        }
+
+        // If only 1 employee, unassign directly
+        if ($assignedBeds->count() === 1) {
+            AssingAccommodation::where('id', $assignedBeds->first()->assign_id)
+                ->update(['emp_id' => 0, 'effected_date' => null]);
+            return response()->json(['success' => true, 'message' => 'Employee unassigned successfully'], 200);
+        }
+
+        // Multiple employees — return list for user to choose
+        $employees = $assignedBeds->map(function ($bed) {
+            return [
+                'assign_id' => base64_encode($bed->assign_id),
+                'bed_no' => $bed->BedNo,
+                'emp_id' => $bed->Emp_id,
+                'name' => $bed->first_name . ' ' . $bed->last_name,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'multiple' => true,
+            'employees' => $employees,
+            'message' => 'Multiple employees assigned. Please select which one to unassign.'
+        ], 200);
     }
 }

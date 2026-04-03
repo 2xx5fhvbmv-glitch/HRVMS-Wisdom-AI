@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Resorts\Accommodation;
 use Carbon\Carbon;
 use DB;
 use Auth;
-use Common;
+use App\Helpers\Common;
 
 use Illuminate\Http\Request;
 use App\Models\BuildingModel;
@@ -40,8 +40,7 @@ class EventController extends Controller
         // Pass the date-wise data to the view for display
         $page_title = 'Calendar';
         $Building = BuildingModel::where('resort_id', $this->resort->resort_id)->get();
-        $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)->get();
-        return view('resorts.Accommodation.Event.index', compact('page_title','Building','InventoryModule'));
+        return view('resorts.Accommodation.Event.index', compact('page_title','Building'));
     }
     public function getClanderData(Request $request)
     {
@@ -57,12 +56,20 @@ class EventController extends Controller
 
             // Map the data to return it in a suitable format for the calendar
             $MaintanaceRequest = $MaintanaceRequest->map(function ($row) {
+                $start = $row->date;
+                $end = $row->date;
+                if ($row->start_time) {
+                    $start = $row->date . 'T' . $row->start_time;
+                }
+                if ($row->end_time) {
+                    $end = $row->date . 'T' . $row->end_time;
+                }
                 return [
                     'id' => $row->id,
-                    'title' => $row->descriptionIssues, // Title for the event
-                    'start' => $row->date, // Start date for the event
-                    'end' => $row->date, // End date for the event
-                    'description' => $row->descriptionIssues // Description for the event
+                    'title' => $row->descriptionIssues,
+                    'start' => $start,
+                    'end' => $end,
+                    'description' => $row->descriptionIssues
                 ];
             });
 
@@ -97,7 +104,7 @@ class EventController extends Controller
             $row->profileImg = isset($row->Parentid) ? Common::getResortUserPicture($row->Parentid) : '-'; // Profile picture
             $row->date = $formattedDate; // Add formatted date to the request
             $row->descriptionIssues = $row->descriptionIssues;
-            $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+            $row->Location = $row->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No - ' . $row->FloorNo;
             $string ='';
             if($row->priority == 'Low')
             {

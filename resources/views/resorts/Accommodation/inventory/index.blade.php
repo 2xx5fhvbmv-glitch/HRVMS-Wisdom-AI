@@ -472,39 +472,45 @@ if ( $(".historical_inventory").is(':checked'))
             var Occupied = $row.find("td:nth-child(5)").text().trim();
             var Avilable = $row.find("td:nth-child(6)").text().trim();
 
+            var categoryOptions = '';
+            @foreach($InventoryCategory as $ic)
+                categoryOptions += `<option value="{{ $ic->id }}" ${('{{ $ic->CategoryName }}' === Category) ? 'selected' : ''}>{{ $ic->CategoryName }}</option>`;
+            @endforeach
+
             var editRowHtml = `
                     <td class="py-1">
                         <div class="form-group">
-                           ${ItemName}
-                        </div>
-                    </td>
-                     <td class="py-1">
-                        <div class="form-group">
-                           ${ItemCode}
-                        </div>
-                    </td>
-                     <td class="py-1">
-                        <div class="form-group">
-                           ${Category}
+                            <input type="text" class="form-control edit-item-name" value="${ItemName}" />
                         </div>
                     </td>
                     <td class="py-1">
                         <div class="form-group">
-                            <input type="number" class="form-control name" min="${Qty}"  value="${Qty}" />
+                            <input type="text" class="form-control edit-item-code" value="${ItemCode}" />
                         </div>
                     </td>
                     <td class="py-1">
                         <div class="form-group">
-                           ${Occupied}
+                            <select class="form-select edit-category">${categoryOptions}</select>
                         </div>
                     </td>
-                      <td class="py-1">
+                    <td class="py-1">
+                        <div class="form-group">
+                            <input type="number" class="form-control edit-qty" min="1" value="${Qty}" />
+                        </div>
+                    </td>
+                    <td class="py-1">
+                        <div class="form-group">
+                            <input type="number" class="form-control edit-occupied" min="0" value="${Occupied}" />
+                        </div>
+                    </td>
+                    <td class="py-1">
                         <div class="form-group">
                            ${Avilable}
                         </div>
                     </td>
                     <td class="py-1">
                         <a href="#" class="btn btn-theme update-row-btn_agent" data-inventory-id="${invenotry_id}">Submit</a>
+                        <a href="#" class="btn btn-themeGray btn-sm cancel-edit-btn ms-1">Cancel</a>
                     </td>
                 `;
 
@@ -512,17 +518,30 @@ if ( $(".historical_inventory").is(':checked'))
             $row.html(editRowHtml);
         });
 
+        $(document).on("click", "#InvenotryIndex .cancel-edit-btn", function (event) {
+            event.preventDefault();
+            InventoryList();
+        });
+
         $(document).on("click", "#InvenotryIndex .update-row-btn_agent", function (event) {
-            event.preventDefault(); // Prevent default action
+            event.preventDefault();
             var $row = $(this).closest("tr");
             var inventory_id = $(this).data('inventory-id');
-            var qty = $row.find("input").eq(0).val();
+            var itemName = $row.find(".edit-item-name").val();
+            var itemCode = $row.find(".edit-item-code").val();
+            var categoryId = $row.find(".edit-category").val();
+            var qty = $row.find(".edit-qty").val();
+            var occupied = $row.find(".edit-occupied").val();
             $.ajax({
                 url: "{{ route('resort.accommodation.Inventoryupdated', '') }}/" + inventory_id,
                 type: "PUT",
                 data: {
-                    qty : qty,
-                    inventory_id : inventory_id,
+                    qty: qty,
+                    inventory_id: inventory_id,
+                    ItemName: itemName,
+                    ItemCode: itemCode,
+                    Inv_Cat_id: categoryId,
+                    Occupied: occupied,
                 },
                 success: function(response) {
                     if(response.success == true) { // Ensure response contains a success key

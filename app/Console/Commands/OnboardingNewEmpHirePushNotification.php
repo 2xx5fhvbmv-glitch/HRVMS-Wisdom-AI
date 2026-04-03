@@ -55,7 +55,7 @@ class OnboardingNewEmpHirePushNotification extends Command
                                                 Common::sendMobileNotification($employee->resort_id,2, null,null, $title,$body,$moduleName,[$emp->id],null);
                                                 if($emp->device_token != null && $emp->device_token != '') {
                                                     //Send in push notification in mobile app
-                                                    $data = Common::sendPushNotifictionForMobile([$emp->device_token], $title, $body, $moduleName,NULL,NULL,NULL,NULL);
+                                                    $data = Common::sendPushNotificationForMobile([$emp->device_token], $title, $body, $moduleName,NULL,NULL,NULL,NULL);
                                                 } 
                                             })->toArray();
                         });

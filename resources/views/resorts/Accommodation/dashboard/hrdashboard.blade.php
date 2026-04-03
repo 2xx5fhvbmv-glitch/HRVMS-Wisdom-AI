@@ -26,7 +26,7 @@
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="mb-0  fw-500">  Employee Present</p>
+                            <p class="mb-0  fw-500">Total Employees</p>
                             <strong>{{ $EmployeesCount }}</strong>
                         </div>
                         <a href="#">
@@ -40,8 +40,10 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Occupied Bed </p>
-                            <strong class="text-danger">{{ $OccupiedBed }}</strong>
-                            <span class="text-danger">More than Employees Presented </span>
+                            <strong>{{ $OccupiedBed }}</strong>
+                            @if($EmployeesCount > $TotalBed)
+                                <small class="text-danger d-block" style="font-size:11px;">Employees exceed available beds ({{ $EmployeesCount - $TotalBed }} short)</small>
+                            @endif
                         </div>
                         <a href="#">
 
@@ -66,7 +68,7 @@
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="mb-0  fw-500">Available Accomodation</p>
+                            <p class="mb-0  fw-500">Available Bed</p>
                             <strong>{{ $AvailableAccomodation }}</strong>
                         </div>
                         <a href="#">
