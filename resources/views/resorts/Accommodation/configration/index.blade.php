@@ -62,14 +62,16 @@
                     <form id="AccommodationTypeForm">
                         @csrf
                         <div class="row g-xl-4 g-3">
-                            <div class="col-md-6">
+                            <div class="col-md-12">
                                 <label for="AccommodationName" class="form-label">Accommodation Name</label>
                                 <input type="text" class="form-control" name="AccommodationName" id="AccommodationName" placeholder="Enter accommodation type">
                             </div>
+                            {{-- Color option commented out
                             <div class="col-md-6">
                                 <label for="AccommodationColor" class="form-label">Color</label>
                                 <input type="color" class="form-control" name="Color" id="AccommodationColor">
                             </div>
+                            --}}
                         </div>
                         <div class="card-footer text-end mt-3">
                             <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
@@ -118,9 +120,9 @@
             <div class="col-lg-12 ">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Available Accommodation</h3>
+                        <h3>Accommodation</h3>
                         <div class="text-end">
-                            <a href="{{ route('resort.accommodation.AccommodationMaster') }}" class="a-link">View All</a>
+                            <a href="{{ route('resort.accommodation.AvailableAccommodationIndex') }}" class="a-link">View All</a>
                         </div>
                     </div>
                     <div class="availabel-main">
@@ -227,9 +229,12 @@
                                         <div id="type_accom_error_5"></div>
 
                                     </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="bedNo" class="form-label">BED NO.</label>
-                                        <input type="number" class="form-control" id="BedNo_1"   name="BedNo[1]"  placeholder="2" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Bed number is required.">
+                                    <div class="col-lg-12" id="bedNoContainer_1">
+                                        <label class="form-label">BED NAMES</label>
+                                        <div class="row g-2" id="bedNoFields_1">
+                                            <div class="col-auto"><small class="text-muted">Enter capacity first to generate bed fields</small></div>
+                                        </div>
+                                        <input type="hidden" name="BedNo[1]" id="BedNo_1" value="0">
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for=" " class="form-label d-block">BLOCK FOR?</label>
@@ -247,8 +252,7 @@
                                     <div class="col-lg-6 col-md-6 col-sm-6">
                                         <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
                                         <select class="form-select select2-inventory" multiple id="Inv_Cat_id_1" name="Inv_Cat_id[1][]"
-                                        aria-label="Default select example" required
-                                        data-parsley-required-message="Please select an option."
+                                        aria-label="Default select example"
                                         data-parsley-errors-container="#type_accom_error_6"
                                         data-placeholder="Select inventories">
 
@@ -260,10 +264,6 @@
                                         </select>
                                         <div id="type_accom_error_6"></div>
 
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="invQty" class="form-label">INVENTORY QUANTITY</label>
-                                        <input type="number" min="1" class="form-control" id="InvQuantity_1" name="InvQuantity[1]" placeholder="e.g. 2" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Inventory quantity is required.">
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
 
@@ -1148,7 +1148,12 @@ $(document).ready(function()
     $(document).on('click','.addMore-availabel',function(){
         var AvailableCount = $("#AvailableCount").val();
         AvailableCount++;
-        var row =`<hr>
+        var row =`<div class="col-12 added-accommodation-row" id="accommodation_row_${AvailableCount}">
+                        <hr class="my-3">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-accommodation-row" data-row="${AvailableCount}"><i class="fa-solid fa-times me-1"></i>Remove</button>
+                        </div>
+                        <div class="row g-xl-4 g-3">
                               <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="building" class="form-label">BUILDING NAME</label>
 
@@ -1229,7 +1234,13 @@ $(document).ready(function()
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="bedNo" class="form-label">BED NO.</label>
-                                        <input type="number" class="form-control" id="BedNo_${AvailableCount}"   name="BedNo[${AvailableCount}]"  placeholder="2" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Bed number is required.">
+                                    </div>
+                                    <div class="col-lg-12" id="bedNoContainer_${AvailableCount}">
+                                        <label class="form-label">BED NAMES</label>
+                                        <div class="row g-2" id="bedNoFields_${AvailableCount}">
+                                            <div class="col-auto"><small class="text-muted">Enter capacity first</small></div>
+                                        </div>
+                                        <input type="hidden" name="BedNo[${AvailableCount}]" id="BedNo_${AvailableCount}" value="0">
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for=" " class="form-label d-block">BLOCK FOR?</label>
@@ -1243,23 +1254,6 @@ $(document).ready(function()
                                                  checked required data-parsley-required-message="Please select an option.">
                                             <label class="form-check-label" for="female_1">Female</label>
                                         </div>
-                                    </div>
-                                    <div class="col-lg-6 col-md-6 col-sm-6">
-                                        <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
-                                        <select class="form-select select2-inventory" multiple id="Inv_Cat_id_${AvailableCount}" name="Inv_Cat_id[${AvailableCount}][]" aria-label="Default select example" data-parsley-errors-container="#type_accom_type_accom_inventory_error_{{$k}}" required data-parsley-required-message="Please select an option." data-placeholder="Select inventories">
-
-                                        @if($InventoryModule->isNotEmpty())
-                                            @foreach ($InventoryModule as $a)
-                                                <option value="{{ $a->id }}">{{ $a->ItemName }} / {{ $a->ItemCode }}</option>
-                                            @endforeach
-                                        @endif
-                                        </select>
-                                        <div id="type_accom_type_accom_inventory_error_{{$k}}"></div>
-
-                                    </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="invQty" class="form-label">INVENTORY QUANTITY</label>
-                                        <input type="number" min="1" class="form-control" id="InvQuantity_${AvailableCount}" name="InvQuantity[${AvailableCount}]" placeholder="e.g. 2" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Inventory quantity is required.">
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
 
@@ -1279,11 +1273,18 @@ $(document).ready(function()
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
                                         <input type="number" min="0" max="100" class="form-control" id="Occupancytheresold_${AvailableCount}" name="Occupancytheresold[${AvailableCount}]" placeholder="90%" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Occupancy threshold is required.">
-                                    </div>`;
+                                    </div>
+                        </div>
+                    </div>`;
                                     $("#AvailableCount").val(AvailableCount);
         $(".appendAvailableAccommodation").append(row);
         AvailableAccommodationJsClass(AvailableCount);
 
+    });
+
+    // Remove dynamically added accommodation row
+    $(document).on('click', '.remove-accommodation-row', function() {
+        $(this).closest('.added-accommodation-row').remove();
     });
 
     $(document).on('click','.addMore-Occupancy_threshod',function(){
@@ -1377,6 +1378,29 @@ $(document).ready(function()
 
 
     }
+    // Generate bed name fields when capacity changes
+    $(document).on('input change', '[id^="Capacity_"]', function() {
+        var id = $(this).attr('id').replace('Capacity_', '');
+        var capacity = parseInt($(this).val()) || 0;
+        var $container = $('#bedNoFields_' + id);
+        $container.empty();
+
+        if (capacity > 0 && capacity <= 50) {
+            for (var b = 1; b <= capacity; b++) {
+                $container.append(
+                    '<div class="col-lg-2 col-md-3 col-sm-4 col-6 mb-1">' +
+                        '<input type="text" class="form-control form-control-sm" name="BedNames[' + id + '][]" value="BedNo-' + b + '" placeholder="Bed ' + b + '">' +
+                    '</div>'
+                );
+            }
+            $('#BedNo_' + id).val(capacity);
+        } else if (capacity > 50) {
+            $container.html('<div class="col-auto"><small class="text-danger">Maximum 50 beds per room</small></div>');
+        } else {
+            $container.html('<div class="col-auto"><small class="text-muted">Enter capacity first to generate bed fields</small></div>');
+        }
+    });
+
     function AvailableAccommodationJsClass(AvailableCount){
 
 

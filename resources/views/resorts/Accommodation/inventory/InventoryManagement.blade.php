@@ -108,6 +108,10 @@
                             <option value="">Select Bed</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label for="assignQuantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="assignQuantity" name="quantity" min="1" value="1" placeholder="Enter quantity">
+                    </div>
                     <input type="hidden" name="available_id" id="assignAvailableId">
                     <input type="hidden" name="item_id" id="assignItemId">
                     <input type="hidden" name="resort_id" id="assignResortId">

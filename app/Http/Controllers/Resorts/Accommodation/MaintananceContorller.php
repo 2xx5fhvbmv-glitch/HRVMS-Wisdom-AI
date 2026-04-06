@@ -53,6 +53,34 @@ class MaintananceContorller extends Controller
 
         return view('resorts.Accommodation.Maintanance.CreateMaintenance',compact('page_title','Building','InventoryItems'));
     }
+
+    public function getEmployeeAccommodation(Request $request)
+    {
+        $empId = $request->emp_id;
+        $resortId = $this->resort->resort_id;
+
+        $data = DB::table('assing_accommodations as aa')
+            ->join('available_accommodation_models as a', 'a.id', '=', 'aa.available_a_id')
+            ->join('building_models as b', 'b.id', '=', 'a.BuildingName')
+            ->where('aa.emp_id', $empId)
+            ->where('aa.resort_id', $resortId)
+            ->select('b.id as building_id', 'b.BuildingName', 'a.Floor', 'a.RoomNo')
+            ->first();
+
+        if ($data) {
+            return response()->json([
+                'success' => true,
+                'has_accommodation' => true,
+                'building_id' => $data->building_id,
+                'building_name' => $data->BuildingName,
+                'floor' => $data->Floor,
+                'room' => $data->RoomNo,
+            ]);
+        }
+
+        return response()->json(['success' => true, 'has_accommodation' => false]);
+    }
+
     public function CreateMaintenanceRequest(Request $request)
     { 
         $item_id = $request->item_id;
