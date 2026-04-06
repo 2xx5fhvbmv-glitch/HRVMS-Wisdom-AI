@@ -60,6 +60,10 @@
                             <td>{{ $data->Room ?? "-" }}</td>
                         </tr>
                         <tr>
+                            <th>Bed No.</th>
+                            <td>{{ $data->BedNo ?? "-" }}</td>
+                        </tr>
+                        <tr>
                             <th>Amenities Provided:</th>
                             <td>
                                 @if(!empty($data->itemData))

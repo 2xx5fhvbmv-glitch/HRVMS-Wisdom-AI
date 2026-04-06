@@ -231,10 +231,12 @@ $(document).ready(function()
                                     </table>
                                 </div>
                             `);
-                            $("#reviewDetails-modal").modal('show')
+                            $("#reviewDetails-modal").modal('show');
+                            toastr.success(response.message || 'Assigned successfully', "Success", {
+                                positionClass: "toast-bottom-right",
+                            });
                     } else {
-
-                        toastr.error(response.message, "Error", {
+                        toastr.error(response.message || 'Failed to assign', "Error", {
                             positionClass: "toast-bottom-right",
                         });
                     }
@@ -309,7 +311,7 @@ $(document).ready(function()
                                                     <img src="{{ URL::asset('resorts_assets/images/bed-active.png') }}" alt="bed">
                                                     <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg') }}" class="icon" alt="icon">
                                                     <div class="img-circle" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                                                        title="Christian Slatter"><img src="{{ URL::asset('resorts_assets/images/user-2.svg') }}" alt="user">
+                                                        title="Available"><img src="{{ URL::asset('resorts_assets/images/user-2.svg') }}" alt="user">
                                                     </div>
                                                 </div>
                                                 <p>Available</p>

@@ -77,19 +77,20 @@ class AccommodationMasterController extends Controller
                                     }
 
 
-                                $BedCapacity = AvailableAccommodationModel::where('resort_id', $this->resort->resort_id)
-                                                                        ->where("BuildingName", $building->id)
-                                                                        ->get([DB::RAW('SUM(available_accommodation_models.Capacity) as BedCapacity')]);
+                                $BedCapacity = AssingAccommodation::join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
+                                                                ->where('a.BuildingName', $building->id)
+                                                                ->where('assing_accommodations.resort_id', $this->resort->resort_id)
+                                                                ->count();
 
-                                $AvailableBed = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
-                                                                ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
-                                                                ->where("BuildingName", $building->id)
-                                                                ->where("emp_id", 0)
-                                                                // ->groupBy('t1.available_a_id')
-                                                                ->first([DB::raw('COUNT(t1.id ) as BedCapacity')]);
-                                $building->AvailableRooms =$AvailableRooms;
-                                $building->BedCapacity = isset($BedCapacity[0]) ? $BedCapacity[0]->BedCapacity :0;
-                                $building->AvailableBed = isset($AvailableBed) ? $AvailableBed->BedCapacity :0;
+                                $AvailableBedCount = AssingAccommodation::join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
+                                                                ->where('a.BuildingName', $building->id)
+                                                                ->where('assing_accommodations.resort_id', $this->resort->resort_id)
+                                                                ->where('assing_accommodations.emp_id', 0)
+                                                                ->count();
+
+                                $building->AvailableRooms = $AvailableRooms;
+                                $building->BedCapacity = $BedCapacity;
+                                $building->AvailableBed = $AvailableBedCount;
 
                                 $OccupancyLevel = OccupancyLevelsHitACriticalThreshold::where("resort_id", $this->resort->resort_id)
                                 ->where('building_id', $building->id)
@@ -172,26 +173,18 @@ class AccommodationMasterController extends Controller
                 })
                 ->editColumn('RoomFacilities', function ($row) {
                     $itemNames = array_column($row->items, 'inventoryItem');
-                    // $d = ($row->Capacity == $row->AssingAccommodationCount)
-                    //     ? $row->Capacity
-                    //     : $row->AssingAccommodationCount;
-
                     $facilities = e(implode(", ", $itemNames));
-                    if ($row->Capacity!= 0 && $row->Capacity !=$row->AssingAccommodationCount) {
-                        $capacity =  $row->Capacity  -  $row->AssingAccommodationCount;
-                        if($capacity ==0)
-                        {
-                            $facilities .= ' <span class="badge badge-danger"> No Bed Available</span>';
-                        }
-                        else {
-                            $facilities .= ' <span class="badge badge-green">' . $capacity . ' Bed Available</span>';
 
-                        }
-                    }
+                    $availableBeds = $row->AssingAccommodationCount ?? 0;
+                    $totalBeds = AssingAccommodation::where('available_a_id', $row->id)->count();
+                    $occupiedBeds = $totalBeds - $availableBeds;
 
-                    else
-                    {
-                        $facilities .= ' <span class="badge badge-danger"> No Bed Available</span>';
+                    if ($totalBeds == 0) {
+                        $facilities .= ' <span class="badge badge-themeWarning">No Beds Configured</span>';
+                    } elseif ($availableBeds == 0) {
+                        $facilities .= ' <span class="badge badge-danger">Full ('.$occupiedBeds.'/'.$totalBeds.' occupied)</span>';
+                    } else {
+                        $facilities .= ' <span class="badge badge-green">'.$availableBeds.' of '.$totalBeds.' beds available</span>';
                     }
 
                     return $facilities;
@@ -499,7 +492,7 @@ class AccommodationMasterController extends Controller
                 ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
                 ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
                 ->groupBy('t2.id')
-                ->first(['t1.id as ChildBedId','t2.id as employee_id','available_accommodation_models.id as AvailableAccommodation_ID','available_accommodation_models.CleaningSchedule','t8.AccommodationName','t7.Floor','t7.Room','t5.BuildingName as BName','t6.name as DepartmentName','t4.position_title','t2.id as employee_id','t2.Emp_id','t3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*','t1.effected_date']);
+                ->first(['t1.id as ChildBedId','t1.BedNo','t2.id as employee_id','available_accommodation_models.id as AvailableAccommodation_ID','available_accommodation_models.CleaningSchedule','t8.AccommodationName','t7.Floor','t7.Room','t5.BuildingName as BName','t6.name as DepartmentName','t4.position_title','t2.id as employee_id','t2.Emp_id','t3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*','t1.effected_date']);
         $history = collect();
         $AssingAccommodation = collect();
 

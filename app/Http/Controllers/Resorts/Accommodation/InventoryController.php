@@ -117,18 +117,15 @@ class InventoryController extends Controller
                 return isset($row->Occupied) ?  $row->Occupied: 0 ;
             })
             ->editColumn('Available', function ($row) {
-
-                    if(isset($row->Occupied))
-                    {
-                        return $row->Quantity - $row->Occupied;
-                    }
-                    else
-                    {
-                        return $row->Quantity;
-                    }
-
+                    return isset($row->Occupied) ? $row->Quantity - $row->Occupied : $row->Quantity;
             })
-            ->rawColumns(['ItemName','ItemCode','Category','Quantity','PurchageDate','Occupied','Available','Action'])
+            ->addColumn('AssignmentType', function ($row) {
+                    $type = $row->assignment_type ?? 'per_person';
+                    $label = $type === 'per_room' ? 'Per Room' : 'Per Person';
+                    $badge = $type === 'per_room' ? 'badge-themeBlue' : 'badge-themeSuccess';
+                    return '<span class="badge '.$badge.'">'.$label.'</span>';
+            })
+            ->rawColumns(['ItemName','ItemCode','Category','Quantity','PurchageDate','Occupied','Available','AssignmentType','Action'])
 
             ->make(true);
 
@@ -261,6 +258,8 @@ class InventoryController extends Controller
                     $PurchageDate = $PurchageDateRaw ? \Carbon\Carbon::createFromFormat('d/m/Y', $PurchageDateRaw)->format('Y-m-d') : null;
                     $ItemCode = array_key_exists($key, $request->ItemCode) ? $request->ItemCode[$key]: "";
                     $MinStock = array_key_exists($key, $request->MinStock) ?  $request->MinStock[$key]: "";
+                    $assignmentType = ($request->AssignmentType && array_key_exists($key, $request->AssignmentType)) ? $request->AssignmentType[$key] : 'per_person';
+                    $defaultQty = ($request->DefaultQtyPerUnit && array_key_exists($key, $request->DefaultQtyPerUnit)) ? $request->DefaultQtyPerUnit[$key] : 1;
                     InventoryModule::create([
                         'resort_id' => $resort_id,
                         'Inv_Cat_id' => $Inv_Cat_id,
@@ -268,7 +267,9 @@ class InventoryController extends Controller
                         'ItemCode' => $ItemCode,
                         'Quantity' => $Quantity,
                         'PurchageDate' => $PurchageDate,
-                        'MinStock' => $MinStock,
+                        'MinMumStockQty' => $MinStock,
+                        'assignment_type' => $assignmentType,
+                        'default_qty_per_unit' => $defaultQty,
                     ]);
                 }
             }
@@ -461,6 +462,9 @@ class InventoryController extends Controller
         if ($request->has('Occupied')) {
             $updateData['Occupied'] = $request->Occupied;
         }
+        if ($request->filled('assignment_type')) {
+            $updateData['assignment_type'] = $request->assignment_type;
+        }
 
         InventoryModule::where("resort_id", $this->resort->resort_id)->where("id", $id)->update($updateData);
         return response()->json(['success' => true, 'message' => 'Inventory updated successfully'], 200);
@@ -471,27 +475,37 @@ class InventoryController extends Controller
         $availableAccId = base64_decode($request->availableAccId);
         $resort_id = base64_decode($request->resort_id);
 
+        // Helper to decrement inventory when unassigning
+        $decrementInventory = function ($availableAId) {
+            $roomItems = AvailableAccommodationInvItem::where('Available_Acc_id', $availableAId)->with('inventoryModule')->get();
+            foreach ($roomItems as $item) {
+                if ($item->inventoryModule && $item->inventoryModule->Occupied > 0) {
+                    $item->inventoryModule->Occupied = $item->inventoryModule->Occupied - 1;
+                    $item->inventoryModule->save();
+                }
+            }
+        };
+
         // If a specific bed/employee is selected, unassign only that one
         if ($request->filled('assignId')) {
             $assignId = base64_decode($request->assignId);
-            $updated = AssingAccommodation::where('id', $assignId)
-                ->where('resort_id', $resort_id)
-                ->where('emp_id', '!=', 0)
-                ->update(['emp_id' => 0, 'effected_date' => null]);
+            $bed = AssingAccommodation::where('id', $assignId)->where('resort_id', $resort_id)->where('emp_id', '!=', 0)->first();
 
-            if ($updated > 0) {
+            if ($bed) {
+                $decrementInventory($bed->available_a_id);
+                $bed->update(['emp_id' => 0, 'effected_date' => null]);
                 return response()->json(['success' => true, 'message' => 'Employee unassigned successfully'], 200);
             }
             return response()->json(['success' => false, 'message' => 'No assigned employee found'], 404);
         }
 
         // Get all assigned employees in this room
-        $assignedBeds = AssingAccommodation::where('available_a_id', $availableAccId)
-            ->where('resort_id', $resort_id)
-            ->where('emp_id', '!=', 0)
+        $assignedBeds = AssingAccommodation::where('assing_accommodations.available_a_id', $availableAccId)
+            ->where('assing_accommodations.resort_id', $resort_id)
+            ->where('assing_accommodations.emp_id', '!=', 0)
             ->join('employees as e', 'e.id', '=', 'assing_accommodations.emp_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.BedNo', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
+            ->select('assing_accommodations.id as assign_id', 'assing_accommodations.available_a_id', 'assing_accommodations.BedNo', 'e.Emp_id', 'ra.first_name', 'ra.last_name')
             ->get();
 
         if ($assignedBeds->isEmpty()) {
@@ -500,6 +514,7 @@ class InventoryController extends Controller
 
         // If only 1 employee, unassign directly
         if ($assignedBeds->count() === 1) {
+            $decrementInventory($assignedBeds->first()->available_a_id);
             AssingAccommodation::where('id', $assignedBeds->first()->assign_id)
                 ->update(['emp_id' => 0, 'effected_date' => null]);
             return response()->json(['success' => true, 'message' => 'Employee unassigned successfully'], 200);

@@ -199,40 +199,41 @@
                         $femaleAvailable = $BedStatistics->FemaleAvailableBeds ?? 0;
                         $totalMaleBeds = $maleOccupied + $maleAvailable;
                         $totalFemaleBeds = $femaleOccupied + $femaleAvailable;
-                        $maleOccupiedPercentage = $totalMaleBeds > 0 ? round(($maleOccupied / $totalMaleBeds) * 100, 2) : 0;
-                        $femaleOccupiedPercentage = $totalFemaleBeds > 0 ? round(($femaleOccupied / $totalFemaleBeds) * 100, 2) : 0;
                         $overallOccupiedBeds = $maleOccupied + $femaleOccupied;
                         $overallTotalBeds = $totalMaleBeds + $totalFemaleBeds;
                         $overallOccupiedPercentage = $overallTotalBeds > 0 ? round(($overallOccupiedBeds / $overallTotalBeds) * 100, 2) : 0;
+                        // Male/Female as share of total occupied beds (adds up to 100%)
+                        $maleSharePercentage = $overallOccupiedBeds > 0 ? round(($maleOccupied / $overallOccupiedBeds) * 100, 2) : 0;
+                        $femaleSharePercentage = $overallOccupiedBeds > 0 ? round(($femaleOccupied / $overallOccupiedBeds) * 100, 2) : 0;
                     @endphp
                   <div class="two-progressbar mb-3">
                     <!-- Male Occupied -->
-                    <div class="progress-container blue" data-progress="{{ $maleOccupiedPercentage }}"
+                    <div class="progress-container blue" data-progress="{{ $maleSharePercentage }}"
                         data-bs-toggle="tooltip" data-bs-placement="bottom"
-                        title="Male Staff Occupied {{ $maleOccupiedPercentage }}%">
+                        title="Male Staff: {{ $maleOccupied }} of {{ $totalMaleBeds }} beds ({{ $maleSharePercentage }}%)">
                         <svg class="progress-circle" viewBox="0 0 120 120">
                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                             <circle class="progress" cx="60" cy="60" r="54"
-                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $maleOccupiedPercentage / 100) }};">
+                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $maleSharePercentage / 100) }};">
                             </circle>
                         </svg>
                     </div>
 
                     <!-- Female Occupied -->
-                    <div class="progress-container skyblue" data-progress="{{ $femaleOccupiedPercentage }}"
+                    <div class="progress-container skyblue" data-progress="{{ $femaleSharePercentage }}"
                         data-bs-toggle="tooltip" data-bs-placement="bottom"
-                        title="Female Staff Occupied {{ $femaleOccupiedPercentage }}%">
+                        title="Female Staff: {{ $femaleOccupied }} of {{ $totalFemaleBeds }} beds ({{ $femaleSharePercentage }}%)">
                         <svg class="progress-circle" viewBox="0 0 120 120">
                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                             <circle class="progress" cx="60" cy="60" r="54"
-                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $femaleOccupiedPercentage / 100) }};">
+                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $femaleSharePercentage / 100) }};">
                             </circle>
                         </svg>
                     </div>
 
                     <!-- Overall Occupied -->
                     <div class="text">
-                        <h5>{{ $overallOccupiedPercentage }}%</h5>
+                        <h5 style="font-size: 30px !important;">{{ $overallOccupiedPercentage }}%</h5>
                         <p>Occupied Bed</p>
                     </div>
                 </div>
@@ -319,7 +320,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-auto"><a href="{{ route('resort.accommodation.inventory')}}" class="a-link">View All</a>
+                            <div class="col-auto"><a href="{{ route('resort.accommodation.InventoryManagement')}}" class="a-link">View All</a>
                             </div>
                         </div>
                     </div>
@@ -559,51 +560,107 @@
         </div>
     </div>
 </div>
-<div class="modal fade" id="selectBed-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small modal-selectBed">
+<div class="modal fade" id="selectBed-modal" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-md modal-selectBed">
         <div class="modal-content">
-        <form id="AssignBedForm">
-            @csrf
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Select Bed</h5>
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-600" id="selectBedModalTitle">Assign Item</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="bg-themeGrayLight">
-                <div class="row">
-                    <div class="col-12">
+                {{-- Already Assigned Section --}}
+                <div id="alreadyAssignedSection" class="d-none mb-3">
+                    <label class="form-label fw-600 text-muted">Currently Assigned</label>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0" id="alreadyAssignedTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Bed</th>
+                                    <th>Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
 
+                <hr class="d-none" id="assignDivider">
+
+                {{-- New Assignment Section --}}
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-8">
+                        <label class="form-label fw-500">SELECT EMPLOYEE</label>
                         <select class="form-select" name="emp_id" id="EmployeeList">
-                            <option selected>Select Employee</option>
+                            <option value="">Select Employee</option>
                         </select>
                     </div>
-                </div>
-                <br>
-                <div class="row">
-
-                    <div class="col-12">
-                            <div class="bed-badge">Bed</div>
-                                <div class="row g-3 AppnedBed">
-
-                                </div>
-                                <input type="hidden" name="assignId" id="assignId">
-                            </div>
+                    <div class="col-sm-4">
+                        <label class="form-label fw-500">QUANTITY</label>
+                        <input type="number" class="form-control" name="quantity" id="bedQuantity" min="1" value="1" placeholder="Qty">
                     </div>
                 </div>
 
+                {{-- Bed Selection with Icons --}}
+                <div class="bg-themeGrayLight p-3 rounded">
+                    <div class="bed-badge" id="bedBadgeLabel">Select Bed</div>
+                    <div class="row g-2 AppnedBed"></div>
+                    <input type="hidden" name="assignId" id="assignId">
+                </div>
             </div>
-            <div class="modal-footer">
-                 <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <button href="#reviewDetails-modal" data-bs-toggle="modal"
-                    class="btn btn-themeBlue">Submit</button>
+            <div class="modal-footer border-top">
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Cancel</a>
+                <button type="button" class="btn btn-themeBlue" id="submitAssignBed">Submit</button>
             </div>
-        </form>
         </div>
     </div>
 </div>
 @endsection
 
 @section('import-css')
+<style>
+    #selectBed-modal .table-sm th,
+    #selectBed-modal .table-sm td {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+    #alreadyAssignedSection {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    #selectBed-modal .bed-block {
+        width: 100%;
+        height: auto;
+        padding: 12px 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    #selectBed-modal .bed-block:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    #selectBed-modal .bed-block.occupied {
+        background: #e8f4fd;
+        border: 2px solid #53CAFF;
+    }
+    #selectBed-modal .bed-block.occupied .img-circle {
+        display: block;
+    }
+    #selectBed-modal .bed-block.occupied p {
+        color: #014653;
+    }
+    #selectBed-modal .bed-block.active {
+        border: 2px solid #014653;
+    }
+    #selectBed-modal .bed-block p {
+        margin-bottom: 0;
+        font-size: 11px;
+    }
+    #selectBed-modal .bed-badge {
+        width: auto;
+        display: inline-block;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -746,122 +803,76 @@
                 });
             }
         });
-        $('#AssignBedForm').validate({
-            rules: {
-                assignId: {
-                    required: true,
-                },
-                emp_id: {
-                    required: true,
-                }
-            },
-            messages: {
-                assignId: {
-                    required: "Please Select Bed.",
-                },
-                emp_id: {
-                    required: "Please Select Employee.",
-                }
-            },
-            errorPlacement: function (error, element) {
-                if (element.attr("name") === "assignId") {
-                $('.bed-block .assign-error').remove();
-
-                // Add error message after the selected bed-block's paragraph
-                if($('.bed-block.selected').length) {
-                    $('.bed-block.selected').append(
-                        `<div class="assign-error" style="color: red; margin-top: 5px;">${error.text()}</div>`
-                    );
-                } else {
-                    // If no bed is selected, append to all bed-blocks
-                    $('.bed-block').append(
-                        `<div class="assign-error" style="color: red; margin-top: 5px;">${error.text()}</div>`
-                    );
-                }
-            } else {
-                // Default placement for other fields
-                error.insertAfter(element);
-            }
-            },
-            submitHandler: function (form, event) {
-                event.preventDefault(); // Prevent form default submission
-
-                var formData = new FormData(form);
-
-                $.ajax({
-                    url: "{{ route('resort.accommodation.AssignAccommodationToEmp') }}",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function (response) {
-                        if (response.success) {
-                            var employee = response.data.employee;
-                            var accommodation = response.data.accommodation;
-                            var facilities = accommodation.facilities.join(", ");
-                            $("#selectBed-modal").modal('hide');
-
-                            $(".appendhereAfterAssign").html(`
-                                <div class="empDetails-user">
-                                     <div class="img-circle"><img src="${employee.profile_picture}" alt="user">
-                                    </div>
-                                    <div>
-                                        <h4>${employee.name}<span class="badge badge-themeNew">#34523</span></h4>
-                                        <p>${employee.position}</p>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-lable">
-                                        <tr>
-                                            <th>Building:</th>
-                                            <td>${accommodation.building_name}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Room No.</th>
-                                            <td>${accommodation.room_no}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Room Facilities:</th>
-                                            <td>${facilities}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Room Status:</th>
-                                            <td>${accommodation.RoomStatus}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Accommodation Name:</th>
-                                            <td>${accommodation.accommodation_name}</td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            `);
-
-                            Aminities();
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: "toast-bottom-right",
-                            });
-                        }
-                    },
-                    error: function (response) {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function (key, error) {
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, "Error", {
-                            positionClass: "toast-bottom-right",
-                        });
-                    }
-                });
-            }
-        });
     });
     $(document).on("click", ".bed-block", function () {
-        // Remove the 'active' class from all bed blocks
         $(".bed-block").removeClass("active");
         $(this).addClass("active");
         $("#assignId").val($(this).data('id'));
+    });
+
+    $(document).on('click', '#submitAssignBed', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var empId = $('#EmployeeList').val();
+        var assignId = $('#assignId').val();
+        var quantity = $('#bedQuantity').val() || 1;
+
+        if (!empId || empId === '') {
+            toastr.error('Please select an employee', 'Error', { positionClass: 'toast-bottom-right' });
+            return false;
+        }
+        if (!assignId || assignId === '') {
+            toastr.error('Please select a bed', 'Error', { positionClass: 'toast-bottom-right' });
+            return false;
+        }
+
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('Submitting...');
+
+        $.ajax({
+            url: "{{ route('resort.accommodation.AssignAccommodationToEmp') }}",
+            type: "POST",
+            data: {
+                _token: '{{ csrf_token() }}',
+                emp_id: empId,
+                assignId: assignId,
+                quantity: quantity
+            },
+            success: function (response) {
+                if (response.success) {
+                    $("#selectBed-modal").modal('hide');
+                    $('#EmployeeList').val('').trigger('change');
+                    $('#bedQuantity').val(1);
+                    $('#assignId').val('');
+                    $('.bed-block').removeClass('active');
+                    Aminities();
+                    toastr.success(response.message || 'Assigned successfully', "Success", {
+                        positionClass: "toast-bottom-right",
+                    });
+                } else {
+                    toastr.error(response.message || 'Failed to assign', "Error", {
+                        positionClass: "toast-bottom-right",
+                    });
+                }
+            },
+            error: function (xhr) {
+                var msg = 'An error occurred';
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.errors) {
+                        msg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
+                    } else if (xhr.responseJSON.message) {
+                        msg = xhr.responseJSON.message;
+                    }
+                }
+                toastr.error(msg, "Error", {
+                    positionClass: "toast-bottom-right",
+                });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).text('Submit');
+            }
+        });
     });
 
     
@@ -1252,49 +1263,108 @@
     {
         var RoomType = $(this).data('roomtype');
         var available_a_id = $(this).data('id');
-        console.log(RoomType,available_a_id);
+        var $row = $(this).closest('tr');
+        var itemName = $row.find('td:first').text().trim() || 'Item';
+        var currentOccupied = parseInt($row.find('td:eq(2)').text().trim()) || 0;
+        $('#selectBedModalTitle').text('Assign - ' + itemName);
+
         $.ajax({
-            url: "{{ route('resort.accommodation.GetAccmmodationwiseEmployee') }}", // Your route for file upload
+            url: "{{ route('resort.accommodation.GetAccmmodationwiseEmployee') }}",
             type: "POST",
             data: {"_token":"{{ csrf_token() }}","RoomType": RoomType,"available_a_id":available_a_id},
             success: function(response)
             {
                 if (response.success)
                 {
-                    var row = '';
-                    var option = '<option></option>';
-                    $.each(response.Employees, function (i, v)
-                    {
-                        option +=`<option value='${v.EmployeeId}'>${v.first_name}  ${v.last_name}</option>`;
+                    // Populate employee dropdown
+                    var option = '<option value="">Select Employee</option>';
+                    $.each(response.Employees, function (i, v) {
+                        option += `<option value='${v.EmployeeId}'>${v.first_name} ${v.last_name} (${v.Emp_id})</option>`;
                     });
                     $("#EmployeeList").html(option);
-                            $.each(response.AssingAccommodation, function (i, v)
-                            {
 
-                                    row +=`<div class="col-6">
-                                                <div class="bed-block" data-id='${v.id}'>
-                                                    <div class="position-relative">
-                                                        <img src="{{ URL::asset('resorts_assets/images/bed-active.png') }}" alt="bed">
-                                                        <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg') }}" class="icon" alt="icon">
-                                                        <div class="img-circle" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                                                            title="Christian Slatter"><img src="{{ URL::asset('resorts_assets/images/user-2.svg') }}" alt="user">
-                                                        </div>
-                                                    </div>
-                                                    <p>Available</p>
+                    if ($('#EmployeeList').data('select2')) {
+                        $('#EmployeeList').select2('destroy');
+                    }
+                    $('#EmployeeList').select2({
+                        placeholder: 'Select Employee',
+                        allowClear: true,
+                        dropdownParent: $('#selectBed-modal')
+                    });
+
+                    // Reset fields
+                    $('#bedQuantity').val(1);
+                    $('#assignId').val('');
+
+                    // Build assigned table and bed icons
+                    var row = '';
+                    var assignedRows = '';
+                    var hasAssigned = false;
+
+                    $.each(response.AssingAccommodation, function (i, v) {
+                        var bedLabel = v.BedNo || ('Bed ' + (i+1));
+                        if (v.is_occupied) {
+                            hasAssigned = true;
+                            assignedRows += `<tr>
+                                <td><small>${v.EmployeeName}</small></td>
+                                <td><small>${bedLabel}</small></td>
+                                <td><small>1</small></td>
+                            </tr>`;
+                            row += `<div class="col-6 col-md-3">
+                                        <div class="bed-block occupied" data-id='${v.id}'>
+                                            <div class="position-relative">
+                                                <img src="{{ URL::asset('resorts_assets/images/bed-active.png') }}" alt="bed">
+                                                <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg') }}" class="icon" alt="icon">
+                                                <div class="img-circle" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                                                    title="${v.EmployeeName}"><img src="${v.profileImg}" alt="user">
                                                 </div>
-                                            </div>`;
+                                            </div>
+                                            <p>${v.EmployeeName}<br><small class="text-muted">${bedLabel}</small></p>
+                                        </div>
+                                    </div>`;
+                        } else {
+                            row += `<div class="col-6 col-md-3">
+                                        <div class="bed-block" data-id='${v.id}'>
+                                            <div class="position-relative">
+                                                <img src="{{ URL::asset('resorts_assets/images/bed-active.png') }}" alt="bed">
+                                                <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg') }}" class="icon" alt="icon">
+                                                <div class="img-circle" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                                                    title="Available"><img src="{{ URL::asset('resorts_assets/images/user-2.svg') }}" alt="user">
+                                                </div>
+                                            </div>
+                                            <p>Available<br><small class="text-muted">${bedLabel}</small></p>
+                                        </div>
+                                    </div>`;
+                        }
+                    });
 
-                            });
+                    $(".AppnedBed").html(row);
+                    $('[data-bs-toggle="tooltip"]').tooltip();
 
-                            $(".AppnedBed").html(row);
-                            $('[data-bs-toggle="tooltip"]').tooltip();
+                    // Show/hide already assigned table
+                    if (hasAssigned) {
+                        $('#alreadyAssignedTable tbody').html(assignedRows);
+                        $('#alreadyAssignedSection').removeClass('d-none');
+                        $('#assignDivider').removeClass('d-none');
+                    } else {
+                        $('#alreadyAssignedSection').addClass('d-none');
+                        $('#assignDivider').addClass('d-none');
+                    }
 
+                    // Auto-select bed when employee is chosen
+                    $('#EmployeeList').off('change.autobed').on('change.autobed', function() {
+                        var selectedEmpId = parseInt($(this).val());
+                        if (selectedEmpId) {
+                            var empBed = response.AssingAccommodation.find(function(b) { return b.emp_id === selectedEmpId; });
+                            if (empBed) {
+                                $('.bed-block').removeClass('active');
+                                $('.bed-block[data-id="' + empBed.id + '"]').addClass('active');
+                                $('#assignId').val(empBed.id);
+                            }
+                        }
+                    });
 
                     $("#selectBed-modal").modal('show');
-
-                    toastr.success(response.message, "success", {
-                        positionClass: "toast-bottom-right",
-                    });
                 } else {
                     toastr.error(response.message, "Error", {
                         positionClass: "toast-bottom-right",

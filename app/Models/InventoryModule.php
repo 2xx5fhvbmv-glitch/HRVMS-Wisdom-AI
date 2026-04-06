@@ -13,7 +13,7 @@ class InventoryModule extends Model
 
 
     protected $table = 'inventory_modules';
-    protected $fillable = ['resort_id','Inv_Cat_id','ItemName','ItemCode','PurchageDate','Occupied','Quantity','MinMumStockQty'];
+    protected $fillable = ['resort_id','Inv_Cat_id','ItemName','ItemCode','PurchageDate','Occupied','Quantity','MinMumStockQty','assignment_type','default_qty_per_unit'];
 
 
     public static function boot(){

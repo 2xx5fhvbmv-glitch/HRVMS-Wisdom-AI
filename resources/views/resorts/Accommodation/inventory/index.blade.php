@@ -81,6 +81,17 @@
                                     <label for="stockAva" class="form-label">MINIMUM STOCK AVAILABLE</label>
                                     <input type="number" min="0" name="MinStock[]" class="form-control" id="MinStock_1" placeholder="1" required data-parsley-type="number" data-parsley-min="1" data-parsley-min-message="Minimum Stock must be at least 1.">
                                 </div>
+                                <div class="col-lg-4 col-sm-6">
+                                    <label for="assignType" class="form-label">ASSIGNMENT TYPE</label>
+                                    <select class="form-select" name="AssignmentType[]" id="AssignmentType_1" required data-parsley-required-message="Please select assignment type.">
+                                        <option value="per_person">Per Person</option>
+                                        <option value="per_room">Per Room</option>
+                                    </select>
+                                </div>
+                                <div class="col-lg-4 col-sm-6">
+                                    <label for="defaultQty" class="form-label">DEFAULT QTY PER UNIT</label>
+                                    <input type="number" min="1" name="DefaultQtyPerUnit[]" class="form-control" id="DefaultQtyPerUnit_1" placeholder="e.g. 2 pillows per person" value="1" required data-parsley-type="number" data-parsley-min="1" data-parsley-min-message="Must be at least 1.">
+                                </div>
                             </div>
                         </div>
                         <input type="hidden" name="count" id="count" value="1">
@@ -165,6 +176,7 @@
                                 <th>Quantity</th>
                                 <th>Occupied</th>
                                 <th>Available</th>
+                                <th>Assignment Type</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -374,13 +386,23 @@ $(document).ready(function()
                             <input type="text" name="ItemCode[]" class="form-control" id="inventoryCode_${counts}" placeholder="451245"
                                 required data-parsley-required-message="Please enter Item Code.">
                         </div>
-                        <div class="col-lg-2 col-sm-3">
+                        <div class="col-lg-4 col-sm-6">
                             <label for="stockAva" class="form-label">MINIMUM STOCK AVAILABLE</label>
                             <input type="number" min="0" name="MinStock[]" class="form-control" id="MinStock_${counts}" placeholder="4" required data-parsley-type="number" data-parsley-min="1" data-parsley-min-message="Minimum Stock must be at least 1.">
-
                         </div>
-                        <div class="col-lg-2 col-sm-3">
-                                <button type="button" style="    margin-top: 32px;" class="btn btn-sm btn-danger remove" data-id="${counts}">Remove</button>
+                        <div class="col-lg-4 col-sm-6">
+                            <label for="assignType" class="form-label">ASSIGNMENT TYPE</label>
+                            <select class="form-select" name="AssignmentType[]" id="AssignmentType_${counts}" required data-parsley-required-message="Please select assignment type.">
+                                <option value="per_person">Per Person</option>
+                                <option value="per_room">Per Room</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-4 col-sm-6">
+                            <label for="defaultQty" class="form-label">DEFAULT QTY PER UNIT</label>
+                            <input type="number" min="1" name="DefaultQtyPerUnit[]" class="form-control" id="DefaultQtyPerUnit_${counts}" placeholder="e.g. 2" value="1" required data-parsley-type="number" data-parsley-min="1" data-parsley-min-message="Must be at least 1.">
+                        </div>
+                        <div class="col-lg-4 col-sm-6">
+                                <button type="button" style="margin-top: 32px;" class="btn btn-sm btn-danger remove" data-id="${counts}">Remove</button>
                         </div>
                     </div>
                 </div>`;
@@ -471,6 +493,7 @@ if ( $(".historical_inventory").is(':checked'))
             var Qty = $row.find("td:nth-child(4)").text().trim();
             var Occupied = $row.find("td:nth-child(5)").text().trim();
             var Avilable = $row.find("td:nth-child(6)").text().trim();
+            var AssignType = $row.find("td:nth-child(7)").text().trim();
 
             var categoryOptions = '';
             @foreach($InventoryCategory as $ic)
@@ -509,6 +532,14 @@ if ( $(".historical_inventory").is(':checked'))
                         </div>
                     </td>
                     <td class="py-1">
+                        <div class="form-group">
+                            <select class="form-select edit-assignment-type">
+                                <option value="per_person" ${AssignType === 'Per Person' ? 'selected' : ''}>Per Person</option>
+                                <option value="per_room" ${AssignType === 'Per Room' ? 'selected' : ''}>Per Room</option>
+                            </select>
+                        </div>
+                    </td>
+                    <td class="py-1">
                         <a href="#" class="btn btn-theme update-row-btn_agent" data-inventory-id="${invenotry_id}">Submit</a>
                         <a href="#" class="btn btn-themeGray btn-sm cancel-edit-btn ms-1">Cancel</a>
                     </td>
@@ -532,6 +563,7 @@ if ( $(".historical_inventory").is(':checked'))
             var categoryId = $row.find(".edit-category").val();
             var qty = $row.find(".edit-qty").val();
             var occupied = $row.find(".edit-occupied").val();
+            var assignmentType = $row.find(".edit-assignment-type").val();
             $.ajax({
                 url: "{{ route('resort.accommodation.Inventoryupdated', '') }}/" + inventory_id,
                 type: "PUT",
@@ -542,6 +574,7 @@ if ( $(".historical_inventory").is(':checked'))
                     ItemCode: itemCode,
                     Inv_Cat_id: categoryId,
                     Occupied: occupied,
+                    assignment_type: assignmentType,
                 },
                 success: function(response) {
                     if(response.success == true) { // Ensure response contains a success key
@@ -615,6 +648,7 @@ if ( $(".historical_inventory").is(':checked'))
                     { data: 'Quantity', name: 'Quantity', className: 'text-nowrap' },
                     { data: 'Occupied', name: 'Occupied', className: 'text-nowrap' },
                     { data: 'Available', name: 'Available', className: 'text-nowrap' },
+                    { data: 'AssignmentType', name: 'AssignmentType', className: 'text-nowrap' },
                     { data: 'Action', name: 'Action', className: 'text-nowrap' },
                      {data:'created_at',visible:false,searchable:false},
                 ]

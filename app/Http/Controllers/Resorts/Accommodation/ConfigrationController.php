@@ -264,7 +264,7 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            AccommodationType::create(["resort_id"=>$this->resort->resort_id,"AccommodationName"=>ucfirst($AccommodationName),'Color'=>$request->Color]);
+            AccommodationType::create(["resort_id"=>$this->resort->resort_id,"AccommodationName"=>ucfirst($AccommodationName),'Color'=>$request->Color ?? '#014653']);
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -389,6 +389,160 @@ class ConfigrationController extends Controller
     }
 
 
+    public function AvailableAccommodationIndex(Request $request)
+    {
+        $page_title = 'Available Accommodation';
+        $resort_id = $this->resort->resort_id;
+
+        if ($request->ajax()) {
+            $data = AvailableAccommodationModel::join('building_models as b', 'b.id', '=', 'available_accommodation_models.BuildingName')
+                ->leftJoin('accommodation_types as at', 'at.id', '=', 'available_accommodation_models.Accommodation_type_id')
+                ->where('available_accommodation_models.resort_id', $resort_id)
+                ->select(
+                    'available_accommodation_models.id',
+                    'b.BuildingName',
+                    'available_accommodation_models.Floor',
+                    'available_accommodation_models.RoomNo',
+                    'available_accommodation_models.Capacity',
+                    'available_accommodation_models.RoomType',
+                    'available_accommodation_models.blockFor',
+                    'available_accommodation_models.CleaningSchedule',
+                    'available_accommodation_models.RoomStatus',
+                    'available_accommodation_models.Occupancytheresold',
+                    'available_accommodation_models.Accommodation_type_id',
+                    'at.AccommodationName',
+                    'available_accommodation_models.created_at'
+                )
+                ->orderBy('available_accommodation_models.id', 'DESC')
+                ->get()
+                ->map(function ($row) {
+                    $rankMap = config('settings.eligibilty');
+                    $row->RoomTypeName = $rankMap[$row->RoomType] ?? 'Unknown';
+                    $beds = \App\Models\AssingAccommodation::where('available_a_id', $row->id)->count();
+                    $occupied = \App\Models\AssingAccommodation::where('available_a_id', $row->id)->where('emp_id', '!=', 0)->count();
+                    $row->Beds = $occupied . '/' . $beds;
+                    return $row;
+                });
+
+            return datatables()->of($data)
+                ->editColumn('BuildingName', fn($row) => e($row->BuildingName))
+                ->editColumn('Floor', fn($row) => e($row->Floor))
+                ->editColumn('RoomNo', fn($row) => e($row->RoomNo))
+                ->addColumn('action', function ($row) {
+                    $id = $row->id;
+                    return '<div class="d-flex align-items-center">
+                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-accommodation-btn" data-id="' . $id . '"
+                                    data-building="' . e($row->BuildingName) . '"
+                                    data-floor="' . e($row->Floor) . '"
+                                    data-room="' . e($row->RoomNo) . '"
+                                    data-capacity="' . e($row->Capacity) . '"
+                                    data-roomtype="' . e($row->RoomType) . '"
+                                    data-blockfor="' . e($row->blockFor) . '"
+                                    data-cleaning="' . e($row->CleaningSchedule) . '"
+                                    data-roomstatus="' . e($row->RoomStatus) . '"
+                                    data-threshold="' . e($row->Occupancytheresold) . '"
+                                    data-accommodationtype="' . e($row->Accommodation_type_id) . '">
+                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit">
+                                </a>
+                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-accommodation-btn" data-id="' . $id . '">
+                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete">
+                                </a>
+                            </div>';
+                })
+                ->rawColumns(['action'])
+                ->make(true);
+        }
+
+        return view('resorts.Accommodation.configration.available-accommodation-list', compact('page_title'));
+    }
+
+    public function AvailableAccommodationDestroy($id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $accommodation = AvailableAccommodationModel::where('id', $id)->where('resort_id', $resort_id)->first();
+        if (!$accommodation) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            AvailableAccommodationInvItem::where('Available_Acc_id', $id)->delete();
+            \App\Models\AssingAccommodation::where('available_a_id', $id)->where('resort_id', $resort_id)->delete();
+            $accommodation->delete();
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Accommodation deleted successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to delete'], 500);
+        }
+    }
+
+    public function getBeds($id)
+    {
+        $beds = \App\Models\AssingAccommodation::where('available_a_id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->select('id', 'BedNo', 'emp_id')
+            ->orderBy('id')
+            ->get();
+
+        return response()->json(['success' => true, 'beds' => $beds]);
+    }
+
+    public function AvailableAccommodationUpdate(Request $request, $id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $accommodation = AvailableAccommodationModel::where('id', $id)->where('resort_id', $resort_id)->first();
+        if (!$accommodation) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+
+        $accommodation->update([
+            'Accommodation_type_id' => $request->Accommodation_type_id,
+            'Capacity' => $request->Capacity,
+            'RoomType' => $request->RoomType,
+            'blockFor' => $request->blockFor,
+            'CleaningSchedule' => $request->CleaningSchedule,
+            'RoomStatus' => $request->RoomStatus ?? 'Available',
+            'Occupancytheresold' => $request->Occupancytheresold,
+        ]);
+
+        // Update existing bed names
+        if ($request->has('bedNames') && is_array($request->bedNames)) {
+            foreach ($request->bedNames as $bedId => $bedName) {
+                \App\Models\AssingAccommodation::where('id', $bedId)
+                    ->where('resort_id', $resort_id)
+                    ->update(['BedNo' => $bedName]);
+            }
+        }
+
+        // Create new beds if capacity increased
+        if ($request->has('newBeds') && is_array($request->newBeds)) {
+            foreach ($request->newBeds as $bedName) {
+                \App\Models\AssingAccommodation::create([
+                    'resort_id' => $resort_id,
+                    'available_a_id' => $id,
+                    'BedNo' => $bedName,
+                ]);
+            }
+        }
+
+        // Remove unoccupied excess beds if capacity decreased
+        $currentBedCount = \App\Models\AssingAccommodation::where('available_a_id', $id)->where('resort_id', $resort_id)->count();
+        $newCapacity = intval($request->Capacity);
+        if ($newCapacity < $currentBedCount) {
+            $excessCount = $currentBedCount - $newCapacity;
+            $emptyBeds = \App\Models\AssingAccommodation::where('available_a_id', $id)
+                ->where('resort_id', $resort_id)
+                ->where('emp_id', 0)
+                ->orderBy('id', 'desc')
+                ->limit($excessCount)
+                ->pluck('id');
+            \App\Models\AssingAccommodation::whereIn('id', $emptyBeds)->delete();
+        }
+
+        return response()->json(['success' => true, 'message' => 'Accommodation updated successfully']);
+    }
+
     public function AvailableAccommodationStore(Request $request)
     {
         $BuildingName = $request->BuildingName;
@@ -483,7 +637,7 @@ class ConfigrationController extends Controller
                             "resort_id"=>$resort_id,
                         ]);
 
-                if(array_key_exists($i,$request->Inv_Cat_id))
+                if($request->Inv_Cat_id && array_key_exists($i,$request->Inv_Cat_id))
                 {
                     $invQuantity = ($request->InvQuantity && array_key_exists($i, $request->InvQuantity)) ? $request->InvQuantity[$i] : 1;
 
@@ -491,19 +645,18 @@ class ConfigrationController extends Controller
                     {
                         AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$invQuantity]);
                     }
-
+                }
 
                     $bedCount = intval($capacity);
+                    $bedNames = ($request->BedNames && array_key_exists($i, $request->BedNames)) ? $request->BedNames[$i] : [];
                     for ($b = 0; $b < $bedCount; $b++)
                     {
                         AssingAccommodation::create([
-                            "resort_id"=>$resort_id,
-                            'available_a_id'=> $parent_id->id,
-                            'BedNo' => 'BedNo-' . ($b + 1),
+                            "resort_id" => $resort_id,
+                            'available_a_id' => $parent_id->id,
+                            'BedNo' => $bedNames[$b] ?? 'BedNo-' . ($b + 1),
                         ]);
                     }
-
-                }
 
 
                 //

@@ -153,56 +153,55 @@
                             $femaleAvailable = $BedStatistics->FemaleAvailableBeds;
                             $totalMaleBeds = $maleOccupied + $maleAvailable;
                             $totalFemaleBeds = $femaleOccupied + $femaleAvailable;
-                            $maleOccupiedPercentage = $totalMaleBeds > 0 ? round(($maleOccupied / $totalMaleBeds) * 100, 2) : 0;
-                            $femaleOccupiedPercentage = $totalFemaleBeds > 0 ? round(($femaleOccupied / $totalFemaleBeds) * 100, 2) : 0;
                             $overallOccupiedBeds = $maleOccupied + $femaleOccupied;
                             $overallTotalBeds = $totalMaleBeds + $totalFemaleBeds;
                             $overallOccupiedPercentage = $overallTotalBeds > 0 ? round(($overallOccupiedBeds / $overallTotalBeds) * 100, 2) : 0;
+                            $maleSharePercentage = $overallOccupiedBeds > 0 ? round(($maleOccupied / $overallOccupiedBeds) * 100, 2) : 0;
+                            $femaleSharePercentage = $overallOccupiedBeds > 0 ? round(($femaleOccupied / $overallOccupiedBeds) * 100, 2) : 0;
                         }
                         else
                         {
-                            $maleOccupied =0;
-                            $maleAvailable =0;
-                            $femaleOccupied =0;
-                            $femaleAvailable =0;
+                            $maleOccupied = 0;
+                            $maleAvailable = 0;
+                            $femaleOccupied = 0;
+                            $femaleAvailable = 0;
                             $totalMaleBeds = 0;
                             $totalFemaleBeds = 0;
-                            $maleOccupiedPercentage =  0;
-                            $femaleOccupiedPercentage = 0;
                             $overallOccupiedBeds = 0;
-                            $overallTotalBeds =0;
-                            $overallOccupiedPercentage =  0;
-
+                            $overallTotalBeds = 0;
+                            $overallOccupiedPercentage = 0;
+                            $maleSharePercentage = 0;
+                            $femaleSharePercentage = 0;
                         }
-                          @endphp
+                    @endphp
                   <div class="two-progressbar mb-3">
                     <!-- Male Occupied -->
-                    <div class="progress-container blue" data-progress="{{ $maleOccupiedPercentage }}"
+                    <div class="progress-container blue" data-progress="{{ $maleSharePercentage }}"
                         data-bs-toggle="tooltip" data-bs-placement="bottom"
-                        title="Male Staff Occupied {{ $maleOccupiedPercentage }}%">
+                        title="Male Staff: {{ $maleOccupied }} of {{ $totalMaleBeds }} beds ({{ $maleSharePercentage }}%)">
                         <svg class="progress-circle" viewBox="0 0 120 120">
                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                             <circle class="progress" cx="60" cy="60" r="54"
-                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $maleOccupiedPercentage / 100) }};">
+                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $maleSharePercentage / 100) }};">
                             </circle>
                         </svg>
                     </div>
 
                     <!-- Female Occupied -->
-                    <div class="progress-container skyblue" data-progress="{{ $femaleOccupiedPercentage }}"
+                    <div class="progress-container skyblue" data-progress="{{ $femaleSharePercentage }}"
                         data-bs-toggle="tooltip" data-bs-placement="bottom"
-                        title="Female Staff Occupied {{ $femaleOccupiedPercentage }}%">
+                        title="Female Staff: {{ $femaleOccupied }} of {{ $totalFemaleBeds }} beds ({{ $femaleSharePercentage }}%)">
                         <svg class="progress-circle" viewBox="0 0 120 120">
                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                             <circle class="progress" cx="60" cy="60" r="54"
-                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $femaleOccupiedPercentage / 100) }};">
+                                style="stroke-dashoffset: {{ 339.292 - (339.292 * $femaleSharePercentage / 100) }};">
                             </circle>
                         </svg>
                     </div>
 
                     <!-- Overall Occupied -->
                     <div class="text">
-                        <h5>{{ $overallOccupiedPercentage }}%</h5>
+                        <h5 style="font-size: 30px !important;">{{ $overallOccupiedPercentage }}%</h5>
                         <p>Occupied Bed</p>
                     </div>
                 </div>

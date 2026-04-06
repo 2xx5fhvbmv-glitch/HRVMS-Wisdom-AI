@@ -15,6 +15,7 @@ use App\Models\AssingAccommodation;
 use App\Http\Controllers\Controller;
 use App\Models\TransferAccommodation;
 use App\Models\AvailableAccommodationModel;
+use App\Models\AvailableAccommodationInvItem;
 class AssignAccommodationController extends Controller
 {
     protected $resort;
@@ -217,12 +218,6 @@ class AssignAccommodationController extends Controller
         DB::beginTransaction();
         try
         {
-            $anyAssigned =AssingAccommodation::where('emp_id',$emp_id)->first();
-            
-            if(!$anyAssigned)
-            {
-
-            
                     AssingAccommodation::where("id",$assignId)->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
 
                     $Employeelist = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
@@ -265,7 +260,7 @@ class AssignAccommodationController extends Controller
                                             'emp_id' => $Employeelist->EmployeeId,
                                         ],
                                         'accommodation' => [
-                                            'building_name' => $availableAccommodation->BuildingName ?? 'Not Available',
+                                            'building_name' => optional(\App\Models\BuildingModel::find($availableAccommodation->BuildingName))->BuildingName ?? 'Not Available',
                                             'floor' => $availableAccommodation->Floor ?? 'Not Available',
                                             'room_no' => $availableAccommodation->RoomNo ?? 'Not Available',
                                             'facilities' => $itemData,
@@ -275,11 +270,11 @@ class AssignAccommodationController extends Controller
                                         ],
                                     ];
                                 }
-                                $InventoryModule =InventoryModule::whereIn('id', $item_id)->get();
+                                $InventoryModule = InventoryModule::whereIn('id', $item_id)->get();
 
                                 foreach ($InventoryModule as $module)
                                 {
-                                    $module->Occupied = $module->Occupied + 1;
+                                    $module->Occupied = ($module->Occupied ?? 0) + 1;
                                     $module->save();
                                 }
                             }
@@ -291,12 +286,7 @@ class AssignAccommodationController extends Controller
 
                     DB::commit();
 
-                return response()->json(['success' =>true,'message'=>'Bed assigned successfully','data' =>$data], 200);
-            }
-            else
-            {
-                return response()->json(['success' =>false,'message'=>'Bed Already assigned '], 500); 
-            }
+                return response()->json(['success' =>true,'message'=>'Assigned successfully','data' =>$data], 200);
         }
         catch (\Exception $e)
         {
@@ -313,20 +303,7 @@ class AssignAccommodationController extends Controller
         $RoomType = base64_decode($request->RoomType);
         $available_a_id = base64_decode($request->available_a_id);
 
-        // Match employees by their exact rank to the room type
-        $emp_grade = [$RoomType];
-
-        $AvailableAccommodationModel = AvailableAccommodationModel::where("id", $available_a_id)
-                                                                    ->pluck('blockFor')
-                                                                    ->map(function ($value) {
-                                                                        return strtolower($value);
-                                                                    });
-
-        $Employees = Employee::leftJoin('assing_accommodations as t3', function ($join) {
-            $join->on('t3.emp_id', '=', 'employees.id')
-                 ->where('t3.resort_id', '=', $this->resort->resort_id);
-        })
-        ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+        $Employees = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
         ->select(
                't1.id as Parentid',
@@ -335,17 +312,26 @@ class AssignAccommodationController extends Controller
                         't1.profile_picture',
                         'employees.Emp_id',
                         'employees.id as EmployeeId',
-                        't2.position_title',
-                        't3.available_a_id'
+                        't2.position_title'
         )
         ->where('employees.resort_id', $this->resort->resort_id)
-        ->whereIn('t1.gender', $AvailableAccommodationModel)
-        ->whereIn('employees.rank',  $emp_grade)
-        ->whereNull('t3.available_a_id')
+        ->where('employees.status', 'Active')
         ->get();
 
 
-        $AssingAccommodation = AssingAccommodation::where("emp_id",0)->where("available_a_id", $available_a_id)->where('resort_id', $this->resort->resort_id)->get();
+        $AssingAccommodation = AssingAccommodation::leftJoin('employees as e', 'e.id', '=', 'assing_accommodations.emp_id')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->where("assing_accommodations.available_a_id", $available_a_id)
+            ->where('assing_accommodations.resort_id', $this->resort->resort_id)
+            ->select('assing_accommodations.id', 'assing_accommodations.BedNo', 'assing_accommodations.emp_id',
+                'ra.first_name', 'ra.last_name', 'ra.id as Parentid')
+            ->get()
+            ->map(function ($bed) {
+                $bed->is_occupied = $bed->emp_id && $bed->emp_id != 0;
+                $bed->EmployeeName = $bed->is_occupied ? ucfirst($bed->first_name . ' ' . $bed->last_name) : null;
+                $bed->profileImg = $bed->is_occupied ? \App\Helpers\Common::getResortUserPicture($bed->Parentid) : null;
+                return $bed;
+            });
 
 
         return response()->json(['success' =>true,'Employees'=>$Employees,'AssingAccommodation'=>$AssingAccommodation], 200);

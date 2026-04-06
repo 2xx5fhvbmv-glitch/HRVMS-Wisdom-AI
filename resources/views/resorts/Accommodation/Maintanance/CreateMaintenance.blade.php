@@ -226,6 +226,59 @@ $(document).ready(function() {
         $(this).parsley().validate();
     });
 
+    // Auto-fill accommodation when employee is selected
+    $('#raised_by').on('change', function() {
+        var empId = $(this).val();
+        if (!empId) {
+            // Reset fields to editable
+            $('#building_1').prop('disabled', false).val('').trigger('change');
+            $('#AvailableFloor_1').prop('disabled', false).html('<option></option>');
+            $('#RoomNo_1').prop('disabled', false).html('<option></option>');
+            $('.auto-filled-badge').remove();
+            return;
+        }
+
+        $.ajax({
+            url: "{{ route('resort.accommodation.getEmployeeAccommodation') }}",
+            type: "GET",
+            data: { emp_id: empId },
+            success: function(response) {
+                if (response.success && response.has_accommodation) {
+                    // Set building and make readonly
+                    $('#building_1').val(response.building_id).trigger('change');
+                    $('#building_1').prop('disabled', true);
+
+                    // Set floor
+                    $('#AvailableFloor_1').html('<option value="' + response.floor + '" selected>' + response.floor + '</option>');
+                    $('#AvailableFloor_1').prop('disabled', true);
+
+                    // Set room
+                    $('#RoomNo_1').html('<option value="' + response.room + '" selected>' + response.room + '</option>');
+                    $('#RoomNo_1').prop('disabled', true);
+
+                    // Add hidden inputs so disabled fields still submit
+                    $('input[name="building_id_hidden"], input[name="FloorNo_hidden"], input[name="RoomNo_hidden"]').remove();
+                    $('#CreateMaintenanceForm').append(
+                        '<input type="hidden" name="building_id" value="' + response.building_id + '" class="auto-filled-hidden">' +
+                        '<input type="hidden" name="FloorNo" value="' + response.floor + '" class="auto-filled-hidden">' +
+                        '<input type="hidden" name="RoomNo" value="' + response.room + '" class="auto-filled-hidden">'
+                    );
+
+                    // Show auto-filled indicator
+                    $('.auto-filled-badge').remove();
+                    $('#building_1').closest('.col-md-6, .col-sm-6').append('<small class="text-success auto-filled-badge"><i class="fa-solid fa-check-circle"></i> Auto-filled from accommodation</small>');
+                } else {
+                    // No accommodation - reset to editable
+                    $('#building_1').prop('disabled', false).val('').trigger('change');
+                    $('#AvailableFloor_1').prop('disabled', false).html('<option></option>');
+                    $('#RoomNo_1').prop('disabled', false).html('<option></option>');
+                    $('.auto-filled-badge').remove();
+                    $('.auto-filled-hidden').remove();
+                }
+            }
+        });
+    });
+
     $(document).on('submit', '#CreateMaintenanceForm', function (e) {
      e.preventDefault();
         var form = $(this);
