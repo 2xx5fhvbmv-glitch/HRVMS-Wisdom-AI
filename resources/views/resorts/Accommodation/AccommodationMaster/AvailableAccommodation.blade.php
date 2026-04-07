@@ -88,7 +88,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="selectBed-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+<div class="modal fade" id="selectBed-modal" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small modal-selectBed">
         <div class="modal-content">
         <form id="AssignBedForm" data-parsley-validate>
@@ -164,12 +164,18 @@
 
 @section('import-scripts')
 <script>
+    // Fix Bootstrap 5 + Select2 focus conflict inside modals
+    $(document).on('select2:open', function() {
+        var searchField = document.querySelector('input.select2-search__field');
+        if (searchField) searchField.focus();
+    });
 
     $(document).ready(function () {
         $('#AssignBedForm').parsley().validate();
         $("#EmployeeList").select2({
             placeholder: "Select Employee",
             allowClear: true,
+            dropdownParent: $('#selectBed-modal')
         });
         $('#AssignBedForm').validate({
             rules: {
