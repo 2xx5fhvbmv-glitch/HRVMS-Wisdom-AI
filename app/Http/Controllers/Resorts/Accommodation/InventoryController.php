@@ -339,8 +339,12 @@ class InventoryController extends Controller
             if(Common::checkRouteWisePermission('resort.accommodation.InventoryManagement',config('settings.resort_permissions.edit')) == false){
                 $edit_class = 'd-none';
             }
+            $selectFields = ['inventory_modules.id', 'ItemName', 'ItemCode', 'inventory_modules.created_at','t3.BuildingName','t2.Floor','t2.RoomNo','t1.Available_Acc_id','t2.RoomType'];
+            if (\Schema::hasColumn('inventory_modules', 'assignment_type')) {
+                $selectFields[] = 'inventory_modules.assignment_type';
+            }
             $inventoryModule = $query->orderBy('inventory_modules.id', 'DESC')
-                ->get(['inventory_modules.id', 'ItemName', 'ItemCode', 'inventory_modules.created_at','t3.BuildingName','t2.Floor','t2.RoomNo','t1.Available_Acc_id','t2.RoomType'])
+                ->get($selectFields)
                 ->map(function($ak) use ($edit_class) {
                     $b = BuildingModel::where("resort_id", $this->resort->resort_id)
                          ->where("BuildingName", $ak->BuildingName)
@@ -374,12 +378,14 @@ class InventoryController extends Controller
                         $emp[]= base64_encode($data->id);
                     }
 
-                    if($AssingAccommodation->count() ==  0)
-                    {
+                    $assignmentType = $ak->assignment_type ?? 'per_person';
+
+                    if ($assignmentType === 'per_room') {
+                        // Per-room items are assigned to the room, not individual employees
+                        $ak->action = '<span class="badge badge-themeBlue">Room Assigned</span>';
+                    } elseif ($AssingAccommodation->count() == 0) {
                         $ak->action = '<button type="button" data-flag="assign" data-available-id="'.base64_encode($ak->Available_Acc_id).'" data-item-id="'.base64_encode($ak->id).'" data-resort-id="'.base64_encode($this->resort->resort_id).'" data-room-type="'.base64_encode($ak->RoomType).'" class="btn btn-sm btn-themeSkyblueLight assign-employee-btn '.$edit_class.'">Please Assign Employee</button>';
-                    }
-                    else
-                    {
+                    } else {
                         $ak->action = '<button type="button" data-flag="unassign" data-resort_id="'.base64_encode($this->resort->resort_id).'" data-item="'.base64_encode($ak->id).'"  data-id="' . base64_encode($ak->Available_Acc_id) . '" class="btn btn-sm btn-danger unassign '.$edit_class.'">Unassign</button>';
                     }
                     
