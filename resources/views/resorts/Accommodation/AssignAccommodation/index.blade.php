@@ -106,7 +106,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="selectBed-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+<div class="modal fade" id="selectBed-modal" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small modal-selectBed">
         <div class="modal-content">
         <form id="AssignBedForm">
@@ -202,7 +202,7 @@ $(document).ready(function()
                                      <div class="img-circle"><img src="${employee.profile_picture}" alt="user">
                                     </div>
                                     <div>
-                                        <h4>${employee.name}<span class="badge badge-themeNew">#34523</span></h4>
+                                        <h4>${employee.name}</h4>
                                         <p>${employee.position}</p>
                                     </div>
                                 </div>
@@ -213,8 +213,16 @@ $(document).ready(function()
                                             <td>${accommodation.building_name}</td>
                                         </tr>
                                         <tr>
+                                            <th>Floor:</th>
+                                            <td>${accommodation.floor}</td>
+                                        </tr>
+                                        <tr>
                                             <th>Room No.</th>
                                             <td>${accommodation.room_no}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Bed No.</th>
+                                            <td>${accommodation.bed_no || '-'}</td>
                                         </tr>
                                         <tr>
                                             <th>Room Facilities:</th>
