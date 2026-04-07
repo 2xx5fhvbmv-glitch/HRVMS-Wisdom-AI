@@ -50,6 +50,7 @@ class ConfigrationController extends Controller
                                             ->orderBy("id","DESC")
                                             ->get();
         $InventoryModule= InventoryModule::where('resort_id',$this->resort->resort_id)
+                                            ->whereRaw('(Quantity - COALESCE(Occupied, 0)) > 0')
                                             ->orderBy("id","DESC")
                                             ->get();
 
@@ -621,8 +622,26 @@ class ConfigrationController extends Controller
             $Floor=array_key_exists($i,$request->Floor)?$request->Floor[$i]:"";
             $RoomNo=array_key_exists($i,$request->RoomNo)?$request->RoomNo[$i]:"";
             $Accommodation_type_id = array_key_exists($i,$request->Accommodation_type_id)?$request->Accommodation_type_id[$i]:"";
+            $buildingId = array_key_exists($i,$request->BuildingName)?$request->BuildingName[$i]:"";
+
+            // Check for duplicate room
+            $exists = AvailableAccommodationModel::where('resort_id', $resort_id)
+                ->where('BuildingName', $buildingId)
+                ->where('Floor', $Floor)
+                ->where('RoomNo', $RoomNo)
+                ->exists();
+
+            if ($exists) {
+                DB::rollBack();
+                $buildingName = \App\Models\BuildingModel::find($buildingId)->BuildingName ?? $buildingId;
+                return response()->json([
+                    'success' => false,
+                    'message' => "Room {$RoomNo} on Floor {$Floor} in {$buildingName} already exists."
+                ], 422);
+            }
+
             $parent_id =  AvailableAccommodationModel::create([
-                            "BuildingName"=>array_key_exists($i,$request->BuildingName)?$request->BuildingName[$i]:"",
+                            "BuildingName"=>$buildingId,
                             "Floor"=>$Floor,
                             "RoomNo"=>$RoomNo,
                             "Accommodation_type_id"=>$Accommodation_type_id,

@@ -794,7 +794,21 @@ $(document).ready(function()
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'
                     });
-                    form.reset(); // Reset the form fields
+                    form.reset();
+                    // Reset Select2 dropdowns
+                    $(form).find('select.select2-inventory').val(null).trigger('change');
+                    $(form).find('select.select2t-none').val(null).trigger('change');
+                    $(form).find('.buildingAvailable').val(null).trigger('change');
+                    $(form).find('.AvailableFloor').html('<option></option>');
+                    $(form).find('.RoomNo').html('<option></option>');
+                    // Reset bed name fields
+                    $('[id^="bedNoFields_"]').html('<div class="col-auto"><small class="text-muted">Enter capacity first to generate bed fields</small></div>');
+                    // Reset inventory quantity fields
+                    $('[id^="invQtyFields_"]').html('<div class="col-auto"><small class="text-muted">Select inventories to set quantities</small></div>');
+                    // Remove dynamically added rows
+                    $('.added-accommodation-row').remove();
+                    // Reset Parsley validation
+                    $(form).parsley().reset();
                 } else {
                     toastr.error(response.message, "error", {
                         positionClass: 'toast-bottom-right'
