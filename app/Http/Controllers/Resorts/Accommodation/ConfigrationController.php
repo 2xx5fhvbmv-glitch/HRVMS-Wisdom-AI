@@ -467,6 +467,16 @@ class ConfigrationController extends Controller
 
         DB::beginTransaction();
         try {
+            // Decrement Occupied count for each linked inventory item
+            $linkedItems = AvailableAccommodationInvItem::where('Available_Acc_id', $id)->get();
+            foreach ($linkedItems as $link) {
+                $inv = InventoryModule::find($link->Item_id);
+                if ($inv) {
+                    $inv->Occupied = max(0, ($inv->Occupied ?? 0) - ($link->quantity ?? 1));
+                    $inv->save();
+                }
+            }
+
             AvailableAccommodationInvItem::where('Available_Acc_id', $id)->delete();
             \App\Models\AssingAccommodation::where('available_a_id', $id)->where('resort_id', $resort_id)->delete();
             $accommodation->delete();
@@ -685,6 +695,13 @@ class ConfigrationController extends Controller
                     {
                         $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
                         AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$qty]);
+
+                        // Increment Occupied count in inventory
+                        $inv = InventoryModule::find($item);
+                        if ($inv) {
+                            $inv->Occupied = ($inv->Occupied ?? 0) + $qty;
+                            $inv->save();
+                        }
                     }
                 }
 
