@@ -686,7 +686,7 @@ return [
 		'2' => "Dismissal",
 		'3' => "Appeals",
 	],
-    'CleaningSchedule' => ['Daily', 'Weekly', 'ByWeekly', 'Monthly'],
+    'CleaningSchedule' => ['Daily', 'Weekly', 'By Weekly', 'Monthly'],
     'RoomStatus' => ['Available', 'Occupied', 'Under Maintenance', 'Maintenance Required', 'Under Maintenance', 'Not in Operation'],
     'EmployeeStatus' => ['Active', 'OnLeave','Probationary','Terminated','Retired','Resigned','Suspended','transferred','contractual'],
     'GenderType' => [
