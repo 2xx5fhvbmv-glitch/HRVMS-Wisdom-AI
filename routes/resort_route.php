@@ -700,7 +700,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::delete('accommodation/available-accommodation-destroy/{id}', 'Accommodation\ConfigrationController@AvailableAccommodationDestroy')->name('resort.accommodation.AvailableAccommodationDestroy');
     Route::put('accommodation/available-accommodation-update/{id}', 'Accommodation\ConfigrationController@AvailableAccommodationUpdate')->name('resort.accommodation.AvailableAccommodationUpdate');
     Route::get('accommodation/get-beds/{id}', 'Accommodation\ConfigrationController@getBeds')->name('resort.accommodation.getBeds');
-    Route::get('accommodation/recalculate-inventory', 'Accommodation\ConfigrationController@recalculateInventory')->name('resort.accommodation.recalculateInventory');
+    // Route::get('accommodation/recalculate-inventory', 'Accommodation\ConfigrationController@recalculateInventory')->name('resort.accommodation.recalculateInventory');
     Route::get('accommodation/assign-accommodation', 'Accommodation\AssignAccommodationController@AssignAccommation')->name('resort.accommodation.AssignAccommation');
     Route::get('accommodation/buildingwise-accommodation', 'Accommodation\AssignAccommodationController@BuildingwiseAccommodation')->name('resort.accommodation.BuildingwiseAccommodation');
     Route::post('accommodation/get-assigned-bed', 'Accommodation\AssignAccommodationController@GetAssignedBed')->name('resort.accommodation.GetAssignedBed');
