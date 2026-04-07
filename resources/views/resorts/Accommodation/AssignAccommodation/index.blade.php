@@ -163,7 +163,8 @@ $(document).ready(function()
 {
     $("#EmployeeList").select2({
         placeholder:'Select Employee',
-        allowClear: true
+        allowClear: true,
+        dropdownParent: $('#selectBed-modal')
     });
     $("#select_build").select2({
         placeholder:'Select Building',
