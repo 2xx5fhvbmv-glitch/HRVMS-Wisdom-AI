@@ -73,8 +73,7 @@ class InventoryController extends Controller
                                 });
 
                             // Final fetch with ordering and select fields
-                            $InventoryModule = $InventoryModule1->orderBy('inventory_modules.id', 'DESC')
-                                ->get([
+                            $selectFields = [
                                     'inventory_modules.id',
                                     'inventory_modules.ItemName',
                                     'inventory_modules.ItemCode',
@@ -83,7 +82,12 @@ class InventoryController extends Controller
                                     'inventory_modules.PurchageDate',
                                     'inventory_modules.created_at',
                                     't1.CategoryName as Category'
-                                ]);
+                                ];
+                            if (\Schema::hasColumn('inventory_modules', 'assignment_type')) {
+                                $selectFields[] = 'inventory_modules.assignment_type';
+                            }
+                            $InventoryModule = $InventoryModule1->orderBy('inventory_modules.id', 'DESC')
+                                ->get($selectFields);
             $edit_class = '';
             if(Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.edit')) == false){
                 $edit_class = 'd-none';

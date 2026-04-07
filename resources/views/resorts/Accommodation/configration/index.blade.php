@@ -249,9 +249,9 @@
                                             <label class="form-check-label" for="female_1">Female</label>
                                         </div>
                                     </div>
-                                    <div class="col-lg-6 col-md-6 col-sm-6">
+                                    <div class="col-lg-4 col-md-6 col-sm-6">
                                         <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
-                                        <select class="form-select select2-inventory" multiple id="Inv_Cat_id_1" name="Inv_Cat_id[1][]"
+                                        <select class="form-select select2-inventory" multiple id="Inv_Cat_id_1" data-row="1"
                                         aria-label="Default select example"
                                         data-parsley-errors-container="#type_accom_error_6"
                                         data-placeholder="Select inventories">
@@ -263,7 +263,7 @@
                                         @endif
                                         </select>
                                         <div id="type_accom_error_6"></div>
-
+                                        <div class="row g-2 mt-2" id="invQtyFields_1"></div>
                                     </div>
                                     <div class="col-lg-3 col-md-4 col-sm-6">
 
@@ -497,6 +497,37 @@ $(document).ready(function()
         placeholder: 'Select inventories',
         allowClear: true,
         width: '100%'
+    });
+
+    // Generate quantity fields when inventory items are selected/deselected
+    $(document).on('change', '.select2-inventory', function() {
+        var rowId = $(this).data('row') || '1';
+        var selected = $(this).val() || [];
+        var $container = $('#invQtyFields_' + rowId);
+        var existingQtys = {};
+
+        // Preserve existing quantities
+        $container.find('input[type="number"]').each(function() {
+            existingQtys[$(this).data('item-id')] = $(this).val();
+        });
+
+        $container.empty();
+
+        if (selected.length > 0) {
+            selected.forEach(function(itemId) {
+                var itemName = $('option[value="' + itemId + '"]', '#Inv_Cat_id_' + rowId).text().trim();
+                var qty = existingQtys[itemId] || 1;
+                $container.append(
+                    '<div class="col-lg-3 col-md-4 col-sm-6">' +
+                        '<div class="input-group input-group-sm">' +
+                            '<span class="input-group-text" style="font-size:11px;" title="' + itemName + '">' + itemName.split('/')[0].trim().substring(0, 15) + '</span>' +
+                            '<input type="number" class="form-control" name="InvQty[' + rowId + '][' + itemId + ']" data-item-id="' + itemId + '" value="' + qty + '" min="1" placeholder="Qty">' +
+                            '<input type="hidden" name="Inv_Cat_id[' + rowId + '][]" value="' + itemId + '">' +
+                        '</div>' +
+                    '</div>'
+                );
+            });
+        }
     });
 
     $("#TypeAccommodation_1").select2({

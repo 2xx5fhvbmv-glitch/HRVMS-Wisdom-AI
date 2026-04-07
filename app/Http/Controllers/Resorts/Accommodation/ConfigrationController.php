@@ -639,11 +639,12 @@ class ConfigrationController extends Controller
 
                 if($request->Inv_Cat_id && array_key_exists($i,$request->Inv_Cat_id))
                 {
-                    $invQuantity = ($request->InvQuantity && array_key_exists($i, $request->InvQuantity)) ? $request->InvQuantity[$i] : 1;
+                    $invQtyMap = ($request->InvQty && array_key_exists($i, $request->InvQty)) ? $request->InvQty[$i] : [];
 
                     foreach( $request->Inv_Cat_id[$i] as $item)
                     {
-                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$invQuantity]);
+                        $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
+                        AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$qty]);
                     }
                 }
 

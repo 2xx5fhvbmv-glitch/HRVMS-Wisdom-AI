@@ -118,8 +118,8 @@ class MaintananceContorller extends Controller
                 'item_id' => 'nullable',
                 'building_id' => 'required',
                 'descriptionIssues' => 'required',
-                'FloorNo' => 'required',
-                'RoomNo' => 'required',
+                'FloorNo' => 'nullable',
+                'RoomNo' => 'nullable',
                 'start_time' => 'nullable',
                 'end_time' => 'nullable',
             ], [
@@ -129,8 +129,6 @@ class MaintananceContorller extends Controller
                 'Image.mimes' => 'The image must be a file of type: jpg, jpeg, png.',
                 'descriptionIssues.required' => 'Please enter a description.',
                 'building_id.required' => 'Please select a building.',
-                'FloorNo.required' => 'Please select a floor number.',
-                'RoomNo.required' => 'Please select a room number.',
             ]);
 
             if ($validator->fails()) {
@@ -140,6 +138,8 @@ class MaintananceContorller extends Controller
                 ], 422);
             }
 
+        DB::beginTransaction();
+        try {
         // Handle image upload
         if ($request->hasFile('Image')) {
             $imageFile = $request->file('Image');
@@ -177,19 +177,52 @@ class MaintananceContorller extends Controller
                     ]);
 
             }
-            DB::commit();
-            return response()->json(['success' =>true,'message'=>'Maintanance Request Created successfully' ], 200);
-        
 
-          DB::beginTransaction();
-        try   {  }
-        catch (\Exception $e)
-        {
+            // Send push notification to employees in the building
+            try {
+                $buildingName = \App\Models\BuildingModel::find($building_id)->BuildingName ?? 'Building';
+                $title = 'Maintenance Event - ' . $buildingName;
+                $body = $descriptionIssues;
+                $moduleName = 'Accommodation';
+
+                // Get employees assigned to this building
+                $query = \App\Models\AssingAccommodation::join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
+                    ->join('employees as e', 'e.id', '=', 'assing_accommodations.emp_id')
+                    ->where('a.BuildingName', $building_id)
+                    ->where('assing_accommodations.resort_id', $this->resort->resort_id)
+                    ->where('assing_accommodations.emp_id', '!=', 0);
+
+                // If floor specified, filter by floor
+                if (!empty($FloorNo)) {
+                    $query->where('a.Floor', $FloorNo);
+                }
+                // If room specified, filter by room
+                if (!empty($RoomNo)) {
+                    $query->where('a.RoomNo', $RoomNo);
+                }
+
+                $deviceTokens = $query->whereNotNull('e.device_token')
+                    ->where('e.device_token', '!=', '')
+                    ->pluck('e.device_token')
+                    ->unique()
+                    ->toArray();
+
+                if (!empty($deviceTokens)) {
+                    Common::sendPushNotificationForMobile($deviceTokens, $title, $body, $moduleName, 'pending', null, null, null);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Push notification failed for maintenance event: ' . $e->getMessage());
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Event created successfully'], 200);
+
+        } catch (\Exception $e) {
             DB::rollBack();
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to Save','message'=>'Failed to  Create Maintenance Request successfully'], 500);
+            return response()->json(['error' => 'Failed to Save', 'message' => 'Failed to create event: ' . $e->getMessage()], 500);
         }
     }
 
