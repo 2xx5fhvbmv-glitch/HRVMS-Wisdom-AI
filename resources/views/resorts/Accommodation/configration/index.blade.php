@@ -249,7 +249,24 @@
                                             <label class="form-check-label" for="female_1">Female</label>
                                         </div>
                                     </div>
-                                    <div class="col-lg-4 col-md-6 col-sm-6">
+                                    <div class="col-lg-3 col-md-4 col-sm-6">
+                                        <label for="roomStatus" class="form-label">CLEANING SCHEDULE</label>
+                                            <select class="form-select select2t-none" id="CleaningSchedule_1" name="CleaningSchedule[1]" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
+                                                <?php
+                                                    $CleaningSchedule = config('settings.CleaningSchedule');
+                                                ?>
+                                                    @if($CleaningSchedule)
+                                                        @foreach ($CleaningSchedule as $a)
+                                                            <option value="{{ $a }}">{{ $a }}</option>
+                                                        @endforeach
+                                                    @endif
+                                        </select>
+                                    </div>
+                                    <div class="col-lg-3 col-md-4 col-sm-6">
+                                        <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
+                                        <input type="number" min="0" max="100" class="form-control" id="Occupancytheresold_1" name="Occupancytheresold[1]" placeholder="90%" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Occupancy threshold is required.">
+                                    </div>
+                                    <div class="col-lg-6 col-md-6 col-sm-6">
                                         <label for="invent" class="form-label">WHAT ARE THE INVENTORIES?</label>
                                         <select class="form-select select2-inventory" multiple id="Inv_Cat_id_1" data-row="1"
                                         aria-label="Default select example"
@@ -263,41 +280,12 @@
                                         @endif
                                         </select>
                                         <div id="type_accom_error_6"></div>
-                                        <div class="row g-2 mt-2" id="invQtyFields_1"></div>
                                     </div>
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-
-                                        <label for="roomStatus" class="form-label">CLEANING SCHEDULE</label>
-                                            <select class="form-select select2t-none" id="CleaningSchedule_1" name="CleaningSchedule[1]" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
-                                                <?php
-                                                    $CleaningSchedule = config('settings.CleaningSchedule');
-                                                ?>
-                                                    @if($CleaningSchedule)
-                                                        @foreach ($CleaningSchedule as $a)
-                                                            <option value="{{ $a }}">{{ $a }}</option>
-                                                        @endforeach
-                                                    @endif
-                                        </select>
-                                    </div>
-
-                                    {{-- ROOM STATUS - Commented out
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="cleaning" class="form-label">ROOM STATUS</label>
-                                        <select class="form-select select2t-none" name="RoomStatus[1]" id="RoomStatus_1" aria-label="Default select example" required data-parsley-required-message="Please select an option.">
-                                            <?php
-                                                    $RoomStatus = config('settings.RoomStatus');
-                                                ?>
-                                            @if($RoomStatus)
-                                                @foreach ($RoomStatus as $r)
-                                                    <option value="{{ $r }}">{{ $r }}</option>
-                                                @endforeach
-                                            @endif
-                                        </select>
-                                    </div>
-                                    --}}
-                                    <div class="col-lg-3 col-md-4 col-sm-6">
-                                        <label for="occupThres" class="form-label">OCCUPANCY THRESHOLDS</label>
-                                        <input type="number" min="0" max="100" class="form-control" id="Occupancytheresold_1" name="Occupancytheresold[1]" placeholder="90%" required data-parsley-type="digits" data-parsley-trigger="keyup" data-parsley-required-message="Occupancy threshold is required.">
+                                    <div class="col-lg-6 col-md-6 col-sm-6">
+                                        <label for="invQty" class="form-label">INVENTORY QUANTITIES</label>
+                                        <div class="row g-2" id="invQtyFields_1">
+                                            <div class="col-auto"><small class="text-muted">Select inventories to set quantities</small></div>
+                                        </div>
                                     </div>
                                 </div>
 
