@@ -218,10 +218,12 @@ class InventoryController extends Controller
             'PurchageDate.*' => 'required|date_format:d/m/Y', // Validate each PurchageDate in the array
             'ItemCode.*' => [
                 'required',
+                'max:50',
+                'regex:/^[a-zA-Z0-9\-_\/]+$/',
                 Rule::unique('inventory_modules', 'ItemCode')->where(function ($query) use ($resort_id) {
                     return $query->where('resort_id', $resort_id);
                 }),
-            ], // Validate uniqueness of each ItemCode in the array
+            ],
             'MinStock.*' => 'nullable|integer|min:0', // Validate each MinStock in the array
         ], [
             'ItemName.*.required' => 'The Item Name field is required. Please write something.',
@@ -258,9 +260,7 @@ class InventoryController extends Controller
                     $PurchageDate = $PurchageDateRaw ? \Carbon\Carbon::createFromFormat('d/m/Y', $PurchageDateRaw)->format('Y-m-d') : null;
                     $ItemCode = array_key_exists($key, $request->ItemCode) ? $request->ItemCode[$key]: "";
                     $MinStock = array_key_exists($key, $request->MinStock) ?  $request->MinStock[$key]: "";
-                    $assignmentType = ($request->AssignmentType && array_key_exists($key, $request->AssignmentType)) ? $request->AssignmentType[$key] : 'per_person';
-                    $defaultQty = ($request->DefaultQtyPerUnit && array_key_exists($key, $request->DefaultQtyPerUnit)) ? $request->DefaultQtyPerUnit[$key] : 1;
-                    InventoryModule::create([
+                    $createData = [
                         'resort_id' => $resort_id,
                         'Inv_Cat_id' => $Inv_Cat_id,
                         'ItemName' => $ItemName,
@@ -268,9 +268,15 @@ class InventoryController extends Controller
                         'Quantity' => $Quantity,
                         'PurchageDate' => $PurchageDate,
                         'MinMumStockQty' => $MinStock,
-                        'assignment_type' => $assignmentType,
-                        'default_qty_per_unit' => $defaultQty,
-                    ]);
+                    ];
+
+                    // Add new fields if they exist in the database
+                    if (\Schema::hasColumn('inventory_modules', 'assignment_type')) {
+                        $createData['assignment_type'] = ($request->AssignmentType && array_key_exists($key, $request->AssignmentType)) ? $request->AssignmentType[$key] : 'per_person';
+                        $createData['default_qty_per_unit'] = ($request->DefaultQtyPerUnit && array_key_exists($key, $request->DefaultQtyPerUnit)) ? $request->DefaultQtyPerUnit[$key] : 1;
+                    }
+
+                    InventoryModule::create($createData);
                 }
             }
             DB::commit();
