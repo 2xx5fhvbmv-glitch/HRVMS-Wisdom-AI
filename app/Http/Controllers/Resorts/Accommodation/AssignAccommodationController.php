@@ -263,6 +263,7 @@ class AssignAccommodationController extends Controller
                                             'building_name' => optional(\App\Models\BuildingModel::find($availableAccommodation->BuildingName))->BuildingName ?? 'Not Available',
                                             'floor' => $availableAccommodation->Floor ?? 'Not Available',
                                             'room_no' => $availableAccommodation->RoomNo ?? 'Not Available',
+                                            'bed_no' => optional(\App\Models\AssingAccommodation::find($assignId))->BedNo ?? '-',
                                             'facilities' => $itemData,
                                             'RoomStatus'=>$availableAccommodation->RoomStatus ?? 'Not Available',
                                             'color' => $availableAccommodation->accommodationType->Color ?? 'DefaultColor',
