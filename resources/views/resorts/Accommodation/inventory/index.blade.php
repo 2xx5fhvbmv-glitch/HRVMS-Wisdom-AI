@@ -66,16 +66,12 @@
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="inventoryCode" class="form-label">INVENTORY CODE</label>
-                                    <input type="number" min="0" max="999999" name="ItemCode[]" class="form-control" id="inventoryCode_1" placeholder="451245"
+                                    <input type="text" name="ItemCode[]" class="form-control" id="inventoryCode_1" placeholder="e.g. INV-001"
                                         required data-parsley-required-message="Please enter Item Code."
-
-                                                    data-parsley-required-message="Please enter Item Code."
-                                                    data-parsley-maxlength="50"
-                                                    data-parsley-maxlength-message="Item Code must not exceed 50 characters."
-                                                    data-parsley-pattern="^[^<>]*$"
-                                                    data-parsley-pattern-message="Item Code cannot contain script tags or special characters like < and >."
-                                                    data-parsley-no-script="true"
-                                                  required>
+                                        data-parsley-maxlength="50"
+                                        data-parsley-maxlength-message="Item Code must not exceed 50 characters."
+                                        data-parsley-pattern="^[a-zA-Z0-9\-_/]+$"
+                                        data-parsley-pattern-message="Only letters, numbers, hyphens, underscores and slashes allowed.">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="stockAva" class="form-label">MINIMUM STOCK AVAILABLE</label>
@@ -383,8 +379,11 @@ $(document).ready(function()
                         </div>
                         <div class="col-lg-4 col-sm-6">
                             <label for="inventoryCode" class="form-label">INVENTORY CODE</label>
-                            <input type="text" name="ItemCode[]" class="form-control" id="inventoryCode_${counts}" placeholder="451245"
-                                required data-parsley-required-message="Please enter Item Code.">
+                            <input type="text" name="ItemCode[]" class="form-control" id="inventoryCode_${counts}" placeholder="e.g. INV-001"
+                                required data-parsley-required-message="Please enter Item Code."
+                                data-parsley-maxlength="50"
+                                data-parsley-pattern="^[a-zA-Z0-9\\-_/]+$"
+                                data-parsley-pattern-message="Only letters, numbers, hyphens, underscores and slashes allowed.">
                         </div>
                         <div class="col-lg-4 col-sm-6">
                             <label for="stockAva" class="form-label">MINIMUM STOCK AVAILABLE</label>

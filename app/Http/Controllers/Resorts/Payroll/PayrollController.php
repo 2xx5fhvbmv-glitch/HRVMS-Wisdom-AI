@@ -3636,12 +3636,10 @@ class PayrollController extends Controller
             $review = $payroll->reviews->where('employee_id', $emp->id)->first();
             if (!$review) continue;
 
-            // Try to find account matching currency, fallback to any available account
+            // Find account matching the specific currency only
             $bankAccount = optional($emp->bankDetails)->firstWhere('currency', $currency);
-            if (!$bankAccount) {
-                $bankAccount = optional($emp->bankDetails)->first();
-            }
             $accountNumber = $bankAccount?->account_no ?? 'N/A';
+            $accountName = $bankAccount?->account_name ?? ($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name);
 
             $amount = 0;
             $netSalary = $review->net_salary ?? 0;
