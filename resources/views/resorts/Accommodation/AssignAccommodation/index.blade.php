@@ -159,12 +159,35 @@
 
 @section('import-scripts')
 <script>
+    // Fix Bootstrap 5 + Select2 focus conflict inside modals
+    // Bootstrap 5 traps focus inside modal, preventing Select2 search from working
+    $(document).on('select2:open', function(e) {
+        var evt = "scroll.select2";
+        $(e.target).parents().off(evt);
+        $(window).off(evt);
+        var searchField = document.querySelector('input.select2-search__field');
+        if (searchField) {
+            searchField.focus();
+        }
+    });
+
+    // Override Bootstrap 5 modal focus trap for Select2 compatibility
+    document.addEventListener('DOMContentLoaded', function() {
+        var modalEl = document.getElementById('selectBed-modal');
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', function() {
+                // Remove Bootstrap's focusin listener that blocks Select2
+                $(document).off('focusin.bs.modal');
+            });
+        }
+    });
+</script>
+<script>
 $(document).ready(function()
 {
     $("#EmployeeList").select2({
         placeholder:'Select Employee',
-        allowClear: true,
-        dropdownParent: $('#selectBed-modal')
+        allowClear: true
     });
     $("#select_build").select2({
         placeholder:'Select Building',
