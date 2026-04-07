@@ -488,6 +488,28 @@ class ConfigrationController extends Controller
         }
     }
 
+    public function recalculateInventory()
+    {
+        $resort_id = $this->resort->resort_id;
+        $items = InventoryModule::where('resort_id', $resort_id)->get();
+        $updated = 0;
+
+        foreach ($items as $item) {
+            $totalOccupied = AvailableAccommodationInvItem::join('available_accommodation_models as a', 'a.id', '=', 'available_accommodation_inv_items.Available_Acc_id')
+                ->where('a.resort_id', $resort_id)
+                ->where('available_accommodation_inv_items.Item_id', $item->id)
+                ->sum('available_accommodation_inv_items.quantity');
+
+            if ($item->Occupied != $totalOccupied) {
+                $item->Occupied = $totalOccupied;
+                $item->save();
+                $updated++;
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => "Recalculated {$updated} inventory items"]);
+    }
+
     public function getBeds($id)
     {
         $beds = \App\Models\AssingAccommodation::where('available_a_id', $id)
