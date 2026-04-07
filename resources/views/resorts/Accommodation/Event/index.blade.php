@@ -75,26 +75,22 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="floor" class="form-label">FLOOR <span class="red-mark">*</span></label>
+                        <label for="floor" class="form-label">FLOOR <small class="text-muted">(Optional)</small></label>
                         <select class="form-select select2t-none AvailableFloor"
                                 id="AvailableFloor_1"
                                 data-id="1"
                                 name="FloorNo"
-                                required
-                                data-parsley-required-message="Please select floor."
                                 data-parsley-errors-container="#floor_error">
                         </select>
                         <div id="floor_error"></div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="roomNo" class="form-label">ROOM NO <span class="red-mark">*</span></label>
+                        <label for="roomNo" class="form-label">ROOM NO <small class="text-muted">(Optional)</small></label>
                         <select class="form-select select2t-none RoomNo"
                                 id="RoomNo_1"
                                 data-id="1"
                                 name="RoomNo"
-                                required
-                                data-parsley-required-message="Please select room no."
                                 data-parsley-errors-container="#room_error">
                         </select>
                         <div id="room_error"></div>
@@ -183,12 +179,6 @@
                 building_id: {
                     required: true,
                 },
-                RoomNo: {
-                    required: true,
-                },
-                FloorNo: {
-                    required: true,
-                },
                 start_time: {
                     required: true,
                 },
@@ -210,12 +200,6 @@
                 },
                 building_id: {
                     required: "Please Select Building.",
-                },
-                RoomNo: {
-                    required: "Please Select Room No.",
-                },
-                FloorNo: {
-                    required: "Please Select Floor No.",
                 },
                 start_time: {
                     required: "Please Select Start Time.",
