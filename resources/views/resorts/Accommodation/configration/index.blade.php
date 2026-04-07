@@ -487,6 +487,15 @@ $(document).ready(function()
         width: '100%'
     });
 
+    // Inventory stock data for validation
+    var invStock = {
+        @if($InventoryModule->isNotEmpty())
+            @foreach($InventoryModule as $a)
+                '{{ $a->id }}': {{ ($a->Quantity ?? 0) - ($a->Occupied ?? 0) }},
+            @endforeach
+        @endif
+    };
+
     // Generate quantity fields when inventory items are selected/deselected
     $(document).on('change', '.select2-inventory', function() {
         var rowId = $(this).data('row') || '1';
@@ -505,13 +514,16 @@ $(document).ready(function()
             selected.forEach(function(itemId) {
                 var itemName = $('option[value="' + itemId + '"]', '#Inv_Cat_id_' + rowId).text().trim();
                 var qty = existingQtys[itemId] || 1;
+                var maxQty = invStock[itemId] || 999;
+                var shortName = itemName.split('/')[0].trim().substring(0, 15);
                 $container.append(
-                    '<div class="col-lg-3 col-md-4 col-sm-6">' +
+                    '<div class="col-lg-4 col-md-4 col-sm-6">' +
                         '<div class="input-group input-group-sm">' +
-                            '<span class="input-group-text" style="font-size:11px;" title="' + itemName + '">' + itemName.split('/')[0].trim().substring(0, 15) + '</span>' +
-                            '<input type="number" class="form-control" name="InvQty[' + rowId + '][' + itemId + ']" data-item-id="' + itemId + '" value="' + qty + '" min="1" placeholder="Qty">' +
+                            '<span class="input-group-text" style="font-size:11px;" title="' + itemName + ' (Available: ' + maxQty + ')">' + shortName + '</span>' +
+                            '<input type="number" class="form-control" name="InvQty[' + rowId + '][' + itemId + ']" data-item-id="' + itemId + '" value="' + Math.min(qty, maxQty) + '" min="1" max="' + maxQty + '" placeholder="Qty">' +
                             '<input type="hidden" name="Inv_Cat_id[' + rowId + '][]" value="' + itemId + '">' +
                         '</div>' +
+                        '<small class="text-muted" style="font-size:10px;">Available: ' + maxQty + '</small>' +
                     '</div>'
                 );
             });

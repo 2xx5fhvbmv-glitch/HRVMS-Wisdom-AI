@@ -660,6 +660,27 @@ class ConfigrationController extends Controller
                 {
                     $invQtyMap = ($request->InvQty && array_key_exists($i, $request->InvQty)) ? $request->InvQty[$i] : [];
 
+                    // Validate inventory stock before linking
+                    $outOfStock = [];
+                    foreach ($request->Inv_Cat_id[$i] as $item) {
+                        $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
+                        $inv = InventoryModule::find($item);
+                        if ($inv) {
+                            $available = ($inv->Quantity ?? 0) - ($inv->Occupied ?? 0);
+                            if ($qty > $available) {
+                                $outOfStock[] = $inv->ItemName . ' (Available: ' . $available . ', Requested: ' . $qty . ')';
+                            }
+                        }
+                    }
+
+                    if (!empty($outOfStock)) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient inventory: ' . implode(', ', $outOfStock)
+                        ], 422);
+                    }
+
                     foreach( $request->Inv_Cat_id[$i] as $item)
                     {
                         $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
