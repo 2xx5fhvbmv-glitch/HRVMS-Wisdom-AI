@@ -392,7 +392,7 @@ class ConfigrationController extends Controller
 
     public function AvailableAccommodationIndex(Request $request)
     {
-        $page_title = 'Available Accommodation';
+        $page_title = 'Listing Accommodation';
         $resort_id = $this->resort->resort_id;
 
         if ($request->ajax()) {
