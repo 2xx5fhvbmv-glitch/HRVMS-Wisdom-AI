@@ -96,7 +96,8 @@
                             {{-- 1. Request Submitted --}}
                             <li class="active">
                                 <span>Request Submitted</span>
-                                <small class="d-block text-muted">by {{ $MaintanaceRequest->first_name }} {{ $MaintanaceRequest->last_name }} on {{ $MaintanaceRequest->Date }}</small>
+                                <small class="d-block text-muted">on {{ $MaintanaceRequest->Date }}</small>
+                                <small class="d-block text-muted">for {{ $MaintanaceRequest->first_name }} {{ $MaintanaceRequest->last_name }}</small>
                             </li>
 
                             {{-- 2. Sent to HR --}}
