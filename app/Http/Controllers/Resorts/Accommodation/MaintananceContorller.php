@@ -245,6 +245,19 @@ class MaintananceContorller extends Controller
             ]);
 
 
+            // Send push notification to assigned HOD
+            try {
+                $hodEmployee = Employee::find($HOD_id);
+                if ($hodEmployee && $hodEmployee->device_token) {
+                    $mainRequest = MaintanaceRequest::find($task_id);
+                    $title = 'Maintenance Request Assigned';
+                    $body = 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? '');
+                    Common::sendPushNotificationForMobile([$hodEmployee->device_token], $title, $body, 'Accommodation', 'Open', null, null, null);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Push notification failed: ' . $e->getMessage());
+            }
+
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Request Forwarded successfully.'], 200);
         }
@@ -254,7 +267,7 @@ class MaintananceContorller extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to Fprward Request'], 500);
+            return response()->json(['error' => 'Failed to Forward Request'], 500);
         }
     }
 
@@ -575,7 +588,18 @@ class MaintananceContorller extends Controller
         DB::beginTransaction();
         try
         {
-            MaintanaceRequest::where("resort_id",$this->resort->resort_id)->where("id",$id)->update(['status'=>'Rejected',"RejactionReason"=>$reason]);
+            $mainRequest = MaintanaceRequest::where("resort_id",$this->resort->resort_id)->where("id",$id)->first();
+            $mainRequest->update(['status'=>'Rejected',"RejactionReason"=>$reason]);
+
+            // Notify the employee who raised the request
+            try {
+                $raisedBy = Employee::find($mainRequest->Raised_By);
+                if ($raisedBy && $raisedBy->device_token) {
+                    Common::sendPushNotificationForMobile([$raisedBy->device_token], 'Maintenance Request Rejected', 'Your request has been rejected. Reason: ' . $reason, 'Accommodation', 'Rejected', null, null, null);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Push notification failed: ' . $e->getMessage());
+            }
 
             DB::commit();
             return response()->json(['success' => true, 'message' => "Request Rejected Successfully"], 200);
@@ -624,6 +648,19 @@ class MaintananceContorller extends Controller
 
             }
 
+
+            // Notify the employee who raised the request
+            try {
+                $mainRequest = MaintanaceRequest::find($task_id);
+                $raisedBy = Employee::find($mainRequest->Raised_By);
+                if ($raisedBy && $raisedBy->device_token) {
+                    $notifTitle = $flag == 'On-Hold' ? 'Maintenance Request On Hold' : 'Maintenance Request Closed';
+                    $notifBody = $flag == 'On-Hold' ? 'Your request has been placed on hold.' : 'Your maintenance request has been resolved and closed.';
+                    Common::sendPushNotificationForMobile([$raisedBy->device_token], $notifTitle, $notifBody, 'Accommodation', $status, null, null, null);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Push notification failed: ' . $e->getMessage());
+            }
 
             DB::commit();
             return response()->json(['success' => true, 'message' => $msgs], 200);
@@ -919,6 +956,19 @@ class MaintananceContorller extends Controller
                     'Status' =>'pending',
                     'date'=>date('Y-m-d'),
                 ]);
+
+                // Send push notification to assigned employee
+                try {
+                    $assignedEmp = Employee::find($emp_id);
+                    if ($assignedEmp && $assignedEmp->device_token) {
+                        $mainRequest = MaintanaceRequest::find($task_id);
+                        $title = 'Maintenance Task Assigned';
+                        $body = 'You have been assigned a maintenance task: ' . ($mainRequest->descriptionIssues ?? '');
+                        Common::sendPushNotificationForMobile([$assignedEmp->device_token], $title, $body, 'Accommodation', 'Assigned', null, null, null);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Push notification failed: ' . $e->getMessage());
+                }
             }
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Request Assigned successfully.'], 200);
