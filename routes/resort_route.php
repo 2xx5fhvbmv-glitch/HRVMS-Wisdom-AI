@@ -705,6 +705,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('accommodation/buildingwise-accommodation', 'Accommodation\AssignAccommodationController@BuildingwiseAccommodation')->name('resort.accommodation.BuildingwiseAccommodation');
     Route::post('accommodation/get-assigned-bed', 'Accommodation\AssignAccommodationController@GetAssignedBed')->name('resort.accommodation.GetAssignedBed');
     Route::post('accommodation/assign-accommodation-to-emp', 'Accommodation\AssignAccommodationController@AssignAccommodationToEmp')->name('resort.accommodation.AssignAccommodationToEmp');
+    Route::post('accommodation/preview-accommodation', 'Accommodation\AssignAccommodationController@previewAccommodation')->name('resort.accommodation.previewAccommodation');
     Route::post('accommodation/get-accommodationwise-employee', 'Accommodation\AssignAccommodationController@GetAccmmodationwiseEmployee')->name('resort.accommodation.GetAccmmodationwiseEmployee');
     Route::post('accommodation/move-to-next', 'Accommodation\AssignAccommodationController@MoveToNext')->name('resort.accommodation.MoveToNext');
 

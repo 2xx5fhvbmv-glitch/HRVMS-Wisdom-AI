@@ -146,8 +146,8 @@
 
             </div>
             <div class="modal-footer">
-                <!-- <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a> -->
-                <a href="#" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue">Submit</a>
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Cancel</a>
+                <button type="button" class="btn btn-themeBlue" id="confirmAssignBed">Confirm Assignment</button>
             </div>
         </div>
     </div>
@@ -205,104 +205,110 @@ $(document).ready(function()
             }
         },
         submitHandler: function(form) {
-            var formData = new FormData(form);
+            var empId = $("#EmployeeList").val();
+            var assignId = $("#assignId").val();
 
-            formData.append("emp_id", $("#EmployeeList").val());
+            if (!empId) {
+                toastr.error("Please select an employee first", "Error", { positionClass: 'toast-bottom-right' });
+                return;
+            }
 
+            // Store for confirmation
+            window._pendingAssignment = { emp_id: empId, assignId: assignId };
+
+            // Fetch preview data from server
             $.ajax({
-                url: "{{ route('resort.accommodation.AssignAccommodationToEmp') }}", // Your route for file upload
+                url: "{{ route('resort.accommodation.previewAccommodation') }}",
                 type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
+                data: { _token: '{{ csrf_token() }}', emp_id: empId, assignId: assignId },
                 success: function(response) {
-                    if(response.success == true)
-                    {
-                        var employee = response.data.employee;
-                        var accommodation = response.data.accommodation;
-                        var facilities = accommodation.facilities.join(", ");
-                        $(".appendhereAfterAssign").html(`
-                                <div class="empDetails-user">
-                                     <div class="img-circle"><img src="${employee.profile_picture}" alt="user">
-                                    </div>
-                                    <div>
-                                        <h4>${employee.name}</h4>
-                                        <p>${employee.position}</p>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-lable">
-                                        <tr>
-                                            <th>Building:</th>
-                                            <td>${accommodation.building_name}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Floor:</th>
-                                            <td>${accommodation.floor}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Room No.</th>
-                                            <td>${accommodation.room_no}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Bed No.</th>
-                                            <td>${accommodation.bed_no || '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Room Facilities:</th>
-                                            <td>${facilities}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Room Status:</th>
-                                            <td>${accommodation.RoomStatus}</td>
-                                        </tr>
-                                        <tr>
-                                            <th>Accommodation Name:</th>
-                                            <td>${accommodation.accommodation_name}</td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            `);
-                            $("#reviewDetails-modal").modal('show');
-                            toastr.success(response.message || 'Assigned successfully', "Success", {
-                                positionClass: "toast-bottom-right",
-                            });
-                    } else {
-                        toastr.error(response.message || 'Failed to assign', "Error", {
-                            positionClass: "toast-bottom-right",
-                        });
-                    }
+                    if (response.success) {
+                        var emp = response.data.employee;
+                        var acc = response.data.accommodation;
+                        var facilities = acc.facilities.join(", ") || '-';
 
-                },
-                error: function(xhr, status, error) 
-                {
-                    try {
-                        const response = xhr.responseJSON;
-                        
-                        if (response && response.success === false) {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else if (response && response.errors) {
-                            const errorMessages = Object.values(response.errors).flat().join('<br>');
-                            toastr.error(errorMessages, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        } else {
-                            toastr.error("An unexpected error occurred", "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    } catch (e) {
-                        toastr.error("An unexpected error occurred", "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
+                        $(".appendhereAfterAssign").html(`
+                            <div class="empDetails-user">
+                                <div class="img-circle"><img src="${emp.profile_picture}" alt="user"></div>
+                                <div>
+                                    <h4>${emp.name} <span class="badge badge-themeNew">${emp.emp_id}</span></h4>
+                                    <p>${emp.position}</p>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-lable">
+                                    <tr><th>Building:</th><td>${acc.building_name}</td></tr>
+                                    <tr><th>Floor:</th><td>${acc.floor}</td></tr>
+                                    <tr><th>Room No.</th><td>${acc.room_no}</td></tr>
+                                    <tr><th>Bed No.</th><td>${acc.bed_no}</td></tr>
+                                    <tr><th>Room Facilities:</th><td>${facilities}</td></tr>
+                                    <tr><th>Room Status:</th><td>${acc.RoomStatus}</td></tr>
+                                    <tr><th>Accommodation Name:</th><td>${acc.accommodation_name}</td></tr>
+                                </table>
+                            </div>
+                        `);
+
+                        $("#selectBed-modal").modal('hide');
+                        setTimeout(function() {
+                            $("#reviewDetails-modal").modal('show');
+                        }, 300);
+                    } else {
+                        toastr.error(response.message || 'Failed to load preview', "Error", { positionClass: 'toast-bottom-right' });
                     }
+                },
+                error: function() {
+                    toastr.error('Failed to load preview', "Error", { positionClass: 'toast-bottom-right' });
                 }
             });
         }
     });
 });
+
+    // Confirm Assignment - actually assign the bed
+    $(document).on("click", "#confirmAssignBed", function() {
+        var pending = window._pendingAssignment;
+        if (!pending) {
+            toastr.error("No pending assignment", "Error", { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        var $btn = $(this);
+        $btn.prop('disabled', true).text('Assigning...');
+
+        $.ajax({
+            url: "{{ route('resort.accommodation.AssignAccommodationToEmp') }}",
+            type: "POST",
+            data: {
+                _token: '{{ csrf_token() }}',
+                emp_id: pending.emp_id,
+                assignId: pending.assignId
+            },
+            success: function(response) {
+                if (response.success) {
+                    $("#reviewDetails-modal").modal('hide');
+                    window._pendingAssignment = null;
+                    getAccommodationList();
+                    toastr.success(response.message || 'Bed assigned successfully', "Success", {
+                        positionClass: "toast-bottom-right",
+                    });
+                } else {
+                    toastr.error(response.message || 'Failed to assign', "Error", {
+                        positionClass: "toast-bottom-right",
+                    });
+                }
+            },
+            error: function(xhr) {
+                var msg = 'An error occurred';
+                if (xhr.responseJSON) {
+                    msg = xhr.responseJSON.message || Object.values(xhr.responseJSON.errors || {}).flat().join(', ') || msg;
+                }
+                toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+            },
+            complete: function() {
+                $btn.prop('disabled', false).text('Confirm Assignment');
+            }
+        });
+    });
 
     $(document).on("click","#Bedshow",function(){
 
@@ -318,27 +324,28 @@ $(document).ready(function()
                         if (response.success) {
 
 
-                            var row = ''; // Initialize row as an empty string
+                            var row = '';
                                 $.each(response.data, function (i, v) {
+                                    var bedLabel = v.BedNo || ('Bed ' + (i+1));
 
                                     if(v.emp_id!=0)
                                     {
                                         row+=` <div class="col-6">
-                                            <div class="bed-block disable" >
+                                            <div class="bed-block disable">
                                                 <div class="position-relative">
                                                     <img src="{{ URL::asset('resorts_assets/images/bed-active.png') }}" alt="bed">
                                                     <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg') }}" class="icon" alt="icon">
                                                     <div class="img-circle" data-bs-toggle="tooltip" data-bs-placement="bottom" title="${v.EmployeeName}"><img src="${v.profileImg}" alt="user">
                                                     </div>
                                                 </div>
-                                                <p>Assigned </p>
+                                                <p>${v.EmployeeName}<br><small class="text-muted">${bedLabel}</small></p>
                                             </div>
                                         </div>`;
                                     }
                                     else{
                                         row += `
                                         <div class="col-6">
-                                            <div class="bed-block" data-id='${v.assingid}'>
+                                            <div class="bed-block" data-id='${v.assingid}' data-bed-no='${bedLabel}'>
                                                 <div class="position-relative">
                                                     <img src="{{ URL::asset('resorts_assets/images/bed-active.png') }}" alt="bed">
                                                     <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg') }}" class="icon" alt="icon">
@@ -346,7 +353,7 @@ $(document).ready(function()
                                                         title="Available"><img src="{{ URL::asset('resorts_assets/images/user-2.svg') }}" alt="user">
                                                     </div>
                                                 </div>
-                                                <p>Available</p>
+                                                <p>Available<br><small class="text-muted">${bedLabel}</small></p>
                                             </div>
                                         </div>`;
                                     }
@@ -390,16 +397,24 @@ $(document).ready(function()
     var position = selectedOption.data('position');
     var pic = selectedOption.data('pic');
     var EmpId = selectedOption.data('emp_id');
-    $(".empDetails-user").html(`<div class="img-circle"><img src="${pic}" alt="user">
-                            </div>
-                            <div>
-                                <h4>${empName} <span class="badge badge-themeNew">${EmpId}</span></h4>
-                                <p>${position}</p>
-                            </div>`);
+    if (empName && empName !== 'Select Employee') {
+        $(".empDetails-user").html(`<div class="img-circle"><img src="${pic}" alt="user">
+                                </div>
+                                <div>
+                                    <h4>${empName} <span class="badge badge-themeNew">${EmpId}</span></h4>
+                                    <p>${position}</p>
+                                </div>`);
+    }
 
 
 });
 
+    // Trigger on page load if employee already selected (browser auto-restore)
+    setTimeout(function() {
+        if ($("#EmployeeList").val()) {
+            $("#EmployeeList").trigger('change');
+        }
+    }, 500);
 
     $(document).on("change","#select_build,#EmployeeList",function(){
         getAccommodationList();
