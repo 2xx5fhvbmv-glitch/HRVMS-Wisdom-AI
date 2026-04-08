@@ -74,7 +74,7 @@
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
                                         <a href="#departments-modal" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
-                                            data-bs-toggle="modal" data-bs-target="#">
+                                            data-bs-toggle="modal" data-bs-target="#departments-modal">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
                                     </div>
@@ -192,12 +192,9 @@
                     <div class="form-group mb-2">
                         <lable class="division-select1" for="division-select1">Select Existing Division <span class="red-mark">*</span></lable>
                         <select id="division-select1" name="division_id" class="form-select select2-modal"
-                            data-parsley-errors-container="#div-division_id1" 
+                            data-parsley-errors-container="#div-division_id1"
                             required data-parsley-required-message="Please select a division.">
                             <option value="">Select Division</option>
-                            @foreach($divisions as $division)
-                                <option value="{{ $division->name }}">{{ $division->name }}</option>
-                            @endforeach
                         </select>
                         <div id="div-division_id1"></div>
 
@@ -215,7 +212,7 @@
 
 					<div class="form-group mb-20">
                         <input type="text" id="new-division-code" name="code" class="form-control"
-                               placeholder="Add Code of Division"  required data-parsley-required-message="Add Code of Division">
+                               placeholder="Add Code of Division">
                     </div>
 
                     <div class="form-group mb-3">
@@ -257,9 +254,6 @@
                         data-parsley-errors-container="#div-division_id"
                         required data-parsley-required-message="Please select a division.">
                         <option value="">Select Division</option>
-                        @foreach($resort_divisions as $division)
-                            <option value="{{ $division->id }}">{{ $division->name }}</option>
-                        @endforeach
                     </select>
                     <div id="div-division_id"></div>
                 </div>
@@ -271,9 +265,6 @@
                         data-parsley-errors-container="#div-dept_id"
                         required data-parsley-required-message="Please select a department.">
                         <option value="">Select Department</option>
-                        @foreach($departments as $department)
-                            <option value="{{ $department->name }}">{{ $department->name }}</option>
-                        @endforeach
                     </select>
                     <div id="div-dept_id"></div>
                 </div>
@@ -290,10 +281,9 @@
 
                 <!-- Department Code -->
                 <div class="form-group mb-20">
-                    <label for="new-dept-code">Add Code of Department <span class="red-mark">*</span></label>
+                    <label for="new-dept-code">Add Code of Department</label>
                     <input type="text" name="code" id="new-dept-code" class="form-control"
-                        placeholder="Add Code of Department"
-                        required data-parsley-required-message="Department code is required.">
+                        placeholder="Add Code of Department">
                 </div>
 
                 <!-- Status -->
@@ -333,13 +323,10 @@
                     @csrf
                     <div class="form-group mb-20">
                         <label class="department-name-label" for="new-dept-name">Select Department <span class="red-mark">*</span></label>
-                        <select id="section-dept" name="dept_id" class="form-select select2-modal" 
-                         data-parsley-errors-container="#div-section_dept_id" 
+                        <select id="section-dept" name="dept_id" class="form-select select2-modal"
+                         data-parsley-errors-container="#div-section_dept_id"
                          required data-parsley-required-message="Please select a department.">
                             <option value="">Select Department</option>
-                            @foreach($resort_departments as $department)
-                                <option value="{{ $department->id }}">{{ $department->name }}</option>
-                            @endforeach
                         </select>
                         <div id="div-section_dept_id"></div>   
 
@@ -350,9 +337,6 @@
                         <select id="section-select" name="section_id" class="form-select select2-modal SelectionModel-name-class"
                           data-parsley-errors-container="#div-section_select">
                             <option value="">Select Section (or add new below)</option>
-                            @foreach($sections as $section)
-                                <option value="{{ $section->name }}">{{ $section->name }}</option>
-                            @endforeach
                         </select>
                         <div id="div-section_select"></div>   
 
@@ -366,10 +350,9 @@
                     </div>
 
                     <div class="form-group mb-20">
-                        <label class="department-name-label" for="new-dept-name">Add Section Code <span class="red-mark">*</span></label>
-                        <input type="text" name="code" id="new-section-code" class="form-control" 
-                        placeholder="Add Code of Section"
-                         required data-parsley-required-message="Please Add Code of Section">
+                        <label class="department-name-label" for="new-dept-name">Add Section Code</label>
+                        <input type="text" name="code" id="new-section-code" class="form-control"
+                        placeholder="Add Code of Section">
                     </div>
 
                     <div class="form-group mb-3">
@@ -413,9 +396,6 @@
                             data-parsley-errors-container="#div-position_dept_id"
                             required data-parsley-required-message="Please select a department.">
                             <option value="">Select Department</option>
-                            @foreach($resort_departments as $department)
-                                <option value="{{ $department->id }}">{{ $department->name }}</option>
-                            @endforeach
                         </select>
                         <div id="div-position_dept_id"></div>
                     </div>
@@ -424,9 +404,6 @@
                         <label class="position-section-label">Select Section</label>
                         <select id="position-section" name="section_id" class="form-select select2-modal PositionSec-class">
                             <option value="">Select Section</option>
-                            @foreach($resort_sections as $section)
-                                <option value="{{ $section->id }}">{{ $section->name }}</option>
-                            @endforeach
                         </select>
                     </div>
 
@@ -435,9 +412,6 @@
                         <select id="position-select" name="position_id" class="form-select select2-modal PositionSelect-class"
                             data-parsley-errors-container="#div-position_select">
                             <option value="">Select Position (or add new below)</option>
-                            @foreach($positions as $position)
-                                <option value="{{ $position->position_title }}">{{ $position->position_title }}</option>
-                            @endforeach
                         </select>
                         <div id="div-position_select"></div>
                     </div>
@@ -449,10 +423,9 @@
                             required data-parsley-required-message="Please add the title of the position.">
                     </div>
                     <div class="form-group mb-20">
-                        <label class="position-code-label">Add Code Of Position <span class="red-mark">*</span></label>
+                        <label class="position-code-label">Add Code Of Position</label>
                         <input type="text" id="new-position-code" name="code" class="form-control"
-                            placeholder="Add Code Of Position"
-                            required data-parsley-required-message="Please add code of the position.">
+                            placeholder="Add Code Of Position">
                     </div>
                     <div class="form-group mb-20">
                         <label class="position-rank-label">Select Rank <span class="red-mark">*</span></label>
@@ -752,8 +725,110 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
     window.resortDivisions = @json($resort_divisions);
     window.resortDepartments = @json($resort_departments);
     window.resortSections = @json($resort_sections);
-    // window.Position_Rank = @json(config('settings.Position_Rank'));
     window.Position_Rank = @json(config('settings.eligibilty'));
+
+    // Function to reload all 4 DataTables
+    function reloadAllTables() {
+        $('#divisions-table').DataTable().ajax.reload(null, false);
+        $('#departments-table').DataTable().ajax.reload(null, false);
+        $('#sections-table').DataTable().ajax.reload(null, false);
+        $('#positions-table').DataTable().ajax.reload(null, false);
+    }
+
+    // Function to fetch fresh dropdown data from backend and populate modals
+    function loadDropdownData(callback) {
+        $.ajax({
+            url: "{{ route('manning.dropdown.data') }}",
+            type: "GET",
+            success: function(data) {
+                // Update global variables for inline editing
+                window.resortDivisions = data.resort_divisions;
+                window.resortDepartments = data.resort_departments;
+                window.resortSections = data.resort_sections;
+                window.Position_Rank = data.eligibility;
+
+                // Division modal - division select (uses global divisions by name)
+                var $divSelect1 = $('#division-select1');
+                $divSelect1.find('option:not(:first)').remove();
+                $.each(data.divisions, function(i, div) {
+                    $divSelect1.append('<option value="' + div.name + '">' + div.name + '</option>');
+                });
+
+                // Department modal - division select (uses resort_divisions by id)
+                var $divSelect2 = $('#division-select2');
+                $divSelect2.find('option:not(:first)').remove();
+                $.each(data.resort_divisions, function(i, div) {
+                    $divSelect2.append('<option value="' + div.id + '">' + div.name + '</option>');
+                });
+
+                // Department modal - department select (uses global departments by name)
+                var $deptSelect1 = $('#department-select1');
+                $deptSelect1.find('option:not(:first)').remove();
+                $.each(data.departments, function(i, dept) {
+                    $deptSelect1.append('<option value="' + dept.name + '">' + dept.name + '</option>');
+                });
+
+                // Section modal - department select (uses resort_departments by id)
+                var $sectionDept = $('#section-dept');
+                $sectionDept.find('option:not(:first)').remove();
+                $.each(data.resort_departments, function(i, dept) {
+                    $sectionDept.append('<option value="' + dept.id + '">' + dept.name + '</option>');
+                });
+
+                // Section modal - section select (uses global sections by name)
+                var $sectionSelect = $('#section-select');
+                $sectionSelect.find('option:not(:first)').remove();
+                $.each(data.sections, function(i, sec) {
+                    $sectionSelect.append('<option value="' + sec.name + '">' + sec.name + '</option>');
+                });
+
+                // Position modal - department select (uses resort_departments by id)
+                var $posDept = $('#position-dept');
+                $posDept.find('option:not(:first)').remove();
+                $.each(data.resort_departments, function(i, dept) {
+                    $posDept.append('<option value="' + dept.id + '">' + dept.name + '</option>');
+                });
+
+                // Position modal - section select (uses resort_sections by id)
+                var $posSec = $('#position-section');
+                $posSec.find('option:not(:first)').remove();
+                $.each(data.resort_sections, function(i, sec) {
+                    $posSec.append('<option value="' + sec.id + '">' + sec.name + '</option>');
+                });
+
+                // Position modal - position select (uses global positions by title)
+                var $posSelect = $('#position-select');
+                $posSelect.find('option:not(:first)').remove();
+                $.each(data.positions, function(i, pos) {
+                    $posSelect.append('<option value="' + pos.position_title + '">' + pos.position_title + '</option>');
+                });
+
+                // Reinitialize select2 on modal selects
+                $('.select2-modal').select2();
+
+                if (typeof callback === 'function') callback();
+            },
+            error: function() {
+                toastr.error("Failed to load dropdown data.", "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
+            }
+        });
+    }
+
+    // Load dropdown data when any "Add New" modal is opened
+    $('#add-divisionmodal, #departments-modal, #sections-modal, #positions-modal').on('show.bs.modal', function() {
+        var $modal = $(this);
+        loadDropdownData(function() {
+            // Reset form and toggles after data is loaded
+            $modal.find('form')[0].reset();
+            $modal.find('select').val(null).trigger('change');
+            toggleDivisionInput();
+            toggleDepartmentInput();
+            toggleSectionInput();
+            togglePositionInput();
+        });
+    });
     
     
     // Disable the textbox initially if the select box has a value
@@ -916,7 +991,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 console.log(response);
                 if (response.success == true) {
                     $('#add-divisionmodal').modal('hide');
-                    divisionTable.ajax.reload();
+                    reloadAllTables();
 
                     // Reset the form fields
                     $('#addDivisionForm')[0].reset();
@@ -1062,6 +1137,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     `;
 
                     $row.html(updatedRowHtml);
+                    reloadAllTables();
 
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'
@@ -1109,7 +1185,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                             positionClass: 'toast-bottom-right'
                         });
 
-                        $('#divisions-table').DataTable().ajax.reload();
+                        reloadAllTables();
                     } else {
                         toastr.error(result.message, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -1155,7 +1231,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             success: function(response) {
                 if(response.success == true) {
                     $('#departments-modal').modal('hide');
-                    $('#departments-table').DataTable().ajax.reload();
+                    reloadAllTables();
 
                      // Reset the form fields
                      $('#addDepartmentForm')[0].reset();
@@ -1327,6 +1403,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     `;
 
                     $row.html(updatedRowHtml);
+                    reloadAllTables();
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'
                     });
@@ -1383,7 +1460,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                             positionClass: 'toast-bottom-right'
                         });
 
-                        $('#departments-table').DataTable().ajax.reload();
+                        reloadAllTables();
                     } else {
                         toastr.error(result.message, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -1430,7 +1507,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             success: function(response) {
                 if(response.success == true) {
                     $('#sections-modal').modal('hide');
-                    $('#sections-table').DataTable().ajax.reload();
+                    reloadAllTables();
 
                     // Reset the form fields
                     $('#addSectionForm')[0].reset();
@@ -1617,6 +1694,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     `;
 
                     $row.html(updatedRowHtml);
+                    reloadAllTables();
 
                      toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'
@@ -1680,7 +1758,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                             positionClass: 'toast-bottom-right'
                         });
 
-                        $('#sections-table').DataTable().ajax.reload();
+                        reloadAllTables();
                     } else {
                         toastr.error(result.message, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -1743,7 +1821,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             success: function(response) {
                 if(response.success == true) {
                     $('#positions-modal').modal('hide');
-                    $('#positions-table').DataTable().ajax.reload();
+                    reloadAllTables();
 
                     // Reset the form fields
                     $('#addPositionForm')[0].reset();
@@ -1949,6 +2027,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                     `;
 
                     $row.html(updatedRowHtml);
+                    reloadAllTables();
 
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'
@@ -2008,7 +2087,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                             positionClass: 'toast-bottom-right'
                         });
 
-                        $('#positions-table').DataTable().ajax.reload();
+                        reloadAllTables();
                     } else {
                         toastr.error(result.message, "Error", {
                             positionClass: 'toast-bottom-right'

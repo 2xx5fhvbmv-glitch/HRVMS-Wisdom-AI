@@ -293,9 +293,9 @@
                 });
             }
         });
-        PendingTaskList();
-        tableassignTask();
-        OnHoldTaskList();
+        try { PendingTaskList(); } catch(e) { console.error('PendingTaskList error:', e); }
+        try { tableassignTask(); } catch(e) { console.error('tableassignTask error:', e); }
+        try { OnHoldTaskList(); } catch(e) { console.error('OnHoldTaskList error:', e); }
     });
     $(".ResortDepartment").on("change",function()
         {
@@ -385,7 +385,7 @@
             "iDisplayLength": 6,
             processing: true,
             serverSide: true,
-            order: [[5, 'desc']]
+            order: [[5, 'desc']],
             ajax: {
                 url: '{{ route("resort.accommodation.HODtableassignTask") }}',
                 type: 'GET',

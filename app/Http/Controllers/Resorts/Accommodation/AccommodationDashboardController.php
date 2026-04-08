@@ -76,7 +76,7 @@ class AccommodationDashboardController extends Controller
                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
                                                         $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
                                                     }
-                                                    $row->EffectedAmenity =isset($InventoryModule->ItemName) ? ucfirst($InventoryModule->ItemName):'';
+                                                    $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                     return  $row;
                                                 });
             return datatables()->of($MaintanaceRequest)
@@ -396,8 +396,8 @@ class AccommodationDashboardController extends Controller
                      {
                             $string = '<a href="'.route('resort.accommodation.MainRequestDetails',$id ).'" class="btn-tableIcon btnIcon-skyblue mainRequetDetails" data-task_id="'.$id.'"><i class="fa-regular fa-eye"></i></a>
                                         <a href="javascript:void(0)" class="btn-tableIcon btnIcon-blue ForwardToHOD" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Forward to HOD" data-req_id="'.$id.'" data-Location="'.$row->Location.'"data-EffectedAmenity="'. $row->EffectedAmenity .'"><i class="fa-solid fa-check"></i></a>
-                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-danger RejectedRequest" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Reject Request" data-req_id="'.$id.'" data-Location="'.$row->Location.'"data-EffectedAmenity="'. $row->EffectedAmenity .'"><i class="fa-solid fa-xmark"></i></a>';
+                                        data-bs-placement="bottom" title="Approve & Forward" data-req_id="'.$id.'" data-Location="'.e($row->Location).'" data-EffectedAmenity="'.e($row->EffectedAmenity).'" data-description="'.e($row->descriptionIssues).'"><i class="fa-solid fa-check"></i></a>
+                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-danger RejectedRequest" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Reject Request" data-req_id="'.$id.'" data-Location="'.e($row->Location).'" data-EffectedAmenity="'.e($row->EffectedAmenity).'" data-description="'.e($row->descriptionIssues).'"><i class="fa-solid fa-xmark"></i></a>';
                      }
                      else
                      {
@@ -478,9 +478,16 @@ class AccommodationDashboardController extends Controller
 
         }
 
-            $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
+            $Employee = Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
+                            ->join('resort_departments as rd', 'rd.id', '=', 'employees.Dept_id')
                             ->where('employees.resort_id', $this->globalUser->resort_id)
-                            ->where("employees.rank",11)
+                            ->where(function($q) {
+                                $q->where('rd.name', 'like', '%engineer%')
+                                  ->orWhere('rd.name', 'like', '%maintenance%')
+                                  ->orWhere('rd.name', 'like', '%technical%');
+                            })
+                            ->whereIn('employees.rank', [1, 2]) // EXCOM or HOD
+                            ->where('employees.status', 'Active')
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
                             
             $buildings = BuildingModel::where("resort_id", $this->globalUser->resort_id)
@@ -700,10 +707,11 @@ class AccommodationDashboardController extends Controller
                                                     ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                                     ->join("resort_departments as t4","t4.id","t3.Dept_id")
                                                     ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold'])
-                                                    ->where('maintanace_requests.Assigned_To',$currentHod);
-                                                    if( isset($request->ResortDepartment))
+                                                    ->where('maintanace_requests.Assigned_To',$currentHod)
+                                                    ->where('maintanace_requests.resort_id', $this->globalUser->resort_id);
+                                                    if($request->filled('ResortDepartment'))
                                                     {
-                                                        $MaintanaceRequest->where('maintanace_requests.Raised_By',$request->ResortDepartment);
+                                                        $MaintanaceRequest->where('t3.Dept_id',$request->ResortDepartment);
                                                     }
                             $MaintanaceRequest =  $MaintanaceRequest->leftjoin("resort_admins as t2","t2.id","maintanace_requests.Assigned_To")
                                                 ->orderBy('maintanace_requests.id','desc')
@@ -725,7 +733,7 @@ class AccommodationDashboardController extends Controller
                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
                                                         $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
                                                     }
-                                                    $row->EffectedAmenity = ucfirst($InventoryModule->ItemName);
+                                                    $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                     return  $row;
                                                 });
                                                 if($request->ajax())
@@ -1136,7 +1144,7 @@ class AccommodationDashboardController extends Controller
                                                             }
                                                                 
                                                         }
-                                                        $row->EffectedAmenity = ucfirst($InventoryModule->ItemName);
+                                                        $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                         return  $row;
                                                     });
             return datatables()->of($MaintanaceRequest)
