@@ -49,10 +49,7 @@
                                 </tr>
                                 <tr>
                                     <th>Date:</th>
-                                    <td> {{ $MaintanaceRequest->Date }}
-                                        <a href="javascript:void(0)" class="a-link ms-2" id="RequestDetails">View All
-                                            Detail</a>
-                                    </td>
+                                    <td>{{ $MaintanaceRequest->Date }}</td>
                                 </tr>
                                 <tr>
                                     <th>Priority :</th>
@@ -95,33 +92,49 @@
                         <div class=" card-title">
                             <h3>Status</h3>
                         </div>
-                        <ul class="manning-timeline text-start ">
-                            {{-- Sent to HOD --}}
-                            <li class="{{ in_array('Open', $displayedStatuses) ? 'active' : '' }}">
-                                <span>Sent to HOD</span>
+                        <ul class="manning-timeline text-start">
+                            {{-- 1. Request Submitted --}}
+                            <li class="active">
+                                <span>Request Submitted</span>
+                                <small class="d-block text-muted">by {{ $MaintanaceRequest->first_name }} {{ $MaintanaceRequest->last_name }} on {{ $MaintanaceRequest->Date }}</small>
                             </li>
 
-                            {{-- Assigned by HOD --}}
+                            {{-- 2. Sent to HR --}}
+                            <li class="{{ in_array('Open', $displayedStatuses) || in_array('Assinged', $displayedStatuses) || $MaintanaceRequest->Status == 'Open' ? 'active' : '' }} {{ $MaintanaceRequest->Status == 'Rejected' ? 'text-danger' : '' }}">
+                                <span>Sent to HR</span>
+                                @if($MaintanaceRequest->Status == 'Rejected')
+                                    <small class="d-block text-danger">Rejected: {{ $MaintanaceRequest->RejactionReason ?? '' }}</small>
+                                @elseif($MaintanaceRequest->Status == 'On-Hold')
+                                    <small class="d-block text-warning">On Hold: {{ $MaintanaceRequest->ReasonOnHold ?? '' }}</small>
+                                @elseif(in_array('Open', $displayedStatuses))
+                                    <small class="d-block text-success">Approved</small>
+                                @endif
+                            </li>
+
+                            {{-- 3. Engineering HOD/EXCOM Review & Assign --}}
                             <li class="{{ in_array('Assinged', $displayedStatuses) ? 'active' : '' }}">
-                                <span>Assigned by HOD</span>
+                                <span>Engineering Department Review</span>
+                                @if(in_array('Assinged', $displayedStatuses) && isset($displayedStatusesDetails['Assinged']))
+                                    @foreach($displayedStatusesDetails['Assinged'] as $detail)
+                                        <small class="d-block text-muted">Assigned to {{ $detail[2] ?? '' }} on {{ $detail[0] ?? '' }}</small>
+                                    @endforeach
+                                @endif
                             </li>
 
-                            {{-- In Progress --}}
-                            <li
-                                class="{{ in_array('In-Progress', $displayedStatuses) || in_array('Resolved', $displayedStatuses) || in_array('Confirmed', $displayedStatuses) ? 'active' : '' }}">
+                            {{-- 4. In Progress --}}
+                            <li class="{{ in_array('In-Progress', $displayedStatuses) || in_array('Resolved', $displayedStatuses) || in_array('Confirmed', $displayedStatuses) ? 'active' : '' }}">
                                 <span>In Progress</span>
                             </li>
 
-                            {{-- Resolved awaiting confirmation --}}
-                            <li class="{{ in_array('Resolvedawaiting', $displayedStatuses) ? 'active' : '' }}">
-                                <span>Resolved awaiting confirmation</span>
+                            {{-- 5. Resolved awaiting confirmation --}}
+                            <li class="{{ in_array('Resolvedawaiting', $displayedStatuses) || in_array('Closed', $displayedStatuses) ? 'active' : '' }}">
+                                <span>Resolved Awaiting Confirmation</span>
                             </li>
 
-                            {{-- Confirmed resolved --}}
+                            {{-- 6. Confirmed resolved --}}
                             <li class="{{ in_array('Closed', $displayedStatuses) ? 'active' : '' }}">
-                                <span>Confirmed resolved</span>
+                                <span>Confirmed Resolved</span>
                             </li>
-
                         </ul>
 
                     </div>
