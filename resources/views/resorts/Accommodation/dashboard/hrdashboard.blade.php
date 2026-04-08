@@ -1176,15 +1176,6 @@
 
     function OnHoldTaskList()
     {
-        @php
-            $permission = true;
-            if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.HoldMaintanaceRequest',config('settings.resort_permissions.view')) == false){
-                $permission = false;
-            }
-        @endphp
-        if ($permission == false) {
-            return;
-        }
         if ($.fn.dataTable.isDataTable('.OnHoldReq'))
         {
             $('.OnHoldReq').DataTable().destroy();
