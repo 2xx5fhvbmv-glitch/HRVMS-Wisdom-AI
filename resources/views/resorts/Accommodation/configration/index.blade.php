@@ -828,18 +828,19 @@ $(document).ready(function()
                 }
             },
             error: function(response) {
-                var errors = response.responseJSON.errors;
-                    var errs = '';
-
-                    if (errors) {
-                        $.each(errors, function(key, error) {
-                            errs += error + '<br>';
-                        });
-                    } else {
-                        errs = 'An unexpected error occurred.';
+                    var msg = 'An unexpected error occurred.';
+                    if (response.responseJSON) {
+                        if (response.responseJSON.message) {
+                            msg = response.responseJSON.message;
+                        } else if (response.responseJSON.errors) {
+                            var errs = [];
+                            $.each(response.responseJSON.errors, function(key, error) {
+                                errs.push(Array.isArray(error) ? error.join(', ') : error);
+                            });
+                            msg = errs.join('<br>');
+                        }
                     }
-
-                    toastr.error(errs, "Validation Errors", {
+                    toastr.error(msg, "Error", {
                         positionClass: 'toast-bottom-right'
                     });
             }
