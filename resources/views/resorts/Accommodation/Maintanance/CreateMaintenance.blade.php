@@ -53,11 +53,8 @@
                 </div>
 
                 <div class="col-lg-6">
-                    <label for="amenity" class="form-label">AFFECTED AMENITY<span class="red-mark">*</span></label>
+                    <label for="amenity" class="form-label">AFFECTED AMENITY <small class="text-muted">(Optional)</small></label>
                     <select class="form-select select2t-none" name="item_id" id="amenity"
-                        required
-                           data-parsley-trigger="submit"
-                        data-parsley-required-message="Please select affected amenity."
                         data-parsley-errors-container="#affected_amenity">
                         <option></option>
                         @if($InventoryItems->isNotEmpty())
@@ -244,24 +241,30 @@ $(document).ready(function() {
             data: { emp_id: empId },
             success: function(response) {
                 if (response.success && response.has_accommodation) {
-                    // Set building and make readonly
-                    $('#building_1').val(response.building_id).trigger('change');
+                    var autoFloor = response.floor;
+                    var autoRoom = response.room;
+                    var autoBuildingId = response.building_id;
+
+                    // Set building without triggering the AJAX floor fetch
+                    $('#building_1').val(autoBuildingId);
+                    if ($('#building_1').data('select2')) {
+                        $('#building_1').trigger('change.select2');
+                    }
                     $('#building_1').prop('disabled', true);
 
-                    // Set floor
-                    $('#AvailableFloor_1').html('<option value="' + response.floor + '" selected>' + response.floor + '</option>');
+                    // Set floor and room directly
+                    $('#AvailableFloor_1').html('<option value="' + autoFloor + '" selected>' + autoFloor + '</option>');
                     $('#AvailableFloor_1').prop('disabled', true);
 
-                    // Set room
-                    $('#RoomNo_1').html('<option value="' + response.room + '" selected>' + response.room + '</option>');
+                    $('#RoomNo_1').html('<option value="' + autoRoom + '" selected>' + autoRoom + '</option>');
                     $('#RoomNo_1').prop('disabled', true);
 
                     // Add hidden inputs so disabled fields still submit
-                    $('input[name="building_id_hidden"], input[name="FloorNo_hidden"], input[name="RoomNo_hidden"]').remove();
+                    $('.auto-filled-hidden').remove();
                     $('#CreateMaintenanceForm').append(
-                        '<input type="hidden" name="building_id" value="' + response.building_id + '" class="auto-filled-hidden">' +
-                        '<input type="hidden" name="FloorNo" value="' + response.floor + '" class="auto-filled-hidden">' +
-                        '<input type="hidden" name="RoomNo" value="' + response.room + '" class="auto-filled-hidden">'
+                        '<input type="hidden" name="building_id" value="' + autoBuildingId + '" class="auto-filled-hidden">' +
+                        '<input type="hidden" name="FloorNo" value="' + autoFloor + '" class="auto-filled-hidden">' +
+                        '<input type="hidden" name="RoomNo" value="' + autoRoom + '" class="auto-filled-hidden">'
                     );
 
                     // Show auto-filled indicator
