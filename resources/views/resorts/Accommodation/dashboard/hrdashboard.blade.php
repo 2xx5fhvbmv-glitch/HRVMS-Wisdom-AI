@@ -698,10 +698,10 @@
         {
             PendingTaskList();
         });
-        Aminities();
-        OnHoldTaskList();
-        PendingTaskList();
-        AccomComplitionRequest();
+        try { PendingTaskList(); } catch(e) { console.error('PendingTaskList error:', e); }
+        try { Aminities(); } catch(e) { console.error('Aminities error:', e); }
+        try { OnHoldTaskList(); } catch(e) { console.error('OnHoldTaskList error:', e); }
+        try { AccomComplitionRequest(); } catch(e) { console.error('AccomComplitionRequest error:', e); }
         $(".InventoryCategory").on("change",function()
         {
             Aminities();

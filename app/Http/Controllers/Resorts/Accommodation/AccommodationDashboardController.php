@@ -52,9 +52,8 @@ class AccommodationDashboardController extends Controller
                                                 ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                                 ->join("resort_departments as t4","t4.id","t3.Dept_id")
                                                 ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold']);
-                                                if( isset($request->ResortDepartment))
+                                                if( $request->filled('ResortDepartment'))
                                                 {
-
                                                     $MaintanaceRequest ->where('t4.id',$request->ResortDepartment);
                                                 }
                                                 $MaintanaceRequest =  $MaintanaceRequest->leftjoin("resort_admins as t2","t2.id","maintanace_requests.Assigned_To")
@@ -356,15 +355,15 @@ class AccommodationDashboardController extends Controller
             $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                                 ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                                 ->join("resort_departments as t4","t4.id","t3.Dept_id")
+                                                ->where('maintanace_requests.resort_id', $this->globalUser->resort_id)
                                                 ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold']);
-                                                if( isset($request->ResortDepartment))
+                                                if( $request->filled('ResortDepartment'))
                                                 {
-
                                                     $MaintanaceRequest ->where('t4.id',$request->ResortDepartment);
                                                 }
             $MaintanaceRequest =  $MaintanaceRequest->leftjoin("resort_admins as t2","t2.id","maintanace_requests.Assigned_To")
                                                 ->orderBy('maintanace_requests.date','desc')
-                                                ->whereIn('maintanace_requests.Status',['Open','pending','In-Progress'])
+                                                ->whereIn('maintanace_requests.Status',['Open','pending','Pending','In-Progress'])
                                                 ->get(['t1.id as Parentid','t1.first_name','t1.last_name','t2.id as Assign_Parentid','t2.first_name as Assign_first_name','t2.last_name as Assign_last_name','maintanace_requests.*'])
                                                 ->map(function ($row) {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
