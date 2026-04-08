@@ -920,7 +920,7 @@
             "iDisplayLength": 6,
             processing: true,
             serverSide: true,
-            order:[[8,'desc']]
+            order:[[8,'desc']],
             ajax: {
                 url: '{{ route("resort.accommodation.HrGetMaintananceRequest") }}',
                 type: 'GET',

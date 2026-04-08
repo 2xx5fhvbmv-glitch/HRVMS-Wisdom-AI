@@ -29,6 +29,22 @@ class MaintananceContorller extends Controller
 {
     protected $resort;
     protected $underEmp_id=[];
+
+    private function createNotification($userId, $type, $message, $requestId = null)
+    {
+        \DB::table('resort_notifications')->insert([
+            'resort_id' => $this->resort->resort_id,
+            'user_id' => $userId,
+            'module' => 'Accommodation',
+            'type' => $type,
+            'message' => $message,
+            'status' => 'unread',
+            'request_id' => $requestId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     public function __construct()
     {
         $this->resort =  auth()->guard('resort-admin')->user();
@@ -173,8 +189,13 @@ class MaintananceContorller extends Controller
                         'Status' =>'pending',
                         'rank'=> $rank,
                         'date'=>date('Y-m-d'),
-
                     ]);
+
+                    // Notify HR about new maintenance request
+                    $hrEmployees = Employee::where('resort_id', $this->resort->resort_id)->whereIn('rank', [3])->pluck('id');
+                    foreach ($hrEmployees as $hrId) {
+                        $this->createNotification($hrId, 'Maintenance Request', 'New maintenance request submitted: ' . $descriptionIssues, $m_id->id);
+                    }
 
             }
 
@@ -245,14 +266,14 @@ class MaintananceContorller extends Controller
             ]);
 
 
-            // Send push notification to assigned HOD
+            // Notify HOD and send push notification
             try {
+                $mainRequest = MaintanaceRequest::find($task_id);
+                $this->createNotification($HOD_id, 'Maintenance Forwarded', 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? ''), $task_id);
+
                 $hodEmployee = Employee::find($HOD_id);
                 if ($hodEmployee && $hodEmployee->device_token) {
-                    $mainRequest = MaintanaceRequest::find($task_id);
-                    $title = 'Maintenance Request Assigned';
-                    $body = 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? '');
-                    Common::sendPushNotificationForMobile([$hodEmployee->device_token], $title, $body, 'Accommodation', 'Open', null, null, null);
+                    Common::sendPushNotificationForMobile([$hodEmployee->device_token], 'Maintenance Request Assigned', 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? ''), 'Accommodation', 'Open', null, null, null);
                 }
             } catch (\Exception $e) {
                 \Log::warning('Push notification failed: ' . $e->getMessage());
@@ -593,6 +614,8 @@ class MaintananceContorller extends Controller
 
             // Notify the employee who raised the request
             try {
+                $this->createNotification($mainRequest->Raised_By, 'Maintenance Rejected', 'Your maintenance request has been rejected. Reason: ' . $reason, $id);
+
                 $raisedBy = Employee::find($mainRequest->Raised_By);
                 if ($raisedBy && $raisedBy->device_token) {
                     Common::sendPushNotificationForMobile([$raisedBy->device_token], 'Maintenance Request Rejected', 'Your request has been rejected. Reason: ' . $reason, 'Accommodation', 'Rejected', null, null, null);
@@ -652,6 +675,10 @@ class MaintananceContorller extends Controller
             // Notify the employee who raised the request
             try {
                 $mainRequest = MaintanaceRequest::find($task_id);
+                $notifType = $flag == 'On-Hold' ? 'Maintenance On Hold' : 'Maintenance Resolved';
+                $notifMsg = $flag == 'On-Hold' ? 'Your maintenance request has been placed on hold.' : 'Your maintenance request has been resolved and closed.';
+                $this->createNotification($mainRequest->Raised_By, $notifType, $notifMsg, $task_id);
+
                 $raisedBy = Employee::find($mainRequest->Raised_By);
                 if ($raisedBy && $raisedBy->device_token) {
                     $notifTitle = $flag == 'On-Hold' ? 'Maintenance Request On Hold' : 'Maintenance Request Closed';
@@ -959,12 +986,14 @@ class MaintananceContorller extends Controller
 
                 // Send push notification to assigned employee
                 try {
+                    $mainRequest = MaintanaceRequest::find($task_id);
+                    $this->createNotification($emp_id, 'Maintenance Assigned', 'You have been assigned a maintenance task: ' . ($mainRequest->descriptionIssues ?? ''), $task_id);
+                    // Also notify the person who raised the request
+                    $this->createNotification($mainRequest->Raised_By, 'Maintenance Update', 'Your maintenance request has been assigned to a technician.', $task_id);
+
                     $assignedEmp = Employee::find($emp_id);
                     if ($assignedEmp && $assignedEmp->device_token) {
-                        $mainRequest = MaintanaceRequest::find($task_id);
-                        $title = 'Maintenance Task Assigned';
-                        $body = 'You have been assigned a maintenance task: ' . ($mainRequest->descriptionIssues ?? '');
-                        Common::sendPushNotificationForMobile([$assignedEmp->device_token], $title, $body, 'Accommodation', 'Assigned', null, null, null);
+                        Common::sendPushNotificationForMobile([$assignedEmp->device_token], 'Maintenance Task Assigned', 'You have been assigned a maintenance task: ' . ($mainRequest->descriptionIssues ?? ''), 'Accommodation', 'Assigned', null, null, null);
                     }
                 } catch (\Exception $e) {
                     \Log::warning('Push notification failed: ' . $e->getMessage());

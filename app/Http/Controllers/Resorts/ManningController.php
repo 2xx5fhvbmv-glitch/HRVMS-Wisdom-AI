@@ -62,6 +62,31 @@ class ManningController extends Controller
         );
     }
 
+    public function getDropdownData()
+    {
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+
+        $divisions = Division::where('status', 'active')->get(['id', 'name']);
+        $resort_divisions = ResortDivision::where('status', 'active')->where('resort_id', $resort_id)->get(['id', 'name']);
+        $resort_departments = ResortDepartment::where('status', 'active')->where('resort_id', $resort_id)->get(['id', 'name']);
+        $departments = Department::where('status', 'active')->get(['id', 'name']);
+        $sections = Section::where('status', 'active')->get(['id', 'name']);
+        $positions = Position::where('status', 'active')->get(['id', 'position_title']);
+        $resort_sections = ResortSection::where('status', 'active')->where('resort_id', $resort_id)->get(['id', 'name']);
+        $eligibility = config('settings.eligibilty');
+
+        return response()->json([
+            'divisions' => $divisions,
+            'resort_divisions' => $resort_divisions,
+            'resort_departments' => $resort_departments,
+            'departments' => $departments,
+            'sections' => $sections,
+            'positions' => $positions,
+            'resort_sections' => $resort_sections,
+            'eligibility' => $eligibility,
+        ]);
+    }
+
     public function get_divisions()
     {
         $edit_class = '';
@@ -117,7 +142,7 @@ class ManningController extends Controller
                 Rule::unique('resort_divisions')->where(fn($query) => $query->where('resort_id', $this->resort_id)),
             ],
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:10',
                 Rule::unique('resort_divisions')->where(fn($query) => $query->where('resort_id', $this->resort_id)),
@@ -177,7 +202,7 @@ class ManningController extends Controller
                     ->ignore($id), // Ignore the current record by ID
             ],
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:10',
                 Rule::unique('resort_divisions')
@@ -321,7 +346,7 @@ class ManningController extends Controller
                     ->ignore($request->id), // Ignore current record ID if updating
             ],
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:10',
                 Rule::unique('resort_departments')
@@ -389,7 +414,7 @@ class ManningController extends Controller
                     })
             ],
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:10',
                 Rule::unique('resort_departments')
@@ -549,7 +574,7 @@ class ManningController extends Controller
                     })
             ],
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:10',
                 Rule::unique('resort_sections')
@@ -629,7 +654,7 @@ class ManningController extends Controller
                             ->ignore($request->id), // Ignore the current record ID when updating
                     ],
                     'code' => [
-                        'required',
+                        'nullable',
                         'string',
                         'max:10',
                         Rule::unique('resort_sections')
@@ -782,7 +807,7 @@ class ManningController extends Controller
                     })
             ],
             'code' => [
-                'required',
+                'nullable',
                 'string',
                 'max:10',
                 Rule::unique('resort_positions')
@@ -883,7 +908,7 @@ class ManningController extends Controller
                         ->ignore($id),
                 ],
                 'code' => [
-                    'required',
+                    'nullable',
                     'string',
                     'max:10',
                     Rule::unique('resort_positions')

@@ -141,6 +141,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     /***Manning page  */
     Route::get('/manning', 'ManningController@index')->name('resort.manning.index');
+    Route::get('/manning/dropdown-data', 'ManningController@getDropdownData')->name('manning.dropdown.data');
 
     // Listing all divisions with DataTables
     Route::get('/manning/getdivisions', 'ManningController@get_divisions')->name('manning.divisions.data');
