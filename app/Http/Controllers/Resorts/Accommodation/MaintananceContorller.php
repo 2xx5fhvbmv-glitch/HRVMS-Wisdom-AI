@@ -737,7 +737,7 @@ class MaintananceContorller extends Controller
             $InventoryModule= InventoryModule::where('resort_id',$this->resort->resort_id)
                                             ->where("id", $MaintanaceRequest->item_id)
                                             ->first('ItemName');
-             $MaintanaceRequest->EffectedAmenity = ucfirst($InventoryModule->ItemName);
+             $MaintanaceRequest->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
              if($MaintanaceRequest->Priority == 'Low')
              {
                 $MaintanaceRequest->Priority = '<span class="badge badge-blueNew border-0">Low</span>';
@@ -1013,7 +1013,7 @@ class MaintananceContorller extends Controller
             $InventoryModule= InventoryModule::where('resort_id',$this->resort->resort_id)
                                             ->where("id", $MaintanaceRequest->item_id)
                                             ->first('ItemName');
-             $MaintanaceRequest->EffectedAmenity = ucfirst($InventoryModule->ItemName);
+             $MaintanaceRequest->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
              if($MaintanaceRequest->Priority == 'Low')
              {
                 $MaintanaceRequest->Priority = '<span class="badge badge-blueNew border-0">Low</span>';
