@@ -170,6 +170,54 @@ class AssignAccommodationController extends Controller
         }
 
     }
+
+    public function previewAccommodation(Request $request)
+    {
+        $assignId = $request->assignId;
+        $empId = $request->emp_id;
+
+        $bed = AssingAccommodation::find($assignId);
+        if (!$bed) {
+            return response()->json(['success' => false, 'message' => 'Bed not found'], 404);
+        }
+
+        $employee = Employee::with(['resortAdmin', 'position'])->find($empId);
+        $accommodation = AvailableAccommodationModel::where('id', $bed->available_a_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
+            ->first();
+
+        if (!$employee || !$accommodation) {
+            return response()->json(['success' => false, 'message' => 'Data not found'], 404);
+        }
+
+        $itemData = [];
+        foreach ($accommodation->availableAccommodationInvItem as $item) {
+            $itemData[] = $item->inventoryModule ? ucfirst($item->inventoryModule->ItemName) : 'Unknown';
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'employee' => [
+                    'name' => $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name,
+                    'position' => optional($employee->position)->position_title ?? '',
+                    'profile_picture' => Common::getResortUserPicture($employee->resortAdmin->id),
+                    'emp_id' => $employee->Emp_id,
+                ],
+                'accommodation' => [
+                    'building_name' => optional(\App\Models\BuildingModel::find($accommodation->BuildingName))->BuildingName ?? 'N/A',
+                    'floor' => $accommodation->Floor ?? 'N/A',
+                    'room_no' => $accommodation->RoomNo ?? 'N/A',
+                    'bed_no' => $bed->BedNo ?? 'N/A',
+                    'facilities' => $itemData,
+                    'RoomStatus' => $accommodation->RoomStatus ?? 'N/A',
+                    'accommodation_name' => optional($accommodation->accommodationType)->AccommodationName ?? 'N/A',
+                ],
+            ]
+        ]);
+    }
+
     public function GetAssignedBed(Request $request)
     {
         $id = base64_decode($request->id);
@@ -183,6 +231,7 @@ class AssignAccommodationController extends Controller
                                                             'available_accommodation_models.Floor',
                                                             'available_accommodation_models.RoomNo',
                                                             't1.emp_id',
+                                                            't1.BedNo',
                                                             't3.first_name',
                                                             't3.last_name',
                                                             't3.id as Parentid',
