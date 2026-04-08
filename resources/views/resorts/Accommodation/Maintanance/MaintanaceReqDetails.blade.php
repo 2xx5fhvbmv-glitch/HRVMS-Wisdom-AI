@@ -139,21 +139,25 @@
                         </ul>
 
                     </div>
-                    <div class="card  card-small  bg">
+                    <div class="card card-small bg">
                         <div class="flex-all justify-content-between">
                             <h6>Assigned Staff:</h6>
-                            @if ($AssingAccommodation->isNotEmpty())
-                                @foreach ($AssingAccommodation as $a)
+                            @if($MaintanaceRequest->Assigned_To)
+                                @php
+                                    $assignedStaff = \App\Models\Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                        ->where('employees.id', $MaintanaceRequest->Assigned_To)
+                                        ->first(['ra.first_name', 'ra.last_name', 'ra.id as Parentid']);
+                                @endphp
+                                @if($assignedStaff)
                                     <div class="tableUser-block">
-                                        <div class="img-circle"><img src="{{ $a->profileImg }}" alt="user"></div>
+                                        <div class="img-circle"><img src="{{ App\Helpers\Common::getResortUserPicture($assignedStaff->Parentid) }}" alt="user"></div>
                                         <div>
-                                            <div>
-                                                <span>{{ $a->EmployeeName }}</span>
-                                            </div>
-                                            {{-- <a href="#reqHistory-modal" data-bs-toggle="modal" class="a-link">Contact</a> --}}
+                                            <span>{{ $assignedStaff->first_name }} {{ $assignedStaff->last_name }}</span>
                                         </div>
                                     </div>
-                                @endforeach
+                                @endif
+                            @else
+                                <span class="text-muted">Not Assigned Yet</span>
                             @endif
                         </div>
                     </div>
