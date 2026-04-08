@@ -114,8 +114,11 @@ class AssignAccommodationController extends Controller
                         $edit_class = 'd-none';
                     }
                     return datatables()->of($data)
-                    ->addColumn('Action', function ($row) use ($edit_class) 
+                    ->addColumn('Action', function ($row) use ($edit_class)
                     {
+                        if ($row->AssingAccommodationCount <= 0) {
+                            return '<span class="badge badge-danger">Full</span>';
+                        }
                         $id = base64_encode($row->id);
                         return '<a href="#" id="Bedshow" class="btn btn-themeSkyblueLight btn-small '.$edit_class.'" data-id="'.$id.'">Select Bed</a>';
                     })
