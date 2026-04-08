@@ -440,7 +440,7 @@
                     </div>
                 </div>
             </div> -->
-            <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.MaintanaceRequestlist',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.MaintanaceRequestlist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
@@ -456,9 +456,10 @@
                         <thead>
                             <tr>
                                 <th>Description of Issue</th>
-                                <th>Location </th>
+                                <th>Location</th>
                                 <th>Date</th>
                                 <th>Priority</th>
+                                <th>Reason For On-Hold</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
