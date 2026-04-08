@@ -316,7 +316,7 @@ class MaintananceContorller extends Controller
                             $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                                 ->where("id", $row->item_id)
                                 ->first('ItemName');
-                            $row->EffectedAmenity = ucfirst($InventoryModule->ItemName ?? 'N/A');
+                            $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                             if(isset($row->Assigned_To) && $row->Assigned_To !=0)                            
                             {
                                 $emp = Common::GetEmployeeDetails($row->Assigned_To);
@@ -432,7 +432,7 @@ class MaintananceContorller extends Controller
                         $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                             ->where("id", $row->item_id)
                             ->first('ItemName');
-                        $row->EffectedAmenity = ucfirst($InventoryModule->ItemName ?? 'N/A');
+                        $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                         if(isset($row->Assigned_To) && $row->Assigned_To !=0)                        {
                             $emp = Common::GetEmployeeDetails($row->Assigned_To);
 
@@ -832,9 +832,7 @@ class MaintananceContorller extends Controller
                         $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                             ->where("id", $row->item_id)
                             ->first('ItemName');
-                        $row->EffectedAmenity = ucfirst($InventoryModule->ItemName ?? 'N/A');
-                        // Remove the echo statement that follows this line
-                        echo $InventoryModule->EffectedAmenity;
+                        $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                         return $row;
                     });
 
@@ -1107,7 +1105,7 @@ class MaintananceContorller extends Controller
                         $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                             ->where("id", $row->item_id)
                             ->first('ItemName');
-                        $row->EffectedAmenity = ucfirst($InventoryModule->ItemName ?? 'N/A');
+                        $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                         return $row;
                     });
 
@@ -1211,7 +1209,7 @@ class MaintananceContorller extends Controller
                                                                     $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                                                                         ->where("id", $row->item_id)
                                                                         ->first('ItemName');
-                                                                    $row->EffectedAmenity = ucfirst($InventoryModule->ItemName ?? 'N/A');
+                                                                    $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                                     if(isset($row->Assigned_To) && $row->Assigned_To !=0)
                                                                     {
                                                                         $emp = Common::GetEmployeeDetails($row->Assigned_To);
@@ -1374,7 +1372,7 @@ class MaintananceContorller extends Controller
                                                                     $InventoryModule = InventoryModule::where('resort_id', $this->resort->resort_id)
                                                                         ->where("id", $row->item_id)
                                                                         ->first('ItemName');
-                                                                    $row->EffectedAmenity = ucfirst($InventoryModule->ItemName ?? 'N/A');
+                                                                    $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                                     if(isset($row->Assigned_To) && $row->Assigned_To !=0)                                                                    {
                                                                         $emp = Common::GetEmployeeDetails($row->Assigned_To);
 
