@@ -116,10 +116,10 @@ class MaintananceContorller extends Controller
 
         $collection = [
             'resort_id' => $this->resort->resort_id,
-            'item_id' => $item_id,
+            'item_id' => $item_id ?? null,
             'building_id' => $building_id,
-            'FloorNo' => $FloorNo,
-            'RoomNo' => $RoomNo,
+            'FloorNo' => $FloorNo ?: null,
+            'RoomNo' => $RoomNo ?: null,
             'descriptionIssues' => $descriptionIssues,
             'priority' => $priority,
             'date'=>$date,
@@ -222,6 +222,16 @@ class MaintananceContorller extends Controller
                     $query->where('a.RoomNo', $RoomNo);
                 }
 
+                // Get employee IDs for in-app notifications
+                $buildingEmployeeIds = (clone $query)->pluck('e.id')->unique()->toArray();
+
+                // Create in-app notifications for building employees
+                $buildingModel = \App\Models\BuildingModel::find($building_id);
+                $locationText = $buildingModel ? $buildingModel->BuildingName : 'Building';
+                foreach ($buildingEmployeeIds as $empId) {
+                    $this->createNotification($empId, 'Maintenance Event', 'New event in ' . $locationText . ': ' . $descriptionIssues, $m_id->id);
+                }
+
                 $deviceTokens = $query->whereNotNull('e.device_token')
                     ->where('e.device_token', '!=', '')
                     ->pluck('e.device_token')
@@ -311,11 +321,28 @@ class MaintananceContorller extends Controller
             if($request->ajax())
             {
 
+              $currentEmployee2 = $this->resort->GetEmployee;
+              $isHrOrAdmin2 = $this->resort->is_master_admin == 1;
+              if ($currentEmployee2) {
+                  $empDept2 = \App\Models\ResortDepartment::find($currentEmployee2->Dept_id);
+                  if ($empDept2 && (
+                      stripos($empDept2->name, 'human') !== false ||
+                      stripos($empDept2->name, 'hr') !== false ||
+                      $currentEmployee2->rank == 3
+                  )) {
+                      $isHrOrAdmin2 = true;
+                  }
+              }
+
               $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                         ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                         ->join("resort_departments as t4","t4.id","t3.Dept_id")
                                         ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                                         ->whereIn('maintanace_requests.Status', ['Closed']);
+
+              if (!$isHrOrAdmin2 && $currentEmployee2) {
+                  $MaintanaceRequest->where('maintanace_requests.Assigned_To', $currentEmployee2->id);
+              }
 
                 if(!empty($ResortDepartment))
                 {
@@ -338,7 +365,7 @@ class MaintananceContorller extends Controller
                         {
                             $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                             $row->AssgingedStaff = $row->Assigned_To;
-                            $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+                            $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                             $row->Priority = $row->priority;
                             $row->NewStatus = $row->Status;
 
@@ -428,12 +455,30 @@ class MaintananceContorller extends Controller
         else
         {
 
+           $currentEmployee = $this->resort->GetEmployee;
+           $isHrOrAdmin = $this->resort->is_master_admin == 1;
+           if ($currentEmployee) {
+               $empDept = \App\Models\ResortDepartment::find($currentEmployee->Dept_id);
+               if ($empDept && (
+                   stripos($empDept->name, 'human') !== false ||
+                   stripos($empDept->name, 'hr') !== false ||
+                   $currentEmployee->rank == 3
+               )) {
+                   $isHrOrAdmin = true;
+               }
+           }
+
            $MaintanaceRequest =  MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                 ->leftjoin("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                 ->leftjoin("resort_departments as t2","t2.id","t3.Dept_id")
                 ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                 ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold'])
                 ->leftjoin("resort_admins as t4","t4.id","maintanace_requests.Assigned_To");
+
+           // Non-HR users only see requests assigned to them
+           if (!$isHrOrAdmin && $currentEmployee) {
+               $MaintanaceRequest->where('maintanace_requests.Assigned_To', $currentEmployee->id);
+           }
             if(!empty($ResortDepartment))
             {
                 $MaintanaceRequest->where('t3.Dept_id', $ResortDepartment);
@@ -455,7 +500,7 @@ class MaintananceContorller extends Controller
                     {
                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                         $row->AssgingedStaff = $row->Assigned_To;
-                        $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+                        $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                         $row->Priority = $row->priority;
                         $row->Date =date('d M Y',strtotime($row->date));
                         $daysSinceRequest = now()->diffInDays(Carbon::parse($row->date));
@@ -494,7 +539,7 @@ class MaintananceContorller extends Controller
                     $string='';
                     if($row->Status !="Open")
                     {
-                        $string1 = '<a href="javascript:void(0)" class="correct-btn ForwardToHOD  '.$edit_class.'" data-req_id="'.$id.'" data-Location="'.$row->Location.'"data-EffectedAmenity="'. $row->EffectedAmenity .'"><i class="fa-solid fa-check"></i></a>';
+                        $string1 = '<a href="javascript:void(0)" class="correct-btn ForwardToHOD  '.$edit_class.'" data-req_id="'.$id.'" data-Location="'.$row->Location.'" data-EffectedAmenity="'. $row->EffectedAmenity .'" data-description="'.e($row->Description).'"><i class="fa-solid fa-check"></i></a>';
 
                     }
                     else
@@ -590,13 +635,20 @@ class MaintananceContorller extends Controller
             }
         }
 
-        $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
+        $Employee = Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
+                            ->join('resort_departments as rd', 'rd.id', '=', 'employees.Dept_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
-                            ->where("employees.rank",11)
+                            ->where(function($q) {
+                                $q->where('rd.name', 'like', '%engineer%')
+                                  ->orWhere('rd.name', 'like', '%maintenance%')
+                                  ->orWhere('rd.name', 'like', '%technical%');
+                            })
+                            ->whereIn('employees.rank', [1, 2])
+                            ->where('employees.status', 'Active')
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
         $ResortDepartment = ResortDepartment::where('resort_id', $this->resort->resort_id)->get();
 
-        return view('resorts.Accommodation.Maintanance.MaintanaceRequestlist',compact('page_title','MaintanaceRequest','Employee','ResortDepartment'));
+        return view('resorts.Accommodation.Maintanance.MaintanaceRequestlist',compact('page_title','MaintanaceRequest','Employee','ResortDepartment','EscalationDay'));
     }
 
     public function HrRejeactedRequest(Request $request)
@@ -710,7 +762,7 @@ class MaintananceContorller extends Controller
             return abort(403, 'Unauthorized access');
         }
         $id =base64_decode($id);
-        $page_title="Maintanance Request Details";
+        $page_title="Maintenance Request Details";
         $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                             ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                             ->join("resort_departments as t4","t4.id","t3.Dept_id")
@@ -794,7 +846,7 @@ class MaintananceContorller extends Controller
 
              $MaintanaceRequest->RequestedBy= $MaintanaceRequest->first_name.' '.$MaintanaceRequest->last_name;
              $MaintanaceRequest->AssgingedStaff= $MaintanaceRequest->Assigned_To;
-             $MaintanaceRequest->Location= $MaintanaceRequest->BuilidngData->BuildingName.',Room No - '. $MaintanaceRequest->RoomNo.',Floor No -'. $MaintanaceRequest->FloorNo;
+             $MaintanaceRequest->Location= $MaintanaceRequest->BuilidngData->BuildingName . (!empty($MaintanaceRequest->RoomNo) ? ', Room No - '. $MaintanaceRequest->RoomNo : '') . (!empty($MaintanaceRequest->FloorNo) ? ', Floor No - '. $MaintanaceRequest->FloorNo : '');
              $MaintanaceRequest->Priority =  $MaintanaceRequest->priority;
              $MaintanaceRequest->Date =  date('d M Y',strtotime($MaintanaceRequest->date));
 
@@ -889,7 +941,7 @@ class MaintananceContorller extends Controller
                     {
                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                         $row->AssgingedStaff = $row->Assigned_To;
-                        $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+                        $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                         $row->Priority = $row->priority;
                         $row->Date =date('d M Y',strtotime($row->date));
                         $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -1015,7 +1067,7 @@ class MaintananceContorller extends Controller
     {
         $id =base64_decode($id);
 
-        $page_title="Maintanance Request Details";
+        $page_title="Maintenance Request Details";
 
         $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                             ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
@@ -1083,7 +1135,7 @@ class MaintananceContorller extends Controller
                                                         });
              $MaintanaceRequest->RequestedBy= $MaintanaceRequest->first_name.' '.$MaintanaceRequest->last_name;
              $MaintanaceRequest->AssgingedStaff= $MaintanaceRequest->Assigned_To;
-             $MaintanaceRequest->Location= $MaintanaceRequest->BuilidngData->BuildingName.',Room No - '. $MaintanaceRequest->RoomNo.',Floor No -'. $MaintanaceRequest->FloorNo;
+             $MaintanaceRequest->Location= $MaintanaceRequest->BuilidngData->BuildingName . (!empty($MaintanaceRequest->RoomNo) ? ', Room No - '. $MaintanaceRequest->RoomNo : '') . (!empty($MaintanaceRequest->FloorNo) ? ', Floor No - '. $MaintanaceRequest->FloorNo : '');
              $MaintanaceRequest->Priority =  $MaintanaceRequest->priority;
              $MaintanaceRequest->Date =  date('d M Y',strtotime($MaintanaceRequest->date));
 
@@ -1147,13 +1199,14 @@ class MaintananceContorller extends Controller
     public function HODHoldMaintanaceRequest(Request $request)
     {
 
+        $currentHodId = Auth::guard('resort-admin')->user()->GetEmployee->id;
         $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                 ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                 ->join("resort_departments as t4","t4.id","t3.Dept_id")
                 ->join("building_models as t5","t5.id","maintanace_requests.building_id")
                 ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                 ->whereIn('maintanace_requests.Status', [ 'On-Hold'])
-                ->whereIn('t3.id',$this->underEmp_id);
+                ->where('maintanace_requests.Assigned_To', $currentHodId);
 
             if(!empty($ResortDepartment))
             {
@@ -1177,7 +1230,7 @@ class MaintananceContorller extends Controller
                     {
                         $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                         $row->AssgingedStaff = $row->Assigned_To;
-                        $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+                        $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                         $row->Priority = $row->priority;
                         $row->Date =date('d M Y',strtotime($row->date));
                         $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -1245,11 +1298,15 @@ class MaintananceContorller extends Controller
             //
             $EscalationDay = EscalationDay::where('resort_id',$this->resort->resort_id)->first();
             $search = $request->Search;
+            $currentHodId = Auth::guard('resort-admin')->user()->GetEmployee->id;
             $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                         ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                         ->join("resort_departments as t4","t4.id","t3.Dept_id")
                                         ->join('building_models as t5', 't5.id', 'maintanace_requests.building_id')
-                                        ->whereIn('t3.id',$this->underEmp_id)
+                                        ->where(function($q) use ($currentHodId) {
+                                            $q->whereIn('t3.id', $this->underEmp_id)
+                                              ->orWhere('maintanace_requests.Assigned_To', $currentHodId);
+                                        })
                                         ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                                         ->whereNotIn('maintanace_requests.Status', ['Closed','On-Hold']);
 
@@ -1276,7 +1333,7 @@ class MaintananceContorller extends Controller
                                                                 {
                                                                     $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                                                                     $row->AssgingedStaff = $row->Assigned_To;
-                                                                    $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+                                                                    $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                                                                     $row->Priority = $row->priority;
                                                                     $row->NewStatus = $row->Status;
 
@@ -1386,7 +1443,7 @@ class MaintananceContorller extends Controller
         }
 
 
-        $page_title="Maintanance Requests";
+        $page_title="Maintenance Requests";
         $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
                             ->whereIn('employees.id',$this->underEmp_id)
@@ -1400,14 +1457,18 @@ class MaintananceContorller extends Controller
         {
             $search = $request->Search;
             $inventory = $request->inventory;
+            $currentHodId = Auth::guard('resort-admin')->user()->GetEmployee->id;
             $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                         ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                         ->join("resort_departments as t4","t4.id","t3.Dept_id")
                                         ->join('building_models as t5', 't5.id', 'maintanace_requests.building_id')
                                         ->join("employees as t6","t6.id","maintanace_requests.Assigned_To")
                                         ->join("resort_admins as t7","t7.id","t6.Admin_Parent_id")
-                                        ->join("inventory_modules as t8","t8.id","maintanace_requests.Item_id")
-                                        ->whereIn('t3.id',$this->underEmp_id)
+                                        ->leftJoin("inventory_modules as t8","t8.id","maintanace_requests.Item_id")
+                                        ->where(function($q) use ($currentHodId) {
+                                            $q->whereIn('t3.id', $this->underEmp_id)
+                                              ->orWhere('maintanace_requests.Assigned_To', $currentHodId);
+                                        })
                                         ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                                         ->where('maintanace_requests.Assigned_To',"!=",null)
                                         ->whereIn('maintanace_requests.Status', ['Assigned','In-Progress']);
@@ -1439,7 +1500,7 @@ class MaintananceContorller extends Controller
                                                                 {
                                                                     $row->RequestedBy = $row->first_name . ' ' . $row->last_name;
                                                                     $row->AssgingedStaff = $row->Assigned_To;
-                                                                    $row->Location = $row->BuilidngData->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+                                                                    $row->Location = $row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
                                                                     $row->Priority = $row->priority;
                                                                     $row->NewStatus = $row->Status;
 

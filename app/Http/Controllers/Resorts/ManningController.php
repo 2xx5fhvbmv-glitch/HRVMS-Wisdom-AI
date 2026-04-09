@@ -806,26 +806,10 @@ class ManningController extends Controller
                         return $query;
                     })
             ],
-            'code' => [
-                'nullable',
-                'string',
-                'max:10',
-                Rule::unique('resort_positions')
-                    ->where(function ($query) use ($request) {
-                        $query->where('resort_id', $this->resort_id);
-                        if ($request->filled('section_id')) {
-                            $query->where('section_id', $request->section_id);
-                        } else {
-                            $query->where('dept_id', $request->dept_id)->whereNull('section_id');
-                        }
-                        return $query;
-                    })
-            ],
             'short_title' => 'nullable|string|max:50',
             'status' => 'required|in:active,inactive',
         ], [
             'position_title.unique' => 'This position name already exists for the selected section.',
-            'code.unique' => 'This position code already exists for the selected section.',
         ]);
         // Usage example:
         if ($validator->fails()) {
@@ -842,7 +826,7 @@ class ManningController extends Controller
             $position->section_id = $request->filled('section_id') ? $request->section_id : null;
             $position->position_title = $request->position_title;
             $position->no_of_positions = $request->input('no_of_positions', 0);
-            $position->code = $request->code;
+            $position->code = $request->filled('code') ? $request->code : strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $request->position_title), 0, 5)) . '_' . rand(1, 99);
             $position->short_title = $request->filled('short_title') ? $request->short_title : '';
             $position->status = $request->status;
             $position->Rank = $request->Rank;
@@ -860,10 +844,11 @@ class ManningController extends Controller
 
     public function inlinePositionUpdate(Request $request, $id)
     {
-        if ($request->has('short_name') || $request->has('position_title'))
-        {
-            $request->merge(['short_title' => $request->short_name]);
+        if ($request->has('name')) {
             $request->merge(['position_title' => $request->name]);
+        }
+        if ($request->has('short_name')) {
+            $request->merge(['short_title' => $request->short_name]);
         }
         $position = ResortPosition::find($id);
         if (!$position) {
@@ -907,28 +892,10 @@ class ManningController extends Controller
                         })
                         ->ignore($id),
                 ],
-                'code' => [
-                    'nullable',
-                    'string',
-                    'max:10',
-                    Rule::unique('resort_positions')
-                        ->where(function ($query) use ($request) {
-                            $query->where('resort_id', $this->resort_id);
-                            $sectionId = ($request->input('section') && $request->input('section') != '') ? $request->input('section') : null;
-                            if ($sectionId) {
-                                $query->where('section_id', $sectionId);
-                            } else {
-                                $query->where('dept_id', $request->input('department'))->whereNull('section_id');
-                            }
-                            return $query;
-                        })
-                        ->ignore($id),
-                ],
                 'short_title' => 'nullable|string|max:50',
                 'status' => 'required|in:active,inactive',
             ], [
                 'position_title.unique' => 'This position name already exists for the selected section.',
-                'code.unique' => 'This position code already exists for the selected section.',
             ]);
             // Usage example:
             if ($validator->fails()) {
@@ -944,7 +911,7 @@ class ManningController extends Controller
                 $position->section_id = ($request->input('section') && $request->input('section') != '') ? $request->input('section') : null;
                 $position->position_title = $request->input('name');
                 $position->no_of_positions = $request->input('no_of_positions');
-                $position->code = $request->input('code');
+                $position->code = $request->filled('code') ? $request->input('code') : $position->code;
                 // short_title not edited from UI; keep existing value
                 $position->status = $request->input('status');
                 $position->Rank = $request->input('Rank');

@@ -134,7 +134,7 @@
                         <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn btn-themeSkyblue btn-sm MoveToNext @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Move In To Another</a>
                     </div>
                     <div class="col-auto">
-                        <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn btn-themeBlue AssignAmmenity btn-sm @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Assign Ammenity</a>
+                        <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn btn-themeBlue AssignAmmenity btn-sm @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Assign Amenity</a>
                     </div>
                 </div>
             </div>
@@ -149,7 +149,7 @@
     <div class="modal-dialog modal-dialog-centered modal-md">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Assign Ammenity </h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Assign Amenity </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
