@@ -158,79 +158,65 @@
             allowClear: true
         });
 
-        $('#ForwardToHODForm').validate({
-            rules: {
-                HOD_id: {
-                    required: true,
-                }
-            },
-            messages: {
-                HOD_id: {
-                    required: "Please Select HOD.",
-                }
-            },
-            submitHandler: function(form) {
-                var formData = new FormData(form);
-
-                $.ajax({
-                    url: "{{ route('resort.accommodation.HrForwardToHODManitenanceRequest') }}", // Your route for file upload
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                            form.reset();
-                            PendingTaskList();
-                            $("#ForwardToHOD-Model").modal('hide');
-
-                        } else {
-                            toastr.error(response.message, "Error", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                        }
-                    },
-                    error: function(response) {
-                        var errors = response.responseJSON;
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) {
-                            errs += error + '<br>';
-                        });
-                        toastr.error(errs, {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                });
-            }
-        });
+        // ForwardToHOD now uses SweetAlert auto-approve flow (see below)
     });
 
     PendingTaskList()
 
     $(document).on("click",".ForwardToHOD",function()
     {
-
+        var task_id = $(this).attr("data-req_id");
         var EffectedAmenity = $(this).attr("data-EffectedAmenity");
         var Location = $(this).attr("data-Location");
+        var description = $(this).attr('data-description') || '';
 
-        var task_id = $(this).attr("data-req_id");
+        @php
+            $engineeringHod = $Employee->first();
+        @endphp
+        var engineeringHodId = '{{ $engineeringHod->id ?? '' }}';
 
-        var  row =    `<table>
-                        <tr>
-                            <th>Item:</th>
-                            <td>${EffectedAmenity}</td>
-                        </tr>
-                        <tr>
-                            <th>Location:</th>
-                            <td>${Location}</td>
-                        </tr>
-                    </table>`;
-       $(".DetailsShow").html(row);
-       $("#task_id").val(task_id);
-        $("#ForwardToHOD-Model").modal('show');
+        if (!engineeringHodId) {
+            toastr.error('Engineering department does not exist. Please add Engineering/Maintenance department employees first.', 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        Swal.fire({
+            title: 'Approve & Forward?',
+            html: `<div class="text-start">
+                        <p><strong>Description:</strong> ${description}</p>
+                        <p><strong>Item:</strong> ${EffectedAmenity}</p>
+                        <p><strong>Location:</strong> ${Location}</p>
+                        <p class="text-muted mt-2">This request will be approved and forwarded to the Engineering department.</p>
+                    </div>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Approve & Forward',
+            confirmButtonColor: '#014653',
+            cancelButtonText: 'Cancel'
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: "{{ route('resort.accommodation.HrForwardToHODManitenanceRequest') }}",
+                    type: "POST",
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        task_id: task_id,
+                        HOD_id: engineeringHodId
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
+                            PendingTaskList();
+                        } else {
+                            toastr.error(response.message || 'Failed to forward', 'Error', { positionClass: 'toast-bottom-right' });
+                        }
+                    },
+                    error: function() {
+                        toastr.error('Failed to forward request', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                });
+            }
+        });
     });
 
 
@@ -401,9 +387,13 @@
                      {data:'created_at',visible:false,searchable:false},
                 ],
                 rowCallback: function (row, data, index) {
-                if (data.EscalationTimeOver === 'Alert'  && data.NewStatus===  'pending' || data.NewStatus===  'In-Progress' || data.NewStatus===  'Assigned')
+                if (data.EscalationTimeOver === 'Alert' && (data.NewStatus === 'pending' || data.NewStatus === 'Pending'))
                 {
                     $(row).addClass('danger-tr');
+                    $(row).attr('data-bs-toggle', 'tooltip');
+                    $(row).attr('data-bs-placement', 'top');
+                    $(row).attr('title', '{{ $EscalationDay }} day(s) has passed for this request, kindly resolve this.');
+                    new bootstrap.Tooltip(row);
                 }
             }
             });

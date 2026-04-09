@@ -104,7 +104,14 @@ class EventController extends Controller
             $row->profileImg = isset($row->Parentid) ? Common::getResortUserPicture($row->Parentid) : '-'; // Profile picture
             $row->date = $formattedDate; // Add formatted date to the request
             $row->descriptionIssues = $row->descriptionIssues;
-            $row->Location = $row->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No - ' . $row->FloorNo;
+            $location = $row->BuildingName;
+            if (!empty($row->RoomNo)) {
+                $location .= ', Room No - ' . $row->RoomNo;
+            }
+            if (!empty($row->FloorNo)) {
+                $location .= ', Floor No - ' . $row->FloorNo;
+            }
+            $row->Location = $location;
             $string ='';
             if($row->priority == 'Low')
             {

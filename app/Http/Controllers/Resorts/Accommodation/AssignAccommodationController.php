@@ -110,7 +110,7 @@ class AssignAccommodationController extends Controller
                     });
 
                     $edit_class = '';
-                    if(Common::checkRouteWisePermission('resort.accommodation.AssignAccommation',config('settings.resort_permissions.view')) == false){
+                    if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false){
                         $edit_class = 'd-none';
                     }
                     return datatables()->of($data)

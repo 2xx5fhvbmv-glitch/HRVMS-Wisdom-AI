@@ -63,7 +63,7 @@ class AccommodationDashboardController extends Controller
                                                 {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                     $row->AssgingedStaff=$row->Assigned_To;
-                                                    $row->Location=$row->BuilidngData->BuildingName.',Room No - '.$row->RoomNo.',Floor No -'.$row->FloorNo;
+                                                    $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                     $row->Priority = $row->priority;
                                                     $row->Date =$row->created_at->format('d M Y');
                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -368,7 +368,7 @@ class AccommodationDashboardController extends Controller
                                                 ->map(function ($row) {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                     $row->AssgingedStaff=$row->Assigned_To;
-                                                    $row->Location=$row->BuilidngData->BuildingName.',Room No - '.$row->RoomNo.',Floor No -'.$row->FloorNo;
+                                                    $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                     $row->Priority = $row->priority;
                                                     $row->Date =$row->created_at->format('d M Y');
                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -719,7 +719,7 @@ class AccommodationDashboardController extends Controller
                                                 ->map(function ($row) {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                     $row->AssgingedStaff=$row->Assigned_To;
-                                                    $row->Location=$row->BuilidngData->BuildingName.',Room No - '.$row->RoomNo.',Floor No -'.$row->FloorNo;
+                                                    $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                     $row->Priority = $row->priority;
                                                     $row->Date =$row->created_at->format('d M Y');
                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -821,27 +821,20 @@ class AccommodationDashboardController extends Controller
 
         }
 
-        $Totalnumberofopenrequests= MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
-                                                ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
-                                                ->join("resort_departments as t4","t4.id","t3.Dept_id")
+        $currentHodId = Auth::guard('resort-admin')->user()->GetEmployee->id;
+
+        $Totalnumberofopenrequests= MaintanaceRequest::where('maintanace_requests.resort_id', $this->globalUser->resort_id)
+                                                ->where('maintanace_requests.Assigned_To', $currentHodId)
                                                 ->whereIn('maintanace_requests.Status', ['pending','Open'])
-                                                ->whereIn('t3.id',$this->underEmp_id)
-                                                ->where("t3.resort_id",$this->globalUser->resort_id)
                                                 ->count();
-        $TotalnumberofHighrequests=MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
-                                                    ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
-                                                    ->join("resort_departments as t4","t4.id","t3.Dept_id")
-                                                    ->whereIn('maintanace_requests.priority', ['High'])
-                                                    ->whereIn('t3.id',$this->underEmp_id)
-                                                    ->where("t3.resort_id",$this->globalUser->resort_id)
+        $TotalnumberofHighrequests= MaintanaceRequest::where('maintanace_requests.resort_id', $this->globalUser->resort_id)
+                                                    ->where('maintanace_requests.Assigned_To', $currentHodId)
+                                                    ->where('maintanace_requests.priority', 'High')
                                                     ->count();
 
-        $TotalnumberofInProgressrequests= MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
-                                                    ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
-                                                    ->join("resort_departments as t4","t4.id","t3.Dept_id")
+        $TotalnumberofInProgressrequests= MaintanaceRequest::where('maintanace_requests.resort_id', $this->globalUser->resort_id)
+                                                    ->where('maintanace_requests.Assigned_To', $currentHodId)
                                                     ->whereIn('maintanace_requests.Status', ['In-Progress'])
-                                                    ->where("t3.resort_id",$this->globalUser->resort_id)
-                                                    ->whereIn('t3.id',$this->underEmp_id)
                                                     ->count();
 
         $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
@@ -978,7 +971,7 @@ class AccommodationDashboardController extends Controller
     {
         $row->RequestedBy                                   =   $row->first_name . ' ' . $row->last_name;
         $row->AssgingedStaff                                =   $row->Assigned_To;
-        $row->Location                                      =   optional($row->BuilidngData)->BuildingName . ', Room No - ' . $row->RoomNo . ', Floor No -' . $row->FloorNo;
+        $row->Location                                      =   optional($row->BuilidngData)->BuildingName . (!empty($row->RoomNo) ? ', Room No - ' . $row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - ' . $row->FloorNo : '');
         // $row->Priority                                      =   $row->priority;
         $row->NewStatus                                     =   $row->Status;
         $row->Date                                          =   date('d M Y', strtotime($row->date));
@@ -1127,7 +1120,7 @@ class AccommodationDashboardController extends Controller
                                                     ->map(function ($row) {
                                                         $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                         $row->AssgingedStaff=$row->Assigned_To;
-                                                        $row->Location=$row->BuilidngData->BuildingName.',Room No - '.$row->RoomNo.',Floor No -'.$row->FloorNo;
+                                                        $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                         $row->Priority = $row->priority;
                                                         $row->Date =$row->created_at->format('d M Y');
                                                         $row->profileImg = Common::getResortUserPicture($row->Parentid);

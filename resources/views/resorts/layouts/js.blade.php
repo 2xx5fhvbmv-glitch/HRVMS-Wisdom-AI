@@ -1227,35 +1227,27 @@
             const updatedCurrency = await updateCurrency(currency, resortid);
            
             if (updatedCurrency) {
-                const rates = await getCurrencyRates(resortid);
+                // Only fetch rates and update in-page for payroll steps
+                if(currentStep && [4,5,6,7].includes(Number(currentStep))) {
+                    const rates = await getCurrencyRates(resortid);
+                    var conversionRate1 = updatedCurrency === 'Dollar' ? rates.usd_to_mvr : rates.mvr_to_usd;
 
-                var conversionRate1 = updatedCurrency === 'Dollar' ? rates.usd_to_mvr : rates.mvr_to_usd;
-
-                if(currentStep == 4)
-                {
-                    getstep4data(searchTerm="",updatedCurrency, conversionRate1);
-                }
-                else if(currentStep == 5)
-                {
-                    getstep5data(updatedCurrency, conversionRate1);
-                }
-                else if(currentStep == 6)
-                {
-                    getstep6data(updatedCurrency, conversionRate1);
-                }
-                else if(currentStep == 7)
-                {
-                    calculatePayrollSummary(updatedCurrency, conversionRate);
-                }
-                else
-                {
-                    // Show loading overlay before reload
+                    if(currentStep == 4) {
+                        getstep4data(searchTerm="",updatedCurrency, conversionRate1);
+                    } else if(currentStep == 5) {
+                        getstep5data(updatedCurrency, conversionRate1);
+                    } else if(currentStep == 6) {
+                        getstep6data(updatedCurrency, conversionRate1);
+                    } else if(currentStep == 7) {
+                        calculatePayrollSummary(updatedCurrency, conversionRate1);
+                    }
+                } else {
+                    // Non-payroll page: reload immediately
                     if (!$('#currency-loading-overlay').length) {
                         $('body').append('<div id="currency-loading-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;"><div style="text-align:center;"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 fw-500">Updating currency...</p></div></div>');
                     }
                     location.reload();
                 }
-
             } else {
                 console.log('Currency update failed.');
             }

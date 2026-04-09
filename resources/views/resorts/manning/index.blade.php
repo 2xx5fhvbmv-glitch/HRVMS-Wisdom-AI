@@ -51,7 +51,6 @@
                             <thead>
                                 <tr>
                                     <th class="text-nowrap">Name</th>
-                                    <th class="text-nowrap">Code</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
@@ -86,7 +85,6 @@
                                 <tr>
                                     <th class="text-nowrap">Name</th>
                                     <th class="text-nowrap">Division</th>
-                                    <th class="text-nowrap">Code</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
@@ -120,7 +118,6 @@
                                     <th class="text-nowrap">Name</th>
                                     <th class="text-nowrap">Division</th>
                                     <th class="text-nowrap">Departments</th>
-                                    <th class="text-nowrap">Code</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
@@ -163,7 +160,6 @@
                                     <th class="text-nowrap">Departments</th>
                                     <th class="text-nowrap">Section</th>
                                     <th class="text-nowrap">Division</th>
-                                    <th class="text-nowrap">Code</th>
                                     <th class="text-nowrap">Rank</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Action</th>
@@ -969,11 +965,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order: [[4, 'desc']], // Sort by created_at DESC
+        order: [[3, 'desc']], // Sort by created_at DESC
         ajax: '{{ route("manning.divisions.data") }}',
         columns: [
             { data: 'name', name: 'name', className: 'text-nowrap' },
-            { data: 'code', name: 'code', className: 'text-nowrap' },
             { data: 'status', name: 'status', className: 'text-nowrap' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
             { data: 'created_at', name: 'created_at', visible: false, searchable: false },
@@ -1032,19 +1027,13 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var $row = $(this).closest("tr");
         // Extract division ID
         var divisionId = $(this).data('division-id');
-        // Extract current values from the row (Name, Code, Status - no Short Name)
+        // Extract current values from the row (Name, Status)
         var currentName = $row.find("td:nth-child(1)").text().trim();
-        var currentCode = $row.find("td:nth-child(2)").text().trim();
-        var currentStatus = $row.find("td:nth-child(3)").text().trim().toLowerCase();
+        var currentStatus = $row.find("td:nth-child(2)").text().trim().toLowerCase();
         var editRowHtml = `
             <td class="py-1">
                 <div class="form-group">
                     <input type="text" class="form-control" value="${currentName}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
-                    <input type="text" class="form-control" value="${currentCode}" />
                 </div>
             </td>
             <td class="py-1">
@@ -1069,10 +1058,9 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var $row = $(this).closest("tr");
 
-        // Get updated values (Name, Code, Status - no Short Name)
+        // Get updated values (Name, Status)
         var divisionId = $(this).data('division-id');
         var updatedName = $row.find("input").eq(0).val();
-        var updatedCode = $row.find("input").eq(1).val();
         var updatedStatus = $row.find("select").val();
 
             const hasScriptTag = str => /<\s*script\b[^>]*>(.*?)<\s*\/\s*script\s*>/gi.test(str);
@@ -1097,32 +1085,28 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 }
 
                 // Validate inputs
-                if (!fieldsAreClean(updatedName, updatedCode)) {
+                if (!fieldsAreClean(updatedName)) {
                     toastr.error(
                         "Invalid characters detected. Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), apostrophes ('), and ampersands (&) are allowed. Script tags are strictly prohibited.",
                         "Validation Error",
                         { positionClass: "toast-bottom-right" }
                     );
                     return;
-                }    
+                }
         $.ajax({
             url: "{{ route('manning.divisions.inlineUpdate', '') }}/" + divisionId,
             type: "PUT",
             data: {
                 name: updatedName,
-                code: updatedCode,
                 status: updatedStatus
             },
             success: function(response) {
-                if(response.success == true) { // Ensure response contains a success key
-                    // Determine the status class and label
+                if(response.success == true) {
                     var statusClass = updatedStatus === 'active' ? 'text-success' : 'text-danger';
                     var statusLabel = updatedStatus.charAt(0).toUpperCase() + updatedStatus.slice(1);
 
-                    // Update the row with new values (no Short Name)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
-                        <td class="text-nowrap">${updatedCode}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
@@ -1210,12 +1194,11 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order:[[5,'desc']],
+        order:[[4,'desc']],
         ajax: '{{ route("manning.departments.data") }}',
         columns: [
             { data: 'name', name: 'name' },
             { data: 'division', name: 'division' },
-            { data: 'code', name: 'code' },
             { data: 'status', name: 'status' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
             {data:'created_at',visible:false,searchable:false},
@@ -1281,10 +1264,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var currentName = $row.find("td:nth-child(1)").text().trim();
         var currentDivision = $row.find("td:nth-child(2)").text().trim();
-        var currentCode = $row.find("td:nth-child(3)").text().trim();
-        var currentStatus = $row.find("td:nth-child(4)").text().trim().toLowerCase();
+        var currentStatus = $row.find("td:nth-child(3)").text().trim().toLowerCase();
 
-        // Use the `resortDivisions` array from the global scope
         var divisionOptions = '<option value="">Select Division</option>';
         window.resortDivisions.forEach(function(division) {
             var selected = (currentDivision === division.name) ? 'selected' : '';
@@ -1301,11 +1282,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 <select id="division-select" name="division_id" class="form-select select2-modal">
                     ${divisionOptions}
                 </select>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
-                    <input type="text" class="form-control" value="${currentCode}" />
-                </div>
             </td>
             <td class="py-1">
                 <div class="form-group">
@@ -1330,11 +1306,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         event.preventDefault(); // Prevent default action
 
         var $row = $(this).closest("tr");
-        // Get updated values (Name, Division, Code, Status - no Short Name)
+        // Get updated values (Name, Division, Status)
         var dept_id = $(this).data('dept-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatedDivision = $row.find("select").eq(0).val();
-        var updatedCode = $row.find("input").eq(1).val();
         var updatedStatus = $row.find("select").eq(1).val();
        
                 const hasScriptTag = str => /<\s*script\b[^>]*>(.*?)<\s*\/\s*script\s*>/gi.test(str);
@@ -1359,36 +1334,31 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 }
 
                 // Validate inputs
-                if (!fieldsAreClean(updatedName, updatedCode)) {
+                if (!fieldsAreClean(updatedName)) {
                     toastr.error(
                         "Invalid characters detected. Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), apostrophes ('), and ampersands (&) are allowed. Script tags are strictly prohibited.",
                         "Validation Error",
                         { positionClass: "toast-bottom-right" }
                     );
                     return;
-                }    
-       // Perform the AJAX update request here
+                }
         $.ajax({
             url: "{{ route('manning.departments.inlineUpdate', '') }}/" + dept_id,
             type: "PUT",
             data: {
                 name: updatedName,
                 division:updatedDivision,
-                code: updatedCode,
                 status: updatedStatus
             },
             success: function(response) {
-                if(response.success == true) { // Ensure response contains a success key
-                    // Determine the status class and label
+                if(response.success == true) {
                     var statusClass = updatedStatus === 'active' ? 'text-success' : 'text-danger';
                     var statusLabel = updatedStatus.charAt(0).toUpperCase() + updatedStatus.slice(1);
                     var updatedDivisionName = response.divisionName;
 
-                    // Update the row with new values (no Short Name)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatedDivisionName}</td>
-                        <td class="text-nowrap">${updatedCode}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
@@ -1485,13 +1455,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order:[[6,'desc']],
+        order:[[5,'desc']],
         ajax: '{{ route("manning.sections.data") }}',
         columns: [
             { data: 'name', name: 'name' },
             { data: 'division', name: 'division' },
             { data: 'department', name: 'department' },
-            { data: 'code', name: 'code' },
             { data: 'status', name: 'status' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
             {data:'created_at',visible:false,searchable:false},
@@ -1554,8 +1523,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var currentName = $row.find("td:nth-child(1)").text().trim();
         var currentDivision = $row.find("td:nth-child(2)").text().trim();
         var currentDepartment = $row.find("td:nth-child(3)").text().trim();
-        var currentCode = $row.find("td:nth-child(4)").text().trim();
-        var currentStatus = $row.find("td:nth-child(5)").text().trim().toLowerCase();
+        var currentStatus = $row.find("td:nth-child(4)").text().trim().toLowerCase();
 
         // Use the `resortDivisions` array from the global scope
         var divisionOptions = '<option value="">Select Division</option>';
@@ -1588,11 +1556,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             </td>
             <td class="py-1">
                 <div class="form-group">
-                    <input type="text" class="form-control" value="${currentCode}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
                     <select class="form-select select2-modal">
                         <option ${currentStatus === "active" ? "selected" : ""} value="active">Active</option>
                         <option ${currentStatus === "inactive" ? "selected" : ""} value="inactive">Inactive</option>
@@ -1616,12 +1579,11 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var $row = $(this).closest("tr");
 
-        // Get updated values (Name, Division, Department, Code, Status - no Short Name)
+        // Get updated values (Name, Division, Department, Status)
         var section_id = $(this).data('section-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatedDivision = $row.find("select").eq(0).val();
         var updatedDepartment = $row.find("select").eq(1).val();
-        var updatedCode = $row.find("input").eq(1).val();
         var updatedStatus = $row.find("select").eq(2).val();
 
             const hasScriptTag = str => /<\s*script\b[^>]*>(.*?)<\s*\/\s*script\s*>/gi.test(str);
@@ -1646,15 +1608,14 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 }
 
                 // Validate inputs
-                if (!fieldsAreClean(updatedName, updatedCode)) {
+                if (!fieldsAreClean(updatedName)) {
                     toastr.error(
                         "Invalid characters detected. Only letters, numbers, spaces, dashes (-), underscores (_), dots (.), forward slashes (/), apostrophes ('), and ampersands (&) are allowed. Script tags are strictly prohibited.",
                         "Validation Error",
                         { positionClass: "toast-bottom-right" }
                     );
                     return;
-                }    
-        // Perform the AJAX update request here
+                }
         $.ajax({
             url: "{{ route('manning.sections.inlineUpdate') }}",
             type: "POST",
@@ -1663,23 +1624,19 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 name: updatedName,
                 division:updatedDivision,
                 department:updatedDepartment,
-                code: updatedCode,
                 status: updatedStatus
             },
             success: function(response) {
-                if(response.success == true) { // Ensure response contains a success key
-                    // Determine the status class and label
+                if(response.success == true) {
                     var statusClass = updatedStatus === 'active' ? 'text-success' : 'text-danger';
                     var statusLabel = updatedStatus.charAt(0).toUpperCase() + updatedStatus.slice(1);
                     var updatedDivisionName = response.divisionName;
                     var updatedDepartmentName = response.deptName;
 
-                    // Update the row with new values (no Short Name)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatedDivisionName}</td>
                          <td class="text-nowrap">${updatedDepartmentName}</td>
-                        <td class="text-nowrap">${updatedCode}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
@@ -1783,7 +1740,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "iDisplayLength": 6,
         processing: true,
         serverSide: true,
-        order:[[9,'desc']],
+        order:[[8,'desc']],
         ajax: {
                 url: '{{ route("manning.positions.data") }}',
                 type: 'GET',
@@ -1800,7 +1757,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             { data: 'department', name: 'department' },
             { data: 'section', name: 'section' },
             { data: 'division', name: 'division' },
-            { data: 'code', name: 'code' },
             { data: 'Rank', name: 'Rank' },
             { data: 'status', name: 'status' },
             { data: 'action', name: 'action', orderable: false, searchable: false },
@@ -1871,9 +1827,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         var currentDepartment = $row.find("td:nth-child(3)").text().trim();
         var currentSection = $row.find("td:nth-child(4)").text().trim();
         var currentDivision = $row.find("td:nth-child(5)").text().trim();
-        var currentCode = $row.find("td:nth-child(6)").text().trim();
-        var rankId = $row.find("td:nth-child(7)").text().trim();
-        var currentStatus = $row.find("td:nth-child(8)").text().trim().toLowerCase();
+        var rankId = $row.find("td:nth-child(6)").text().trim();
+        var currentStatus = $row.find("td:nth-child(7)").text().trim().toLowerCase();
         var divisionOptions = '<option value="">Select Division</option>';
 
         // var rankId = $row.find('input[name="rankId"]').val(); // Capture the rankId from the input field
@@ -1931,11 +1886,6 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             </td>
             <td class="py-1">
                 <div class="form-group">
-                    <input type="text" class="form-control" value="${currentCode}" />
-                </div>
-            </td>
-            <td class="py-1">
-                <div class="form-group">
                     <select class="form-select select2-modal">
                         ${RankOptions}
                     </select>
@@ -1967,19 +1917,16 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
         var $row = $(this).closest("tr");
 
-        // Get updated values (no Short Title)
+        // Get updated values
         var position_id = $(this).data('position-id');
         var updatedName = $row.find("input").eq(0).val();
         var updatednoofPositions = $row.find("td:nth-child(2)").text().trim();
-        var  updatedDepartment = $row.find("select").eq(0).val();
-        var  updatedSection = $row.find("select").eq(1).val();
-        var  updatedDivision = $row.find("select").eq(2).val();
-        var updatedCode = $row.find("input").eq(1).val();
+        var updatedDepartment = $row.find("select").eq(0).val();
+        var updatedSection = $row.find("select").eq(1).val();
+        var updatedDivision = $row.find("select").eq(2).val();
         var Rank = $row.find("select").eq(3).val();
-        var updatedStatus  = $row.find("select").eq(4).val();
+        var updatedStatus = $row.find("select").eq(4).val();
 
-        // console.log(updatednoofPositions);
-        // // Perform the AJAX update request here
         $.ajax({
             url: "{{ route('manning.positions.inlineUpdate', '') }}/" + position_id,
             type: "PUT",
@@ -1989,30 +1936,25 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 division:updatedDivision,
                 department:updatedDepartment,
                 section:updatedSection,
-                code: updatedCode,
-                short_name: updatedShortName,
                 status: updatedStatus,
                 Rank:Rank
             },
             success: function(response) {
-                if(response.success == true) { // Ensure response contains a success key
-                    // Determine the status class and label
+                if(response.success == true) {
                     var statusClass = updatedStatus === 'active' ? 'text-success' : 'text-danger';
                     var statusLabel = updatedStatus.charAt(0).toUpperCase() + updatedStatus.slice(1);
                     var updatedDivisionName = response.divisionName;
                     var updatedDepartmentName = response.deptName;
                     var updatedSectionName = response.sectionName;
-                    var Rank = response.Rank;
+                    var RankName = response.Rank;
 
-                    // Update the row with new values (no Short Title)
                     var updatedRowHtml = `
                         <td class="text-nowrap">${updatedName}</td>
                         <td class="text-nowrap">${updatednoofPositions}</td>
                         <td class="text-nowrap">${updatedDepartmentName}</td>
                         <td class="text-nowrap">${updatedSectionName}</td>
                         <td class="text-nowrap">${updatedDivisionName}</td>
-                        <td class="text-nowrap">${updatedCode}</td>
-                        <td class="text-nowrap">${Rank}</td>
+                        <td class="text-nowrap">${RankName}</td>
                         <td class="text-nowrap ${statusClass}">${statusLabel}</td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">
