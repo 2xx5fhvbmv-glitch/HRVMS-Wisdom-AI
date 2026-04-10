@@ -279,7 +279,7 @@
                 serverSide: true,
                 order:[[6, 'desc']],
                 ajax: {
-                    url: '{{ route("resort.accommodation.HoldMaintanaceRequest") }}',
+                    url: '{{ $holdAjaxRoute }}',
                     type: 'GET',
                     data: function (d)
                     {

@@ -175,18 +175,6 @@ class AccommodationMasterController extends Controller
                     $itemNames = array_column($row->items, 'inventoryItem');
                     $facilities = e(implode(", ", $itemNames));
 
-                    $availableBeds = $row->AssingAccommodationCount ?? 0;
-                    $totalBeds = AssingAccommodation::where('available_a_id', $row->id)->count();
-                    $occupiedBeds = $totalBeds - $availableBeds;
-
-                    if ($totalBeds == 0) {
-                        $facilities .= ' <span class="badge badge-themeWarning">No Beds Configured</span>';
-                    } elseif ($availableBeds == 0) {
-                        $facilities .= ' <span class="badge badge-danger">Full ('.$occupiedBeds.'/'.$totalBeds.' occupied)</span>';
-                    } else {
-                        $facilities .= ' <span class="badge badge-green">'.$availableBeds.' of '.$totalBeds.' beds available</span>';
-                    }
-
                     return $facilities;
                 })
                 ->editColumn('BedCapacity', fn($row) => e($row->Capacity ?? 0))
@@ -211,11 +199,21 @@ class AccommodationMasterController extends Controller
                     return   $string;
                 })
                 ->editColumn('RoomStatus', function ($row) {
-                      return '<span class="d-flex text-successTheme">
-                                    <i class="fa-solid fa-circle-check"></i> Ready to be checked in
-                                </span>';
+                    $availableBeds = $row->AssingAccommodationCount ?? 0;
+                    $totalBeds = AssingAccommodation::where('available_a_id', $row->id)->count();
+                    $occupiedBeds = $totalBeds - $availableBeds;
+
+                    if ($totalBeds == 0) {
+                        return '<span class="badge badge-themeWarning">No Beds Configured</span>';
+                    } elseif ($availableBeds == 0) {
+                        return '<span class="badge badge-danger">Full ('.$occupiedBeds.'/'.$totalBeds.' occupied)</span>';
+                    } elseif ($availableBeds == $totalBeds) {
+                        return '<span class="d-flex text-successTheme"><i class="fa-solid fa-circle-check"></i> Ready to be checked in</span>';
+                    } else {
+                        return '<span class="badge badge-green">'.$availableBeds.' of '.$totalBeds.' beds available</span>';
+                    }
                 })
-                ->rawColumns(['AssignTo', 'RoomFacilities', 'RoomStatus']) // Ensure proper rendering for these columns
+                ->rawColumns(['AssignTo', 'RoomFacilities', 'RoomStatus'])
                 ->make(true);
         }
     }
@@ -300,9 +298,14 @@ class AccommodationMasterController extends Controller
             ->where('t6.resort_id', $this->resort->resort_id)
             ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
             ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType');
+        $Department = $request->input('Department');
         if ($Poitions)
         {
             $dataQuery->where('t4.id', $Poitions);
+        }
+        if ($Department)
+        {
+            $dataQuery->where('t6.id', $Department);
         }
 
         // Apply filter for search (e.g., Employee Name or Department Name)
@@ -370,7 +373,8 @@ class AccommodationMasterController extends Controller
         if($request->ajax())
         {
 
-            $Poitions = $request->input('Poitions');
+            $Poitions = $request->input('Poitions') ?? $request->input('position');
+            $Department = $request->input('Department');
             $search = $request->input('searchTerm');
 
           // Start building the query
@@ -389,6 +393,10 @@ class AccommodationMasterController extends Controller
         if ($Poitions)
         {
             $dataQuery->where('t4.id', $Poitions);
+        }
+        if ($Department)
+        {
+            $dataQuery->where('t6.id', $Department);
         }
 
         // Apply filter for search (e.g., Employee Name or Department Name)
@@ -485,14 +493,11 @@ class AccommodationMasterController extends Controller
                 ->join('resort_departments as t6', 't6.id', '=', 't2.Dept_id')
                 ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
                 ->join('building_models as t5', 't5.id', '=', 'available_accommodation_models.BuildingName')
-                ->join('bulidng_and_floor_and_rooms as t7', 't7.building_id', '=', 'available_accommodation_models.BuildingName')
                 ->join('accommodation_types as t8', 't8.id', '=', 'available_accommodation_models.Accommodation_type_id')
-                ->leftjoin('transfer_accommodations as t9', 't9.NewAccommodation_id', '=', 't1.id')
                 ->where('t2.id', $id)
                 ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
                 ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
-                ->groupBy('t2.id')
-                ->first(['t1.id as ChildBedId','t1.BedNo','t2.id as employee_id','available_accommodation_models.id as AvailableAccommodation_ID','available_accommodation_models.CleaningSchedule','t8.AccommodationName','t7.Floor','t7.Room','t5.BuildingName as BName','t6.name as DepartmentName','t4.position_title','t2.id as employee_id','t2.Emp_id','t3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*','t1.effected_date']);
+                ->first(['t1.id as ChildBedId','t1.BedNo','t2.id as employee_id','available_accommodation_models.id as AvailableAccommodation_ID','available_accommodation_models.CleaningSchedule','t8.AccommodationName','available_accommodation_models.Floor','available_accommodation_models.RoomNo as Room','t5.BuildingName as BName','t6.name as DepartmentName','t4.position_title','t2.id as employee_id','t2.Emp_id','t3.id as Parentid', 't3.first_name', 't3.last_name', 'available_accommodation_models.*','t1.effected_date']);
         $history = collect();
         $AssingAccommodation = collect();
 
@@ -768,28 +773,7 @@ class AccommodationMasterController extends Controller
                 })
                 ->editColumn('RoomFacilities', function ($row) {
                     $itemNames = array_column($row->items, 'inventoryItem');
-                    // $d = ($row->Capacity == $row->AssingAccommodationCount)
-                    //     ? $row->Capacity
-                    //     : $row->AssingAccommodationCount;
-
                     $facilities = e(implode(", ", $itemNames));
-                    if ($row->Capacity!= 0 && $row->Capacity !=$row->AssingAccommodationCount)
-                    {
-                        $capacity =  $row->Capacity  -  $row->AssingAccommodationCount;
-                        if($capacity ==0)
-                        {
-                            $facilities .= ' <span class="badge badge-danger"> No Bed Available</span>';
-                        }
-                        else
-                        {
-                            $facilities .= ' <span class="badge badge-green">' . $capacity . ' Bed Available</span>';
-                        }
-                    }
-
-                    else
-                    {
-                        $facilities .= ' <span class="badge badge-danger"> No Bed Available</span>';
-                    }
 
                     return $facilities;
                 })
@@ -804,13 +788,22 @@ class AccommodationMasterController extends Controller
                     }
                 })
                 ->editColumn('RoomStatus', function ($row) {
-                      return '<span class="d-flex text-successTheme">
-                                    <i class="fa-solid fa-circle-check"></i> Ready to be checked in
-                                </span>';
+                    $availableBeds = $row->AssingAccommodationCount ?? 0;
+                    $totalBeds = AssingAccommodation::where('available_a_id', $row->available_a_id)->count();
+                    $occupiedBeds = $totalBeds - $availableBeds;
 
+                    if ($totalBeds == 0) {
+                        return '<span class="badge badge-themeWarning">No Beds Configured</span>';
+                    } elseif ($availableBeds == 0) {
+                        return '<span class="badge badge-danger">Full ('.$occupiedBeds.'/'.$totalBeds.' occupied)</span>';
+                    } elseif ($availableBeds == $totalBeds) {
+                        return '<span class="d-flex text-successTheme"><i class="fa-solid fa-circle-check"></i> Ready to be checked in</span>';
+                    } else {
+                        return '<span class="badge badge-green">'.$availableBeds.' of '.$totalBeds.' beds available</span>';
+                    }
                 })
 
-                ->rawColumns(['Action', 'RoomFacilities', 'RoomStatus']) // Ensure proper rendering for these columns
+                ->rawColumns(['Action', 'RoomFacilities', 'RoomStatus'])
                 ->make(true);
 
         }

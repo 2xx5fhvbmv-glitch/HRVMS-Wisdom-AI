@@ -396,7 +396,7 @@
                 submitHandler: function(form) 
                 {
                     var formData = new FormData(form);
-                    formData.append("emp_id", "{{ $employee->Emp_id }}");
+                    formData.append("emp_id", "{{ $employee->id }}");
                     $.ajax({
                         url: "{{ route('resort.accommodation.MoveToNext') }}",
                         type: "POST",
@@ -411,23 +411,50 @@
                         
                         if(response.success == true)
                             {
+                                if (!response.data || !response.data.accommodation) {
+                                    toastr.success(response.message, "Success", { positionClass: "toast-bottom-right" });
+                                    setTimeout(function() { location.reload(); }, 1000);
+                                    return;
+                                }
                                 var employee = response.data.employee;
                                 var accommodation = response.data.accommodation;
-                                var facilities = accommodation.facilities.join(", ");
+                                var facilities = accommodation.facilities ? accommodation.facilities.join(", ") : 'N/A';
+                                var prevHtml = '';
+                                var prev = response.data.previous_accommodation;
+                                if (prev) {
+                                    prevHtml = `
+                                        <h6 class="fw-bold mt-2 mb-2">Previous Accommodation</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-lable">
+                                                <tr><th>Building:</th><td>${prev.building_name}</td></tr>
+                                                <tr><th>Floor:</th><td>${prev.floor}</td></tr>
+                                                <tr><th>Room No.</th><td>${prev.room_no}</td></tr>
+                                                <tr><th>Bed No.</th><td>${prev.bed_no}</td></tr>
+                                            </table>
+                                        </div>
+                                        <hr>`;
+                                }
+
                                 $(".appendhereAfterAssign").html(`
                                         <div class="empDetails-user">
                                             <div class="img-circle"><img src="${employee.profile_picture}" alt="user">
                                             </div>
                                             <div>
-                                                <h4>${employee.name}<span class="badge badge-themeNew">#34523</span></h4>
+                                                <h4>${employee.name}<span class="badge badge-themeNew">${employee.emp_id}</span></h4>
                                                 <p>${employee.position}</p>
                                             </div>
                                         </div>
+                                        ${prevHtml}
+                                        <h6 class="fw-bold mt-2 mb-2">New Accommodation</h6>
                                         <div class="table-responsive">
                                             <table class="table table-lable">
                                                 <tr>
                                                     <th>Building:</th>
                                                     <td>${accommodation.building_name}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Floor:</th>
+                                                    <td>${accommodation.floor}</td>
                                                 </tr>
                                                 <tr>
                                                     <th>Room No.</th>

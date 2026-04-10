@@ -232,6 +232,20 @@ class MaintananceContorller extends Controller
                     $this->createNotification($empId, 'Maintenance Event', 'New event in ' . $locationText . ': ' . $descriptionIssues, $m_id->id);
                 }
 
+                // Notify HR employees
+                $hrEmployees = Employee::where('resort_id', $this->resort->resort_id)->whereIn('rank', [3])->pluck('id');
+                foreach ($hrEmployees as $hrId) {
+                    if (!in_array($hrId, $buildingEmployeeIds)) {
+                        $this->createNotification($hrId, 'Maintenance Event', 'New event in ' . $locationText . ': ' . $descriptionIssues, $m_id->id);
+                    }
+                }
+
+                // Notify event creator if not already notified
+                $creatorId = Auth::guard('resort-admin')->user()->GetEmployee->id ?? null;
+                if ($creatorId && !in_array($creatorId, $buildingEmployeeIds) && !$hrEmployees->contains($creatorId)) {
+                    $this->createNotification($creatorId, 'Maintenance Event', 'Event created in ' . $locationText . ': ' . $descriptionIssues, $m_id->id);
+                }
+
                 $deviceTokens = $query->whereNotNull('e.device_token')
                     ->where('e.device_token', '!=', '')
                     ->pluck('e.device_token')
@@ -382,7 +396,7 @@ class MaintananceContorller extends Controller
                             {
                                 $emp = Common::GetEmployeeDetails($row->Assigned_To);
                                 $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                                $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                             }
                             return $row;
                         });
@@ -516,7 +530,7 @@ class MaintananceContorller extends Controller
                             $emp = Common::GetEmployeeDetails($row->Assigned_To);
 
                             $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                            $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                            $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                         }
                         return $row;
                     });
@@ -1006,11 +1020,12 @@ class MaintananceContorller extends Controller
                 ->make(true);
             }
         $page_title="On Hold Requests";
+        $holdAjaxRoute = route('resort.accommodation.HoldMaintanaceRequest');
         $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
                             ->where("employees.rank",2)
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
-        return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee'));
+        return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee','holdAjaxRoute'));
     }
 
     public function HodAssignToEmp(Request $request)
@@ -1206,7 +1221,10 @@ class MaintananceContorller extends Controller
                 ->join("building_models as t5","t5.id","maintanace_requests.building_id")
                 ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                 ->whereIn('maintanace_requests.Status', [ 'On-Hold'])
-                ->where('maintanace_requests.Assigned_To', $currentHodId);
+                ->where(function($q) use ($currentHodId) {
+                    $q->where('maintanace_requests.Assigned_To', $currentHodId)
+                      ->orWhereIn('maintanace_requests.Assigned_To', $this->underEmp_id);
+                });
 
             if(!empty($ResortDepartment))
             {
@@ -1284,11 +1302,12 @@ class MaintananceContorller extends Controller
                 ->make(true);
             }
         $page_title="On Hold Requests";
+        $holdAjaxRoute = route('resort.accommodation.HODHoldMaintanaceRequest');
                     $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
                             ->where("employees.rank",2)
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
-        return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee'));
+        return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee','holdAjaxRoute'));
     }
 
     public function HODMaintanaceRequestlist(Request $request)
@@ -1351,7 +1370,7 @@ class MaintananceContorller extends Controller
                                                                         $emp = Common::GetEmployeeDetails($row->Assigned_To);
 
                                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                                        $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                                                                     }
                                                                     return $row;
                                                                 });
@@ -1467,7 +1486,8 @@ class MaintananceContorller extends Controller
                                         ->leftJoin("inventory_modules as t8","t8.id","maintanace_requests.Item_id")
                                         ->where(function($q) use ($currentHodId) {
                                             $q->whereIn('t3.id', $this->underEmp_id)
-                                              ->orWhere('maintanace_requests.Assigned_To', $currentHodId);
+                                              ->orWhere('maintanace_requests.Assigned_To', $currentHodId)
+                                              ->orWhereIn('maintanace_requests.Assigned_To', $this->underEmp_id);
                                         })
                                         ->where('maintanace_requests.resort_id', $this->resort->resort_id)
                                         ->where('maintanace_requests.Assigned_To',"!=",null)
@@ -1517,7 +1537,7 @@ class MaintananceContorller extends Controller
                                                                         $emp = Common::GetEmployeeDetails($row->Assigned_To);
 
                                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                                        $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                                                                     }
                                                                     return $row;
                                                                 });

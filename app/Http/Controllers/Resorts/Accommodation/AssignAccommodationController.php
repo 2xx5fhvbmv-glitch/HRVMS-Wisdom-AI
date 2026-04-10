@@ -14,6 +14,7 @@ use App\Models\InventoryModule;
 use App\Models\AssingAccommodation;
 use App\Http\Controllers\Controller;
 use App\Models\TransferAccommodation;
+use App\Models\BuildingModel;
 use App\Models\AvailableAccommodationModel;
 use App\Models\AvailableAccommodationInvItem;
 class AssignAccommodationController extends Controller
@@ -394,9 +395,13 @@ class AssignAccommodationController extends Controller
     {
         $Reason        = $request->Reason;
         $assignId      = $request->assignId;
-        $emp_id        = $request->emp_id;
+        $emp_id_input  = $request->emp_id;
         $OldAssingedId = $request->OldAssingedId;
         $ChildBedId    = $request->ChildBedId;
+
+        // Resolve numeric employee ID (form may send Emp_id string like "DR-20")
+        $empRecord = Employee::where('Emp_id', $emp_id_input)->orWhere('id', $emp_id_input)->first();
+        $emp_id = $empRecord ? $empRecord->id : $emp_id_input;
             $validator = Validator::make($request->all(), [
                 'assignId' =>'required',
                 'emp_id' => 'required',
@@ -431,23 +436,44 @@ class AssignAccommodationController extends Controller
                         ->where("t3.id", $ChildBedId)
                         ->first();
                 $data=[];
+                $item_id=[];
                 if ($Employeelist)
                 {
-                    $availableAccommodation = AvailableAccommodationModel::where("id", $Employeelist->available_a_id)
+                    // Get NEW accommodation details (the room being moved to)
+                    $newBed = AssingAccommodation::where("id", $assignId)->first();
+                    $newAccommodation = $newBed ? AvailableAccommodationModel::where("id", $newBed->available_a_id)
                                                                         ->where('resort_id', $this->resort->resort_id)
-                                                                        ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType') // Eager load relationships
-                                                                        ->first();
-                    if ($availableAccommodation)
+                                                                        ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
+                                                                        ->first() : null;
+
+                    // Get OLD (current) accommodation details
+                    $oldAccommodation = null;
+                    $oldBed = AssingAccommodation::where("id", $ChildBedId)->first();
+                    if ($oldBed) {
+                        $oldRoom = AvailableAccommodationModel::find($oldBed->available_a_id);
+                        if ($oldRoom) {
+                            $oldBuilding = BuildingModel::find($oldRoom->BuildingName);
+                            $oldAccommodation = [
+                                'building_name' => $oldBuilding ? $oldBuilding->BuildingName : 'N/A',
+                                'floor' => $oldRoom->Floor ?? 'N/A',
+                                'room_no' => $oldRoom->RoomNo ?? 'N/A',
+                                'bed_no' => $oldBed->BedNo ?? 'N/A',
+                            ];
+                        }
+                    }
+
+                    if ($newAccommodation)
                     {
                         $itemData = [];
-                        $item_id=[];
-                        // Process inventory items
-                        foreach ($availableAccommodation->availableAccommodationInvItem as $item)
+                        foreach ($newAccommodation->availableAccommodationInvItem as $item)
                         {
                             $inventoryItem = $item->inventoryModule ? ucfirst($item->inventoryModule->ItemName) : 'Unknown';
                             $item_id[] = $item->inventoryModule->id;
                             $itemData[] = $inventoryItem;
                         }
+                        $buildingModel = BuildingModel::find($newAccommodation->BuildingName);
+                        $buildingDisplayName = $buildingModel ? $buildingModel->BuildingName : 'Not Available';
+
                         $data = [
                             'employee' => [
                                 'name' => ucfirst($Employeelist->first_name . ' ' . $Employeelist->last_name),
@@ -456,17 +482,31 @@ class AssignAccommodationController extends Controller
                                 'emp_id' => $Employeelist->EmployeeId,
                             ],
                             'accommodation' => [
-                                'building_name' => $availableAccommodation->BuildingName ?? 'Not Available',
-                                'floor' => $availableAccommodation->Floor ?? 'Not Available',
-                                'room_no' => $availableAccommodation->RoomNo ?? 'Not Available',
+                                'building_name' => $buildingDisplayName,
+                                'floor' => $newAccommodation->Floor ?? 'Not Available',
+                                'room_no' => $newAccommodation->RoomNo ?? 'Not Available',
                                 'facilities' => $itemData,
-                                'RoomStatus'=>$availableAccommodation->RoomStatus ?? 'Not Available',
-                                'color' => $availableAccommodation->accommodationType->Color ?? 'DefaultColor',
-                                'accommodation_name' => $availableAccommodation->accommodationType->AccommodationName ?? 'Not Available',
+                                'RoomStatus'=>$newAccommodation->RoomStatus ?? 'Not Available',
+                                'color' => $newAccommodation->accommodationType->Color ?? 'DefaultColor',
+                                'accommodation_name' => $newAccommodation->accommodationType->AccommodationName ?? 'Not Available',
                             ],
+                            'previous_accommodation' => $oldAccommodation,
                         ];
                     }
-                    $InventoryModule =InventoryModule::whereIn('id', $item_id)->get();
+
+                    // Decrement old room inventory occupied count
+                    $oldAvailableAccommodation = AvailableAccommodationModel::where("id", $Employeelist->available_a_id)
+                                                                        ->where('resort_id', $this->resort->resort_id)
+                                                                        ->with('availableAccommodationInvItem.inventoryModule')
+                                                                        ->first();
+                    if ($oldAvailableAccommodation) {
+                        foreach ($oldAvailableAccommodation->availableAccommodationInvItem as $item) {
+                            if ($item->inventoryModule) {
+                                $item_id[] = $item->inventoryModule->id;
+                            }
+                        }
+                    }
+                    $InventoryModule = InventoryModule::whereIn('id', $item_id)->get();
 
                     foreach ($InventoryModule as $module)
                     {

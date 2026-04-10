@@ -74,7 +74,7 @@ class AccommodationDashboardController extends Controller
                                                     {
                                                         $emp = Common::GetEmployeeDetails($row->Assigned_To);
                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                        $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                                                     }
                                                     $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                     return  $row;
@@ -731,7 +731,7 @@ class AccommodationDashboardController extends Controller
                                                         $emp = Common::GetEmployeeDetails($row->Assigned_To);
 
                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                        $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                                                     }
                                                     $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                     return  $row;
@@ -1133,7 +1133,7 @@ class AccommodationDashboardController extends Controller
                                                             if($emp)
                                                             {
                                                                 $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                                $row->Assign_toName     = $emp->first_name.' '.$row->last_name;
+                                                                $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
                                                             }
                                                                 
                                                         }
