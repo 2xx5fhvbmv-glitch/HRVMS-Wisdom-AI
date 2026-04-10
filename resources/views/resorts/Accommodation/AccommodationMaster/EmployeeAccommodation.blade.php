@@ -200,11 +200,7 @@
                 deptId: deptId
             },
             success: function(d) {
-                // Clear the dropdown and add a placeholder option
-
-
                 if (d.success == true) {
-
                     let string = '<option></option>';
                     $.each(d.data.ResortPosition, function(key, value) {
                         string += '<option value="' + value.id + '">' + value
@@ -218,7 +214,6 @@
                             .name + '</option>';
                     });
                     $(".Section").html(string1);
-
                 }
             },
             error: function(response) {
@@ -227,6 +222,8 @@
                 });
             }
         });
+        EmployeeGrid();
+        datatablelist();
     });
 
     $(".btn-grid").click(function () {
@@ -262,10 +259,11 @@
     {
         var search = $(".Search").val();
         var Poitions = $("#position").val();
+        var Department = $(".Department").val();
         $.ajax({
                 url: "{{ route('resort.accommodation.SearchEmpAccommodationgird') }}",
                 type: "get",
-                data: {"_token":"{{ csrf_token() }}","search":search,"Poitions":Poitions},
+                data: {"_token":"{{ csrf_token() }}","search":search,"Poitions":Poitions,"Department":Department},
                 success: function (response) {
 
                     if (response.success)
@@ -313,6 +311,7 @@
                     type: 'GET',
                     data: function(d) {
                         d.position = $("#position").val();
+                        d.Department = $(".Department").val();
                         d.searchTerm = $('.Search').val();
                     }
                 },

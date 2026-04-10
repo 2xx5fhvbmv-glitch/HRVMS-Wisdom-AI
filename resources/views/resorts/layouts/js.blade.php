@@ -145,16 +145,25 @@
             });
             
             
-            $('.carosel-menu').slick({
-                variableWidth: true,
-                slidesToShow: 1,
-                infinite: true,
-                slidesToScroll: 3,
-                initialSlide: activeIndex >= 0 ? activeIndex : 0,
-                dots: false,
-                focusOnSelect: false,  // on click slide false
-                swipe: true
-            });
+            var slideCount = $('.carosel-menu .text-center').length;
+
+            if (slideCount <= 3) {
+                // Few modules — no carousel needed, use simple flex layout
+                $('.navcarosel-box').css('max-width', 'fit-content');
+                $('.carosel-menu').addClass('d-flex').css('gap', '8px');
+                $('.carosel-menu .text-center').css('width', 'auto');
+            } else {
+                $('.carosel-menu').slick({
+                    variableWidth: true,
+                    slidesToShow: 1,
+                    infinite: true,
+                    slidesToScroll: 3,
+                    initialSlide: activeIndex >= 0 ? activeIndex : 0,
+                    dots: false,
+                    focusOnSelect: false,
+                    swipe: true
+                });
+            }
 
             // Handle active class toggle
             function updateActiveClasses() {
