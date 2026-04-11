@@ -28,7 +28,7 @@ class CycleController extends Controller
     {
         $this->resort = Auth::guard('resort-admin')->user();
         if(!$this->resort) return;
-        $reporting_to = $this->resort;
+        $reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 3;
         $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
     function index()
