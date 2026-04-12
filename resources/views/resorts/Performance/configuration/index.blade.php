@@ -106,7 +106,7 @@
                                     <thead>
                                         <tr>
                                             <th>Category Title</th>
-                                            <th>Wedightage</th>
+                                            <th>Weightage (%)</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
