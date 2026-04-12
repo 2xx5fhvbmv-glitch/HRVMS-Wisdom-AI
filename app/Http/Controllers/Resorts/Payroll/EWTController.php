@@ -331,13 +331,15 @@ class EWTController extends Controller
                     $tax_rate = 0;
                     $tax_slab = 'N/A';
 
-                    foreach ($brackets as $slabIndex => $bracket) {
+                    $slabCounter = 1;
+                    foreach ($brackets as $bracket) {
                         if ($totalMVR >= $bracket->min_salary &&
                             ($totalMVR <= ($bracket->max_salary ?? PHP_FLOAT_MAX))) {
                             $tax_rate = $bracket->tax_rate;
-                            $tax_slab = "Slab " . ($slabIndex + 1);
+                            $tax_slab = "Slab " . $slabCounter . " (" . $bracket->tax_rate . "%)";
                             break;
                         }
+                        $slabCounter++;
                     }
 
                     // Initialize employee if not exists

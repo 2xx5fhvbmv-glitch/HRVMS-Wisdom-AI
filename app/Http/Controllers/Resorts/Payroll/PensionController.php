@@ -156,6 +156,7 @@ class PensionController extends Controller
                     ->where('er.status', 'approved');
             })
             ->where('e.status','Active')
+            ->where('e.nationality', 'Maldivian')
             ->where('p.resort_id', $resort_id)
             ->where('p.status', 'locked')
             ->select(
@@ -302,6 +303,7 @@ class PensionController extends Controller
                 })
                 ->where('p.resort_id', $resort_id)
                 ->where('p.status', 'locked')
+                ->where('e.nationality', 'Maldivian')
                 ->whereIn('e.status', ['Resigned', 'Terminated', 'Inactive'])
                 ->select(
                     'e.id as employee_id',

@@ -32,13 +32,32 @@ class PerformanceDashboardController extends Controller
     public function HR_Dashobard(Request $request)
     {
         $page_title="Performance Dashboard";
-        $Employee_count = Employee::with(['resortAdmin'])->where('resort_id',$this->globalUser->resort_id)
-                                        ->where('status','Active')
+        $resort_id = $this->globalUser->resort_id;
+
+        $Employee_count = Employee::where('resort_id', $resort_id)
+                                    ->where('status', 'Active')
                                     ->whereHas('resortAdmin', function($query) {
                                         $query->where('status', 'Active');
-                                    })->get()->count();
+                                    })->count();
 
-        return view('resorts.Performance.dashboard.hrdashboard',compact('page_title','Employee_count'));
+        // Appraisal pending: employees in active cycles who haven't completed manager review
+        $activeCycleIds = DB::table('performance_cycles')
+                            ->where('resort_id', $resort_id)
+                            ->where('status', 'OnGoing')
+                            ->pluck('id');
+
+        $appraisal_total = DB::table('performa_child_cycles')
+                            ->whereIn('Parent_cycle_id', $activeCycleIds)
+                            ->count();
+
+        $appraisal_pending = DB::table('performa_child_cycles')
+                            ->whereIn('Parent_cycle_id', $activeCycleIds)
+                            ->whereNull('Manager_review_date')
+                            ->count();
+
+        return view('resorts.Performance.dashboard.hrdashboard', compact(
+            'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending'
+        ));
 
     }
 

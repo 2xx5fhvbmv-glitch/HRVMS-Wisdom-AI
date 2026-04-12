@@ -86,32 +86,32 @@ class CycleController extends Controller
         $employees = Employee::join('resort_admins as t3', 't3.id', '=', 'employees.Admin_Parent_id')
                                 ->join('resort_departments as t1', 't1.id', '=', 'employees.Dept_id')
                                 ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-                                ->where('employees.resort_id', $this->resort->resort_id);
-                                if(isset($Department))
+                                ->where('employees.resort_id', $this->resort->resort_id)
+                                ->where('employees.status', 'Active');
+                                if(!empty($Department))
                                 {
-                                    $employees->where('employees.Dept_id', $Department );
+                                    $employees->where('employees.Dept_id', $Department);
                                 }
-                                if(isset($Position) && $Position !="")
+                                if(!empty($Position))
                                 {
-
-                                    $employees->where('t2.id', $Position );
+                                    $employees->where('t2.id', $Position);
                                 }
-                                if(isset($emp_status))
+                                if(!empty($emp_status))
                                 {
-                                    $employees->where('employees.Status', $emp_status );
+                                    $employees->where('employees.employment_type', $emp_status);
                                 }
-                                if(isset($emp_status))
+                                if(!empty($gender))
                                 {
-                                    $employees->where('employees.Status', $emp_status );
+                                    $employees->where('t3.gender', strtolower($gender));
                                 }
-                                if(isset($gender))
+                                if(!empty($joining_date))
                                 {
-                                    $employees->where('t3.gender', strtolower($gender) );
-                                }
-                                if(isset($joining_date))
-                                {
-                                    $date= Carbon::parse($joining_date)->format('Y/m/d');
+                                    $date = Carbon::parse($joining_date)->format('Y-m-d');
                                     $employees->whereDate('employees.joining_date', $date);
+                                }
+                                if(!empty($Location))
+                                {
+                                    $employees->where('employees.nationality', $Location);
                                 }
 
                                 if (isset($tenure_duration) && $tenure_duration !=0)
@@ -119,7 +119,7 @@ class CycleController extends Controller
 
                                     $employees->whereRaw('TIMESTAMPDIFF(YEAR, employees.joining_date, CURDATE()) >= ?', [$tenure_duration]);
                                 }
-                                $employees=   $employees->get(['t3.id as Parentid','employees.Emp_id','t3.status','t3.gender','t3.first_name','t3.last_name','t1.name as DepartmentName', 't2.position_title as PositionTitle'])
+                                $employees=   $employees->get(['t3.id as Parentid','employees.Emp_id','employees.joining_date','t3.status','t3.gender','t3.first_name','t3.last_name','t1.name as DepartmentName', 't2.position_title as PositionTitle'])
                                 ->map(function ($i)
                                 {
                                     $i->EmployeeName = ucfirst($i->first_name . ' ' . $i->last_name);

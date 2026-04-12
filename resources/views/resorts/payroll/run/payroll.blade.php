@@ -71,19 +71,19 @@
                                 <h6>{{ \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($payroll->end_date)->format('d M Y') }}</h6>
                             @endif
                         </div>
+                        @if(isset($payroll_id) && !empty($payroll_id))
                         <div class="col-auto">
                             <a href="{{ route('payroll.bankcashsheet.download', ['id' => $payroll_id]) }}" class="a-link">Cash And Bank Sheets</a>
                         </div>
-                        @if(isset($payroll_id) && !empty($payroll_id))
                             <div class="col-auto">
                                 <a href="{{ route('payroll.activity-log', ['payroll_id' => base64_encode($payroll_id)]) }}" class="btn btn-themeSkyblue">Activity Log</a>
                             </div>
-                        @endif
                         <div class="col-auto">
                             <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'excel']) }}" class="btn btn-themeSkyblue btn-sm">
                                 <i class="fa-solid fa-file-excel me-1"></i> Download Excel
                             </a>
                         </div>
+                        @endif
                     </div>
                 </div>
 

@@ -18,11 +18,13 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <!-- <div class="col-auto">
+                <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="#" class="btn btn-theme">Request Manning</a>
+                        <a href="{{ route('Performance.Meeting.list') }}" class="btn btn-themeSkyblue">
+                            <i class="fa-solid fa-list me-1"></i> View All Meetings
+                        </a>
                     </div>
-                </div> -->
+                </div>
             </div>
         </div>
 
@@ -49,11 +51,14 @@
                                     <input type="time" id="end_time" name="end_time" class="form-control timepicker" placeholder="Select Time">
                                 </div>
                                 <div class="col-12">
-                                    <label for="location" class="form-label">Location <span class="red-mark">*</span></label>
+                                    <p class="text-muted mb-1" style="font-size:12px;">Please fill in either Location or Meeting Link (at least one is required)</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label for="location" class="form-label">Location</label>
                                     <input type="text" id="location" name="location" class="form-control" placeholder="Enter a location for the in-person meeting">
                                 </div>
-                                <div class="col-12">
-                                    <label for="conference_link" class="form-label">Conference Link <span class="red-mark">*</span></label>
+                                <div class="col-sm-6">
+                                    <label for="conference_link" class="form-label">Meeting Link</label>
                                     <input type="text" id="conference_link" name="conference_link" class="form-control" placeholder="Enter a link for the remote meeting">
                                 </div>
                                 <div class="col-12">
@@ -202,10 +207,14 @@
                 // greaterThanStart: true // Custom validation rule
             },
             location: {
-                required: true,
+                required: function() {
+                    return $('#conference_link').val().trim() === '';
+                },
             },
             conference_link: {
-                required: true,
+                required: function() {
+                    return $('#location').val().trim() === '';
+                },
             },
             description: {
                 required: true,
@@ -229,10 +238,10 @@
                 // greaterThanStart: "End time must be greater than start time" // Custom message
             },
             location: {
-                required: "Please Enter Meeting Location",
+                required: "Please enter Location or Meeting Link",
             },
             conference_link: {
-                required: "Please Enter Meeting Conference Link",
+                required: "Please enter Meeting Link or Location",
             },
             description: {
                 required: "Please Enter Meeting description",
@@ -258,8 +267,11 @@
                             positionClass: "toast-bottom-right",
                         });
 
+                        // Reset form
+                        $('#ScheduleMeetingForm')[0].reset();
+                        $(".PerformanceMeetingSelectEmp").html('');
                         $(".ScheduleMeeting").attr('disabled',false);
-                    } 
+                    }
                     else
                     {
                         toastr.error(response.message, "Error", {

@@ -24,6 +24,10 @@ Route::post('/broadcasting/auth', function () {
 |
 */
 
+// Performance Meeting Accept/Decline (public - no auth required, accessed from email)
+Route::get('/meeting/respond/{token}', 'App\Http\Controllers\Resorts\Performance\PerformanceMeetingController@showMeetingResponse')->name('meeting.respond');
+Route::post('/meeting/respond/{token}', 'App\Http\Controllers\Resorts\Performance\PerformanceMeetingController@submitMeetingResponse')->name('meeting.respond.submit');
+
 Route::get('/migrate', function () {
     // Only allow from a secure IP or with auth!
  Artisan::call('migrate', [

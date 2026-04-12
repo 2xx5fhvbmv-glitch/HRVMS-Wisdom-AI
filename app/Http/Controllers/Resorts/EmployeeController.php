@@ -40,15 +40,20 @@ class EmployeeController extends Controller
         if ($request->ajax()) {
 
             $user = Auth::guard('resort-admin')->user();
-            $position_id = $user->GetEmployee->Position_id;
-            $Dept_id = $user->GetEmployee->Dept_id;
+            $employee = $user->GetEmployee;
+            $Dept_id = $employee->Dept_id ?? null;
+            $rank = $employee->rank ?? null;
 
-            $employees = Employee::where('resort_id', $user->resort_id)
-            ->with('resortAdmin')
-            // ->where('position_id', $position_id)
-            ->where('dept_id', $Dept_id)
-            ->where('resort_id', $user->resort_id)
-            ->get();
+            $query = Employee::where('resort_id', $user->resort_id)
+                ->with('resortAdmin')
+                ->where('status', 'Active');
+
+            // HR (rank 3), EXCOM (rank 1), or master admin see all employees
+            if (!$user->is_master_admin && !in_array($rank, [1, 3])) {
+                $query->where('dept_id', $Dept_id);
+            }
+
+            $employees = $query->get();
 
             return datatables()->of($employees)
             ->addColumn('name', function ($row) {

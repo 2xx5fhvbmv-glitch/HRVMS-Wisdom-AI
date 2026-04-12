@@ -107,6 +107,17 @@
     .ewt-cell:hover .ewt-tooltip {
         display: block;
     }
+    /* Flip tooltip downward for first row */
+    .ewt-tooltip-bottom .ewt-tooltip {
+        bottom: auto !important;
+        top: 100% !important;
+    }
+    .ewt-tooltip-bottom .ewt-tooltip::after {
+        top: auto !important;
+        bottom: 100% !important;
+        border-top-color: transparent !important;
+        border-bottom-color: #1a1a2e !important;
+    }
     .ewt-tooltip .ewt-row {
         display: flex;
         justify-content: space-between;
@@ -297,7 +308,13 @@
                 },
                 columns: columns,
                 drawCallback: function() {
-                    // tooltips handled via CSS hover
+                    // Flip tooltip downward for first row to prevent clipping
+                    var table = this.api();
+                    table.rows().every(function(rowIdx) {
+                        if (rowIdx === 0) {
+                            $(this.node()).find('.ewt-cell').addClass('ewt-tooltip-bottom');
+                        }
+                    });
                 }
             });
         }

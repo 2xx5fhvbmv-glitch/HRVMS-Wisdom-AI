@@ -35,10 +35,10 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Total Employee</p>
-                            <strong>{{$Employee_count ?? 0 }}</strong>
+                            <strong>{{ $Employee_count ?? 0 }}</strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ route('resort.employeelist') }}">
+                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -48,40 +48,40 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Appraisal Pending</p>
-                            <strong>12 <small>/15</small></strong>
+                            <strong>{{ $appraisal_pending ?? 0 }} <small>/{{ $appraisal_total ?? 0 }}</small></strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ route('Performance.cycle') }}">
+                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
             </div>
-            <!-- <div class="col-lg-3 col-sm-6">
+            <div class="col-lg-3 col-sm-6">
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="mb-0  fw-500">Employees in PIP </p>
-                            <strong>64</strong>
+                            <p class="mb-0  fw-500">Employees in PIP</p>
+                            <strong>{{ $pip_count ?? 0 }}</strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ route('Performance.MonltyCheckIn') }}">
+                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
-            </div> -->
-            <!-- <div class="col-lg-3 col-sm-6">
+            </div>
+            <div class="col-lg-3 col-sm-6">
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Employees in PDP</p>
-                            <strong>&nbsp;</strong>
+                            <strong>{{ $pdp_count ?? 0 }}</strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ route('Performance.MonltyCheckIn') }}">
+                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
-            </div> -->
+            </div>
             <div class="col-xl-6">
                 <div class="card card-serviceCharges">
                     <div class=" card-title">
@@ -151,7 +151,7 @@
                                 <h3 class="text-nowrap">Appraisal Pending Departments</h3>
                             </div>
                             <div class="col-auto">
-                                <a href="#" class="a-link">View All</a>
+                                <a href="{{ route('Performance.cycle') }}" class="a-link">View All</a>
                             </div>
                         </div>
                     </div>
@@ -159,55 +159,53 @@
                         <thead>
                             <tr>
                                 <th>Department</th>
-                                <th>Appraisal Time</th>
                                 <th>Employees</th>
-                                <th>Last Appraisal</th>
+                                <th>Pending</th>
+                                <th>Completed</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>Management <span class="badge badge-themeLight">M-415</span></td>
-                                <td>6 month</td>
-                                <td>15</td>
-                                <td>1 oct 2019</td>
-                                <td><span class="badge badge-themeYellow">Pending</span></td>
-                            </tr>
-                            <tr>
-                                <td>Management <span class="badge badge-themeLight">M-415</span></td>
-                                <td>6 month</td>
-                                <td>10</td>
-                                <td>5 July 2020</td>
-                                <td><span class="badge badge-themeSuccess">Done</span></td>
-                            </tr>
-                            <tr>
-                                <td>Front Office <span class="badge badge-themeLight">F-845</span></td>
-                                <td>6 month</td>
-                                <td>50</td>
-                                <td>20 Jun 2018</td>
-                                <td><span class="badge badge-themeSuccess">Done</span></td>
-                            </tr>
-                            <tr>
-                                <td>Housekeeping <span class="badge badge-themeLight">H-451</span></td>
-                                <td>6 month</td>
-                                <td>26</td>
-                                <td>3 Aug 2022</td>
-                                <td><span class="badge badge-themeSuccess">Done</span></td>
-                            </tr>
-                            <tr>
-                                <td>Management <span class="badge badge-themeLight">M-515</span></td>
-                                <td>6 month</td>
-                                <td>18</td>
-                                <td>7 Jan 2023</td>
-                                <td><span class="badge badge-themeSuccess">Done</span></td>
-                            </tr>
-                            <tr>
-                                <td>Management <span class="badge badge-themeLight">M-415</span></td>
-                                <td>6 month</td>
-                                <td>15</td>
-                                <td>1 Mar 2022</td>
-                                <td><span class="badge badge-themeSuccess">Done</span></td>
-                            </tr>
+                            @php
+                                $departments = \App\Models\ResortDepartment::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->get();
+                                $activeCycleIds = \DB::table('performance_cycles')
+                                    ->where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
+                                    ->where('status', 'OnGoing')
+                                    ->pluck('id');
+                            @endphp
+                            @foreach($departments as $dept)
+                                @php
+                                    $deptEmpIds = \App\Models\Employee::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
+                                        ->where('Dept_id', $dept->id)
+                                        ->where('status', 'Active')
+                                        ->pluck('id');
+                                    $totalInCycle = \DB::table('performa_child_cycles')
+                                        ->whereIn('Parent_cycle_id', $activeCycleIds)
+                                        ->whereIn('Emp_main_id', $deptEmpIds)
+                                        ->count();
+                                    $pendingCount = \DB::table('performa_child_cycles')
+                                        ->whereIn('Parent_cycle_id', $activeCycleIds)
+                                        ->whereIn('Emp_main_id', $deptEmpIds)
+                                        ->whereNull('Manager_review_date')
+                                        ->count();
+                                    $completedCount = $totalInCycle - $pendingCount;
+                                @endphp
+                                <tr>
+                                    <td>{{ $dept->name }} <span class="badge badge-themeLight">{{ $dept->code }}</span></td>
+                                    <td>{{ $deptEmpIds->count() }}</td>
+                                    <td>{{ $pendingCount }}</td>
+                                    <td>{{ $completedCount }}</td>
+                                    <td>
+                                        @if($totalInCycle == 0)
+                                            <span class="badge badge-themeLight">No Cycle</span>
+                                        @elseif($pendingCount == 0)
+                                            <span class="badge badge-themeSuccess">Done</span>
+                                        @else
+                                            <span class="badge badge-themeYellow">Pending</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
