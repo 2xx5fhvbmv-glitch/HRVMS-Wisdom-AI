@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Mail;
 
 use App\Http\Controllers\Controller;
 use App\Models\PerformanceMeetingContent;
+use App\Models\PerformanceMeetingParticipant;
 use App\Models\Resort;
+use Illuminate\Support\Str;
 class PerformanceMeetingController extends Controller
 {
 
@@ -55,25 +57,216 @@ class PerformanceMeetingController extends Controller
         $page_title="Performance Meeting";
         return view('resorts.Performance.Meeting.index',compact('page_title','employees'));
     }
+
+    public function scheduledMeetings()
+    {
+        $page_title = "Scheduled Meetings";
+        return view('resorts.Performance.Meeting.scheduled', compact('page_title'));
+    }
+
+    public function calendarData(Request $request)
+    {
+        // Only show meetings that have at least one accepted participant
+        $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
+            ->whereHas('participants', function($q) {
+                $q->where('status', 'accepted');
+            })
+            ->get()
+            ->map(function ($meeting) {
+                $accepted = $meeting->participants()->where('status', 'accepted')->count();
+                $declined = $meeting->participants()->where('status', 'declined')->count();
+                $pending = $meeting->participants()->where('status', 'pending')->count();
+                $total = $accepted + $declined + $pending;
+
+                $color = '#28a745';
+                if ($pending > 0) $color = '#EFB408';
+
+                return [
+                    'id' => $meeting->id,
+                    'title' => $meeting->title,
+                    'start' => $meeting->date . 'T' . $meeting->start_time,
+                    'end' => $meeting->date . 'T' . $meeting->end_time,
+                    'color' => $color,
+                    'textColor' => '#fff',
+                    'description' => $meeting->description,
+                    'location' => $meeting->location,
+                    'conference_link' => $meeting->conference_links,
+                    'accepted' => $accepted,
+                    'declined' => $declined,
+                    'pending' => $pending,
+                    'total' => $total,
+                ];
+            });
+
+        return response()->json($meetings);
+    }
+
+    public function meetingSidebar(Request $request)
+    {
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth = Carbon::now()->endOfMonth();
+
+        $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->orderBy('date', 'desc')
+            ->get()
+            ->map(function ($meeting) {
+                $participants = PerformanceMeetingParticipant::where('meeting_id', $meeting->id)
+                    ->with('employee.resortAdmin')
+                    ->get();
+                $meeting->accepted = $participants->where('status', 'accepted')->count();
+                $meeting->declined = $participants->where('status', 'declined')->count();
+                $meeting->pending = $participants->where('status', 'pending')->count();
+                $meeting->total = $participants->count();
+                $meeting->formattedDate = Carbon::parse($meeting->date)->format('D d M Y');
+                $meeting->participantList = $participants->map(function ($p) {
+                    return [
+                        'name' => optional($p->employee->resortAdmin)->first_name . ' ' . optional($p->employee->resortAdmin)->last_name,
+                        'profileImg' => Common::getResortUserPicture(optional($p->employee)->Admin_Parent_id),
+                        'status' => $p->status,
+                    ];
+                });
+                return $meeting;
+            });
+
+        $html = '';
+        foreach ($meetings as $meeting) {
+            $dateParts = explode(' ', $meeting->formattedDate);
+            $statusBadge = '';
+            if ($meeting->total > 0) {
+                $statusBadge = '<span class="badge badge-green">' . $meeting->accepted . ' Accepted</span> ';
+                if ($meeting->pending > 0) $statusBadge .= '<span class="badge badge-themeWarning">' . $meeting->pending . ' Pending</span> ';
+                if ($meeting->declined > 0) $statusBadge .= '<span class="badge badge-danger">' . $meeting->declined . ' Declined</span>';
+            }
+
+            $participantHtml = '';
+            foreach ($meeting->participantList as $p) {
+                $statusIcon = $p['status'] === 'accepted' ? '<span class="text-success">&#10004;</span>' : ($p['status'] === 'declined' ? '<span class="text-danger">&#10006;</span>' : '<span class="text-warning">&#9679;</span>');
+                $participantHtml .= '<div class="d-flex align-items-center gap-2 mb-1">
+                    <div class="img-circle" style="width:30px;height:30px;"><img src="' . e($p['profileImg']) . '" alt="user" style="width:30px;height:30px;border-radius:50%;"></div>
+                    <span style="font-size:13px;">' . e($p['name']) . '</span> ' . $statusIcon . '
+                </div>';
+            }
+
+            $html .= '<div class="leaveUser-block mb-3">
+                <div class="leaveUser-date">
+                    <div class="leaveDate-box">
+                        <span>' . ($dateParts[1] ?? '') . '</span>
+                        <p>' . ($dateParts[2] ?? '') . '</p>
+                        <small>' . ($dateParts[0] ?? '') . '</small>
+                    </div>
+                </div>
+                <div class="leaveUser-content" style="flex:1;">
+                    <h6 class="mb-1">' . e($meeting->title) . '</h6>
+                    <p class="mb-1" style="font-size:12px;color:#666;">
+                        <i class="fa-regular fa-clock"></i> ' . $meeting->start_time . ' - ' . $meeting->end_time . '
+                    </p>
+                    ' . (!empty($meeting->location) ? '<p class="mb-1" style="font-size:12px;color:#666;"><i class="fa-solid fa-location-dot"></i> ' . e($meeting->location) . '</p>' : '') . '
+                    <div class="mb-2">' . $statusBadge . '</div>
+                    ' . $participantHtml . '
+                </div>
+            </div>';
+        }
+
+        if (empty($html)) {
+            $html = '<div class="text-center py-4 text-muted"><i class="fa-regular fa-calendar-xmark" style="font-size:40px;"></i><p class="mt-2">No meetings this month</p></div>';
+        }
+
+        return response()->json(['success' => true, 'data' => $html]);
+    }
+
+    public function meetingsList()
+    {
+        $page_title = "All Meetings";
+        return view('resorts.Performance.Meeting.list', compact('page_title'));
+    }
+
+    public function meetingsListData(Request $request)
+    {
+        $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
+            ->orderBy('date', 'desc')
+            ->get()
+            ->map(function ($meeting) {
+                $participants = $meeting->participants()->with('employee.resortAdmin')->get();
+                $meeting->accepted_count = $participants->where('status', 'accepted')->count();
+                $meeting->declined_count = $participants->where('status', 'declined')->count();
+                $meeting->pending_count = $participants->where('status', 'pending')->count();
+                $meeting->total_count = $participants->count();
+                $meeting->declined_details = $participants->where('status', 'declined')->map(function ($p) {
+                    return [
+                        'name' => optional($p->employee->resortAdmin)->first_name . ' ' . optional($p->employee->resortAdmin)->last_name,
+                        'reason' => $p->reason ?? 'No reason provided',
+                    ];
+                })->values();
+                $meeting->accepted_names = $participants->where('status', 'accepted')->map(function ($p) {
+                    return optional($p->employee->resortAdmin)->first_name . ' ' . optional($p->employee->resortAdmin)->last_name;
+                })->values();
+                $meeting->pending_names = $participants->where('status', 'pending')->map(function ($p) {
+                    return optional($p->employee->resortAdmin)->first_name . ' ' . optional($p->employee->resortAdmin)->last_name;
+                })->values();
+                return $meeting;
+            });
+
+        return datatables()->of($meetings)
+            ->editColumn('title', function ($row) {
+                return e($row->title);
+            })
+            ->editColumn('date', function ($row) {
+                return Carbon::parse($row->date)->format('d M Y');
+            })
+            ->addColumn('time', function ($row) {
+                return $row->start_time . ' - ' . $row->end_time;
+            })
+            ->addColumn('location_link', function ($row) {
+                $loc = '';
+                if ($row->location) $loc .= e($row->location);
+                if ($row->location && $row->conference_links) $loc .= '<br>';
+                if ($row->conference_links) $loc .= '<small class="text-muted">' . e($row->conference_links) . '</small>';
+                return $loc ?: 'N/A';
+            })
+            ->addColumn('accepted', function ($row) {
+                $tooltip = $row->accepted_names->implode(', ');
+                return '<span class="badge badge-green" data-bs-toggle="tooltip" title="' . e($tooltip) . '">' . $row->accepted_count . ' Accepted</span>';
+            })
+            ->addColumn('declined', function ($row) {
+                if ($row->declined_count == 0) return '<span class="badge badge-themeLight">0</span>';
+                $details = '';
+                foreach ($row->declined_details as $d) {
+                    $details .= e($d['name']) . ': ' . e($d['reason']) . '&#10;';
+                }
+                return '<span class="badge badge-danger" data-bs-toggle="tooltip" data-bs-html="true" title="' . $details . '">' . $row->declined_count . ' Declined</span>';
+            })
+            ->addColumn('pending', function ($row) {
+                if ($row->pending_count == 0) return '<span class="badge badge-themeLight">0</span>';
+                $tooltip = $row->pending_names->implode(', ');
+                return '<span class="badge badge-themeWarning" data-bs-toggle="tooltip" title="' . e($tooltip) . '">' . $row->pending_count . ' Pending</span>';
+            })
+            ->addColumn('total', function ($row) {
+                return $row->total_count;
+            })
+            ->rawColumns(['location_link', 'accepted', 'declined', 'pending'])
+            ->make(true);
+    }
+
    public function SendMeetingLink(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'title' => 'required|string|max:255',
-        'date' => 'required|date',
+        'date' => 'required|date_format:m/d/Y',
         'start_time' => 'required|date_format:H:i',
         'end_time' => 'required|date_format:H:i|after:start_time',
-        'location' => 'required|string|max:255',
-        'conference_link' => 'required|string|max:255',
-        'description' => 'required|string|max:500',
+        'location' => 'nullable|string|max:255|required_without:conference_link',
+        'conference_link' => 'nullable|string|max:255|required_without:location',
+        'description' => 'nullable|string|max:500',
         'Emp_id' => 'required|array|min:1',
     ], [
         'title.required' => 'Please provide a meeting title.',
         'date.required' => 'Please provide a meeting date.',
         'start_time.required' => 'Please provide a start time.',
         'end_time.required' => 'Please provide an end time.',
-        'location.required' => 'Please provide a location.',
-        'conference_link.required' => 'Please provide a conference link.',
-        'description.required' => 'Please provide a description.',
+        'end_time.after' => 'End time must be after start time.',
+        'location.required_without' => 'Please provide either a Location or Meeting Link.',
+        'conference_link.required_without' => 'Please provide either a Meeting Link or Location.',
         'Emp_id.required' => 'Please select at least one employee.',
     ]);
 
@@ -98,6 +291,38 @@ class PerformanceMeetingController extends Controller
         $content = PerformanceMeetingContent::where('resort_id', $this->resort->resort_id)->first();
         $emailTemplate = $content->content ?? '';
 
+        // Use default template if none configured
+        if (empty(trim(strip_tags($emailTemplate)))) {
+            $emailTemplate = '
+                <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                    <div style="background:#014653;color:#fff;padding:20px;border-radius:8px 8px 0 0;text-align:center;">
+                        <h2 style="margin:0;">Performance Meeting Invitation</h2>
+                    </div>
+                    <div style="padding:24px;background:#fff;border:1px solid #e0e0e0;">
+                        <p>Dear <strong>{Employee_name}</strong>,</p>
+                        <p>You are invited to attend a performance meeting. Please find the details below:</p>
+                        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                            <tr><td style="padding:8px 12px;border:1px solid #e0e0e0;background:#f8f9fa;font-weight:600;width:140px;">Title</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{Title}</td></tr>
+                            <tr><td style="padding:8px 12px;border:1px solid #e0e0e0;background:#f8f9fa;font-weight:600;">Date</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{Meeting_Date}</td></tr>
+                            <tr><td style="padding:8px 12px;border:1px solid #e0e0e0;background:#f8f9fa;font-weight:600;">Time</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{Meeting_Time}</td></tr>
+                            <tr><td style="padding:8px 12px;border:1px solid #e0e0e0;background:#f8f9fa;font-weight:600;">Location</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{Meeting_Location}</td></tr>
+                            <tr><td style="padding:8px 12px;border:1px solid #e0e0e0;background:#f8f9fa;font-weight:600;">Meeting Link</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{Meeting_Link}</td></tr>
+                            <tr><td style="padding:8px 12px;border:1px solid #e0e0e0;background:#f8f9fa;font-weight:600;">Description</td><td style="padding:8px 12px;border:1px solid #e0e0e0;">{Description}</td></tr>
+                        </table>
+                        {Accept_Decline_Buttons}
+                    </div>
+                    <div style="padding:16px 24px;background:#f8f9fa;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;">
+                        <p style="margin:0;color:#666;">Best regards,<br><strong>{Your_Name}</strong><br>{Your_Designation}<br>{Resort_Name}</p>
+                    </div>
+                </div>
+            ';
+        } else {
+            // Append accept/decline buttons to custom template if not already included
+            if (strpos($emailTemplate, '{Accept_Decline_Buttons}') === false) {
+                $emailTemplate .= '{Accept_Decline_Buttons}';
+            }
+        }
+
         $Your_Name = $this->resort->first_name . ' ' . $this->resort->last_name;
         $Designation = $this->resort->is_employee == 1
             ? optional($this->resort->GetEmployee->position)->position_title
@@ -110,30 +335,52 @@ class PerformanceMeetingController extends Controller
 
             if (!$employee || !$employee->resortAdmin) continue;
 
+            // Create participant record with unique token
+            $token = Str::random(48);
+            PerformanceMeetingParticipant::create([
+                'meeting_id' => $meeting->id,
+                'employee_id' => $employee->id,
+                'resort_id' => $this->resort->resort_id,
+                'status' => 'pending',
+                'token' => $token,
+            ]);
+
             $EmployeeName = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
+            $respondUrl = route('meeting.respond', ['token' => $token]);
 
             $placeholders = [
                 "{Employee_name}",
                 "{Title}",
                 "{Meeting_Date}",
                 "{Meeting_Time}",
+                "{Meeting_Location}",
                 "{Description}",
                 "{Your_Name}",
                 "{Your_Designation}",
                 "{Resort_Name}",
-                "{Meeting_Link}"
+                "{Meeting_Link}",
+                "{Accept_Decline_Buttons}"
             ];
+
+            $acceptDeclineHtml = '
+                <div style="margin-top:20px;padding:15px;background:#f8f9fa;border-radius:8px;text-align:center;">
+                    <p style="margin-bottom:12px;font-weight:600;">Please respond to this meeting invitation:</p>
+                    <a href="'.$respondUrl.'?action=accept" style="display:inline-block;padding:10px 30px;background:#014653;color:#fff;text-decoration:none;border-radius:6px;margin-right:10px;font-weight:500;">Accept</a>
+                    <a href="'.$respondUrl.'?action=decline" style="display:inline-block;padding:10px 30px;background:#dc3545;color:#fff;text-decoration:none;border-radius:6px;font-weight:500;">Decline</a>
+                </div>';
 
             $replacements = [
                 $EmployeeName,
                 $request->title,
                 Carbon::parse($request->date)->format('d M Y'),
                 $request->start_time . ' to ' . $request->end_time,
-                $request->description,
+                $request->location ?? 'N/A',
+                $request->description ?? '',
                 $Your_Name,
                 $Designation,
                 $resort_details->resort_name ?? 'Resort',
-                $request->conference_link
+                $request->conference_link ?? 'N/A',
+                $acceptDeclineHtml
             ];
 
             $finalBody = str_replace($placeholders, $replacements, $emailTemplate);
@@ -146,7 +393,7 @@ class PerformanceMeetingController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Meeting link sent successfully to employees.',
+            'message' => 'Meeting request has been sent to employee(s).',
         ]);
     } catch (\Exception $e) {
         DB::rollBack();
@@ -362,5 +609,78 @@ class PerformanceMeetingController extends Controller
             }
         }
         return array_values($raw);
+    }
+
+    public function showMeetingResponse($token)
+    {
+        $participant = PerformanceMeetingParticipant::where('token', $token)->first();
+
+        if (!$participant) {
+            return view('resorts.Performance.Meeting.response', [
+                'error' => 'Invalid or expired meeting link.',
+                'meeting' => null,
+                'participant' => null,
+                'action' => null
+            ]);
+        }
+
+        $meeting = $participant->meeting;
+        $action = request('action', null);
+
+        // Auto-accept if action=accept and not yet responded
+        if ($action === 'accept' && $participant->status === 'pending') {
+            $participant->update([
+                'status' => 'accepted',
+                'responded_at' => now(),
+            ]);
+            return view('resorts.Performance.Meeting.response', [
+                'error' => null,
+                'meeting' => $meeting,
+                'participant' => $participant,
+                'action' => 'accepted',
+                'message' => 'You have accepted the meeting invitation.'
+            ]);
+        }
+
+        return view('resorts.Performance.Meeting.response', [
+            'error' => null,
+            'meeting' => $meeting,
+            'participant' => $participant,
+            'action' => $action
+        ]);
+    }
+
+    public function submitMeetingResponse(Request $request, $token)
+    {
+        $participant = PerformanceMeetingParticipant::where('token', $token)->first();
+
+        if (!$participant) {
+            return back()->with('error', 'Invalid or expired meeting link.');
+        }
+
+        $status = $request->input('status');
+        $reason = $request->input('reason', '');
+
+        if ($status === 'declined' && empty(trim($reason))) {
+            return back()->with('error', 'Please provide a reason for declining.')->withInput();
+        }
+
+        $participant->update([
+            'status' => $status,
+            'reason' => $reason,
+            'responded_at' => now(),
+        ]);
+
+        $message = $status === 'accepted'
+            ? 'You have accepted the meeting invitation.'
+            : 'You have declined the meeting invitation.';
+
+        return view('resorts.Performance.Meeting.response', [
+            'error' => null,
+            'meeting' => $participant->meeting,
+            'participant' => $participant,
+            'action' => $status,
+            'message' => $message
+        ]);
     }
 }

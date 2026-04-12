@@ -54,11 +54,11 @@
 
 
             var table = $('#employeeTable').DataTable({
-                "searching": false,
-                "processing": true, // Show processing indicator
-
+                "searching": true,
+                "processing": true,
                 "ordering": true,
-                "paging": false,
+                "paging": true,
+                "iDisplayLength": 10,
                 "ajax": {
                     "url": "{{ route('resort.employeelist') }}",
                     "type": "get",

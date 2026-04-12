@@ -881,6 +881,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
 
     Route::get('performance/meeting', 'Performance\PerformanceMeetingController@index')->name('Performance.Meeting.index');
+    Route::get('performance/scheduled-meetings', 'Performance\PerformanceMeetingController@scheduledMeetings')->name('Performance.Meeting.scheduled');
+    Route::get('performance/scheduled-meetings/calendar-data', 'Performance\PerformanceMeetingController@calendarData')->name('Performance.Meeting.calendarData');
+    Route::get('performance/scheduled-meetings/sidebar', 'Performance\PerformanceMeetingController@meetingSidebar')->name('Performance.Meeting.sidebar');
+    Route::get('performance/meetings-list', 'Performance\PerformanceMeetingController@meetingsList')->name('Performance.Meeting.list');
+    Route::get('performance/meetings-list/data', 'Performance\PerformanceMeetingController@meetingsListData')->name('Performance.Meeting.listData');
     Route::post('performance/schedule-meeting-employee', 'Performance\PerformanceMeetingController@SendMeetingLink')->name('Performance.Meeting.ScheduleMeetingEmp');
     Route::post('performance/get-performance-employee', 'Performance\PerformanceMeetingController@GetPerformanceEmp')->name('Performance.Meeting.GetPerformanceEmp');
 

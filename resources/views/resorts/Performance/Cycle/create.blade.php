@@ -48,22 +48,22 @@
                                     <label for="cycle_name" class="form-label">CYCLE NAME</label>
                                     <input type="text" class="form-control" id="cycle_name" name="cycle_name" value=""  placeholder="Cycle Name"
                                         data-parsley-required-message="Please enter cycle name"
-                                        data-parsley-group="block-0  " required>
+                                        data-parsley-group="block-0" required>
                                 </div>
                                 <div class="col-md-4 col-sm-6">
                                     <label for="Step_One_start_date" class="form-label">START DATE</label>
-                                    <input type="text" class="form-control datepicker" id="Step_One_start_date" name="Step_One_start_date" data-parsley-required-message="Please Select Cycle Start Date"
-                                    required data-parsley-group="block-0" required >
+                                    <input type="text" class="form-control datepicker" id="Step_One_start_date" name="Step_One_start_date" placeholder="Select Date" data-parsley-required-message="Please Select Cycle Start Date"
+                                    required data-parsley-group="block-0">
                                 </div>
                                 <div class="col-md-4 col-sm-6">
                                     <label for="Step_End_start_date" class="form-label">END DATE</label>
                                     <input type="text" class="form-control datepicker" id="Step_End_start_date" name="Step_One_end_date" placeholder="Select Date"
                                     data-parsley-required-message="Please Select Cycle End Date"
-                                    required data-parsley-group="block-0" required  data-parsley-endgreaterthanstart="#Step_One_start_date">
+                                    required data-parsley-group="block-0" data-parsley-endgreaterthanstart="#Step_One_start_date">
                                 </div>
                                 <div class="col-md-12 col-sm-12">
                                     <label for="end_date" class="form-label">Summary</label>
-                                    <textarea class="form-control" name="CycleSummary" id="CycleSummary" name="CycleSummary" placeholder="Enter Cycle Description"   data-parsley-required-message="Please enter Cycle summary"
+                                    <textarea class="form-control" id="CycleSummary" name="CycleSummary" placeholder="Enter Cycle Description" data-parsley-required-message="Please enter Cycle summary"
                                     required data-parsley-group="block-0"></textarea>
                                 </div>
                             </div>
@@ -98,17 +98,16 @@
                                     </select>
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
-                                    <label for="emp_status" class="form-label">EMPLOYMENT STATUS</label>
+                                    <label for="emp_status" class="form-label">EMPLOYMENT TYPE</label>
                                     <select class="form-select select2t-none" id="emp_status" name="emp_status"
                                         aria-label="Default select example">
                                      <option value=""></option>
-                                        <?php
-                                            $status = config('settings.EmployeeStatus');
+                                        @php
+                                            $employmentTypes = ['Full-Time','Part-Time','Contract','Casual','Probationary','Internship','Temporary'];
                                             $GenderType = config('settings.GenderType');
-
-                                        ?>
-                                        @foreach ($status as $s)
-                                            <option value="{{ $s }}">{{ucfirst($s)}}</option>
+                                        @endphp
+                                        @foreach ($employmentTypes as $s)
+                                            <option value="{{ $s }}">{{ $s }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -144,6 +143,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <button type="button" class="btn btn-themeBlue FilterEmployees">Submit</button>
+                                    <button type="button" class="btn btn-themeGray ms-2 ResetFilters">Reset</button>
                                 </div>
                             </div>
                         </div>
@@ -230,7 +230,7 @@
                         <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
                         <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                     </fieldset>
-                    <fieldset data-parsley-group="block-4">
+                    <fieldset data-parsley-group="block-3">
                         <div class="mt-md-4 mt-2 mb-md-4 mb-3 pb-md-2  text-center">
                             <h4 class="fw-600">Cycle Summary & Calendar/Activity Setup</h4>
                         </div>
@@ -458,6 +458,19 @@
         var opacity;
         var current = 1;
         var steps = $("fieldset").length;
+        // Restore step from sessionStorage on page load
+        var savedStep = sessionStorage.getItem('performanceCycleStep');
+        if (savedStep && parseInt(savedStep) > 0) {
+            var stepIndex = parseInt(savedStep);
+            $("fieldset").hide();
+            $("fieldset").eq(stepIndex).show().css('opacity', 1);
+            $("#progressbar li").each(function(i) {
+                if (i <= stepIndex) $(this).addClass('active');
+                if (i === stepIndex) $(this).addClass('current');
+                else $(this).removeClass('current');
+            });
+        }
+
         $(".next").click(function (e) {
                 e.preventDefault();
 
@@ -490,6 +503,9 @@
                 }       
                 $("#progressbar li").eq($("fieldset").index(current_fs)).removeClass("current");
                 $("#progressbar li").eq($("fieldset").index(next_fs)).addClass("active current");
+
+                // Save current step
+                sessionStorage.setItem('performanceCycleStep', $("fieldset").index(next_fs));
 
                 next_fs.show();
                 current_fs.animate({ opacity: 0 }, {
@@ -596,6 +612,10 @@
             $("#progressbar li").eq($("fieldset").index(previous_fs)).addClass("current");
 
             $("#progressbar li").eq($("fieldset").index(current_fs)).removeClass("active");
+
+            // Save current step
+            sessionStorage.setItem('performanceCycleStep', $("fieldset").index(previous_fs));
+
             previous_fs.show();
             current_fs.animate({ opacity: 0 },
             {
@@ -621,6 +641,18 @@
             e.preventDefault();
             FetchEmployees();
             GetTheTemplete();
+        });
+        $(".ResetFilters").click(function (e)
+        {
+            e.preventDefault();
+            $('#select_dep').val(null).trigger('change');
+            $('#select_position').html('<option></option>').val(null).trigger('change');
+            $('#emp_status').val(null).trigger('change');
+            $('#gender').val(null).trigger('change');
+            $('#Location').val(null).trigger('change');
+            $('#joining_date').val('');
+            $('#tenure_duration').val('');
+            FetchEmployees();
         });
         $('.datepicker').datepicker({format: 'dd/mm/yyyy', autoclose: true}).on('changeDate', function () {
             $(this).parsley().validate();
@@ -793,7 +825,7 @@
                 "iDisplayLength": 10,
                 processing: true,
                 serverSide: true,
-                order:[[7, 'desc']],
+                order:[[1, 'asc']],
                 ajax: {
                     url: '{{ route("Performance.cycle.FetchEmployees") }}',
                     type: 'GET',
@@ -808,7 +840,7 @@
                      d.tenure_duration = $("#tenure_duration").val();
                      d.CheckedAll  = $(".CycleEmp").is(":checked");
                     }
-  
+
                 },
                 columns: [
                     { data: 'id', name: 'Id', className: 'text-nowrap', orderable: false, searchable: false },
@@ -817,8 +849,7 @@
                     { data: 'DepartmentName', name: 'DepartmentName', className: 'text-nowrap' },
                     { data: 'PositionTitle', name: 'PositionTitle', className: 'text-nowrap' },
                     { data: 'JoiningDate', name: 'JoiningDate', className: 'text-nowrap' },
-                    { data: 'status', name: 'PositionTitle' },
-                    {data:'created_at', visible:false,searchable:false},
+                    { data: 'status', name: 'status' },
                 ]
             });
             TableAccomMainten.on('draw', function () {
@@ -959,6 +990,7 @@
                 {
                     if(d.success == true)
                     {
+                        sessionStorage.removeItem('performanceCycleStep');
                         toastr.success(d.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });

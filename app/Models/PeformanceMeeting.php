@@ -13,4 +13,9 @@ class PeformanceMeeting extends Model
     protected $fillable = [
         'title',	'start_time','end_time','date','location','conference_links','description','resort_id'
     ];
+
+    public function participants()
+    {
+        return $this->hasMany(PerformanceMeetingParticipant::class, 'meeting_id');
+    }
 }

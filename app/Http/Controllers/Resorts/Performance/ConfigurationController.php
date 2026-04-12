@@ -481,7 +481,8 @@ class ConfigurationController extends Controller
             return datatables()->of($NintyDayPeformanceForm)
             ->addColumn('action', function ($row)
             {
-                return '<a hef="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-name="'.$row->FormName.'" data-id="'.e($row->id).'"><img src="'. asset('resorts_assets/images/edit.svg').'" alt="" class="img-fluid" /></a>
+                return '<a href="javascript:void(0)" class="btn-lg-icon icon-bg-skyblue me-1 view-row-btn" data-id="'.e($row->id).'" data-name="'.e($row->FormName).'"><i class="fa-regular fa-eye"></i></a>
+                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-name="'.e($row->FormName).'" data-id="'.e($row->id).'"><img src="'. asset('resorts_assets/images/edit.svg').'" alt="" class="img-fluid" /></a>
                         <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="'.e(base64_encode($row->id)).'"><img src="'. asset("resorts_assets/images/trash-red.svg").'" alt="" class="img-fluid" /></a>';
              })
             ->editColumn('FormName', function ($row)
@@ -491,7 +492,7 @@ class ConfigurationController extends Controller
             ->rawColumns(['FormName','action'])
             ->make(true);
         }
-        $page_title="90 Day Peformance Form List";
+        $page_title="90 Day Performance Form List";
 
         return view('resorts.Performance.configuration.NintyPerformanceFormList',compact('page_title'));
     }
@@ -612,7 +613,8 @@ class ConfigurationController extends Controller
             return datatables()->of($Professionalform)
             ->addColumn('action', function ($row)
             {
-                return '<a hef="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-name="'.$row->FormName.'" data-id="'.e($row->id).'"><img src="'. asset('resorts_assets/images/edit.svg').'" alt="" class="img-fluid" /></a>
+                return '<a href="javascript:void(0)" class="btn-lg-icon icon-bg-skyblue me-1 view-row-btn" data-id="'.e($row->id).'" data-name="'.e($row->FormName).'"><i class="fa-regular fa-eye"></i></a>
+                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-name="'.e($row->FormName).'" data-id="'.e($row->id).'"><img src="'. asset('resorts_assets/images/edit.svg').'" alt="" class="img-fluid" /></a>
                         <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="'.e(base64_encode($row->id)).'"><img src="'. asset("resorts_assets/images/trash-red.svg").'" alt="" class="img-fluid" /></a>';
              })
             ->editColumn('FormBuilderName', function ($row)
@@ -622,7 +624,7 @@ class ConfigurationController extends Controller
             ->rawColumns(['FormBuilderName','action'])
             ->make(true);
         }
-        $page_title="Professional Form List";
+        $page_title="Professional Development Form List";
 
         return view('resorts.Performance.configuration.ProfessionalFormList',compact('page_title'));
     }

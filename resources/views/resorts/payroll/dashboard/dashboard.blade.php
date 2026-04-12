@@ -1194,7 +1194,7 @@
                 }
             },
             scales: {
-                x: { stacked: true, grid: { display: false } },
+                x: { stacked: true, grid: { display: false }, ticks: { autoSkip: false, maxRotation: 45, minRotation: 0 } },
                 y: { stacked: true, beginAtZero: true, grid: { display: false }, ticks: { callback: function(v) { return formatAmount(v, 'USD'); } } }
             }
         }
