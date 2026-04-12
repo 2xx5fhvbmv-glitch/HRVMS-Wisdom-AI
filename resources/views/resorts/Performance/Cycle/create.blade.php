@@ -658,24 +658,27 @@
             $(this).parsley().validate();
         });
 
-        $(document).on('change', '.Review_Types', function() 
+        // Load templates on page load
+        GetTheTemplete();
+
+        $(document).on('change', '.Review_Types', function()
         {
             var id = $(this).data('id');
             var targetDiv = $('#DivFormTemplete_' + id);
             var selectField = $('#FormTemplete_' + id);
-            if ($(this).is(':checked')) 
+            if ($(this).is(':checked'))
             {
                 targetDiv.removeClass('d-none');
                 selectField.attr('data-parsley-required', 'true');
-            } 
+                // Reload templates when review type is checked
+                GetTheTemplete();
+            }
             else
             {
                 targetDiv.addClass('d-none');
                 selectField.removeAttr('data-parsley-required');
-                // Reset the Select2 dropdown to its placeholder or default state
                 selectField.val(null).trigger('change');
-
-        }
+            }
         });
         $(".select2t-none").on('change', function () 
         {
@@ -883,6 +886,7 @@
                 type: "post",
                 data:
                 {
+                    _token: "{{ csrf_token() }}",
                     deptId: deptId,
                     position: position,
                     tenure_duration: tenure_duration
@@ -891,13 +895,15 @@
                 {
                     if(d.success == true)
                     {
-                        let string='<option value=""></option>';
+                        let string='<option value="">Select Template</option>';
                         $.each(d.data, function(key, value)
                         {
                             string+='<option value="'+value.id+'">'+value.FormName+'</option>';
                         });
-                        $("#FormTemplete_1").html(string);
-                        $("#FormTemplete_0").html(string);
+                        // Populate all FormTemplete dropdowns dynamically
+                        $('select[id^="FormTemplete_"]').each(function() {
+                            $(this).html(string);
+                        });
                     }
                 },
                 error: function(response) 

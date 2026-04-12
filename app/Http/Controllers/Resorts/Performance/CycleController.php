@@ -16,6 +16,7 @@ use App\Models\Employee;
 use App\Models\PerformanceReviewType;
 use App\Models\PerformanceTemplateForm;
 use App\Models\NintyDayPeformanceForm;
+use App\Models\Professionalform;
 use App\Models\PerformaChildCycle;
 use App\Models\PerformanceCycle;
 class CycleController extends Controller
@@ -61,10 +62,7 @@ class CycleController extends Controller
         $page_title = "Create Cycle";
         $ResortDepartment = ResortDepartment::where('resort_id',$this->resort->resort_id)->get();
         $Location =  Employee::where('resort_id',$this->resort->resort_id)->get()->pluck('nationality')->unique();
-        $PerformanceReviewType = PerformanceReviewType::where('resort_id',$this->resort->resort_id)->where(function($query) {
-                                                    $query->whereIn('category_title',['Manager Review','manager review','Manager-Review','MANAGER REVIEW','MANAGER-REVIEW'])
-                                                        ->orWhereIn('category_title',['Self-Review','Self Review','self review','SELF REVIEW','SELF-REVIEW']);
-                                                })
+        $PerformanceReviewType = PerformanceReviewType::where('resort_id',$this->resort->resort_id)
                                         ->orderBy("category_title","DESC")
                                         ->get(['id','category_title']);
        $PerformanceTemplateForm =  PerformanceTemplateForm::where('resort_id',$this->resort->resort_id)->get();
@@ -180,38 +178,60 @@ class CycleController extends Controller
 
     function CycleFetchTemplate(Request $request)
     {
-
-        $deptId =$request->deptId;
-        $position =$request->position;
-        $tenure_duration =$request->tenure_duration;
+        $deptId = $request->deptId;
+        $position = $request->position;
+        $tenure_duration = $request->tenure_duration;
+        $resort_id = $this->resort->resort_id;
 
         try
         {
-            if(isset($deptId)  && isset($position) && !isset($tenure_duration))
-            {
-                $performance = PerformanceTemplateForm::where("resort_id",$this->resort->resort_id)
-                                                        ->where("Department_id",$deptId)
-                                                        ->where("Position_id",$position)
-                                                        ->get();
-                if( $performance->isEmpty())
-                {
-                    $performance = PerformanceTemplateForm::where("resort_id",$this->resort->resort_id)->get();
+            $allForms = collect();
+
+            // 1. Form Templates (filtered by dept/position if provided, else all)
+            $templateQuery = PerformanceTemplateForm::where("resort_id", $resort_id);
+            if (!empty($deptId) && !empty($position)) {
+                $matchedTemplates = (clone $templateQuery)
+                    ->where("Department_id", $deptId)
+                    ->where("Position_id", $position)
+                    ->get();
+                if ($matchedTemplates->isNotEmpty()) {
+                    $templateQuery = $templateQuery->where("Department_id", $deptId)->where("Position_id", $position);
                 }
             }
-            elseif(isset($tenure_duration) && $tenure_duration !=0)
-            {
-                $performance = NintyDayPeformanceForm::where("resort_id",$this->resort->resort_id)->get();
+            $templates = $templateQuery->get(['id', 'FormName'])->map(function($t) {
+                $t->FormName = $t->FormName . ' (Template)';
+                return $t;
+            });
+            $allForms = $allForms->merge($templates);
+
+            // 2. 90 Day Appraisal Forms
+            $nintyDayForms = NintyDayPeformanceForm::where("resort_id", $resort_id)
+                ->get(['id', 'FormName'])
+                ->map(function($f) {
+                    $f->id = 'ninty_' . $f->id;
+                    $f->FormName = $f->FormName . ' (90 Day)';
+                    return $f;
+                });
+            $allForms = $allForms->merge($nintyDayForms);
+
+            // 3. Professional Development Forms
+            if (class_exists(\App\Models\Professionalform::class)) {
+                $professionalForms = \App\Models\Professionalform::where("resort_id", $resort_id)
+                    ->get(['id', 'FormName'])
+                    ->map(function($f) {
+                        $f->id = 'prof_' . $f->id;
+                        $f->FormName = $f->FormName . ' (Professional)';
+                        return $f;
+                    });
+                $allForms = $allForms->merge($professionalForms);
             }
-            else
-            {
-                $performance = PerformanceTemplateForm::where("resort_id",$this->resort->resort_id)->get();
-            }
+
             return response()->json([
-                    'success' => true,
-                    'message' => 'Professional Form Deleted Successfully',
-                    'data' => $performance
-                ], 200);
-               
+                'success' => true,
+                'message' => 'Templates fetched successfully',
+                'data' => $allForms->values()
+            ], 200);
+
         }
         catch (\Exception $e)
         {
@@ -241,8 +261,15 @@ class CycleController extends Controller
         $Activivty_manager_End_date = $request->step_four_end_date_manager_hidden;
         $CycleReminders = $request->CycleReminders;
 
-        $CycleStartDate = Carbon::createFromFormat('d/m/Y', $CycleStartDate)->format('Y/m/d');
-        $CycleEndDate = Carbon::createFromFormat('d/m/Y', $Step_One_end_date)->format('Y/m/d');
+        if (empty($CycleStartDate) || empty($Step_One_end_date)) {
+            return response()->json(['success' => false, 'errors' => ['date' => ['Start date and end date are required']]], 422);
+        }
+        try {
+            $CycleStartDate = Carbon::createFromFormat('d/m/Y', $CycleStartDate)->format('Y-m-d');
+            $CycleEndDate = Carbon::createFromFormat('d/m/Y', $Step_One_end_date)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'errors' => ['date' => ['Invalid date format. Expected dd/mm/yyyy']]], 422);
+        }
 
         $Self_Activity_Start_Date = 0;
         $Self_Activity_End_Date = 0;
