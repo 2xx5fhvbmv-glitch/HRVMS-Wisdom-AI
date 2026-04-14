@@ -28,7 +28,7 @@
 
         <div>
             <div class="row g-4">
-                <div class="col-lg-6 ">
+                <div class="col-lg-6">
                     <div class="card">
                         <div class="card-title">
                             <h3>Form Templates</h3>
@@ -36,46 +36,88 @@
                                 <a href="{{ route('Performance.config.PerformanceTemplateFormList') }}" class="a-link">View All</a>
                             </div>
                         </div>
+                        <p class="text-muted mb-3">Build position-specific appraisal templates. Select hierarchy below to create a targeted form template.</p>
                         <form id="FormTemplate">
                             @csrf
-
-                            <div class="mb-2">
-                                <select class="form-select  ResortDivision" id="ResortDivision" name='ResortDivision' aria-label="Default select example">
-                                    <option  > </option>
-                                    @if($resort_divisions->isNotEmpty())
-                                        @foreach($resort_divisions as $resort_division)
-                                            <option value="{{ $resort_division->id }}">{{ $resort_division->name }}</option>
-                                        @endforeach
-                                    @endif
-                                </select>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-500">Division</label>
+                                    <select class="form-select ResortDivision" id="ResortDivision" name="ResortDivision">
+                                        <option value="">Select Division</option>
+                                        @if($resort_divisions->isNotEmpty())
+                                            @foreach($resort_divisions as $resort_division)
+                                                <option value="{{ $resort_division->id }}">{{ $resort_division->name }}</option>
+                                            @endforeach
+                                        @endif
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-500">Department</label>
+                                    <select class="form-select select2 Department">
+                                        <option value="">Select Department</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-500">Section</label>
+                                    <select class="form-select Section">
+                                        <option value="">Select Section</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-500">Position</label>
+                                    <select class="form-select select2 Position">
+                                        <option value="">Select Position</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="mb-2">
-                                <select class="form-select select2 Department" aria-label="Default select example">
-                                    <option ></option>
-
-                                </select>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-themeSkyblue FormTemplate w-100" data-flag="simple" disabled>
+                                    <i class="fa-solid fa-plus me-1"></i> Create Template
+                                </button>
                             </div>
-                            <div class="mb-2">
-                                <select class="form-select  Section" aria-label="Default select example">
-                                    <option ></option>
-
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <select class="form-select select2 Position" aria-label="Default select example">
-                                    <option ></option>
-
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <button type="button" class="btn btn-themeSkyblue FormTemplate" data-flag="simple" disabled>Create Template</button>
-                            </div>
-
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a></div>
                         </form>
                     </div>
                 </div>
-                <div class="col-lg-6 ">
+
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-title">
+                            <h3>Performance Meeting Email</h3>
+                        </div>
+                        <p class="text-muted mb-3">Customize the email template sent to participants when scheduling performance meetings.</p>
+                        <form id="ScheduleMeetingEmailForm">
+                            @csrf
+                            <div class="mb-3">
+                                <label class="form-label fw-500">Email Template</label>
+                                <textarea class="form-control ScheduleMeetingEmail" rows="7" name="ScheduleMeetingEmail" id="ScheduleMeetingEmail">{!! isset($PerformanceMeetingContent->content) ? $PerformanceMeetingContent->content : ''  !!}</textarea>
+                            </div>
+
+                            <div class="placeholders-box">
+                                <strong class="d-block mb-2"><i class="fa-solid fa-tag me-1"></i> Available Placeholders</strong>
+                                <div class="row g-2">
+                                    <div class="col-md-6"><code class="insert-placeholder">{Employee_name}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Title}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Description}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Meeting_Link}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Meeting_Date}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Meeting_Time}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Meeting_Location}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Your_Name}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Your_Designation}</code></div>
+                                    <div class="col-md-6"><code class="insert-placeholder">{Resort_Name}</code></div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 mt-3">
+                                <button type="submit" class="btn btn-themeBlue w-100">
+                                    <i class="fa-regular fa-save me-1"></i> Save Template
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                {{-- <div class="col-lg-6 ">
                     <div class="card h-100">
                         <div class="card-title">
                             <h3>Review Types</h3>
@@ -117,111 +159,91 @@
 
 
                     </div>
-                </div>
+                </div> --}}
 
 
 
 
-                <div class="col-lg-6 ">
-                    <div class="card ">
+                <div class="col-xl-4 col-lg-6 col-md-6">
+                    <div class="card h-100 d-flex flex-column">
                         <div class="card-title">
                             <h3>Mid-Year / Half-Year Appraisal</h3>
                             <div class="text-end">
-                                <a href="{{ route('Performance.config.ProfessionalFormList') }}" class="a-link">View All</a>
+                                <a href="{{ route('Performance.config.ProfessionalFormList', ['type' => 'ProfessionalForm']) }}" class="a-link">View All</a>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-themeSkyblue " data-flag="ProfessionalForm" id="ProfessionalForm">Create Template</button>
+                        <p class="text-muted">Mid-year performance appraisal form for regular reviews.</p>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="ProfessionalForm" id="ProfessionalForm">
+                                <i class="fa-solid fa-plus me-1"></i> Create Template
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-6 ">
-                    <div class="card ">
+                <div class="col-xl-4 col-lg-6 col-md-6">
+                    <div class="card h-100 d-flex flex-column">
                         <div class="card-title">
                             <h3>90 Day Appraisal Form</h3>
                             <div class="text-end">
                                 <a href="{{ route('Performance.config.NintyPerformanceFormList') }}" class="a-link">View All</a>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-themeSkyblue " data-flag="nintyDayForm" id="nintyDayForm">Create Template</button>
+                        <p class="text-muted">Probationary review form for new hires within 90 days.</p>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="nintyDayForm" id="nintyDayForm">
+                                <i class="fa-solid fa-plus me-1"></i> Create Template
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-6 ">
-                    <div class="card ">
+                <div class="col-xl-4 col-lg-6 col-md-6">
+                    <div class="card h-100 d-flex flex-column">
                         <div class="card-title">
                             <h3>Annual Appraisal</h3>
+                            <div class="text-end">
+                                <a href="{{ route('Performance.config.ProfessionalFormList', ['type' => 'annualAppraisal']) }}" class="a-link">View All</a>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-themeSkyblue " data-flag="annualAppraisal" id="annualAppraisal">Create Template</button>
+                        <p class="text-muted">Yearly performance appraisal form for end-of-year reviews.</p>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="annualAppraisal" id="annualAppraisal">
+                                <i class="fa-solid fa-plus me-1"></i> Create Template
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-6 ">
-                    <div class="card ">
+                <div class="col-xl-4 col-lg-6 col-md-6">
+                    <div class="card h-100 d-flex flex-column">
                         <div class="card-title">
                             <h3>Performance Improvement Plan (PIP)</h3>
+                            <div class="text-end">
+                                <a href="{{ route('Performance.config.ProfessionalFormList', ['type' => 'pipForm']) }}" class="a-link">View All</a>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-themeSkyblue " data-flag="pipForm" id="pipForm">Create Template</button>
+                        <p class="text-muted">Action plan for employees requiring performance improvement.</p>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="pipForm" id="pipForm">
+                                <i class="fa-solid fa-plus me-1"></i> Create Template
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-6 ">
-                    <div class="card ">
+                <div class="col-xl-4 col-lg-6 col-md-6">
+                    <div class="card h-100 d-flex flex-column">
                         <div class="card-title">
                             <h3>Professional Development Plan (PDP)</h3>
-                        </div>
-                        <div class="mb-3">
-                            <button type="button" class="btn btn-themeSkyblue " data-flag="pdpForm" id="pdpForm">Create Template</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-6  ">
-                    <div class="card h-100">
-                        <div class="card-title">
-                            <h3>Performance- Meeting Email</h3>
-
-                        </div>
-                            <form id="ScheduleMeetingEmailForm">
-                                @csrf
-
-                                <div class="mb-3">
-
-                                    <textarea class="form-control ScheduleMeetingEmail" rows="7" name="ScheduleMeetingEmail" id="ScheduleMeetingEmail">
-                                        {!! isset($PerformanceMeetingContent->content) ? $PerformanceMeetingContent->content : ''  !!}
-                                    </textarea>
-                                </div>
-
-                                <div class="modal-footer">
-                                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                                    <button type="submit"class="btn btn-themeBlue">Submit</button>
-                                </div>
-                            </form>
-                            <hr>
-                            <div class="placeholders">
-                                <strong>Available Placeholders:</strong>
-                                <ul>
-                                    <li><code class="insert-placeholder" data-placeholder="user_name">{Employee_name}</code> - EmployeeName</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Meeting_Link">{Title}</code> - Title</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Meeting_Link">{Description}</code> - Description</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Meeting_Link">{Meeting_Link}</code> - MeetingLink</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Meeting_Time">{Meeting_Date}</code> - MeetingDate</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Meeting_Time">{Meeting_Time}</code> - MeetingTime</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Meeting_Time">{Meeting_Location}</code> - Meeting Location</li>
-
-                                    <li><code class="insert-placeholder" data-placeholder="Your_Name">{Your_Name}</code> - YourName</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Your_Designation">{Your_Designation}</code>  - Your Designation</li>
-                                    <li><code class="insert-placeholder" data-placeholder="Resort_Name">{Resort_Name}</code> - ResortName</li>
-
-                                </ul>
+                            <div class="text-end">
+                                <a href="{{ route('Performance.config.ProfessionalFormList', ['type' => 'pdpForm']) }}" class="a-link">View All</a>
                             </div>
+                        </div>
+                        <p class="text-muted">Career growth and skill development planning form.</p>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="pdpForm" id="pdpForm">
+                                <i class="fa-solid fa-plus me-1"></i> Create Template
+                            </button>
+                        </div>
                     </div>
-
-
                 </div>
             </div>
         </div>
@@ -275,6 +297,19 @@
     .table-field th { background: #014653; color: #fff; font-weight: 500; padding: 8px 12px; }
     .table-field td { background: #fff; padding: 8px 12px; }
     .table-field th[contenteditable]:focus, .table-field td[contenteditable]:focus { outline: 2px solid #2EACB3; }
+
+    /* Configuration page polish */
+    .placeholders-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; font-size: 12px; }
+    .placeholders-box strong { color: #014653; font-size: 13px; }
+    .placeholders-box code.insert-placeholder { display: inline-block; background: #fff; border: 1px solid #dee2e6; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #014653; font-size: 11px; transition: all 0.2s; }
+    .placeholders-box code.insert-placeholder:hover { background: #014653; color: #fff; border-color: #014653; }
+    .card .card-title { margin-bottom: 12px; }
+    .card p.text-muted { font-size: 13px; line-height: 1.5; }
+    .form-label.fw-500 { font-weight: 500; font-size: 13px; color: #555; margin-bottom: 4px; }
+
+    /* Prevent Select2 overflow */
+    #FormTemplate .select2-container { width: 100% !important; max-width: 100%; }
+    #FormTemplate .form-select { width: 100%; max-width: 100%; }
 </style>
 @endsection
 
@@ -502,10 +537,10 @@
                 }
 
             });
-            $("#ResortDivision").select2({placeholder: "Select Division"});
-            $(".Department").select2({placeholder: "Select Department"});
-            $(".Section").select2({placeholder: "select Section"});
-            $(".Position").select2({placeholder: "select Position"});
+            $("#ResortDivision").select2({placeholder: "Select Division", width: '100%'});
+            $(".Department").select2({placeholder: "Select Department", width: '100%'});
+            $(".Section").select2({placeholder: "Select Section", width: '100%'});
+            $(".Position").select2({placeholder: "Select Position", width: '100%'});
              ReviewType();
             $('#reviewForm').parsley();
             $('#reviewForm').on('submit', function (e) {

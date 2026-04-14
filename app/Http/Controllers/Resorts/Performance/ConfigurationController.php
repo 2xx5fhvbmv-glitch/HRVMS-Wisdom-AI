@@ -607,7 +607,12 @@ class ConfigurationController extends Controller
     }
     public function ProfessionalFormList(Request $request)
     {
-        $Professionalform = Professionalform::where('resort_id',$this->resort->resort_id)->get();
+        $form_type = $request->type;
+        $query = Professionalform::where('resort_id',$this->resort->resort_id);
+        if ($form_type) {
+            $query->where('form_type', $form_type);
+        }
+        $Professionalform = $query->get();
         if($request->ajax())
         {
             return datatables()->of($Professionalform)
@@ -633,6 +638,7 @@ class ConfigurationController extends Controller
     {
         $FormName = $request->FormName;
         $form_structure = json_encode($request->form_structure);
+        $form_type = $request->form_type ?: 'ProfessionalForm';
 
         $validator = Validator::make($request->all(), [
             'FormName' => [
@@ -654,6 +660,7 @@ class ConfigurationController extends Controller
             Professionalform::create([
                     'resort_id'=>$this->resort->resort_id,
                     'FormName'=>$FormName,
+                    'form_type'=>$form_type,
                     'form_structure'=>$form_structure
              ]);
              DB::commit();

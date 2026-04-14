@@ -87,60 +87,38 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">Department Wise Performance</h3>
-                            </div>
-                            <div class="col-auto">
-                                <div class="form-group">
-                                    <select class="form-select" aria-label="Default select example">
-                                        <option selected="">Select Division</option>
-                                        <option value="1">AAA</option>
-                                        <option value="2">AAA</option>
-                                    </select>
-                                </div>
+                                <h3 class="text-nowrap">Department Wise Distribution</h3>
                             </div>
                         </div>
                     </div>
-                    <div class="row g-4 align-items-center">
-                        <div class="col-md-6">
-                            <div class="chart-department"> <canvas id="myDoughnutChart"></canvas></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="row g-2 ">
-                                <div class="col-6">
-                                    <div class="doughnut-label">
-                                        <span class="bg-theme"></span>Management <br>40%
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeSkyblue"></span>Human Resources <br>15%
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeSkyblueLightNew"></span>Accounting <br>30%
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeGray"></span>Purchasing And Receiving <br>10%
-                                    </div>
-                                </div>
-
-                                <div class="col-6">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeWarning"></span>General Support <br>10%
-                                    </div>
-                                </div>
-
-                                <div class="col-6">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeSkyblueLight"></span>Security <br>30%
-                                    </div>
+                    @php
+                        $deptColors = ['#014653', '#2EACB3', '#53CAFF', '#333333', '#EFB408', '#8DC9C9', '#d9534f', '#5cb85c', '#f0ad4e', '#5bc0de'];
+                        $deptTotal = $department_data->sum('count');
+                    @endphp
+                    @if($deptTotal > 0)
+                        <div class="row g-4 align-items-center">
+                            <div class="col-md-6">
+                                <div class="chart-department"> <canvas id="myDoughnutChart"></canvas></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="row g-2 ">
+                                    @foreach($department_data as $idx => $dept)
+                                        @php $pct = round(($dept->count / $deptTotal) * 100); @endphp
+                                        <div class="col-6">
+                                            <div class="doughnut-label">
+                                                <span style="background:{{ $deptColors[$idx % count($deptColors)] }};"></span>{{ $dept->name }} <br>{{ $pct }}%
+                                            </div>
+                                        </div>
+                                    @endforeach
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    @else
+                        <div class="text-center py-4 text-muted">
+                            <i class="fa-regular fa-chart-bar" style="font-size:40px;"></i>
+                            <p class="mt-2">No department data available</p>
+                        </div>
+                    @endif
                 </div>
             </div>
             <div class="col-lg-6">
@@ -402,81 +380,60 @@
                                 <h3 class="text-nowrap">Performance Cycles</h3>
                             </div>
                             <div class="col-auto">
-                                <a href="#" class="a-link">View All</a>
+                                <a href="{{ route('Performance.cycle') }}" class="a-link">View All</a>
                             </div>
                         </div>
                     </div>
                     <div class="PerformanceCyc-main">
-                        <div class="PerformanceCyc-block bg-themeGrayLight">
-                            <div class="PerformanceCyc-head">
-                                <div class="">
-                                    <h5>Lorem ipsum is simply dummy text <span
-                                            class="badge badge-success">Ongoing</span>
-                                    </h5>
-                                    <p><img src="assets/images/users.svg" alt="icon"> 142 Employees</p>
-                                </div>
-                                <div>
-                                    <a href="#" class="btn btn-themeBlue btn-xsmall">Duplicate</a>
-                                    <a href="#" class="btn-tableIcon btnIcon-danger"><i
-                                            class="fa-regular fa-trash-can"></i></a>
-                                </div>
-                            </div>
-                            <div class="row gx-md-4 g-3">
-                                <div class="col-lg-3 col-sm-6">
-                                    <div class="d-flex bg-white">
-                                        <p>Manager Reviews</p>
-                                        <h3>46</h3>
+                        @forelse($performance_cycles as $cycle)
+                            @php
+                                $statusBadge = 'badge-themeWarning';
+                                if ($cycle->status === 'OnGoing') $statusBadge = 'badge-success';
+                                elseif ($cycle->status === 'Close') $statusBadge = 'badge-themeLight';
+                            @endphp
+                            <div class="PerformanceCyc-block bg-themeGrayLight">
+                                <div class="PerformanceCyc-head">
+                                    <div class="">
+                                        <h5>{{ $cycle->Cycle_Name }}
+                                            <span class="badge {{ $statusBadge }}">{{ $cycle->status }}</span>
+                                        </h5>
+                                        <p><i class="fa-regular fa-user"></i> {{ $cycle->total_employees }} {{ $cycle->total_employees == 1 ? 'Employee' : 'Employees' }}</p>
+                                        <p class="mb-0" style="font-size:12px;color:#666;">
+                                            <i class="fa-regular fa-calendar me-1"></i>
+                                            {{ \Carbon\Carbon::parse($cycle->Start_Date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($cycle->End_Date)->format('d M Y') }}
+                                        </p>
                                     </div>
                                 </div>
-                                <div class="col-lg-3 col-sm-6">
-                                    <div class="d-flex bg-white">
-                                        <p>Self Reviews</p>
-                                        <h3>142</h3>
+                                <div class="row gx-md-4 g-3">
+                                    <div class="col-lg-4 col-sm-6">
+                                        <div class="d-flex bg-white">
+                                            <p>Self Reviews</p>
+                                            <h3>{{ $cycle->self_completed }}<small class="text-muted" style="font-size:12px;">/{{ $cycle->total_employees }}</small></h3>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="col-lg-3 col-sm-6">
-                                    <div class="d-flex bg-white">
-                                        <p>Peer Reviews</p>
-                                        <h3>79</h3>
+                                    <div class="col-lg-4 col-sm-6">
+                                        <div class="d-flex bg-white">
+                                            <p>Manager Reviews</p>
+                                            <h3>{{ $cycle->manager_completed }}<small class="text-muted" style="font-size:12px;">/{{ $cycle->total_employees }}</small></h3>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="PerformanceCyc-block bg-themeGrayLight">
-                            <div class="PerformanceCyc-head">
-                                <div class="">
-                                    <h5>Lorem ipsum is simply dummy text <span
-                                            class="badge badge-success">Ongoing</span>
-                                    </h5>
-                                    <p><img src="assets/images/users.svg" alt="icon"> 142 Employees</p>
-                                </div>
-                                <div>
-                                    <a href="#" class="btn btn-themeBlue btn-xsmall">Duplicate</a>
-                                    <a href="#" class="btn-tableIcon btnIcon-danger"><i
-                                            class="fa-regular fa-trash-can"></i></a>
-                                </div>
-                            </div>
-                            <div class="row gx-md-4 g-3">
-                                <div class="col-lg-3 col-sm-6">
-                                    <div class="d-flex bg-white">
-                                        <p>Manager Reviews</p>
-                                        <h3>46</h3>
-                                    </div>
-                                </div>
-                                <div class="col-lg-3 col-sm-6">
-                                    <div class="d-flex bg-white">
-                                        <p>Self Reviews</p>
-                                        <h3>142</h3>
-                                    </div>
-                                </div>
-                                <div class="col-lg-3 col-sm-6">
-                                    <div class="d-flex bg-white">
-                                        <p>Peer Reviews</p>
-                                        <h3>79</h3>
+                                    <div class="col-lg-4 col-sm-6">
+                                        <div class="d-flex bg-white">
+                                            <p>Pending</p>
+                                            <h3>{{ $cycle->self_pending + $cycle->manager_pending }}</h3>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        @empty
+                            <div class="text-center py-4 text-muted">
+                                <i class="fa-regular fa-calendar-xmark" style="font-size:40px;"></i>
+                                <p class="mt-2">No performance cycles created yet</p>
+                                <a href="{{ route('Performance.create') }}" class="btn btn-themeSkyblue btn-sm">
+                                    <i class="fa-solid fa-plus me-1"></i> Create Your First Cycle
+                                </a>
+                            </div>
+                        @endforelse
                     </div>
                 </div>
             </div>
@@ -524,7 +481,9 @@
 
 @section('import-scripts')
 <script type="module">
-    var ctz = document.getElementById('myDoughnutChart').getContext('2d');
+    var doughnutCanvas = document.getElementById('myDoughnutChart');
+    if (doughnutCanvas) {
+    var ctz = doughnutCanvas.getContext('2d');
 
     // Custom plugin only registered for this chart
     const doughnutLabelsInsideN = {
@@ -555,13 +514,17 @@
         }
     };
 
+    var deptLabels = @json($department_data->pluck('name'));
+    var deptCounts = @json($department_data->pluck('count'));
+    var deptBgColors = ['#014653', '#2EACB3', '#53CAFF', '#333333', '#EFB408', '#8DC9C9', '#d9534f', '#5cb85c', '#f0ad4e', '#5bc0de'];
+
     var myDoughnutChart = new Chart(ctz, {
         type: 'doughnut',
         data: {
-            labels: ['Management', 'Human Resources', 'Accounting', 'Purchasing And Receiving', 'General Support', 'Security'],
+            labels: deptLabels,
             datasets: [{
-                data: [40, 15, 30, 10, 10, 30],
-                backgroundColor: ['#014653', '#2EACB3', '#53CAFF', '#333333', '#EFB408', '#8DC9C9'],
+                data: deptCounts,
+                backgroundColor: deptLabels.map(function(_, i) { return deptBgColors[i % deptBgColors.length]; }),
                 borderWidth: 0
             }]
         },
@@ -585,6 +548,7 @@
         },
         plugins: [doughnutLabelsInsideN] // Attach the plugin to this chart only
     });
+    }
 </script>
 @endsection
 

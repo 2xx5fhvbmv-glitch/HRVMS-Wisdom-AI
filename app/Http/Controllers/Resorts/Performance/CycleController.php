@@ -32,7 +32,7 @@ class CycleController extends Controller
         $reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 3;
         $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
-    function index()
+    function index(Request $request)
     {
 
         if(Common::checkRouteWisePermission('Performance.cycle',config('settings.resort_permissions.view')) == false){
@@ -40,17 +40,34 @@ class CycleController extends Controller
         }
 
         $page_title = " Cycle";
+        $selectedYear = $request->get('year');
 
-        $PerformanceCycle   = PerformanceCycle::where('resort_id',$this->resort->resort_id)->get()
+        // Get distinct years from all cycles for dropdown
+        $availableYears = PerformanceCycle::where('resort_id', $this->resort->resort_id)
+            ->selectRaw('DISTINCT YEAR(Start_Date) as year')
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->filter()
+            ->values();
+
+        $query = PerformanceCycle::where('resort_id', $this->resort->resort_id);
+        if (!empty($selectedYear)) {
+            $query->where(function ($q) use ($selectedYear) {
+                $q->whereYear('Start_Date', $selectedYear)
+                  ->orWhereYear('End_Date', $selectedYear);
+            });
+        }
+
+        $PerformanceCycle = $query->orderByDesc('id')->get()
         ->map(function($p){
-            $ChildCycle = PerformaChildCycle ::where('Parent_cycle_id',$p->id)->get();
+            $ChildCycle = PerformaChildCycle::where('Parent_cycle_id', $p->id)->get();
 
             $p->child_count = $ChildCycle->count();
-            $p->ManagerReview = $ChildCycle->whereNotNull('Manager_review_date',null)->count();
-            $p->SelfReview = $ChildCycle->whereNotNull('Self_review_date',null)->count();
+            $p->ManagerReview = $ChildCycle->where('manager_review_status', 'completed')->count();
+            $p->SelfReview = $ChildCycle->where('self_review_status', 'completed')->count();
             return $p;
         });
-        return view('resorts.Performance.Cycle.index',compact('page_title','PerformanceCycle'));
+        return view('resorts.Performance.Cycle.index', compact('page_title', 'PerformanceCycle', 'availableYears', 'selectedYear'));
     }
     function create()
     {
@@ -61,7 +78,7 @@ class CycleController extends Controller
 
         $page_title = "Create Cycle";
         $ResortDepartment = ResortDepartment::where('resort_id',$this->resort->resort_id)->get();
-        $Location =  Employee::where('resort_id',$this->resort->resort_id)->get()->pluck('nationality')->unique();
+        $Location = collect(['Maldives', 'Resorts']);
         $PerformanceReviewType = PerformanceReviewType::where('resort_id',$this->resort->resort_id)
                                         ->orderBy("category_title","DESC")
                                         ->get(['id','category_title']);
@@ -77,15 +94,21 @@ class CycleController extends Controller
         $emp_status         =    $request->emp_status;
         $Location           =    $request->Location;
         $gender             =    $request->gender;
-        $joining_date       =    $request->joining_date;
+        $joining_date_from  =    $request->joining_date_from;
+        $joining_date_to    =    $request->joining_date_to;
         $tenure_duration    =   (int)$request->tenure_duration;
         $CheckedAll         = $request->CheckedAll;
         
+        $statusValues = ['Active','Inactive','Terminated','Resigned','On Leave','Suspended'];
+
         $employees = Employee::join('resort_admins as t3', 't3.id', '=', 'employees.Admin_Parent_id')
                                 ->join('resort_departments as t1', 't1.id', '=', 'employees.Dept_id')
                                 ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-                                ->where('employees.resort_id', $this->resort->resort_id)
-                                ->where('employees.status', 'Active');
+                                ->where('employees.resort_id', $this->resort->resort_id);
+                                // Default to Active employees only if no status-type filter applied
+                                if (empty($emp_status) || !in_array($emp_status, $statusValues)) {
+                                    $employees->where('employees.status', 'Active');
+                                }
                                 if(!empty($Department))
                                 {
                                     $employees->where('employees.Dept_id', $Department);
@@ -96,26 +119,42 @@ class CycleController extends Controller
                                 }
                                 if(!empty($emp_status))
                                 {
-                                    $employees->where('employees.employment_type', $emp_status);
+                                    if ($emp_status === 'Probationary') {
+                                        // Probationary = joined within last 3 months (90 days)
+                                        $employees->whereRaw('DATEDIFF(CURDATE(), employees.joining_date) <= 90');
+                                    } elseif (in_array($emp_status, $statusValues)) {
+                                        $employees->where('employees.status', $emp_status);
+                                    } else {
+                                        $employees->where('employees.employment_type', $emp_status);
+                                    }
                                 }
                                 if(!empty($gender))
                                 {
                                     $employees->where('t3.gender', strtolower($gender));
                                 }
-                                if(!empty($joining_date))
+                                if(!empty($joining_date_from))
                                 {
-                                    $date = Carbon::parse($joining_date)->format('Y-m-d');
-                                    $employees->whereDate('employees.joining_date', $date);
+                                    $from = Carbon::createFromFormat('d/m/Y', $joining_date_from)->format('Y-m-d');
+                                    $employees->whereDate('employees.joining_date', '>=', $from);
+                                }
+                                if(!empty($joining_date_to))
+                                {
+                                    $to = Carbon::createFromFormat('d/m/Y', $joining_date_to)->format('Y-m-d');
+                                    $employees->whereDate('employees.joining_date', '<=', $to);
                                 }
                                 if(!empty($Location))
                                 {
-                                    $employees->where('employees.nationality', $Location);
+                                    if ($Location === 'Maldives') {
+                                        $employees->where('employees.nationality', 'Maldivian');
+                                    } elseif ($Location === 'Resorts') {
+                                        $employees->where('employees.nationality', '!=', 'Maldivian');
+                                    }
                                 }
 
-                                if (isset($tenure_duration) && $tenure_duration !=0)
+                                if (!empty($tenure_duration) && $tenure_duration != 0)
                                 {
-
-                                    $employees->whereRaw('TIMESTAMPDIFF(YEAR, employees.joining_date, CURDATE()) >= ?', [$tenure_duration]);
+                                    // Show employees who joined within the last X days
+                                    $employees->whereRaw('DATEDIFF(CURDATE(), employees.joining_date) <= ?', [$tenure_duration]);
                                 }
                                 $employees=   $employees->get(['t3.id as Parentid','employees.Emp_id','employees.joining_date','t3.status','t3.gender','t3.first_name','t3.last_name','t1.name as DepartmentName', 't2.position_title as PositionTitle'])
                                 ->map(function ($i)
@@ -253,13 +292,10 @@ class CycleController extends Controller
         $Step_One_end_date = $request->Step_One_end_date;
         $CycleSummary = $request->CycleSummary;
         $Emp_main_id = $request->Emp_main_id;
-        $review_type = $request->review;
-        $form_review_type = $request->FormTemplete;
-        $Activity_self_Start_date = $request->step_four_start_date_self_hidden;
-        $Activity_self_End_date = $request->step_four_end_date_self_hidden;
-        $Activity_manager_Start_date = $request->step_four_start_date_manager_hidden;
-        $Activivty_manager_End_date = $request->step_four_end_date_manager_hidden;
-        $CycleReminders = $request->CycleReminders;
+        $cycleTemplate = $request->CycleTemplate;
+        $activityStartDates = $request->ActivityStartDate ?? [];
+        $activityEndDates = $request->ActivityEndDate ?? [];
+        $CycleReminders = in_array(strtolower((string) $request->CycleReminders), ['on', '1', 'true', 'yes']) ? 'ON' : 'OFF';
 
         if (empty($CycleStartDate) || empty($Step_One_end_date)) {
             return response()->json(['success' => false, 'errors' => ['date' => ['Start date and end date are required']]], 422);
@@ -271,31 +307,50 @@ class CycleController extends Controller
             return response()->json(['success' => false, 'errors' => ['date' => ['Invalid date format. Expected dd/mm/yyyy']]], 422);
         }
 
-        $Self_Activity_Start_Date = 0;
-        $Self_Activity_End_Date = 0;
-        $self_review = null;
-        $manager_review = null;
-        try 
+        $Self_Activity_Start_Date = null;
+        $Self_Activity_End_Date = null;
+        $Manager_Activity_Start_Date = null;
+        $Manager_Activity_End_Date = null;
+
+        try
         {
             DB::beginTransaction();
-                if(array_key_exists('Self_Review', $form_review_type) && isset($form_review_type['Self_Review'][0]) ) 
-                {
-                    $self_review = $form_review_type['Self_Review'][0];  
-                    if(isset($Activity_self_Start_date))
-                    {
-                        $Self_Activity_Start_Date = Carbon::createFromFormat('d/m/Y', $Activity_self_Start_date)->format('Y/m/d');
-                        $Self_Activity_End_Date = Carbon::createFromFormat('d/m/Y', $Activity_self_End_date)->format('Y/m/d');
-                    }          
-                }
-                if(array_key_exists('Manager_Review', $form_review_type) && isset($form_review_type['Manager_Review'][0]))
-                {
-                    $manager_review = $form_review_type['Manager_Review'][0];
-                    if(isset($Activity_manager_Start_date))
-                    {
-                        $Activity_manager_Start_date = Carbon::createFromFormat('d/m/Y', $Activity_manager_Start_date)->format('Y/m/d');
-                        $Activivty_manager_End_date = Carbon::createFromFormat('d/m/Y', $Activivty_manager_End_date)->format('Y/m/d');
-                    }   
-                }
+
+            // Parse Self Review activity dates
+            if (!empty($activityStartDates['Self_Review'] ?? null)) {
+                try {
+                    $Self_Activity_Start_Date = Carbon::createFromFormat('d/m/Y', $activityStartDates['Self_Review'])->format('Y-m-d');
+                } catch (\Exception $e) {}
+            }
+            if (!empty($activityEndDates['Self_Review'] ?? null)) {
+                try {
+                    $Self_Activity_End_Date = Carbon::createFromFormat('d/m/Y', $activityEndDates['Self_Review'])->format('Y-m-d');
+                } catch (\Exception $e) {}
+            }
+
+            // Parse Manager Review activity dates
+            if (!empty($activityStartDates['Manager_Review'] ?? null)) {
+                try {
+                    $Manager_Activity_Start_Date = Carbon::createFromFormat('d/m/Y', $activityStartDates['Manager_Review'])->format('Y-m-d');
+                } catch (\Exception $e) {}
+            }
+            if (!empty($activityEndDates['Manager_Review'] ?? null)) {
+                try {
+                    $Manager_Activity_End_Date = Carbon::createFromFormat('d/m/Y', $activityEndDates['Manager_Review'])->format('Y-m-d');
+                } catch (\Exception $e) {}
+            }
+
+            // Extract numeric template id for legacy int columns
+            $legacyTemplateId = null;
+            if (is_numeric($cycleTemplate)) {
+                $legacyTemplateId = (int) $cycleTemplate;
+            } elseif (preg_match('/(\d+)/', $cycleTemplate, $m)) {
+                $legacyTemplateId = (int) $m[1];
+            }
+            $self_review = $legacyTemplateId;
+            $manager_review = $legacyTemplateId;
+            $Activity_manager_Start_date = $Manager_Activity_Start_Date;
+            $Activivty_manager_End_date = $Manager_Activity_End_Date;
                 $p_id = PerformanceCycle::create(['resort_id'=>$this->resort->resort_id,
                                             'Cycle_Name'=>$cycle_name,
                                             'Start_Date'=>$CycleStartDate,
@@ -312,13 +367,56 @@ class CycleController extends Controller
 
                 if(isset($p_id->id))
                 {
-                    foreach ( $Emp_main_id as $key => $emp_id) 
+                    $selectedTemplate = $request->CycleTemplate;
+                    foreach ( $Emp_main_id as $key => $emp_id)
                     {
+                        // Resolve employee — Emp_main_id could be numeric id, base64, or Emp_id string (e.g. DR-17)
+                        $actualEmpId = null;
+                        $employee = null;
+                        if (is_numeric($emp_id)) {
+                            $employee = Employee::find($emp_id);
+                            $actualEmpId = $emp_id;
+                        } else {
+                            // Try base64 decode first
+                            $decoded = base64_decode($emp_id, true);
+                            if ($decoded && is_numeric($decoded)) {
+                                $employee = Employee::find($decoded);
+                                $actualEmpId = $decoded;
+                            }
+                            // Fallback: lookup by Emp_id string like "DR-17"
+                            if (!$employee) {
+                                $employee = Employee::where('Emp_id', $emp_id)
+                                    ->where('resort_id', $this->resort->resort_id)
+                                    ->first();
+                                if ($employee) $actualEmpId = $employee->id;
+                            }
+                        }
+                        if (!$employee) continue;
+
+                        // Check if employee is GM (rank 8 or position contains "general manager")
+                        $isGm = false;
+                        if ($employee->rank == 8) {
+                            $isGm = true;
+                        } else {
+                            $position = \App\Models\ResortPosition::find($employee->Position_id);
+                            if ($position && stripos($position->position_title, 'general manager') !== false) {
+                                $isGm = true;
+                            }
+                        }
+
+                        // Find reporting manager from org hierarchy
+                        $managerId = $employee->reporting_to ?: null;
+
                         PerformaChildCycle::create([
-                            'Parent_cycle_id'=>$p_id->id,
-                            'Emp_main_id'=>$emp_id,
-                            'Self_review_date'=>null,
-                            'Manager_review_date'=>null,
+                            'Parent_cycle_id' => $p_id->id,
+                            'Emp_main_id' => $actualEmpId,
+                            'Manager_id' => $isGm ? null : $managerId,
+                            'template_id' => $selectedTemplate,
+                            'is_gm_review' => $isGm,
+                            'self_review_status' => 'pending',
+                            'manager_review_status' => $isGm ? 'not_applicable' : 'pending',
+                            'Self_review_date' => null,
+                            'Manager_review_date' => null,
                         ]);
                     }
                 }                 
@@ -338,6 +436,56 @@ class CycleController extends Controller
             return response()->json(['error' => 'Failed to create Cycle'], 500);
         }
     }
+    public function viewCycle($id)
+    {
+        if (Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+
+        $id = base64_decode($id);
+        $cycle = PerformanceCycle::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+
+        if (!$cycle) {
+            abort(404, 'Cycle not found');
+        }
+
+        $children = PerformaChildCycle::where('Parent_cycle_id', $id)->get();
+        $totalEmployees = $children->count();
+        $selfCompleted = $children->where('self_review_status', 'completed')->count();
+        $managerCompleted = $children->where('manager_review_status', 'completed')->count();
+        $managerTotal = $children->where('is_gm_review', false)->count() ?: $totalEmployees;
+
+        $selfPct = $totalEmployees > 0 ? round(($selfCompleted / $totalEmployees) * 100) : 0;
+        $managerPct = $managerTotal > 0 ? round(($managerCompleted / $managerTotal) * 100) : 0;
+
+        // Build participant list with review status
+        $participants = $children->map(function ($child) {
+            $empId = is_numeric($child->Emp_main_id) ? $child->Emp_main_id : base64_decode($child->Emp_main_id);
+            $employee = Employee::with(['resortAdmin', 'department', 'position'])->find($empId);
+            if (!$employee) return null;
+
+            return (object)[
+                'child_id' => $child->id,
+                'emp_id' => $employee->Emp_id,
+                'name' => trim(optional($employee->resortAdmin)->first_name . ' ' . optional($employee->resortAdmin)->last_name),
+                'profileImg' => Common::getResortUserPicture(optional($employee->resortAdmin)->id),
+                'department' => optional($employee->department)->name ?? 'N/A',
+                'position' => optional($employee->position)->position_title ?? 'N/A',
+                'self_status' => $child->self_review_status,
+                'self_date' => $child->Self_review_date,
+                'manager_status' => $child->manager_review_status,
+                'manager_date' => $child->Manager_review_date,
+                'is_gm' => (bool) $child->is_gm_review,
+            ];
+        })->filter()->values();
+
+        $page_title = "Cycle Details";
+
+        return view('resorts.Performance.Cycle.view', compact('page_title', 'cycle', 'totalEmployees', 'selfCompleted', 'managerCompleted', 'selfPct', 'managerPct', 'participants'));
+    }
+
     public function Destroy($id)
     {
         $id= base64_decode($id);

@@ -131,7 +131,25 @@
     const $employeeContainer = $('.employee-container');
     const $noResults = $('.no-results');
 
-    $("#searchEmployee").on("keyup", function () 
+    // Track selected employees across searches
+    window.selectedEmployees = window.selectedEmployees || {};
+
+    // Persist selection state when checkbox changes
+    $(document).on('change', "input[name='Emp_id[]']", function() {
+        var val = $(this).val();
+        if ($(this).is(':checked')) {
+            window.selectedEmployees[val] = true;
+        } else {
+            delete window.selectedEmployees[val];
+        }
+    });
+
+    // On initial load, capture any pre-checked employees
+    $("input[name='Emp_id[]']:checked").each(function() {
+        window.selectedEmployees[$(this).val()] = true;
+    });
+
+    $("#searchEmployee").on("keyup", function ()
     {
         let searchValue = $(this).val().toLowerCase().trim();
 
@@ -144,9 +162,8 @@
             },
             success: function (response) {
                 if (response.success) {
-                    let employeeList = $("#employeeList"); // Replace with the actual ID of your container
+                    let employeeList = $("#employeeList");
                     employeeList.empty();
-                    console.log(response.data === 0,response.data);
                     if (response.data === 0)
                     {
                         employeeList.append("<p>No results found.</p>");
@@ -154,6 +171,7 @@
                     else
                     {
                         response.data.forEach((e) => {
+                            var checked = window.selectedEmployees[e.Emp_id] ? 'checked' : '';
                             let employeeHtml = `<div class="employee-item">
                                                     <div class="d-flex">
                                                         <div class="img-circle userImg-block">
@@ -164,7 +182,7 @@
                                                             <p class="position-name">${e.positionName}</p>
                                                         </div>
                                                         <div class="form-check no-label">
-                                                            <input class="form-check-input" type="checkbox" name="Emp_id[]" value="${e.Emp_id}">
+                                                            <input class="form-check-input" type="checkbox" name="Emp_id[]" value="${e.Emp_id}" ${checked}>
                                                         </div>
                                                     </div>
                                                 </div>`;
@@ -251,9 +269,20 @@
             }
         },
         submitHandler: function (form, event) {
-            event.preventDefault(); // Prevent form default submission
+            event.preventDefault();
+
+            var selectedIds = Object.keys(window.selectedEmployees || {});
+            if (selectedIds.length === 0) {
+                toastr.error('Please select at least one employee', 'Error', { positionClass: 'toast-bottom-right' });
+                return false;
+            }
 
             var formData = new FormData(form);
+            formData.delete('Emp_id[]');
+            selectedIds.forEach(function(empId) {
+                formData.append('Emp_id[]', empId);
+            });
+
             $(".ScheduleMeeting").attr('disabled',true);
             $.ajax({
                 url: "{{ route('Performance.Meeting.ScheduleMeetingEmp') }}",
@@ -267,9 +296,11 @@
                             positionClass: "toast-bottom-right",
                         });
 
-                        // Reset form
+                        // Reset form and selections
                         $('#ScheduleMeetingForm')[0].reset();
                         $(".PerformanceMeetingSelectEmp").html('');
+                        window.selectedEmployees = {};
+                        $("input[name='Emp_id[]']").prop('checked', false);
                         $(".ScheduleMeeting").attr('disabled',false);
                     }
                     else

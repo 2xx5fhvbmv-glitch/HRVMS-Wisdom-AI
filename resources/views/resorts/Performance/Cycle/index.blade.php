@@ -29,15 +29,16 @@
                 <div class="row g-md-3 g-2 align-items-center">
                     <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
                         <div class="input-group">
-                            <input type="search" class="form-control " placeholder="Search" />
+                            <input type="search" class="form-control cycleSearch" placeholder="Search by cycle name" />
                             <i class="fa-solid fa-search"></i>
                         </div>
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-7">
-                        <select class="form-select">
-                            <option selected>Select duration</option>
-                            <option value="1">abc</option>
-                            <option value="2">abc</option>
+                        <select class="form-select" id="cycleYearFilter">
+                            <option value="">All Years</option>
+                            @foreach($availableYears as $year)
+                                <option value="{{ $year }}" {{ $selectedYear == $year ? 'selected' : '' }}>{{ $year }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -61,7 +62,7 @@
                                     <p><img src="{{ URL::asset('resorts_assets/images/users.svg') }}" alt="icon"> {{ $p->child_count }} Employees</p>
                                 </div>
                                 <div>
-                                    <a href="#" class="btn btn-themeBlue btn-xsmall">Duplicate</a>
+                                    <a href="{{ route('Performance.cycle.view', base64_encode($p->id)) }}" class="btn btn-themeSkyblue btn-xsmall"><i class="fa-regular fa-eye me-1"></i> View</a>
                                     <a href="#" class="btn-tableIcon btnIcon-danger cycle-delete" data-id="{{ base64_encode($p->id) }}"><i class="fa-regular fa-trash-can"></i></a>
                                 </div>
                             </div>
@@ -97,6 +98,25 @@
    
 
 $(document).ready(function(){
+
+    // Year filter — reload page with selected year
+    $('#cycleYearFilter').on('change', function() {
+        var year = $(this).val();
+        var url = "{{ route('Performance.cycle') }}";
+        if (year) {
+            url += '?year=' + encodeURIComponent(year);
+        }
+        window.location.href = url;
+    });
+
+    // Client-side search filter on cycle cards
+    $('.cycleSearch').on('keyup', function() {
+        var term = $(this).val().toLowerCase();
+        $('.PerformanceCyc-block').each(function() {
+            var title = $(this).find('h5').text().toLowerCase();
+            $(this).toggle(title.indexOf(term) !== -1);
+        });
+    });
 
     $(document).on('click', '.cycle-delete', function (e) {
         
