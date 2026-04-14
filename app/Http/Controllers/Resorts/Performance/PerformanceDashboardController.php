@@ -43,7 +43,7 @@ class PerformanceDashboardController extends Controller
         // Appraisal pending: employees in active cycles who haven't completed manager review
         $activeCycleIds = DB::table('performance_cycles')
                             ->where('resort_id', $resort_id)
-                            ->where('status', 'OnGoing')
+                            ->whereIn('status', ['OnGoing','Pending'])
                             ->pluck('id');
 
         $appraisal_total = DB::table('performa_child_cycles')
@@ -52,11 +52,38 @@ class PerformanceDashboardController extends Controller
 
         $appraisal_pending = DB::table('performa_child_cycles')
                             ->whereIn('Parent_cycle_id', $activeCycleIds)
-                            ->whereNull('Manager_review_date')
+                            ->where('manager_review_status', 'pending')
                             ->count();
 
+        // Department wise performance (active employee distribution by department)
+        $department_data = DB::table('employees')
+                            ->join('resort_departments', 'resort_departments.id', '=', 'employees.Dept_id')
+                            ->where('employees.resort_id', $resort_id)
+                            ->where('employees.status', 'Active')
+                            ->groupBy('resort_departments.id', 'resort_departments.name')
+                            ->select('resort_departments.name', DB::raw('COUNT(employees.id) as count'))
+                            ->orderByDesc('count')
+                            ->get();
+
+        // Performance Cycles with review counts
+        $performance_cycles = DB::table('performance_cycles')
+                            ->where('resort_id', $resort_id)
+                            ->orderByDesc('id')
+                            ->limit(5)
+                            ->get()
+                            ->map(function ($cycle) {
+                                $children = DB::table('performa_child_cycles')->where('Parent_cycle_id', $cycle->id)->get();
+                                $cycle->total_employees = $children->count();
+                                $cycle->self_completed = $children->where('self_review_status', 'completed')->count();
+                                $cycle->manager_completed = $children->where('manager_review_status', 'completed')->count();
+                                $cycle->self_pending = $children->where('self_review_status', 'pending')->count();
+                                $cycle->manager_pending = $children->where('manager_review_status', 'pending')->count();
+                                return $cycle;
+                            });
+
         return view('resorts.Performance.dashboard.hrdashboard', compact(
-            'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending'
+            'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending',
+            'department_data', 'performance_cycles'
         ));
 
     }

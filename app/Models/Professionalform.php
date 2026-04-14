@@ -10,7 +10,7 @@ class Professionalform extends Model
     use HasFactory;
 
     protected $table = 'professionalforms';
-    protected $fillable = ['FormName', 'resort_id', 'form_structure'];
+    protected $fillable = ['FormName', 'resort_id', 'form_structure', 'form_type'];
 
 
 }

@@ -31,9 +31,8 @@
                             class="progressbar-tab d-flex justify-content-between align-items-center ">
                             <li class="active current"> <span>Name and Start Date</span></li>
                             <li><span>Participant</span></li>
-                            <li><span>Review Type</span></li>
+                            <li><span>Template</span></li>
                             <li><span>Cycle Summary & Calendar</span></li>
-                            {{-- <li><span>Review and Scheduling</span></li> --}}
                             <li><span>Confirmation</span></li>
                         </ul>
                     </div>
@@ -103,7 +102,7 @@
                                         aria-label="Default select example">
                                      <option value=""></option>
                                         @php
-                                            $employmentTypes = ['Full-Time','Part-Time','Contract','Casual','Probationary','Internship','Temporary'];
+                                            $employmentTypes = ['Full-Time','Part-Time','Contract','Casual','Probationary','Internship','Temporary','Active','Inactive','Terminated','Resigned','On Leave','Suspended'];
                                             $GenderType = config('settings.GenderType');
                                         @endphp
                                         @foreach ($employmentTypes as $s)
@@ -121,8 +120,11 @@
                                     </select>
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
-                                    <label for="joining_date" class="form-label">JOINING DATE</label>
-                                    <input type="text" class="form-control datepicker" id="joining_date" name="joining_date" placeholder="Select Date">
+                                    <label for="joining_date_from" class="form-label">JOINING DATE RANGE</label>
+                                    <div class="d-flex gap-2">
+                                        <input type="text" class="form-control datepicker" id="joining_date_from" name="joining_date_from" placeholder="From">
+                                        <input type="text" class="form-control datepicker" id="joining_date_to" name="joining_date_to" placeholder="To">
+                                    </div>
 
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
@@ -180,49 +182,16 @@
 
                     <fieldset data-parsley-group="block-2">
                         <div class="mt-md-4 mt-2 mb-md-4 mb-3 pb-md-2  text-center">
-                            <h4 class="fw-600">Select Review Types</h4>
+                            <h4 class="fw-600">Select Template</h4>
                         </div>
-                          
-                        <div class="row gx-md-4 g-3 mb-md-4 mb-3">
-                            <!-- Add a wrapper div with parsley validation for the checkbox group -->
-                            <div class="checkbox-group" data-parsley-validate>
-                                @if($PerformanceReviewType->isNotEmpty())
-                                    @foreach ($PerformanceReviewType as $k=>$p)
-                                    <?php $category_title = str_replace(' ', '_', $p->category_title); ?>
-                                        <div class="col-lg-6">
-                                            <div class="selectReviewTypes-block">
-                                                <div class="form-check mb-0">
-                                                    <input class="form-check-input Review_Types" 
-                                                        data-name="{{ $p->category_title }}" 
-                                                        type="checkbox"  
-                                                        id="inlineCheckbox{{$p->id}}"
-                                                        name="review[]" 
-                                                        data-id="{{$k}}"
-                                                        value="{{$category_title}}"
-                                                        data-parsley-mincheck="1"
-                                                        data-parsley-required="true"
-                                                        data-parsley-errors-container="#error-checkbox"
-                                                        data-parsley-error-message="Please select at least one review type"
-                                                        data-parsley-group="block-2">
-                                                    <label class="form-check-label" for="inlineCheckbox{{ $p->id }}">
-                                                        {{ $p->category_title }}
-                                                    </label>
-                                                </div>
-                                                <div class="form-check mb-0 d-none" id="DivFormTemplete_{{$k}}">
-                                                    <select class="form-control" name="FormTemplete[{{$category_title}}][]" id="FormTemplete_{{$k}}" data-parsley-group="block-2" data-parsley-error-message="Please select a template">
-                                                        <option value="">Select Template</option>
-                                                    </select>
-                                                    <div class="parsley-errors-list"></div>
-                                                </div>
-                                            </div>
-                                            
-                                        </div>
 
-                                    @endforeach
-                                @endif
+                        <div class="row gx-md-4 g-3 mb-md-4 mb-3 justify-content-center">
+                            <div class="col-lg-6 col-md-8">
+                                <label for="CycleTemplateSelect" class="form-label">TEMPLATE</label>
+                                <select class="form-control select2t-none" name="CycleTemplate" id="CycleTemplateSelect" required data-parsley-required-message="Please select a template" data-parsley-group="block-2">
+                                    <option value="">Select Template</option>
+                                </select>
                             </div>
-                            <!-- Error container -->
-                            <div id="error-checkbox"></div>
                         </div>
 
                         <div class="d-md-block d-none" style="height: 274px;"></div>
@@ -427,10 +396,10 @@
                 allowClear: true
             });
 
-            $('#joining_date').datepicker({
+            $('#joining_date_from, #joining_date_to').datepicker({
                     format: 'dd/mm/yyyy',
-                    autoclose: true,      // Close the picker after selection
-                    todayHighlight: true  // Highlight today's date
+                    autoclose: true,
+                    todayHighlight: true
             });
             $('#Step_End_start_date').datepicker({
                     format: 'dd/mm/yyyy',
@@ -458,6 +427,102 @@
         var opacity;
         var current = 1;
         var steps = $("fieldset").length;
+
+        // Persist form data across refresh
+        var FORM_DATA_KEY = 'performanceCycleFormData';
+        var SELECTED_EMP_KEY = 'performanceCycleSelectedEmps';
+
+        function saveFormData() {
+            var data = {};
+            $('#msform').find('input[type="text"], input[type="number"], input[type="date"], textarea').each(function() {
+                var name = $(this).attr('name') || $(this).attr('id');
+                if (name) data[name] = $(this).val();
+            });
+            $('#msform').find('select').each(function() {
+                var name = $(this).attr('name') || $(this).attr('id');
+                if (name) data[name] = $(this).val();
+            });
+            $('#msform').find('input[type="checkbox"]').each(function() {
+                var name = $(this).attr('name') || $(this).attr('id');
+                if (name && name !== 'Emp_main_id[]') data[name] = $(this).is(':checked');
+            });
+            sessionStorage.setItem(FORM_DATA_KEY, JSON.stringify(data));
+        }
+
+        function restoreFormData() {
+            var saved = sessionStorage.getItem(FORM_DATA_KEY);
+            if (!saved) return;
+            try { var data = JSON.parse(saved); } catch(e) { return; }
+
+            Object.keys(data).forEach(function(key) {
+                var $el = $('#msform').find('[name="' + key + '"], #' + key).first();
+                if ($el.length === 0) return;
+                if ($el.attr('type') === 'checkbox') {
+                    $el.prop('checked', data[key]);
+                } else {
+                    $el.val(data[key]);
+                    if ($el.hasClass('select2-hidden-accessible') || $el.hasClass('select2')) {
+                        $el.trigger('change.select2');
+                    }
+                }
+            });
+        }
+
+        // Save form data on any input change (debounced)
+        var saveTimer;
+        $(document).on('input change', '#msform input, #msform select, #msform textarea', function() {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(saveFormData, 300);
+        });
+
+        // Restore form data on page load
+        restoreFormData();
+
+        // Re-sync step 4 display from restored step 1 values
+        function syncStep4Display() {
+            $(".Cycle_nameStep_4").text($("#cycle_name").val() || '');
+            $(".Cycle_Step_One_summary").text($("#CycleSummary").val() || '');
+            var sd = $("#Step_One_start_date").val();
+            var ed = $("#Step_End_start_date").val();
+            if (sd || ed) {
+                $(".Cycle_dateStep_4").text((sd || '') + " to " + (ed || ''));
+            }
+        }
+
+        // Rebuild step 4 Activity Scheduling blocks (Self/Manager Review)
+        function rebuildActivityScheduling() {
+            if ($(".Selected_Review_type").children().length > 0) return;
+            $(".Selected_Review_type").html('');
+            var reviewTypes = [
+                { name: 'Self Review', value: 'Self_Review', ak: 0 },
+                { name: 'Manager Review', value: 'Manager_Review', ak: 1 }
+            ];
+            reviewTypes.forEach(function(rt) {
+                $(".Selected_Review_type").append(`
+                    <div class="perActSch-block bg-themeGrayLight">
+                        <h6>${rt.name}</h6>
+                        <div class="row g-md-4 g-3">
+                            <div class="col-md-4 col-sm-6">
+                                <label for="step_four_start_date_${rt.ak}" class="form-label">START DATE</label>
+                                <input type="text" name="ActivityStartDate[${rt.value}]" class="form-control ActiviteStartDate" id="step_four_start_date_${rt.ak}" data-name="${rt.name}" placeholder="Select Date">
+                            </div>
+                            <div class="col-md-4 col-sm-6">
+                                <label for="step_four_end_date_${rt.ak}" class="form-label">END DATE</label>
+                                <input type="text" class="form-control ActiviteStartDate" name="ActivityEndDate[${rt.value}]" id="step_four_end_date_${rt.ak}" placeholder="Select Date" data-name="${rt.name}" data-parsley-endgreaterthanstart="#step_four_start_date_${rt.ak}">
+                            </div>
+                        </div>
+                    </div>
+                `);
+                $(`#step_four_start_date_${rt.ak},#step_four_end_date_${rt.ak}`).datepicker({
+                    format: 'dd/mm/yyyy',
+                    autoclose: true,
+                    todayHighlight: true
+                });
+            });
+            // Restore hidden date values after rebuild
+            restoreFormData();
+        }
+
         // Restore step from sessionStorage on page load
         var savedStep = sessionStorage.getItem('performanceCycleStep');
         if (savedStep && parseInt(savedStep) > 0) {
@@ -469,6 +534,45 @@
                 if (i === stepIndex) $(this).addClass('current');
                 else $(this).removeClass('current');
             });
+
+            // If restoring to step 3+ (Summary/Confirmation), rebuild step 4 content
+            if (stepIndex >= 3) {
+                syncStep4Display();
+                rebuildActivityScheduling();
+            }
+
+            // If restoring to step 4 (Final Confirmation), populate confirmation view
+            if (stepIndex >= 4) {
+                syncConfirmationDisplay();
+            }
+        }
+
+        function syncConfirmationDisplay() {
+            // Reminders
+            var reminderOn = $("#CycleReminders").is(":checked") ? "ON" : "OFF";
+            $("#AutoReminder").html(`<span class="fw-600">Automated reminders : ${reminderOn}</span>`);
+
+            // Template selected
+            var templateName = $("#CycleTemplateSelect option:selected").text() || '-';
+            $("#SelectTempleteview").html(`<span class="fw-600">Template Selected: ${templateName}</span>`);
+
+            // Self review dates
+            var selfStart = $("#step_four_start_date_0").val() || $("#step_four_start_date_self_hidden").val();
+            var selfEnd = $("#step_four_end_date_0").val() || $("#step_four_end_date_self_hidden").val();
+            if (selfStart && selfEnd) {
+                $("#Self_review").html(`<span class="fw-600"> Self Review : ${selfStart} To ${selfEnd}</span>`);
+                $("#step_four_start_date_self_hidden").val(selfStart);
+                $("#step_four_end_date_self_hidden").val(selfEnd);
+            }
+
+            // Manager review dates
+            var mgrStart = $("#step_four_start_date_1").val() || $("#step_four_start_date_manager_hidden").val();
+            var mgrEnd = $("#step_four_end_date_1").val() || $("#step_four_end_date_manager_hidden").val();
+            if (mgrStart && mgrEnd) {
+                $("#Manager_review").html(`<span class="fw-600"> Manager Review : ${mgrStart} To ${mgrEnd}</span>`);
+                $("#step_four_start_date_manager_hidden").val(mgrStart);
+                $("#step_four_end_date_manager_hidden").val(mgrEnd);
+            }
         }
 
         $(".next").click(function (e) {
@@ -476,13 +580,17 @@
 
                 var currentFieldset = $(this).closest('fieldset');
                 var currentGroup = currentFieldset.data('parsley-group');
-                $('.ActiviteStartDate, .ActivitEndDate').each(function() {
-                    $(this).attr({
-                        'data-parsley-required': 'true',
-                        'data-parsley-group': currentGroup
+
+                // Only tag activity dates when moving from step 4 (block-3)
+                if (currentGroup === 'block-3') {
+                    $('.ActiviteStartDate').each(function() {
+                        $(this).attr({
+                            'data-parsley-required': 'true',
+                            'data-parsley-group': currentGroup
+                        });
                     });
-                });               
-            
+                }
+
                 var form = $('#msform').parsley();
                 var isValid = form.validate({ group: currentGroup });
                 if (isValid) 
@@ -551,49 +659,35 @@
                 }
                 $("#SelectTempleteview").html(`<span class="fw-600">Template Selected: ${newstring}</span>`);
                 $("#AutoReminder").html(`<span class="fw-600">Automated reminders : ${status}</span>`);
-                $(".Selected_Review_type").html(" ");
-                var ak = 0;
-                    $(".Review_Types:checked").each(function () {
-                        if($(this).data('name')=="Manager Review")
-                        {
-                            ak=1;
-                        }
-
-                        $(".Selected_Review_type").append(`
-                            <div class="perActSch-block bg-themeGrayLight">
-                                <h6>${$(this).data('name')}</h6>
-                                <div class="row g-md-4 g-3">
-                                    <div class="col-md-4 col-sm-6">
-                                        <label for="start_date_${ak}" class="form-label">START DATE</label>
-                                        <input type="text" name="ActivityStartDate[${$(this).val()}]" class="form-control  ActiviteStartDate" id="step_four_start_date_${ak}" data-name=" ${$(this).data('name')}" placeholder="Select Date" required data-parsley-required-message="Please select the start date">
-                                    </div>
-                                    <div class="col-md-4 col-sm-6">
-                                        <label for="end_date_${ak}" class="form-label">END DATE</label>
-                                        <input type="text" class="form-control  ActiviteStartDate" name="ActivityEndDate[${$(this).val()}]" id="step_four_end_date_${ak}" placeholder="Select Date"data-name=" ${$(this).data('name')}" required data-parsley-required-message="Please select the end date" data-parsley-endgreaterthanstart="#step_four_start_date_${ak}">
-                                    </div>
+                // Build Self Review and Manager Review activity scheduling blocks
+                $(".Selected_Review_type").html('');
+                var reviewTypes = [
+                    { name: 'Self Review', value: 'Self_Review', ak: 0 },
+                    { name: 'Manager Review', value: 'Manager_Review', ak: 1 }
+                ];
+                reviewTypes.forEach(function(rt) {
+                    $(".Selected_Review_type").append(`
+                        <div class="perActSch-block bg-themeGrayLight">
+                            <h6>${rt.name}</h6>
+                            <div class="row g-md-4 g-3">
+                                <div class="col-md-4 col-sm-6">
+                                    <label for="step_four_start_date_${rt.ak}" class="form-label">START DATE</label>
+                                    <input type="text" name="ActivityStartDate[${rt.value}]" class="form-control ActiviteStartDate" id="step_four_start_date_${rt.ak}" data-name="${rt.name}" placeholder="Select Date" required data-parsley-required-message="Please select the start date">
+                                </div>
+                                <div class="col-md-4 col-sm-6">
+                                    <label for="step_four_end_date_${rt.ak}" class="form-label">END DATE</label>
+                                    <input type="text" class="form-control ActiviteStartDate" name="ActivityEndDate[${rt.value}]" id="step_four_end_date_${rt.ak}" placeholder="Select Date" data-name="${rt.name}" required data-parsley-required-message="Please select the end date" data-parsley-endgreaterthanstart="#step_four_start_date_${rt.ak}">
                                 </div>
                             </div>
-                        `);
-                        $(`#step_four_start_date_${ak},#step_four_end_date_${ak}`).datepicker({
-                            format: 'dd/mm/yyyy',
-                            autoclose: true,     
-                            todayHighlight: true  
-                        });
-                        $(`#step_four_start_date_${ak},#step_four_end_date_${ak}`).on('changeDate', function () 
-                        {
-                            if($(this).hasClass('ActiviteStartDate')) 
-                            {
-                                var endDateInput = $(this).closest('.row').find('.ActivitEndDate');
-                                if(endDateInput.val()) 
-                                {
-                                    // endDateInput.parsley().validate();
-                                }
-                            }
-                        });
-                        
-                        ak++;
+                        </div>
+                    `);
+                    $(`#step_four_start_date_${rt.ak},#step_four_end_date_${rt.ak}`).datepicker({
+                        format: 'dd/mm/yyyy',
+                        autoclose: true,
+                        todayHighlight: true
                     });
-                    FindSelectedDateStepFour();
+                });
+                FindSelectedDateStepFour();
                 return false;
             } 
             else
@@ -650,7 +744,8 @@
             $('#emp_status').val(null).trigger('change');
             $('#gender').val(null).trigger('change');
             $('#Location').val(null).trigger('change');
-            $('#joining_date').val('');
+            $('#joining_date_from').val('');
+            $('#joining_date_to').val('');
             $('#tenure_duration').val('');
             FetchEmployees();
         });
@@ -661,24 +756,10 @@
         // Load templates on page load
         GetTheTemplete();
 
-        $(document).on('change', '.Review_Types', function()
-        {
-            var id = $(this).data('id');
-            var targetDiv = $('#DivFormTemplete_' + id);
-            var selectField = $('#FormTemplete_' + id);
-            if ($(this).is(':checked'))
-            {
-                targetDiv.removeClass('d-none');
-                selectField.attr('data-parsley-required', 'true');
-                // Reload templates when review type is checked
-                GetTheTemplete();
-            }
-            else
-            {
-                targetDiv.addClass('d-none');
-                selectField.removeAttr('data-parsley-required');
-                selectField.val(null).trigger('change');
-            }
+        // Initialize Select2 for template dropdown
+        $("#CycleTemplateSelect").select2({
+            placeholder: "Select Template",
+            allowClear: true
         });
         $(".select2t-none").on('change', function () 
         {
@@ -839,7 +920,8 @@
                      d.emp_status = $("#emp_status").val();
                      d.Location   = $("#Location").val();
                      d.gender     = $("#gender").val();
-                     d.joining_date = $("#joining_date").val();
+                     d.joining_date_from = $("#joining_date_from").val();
+                     d.joining_date_to = $("#joining_date_to").val();
                      d.tenure_duration = $("#tenure_duration").val();
                      d.CheckedAll  = $(".CycleEmp").is(":checked");
                     }
@@ -900,10 +982,7 @@
                         {
                             string+='<option value="'+value.id+'">'+value.FormName+'</option>';
                         });
-                        // Populate all FormTemplete dropdowns dynamically
-                        $('select[id^="FormTemplete_"]').each(function() {
-                            $(this).html(string);
-                        });
+                        $('#CycleTemplateSelect').html(string);
                     }
                 },
                 error: function(response) 
@@ -997,9 +1076,14 @@
                     if(d.success == true)
                     {
                         sessionStorage.removeItem('performanceCycleStep');
+                        sessionStorage.removeItem('performanceCycleFormData');
+                        sessionStorage.removeItem('performanceCycleSelectedEmps');
                         toastr.success(d.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
+                        setTimeout(function() {
+                            window.location.href = "{{ route('Performance.cycle') }}";
+                        }, 1200);
                     }
                     else {
                             toastr.error(d.message, "Error", {

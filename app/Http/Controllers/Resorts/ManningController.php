@@ -372,7 +372,7 @@ class ManningController extends Controller
                 $department->resort_id = $this->resort_id;
                 $department->division_id = $request->division_id;
                 $department->name = $request->name;
-                $department->code = $request->code;
+                $department->code = $request->filled('code') ? $request->code : '';
                 $department->short_name = $request->filled('short_name') ? $request->short_name : '';
                 $department->status = $request->status;
                 $department->save();

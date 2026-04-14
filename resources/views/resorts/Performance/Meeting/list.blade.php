@@ -23,6 +23,16 @@
         </div>
 
         <div class="card">
+            <div class="card-header">
+                <div class="row g-md-3 g-2 align-items-center">
+                    <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8">
+                        <div class="input-group">
+                            <input type="search" class="form-control search" placeholder="Search">
+                            <i class="fa-solid fa-search"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <table class="table table-meetingsList w-100" id="meetingsTable">
                 <thead>
                     <tr>
@@ -34,24 +44,34 @@
                         <th>Declined</th>
                         <th>Pending</th>
                         <th>Total</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
             </table>
         </div>
     </div>
 </div>
+
 @endsection
 
 @section('import-css')
+<style>
+    .participant-card { padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e0e0e0; }
+    .participant-card.accepted { background: #e8f5e9; border-color: #28a745; }
+    .participant-card.declined { background: #ffeaea; border-color: #dc3545; }
+    .participant-card.pending { background: #fff8e1; border-color: #EFB408; }
+    .participant-card .profile-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    .reason-box { background: #fff; border: 1px solid #dc3545; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 13px; }
+</style>
 @endsection
 
 @section('import-scripts')
 <script>
     $(document).ready(function () {
         var table = $('#meetingsTable').DataTable({
-            searching: true,
+            searching: false,
             bLengthChange: false,
-            bFilter: true,
+            bFilter: false,
             bInfo: true,
             bAutoWidth: false,
             scrollX: true,
@@ -61,7 +81,10 @@
             order: [[1, 'desc']],
             ajax: {
                 url: '{{ route("Performance.Meeting.listData") }}',
-                type: 'GET'
+                type: 'GET',
+                data: function(d) {
+                    d.search = { value: $('.search').val() };
+                }
             },
             columns: [
                 { data: 'title', name: 'title', className: 'text-nowrap' },
@@ -72,10 +95,20 @@
                 { data: 'declined', name: 'declined', className: 'text-center', orderable: false },
                 { data: 'pending', name: 'pending', className: 'text-center', orderable: false },
                 { data: 'total', name: 'total', className: 'text-center', orderable: false },
+                { data: 'action', name: 'action', className: 'text-center', orderable: false, searchable: false },
             ],
             drawCallback: function() {
                 $('[data-bs-toggle="tooltip"]').tooltip();
             }
+        });
+
+        // Custom search box handler
+        var searchTimer;
+        $('.search').on('keyup', function() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function() {
+                table.ajax.reload();
+            }, 400);
         });
     });
 </script>

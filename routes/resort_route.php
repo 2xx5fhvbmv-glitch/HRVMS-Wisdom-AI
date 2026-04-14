@@ -884,8 +884,18 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/scheduled-meetings', 'Performance\PerformanceMeetingController@scheduledMeetings')->name('Performance.Meeting.scheduled');
     Route::get('performance/scheduled-meetings/calendar-data', 'Performance\PerformanceMeetingController@calendarData')->name('Performance.Meeting.calendarData');
     Route::get('performance/scheduled-meetings/sidebar', 'Performance\PerformanceMeetingController@meetingSidebar')->name('Performance.Meeting.sidebar');
+
+    // Performance Review Flow
+    Route::get('performance/my-reviews', 'Performance\ReviewController@mySelfReviews')->name('Performance.Review.mySelf');
+    Route::get('performance/team-reviews', 'Performance\ReviewController@myTeamReviews')->name('Performance.Review.myTeam');
+    Route::get('performance/review/self/{id}', 'Performance\ReviewController@showSelfReview')->name('Performance.Review.showSelf');
+    Route::post('performance/review/self/{id}/submit', 'Performance\ReviewController@submitSelfReview')->name('Performance.Review.submitSelf');
+    Route::get('performance/review/manager/{id}', 'Performance\ReviewController@showManagerReview')->name('Performance.Review.showManager');
+    Route::post('performance/review/manager/{id}/submit', 'Performance\ReviewController@submitManagerReview')->name('Performance.Review.submitManager');
+    Route::get('performance/review/gm-export/{id}', 'Performance\ReviewController@exportGmReview')->name('Performance.Review.gmExport');
     Route::get('performance/meetings-list', 'Performance\PerformanceMeetingController@meetingsList')->name('Performance.Meeting.list');
     Route::get('performance/meetings-list/data', 'Performance\PerformanceMeetingController@meetingsListData')->name('Performance.Meeting.listData');
+    Route::get('performance/meetings-list/view/{id}', 'Performance\PerformanceMeetingController@meetingDetailPage')->name('Performance.Meeting.view');
     Route::post('performance/schedule-meeting-employee', 'Performance\PerformanceMeetingController@SendMeetingLink')->name('Performance.Meeting.ScheduleMeetingEmp');
     Route::post('performance/get-performance-employee', 'Performance\PerformanceMeetingController@GetPerformanceEmp')->name('Performance.Meeting.GetPerformanceEmp');
 
@@ -894,6 +904,15 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/kpi/list', 'Performance\KpiController@KpiList')->name('Performance.kpi.KpiList');
 
     Route::get('performance/cycle', 'Performance\CycleController@index')->name('Performance.cycle');
+    Route::get('performance/cycle/view/{id}', 'Performance\CycleController@viewCycle')->name('Performance.cycle.view');
+
+    // PIP & PDP
+    Route::get('performance/pip', 'Performance\PipPdpController@pipIndex')->name('Performance.pip.index');
+    Route::post('performance/pip/store', 'Performance\PipPdpController@pipStore')->name('Performance.pip.store');
+    Route::delete('performance/pip/{id}', 'Performance\PipPdpController@pipDestroy')->name('Performance.pip.destroy');
+    Route::get('performance/pdp', 'Performance\PipPdpController@pdpIndex')->name('Performance.pdp.index');
+    Route::post('performance/pdp/store', 'Performance\PipPdpController@pdpStore')->name('Performance.pdp.store');
+    Route::delete('performance/pdp/{id}', 'Performance\PipPdpController@pdpDestroy')->name('Performance.pdp.destroy');
     Route::get('performance/create', 'Performance\CycleController@create')->name('Performance.create');
 
     Route::get('performance-cycle/fetch-employees', 'Performance\CycleController@CycleFetchEmployees')->name('Performance.cycle.FetchEmployees');

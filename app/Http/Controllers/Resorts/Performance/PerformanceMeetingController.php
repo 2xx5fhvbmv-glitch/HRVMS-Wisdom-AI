@@ -181,6 +181,36 @@ class PerformanceMeetingController extends Controller
         return view('resorts.Performance.Meeting.list', compact('page_title'));
     }
 
+    public function meetingDetailPage($id)
+    {
+        $meeting = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
+            ->where('id', $id)
+            ->first();
+
+        if (!$meeting) {
+            abort(404, 'Meeting not found');
+        }
+
+        $participants = $meeting->participants()->with('employee.resortAdmin', 'employee.position')->get()->map(function ($p) {
+            return (object)[
+                'name' => optional($p->employee->resortAdmin)->first_name . ' ' . optional($p->employee->resortAdmin)->last_name,
+                'email' => optional($p->employee->resortAdmin)->email,
+                'position' => optional($p->employee->position)->position_title ?? '',
+                'profileImg' => Common::getResortUserPicture(optional($p->employee)->Admin_Parent_id),
+                'status' => $p->status,
+                'reason' => $p->reason,
+                'responded_at' => $p->responded_at ? Carbon::parse($p->responded_at)->format('d M Y, h:i A') : null,
+            ];
+        });
+
+        $accepted = $participants->where('status', 'accepted');
+        $declined = $participants->where('status', 'declined');
+        $pending = $participants->where('status', 'pending');
+        $page_title = 'Meeting Details';
+
+        return view('resorts.Performance.Meeting.view', compact('page_title', 'meeting', 'participants', 'accepted', 'declined', 'pending'));
+    }
+
     public function meetingsListData(Request $request)
     {
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
@@ -244,7 +274,10 @@ class PerformanceMeetingController extends Controller
             ->addColumn('total', function ($row) {
                 return $row->total_count;
             })
-            ->rawColumns(['location_link', 'accepted', 'declined', 'pending'])
+            ->addColumn('action', function ($row) {
+                return '<a href="' . route('Performance.Meeting.view', $row->id) . '" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>';
+            })
+            ->rawColumns(['location_link', 'accepted', 'declined', 'pending', 'action'])
             ->make(true);
     }
 
