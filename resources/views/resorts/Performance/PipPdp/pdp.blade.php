@@ -158,9 +158,16 @@
             width: '100%'
         });
 
+        var pdpPositions = @json($positions->pluck('position_title', 'id'));
         $('#pdpEmployee').on('change', function() {
             var posId = $(this).find(':selected').data('position');
-            if (posId) $('#pdpPosition').val(posId).trigger('change');
+            if (posId) {
+                $('#pdpPosition').val(posId);
+                $('#pdpPositionDisplay').val(pdpPositions[posId] || '');
+            } else {
+                $('#pdpPosition').val('');
+                $('#pdpPositionDisplay').val('');
+            }
         });
 
         $('.pdpSearch').on('keyup', function() {
