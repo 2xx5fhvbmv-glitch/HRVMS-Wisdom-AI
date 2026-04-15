@@ -82,6 +82,19 @@
                     </div>
                 </div>
             </div>
+            <div class="col-lg-3 col-sm-6">
+                <div class="card dashboard-boxcard timeAttend-boxcard">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <p class="mb-0 fw-500">Approved Monthly Check-Ins</p>
+                            <strong>{{ $approved_checkins_count ?? 0 }}</strong>
+                        </div>
+                        <a href="{{ route('Performance.MonltyCheckIn.history') }}">
+                            <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
+                        </a>
+                    </div>
+                </div>
+            </div>
             <div class="col-xl-6">
                 <div class="card card-serviceCharges">
                     <div class=" card-title">

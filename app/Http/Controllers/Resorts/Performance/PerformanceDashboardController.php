@@ -9,6 +9,12 @@ use Carbon\Carbon;
 use App\Helpers\Common;
 use Illuminate\Http\Request;
 use App\Models\Employee;
+use App\Models\ResortDepartment;
+use App\Models\ResortPosition;
+use App\Models\PerformaChildCycle;
+use App\Models\PerformanceCycle;
+use App\Models\EmployeePipPlan;
+use App\Models\EmployeePdpPlan;
 use App\Http\Controllers\Controller;
 class PerformanceDashboardController extends Controller
 {
@@ -81,9 +87,14 @@ class PerformanceDashboardController extends Controller
                                 return $cycle;
                             });
 
+        $approved_checkins_count = DB::table('monthly_checking_models')
+            ->where('resort_id', $resort_id)
+            ->where('approval_status', 'approved')
+            ->count();
+
         return view('resorts.Performance.dashboard.hrdashboard', compact(
             'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending',
-            'department_data', 'performance_cycles'
+            'department_data', 'performance_cycles', 'approved_checkins_count'
         ));
 
     }
@@ -98,6 +109,214 @@ class PerformanceDashboardController extends Controller
     {
         request()->merge(['dashboard_label' => 'XCOM']);
         return $this->Hod_dashboard(request());
+    }
+
+    public function employeesIndex()
+    {
+        $page_title = 'Employees';
+        $resort_id  = $this->resort->resort_id;
+        $departments = ResortDepartment::where('resort_id', $resort_id)->where('status', 'active')->get();
+        $positions   = ResortPosition::where('resort_id', $resort_id)->where('status', 'active')->get();
+        return view('resorts.Performance.employee.list', compact('page_title', 'departments', 'positions'));
+    }
+
+    public function employeesGrid(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $query = Employee::with(['resortAdmin', 'position', 'department'])
+            ->where('resort_id', $resort_id)
+            ->where('status', '!=', 'Inactive');
+
+        if ($request->searchTerm) {
+            $searchTerm = $request->searchTerm;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('Emp_id', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereHas('resortAdmin', function ($a) use ($searchTerm) {
+                      $a->where('first_name', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('last_name', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('position', function ($p) use ($searchTerm) {
+                      $p->where('position_title', 'LIKE', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        if ($request->filled('department_id')) {
+            $query->where('Dept_id', $request->department_id);
+        }
+        if ($request->filled('position_id')) {
+            $query->where('Position_id', $request->position_id);
+        }
+
+        $pageSize  = $request->input('pageSize', 10);
+        $employees = $query->orderBy('created_at', 'desc')->paginate($pageSize);
+
+        $activeCycleIds = PerformanceCycle::where('resort_id', $resort_id)
+            ->whereIn('status', ['OnGoing', 'Pending'])
+            ->pluck('id');
+
+        $employeeStatus = [];
+        foreach ($employees as $emp) {
+            $employeeStatus[$emp->id] = $this->computeAppraisalStatus($emp->id, $activeCycleIds);
+        }
+
+        if ($request->appraisal_status) {
+            $filtered = $employees->getCollection()->filter(function ($emp) use ($employeeStatus, $request) {
+                return ($employeeStatus[$emp->id]['label'] ?? '') === $request->appraisal_status;
+            })->values();
+            $employees->setCollection($filtered);
+        }
+
+        return response()->json([
+            'html'       => view('resorts.Performance.employee.grid', compact('employees', 'employeeStatus'))->render(),
+            'pagination' => (string) $employees->withQueryString()->links(),
+        ]);
+    }
+
+    public function employeesListData(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $query = Employee::with(['resortAdmin', 'position', 'department'])
+            ->where('resort_id', $resort_id)
+            ->where('status', '!=', 'Inactive');
+
+        if ($request->searchTerm) {
+            $searchTerm = $request->searchTerm;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('Emp_id', 'LIKE', "%{$searchTerm}%")
+                  ->orWhereHas('resortAdmin', function ($a) use ($searchTerm) {
+                      $a->where('first_name', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('last_name', 'LIKE', "%{$searchTerm}%");
+                  })
+                  ->orWhereHas('position', function ($p) use ($searchTerm) {
+                      $p->where('position_title', 'LIKE', "%{$searchTerm}%");
+                  });
+            });
+        }
+        if ($request->filled('department_id')) {
+            $query->where('Dept_id', $request->department_id);
+        }
+        if ($request->filled('position_id')) {
+            $query->where('Position_id', $request->position_id);
+        }
+
+        $activeCycleIds = PerformanceCycle::where('resort_id', $resort_id)
+            ->whereIn('status', ['OnGoing', 'Pending'])
+            ->pluck('id');
+
+        return datatables()->of($query)
+            ->addColumn('applicant', function ($row) {
+                return '<div class="tableUser-block"><div class="img-circle"><img src="'.\App\Helpers\Common::getResortUserPicture($row->Admin_Parent_id ?? null).'" alt="user"></div><span class="userApplicants-btn">'.e($row->resortAdmin->full_name ?? '').'</span></div>';
+            })
+            ->addColumn('position', fn($row) => $row->position->position_title ?? '')
+            ->addColumn('department', fn($row) => $row->department->name ?? '')
+            ->addColumn('rating', function ($row) use ($activeCycleIds) {
+                $st = $this->computeAppraisalStatus($row->id, $activeCycleIds);
+                $r = (int) round($st['rating']);
+                $html = '';
+                for ($i = 1; $i <= 5; $i++) {
+                    $html .= '<i class="fa-'.($i <= $r ? 'solid' : 'regular').' fa-star" style="color:#f5a623;"></i>';
+                }
+                return $html;
+            })
+            ->addColumn('appraisal_status', function ($row) use ($activeCycleIds) {
+                $st = $this->computeAppraisalStatus($row->id, $activeCycleIds);
+                $cls = match($st['label']) {
+                    'Done'        => 'badge-themeSuccess',
+                    'In Progress' => 'badge-themeWarning',
+                    default       => 'badge-themeDanger',
+                };
+                return '<span class="badge '.$cls.'" data-label="'.$st['label'].'">'.$st['label'].'</span>';
+            })
+            ->addColumn('action', function ($row) {
+                return '<a href="'.route('Performance.employees.details', base64_encode($row->id)).'" class="btn btn-theme btn-sm">View Details</a>';
+            })
+            ->rawColumns(['applicant', 'rating', 'appraisal_status', 'action'])
+            ->make(true);
+    }
+
+    public function employeeDetails($id)
+    {
+        $page_title = 'Employee Details';
+        $resort_id  = $this->resort->resort_id;
+        $empId      = base64_decode($id);
+
+        $employee = Employee::with(['resortAdmin', 'position', 'department'])
+            ->where('resort_id', $resort_id)
+            ->findOrFail($empId);
+
+        $activeCycleIds = PerformanceCycle::where('resort_id', $resort_id)
+            ->whereIn('status', ['OnGoing', 'Pending'])
+            ->pluck('id');
+
+        $status = $this->computeAppraisalStatus($empId, $activeCycleIds);
+
+        $history = DB::table('performa_child_cycles')
+            ->leftJoin('performance_cycles', 'performance_cycles.id', '=', 'performa_child_cycles.Parent_cycle_id')
+            ->where('performa_child_cycles.Emp_main_id', $empId)
+            ->where('performance_cycles.resort_id', $resort_id)
+            ->orderBy('performa_child_cycles.created_at', 'desc')
+            ->select(
+                'performa_child_cycles.*',
+                'performance_cycles.Cycle_Name',
+                'performance_cycles.Start_Date',
+                'performance_cycles.End_Date'
+            )
+            ->get();
+
+        $latestChildCycleId = $history->first()->id ?? null;
+
+        $activePip = EmployeePipPlan::where('resort_id', $resort_id)
+            ->where('employee_id', $empId)
+            ->where('status', 'active')
+            ->orderByDesc('id')
+            ->first();
+
+        $activePdp = EmployeePdpPlan::where('resort_id', $resort_id)
+            ->where('employee_id', $empId)
+            ->where('status', 'active')
+            ->orderByDesc('id')
+            ->first();
+
+        return view('resorts.Performance.employee.details', compact(
+            'page_title', 'employee', 'status', 'history', 'latestChildCycleId', 'activePip', 'activePdp'
+        ));
+    }
+
+    private function computeAppraisalStatus($empId, $activeCycleIds)
+    {
+        if ($activeCycleIds->isEmpty()) {
+            return ['label' => 'Not Started', 'rating' => 0];
+        }
+
+        $child = PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)
+            ->where('Emp_main_id', $empId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$child) {
+            return ['label' => 'Not Started', 'rating' => 0];
+        }
+
+        if ($child->manager_review_status === 'completed') {
+            $label = 'Done';
+        } elseif ($child->self_review_status === 'completed' || $child->manager_review_status === 'pending') {
+            $label = 'In Progress';
+        } else {
+            $label = 'Not Started';
+        }
+
+        $rating = 0;
+        if (!empty($child->manager_review_data)) {
+            $data = json_decode($child->manager_review_data, true);
+            if (is_array($data) && isset($data['rating'])) {
+                $rating = (float) $data['rating'];
+            }
+        }
+
+        return ['label' => $label, 'rating' => $rating];
     }
 }
 

@@ -12,7 +12,7 @@ class MonthlyCheckingModel extends Model
     protected $table = 'monthly_checking_models';
 
     protected $fillable = [
-        'resort_id','Checkin_id','tranining_id','emp_id','date_discussion','start_time','end_time','Meeting_Place','Area_of_Discussion','Area_of_Improvement','Time_Line','comment','employee_comment','status','created_by'
+        'resort_id','Checkin_id','tranining_id','emp_id','date_discussion','start_time','end_time','Meeting_Place','Area_of_Discussion','Area_of_Improvement','Time_Line','comment','employee_comment','status','created_by','approval_status','approved_at','rejected_at','employee_rejection_reason','finalized_at'
     ];
 
     public static function boot()

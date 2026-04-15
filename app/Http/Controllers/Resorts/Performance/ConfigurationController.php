@@ -631,7 +631,7 @@ class ConfigurationController extends Controller
         }
         $page_title="Professional Development Form List";
 
-        return view('resorts.Performance.configuration.ProfessionalFormList',compact('page_title'));
+        return view('resorts.Performance.configuration.ProfessionalFormList',compact('page_title','form_type'));
     }
 
     public function ProfessionalFormStore(Request $request)

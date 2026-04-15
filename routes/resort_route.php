@@ -851,6 +851,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // Perfromance Module Start
     Route::get('performance/configuration', 'Performance\ConfigurationController@index')->name('Performance.configuration');
     Route::get('performance/dashboard', 'Performance\PerformanceDashboardController@HR_Dashobard')->name('Performance.Hrdashboard');
+
+    Route::get('performance/employees', 'Performance\PerformanceDashboardController@employeesIndex')->name('Performance.employees');
+    Route::get('performance/employees/grid', 'Performance\PerformanceDashboardController@employeesGrid')->name('Performance.employees.grid');
+    Route::get('performance/employees/list-data', 'Performance\PerformanceDashboardController@employeesListData')->name('Performance.employees.listData');
+    Route::get('performance/employees/details/{id}', 'Performance\PerformanceDashboardController@employeeDetails')->name('Performance.employees.details');
     Route::get('performance/hod-dashboard', 'Performance\PerformanceDashboardController@Hod_dashboard')->name('Performance.HODdashboard');
 
 
@@ -926,6 +931,15 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/monthly-check-in/get-employee-details', 'Performance\MonthlyCheckingController@GetEmployeeDetails')->name('Performance.GetEmployeeDetailsMonthlyChecking');
     Route::get('performance/monthly-check-in/details/{id}', 'Performance\MonthlyCheckingController@GetMonthlyCheckInDetails')->name('Performance.GetMonthlyCheckInDetails');
     Route::get('performance/monthly-check-in/details-page-list', 'Performance\MonthlyCheckingController@MonltyCheckInDetailsPageList')->name('Performance.MonltyCheckInDetailsPageList');
+
+    Route::post('performance/monthly-check-in/schedule-request', 'Performance\MonthlyCheckingController@scheduleRequest')->name('Performance.MonltyCheckIn.scheduleRequest');
+    Route::get('performance/monthly-check-in/approved-list', 'Performance\MonthlyCheckingController@approvedList')->name('Performance.MonltyCheckIn.approvedList');
+    Route::post('performance/monthly-check-in/employee-approve/{id}', 'Performance\MonthlyCheckingController@employeeApprove')->name('Performance.MonltyCheckIn.employeeApprove');
+    Route::post('performance/monthly-check-in/employee-reject/{id}', 'Performance\MonthlyCheckingController@employeeReject')->name('Performance.MonltyCheckIn.employeeReject');
+    Route::post('performance/monthly-check-in/finalize/{id}', 'Performance\MonthlyCheckingController@finalize')->name('Performance.MonltyCheckIn.finalize');
+    Route::get('performance/monthly-check-in/history', 'Performance\MonthlyCheckingController@history')->name('Performance.MonltyCheckIn.history');
+    Route::get('performance/monthly-check-in/history-data', 'Performance\MonthlyCheckingController@historyData')->name('Performance.MonltyCheckIn.historyData');
+    Route::get('performance/monthly-check-in/employee-pending', 'Performance\MonthlyCheckingController@employeePending')->name('Performance.MonltyCheckIn.employeePending');
 
 
 
