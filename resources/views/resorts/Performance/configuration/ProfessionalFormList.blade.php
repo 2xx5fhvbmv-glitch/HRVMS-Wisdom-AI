@@ -383,6 +383,7 @@ $(document).ready(function ()
                     type: 'GET',
                     data: function (d) {
                         d.ResortDepartment = $(".ResortDepartment").val();
+                        d.type = '{{ $form_type ?? "" }}';
                     }
                 },
                 columns: [

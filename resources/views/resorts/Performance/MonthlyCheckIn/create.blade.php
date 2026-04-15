@@ -18,11 +18,11 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
-                    <!-- <div class="col-auto">
-                        <div class="d-flex justify-content-end">
-                            <a href="#" class="btn btn-theme">Request Manning</a>
+                    <div class="col-auto">
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ route('Performance.MonltyCheckIn.history') }}" class="btn btn-themeBlue">View All</a>
                         </div>
-                    </div> -->
+                    </div>
                 </div>
             </div>
 
@@ -98,43 +98,39 @@
                                             class="form-control" placeholder="Enter Meeting Place">
                                     </div>
 
-                                    <div class="col-md-6 mt-3">
-                                        <label class="form-label">AREA OF DISCUSSION <span class="text-danger">*</span></label>
-                                        <input type="text" name="Area_of_Discussion" 
-                                            required
-                                            data-parsley-required-message="Area Of Discussion is required"
-                                            class="form-control" placeholder="Enter Area">
-                                    </div>
-
-                                    <div class="col-md-6 mt-3">
-                                        <label class="form-label">AREA OF IMPROVEMENT <span class="text-danger">*</span></label>
-                                        <input type="text" name="Area_of_Improvement" 
-                                            required
-                                            data-parsley-required-message="Area Of Improvement is required"
-                                            class="form-control" placeholder="Enter Improvement Area">
-                                    </div>
-
-                                    <div class="col-md-6 mt-3">
-                                        <label class="form-label">TIME LINE <span class="text-danger">*</span></label>
-                                        <input type="text" name="Time_Line" 
-                                            required
-                                            data-parsley-required-message="Time Line is required"
-                                            class="form-control" placeholder="Enter Timeline">
-                                    </div>
-
-                                    <div class="mb-md-4 mt-3 mb-3 pb-2">
-                                        <label for="summary" class="form-label">COMMENT <span class="text-danger">*</span></label>
-                                        <textarea id="summary" name="comment" class="form-control" rows="4" placeholder="Type Here..."></textarea>
-                                    </div>
-
-                                    <div class="row">
-
-                                        <div class="col-md-2 mt-4 mb-3 pb-2">
-                                            <a href="javascript:void(0)" class="AddTraning btn btn-themeSkyblue btn-sm">Add Training</a>
+                                    <div id="stage2Fields" class="d-none w-100">
+                                        <div class="alert alert-info py-2 mx-2 my-2" id="stage2Banner">
+                                            Employee approved this request — please fill the remaining details and submit.
                                         </div>
 
+                                        <div class="col-md-6 mt-3">
+                                            <label class="form-label">AREA OF DISCUSSION <span class="text-danger">*</span></label>
+                                            <input type="text" name="Area_of_Discussion"
+                                                class="form-control" placeholder="Enter Area">
+                                        </div>
 
-                                        <div class="col-md-5 checkTraning d-none">
+                                        <div class="col-md-6 mt-3">
+                                            <label class="form-label">AREA OF IMPROVEMENT <span class="text-danger">*</span></label>
+                                            <input type="text" name="Area_of_Improvement"
+                                                class="form-control" placeholder="Enter Improvement Area">
+                                        </div>
+
+                                        <div class="col-md-6 mt-3">
+                                            <label class="form-label">TIME LINE <span class="text-danger">*</span></label>
+                                            <input type="text" name="Time_Line"
+                                                class="form-control" placeholder="Enter Timeline">
+                                        </div>
+
+                                        <div class="mb-md-4 mt-3 mb-3 pb-2">
+                                            <label for="summary" class="form-label">COMMENT <span class="text-danger">*</span></label>
+                                            <textarea id="summary" name="comment" class="form-control" rows="4" placeholder="Type Here..."></textarea>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-2 mt-4 mb-3 pb-2">
+                                                <a href="javascript:void(0)" class="AddTraning btn btn-themeSkyblue btn-sm">Add Training</a>
+                                            </div>
+                                            <div class="col-md-5 checkTraning d-none">
                                                 <label for="select_training" class="form-label">SELECT TRAINING</label>
                                                 <select class="form-select" id="select_training" name="tranining_id">
                                                     <option value="">Select Training</option>
@@ -144,10 +140,8 @@
                                                         @endforeach
                                                     @endif
                                                 </select>
-                                           
-                                        </div>
-                                        <div class="col-md-5 checkTraning d-none">
-                                           
+                                            </div>
+                                            <div class="col-md-5 checkTraning d-none">
                                                 <label for="select_learning_manager_id" class="form-label">SELECT LEARNING MANAGER</label>
                                                 <select class="form-select" id="select_learning_manager_id" name="learning_manager_id">
                                                     <option value="">Select Learning Manager</option>
@@ -157,7 +151,7 @@
                                                         @endforeach
                                                     @endif
                                                 </select>
-                                           
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -165,11 +159,25 @@
                             </div>
                         </div>
                         <input type="hidden" name="emp_id" id="emp_hidden_id">
+                        <input type="hidden" name="checkin_id" id="checkin_hidden_id">
 
                         <div class="card-footer text-end">
-                            <button type='submit' class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type='button' id="sendApprovalBtn" class="btn btn-themeBlue btn-sm">Send for Approval</button>
+                            <button type='button' id="submitFinalBtn" class="btn btn-theme btn-sm d-none">Submit Check-In</button>
+                            <button type='button' id="cancelStage2Btn" class="btn btn-themeGray btn-sm d-none">Cancel</button>
                         </div>
                     </form>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Approved Check-Ins (awaiting final submission)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="approvedListContainer" class="row g-3">
+                            <div class="col-12 text-center text-muted py-3">Loading…</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -264,77 +272,154 @@ $(document).on("keyup",".search",function(){
 });
 
 
-$(document).on("submit","#MonthlyCheckinForm",function(e)
-{
-    e.preventDefault();
-    let Emp = $("#emp_hidden_id").val();
-
-    if(!isNaN(Emp))
-    {
-     
-        toastr.error("Please Select Employee", "Error",
-        {
-            positionClass: 'toast-bottom-right'
-        });
-        return false;
+function showError(response) {
+    var errors = response.responseJSON;
+    if (errors && errors.message) {
+        toastr.error(errors.message, "Error", { positionClass: 'toast-bottom-right' });
+    } else if (errors && errors.errors) {
+        var errs = '';
+        $.each(errors.errors, function(key, error) { errs += error + '<br>'; });
+        toastr.error(errs, "Validation Error", { positionClass: 'toast-bottom-right' });
+    } else {
+        toastr.error('Something went wrong', "Error", { positionClass: 'toast-bottom-right' });
     }
+}
 
+function resetToStage1() {
+    $('#MonthlyCheckinForm')[0].reset();
+    $('#emp_hidden_id').val('');
+    $('#checkin_hidden_id').val('');
+    $('#Append_id').html('');
+    $('.Employee').removeClass('select');
+    $('#stage2Fields').addClass('d-none');
+    $('#sendApprovalBtn').removeClass('d-none');
+    $('#submitFinalBtn').addClass('d-none');
+    $('#cancelStage2Btn').addClass('d-none');
+    $('[name="date_discussion"], [name="start_time"], [name="end_time"], [name="Meeting_Place"]').prop('readonly', false);
+}
 
-    e.preventDefault();
-    let form = $(this);
-        if (form.parsley().isValid()) 
-        {
-            let formData = new FormData(this);
-            $.ajax({
-                url: "{{ route('Performance.MonltyCheckInStore') }}", 
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    console.log(response.success);
-                    if (response.success) {
-                        // Show success message
-                        toastr.success(response.message,"Success",
-                        {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        form[0].reset();
-                        window.location.href = response.route;
-                        $('.select2t-none').val('').trigger('change');
-                    } 
-                    else
-                    {
-                            toastr.error(response.message, "Error",
-                            {
-                                positionClass: 'toast-bottom-right'
-                            });
-                    }
-                },
-                error: function(response) 
-                {
-                    var errors = response.responseJSON;
+// Stage 1 — send approval request
+$(document).on("click", "#sendApprovalBtn", function() {
+    let empId = $("#emp_hidden_id").val();
+    if (!empId) {
+        toastr.error("Please select an employee", "Error", { positionClass: 'toast-bottom-right' });
+        return;
+    }
+    let formData = {
+        _token: '{{ csrf_token() }}',
+        emp_id: empId,
+        date_discussion: $('[name="date_discussion"]').val(),
+        start_time: $('[name="start_time"]').val(),
+        end_time: $('[name="end_time"]').val(),
+        Meeting_Place: $('[name="Meeting_Place"]').val(),
+    };
+    $.ajax({
+        url: "{{ route('Performance.MonltyCheckIn.scheduleRequest') }}",
+        type: 'POST',
+        data: formData,
+        success: function(res) {
+            if (res.success) {
+                toastr.success(res.message, "Success", { positionClass: 'toast-bottom-right' });
+                resetToStage1();
+                loadApprovedList();
+            }
+        },
+        error: showError
+    });
+});
 
-                    if (errors.error) { 
-                        // If it's a duplicate entry error
-                        toastr.error(errors.error, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    } else {
-                        // If it's a validation error
-                        var errs = '';
-                        $.each(errors.errors, function(key, error) {
-                            errs += error + '<br>';
-                        });
+// Stage 2 — finalize a previously approved check-in
+$(document).on("click", "#submitFinalBtn", function() {
+    let checkinId = $('#checkin_hidden_id').val();
+    if (!checkinId) {
+        toastr.error("No approved check-in selected", "Error", { positionClass: 'toast-bottom-right' });
+        return;
+    }
+    let formData = {
+        _token: '{{ csrf_token() }}',
+        Area_of_Discussion: $('[name="Area_of_Discussion"]').val(),
+        Area_of_Improvement: $('[name="Area_of_Improvement"]').val(),
+        Time_Line: $('[name="Time_Line"]').val(),
+        comment: $('[name="comment"]').val(),
+        tranining_id: $('[name="tranining_id"]').val(),
+        learning_manager_id: $('[name="learning_manager_id"]').val(),
+    };
+    $.ajax({
+        url: "{{ url('resort/performance/monthly-check-in/finalize') }}/" + checkinId,
+        type: 'POST',
+        data: formData,
+        success: function(res) {
+            if (res.success) {
+                toastr.success(res.message, "Success", { positionClass: 'toast-bottom-right' });
+                setTimeout(() => { window.location.href = res.route; }, 600);
+            }
+        },
+        error: showError
+    });
+});
 
-                        toastr.error(errs, "Validation Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                }
+$(document).on("click", "#cancelStage2Btn", function() {
+    resetToStage1();
+    loadApprovedList();
+});
 
+// Load approved check-ins awaiting finalization
+function loadApprovedList() {
+    $.ajax({
+        url: "{{ route('Performance.MonltyCheckIn.approvedList') }}",
+        type: 'GET',
+        success: function(res) {
+            if (!res.success || !res.data.length) {
+                $('#approvedListContainer').html('<div class="col-12 text-center text-muted py-3">No approved check-ins awaiting submission.</div>');
+                return;
+            }
+            let html = '';
+            res.data.forEach(function(row) {
+                html += `<div class="col-xl-4 col-md-6">
+                    <div class="empListPeopleEmp-block p-3 approved-checkin" data-row='${JSON.stringify(row)}' style="cursor:pointer;">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="img-circle" style="width:48px;height:48px;"><img src="${row.emp_photo}" style="width:48px;height:48px;border-radius:50%;"></div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0">${row.emp_name}</h6>
+                                <small class="text-muted">#${row.emp_id} · ${row.emp_position}</small>
+                            </div>
+                            <span class="badge badge-themeSuccess">Approved</span>
+                        </div>
+                        <div class="small mt-2">
+                            <div><strong>Date:</strong> ${row.date_discussion}</div>
+                            <div><strong>Time:</strong> ${row.start_time} - ${row.end_time}</div>
+                            <div><strong>Place:</strong> ${row.Meeting_Place}</div>
+                        </div>
+                    </div>
+                </div>`;
             });
+            $('#approvedListContainer').html(html);
         }
+    });
+}
+$(document).ready(loadApprovedList);
+
+// Click an approved card → load into stage-2
+$(document).on("click", ".approved-checkin", function() {
+    let row = $(this).data('row');
+    $('#checkin_hidden_id').val(row.id);
+    $('#emp_hidden_id').val(row.emp_id);
+    $('[name="date_discussion"]').val(row.date_discussion ? row.date_discussion.split('-').reverse().join('/') : '').prop('readonly', true);
+    $('[name="start_time"]').val(row.start_time).prop('readonly', true);
+    $('[name="end_time"]').val(row.end_time).prop('readonly', true);
+    $('[name="Meeting_Place"]').val(row.Meeting_Place).prop('readonly', true);
+    $('#Append_id').html(`<div class="img-circle userImg-block me-lg-4 me-md-3 me-2">
+                            <img src="${row.emp_photo}" alt="user">
+                        </div>
+                        <div>
+                            <h4 class="mb-md-2 mb-1">${row.emp_name}<span class="badge badge-themeNew">${row.emp_id}</span></h4>
+                            <p>${row.emp_position}</p>
+                        </div>`);
+    $('#stage2Fields').removeClass('d-none');
+    $('#sendApprovalBtn').addClass('d-none');
+    $('#submitFinalBtn').removeClass('d-none');
+    $('#cancelStage2Btn').removeClass('d-none');
+    $('html, body').animate({ scrollTop: $('#stage2Fields').offset().top - 100 }, 300);
 });
 
 </script>

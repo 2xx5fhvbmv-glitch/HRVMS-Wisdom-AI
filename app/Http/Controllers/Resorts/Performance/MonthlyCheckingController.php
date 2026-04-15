@@ -284,10 +284,9 @@ class MonthlyCheckingController extends Controller
             'start_time' => 'required',
             'end_time' => 'required',
             'comment' => 'required|max:500',
-            
-
-            
+            'learning_manager_id' => 'required_with:tranining_id',
         ], [
+            'learning_manager_id.required_with' => 'Please select a Learning Manager when a training is chosen.',
             'date_discussion.required' => 'Please Select Date of Discussion.',
             'start_time.required' => 'Start Time is required.',
             'end_time.required' => 'End Time is required.',
@@ -320,7 +319,7 @@ class MonthlyCheckingController extends Controller
                 "tranining_id" =>$request->tranining_id, 
                 "emp_id" =>$e->id, 
             ]);
-            if(isset($request->tranining_id))
+            if(!empty($request->tranining_id) && !empty($request->learning_manager_id))
             {
                 $l = LearningRequest::create([
                                                 "resort_id"=>$this->resort->resort_id,
@@ -467,8 +466,346 @@ class MonthlyCheckingController extends Controller
                                                     })
                                              
                                         
-                                                    ->rawColumns(['DateOfDisussion','Time','AreaOfDiscussion','AreaOfImprovement','Comment','TimeLine','Training','Duration','Status']) 
+                                                    ->rawColumns(['DateOfDisussion','Time','AreaOfDiscussion','AreaOfImprovement','Comment','TimeLine','Training','Duration','Status'])
                                                     ->make(true);
-        }            
+        }
+    }
+
+    /**
+     * Stage 1 — HR schedules a monthly check-in request with only the first 4 fields.
+     * Status stays 'pending' until the selected employee approves or rejects.
+     */
+    public function scheduleRequest(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'emp_id'          => 'required',
+            'date_discussion' => 'required',
+            'start_time'      => 'required',
+            'end_time'        => 'required',
+            'Meeting_Place'   => 'required|max:255',
+        ], [
+            'emp_id.required'          => 'Please select an employee.',
+            'date_discussion.required' => 'Please select the date of discussion.',
+            'start_time.required'      => 'Start time is required.',
+            'end_time.required'        => 'End time is required.',
+            'Meeting_Place.required'   => 'Please enter the meeting place.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $e = Employee::where('resort_id', $this->resort->resort_id)->where('Emp_id', $request->emp_id)->first();
+        if (!$e) {
+            return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            $checkin = MonthlyCheckingModel::create([
+                'Checkin_id'       => Common::getMonthlyCheckIn(),
+                'resort_id'        => $this->resort->resort_id,
+                'emp_id'           => $e->id,
+                'date_discussion'  => date('Y-m-d', strtotime($request->date_discussion)),
+                'start_time'       => $request->start_time,
+                'end_time'         => $request->end_time,
+                'Meeting_Place'    => $request->Meeting_Place,
+                'approval_status'  => 'pending',
+            ]);
+
+            $title      = 'Monthly Check-In Approval Required';
+            $msg        = 'A monthly check-in meeting has been scheduled with you on '.date('d M Y', strtotime($request->date_discussion)).' at '.$request->start_time.'. Please approve or reject.';
+            $ModuleName = 'Performance';
+
+            // In-app / website notification
+            event(new ResortNotificationEvent(
+                Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $e->id, $ModuleName)
+            ));
+
+            // Mobile push
+            Common::sendMobileNotification(
+                $this->resort->resort_id,
+                2, // monthly check-in meeting
+                null,
+                null,
+                $title,
+                $msg,
+                $ModuleName,
+                [$e->id],
+                $checkin->id
+            );
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Check-in request sent to employee for approval.',
+                'checkin' => [
+                    'id'               => $checkin->id,
+                    'Checkin_id'       => $checkin->Checkin_id,
+                    'date_discussion'  => $checkin->date_discussion,
+                    'start_time'       => $checkin->start_time,
+                    'end_time'         => $checkin->end_time,
+                    'Meeting_Place'    => $checkin->Meeting_Place,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('scheduleRequest File: '.$e->getFile());
+            \Log::emergency('scheduleRequest Line: '.$e->getLine());
+            \Log::emergency('scheduleRequest Message: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to schedule request'], 500);
+        }
+    }
+
+    /**
+     * Returns rows the HR can pick up for stage-2 (approved but not yet finalized).
+     */
+    public function approvedList(Request $request)
+    {
+        $rows = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('approval_status', 'approved')
+            ->whereNull('finalized_at')
+            ->orderByDesc('approved_at')
+            ->limit(30)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id'              => $row->id,
+                    'Checkin_id'      => $row->Checkin_id,
+                    'emp_id'          => $row->employee->Emp_id ?? '',
+                    'emp_name'        => $row->employee->resortAdmin->full_name ?? '',
+                    'emp_position'    => $row->employee->position->position_title ?? '',
+                    'emp_photo'       => Common::getResortUserPicture($row->employee->Admin_Parent_id ?? null),
+                    'date_discussion' => $row->date_discussion,
+                    'start_time'      => $row->start_time,
+                    'end_time'        => $row->end_time,
+                    'Meeting_Place'   => $row->Meeting_Place,
+                    'approved_at'     => $row->approved_at,
+                ];
+            });
+
+        return response()->json(['success' => true, 'data' => $rows]);
+    }
+
+    /**
+     * Employee approves an in-flight check-in request.
+     */
+    public function employeeApprove(Request $request, $id)
+    {
+        $checkin = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$checkin) {
+            return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
+        }
+
+        $authEmpId = optional($this->resort->GetEmployee)->id;
+        if ($authEmpId && $checkin->emp_id != $authEmpId) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to approve this request'], 403);
+        }
+
+        if ($checkin->approval_status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'This request has already been '.$checkin->approval_status], 422);
+        }
+
+        $checkin->approval_status = 'approved';
+        $checkin->approved_at = now();
+        $checkin->save();
+
+        $title      = 'Monthly Check-In Approved';
+        $msg        = ($this->resort->full_name ?? 'Employee').' has approved the monthly check-in scheduled on '.date('d M Y', strtotime($checkin->date_discussion)).'.';
+        $ModuleName = 'Performance';
+
+        event(new ResortNotificationEvent(
+            Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
+        ));
+        Common::sendMobileNotification(
+            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id
+        );
+
+        return response()->json(['success' => true, 'message' => 'Check-in approved']);
+    }
+
+    /**
+     * Employee rejects an in-flight check-in request with a reason.
+     */
+    public function employeeReject(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'reason' => 'required|string|max:1000',
+        ], [
+            'reason.required' => 'Please provide a reason for rejection.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $checkin = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$checkin) {
+            return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
+        }
+
+        $authEmpId = optional($this->resort->GetEmployee)->id;
+        if ($authEmpId && $checkin->emp_id != $authEmpId) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to reject this request'], 403);
+        }
+
+        if ($checkin->approval_status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'This request has already been '.$checkin->approval_status], 422);
+        }
+
+        $checkin->approval_status = 'rejected';
+        $checkin->rejected_at = now();
+        $checkin->employee_rejection_reason = $request->reason;
+        $checkin->save();
+
+        $title      = 'Monthly Check-In Rejected';
+        $msg        = ($this->resort->full_name ?? 'Employee').' has rejected the monthly check-in. Reason: '.$request->reason;
+        $ModuleName = 'Performance';
+
+        event(new ResortNotificationEvent(
+            Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
+        ));
+        Common::sendMobileNotification(
+            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id
+        );
+
+        return response()->json(['success' => true, 'message' => 'Check-in rejected']);
+    }
+
+    /**
+     * Stage 2 — HR finalizes an approved check-in by filling the remaining fields.
+     */
+    public function finalize(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'Area_of_Discussion'  => 'required',
+            'Area_of_Improvement' => 'required',
+            'Time_Line'           => 'required',
+            'comment'             => 'required|max:500',
+            'learning_manager_id' => 'required_with:tranining_id',
+        ], [
+            'learning_manager_id.required_with' => 'Please select a Learning Manager when a training is chosen.',
+            'Area_of_Discussion.required'       => 'Please enter area of discussion.',
+            'Area_of_Improvement.required'      => 'Please enter area of improvement.',
+            'Time_Line.required'                => 'Please enter timeline.',
+            'comment.required'                  => 'Please enter comment.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $checkin = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$checkin) {
+            return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
+        }
+        if ($checkin->approval_status !== 'approved') {
+            return response()->json(['success' => false, 'message' => 'Check-in must be approved before it can be finalized.'], 422);
+        }
+        if ($checkin->finalized_at) {
+            return response()->json(['success' => false, 'message' => 'Check-in already submitted.'], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $checkin->update([
+                'Area_of_Discussion'  => $request->Area_of_Discussion,
+                'Area_of_Improvement' => $request->Area_of_Improvement,
+                'Time_Line'           => $request->Time_Line,
+                'comment'             => $request->comment,
+                'tranining_id'        => $request->tranining_id ?: null,
+                'finalized_at'        => now(),
+            ]);
+
+            if (!empty($request->tranining_id) && !empty($request->learning_manager_id)) {
+                $l = LearningRequest::create([
+                    'resort_id'           => $this->resort->resort_id,
+                    'learning_id'         => $request->tranining_id,
+                    'status'              => 'Pending',
+                    'reason'              => $request->Area_of_Improvement,
+                    'learning_manager_id' => $request->learning_manager_id,
+                ]);
+                LearningRequestEmployee::create([
+                    'employee_id'         => $checkin->emp_id,
+                    'learning_request_id' => $l->id,
+                ]);
+            }
+
+            $title      = 'Monthly Check-In Submitted';
+            $msg        = 'Your monthly check-in for '.date('d M Y', strtotime($checkin->date_discussion)).' has been recorded.';
+            $ModuleName = 'Performance';
+            event(new ResortNotificationEvent(
+                Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->emp_id, $ModuleName)
+            ));
+            Common::sendMobileNotification(
+                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->emp_id], $checkin->id
+            );
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Monthly check-in submitted successfully.',
+                'route'   => route('Performance.MonltyCheckIn'),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('finalize File: '.$e->getFile());
+            \Log::emergency('finalize Line: '.$e->getLine());
+            \Log::emergency('finalize Message: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to submit check-in.'], 500);
+        }
+    }
+
+    /**
+     * View All page — finalized check-ins history.
+     */
+    public function history()
+    {
+        $page_title = 'Monthly Check-In History';
+        return view('resorts.Performance.MonthlyCheckIn.history', compact('page_title'));
+    }
+
+    public function historyData(Request $request)
+    {
+        $query = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
+            ->where('resort_id', $this->resort->resort_id)
+            ->whereNotNull('finalized_at')
+            ->orderByDesc('finalized_at');
+
+        return datatables()->of($query)
+            ->addColumn('employee', function ($row) {
+                $name = $row->employee->resortAdmin->full_name ?? '';
+                $pos  = $row->employee->position->position_title ?? '';
+                return '<div class="tableUser-block"><span class="userApplicants-btn">'.e($name).'</span><div class="text-muted small">'.e($pos).'</div></div>';
+            })
+            ->addColumn('date', fn($row) => $row->date_discussion ? date('d M Y', strtotime($row->date_discussion)) : '-')
+            ->addColumn('time', fn($row) => $row->start_time.' - '.$row->end_time)
+            ->addColumn('meeting_place', fn($row) => e($row->Meeting_Place))
+            ->addColumn('area', fn($row) => e($row->Area_of_Discussion))
+            ->addColumn('improvement', fn($row) => e($row->Area_of_Improvement))
+            ->addColumn('status_badge', function ($row) {
+                return '<span class="badge badge-themeSuccess">Submitted</span>';
+            })
+            ->addColumn('action', function ($row) {
+                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', $row->id).'" class="btn btn-theme btn-sm">View</a>';
+            })
+            ->rawColumns(['employee', 'status_badge', 'action'])
+            ->make(true);
+    }
+
+    /**
+     * Employee-facing — page showing pending check-in requests for logged-in employee.
+     */
+    public function employeePending()
+    {
+        $page_title = 'Pending Monthly Check-In Approvals';
+        $empId = optional($this->resort->GetEmployee)->id;
+        $pending = collect();
+        if ($empId) {
+            $pending = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)
+                ->where('emp_id', $empId)
+                ->where('approval_status', 'pending')
+                ->orderByDesc('created_at')
+                ->get();
+        }
+        return view('resorts.Performance.MonthlyCheckIn.employee-pending', compact('page_title', 'pending'));
     }
 }
