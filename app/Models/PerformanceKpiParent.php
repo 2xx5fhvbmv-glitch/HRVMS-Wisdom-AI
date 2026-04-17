@@ -13,7 +13,11 @@ class PerformanceKpiParent extends Model
 {
     use HasFactory;
     protected $table = 'performance_kpi_parents';
-    protected $fillable =['property_goal','PropertyGoalbudget','PropertyGoalweightage','PropertyGoalscore','resort_id'];
+    protected $fillable =['property_goal','PropertyGoalbudget','PropertyGoalweightage','PropertyGoalscore','resort_id','status','responded_by','responded_at','individual_goal','response_budget','response_weightage','response_entries','gm_action','gm_action_at','gm_remarks'];
+
+    protected $casts = [
+        'response_entries' => 'array',
+    ];
 
     public static function boot(){
         parent::boot();
@@ -31,5 +35,15 @@ class PerformanceKpiParent extends Model
     public function childrenKpi()
     {
         return $this->hasMany(PerformanceKpiChild::class, 'kpi_parents_id');
+    }
+
+    public function responder()
+    {
+        return $this->belongsTo(Employee::class, 'responded_by');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(\App\Models\ResortAdmin::class, 'created_by');
     }
 }

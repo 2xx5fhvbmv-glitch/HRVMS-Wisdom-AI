@@ -1,45 +1,39 @@
 @extends('resorts.layouts.app')
-@section('page_tab_title' ,$page_title)
-
-@if ($message = Session::get('success'))
-<div class="alert alert-success">
-	<p>{{ $message }}</p>
-</div>
-@endif
+@section('page_tab_title', $page_title)
 
 @section('content')
-
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
-            <div class="row  g-3">
+            <div class="row g-3">
                 <div class="col-auto">
                     <div class="page-title">
                         <span>Performance</span>
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                @if(($userRank ?? null) == 8)
                 <div class="col-auto ms-auto">
-                    <a href="{{route('Performance.kpi.create')}}" class="btn btn-theme">Create New KPI </a>
+                    <a href="{{ route('Performance.kpi.create') }}" class="btn btn-theme">Create New KPI</a>
                 </div>
+                @endif
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
                 <div class="row g-md-3 g-2 align-items-center">
-                    <div class="col-xl-3 col-lg-5 col-sm-6 ">
+                    <div class="col-xl-3 col-lg-5 col-sm-6">
                         <div class="input-group">
                             <input type="search" class="form-control search" placeholder="Search" />
                             <i class="fa-solid fa-search"></i>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-lg-4 col-md-5  col-sm-6">
+                    <div class="col-xl-2 col-lg-4 col-md-5 col-sm-6">
                         @php
-                        $currentYear = date('Y');
-                        $futureYear = $currentYear + 1;
-                    @endphp
-
+                            $currentYear = date('Y');
+                            $futureYear = $currentYear + 1;
+                        @endphp
                         <select class="form-select Year">
                             <option value="All">Select Duration</option>
                             <option value="{{ $currentYear }}">{{ $currentYear }}</option>
@@ -49,69 +43,73 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table id="" class="table table-performance-kpilist w-100">
+                <table class="table table-performance-kpilist w-100">
                     <thead>
-                        <th>Property Goals</th>
-                        <th>Budget/Goal</th>
-                        <th>Actual</th>
-                        <th>Result</th>
-                        <th>Value</th>
-                        <th>Score</th>
-                        <th>Score %</th>
-                        <th>Individual Goals</th>
+                        <tr>
+                            <th>Property Goals</th>
+                            <th>Budget/Goal</th>
+                            <th>Value</th>
+                            <th>Actual</th>
+                            <th>Result</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
                     </thead>
-                    <tbody>
-
-                    </tbody>
-
+                    <tbody></tbody>
                 </table>
             </div>
-
         </div>
-
     </div>
 </div>
-@endsection
 
-@section('import-css')
+{{-- GM Reject Modal --}}
+<div class="modal fade" id="rejectKpiModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="rejectKpiForm">
+            @csrf
+            <input type="hidden" id="rejectKpiId">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reject KPI Response</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                    <textarea name="remarks" class="form-control" rows="4" required placeholder="Reason for rejection"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection
 
 @section('import-scripts')
 <script>
 $(document).ready(function () {
     datatablelist();
-
-    $(".Year").select2({
-        placeholder:"select Year"
-    });
+    $(".Year").select2({ placeholder: "Select Year" });
 });
 
-$(document).on("change",".Year",function() {
+$(document).on("change", ".Year", datatablelist);
+$(document).on("keyup", ".search", datatablelist);
 
-    datatablelist();
-});
-$(document).on("keyup",".search",function() {
-    datatablelist();
-});
-
-
-function datatablelist()
-{
-    if ($.fn.DataTable.isDataTable('.table-performance-kpilist'))
-    {
+function datatablelist() {
+    if ($.fn.DataTable.isDataTable('.table-performance-kpilist')) {
         $('.table-performance-kpilist').DataTable().destroy();
     }
-    var divisionTable = $('.table-performance-kpilist').DataTable({
+    $('.table-performance-kpilist').DataTable({
         searching: false,
         bLengthChange: false,
-        bFilter: true,
         bInfo: true,
-        bAutoWidth: false,
         scrollX: true,
-        iDisplayLength: 6,
+        iDisplayLength: 10,
         processing: true,
         serverSide: true,
-        order: [[8, 'desc']],
+        order: [[7, 'desc']],
         ajax: {
             url: "{{ route('Performance.kpi.KpiList') }}",
             type: 'GET',
@@ -121,17 +119,80 @@ function datatablelist()
             }
         },
         columns: [
-            { data: 'PropertyGoals', name: 'PropertyGoals',},
+            { data: 'PropertyGoals', name: 'PropertyGoals' },
             { data: 'budget', name: 'budget' },
+            { data: 'Value', name: 'Value' },
             { data: 'Actual', name: 'Actual' },
             { data: 'Result', name: 'Result' },
-            { data: 'Value', name: 'Value' },
-            { data: 'Score', name: 'Score' },
-            { data: 'ScoreInPercentage', name: 'Score' },
-            { data: 'IndividualGoals', name: 'IndividualGoals' },
-            {data:'created_at', visible:false,searchable:false},
+            { data: 'status_badge', name: 'status_badge', orderable: false },
+            { data: 'action', name: 'action', orderable: false, searchable: false },
+            { data: 'created_at', visible: false, searchable: false },
         ]
     });
 }
+
+// GM Approve
+$(document).on('click', '.gm-approve-btn', function() {
+    const id = $(this).data('id');
+    Swal.fire({
+        title: 'Approve this KPI response?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, approve'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: "{{ url('resort/performance/kpi/approve') }}/" + id,
+            type: 'POST',
+            data: { _token: '{{ csrf_token() }}' },
+            success: function(res) {
+                if (res.success) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    datatablelist();
+                }
+            },
+            error: function(xhr) {
+                toastr.error(xhr.responseJSON?.message || 'Failed', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+});
+
+// GM Reject
+$(document).on('click', '.gm-reject-btn', function() {
+    $('#rejectKpiId').val($(this).data('id'));
+    $('#rejectKpiForm')[0].reset();
+    $('#rejectKpiId').val($(this).data('id'));
+    $('#rejectKpiModal').modal('show');
+});
+
+$(document).on('submit', '#rejectKpiForm', function(e) {
+    e.preventDefault();
+    const id = $('#rejectKpiId').val();
+    const remarks = $('[name="remarks"]', this).val();
+    $.ajax({
+        url: "{{ url('resort/performance/kpi/reject') }}/" + id,
+        type: 'POST',
+        data: { _token: '{{ csrf_token() }}', remarks: remarks },
+        success: function(res) {
+            if (res.success) {
+                $('#rejectKpiModal').modal('hide');
+                toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                datatablelist();
+            }
+        },
+        error: function(xhr) {
+            var errs = xhr.responseJSON?.errors;
+            if (errs) {
+                var msg = '';
+                $.each(errs, function(k, v) { msg += v + '<br>'; });
+                toastr.error(msg, 'Validation Error', { positionClass: 'toast-bottom-right' });
+            } else {
+                toastr.error(xhr.responseJSON?.message || 'Failed', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        }
+    });
+});
+
 </script>
 @endsection

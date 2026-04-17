@@ -776,6 +776,14 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('Performance/kpicreate', 'Performance\KpiController@create')->name('Performance.kpi.create');
     Route::post('Performance/kpistore', 'Performance\KpiController@PerformanceKpiStore')->name('Performance.kpi.store');
     Route::get('Performance/KpiList', 'Performance\KpiController@KpiList')->name('Performance.kpi.KpiList');
+    Route::get('Performance/kpi/respond/{id}', 'Performance\KpiController@respond')->name('Performance.kpi.respond');
+    Route::post('Performance/kpi/respond/{id}', 'Performance\KpiController@storeResponse')->name('Performance.kpi.storeResponse');
+    Route::post('Performance/kpi/approve/{id}', 'Performance\KpiController@approve')->name('Performance.kpi.approve');
+    Route::post('Performance/kpi/reject/{id}', 'Performance\KpiController@reject')->name('Performance.kpi.reject');
+    Route::get('Performance/kpi/show/{id}', 'Performance\KpiController@show')->name('Performance.kpi.show');
+    Route::get('Performance/kpi/view/{id}', 'Performance\KpiController@viewPage')->name('Performance.kpi.view');
+    Route::post('Performance/kpi/view/{id}/actual', 'Performance\KpiController@storeActual')->name('Performance.kpi.storeActual');
+    Route::delete('Performance/kpi/actual/{id}', 'Performance\KpiController@destroyActual')->name('Performance.kpi.destroyActual');
 
     Route::get('Performance/employees', 'Performance\PerformanceDashboardController@employeesIndex')->name('Performance.employees');
     Route::get('Performance/employees/grid', 'Performance\PerformanceDashboardController@employeesGrid')->name('Performance.employees.grid');
