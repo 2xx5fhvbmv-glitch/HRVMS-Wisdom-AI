@@ -9,9 +9,15 @@ class PerformanceKpiChild extends Model
 {
     use HasFactory;
     protected $table = 'performance_kpi_children';
-    protected $fillable =['budget','weightage','score','kpi_parents_id'];
+    protected $fillable =['budget','weightage','score','kpi_parents_id','individual_goal','month','created_by'];
+
     public function parentKpi()
     {
-        return $this->belongsTo(PerformanceKpiParent::class, 'parent_id');
+        return $this->belongsTo(PerformanceKpiParent::class, 'kpi_parents_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(\App\Models\ResortAdmin::class, 'created_by');
     }
 }
