@@ -105,6 +105,11 @@ class EmployeeController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+
+        if ($request->filled('location')) {
+            $query->where('employees.location', $request->location);
+        }
+
         $pageSize = $request->input('pageSize', 10); // default to 10 if not sent
         $employees = $query->orderBy('created_by', 'desc')->paginate($pageSize);
 
@@ -155,6 +160,10 @@ class EmployeeController extends Controller
 
         if ($request->status) {
             $query->where('status', $request->status);
+        }
+
+        if ($request->filled('location')) {
+            $query->where('employees.location', $request->location);
         }
 
          // ✅ Sorting manually if needed (optional)
@@ -230,6 +239,10 @@ class EmployeeController extends Controller
 
         if ($request->status) {
             $query->where('status', $request->status);
+        }
+
+        if ($request->filled('location')) {
+            $query->where('location', $request->location);
         }
 
         if ($request->searchTerm) {
@@ -872,6 +885,9 @@ class EmployeeController extends Controller
         $employee->dob = $formattedDOB;
         $employee->marital_status = $request->marital_status;
         $employee->nationality = $request->nationality;
+        if ($request->has('location')) {
+            $employee->location = $request->location ?: null;
+        }
         $employee->religion = $request->religion;
         $employee->blood_group = $request->blood_group;
         $employee->passport_number = $request->passport_number;

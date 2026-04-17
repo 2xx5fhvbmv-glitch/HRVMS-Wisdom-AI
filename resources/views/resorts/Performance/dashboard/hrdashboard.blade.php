@@ -63,7 +63,7 @@
                             <p class="mb-0  fw-500">Employees in PIP</p>
                             <strong>{{ $pip_count ?? 0 }}</strong>
                         </div>
-                        <a href="{{ route('Performance.MonltyCheckIn') }}">
+                        <a href="{{ route('Performance.pip.index') }}">
                             <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
@@ -76,7 +76,7 @@
                             <p class="mb-0  fw-500">Employees in PDP</p>
                             <strong>{{ $pdp_count ?? 0 }}</strong>
                         </div>
-                        <a href="{{ route('Performance.MonltyCheckIn') }}">
+                        <a href="{{ route('Performance.pdp.index') }}">
                             <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>

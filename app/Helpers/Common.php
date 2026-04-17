@@ -3102,6 +3102,38 @@ class Common
         return $subordinates;
     }
 
+    /**
+     * Performance module — returns the list of employee IDs the logged-in
+     * resort user is allowed to see, or NULL for unrestricted (all).
+     *
+     * GM (rank 8), HR (rank 3), super admin, and master admin see everything.
+     * All other ranks see only their subordinates + themselves.
+     */
+    public static function getPerformanceScopedEmpIds()
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) return [];
+
+        // Super admin / master admin bypass scoping entirely
+        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+            return null;
+        }
+
+        $emp = $user->GetEmployee ?? null;
+        if (!$emp) return null;
+
+        // GM (8) and HR (3) see everything
+        if (in_array((int) $emp->rank, [3, 8])) {
+            return null;
+        }
+
+        // Everyone else is scoped to their subordinates + self
+        $ids = self::getSubordinates($emp->id);
+        if (!is_array($ids)) $ids = [];
+        $ids[] = $emp->id;
+        return array_values(array_unique($ids));
+    }
+
     public static function getEmpGrade($rank){
         if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
             $emp_grade = "1";

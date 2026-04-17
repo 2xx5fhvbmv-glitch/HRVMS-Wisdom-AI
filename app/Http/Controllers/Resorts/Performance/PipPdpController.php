@@ -27,9 +27,12 @@ class PipPdpController extends Controller
     public function pipIndex()
     {
         $page_title = 'Performance Improvement Plan';
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+
         $employees = Employee::with('resortAdmin', 'position')
             ->where('resort_id', $this->resort->resort_id)
             ->where('status', 'Active')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('id', $scopedIds))
             ->get();
         $positions = ResortPosition::where('resort_id', $this->resort->resort_id)->where('status', 'active')->get();
         $templates = Professionalform::where('resort_id', $this->resort->resort_id)
@@ -38,6 +41,7 @@ class PipPdpController extends Controller
 
         $plans = EmployeePipPlan::with('employee.resortAdmin', 'position', 'template')
             ->where('resort_id', $this->resort->resort_id)
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('employee_id', $scopedIds))
             ->orderByDesc('id')
             ->get();
 
@@ -87,9 +91,12 @@ class PipPdpController extends Controller
     public function pdpIndex()
     {
         $page_title = 'Professional Development Plan';
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+
         $employees = Employee::with('resortAdmin', 'position')
             ->where('resort_id', $this->resort->resort_id)
             ->where('status', 'Active')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('id', $scopedIds))
             ->get();
         $positions = ResortPosition::where('resort_id', $this->resort->resort_id)->where('status', 'active')->get();
         $templates = Professionalform::where('resort_id', $this->resort->resort_id)
@@ -98,6 +105,7 @@ class PipPdpController extends Controller
 
         $plans = EmployeePdpPlan::with('employee.resortAdmin', 'position', 'template')
             ->where('resort_id', $this->resort->resort_id)
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('employee_id', $scopedIds))
             ->orderByDesc('id')
             ->get();
 

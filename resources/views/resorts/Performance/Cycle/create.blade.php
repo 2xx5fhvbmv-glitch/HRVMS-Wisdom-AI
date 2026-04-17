@@ -343,14 +343,83 @@
 @endsection
 
 @section('import-css')
+<style>
+    .append_select_emp {
+        max-height: 320px;
+        overflow-y: auto;
+        padding-right: 8px;
+    }
+    .append_select_emp::-webkit-scrollbar { width: 6px; }
+    .append_select_emp::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .append_select_emp::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
 @endsection
 
 @section('import-scripts')
 <script type="text/javascript">
+    // ---- Form persistence across refresh ----
+    // Store all form field values + the active step in sessionStorage, restore on page load.
+    var PERF_CYCLE_FORM_KEY = 'performanceCycleFormData';
+    var PERF_CYCLE_STEP_KEY = 'performanceCycleStep';
+
+    function savePerfCycleForm() {
+        var data = {};
+        $('#msform').find('input, select, textarea').each(function () {
+            var $el = $(this);
+            var name = $el.attr('name') || $el.attr('id');
+            if (!name) return;
+            if ($el.attr('type') === 'checkbox') {
+                data[name] = $el.is(':checked');
+            } else if ($el.attr('type') === 'radio') {
+                if ($el.is(':checked')) data[name] = $el.val();
+            } else {
+                data[name] = $el.val();
+            }
+        });
+        try { sessionStorage.setItem(PERF_CYCLE_FORM_KEY, JSON.stringify(data)); } catch (e) {}
+    }
+
+    function restorePerfCycleForm() {
+        var raw = sessionStorage.getItem(PERF_CYCLE_FORM_KEY);
+        if (!raw) return;
+        var data;
+        try { data = JSON.parse(raw); } catch (e) { return; }
+        if (!data) return;
+
+        $('#msform').find('input, select, textarea').each(function () {
+            var $el = $(this);
+            var name = $el.attr('name') || $el.attr('id');
+            if (!name || !(name in data)) return;
+            var val = data[name];
+            if ($el.attr('type') === 'checkbox') {
+                $el.prop('checked', !!val);
+            } else if ($el.attr('type') === 'radio') {
+                if ($el.val() === val) $el.prop('checked', true);
+            } else {
+                $el.val(val);
+                if ($el.hasClass('select2-hidden-accessible')) $el.trigger('change.select2');
+            }
+        });
+    }
+
+    function restorePerfCycleStep() {
+        var step = parseInt(sessionStorage.getItem(PERF_CYCLE_STEP_KEY) || '0', 10);
+        if (!step || step <= 0) return;
+        var $fieldsets = $('#msform fieldset');
+        if (step >= $fieldsets.length) step = $fieldsets.length - 1;
+        $fieldsets.hide();
+        $fieldsets.eq(step).show().css('opacity', 1);
+        $('#progressbar li').removeClass('active current');
+        for (var i = 0; i <= step; i++) {
+            $('#progressbar li').eq(i).addClass('active');
+        }
+        $('#progressbar li').eq(step).addClass('current');
+    }
+
     $(document).ready(function ()
     {
         var form = $('#msform');
-    
+
         // Initialize Parsley
         form.parsley({
             errorClass: 'is-invalid',
@@ -359,6 +428,15 @@
             errorTemplate: '<span></span>',
             trigger: 'change'
         });
+
+        // Persist form on every input change (delegated so cloned/dynamic fields also save)
+        $(document).on('input change', '#msform input, #msform select, #msform textarea', function () {
+            savePerfCycleForm();
+        });
+
+        // Restore saved values + the active step
+        restorePerfCycleForm();
+        setTimeout(restorePerfCycleStep, 300); // after select2/datepickers init
 
 
             $("#select_dep").select2({
@@ -644,20 +722,11 @@
                 //     $('#cycle_name_display').text(formData.cycle_name);
                 // }
                 let status = $("#CycleReminders").is(":checked") ? "ON" : "OFF";
-                let selectedtemp0 = $("#FormTemplete_0").find(":selected").text();
-
-                let selectedtemp1 =  $("#FormTemplete_1").find(":selected").text();
-                let newstring ='';
-                if(selectedtemp0 == null)
-                {
-                    newstring +="First Template : "+ selectedtemp0;
-                }
-                
-                if(selectedtemp1 == null)
-                {
-                    newstring +="First Template : "+ selectedtemp1;
-                }
-                $("#SelectTempleteview").html(`<span class="fw-600">Template Selected: ${newstring}</span>`);
+                let templateName = $("#CycleTemplateSelect option:selected").text().trim();
+                let templateHtml = templateName
+                    ? `<strong>${templateName}</strong>`
+                    : '<em class="text-muted">No template selected</em>';
+                $("#SelectTempleteview").html(`<span class="fw-600">Template Selected:</span> ${templateHtml}`);
                 $("#AutoReminder").html(`<span class="fw-600">Automated reminders : ${status}</span>`);
                 // Build Self Review and Manager Review activity scheduling blocks
                 $(".Selected_Review_type").html('');
@@ -837,23 +906,11 @@
         var SelfendDate = $(`#step_four_end_date_0`).val();
         var ManagerStartDate = $(`#step_four_start_date_1`).val();
         var ManagerEndDate = $(`#step_four_end_date_1`).val();
-        var FormTemplete_0 = $("#FormTemplete_0 option:selected").text();
-
-        var FormTemplete_1 =  $("#FormTemplete_1 option:selected").text();
-        var string = "";
-
-        if(isNaN(FormTemplete_0)) {
-            string = "Self Review";
-        }
-
-        if(isNaN(FormTemplete_1)) {
-            if(isNaN(FormTemplete_0)) {
-                string += " - Manager Review";  // Add manager review with separator
-            } else {
-                string = "Manager Review";  // Only manager review
-            }
-        }
-        $("#SelectTempleteview").html(`<span class="fw-600">Template Selected: ${string}</span>`);
+        var selectedTemplateName = $("#CycleTemplateSelect option:selected").text().trim();
+        var templateHtmlStr = selectedTemplateName
+            ? `<strong>${selectedTemplateName}</strong>`
+            : '<em class="text-muted">No template selected</em>';
+        $("#SelectTempleteview").html(`<span class="fw-600">Template Selected:</span> ${templateHtmlStr}`);
         if(isNaN(SelfstartDate)  && isNaN(SelfendDate))
         {
             if (SelfstartDate !== undefined && SelfendDate !== undefined) 

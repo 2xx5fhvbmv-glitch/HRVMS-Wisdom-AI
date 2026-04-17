@@ -47,6 +47,7 @@ class Employee extends Model
         'modified_by',
         'Admin_Parent_id',
         'nationality',
+        'location',
         'dob',
         'marital_status',
         'blood_group',

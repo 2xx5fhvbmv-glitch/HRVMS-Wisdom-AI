@@ -12,7 +12,10 @@
                         <h1>Cycles</h1>
                     </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto d-flex gap-2">
+                    <a href="{{ route('Performance.cycle.analytics', base64_encode($cycle->id)) }}" class="btn btn-theme">
+                        View Analytics
+                    </a>
                     <a href="{{ route('Performance.cycle') }}" class="btn btn-themeGray">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back
                     </a>

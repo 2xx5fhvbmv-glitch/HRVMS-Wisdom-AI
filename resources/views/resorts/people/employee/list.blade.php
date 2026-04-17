@@ -63,6 +63,13 @@
                                 <option value="Suspended">Suspended</option>
                             </select>
                         </div>
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            <select class="form-select select2t-none" id="locationFilter">
+                                <option value="">Location</option>
+                                <option value="Malé">Malé</option>
+                                <option value="Resorts">Resorts</option>
+                            </select>
+                        </div>
                         <div class="col-xl-1 col-md-2 col-sm-3 col-6">
                             <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
                         </div>
@@ -243,7 +250,7 @@
             $('.btn-grid').hasClass('active') ? loadGridView() : getEmpTable();
         });
 
-        $('#deptFilter, #positionFilter, #statusFilter').on('change', function () {
+        $('#deptFilter, #positionFilter, #statusFilter, #locationFilter').on('change', function () {
             $('.btn-grid').hasClass('active') ? loadGridView() : getEmpTable();
         });
 
@@ -282,6 +289,7 @@
                         department_id: $('#deptFilter').val(),
                         position_id: $('#positionFilter').val(),
                         status: $('#statusFilter').val(),
+                        location: $('#locationFilter').val(),
                         searchTerm: $('#search-input').val()
                     },
                     success: function (response) {
@@ -482,6 +490,7 @@
             $('#deptFilter').val('').trigger('change');
             $('#statusFilter').val('').trigger('change');
             $('#positionFilter').val('').trigger('change');
+            $('#locationFilter').val('').trigger('change');
             loadGridView();
             getEmpTable();
         });
@@ -495,6 +504,7 @@
                 department_id: $('#deptFilter').val(),
                 position_id: $('#positionFilter').val(),
                 status: $('#statusFilter').val(),
+                location: $('#locationFilter').val(),
                 searchTerm: $('#search-input').val(),
             },
             success: function (res) {
@@ -544,6 +554,7 @@
                     d.position_id = $('#positionFilter').val();
                     d.searchTerm = $('#search-input').val();
                     d.status = $('#statusFilter').val();
+                    d.location = $('#locationFilter').val();
                 }
             },
             columns: [

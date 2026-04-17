@@ -145,14 +145,10 @@ $(document).ready(function(){
                         dataType: "json",
                     }).done(function(result) {
                         if (result.success == true) {
-                            $row.remove();
-
                             toastr.success(result.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
-
-                            ReviewType();
-
+                            setTimeout(function() { location.reload(); }, 600);
                         }
                             else {
                             toastr.error(result.message, "Error", {
