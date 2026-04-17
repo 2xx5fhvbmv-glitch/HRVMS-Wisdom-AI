@@ -39,9 +39,11 @@ class PerformanceDashboardController extends Controller
     {
         $page_title="Performance Dashboard";
         $resort_id = $this->globalUser->resort_id;
+        $scopedIds = Common::getPerformanceScopedEmpIds();
 
         $Employee_count = Employee::where('resort_id', $resort_id)
                                     ->where('status', 'Active')
+                                    ->when(is_array($scopedIds), fn($q) => $q->whereIn('id', $scopedIds))
                                     ->whereHas('resortAdmin', function($query) {
                                         $query->where('status', 'Active');
                                     })->count();
@@ -54,10 +56,12 @@ class PerformanceDashboardController extends Controller
 
         $appraisal_total = DB::table('performa_child_cycles')
                             ->whereIn('Parent_cycle_id', $activeCycleIds)
+                            ->when(is_array($scopedIds), fn($q) => $q->whereIn('Emp_main_id', $scopedIds))
                             ->count();
 
         $appraisal_pending = DB::table('performa_child_cycles')
                             ->whereIn('Parent_cycle_id', $activeCycleIds)
+                            ->when(is_array($scopedIds), fn($q) => $q->whereIn('Emp_main_id', $scopedIds))
                             ->where('manager_review_status', 'pending')
                             ->count();
 
@@ -90,11 +94,25 @@ class PerformanceDashboardController extends Controller
         $approved_checkins_count = DB::table('monthly_checking_models')
             ->where('resort_id', $resort_id)
             ->where('approval_status', 'approved')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))
+            ->count();
+
+        $pip_count = DB::table('employee_pip_plans')
+            ->where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('employee_id', $scopedIds))
+            ->count();
+
+        $pdp_count = DB::table('employee_pdp_plans')
+            ->where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('employee_id', $scopedIds))
             ->count();
 
         return view('resorts.Performance.dashboard.hrdashboard', compact(
             'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending',
-            'department_data', 'performance_cycles', 'approved_checkins_count'
+            'department_data', 'performance_cycles', 'approved_checkins_count',
+            'pip_count', 'pdp_count'
         ));
 
     }
@@ -127,6 +145,11 @@ class PerformanceDashboardController extends Controller
         $query = Employee::with(['resortAdmin', 'position', 'department'])
             ->where('resort_id', $resort_id)
             ->where('status', '!=', 'Inactive');
+
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds)) {
+            $query->whereIn('id', $scopedIds);
+        }
 
         if ($request->searchTerm) {
             $searchTerm = $request->searchTerm;
@@ -181,6 +204,11 @@ class PerformanceDashboardController extends Controller
         $query = Employee::with(['resortAdmin', 'position', 'department'])
             ->where('resort_id', $resort_id)
             ->where('status', '!=', 'Inactive');
+
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds)) {
+            $query->whereIn('id', $scopedIds);
+        }
 
         if ($request->searchTerm) {
             $searchTerm = $request->searchTerm;
@@ -242,6 +270,11 @@ class PerformanceDashboardController extends Controller
         $page_title = 'Employee Details';
         $resort_id  = $this->resort->resort_id;
         $empId      = base64_decode($id);
+
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds) && !in_array((int) $empId, $scopedIds)) {
+            abort(403, 'You do not have access to this employee.');
+        }
 
         $employee = Employee::with(['resortAdmin', 'position', 'department'])
             ->where('resort_id', $resort_id)

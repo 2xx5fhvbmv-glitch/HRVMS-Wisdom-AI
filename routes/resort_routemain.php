@@ -791,6 +791,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('Performance/employees/details/{id}', 'Performance\PerformanceDashboardController@employeeDetails')->name('Performance.employees.details');
 
     Route::get('Performance/cycle', 'Performance\CycleController@index')->name('Performance.cycle');
+    Route::get('Performance/cycle/view/{id}', 'Performance\CycleController@viewCycle')->name('Performance.cycle.view');
+    Route::get('Performance/cycle/analytics/{id}', 'Performance\CycleController@cycleAnalytics')->name('Performance.cycle.analytics');
     Route::get('Performance/create', 'Performance\CycleController@create')->name('Performance.create');
 
     Route::get('Performance/CycleFetchEmployees', 'Performance\CycleController@CycleFetchEmployees')->name('Performance.cycle.FetchEmployees');

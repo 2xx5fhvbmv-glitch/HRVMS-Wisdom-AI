@@ -66,10 +66,18 @@ class PerformanceMeetingController extends Controller
 
     public function calendarData(Request $request)
     {
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         // Only show meetings that have at least one accepted participant
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
             ->whereHas('participants', function($q) {
                 $q->where('status', 'accepted');
+            })
+            ->when(is_array($scopedIds), function ($q) use ($scopedIds) {
+                $q->whereIn('id', function ($sub) use ($scopedIds) {
+                    $sub->from('performance_meeting_participants')
+                        ->select('meeting_id')
+                        ->whereIn('employee_id', $scopedIds);
+                });
             })
             ->get()
             ->map(function ($meeting) {
@@ -106,8 +114,16 @@ class PerformanceMeetingController extends Controller
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->when(is_array($scopedIds), function ($q) use ($scopedIds) {
+                $q->whereIn('id', function ($sub) use ($scopedIds) {
+                    $sub->from('performance_meeting_participants')
+                        ->select('meeting_id')
+                        ->whereIn('employee_id', $scopedIds);
+                });
+            })
             ->orderBy('date', 'desc')
             ->get()
             ->map(function ($meeting) {
@@ -213,7 +229,15 @@ class PerformanceMeetingController extends Controller
 
     public function meetingsListData(Request $request)
     {
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $meetings = PeformanceMeeting::where('resort_id', $this->resort->resort_id)
+            ->when(is_array($scopedIds), function ($q) use ($scopedIds) {
+                $q->whereIn('id', function ($sub) use ($scopedIds) {
+                    $sub->from('performance_meeting_participants')
+                        ->select('meeting_id')
+                        ->whereIn('employee_id', $scopedIds);
+                });
+            })
             ->orderBy('date', 'desc')
             ->get()
             ->map(function ($meeting) {

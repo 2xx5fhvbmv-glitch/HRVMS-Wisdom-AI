@@ -20,7 +20,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end gap-2">
-                            <a href="{{ route('Performance.MonltyCheckIn.history') }}" class="btn btn-themeBlue">View All</a>
+                            <a href="{{ route('Performance.MonltyCheckIn.history') }}" class="btn btn-theme">View All</a>
                         </div>
                     </div>
                 </div>

@@ -58,9 +58,23 @@ class CycleController extends Controller
             });
         }
 
+        // Department scoping — limit cycles to ones containing at least one scoped employee
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds)) {
+            $query->whereIn('id', function ($sub) use ($scopedIds) {
+                $sub->from('performa_child_cycles')
+                    ->select('Parent_cycle_id')
+                    ->whereIn('Emp_main_id', $scopedIds);
+            });
+        }
+
         $PerformanceCycle = $query->orderByDesc('id')->get()
-        ->map(function($p){
-            $ChildCycle = PerformaChildCycle::where('Parent_cycle_id', $p->id)->get();
+        ->map(function($p) use ($scopedIds) {
+            $cq = PerformaChildCycle::where('Parent_cycle_id', $p->id);
+            if (is_array($scopedIds)) {
+                $cq->whereIn('Emp_main_id', $scopedIds);
+            }
+            $ChildCycle = $cq->get();
 
             $p->child_count = $ChildCycle->count();
             $p->ManagerReview = $ChildCycle->where('manager_review_status', 'completed')->count();
@@ -78,7 +92,7 @@ class CycleController extends Controller
 
         $page_title = "Create Cycle";
         $ResortDepartment = ResortDepartment::where('resort_id',$this->resort->resort_id)->get();
-        $Location = collect(['Maldives', 'Resorts']);
+        $Location = collect(['Malé', 'Resorts']);
         $PerformanceReviewType = PerformanceReviewType::where('resort_id',$this->resort->resort_id)
                                         ->orderBy("category_title","DESC")
                                         ->get(['id','category_title']);
@@ -144,7 +158,7 @@ class CycleController extends Controller
                                 }
                                 if(!empty($Location))
                                 {
-                                    if ($Location === 'Maldives') {
+                                    if ($Location === 'Malé') {
                                         $employees->where('employees.nationality', 'Maldivian');
                                     } elseif ($Location === 'Resorts') {
                                         $employees->where('employees.nationality', '!=', 'Maldivian');
@@ -451,7 +465,12 @@ class CycleController extends Controller
             abort(404, 'Cycle not found');
         }
 
-        $children = PerformaChildCycle::where('Parent_cycle_id', $id)->get();
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $childQuery = PerformaChildCycle::where('Parent_cycle_id', $id);
+        if (is_array($scopedIds)) {
+            $childQuery->whereIn('Emp_main_id', $scopedIds);
+        }
+        $children = $childQuery->get();
         $totalEmployees = $children->count();
         $selfCompleted = $children->where('self_review_status', 'completed')->count();
         $managerCompleted = $children->where('manager_review_status', 'completed')->count();
@@ -486,15 +505,181 @@ class CycleController extends Controller
         return view('resorts.Performance.Cycle.view', compact('page_title', 'cycle', 'totalEmployees', 'selfCompleted', 'managerCompleted', 'selfPct', 'managerPct', 'participants'));
     }
 
+    /**
+     * Cycle analytics — bucket employees into Does not Meet / Meets / Exceeds
+     * based on extracted numeric ratings from manager_review_data.
+     */
+    public function cycleAnalytics(Request $request, $id)
+    {
+        if (Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+
+        $id = base64_decode($id);
+        $cycle = PerformanceCycle::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+
+        if (!$cycle) abort(404, 'Cycle not found');
+
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        $childQ = PerformaChildCycle::where('Parent_cycle_id', $id);
+        if (is_array($scopedIds)) {
+            $childQ->whereIn('Emp_main_id', $scopedIds);
+        }
+        $children = $childQ->get();
+
+        // Build employee list with optional rating from manager_review_data
+        $rows = $children->map(function ($child) {
+            $empId = is_numeric($child->Emp_main_id) ? $child->Emp_main_id : base64_decode($child->Emp_main_id);
+            $employee = Employee::with(['resortAdmin', 'department', 'position'])->find($empId);
+            if (!$employee) return null;
+
+            $rating = $this->extractRating($child->manager_review_data);
+
+            return (object)[
+                'emp_id'          => $employee->id,
+                'emp_code'        => $employee->Emp_id,
+                'name'            => trim(optional($employee->resortAdmin)->first_name.' '.optional($employee->resortAdmin)->last_name),
+                'profileImg'      => Common::getResortUserPicture(optional($employee->resortAdmin)->id),
+                'department_id'   => $employee->Dept_id,
+                'department'      => optional($employee->department)->name ?? '-',
+                'position_id'     => $employee->Position_id,
+                'position'        => optional($employee->position)->position_title ?? '-',
+                'employment_type' => $employee->employment_type ?? '-',
+                'rating'          => $rating,
+                'manager_status'  => $child->manager_review_status,
+            ];
+        })->filter()->values();
+
+        // Apply filters
+        if ($request->filled('department_id')) {
+            $rows = $rows->where('department_id', $request->department_id)->values();
+        }
+        if ($request->filled('position_id')) {
+            $rows = $rows->where('position_id', $request->position_id)->values();
+        }
+        if ($request->filled('employment_type')) {
+            $rows = $rows->where('employment_type', $request->employment_type)->values();
+        }
+
+        // Bucket employees by rating (scale 1-5)
+        // Does not Meet: rating < 2.5
+        // Meets: 2.5 <= rating <= 4.0
+        // Exceeds: rating > 4.0
+        // Uncategorized: no rating yet (pending review)
+        $doesNotMeet = $rows->filter(fn($r) => $r->rating !== null && $r->rating < 2.5)->values();
+        $meets       = $rows->filter(fn($r) => $r->rating !== null && $r->rating >= 2.5 && $r->rating <= 4.0)->values();
+        $exceeds     = $rows->filter(fn($r) => $r->rating !== null && $r->rating > 4.0)->values();
+        $uncategorized = $rows->filter(fn($r) => $r->rating === null)->values();
+
+        $total = $rows->count();
+        $pct = function ($n) use ($total) {
+            return $total > 0 ? round(($n / $total) * 100) : 0;
+        };
+
+        $buckets = [
+            'does_not_meet' => [
+                'label'     => 'Does not Meet',
+                'count'     => $doesNotMeet->count(),
+                'percent'   => $pct($doesNotMeet->count()),
+                'employees' => $doesNotMeet,
+            ],
+            'meets' => [
+                'label'     => 'Meets',
+                'count'     => $meets->count(),
+                'percent'   => $pct($meets->count()),
+                'employees' => $meets,
+            ],
+            'exceeds' => [
+                'label'     => 'Exceeds',
+                'count'     => $exceeds->count(),
+                'percent'   => $pct($exceeds->count()),
+                'employees' => $exceeds,
+            ],
+            'uncategorized' => [
+                'label'     => 'Pending Review',
+                'count'     => $uncategorized->count(),
+                'percent'   => $pct($uncategorized->count()),
+                'employees' => $uncategorized,
+            ],
+        ];
+
+        // Filter options
+        $departments = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'active')->get();
+        $positions = ResortPosition::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'active')->get();
+        $employmentTypes = Employee::where('resort_id', $this->resort->resort_id)
+            ->whereNotNull('employment_type')
+            ->distinct()->pluck('employment_type');
+
+        $page_title = 'Cycle Analytics';
+
+        return view('resorts.Performance.Cycle.analytics', compact(
+            'page_title', 'cycle', 'buckets', 'total',
+            'departments', 'positions', 'employmentTypes'
+        ));
+    }
+
+    /**
+     * Extract a numeric rating (1-5 scale) from manager_review_data JSON.
+     * Scans all numeric values, averages them, returns null if nothing found.
+     */
+    private function extractRating($json)
+    {
+        if (!$json) return null;
+        $data = is_string($json) ? json_decode($json, true) : $json;
+        if (!is_array($data)) return null;
+
+        $nums = [];
+        $walk = function ($arr) use (&$walk, &$nums) {
+            foreach ($arr as $v) {
+                if (is_array($v)) { $walk($v); continue; }
+                if (is_numeric($v)) {
+                    $n = (float) $v;
+                    // Treat values between 1 and 5 as ratings
+                    if ($n >= 1 && $n <= 5) $nums[] = $n;
+                }
+            }
+        };
+        $walk($data);
+
+        if (empty($nums)) return null;
+        return round(array_sum($nums) / count($nums), 2);
+    }
+
     public function Destroy($id)
     {
-        $id= base64_decode($id);
-        $p = PerformaChildCycle::where("id",$id)->delete();
+        $id = base64_decode($id);
 
-        PerformaChildCycle::where("Parent_cycle_id",$id)->delete();
-        return response()->json([
-            'success' => true,
-            'message' => 'Cycle Delete Successfully..',
-        ], 200);
+        $cycle = PerformanceCycle::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$cycle) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cycle not found.',
+            ], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            PerformaChildCycle::where('Parent_cycle_id', $id)->delete();
+            $cycle->delete();
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cycle deleted successfully.',
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('Cycle Destroy File: '.$e->getFile());
+            \Log::emergency('Cycle Destroy Line: '.$e->getLine());
+            \Log::emergency('Cycle Destroy Message: '.$e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete cycle.',
+            ], 500);
+        }
     }
 }

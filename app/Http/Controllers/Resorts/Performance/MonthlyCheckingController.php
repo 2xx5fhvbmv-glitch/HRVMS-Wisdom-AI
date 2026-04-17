@@ -46,11 +46,15 @@ class MonthlyCheckingController extends Controller
             $date_discussion = $request->date_discussion;
             $searchTerm = $request->searchTerm;
       
+            $scopedIds = Common::getPerformanceScopedEmpIds();
             $monthly = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
             ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
             ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
             ->leftjoin("learning_programs as t4", "t4.id", "=", "monthly_checking_models.tranining_id")
             ->where("t1.resort_id", $this->resort->resort_id)
+            ->when(is_array($scopedIds), function ($query) use ($scopedIds) {
+                $query->whereIn("monthly_checking_models.emp_id", $scopedIds);
+            })
             
             ->when($date_discussion, function ($query) use ($date_discussion) {
                 try { 
@@ -174,9 +178,11 @@ class MonthlyCheckingController extends Controller
             return abort(403, 'Unauthorized access');
         }
         
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $Employee  = Employee::join("resort_admins as t1","t1.id","=","employees.Admin_Parent_id")
                                ->join("resort_positions as t2","t2.id","=","employees.Position_id")
                                ->where("employees.resort_id", $this->resort->resort_id)
+                               ->when(is_array($scopedIds), fn($q) => $q->whereIn('employees.id', $scopedIds))
                                 ->orderBy("employees.id","DESC")
                                 ->get(['t1.id as ParentId','t1.last_name','t1.first_name','employees.*','t2.position_title as PositionName'])
                                 ->map(function($ak)
@@ -205,9 +211,11 @@ class MonthlyCheckingController extends Controller
     {
         
         $search = $request->search;
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $Employee = Employee::join("resort_admins as t1", "t1.id", "=", "employees.Admin_Parent_id")
                             ->join("resort_positions as t2", "t2.id", "=", "employees.Position_id")
                             ->where("employees.resort_id", $this->resort->resort_id)
+                            ->when(is_array($scopedIds), fn($q) => $q->whereIn('employees.id', $scopedIds))
                             ->when($search, function ($query, $search) {
                                 $query->where(function ($q) use ($search) {
                                     $q->where("t1.first_name", "like", "%$search%")
@@ -372,14 +380,19 @@ class MonthlyCheckingController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $id = base64_decode($id);
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $monthly =  MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
                                         ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
                                         ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
                                         ->leftjoin("learning_programs as t4", "t4.id", "=", "monthly_checking_models.tranining_id")
                                         ->where("t1.resort_id", $this->resort->resort_id)
                                         ->where("monthly_checking_models.id", $id)
+                                        ->when(is_array($scopedIds), fn($q) => $q->whereIn('monthly_checking_models.emp_id', $scopedIds))
                                         ->orderBy("id","desc")
                                         ->first(['monthly_checking_models.id as Parent_m_id','t4.name as traniningname','t2.first_name','t2.last_name','t2.id as ParentId','t1.Emp_id as OrignalEmp_id','t3.position_title as PositionName','monthly_checking_models.*']);
+        if (!$monthly) {
+            abort(403, 'You do not have access to this check-in.');
+        }
         $monthly->profileImg = Common::getResortUserPicture($monthly->ParentId);
         $page_title="Monthly Check In Details";
         return view("resorts.Performance.MonthlyCheckIn.Details", compact('page_title','monthly'));
@@ -511,49 +524,43 @@ class MonthlyCheckingController extends Controller
                 'Meeting_Place'    => $request->Meeting_Place,
                 'approval_status'  => 'pending',
             ]);
+            DB::commit();
+        } catch (\Exception $ex) {
+            DB::rollBack();
+            \Log::emergency('scheduleRequest File: '.$ex->getFile());
+            \Log::emergency('scheduleRequest Line: '.$ex->getLine());
+            \Log::emergency('scheduleRequest Message: '.$ex->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to schedule request'], 500);
+        }
 
+        // Notifications outside transaction — don't fail the request if the push service is down
+        try {
             $title      = 'Monthly Check-In Approval Required';
             $msg        = 'A monthly check-in meeting has been scheduled with you on '.date('d M Y', strtotime($request->date_discussion)).' at '.$request->start_time.'. Please approve or reject.';
             $ModuleName = 'Performance';
 
-            // In-app / website notification
             event(new ResortNotificationEvent(
                 Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $e->id, $ModuleName)
             ));
-
-            // Mobile push
             Common::sendMobileNotification(
-                $this->resort->resort_id,
-                2, // monthly check-in meeting
-                null,
-                null,
-                $title,
-                $msg,
-                $ModuleName,
-                [$e->id],
-                $checkin->id
+                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$e->id], $checkin->id
             );
-
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => 'Check-in request sent to employee for approval.',
-                'checkin' => [
-                    'id'               => $checkin->id,
-                    'Checkin_id'       => $checkin->Checkin_id,
-                    'date_discussion'  => $checkin->date_discussion,
-                    'start_time'       => $checkin->start_time,
-                    'end_time'         => $checkin->end_time,
-                    'Meeting_Place'    => $checkin->Meeting_Place,
-                ],
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::emergency('scheduleRequest File: '.$e->getFile());
-            \Log::emergency('scheduleRequest Line: '.$e->getLine());
-            \Log::emergency('scheduleRequest Message: '.$e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to schedule request'], 500);
+        } catch (\Exception $ne) {
+            \Log::warning('Monthly check-in schedule notification failed: '.$ne->getMessage());
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Check-in request sent to employee for approval.',
+            'checkin' => [
+                'id'               => $checkin->id,
+                'Checkin_id'       => $checkin->Checkin_id,
+                'date_discussion'  => $checkin->date_discussion,
+                'start_time'       => $checkin->start_time,
+                'end_time'         => $checkin->end_time,
+                'Meeting_Place'    => $checkin->Meeting_Place,
+            ],
+        ]);
     }
 
     /**
@@ -765,8 +772,10 @@ class MonthlyCheckingController extends Controller
 
     public function historyData(Request $request)
     {
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $query = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
             ->where('resort_id', $this->resort->resort_id)
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))
             ->whereNotNull('finalized_at')
             ->orderByDesc('finalized_at');
 

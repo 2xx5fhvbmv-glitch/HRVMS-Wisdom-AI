@@ -261,6 +261,21 @@
                                                                 </td>
                                                             </tr>
                                                             <tr>
+                                                                @php
+                                                                    $loc = $employee->location
+                                                                        ?: ($employee->nationality === 'Maldivian' ? 'Malé' : ($employee->nationality ? 'Resorts' : ''));
+                                                                @endphp
+                                                                <th>Location:</th>
+                                                                <td>
+                                                                    <span class="view-mode">{{ $loc ?: '-' }}</span>
+                                                                    <select name="location" class="form-select edit-mode d-none">
+                                                                        <option value="">Select Location</option>
+                                                                        <option value="Malé" {{ $loc === 'Malé' ? 'selected' : '' }}>Malé</option>
+                                                                        <option value="Resorts" {{ $loc === 'Resorts' ? 'selected' : '' }}>Resorts</option>
+                                                                    </select>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
                                                                 <th>Religion:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{ ($employee->religion === null || $employee->religion === '') ? "N/A" : ($employee->religion === '0' ? "Non-Muslim" : "Muslim") }}</span>
