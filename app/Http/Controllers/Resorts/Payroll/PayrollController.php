@@ -2847,6 +2847,17 @@ class PayrollController extends Controller
             ]);
         }
 
+        // KPI Bonus — build a map of rank → bonus_percentage for this payroll's month+year
+        $periodStart = \Carbon\Carbon::parse($payroll->start_date);
+        $periodMonth = $periodStart->format('F');
+        $periodYear  = (int) $periodStart->year;
+        $kpiBonusMap = \App\Models\PerformanceBonusConfig::where('resort_id', $payroll->resort_id ?? $this->resort->resort_id)
+            ->where('month', $periodMonth)
+            ->where('year', $periodYear)
+            ->get()
+            ->keyBy('rank')
+            ->map(fn($r) => (float) $r->bonus_percentage);
+
         // Start DataTables query with filtering
         $query = datatables()->of($payroll->employees)
             ->filter(function ($query) use ($request, $payroll) {
@@ -3031,6 +3042,17 @@ class PayrollController extends Controller
                $earnings_allowance = ($payroll->reviews->where('employee_id', $emp_detail->id)->first())->earnings_allowance ?? 0;
                return number_format($earnings_allowance , 2);
             })
+            ->addColumn('kpi_bonus', function ($employee) use ($payroll, $kpiBonusMap) {
+                $emp_detail = Employee::where('id', $employee->employee_id)->first();
+                if (!$emp_detail) return number_format(0, 2);
+
+                $pct = $kpiBonusMap->get((int) $emp_detail->rank);
+                if ($pct === null) return number_format(0, 2);
+
+                $annualBasic = (float) ($emp_detail->basic_salary ?? 0);
+                $bonus = $annualBasic * $pct / 100;
+                return number_format($bonus, 2);
+            })
             ->addColumn('total_pay', function ($employee) use ($payroll) {
                 $emp_detail = Employee::with('position')->where('id',$employee->employee_id)->first();
 
@@ -3076,6 +3098,13 @@ class PayrollController extends Controller
                 'service_charge' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('service_charge'),
                 'earned_salary' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('earned_salary'),
                 'total_allowance' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('earnings_allowance'),
+                'kpi_bonus' => $payroll->employees->sum(function ($e) use ($kpiBonusMap) {
+                    $emp = \App\Models\Employee::where('id', $e->employee_id)->first();
+                    if (!$emp) return 0;
+                    $pct = $kpiBonusMap->get((int) $emp->rank);
+                    if ($pct === null) return 0;
+                    return ((float) ($emp->basic_salary ?? 0)) * $pct / 100;
+                }),
                 'total_pay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('total_earnings'),
                 'deductions' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('total_deductions'),
                 'net_pay' => $payroll->reviews->whereIn('employee_id', $allEmployeeIds)->sum('net_salary'),

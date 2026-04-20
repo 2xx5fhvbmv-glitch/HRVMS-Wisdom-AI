@@ -259,6 +259,11 @@
                         tableColumns.push({ data: col, name: col, title: col, render: fmtCol, className: 'grp-earnings' });
                     });
 
+                    // KPI Bonus (from Performance > Bonus Configuration — matched by rank + payroll month/year)
+                    tableColumns.push(
+                        { data: 'kpi_bonus', name: 'kpi_bonus', title: 'KPI Bonus', render: fmtCol, className: 'grp-earnings' }
+                    );
+
                     // Total Earnings (shown in earnings, deductions, summary)
                     tableColumns.push(
                         { data: 'total_pay', name: 'total_pay', title: 'Total Earnings', render: fmtCol, className: 'grp-earnings grp-summary' }

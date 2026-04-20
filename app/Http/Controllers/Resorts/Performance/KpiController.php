@@ -141,7 +141,12 @@ class KpiController extends Controller
             ->where('resort_id', $this->resort->resort_id)
             ->when($Year, fn($q) => $q->whereYear('created_at', $Year))
             ->when($searchTerm, fn($q) => $q->where('property_goal', 'LIKE', "%{$searchTerm}%"))
-            ->get();
+            ->get()
+            ->map(function ($k) {
+                $k->actual_budget_sum    = (float) $k->childrenKpi->sum('budget');
+                $k->actual_weightage_sum = (float) $k->childrenKpi->sum('weightage');
+                return $k;
+            });
 
         if ($request->ajax()) {
             $rank = $this->getUserRank();
@@ -150,9 +155,9 @@ class KpiController extends Controller
             return datatables()->of($kpiList)
                 ->editColumn('PropertyGoals', fn($row) => ucfirst($row->property_goal))
                 ->editColumn('budget', fn($row) => $row->PropertyGoalbudget !== null && $row->PropertyGoalbudget !== '' ? number_format((float)$row->PropertyGoalbudget) : '-')
-                ->addColumn('Actual', fn($row) => $row->response_budget !== null && $row->response_budget !== '' ? number_format((float)$row->response_budget) : '-')
+                ->addColumn('Actual', fn($row) => $row->actual_budget_sum > 0 ? number_format($row->actual_budget_sum) : '-')
                 ->addColumn('Value', fn($row) => $row->PropertyGoalweightage !== null && $row->PropertyGoalweightage !== '' ? $row->PropertyGoalweightage.'%' : '-')
-                ->addColumn('Result', fn($row) => $row->response_weightage !== null && $row->response_weightage !== '' ? $row->response_weightage.'%' : '-')
+                ->addColumn('Result', fn($row) => $row->actual_weightage_sum > 0 ? $row->actual_weightage_sum.'%' : '-')
                 ->addColumn('status_badge', function ($row) {
                     $map = [
                         'pending'   => 'badge-themeWarning',
@@ -454,6 +459,55 @@ class KpiController extends Controller
 
         $child->delete();
         return response()->json(['success' => true, 'message' => 'Entry removed.']);
+    }
+
+    /**
+     * KPI Config page — shows all KPIs with editable Poor/Fair/Good/Superb thresholds.
+     */
+    public function kpiConfig()
+    {
+        $kpis = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)
+            ->orderByDesc('id')
+            ->get();
+
+        $page_title = 'KPI Configuration';
+        return view('resorts.Performance.Kpi.config', compact('page_title', 'kpis'));
+    }
+
+    /**
+     * Update a KPI's Poor/Fair/Good/Superb ranges + points.
+     */
+    public function updateKpiConfig(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'poor_range'   => 'nullable|string|max:100',
+            'fair_range'   => 'nullable|string|max:100',
+            'good_range'   => 'nullable|string|max:100',
+            'superb_range' => 'nullable|string|max:100',
+            'poor'         => 'nullable|numeric',
+            'fair'         => 'nullable|numeric',
+            'good'         => 'nullable|numeric',
+            'superb'       => 'nullable|numeric',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
+        $kpi->update($request->only([
+            'poor_range', 'fair_range', 'good_range', 'superb_range',
+            'poor', 'fair', 'good', 'superb',
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'KPI config updated successfully.',
+            'data'    => $kpi->only([
+                'id', 'property_goal', 'PropertyGoalbudget', 'PropertyGoalweightage',
+                'poor_range', 'fair_range', 'good_range', 'superb_range',
+                'poor', 'fair', 'good', 'superb',
+            ]),
+        ]);
     }
 
     /**

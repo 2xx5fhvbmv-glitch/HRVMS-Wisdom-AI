@@ -13,7 +13,7 @@ class PerformanceKpiParent extends Model
 {
     use HasFactory;
     protected $table = 'performance_kpi_parents';
-    protected $fillable =['property_goal','PropertyGoalbudget','PropertyGoalweightage','PropertyGoalscore','resort_id','status','responded_by','responded_at','individual_goal','response_budget','response_weightage','response_entries','gm_action','gm_action_at','gm_remarks'];
+    protected $fillable =['property_goal','PropertyGoalbudget','PropertyGoalweightage','PropertyGoalscore','resort_id','status','responded_by','responded_at','individual_goal','response_budget','response_weightage','response_entries','gm_action','gm_action_at','gm_remarks','poor','fair','good','superb','poor_range','fair_range','good_range','superb_range'];
 
     protected $casts = [
         'response_entries' => 'array',

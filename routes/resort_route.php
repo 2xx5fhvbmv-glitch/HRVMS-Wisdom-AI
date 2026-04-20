@@ -913,6 +913,10 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('performance/kpi/reject/{id}', 'Performance\KpiController@reject')->name('Performance.kpi.reject');
     Route::get('performance/kpi/show/{id}', 'Performance\KpiController@show')->name('Performance.kpi.show');
     Route::get('performance/kpi/view/{id}', 'Performance\KpiController@viewPage')->name('Performance.kpi.view');
+    Route::get('performance/kpi/config', 'Performance\KpiController@kpiConfig')->name('Performance.kpi.config');
+    Route::post('performance/kpi/config/{id}', 'Performance\KpiController@updateKpiConfig')->name('Performance.kpi.configUpdate');
+    Route::get('performance/bonus-configuration', 'Performance\BonusConfigController@index')->name('Performance.bonusConfig');
+    Route::post('performance/bonus-configuration/update', 'Performance\BonusConfigController@update')->name('Performance.bonusConfig.update');
     Route::post('performance/kpi/view/{id}/actual', 'Performance\KpiController@storeActual')->name('Performance.kpi.storeActual');
     Route::delete('performance/kpi/actual/{id}', 'Performance\KpiController@destroyActual')->name('Performance.kpi.destroyActual');
 
