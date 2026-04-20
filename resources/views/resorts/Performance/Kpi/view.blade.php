@@ -60,7 +60,7 @@
                         <strong>Property Goal:</strong> {{ $kpi->property_goal }}
                     </div>
                     <div class="col-md-3">
-                        <strong>Value (Weightage):</strong> {{ $kpi->PropertyGoalweightage }}%
+                        <strong>Value (Weight):</strong> {{ $kpi->PropertyGoalweightage }}%
                     </div>
                     <div class="col-md-3">
                         <strong>Budget:</strong>
@@ -98,7 +98,7 @@
                                         <th style="width:50px;">#</th>
                                         <th>Individual Goal</th>
                                         <th>Budget</th>
-                                        <th>Weightage</th>
+                                        <th>Weight</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -133,7 +133,7 @@
                                             <th style="width:50px;">#</th>
                                             <th>Individual Goal</th>
                                             <th>Budget</th>
-                                            <th>Weightage</th>
+                                            <th>Weight</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -190,7 +190,7 @@
                                     <th>Individual Goal</th>
                                     <th>Month</th>
                                     <th>Budget</th>
-                                    <th>Weightage</th>
+                                    <th>Weight</th>
                                     <th>Created By</th>
                                     <th>Added On</th>
                                     @if($canAddActual ?? false)
@@ -248,14 +248,14 @@
                         <div class="p-3 rounded" style="background:#f1f5f9;">
                             <small class="text-muted d-block">TARGET</small>
                             <div><strong>Budget:</strong> {{ number_format($allocatedBudget) }}</div>
-                            <div><strong>Weightage:</strong> {{ $allocatedWeightage }}%</div>
+                            <div><strong>Weight:</strong> {{ $allocatedWeightage }}%</div>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="p-3 rounded" style="background:#fff4e5;">
                             <small class="text-muted d-block">ACHIEVED</small>
                             <div><strong>Budget:</strong> {{ number_format($usedBudget) }}</div>
-                            <div><strong>Weightage:</strong> {{ $usedWeightage }}%</div>
+                            <div><strong>Weight:</strong> {{ $usedWeightage }}%</div>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -264,7 +264,7 @@
                             <div><strong>Budget:</strong>
                                 <span style="color:{{ $balanceBudget < 0 ? '#d9534f' : '#28a745' }}">{{ number_format($balanceBudget) }}</span>
                             </div>
-                            <div><strong>Weightage:</strong>
+                            <div><strong>Weight:</strong>
                                 <span style="color:{{ $balanceWeightage < 0 ? '#d9534f' : '#28a745' }}">{{ $balanceWeightage }}%</span>
                             </div>
                         </div>
@@ -303,10 +303,10 @@
                                                placeholder="Budget (optional)" min="1">
                                     </div>
                                     <div class="col-sm-6">
-                                        <label class="form-label">WEIGHTAGE</label>
+                                        <label class="form-label">WEIGHT</label>
                                         <div class="input-group">
                                             <input type="number" class="form-control" name="entries[0][weightage]"
-                                                   placeholder="Weightage" required min="1">
+                                                   placeholder="Weight" required min="1">
                                             <span class="input-group-text">%</span>
                                         </div>
                                     </div>

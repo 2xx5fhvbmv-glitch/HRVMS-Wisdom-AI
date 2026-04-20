@@ -12,11 +12,12 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                @if(($userRank ?? null) == 8)
-                <div class="col-auto ms-auto">
-                    <a href="{{ route('Performance.kpi.create') }}" class="btn btn-theme">Create New KPI</a>
+                <div class="col-auto ms-auto d-flex gap-2">
+                    <a href="{{ route('Performance.kpi.config') }}" class="btn btn-theme">KPI Config</a>
+                    @if(($userRank ?? null) == 8)
+                        <a href="{{ route('Performance.kpi.create') }}" class="btn btn-theme">Create New KPI</a>
+                    @endif
                 </div>
-                @endif
             </div>
         </div>
 
@@ -47,10 +48,10 @@
                     <thead>
                         <tr>
                             <th>Property Goals</th>
-                            <th>Budget/Goal</th>
-                            <th>Value</th>
-                            <th>Actual</th>
-                            <th>Result</th>
+                            <th>Target Budget</th>
+                            <th>Target Weight</th>
+                            <th>Achieved Budget</th>
+                            <th>Achieved Weight</th>
                             <th>Status</th>
                             <th>Action</th>
                         </tr>

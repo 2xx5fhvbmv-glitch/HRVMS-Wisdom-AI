@@ -12,7 +12,7 @@ class PayrollReview extends Model
 {
     use HasFactory;
     protected $table = 'payroll_reviews';
-    protected $fillable = ['Emp_id', 'employee_id','payroll_id', 'service_charge','regularOTPay','holidayOTPay','earnings_basic', 'earned_salary','earnings_overtime','earnings_allowance','total_earnings','total_deductions','net_salary'];
+    protected $fillable = ['Emp_id', 'employee_id','payroll_id', 'service_charge','regularOTPay','holidayOTPay','earnings_basic', 'earned_salary','earnings_overtime','earnings_allowance','kpi_bonus','total_earnings','total_deductions','net_salary'];
 
     public static function boot(){
         parent::boot();

@@ -7,7 +7,12 @@
       "Bash(php -l app/Http/Controllers/Resorts/Performance/CycleController.php)",
       "Bash(php -l app/Http/Controllers/Resorts/People/Employee/EmployeeController.php)",
       "Bash(php -l app/Http/Controllers/Resorts/Performance/PipPdpController.php)",
-      "Bash(php -l app/Http/Controllers/Resorts/Performance/PerformanceMeetingController.php)"
+      "Bash(php -l app/Http/Controllers/Resorts/Performance/PerformanceMeetingController.php)",
+      "Bash(php -l app/Http/Controllers/Resorts/Performance/BonusConfigController.php)",
+      "Bash(php -l app/Models/PerformanceBonusConfig.php)",
+      "Bash(grep -n 'protected $fillable\\\\|protected $table\\\\|class Employee' /Users/ankittisawer/Desktop/HRVMS-Wisdom-AI/app/Models/Employee.php)",
+      "Bash(php -l app/Http/Controllers/Resorts/Payroll/PayrollController.php)",
+      "Bash(php -l app/Models/PayrollReview.php)"
     ]
   }
 }
