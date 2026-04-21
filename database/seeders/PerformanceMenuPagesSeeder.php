@@ -34,11 +34,20 @@ class PerformanceMenuPagesSeeder extends Seeder
         // ---- 1. Ensure module_pages rows exist ----
         // Place orders are relative to existing Performance menu structure.
         $pagesToEnsure = [
-            // [internal_route, page_name, place_order, type_of_page_visible_in_menu]
-            ['Performance.employees',       'Employees',            2,  true],
-            ['Performance.kpi.KpiList',     'KPI List',             3,  true],
-            ['Performance.kpi.create',      'Create KPI',           0,  false], // hidden from menu but needs permission
-            ['Performance.bonusConfig',     'Bonus Configuration',  13, true],
+            // [internal_route, page_name, place_order, visible_in_menu]
+            // Pre-existing pages that may be missing on live:
+            ['Performance.Meeting.scheduled',   'Scheduled Meetings',            4,  true],
+            ['Performance.Review.mySelf',       'My Reviews',                    8,  true],
+            ['Performance.Review.myTeam',       'Team Reviews',                  9,  true],
+            ['Performance.pip.index',           'Performance Improvement Plan',  10, true],
+            ['Performance.pdp.index',           'Professional Development Plan', 11, true],
+            // Pages added during the session:
+            ['Performance.employees',           'Employees',                     2,  true],
+            ['Performance.kpi.KpiList',         'KPI List',                      3,  true],
+            ['Performance.kpi.create',          'Create KPI',                    0,  false], // hidden from menu, permission only
+            ['Performance.bonusConfig',         'Bonus Configuration',           12, true],
+            // Name-only fix for existing row (typo correction):
+            ['Performance.MonltyCheckIn',       'Monthly Check In',              7,  true],
         ];
 
         $pageIdMap = []; // internal_route => id
@@ -46,6 +55,14 @@ class PerformanceMenuPagesSeeder extends Seeder
             $existing = DB::table('module_pages')->where('internal_route', $route)->first();
             if ($existing) {
                 $pageIdMap[$route] = $existing->id;
+                // Update page_name if it differs (fixes typos like "Monlty" -> "Monthly")
+                if ($existing->page_name !== $name) {
+                    DB::table('module_pages')->where('id', $existing->id)->update([
+                        'page_name'  => $name,
+                        'updated_at' => $now,
+                    ]);
+                    $this->command->info("Updated page name for {$route}: '{$existing->page_name}' -> '{$name}'");
+                }
                 continue;
             }
 
