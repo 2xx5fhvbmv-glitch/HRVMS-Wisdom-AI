@@ -35,17 +35,33 @@ class MonthlyCheckingController extends Controller
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
     }
+
+    /**
+     * Parse user-submitted date (dd/mm/yyyy preferred, falls back to Carbon::parse).
+     * Returns Y-m-d string or null on failure.
+     */
+    private function parseDate($raw)
+    {
+        if (empty($raw)) return null;
+        try {
+            return Carbon::createFromFormat('d/m/Y', $raw)->format('Y-m-d');
+        } catch (\Exception $e) {}
+        try {
+            return Carbon::parse($raw)->format('Y-m-d');
+        } catch (\Exception $e) {}
+        return null;
+    }
     public function index(Request $request)
     {
         if(Common::checkRouteWisePermission('Performance.MonltyCheckIn',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized access');
         }
-        
+
         if($request->ajax())
         {
             $date_discussion = $request->date_discussion;
             $searchTerm = $request->searchTerm;
-      
+
             $scopedIds = Common::getPerformanceScopedEmpIds();
             $monthly = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
             ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
@@ -55,17 +71,17 @@ class MonthlyCheckingController extends Controller
             ->when(is_array($scopedIds), function ($query) use ($scopedIds) {
                 $query->whereIn("monthly_checking_models.emp_id", $scopedIds);
             })
-            
+
             ->when($date_discussion, function ($query) use ($date_discussion) {
-                try { 
+                try {
                 $convertedDate = date('Y-d-m', strtotime($date_discussion));
                 $query->whereDate("monthly_checking_models.date_discussion", $convertedDate);
-                
+
                   } catch (\Exception $e) {
                 // Handle invalid date silently or log it
                 }
             })
-            
+
             ->when($searchTerm, function ($query) use ($searchTerm) {
                 $query->where(function ($q) use ($searchTerm) {
                 $q->whereRaw("CONCAT(t2.first_name, ' ', t2.last_name) LIKE ?", ["%{$searchTerm}%"])
@@ -73,30 +89,31 @@ class MonthlyCheckingController extends Controller
                   ->orWhere("monthly_checking_models.comment", "like", "%{$searchTerm}%")
                   ->orWhere("monthly_checking_models.Time_Line", "like", "%{$searchTerm}%")
                   ->orWhere("t3.position_title", "like", "%{$searchTerm}%");
-        
+
                 if (strtolower($searchTerm) === "yes") {
                     $q->orWhereNotNull("monthly_checking_models.tranining_id");
                 }
-        
+
                 if (strtolower($searchTerm) === "no") {
                     $q->orWhereNull("monthly_checking_models.tranining_id");
                 }
                 });
             })
-            
+
             ->orderBy("monthly_checking_models.id", "desc")
             ->select([
                 't1.id as emp_orignal_id',
+                't1.Emp_id as employee_code',
                 't4.name as traniningname',
                 't2.first_name',
                 't2.last_name',
                 't3.position_title as PositionName',
                 'monthly_checking_models.*'
             ]);
-            
+
             // Get the collection after executing the query
             $monthlyCollection = $monthly->get();
-            
+
             // Process each record
             $processed = $monthlyCollection->map(function($ak) {
             if (isset($ak->tranining_id)) {
@@ -108,11 +125,11 @@ class MonthlyCheckingController extends Controller
                 })
                 ->latest('id')
                 ->first();
-                
+
                 $ak->duration = isset($l->start_date) && isset($l->end_date)
                 ? $l->start_date . '-' . $l->end_date
                 : '-';
-        
+
                 $ak->status = isset($l->status) && $l->status == 'Approved'
                 ? 'In Progress'
                 : (isset($l->status) ? $l->status : 'Pending');
@@ -120,14 +137,14 @@ class MonthlyCheckingController extends Controller
                 $ak->duration = '-';
                 $ak->status = 'Pending';
             }
-            $ak->new_date_of_dicussion = date("d M Y",strtotime($ak->date_discussion));
-            return $ak; 
+            $ak->new_date_of_dicussion = $ak->date_discussion ? date('d M Y', strtotime($ak->date_discussion)) : '-';
+            return $ak;
             });
-        
+
             return datatables()->of($processed)
             ->addIndexColumn()
             ->addColumn('ID', function($row) {
-                return $row->Checkin_id;
+                return $row->employee_code ?: $row->Checkin_id;
             })
             ->addColumn('Name', function($row) {
                 return $row->first_name.' '.$row->last_name;
@@ -142,16 +159,19 @@ class MonthlyCheckingController extends Controller
                 return isset($row->tranining_id) ? 'Yes' : 'No';
             })
             ->addColumn('Date', function($row) {
-            
+
                 return $row->new_date_of_dicussion ;
-               
+
             })
             ->addColumn('Time', function($row) {
-
-         
-                $formattedStart = Carbon::parse($row->start_time)->format('g:i A');
-                $formattedEnd = Carbon::parse($row->end_time)->format('g:i A');
-                return $formattedStart . ' - ' . $formattedEnd;
+                if (empty($row->start_time) || empty($row->end_time)) return '-';
+                try {
+                    $formattedStart = Carbon::parse($row->start_time)->format('g:i A');
+                    $formattedEnd = Carbon::parse($row->end_time)->format('g:i A');
+                    return $formattedStart . ' - ' . $formattedEnd;
+                } catch (\Exception $e) {
+                    return '-';
+                }
             })
             ->addColumn('Summary', function($row) {
                 return $row->comment;
@@ -162,7 +182,7 @@ class MonthlyCheckingController extends Controller
             ->addColumn('Action', function($row) {
                 $route = route('Performance.GetMonthlyCheckInDetails', base64_encode($row->id));
                 $img = URL::asset('resorts_assets/images/history.svg');
-                return '<a target="_blank" href="'.$route.'" class="btn-lg-icon icon-bg-blue" data-bs-toggle="tooltip" 
+                return '<a target="_blank" href="'.$route.'" class="btn-lg-icon icon-bg-blue" data-bs-toggle="tooltip"
                 data-bs-placement="bottom" title="" data-bs-original-title="View History" aria-label="View History">
                 <img src="'.$img.'" alt="icon"></a>';
             })
@@ -177,7 +197,7 @@ class MonthlyCheckingController extends Controller
         if(Common::checkRouteWisePermission('Performance.CreateMonltyCheckIn',config('settings.resort_permissions.create')) == false){
             return abort(403, 'Unauthorized access');
         }
-        
+
         $scopedIds = Common::getPerformanceScopedEmpIds();
         $Employee  = Employee::join("resort_admins as t1","t1.id","=","employees.Admin_Parent_id")
                                ->join("resort_positions as t2","t2.id","=","employees.Position_id")
@@ -194,7 +214,7 @@ class MonthlyCheckingController extends Controller
         $learningProgram = LearningProgram::where('resort_id', $this->resort->resort_id)->orderBy("id","desc")->get();
         $page_title="Create Monthly Check In";
 
-        
+
         $trainingManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
 
         // Get position IDs that match the titles in the current resort
@@ -206,10 +226,10 @@ class MonthlyCheckingController extends Controller
                             ->get();
         return view("resorts.Performance.MonthlyCheckIn.create", compact('learningManagers','page_title','Employee','learningProgram'));
     }
-    
+
     public function GetEmployeeDetails(Request $request)
     {
-        
+
         $search = $request->search;
         $scopedIds = Common::getPerformanceScopedEmpIds();
         $Employee = Employee::join("resort_admins as t1", "t1.id", "=", "employees.Admin_Parent_id")
@@ -241,8 +261,8 @@ class MonthlyCheckingController extends Controller
         if ($Employee->isNotEmpty()) {
             // initialize string if you plan to use later
             foreach ($Employee as $e) {
-                $html .= '<div class="d-flex Employee" 
-                            data-id="' . $e->emp_id . '" 
+                $html .= '<div class="d-flex Employee"
+                            data-id="' . $e->emp_id . '"
                             data-profile="' . $e->profileImg . '"
                             data-position="' . $e->PositionName . '"
                             data-first_name="' . $e->first_name . '"
@@ -265,7 +285,7 @@ class MonthlyCheckingController extends Controller
                         <h6>No Record Found</h6>
                         <p></p>
                     </div>
-                </div>';                
+                </div>';
         }
         return response()->json([
             'success' => true,
@@ -274,7 +294,7 @@ class MonthlyCheckingController extends Controller
     }
     public function MonltyCheckInStore(Request $request)
     {
-       
+
         $validator = Validator::make($request->all(), [
             'date_discussion' => 'required', // Ensure it's an array
             // 'tranining_id' => [
@@ -316,16 +336,16 @@ class MonthlyCheckingController extends Controller
             MonthlyCheckingModel::create([
                 "Checkin_id"=>Common::getMonthlyCheckIn(),
                 "resort_id"=>$this->resort->resort_id,
-                "start_time" =>$request->start_time, 
-                "end_time" =>$request->end_time, 
-                "date_discussion" =>date("Y-m-d", strtotime($request->date_discussion)), //$request->date_discussion, 
-                "Meeting_Place" =>$request->Meeting_Place, 
-                "Area_of_Discussion" =>$request->Area_of_Discussion, 
+                "start_time" =>$request->start_time,
+                "end_time" =>$request->end_time,
+                "date_discussion" => $this->parseDate($request->date_discussion),
+                "Meeting_Place" =>$request->Meeting_Place,
+                "Area_of_Discussion" =>$request->Area_of_Discussion,
                 "Area_of_Improvement" =>$request->Area_of_Improvement,
-                "Time_Line" =>$request->Time_Line, 
+                "Time_Line" =>$request->Time_Line,
                 "comment" =>isset($request->comment) ?  $request->comment : null,
-                "tranining_id" =>$request->tranining_id, 
-                "emp_id" =>$e->id, 
+                "tranining_id" =>$request->tranining_id,
+                "emp_id" =>$e->id,
             ]);
             if(!empty($request->tranining_id) && !empty($request->learning_manager_id))
             {
@@ -334,12 +354,12 @@ class MonthlyCheckingController extends Controller
                                                 "learning_id" =>$request->tranining_id,
                                                 'status'=>'Pending',
                                                 "reason"=>$request->Area_of_Improvement,
-                                                "learning_manager_id" => $request->learning_manager_id, 
+                                                "learning_manager_id" => $request->learning_manager_id,
                                             ]);
 
                     LearningRequestEmployee::create([
                         "employee_id" =>$e->id,
-                        "learning_request_id" =>$l->id,               
+                        "learning_request_id" =>$l->id,
                     ]);
 
             }
@@ -372,7 +392,7 @@ class MonthlyCheckingController extends Controller
             \Log::emergency("Message: " . $e->getMessage());
             return response()->json(['error' => 'Failed to add  Review Type'], 500);
         }
-                        
+
     }
     public function GetMonthlyCheckInDetails($id)
     {
@@ -399,10 +419,10 @@ class MonthlyCheckingController extends Controller
     }
     public function MonltyCheckInDetailsPageList(Request $request)
     {
-   
+
 
         if($request->ajax())
-        {   
+        {
             $id = base64_decode($request->Parent_id);
             $monthlyDetails = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
                                                     ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
@@ -424,7 +444,7 @@ class MonthlyCheckingController extends Controller
                                                                                 ->where("resort_id", $this->resort->resort_id)
                                                                                 ->latest('id')
                                                                                 ->first();
-                                                        
+
                                                             $ak->duration = isset($l->start_date) && isset($l->end_date) ?   $l->start_date.'-'. $l->end_date :' ';
                                                             if(isset($l->status) && $l->status == 'Approved')
                                                             {
@@ -440,13 +460,13 @@ class MonthlyCheckingController extends Controller
                                                             $ak->duration ='-';
                                                             $ak->status  ='Pending';
                                                         }
-                                                        return $ak; 
+                                                        return $ak;
                                                     });
 
                                                     return datatables()->of($monthlyDetails)
-                                                    
+
                                                     ->editColumn('DateOfDisussion', function($row)  {
-                                                        return date('d/m/Y',strtotime ($row->date_discussion));
+                                                        return $row->date_discussion ? date('d M Y', strtotime($row->date_discussion)) : '-';
                                                     })
                                                      ->editColumn('Time', function($row)  {
                                                         $formattedStart = Carbon::parse($row->start_time)->format('g:i A');
@@ -462,13 +482,13 @@ class MonthlyCheckingController extends Controller
                                                      ->editColumn('Comment', function($row)  {
                                                         return $row->comment;
                                                      })
-                                                     
+
                                                      ->editColumn('TimeLine', function($row)  {
                                                         return $row->Time_Line;
                                                      })
-                                               
+
                                                      ->editColumn('Training', function($row)  {
-                                
+
                                                         return  isset($row->tranining_id) ?  $row->traniningname: '-';
                                                      })
                                                      ->editColumn('Duration', function($row)  {
@@ -477,8 +497,8 @@ class MonthlyCheckingController extends Controller
                                                     ->editColumn('Status', function($row) {
                                                         return $row->status;
                                                     })
-                                             
-                                        
+
+
                                                     ->rawColumns(['DateOfDisussion','Time','AreaOfDiscussion','AreaOfImprovement','Comment','TimeLine','Training','Duration','Status'])
                                                     ->make(true);
         }
@@ -518,7 +538,7 @@ class MonthlyCheckingController extends Controller
                 'Checkin_id'       => Common::getMonthlyCheckIn(),
                 'resort_id'        => $this->resort->resort_id,
                 'emp_id'           => $e->id,
-                'date_discussion'  => date('Y-m-d', strtotime($request->date_discussion)),
+                'date_discussion'  => $this->parseDate($request->date_discussion),
                 'start_time'       => $request->start_time,
                 'end_time'         => $request->end_time,
                 'Meeting_Place'    => $request->Meeting_Place,
@@ -536,7 +556,8 @@ class MonthlyCheckingController extends Controller
         // Notifications outside transaction — don't fail the request if the push service is down
         try {
             $title      = 'Monthly Check-In Approval Required';
-            $msg        = 'A monthly check-in meeting has been scheduled with you on '.date('d M Y', strtotime($request->date_discussion)).' at '.$request->start_time.'. Please approve or reject.';
+            $formatted = $this->parseDate($request->date_discussion);
+            $msg        = 'A monthly check-in meeting has been scheduled with you on '.($formatted ? date('d M Y', strtotime($formatted)) : $request->date_discussion).' at '.$request->start_time.'. Please approve or reject.';
             $ModuleName = 'Performance';
 
             event(new ResortNotificationEvent(

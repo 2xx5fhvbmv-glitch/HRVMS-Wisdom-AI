@@ -333,7 +333,7 @@ class ConfigurationController extends Controller
             ->make(true);
         }
 
-        $page_title="Performance Template Form List";
+        $page_title="Performance Review Template Forms";
         return view('resorts.Performance.configuration.PerformanceTemplateFormList',compact('page_title'));
     }
 
@@ -492,7 +492,7 @@ class ConfigurationController extends Controller
             ->rawColumns(['FormName','action'])
             ->make(true);
         }
-        $page_title="90 Day Performance Form List";
+        $page_title="90 Day Appraisal Form";
 
         return view('resorts.Performance.configuration.NintyPerformanceFormList',compact('page_title'));
     }
@@ -629,7 +629,14 @@ class ConfigurationController extends Controller
             ->rawColumns(['FormBuilderName','action'])
             ->make(true);
         }
-        $page_title="Professional Development Form List";
+        // Title map so "View All" lands on a page titled with the specific form group
+        $titleMap = [
+            'ProfessionalForm' => 'Mid-Year / Half-Year Appraisal',
+            'annualAppraisal'  => 'Annual Appraisal',
+            'pipForm'          => 'Performance Improvement Plan (PIP)',
+            'pdpForm'          => 'Professional Development Plan (PDP)',
+        ];
+        $page_title = $titleMap[$form_type] ?? 'Professional Development Form List';
 
         return view('resorts.Performance.configuration.ProfessionalFormList',compact('page_title','form_type'));
     }

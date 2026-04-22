@@ -1,6 +1,8 @@
 @extends('resorts.layouts.app')
 @section('page_tab_title', $page_title)
 
+@php $isEdit = !empty($kpi); @endphp
+
 @section('content')
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -11,6 +13,11 @@
                             <span>Performance</span>
                             <h1>{{ $page_title }}</h1>
                         </div>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ route('Performance.kpi.KpiList') }}" class="btn btn-themeGray btn-sm">
+                            <i class="fa-solid fa-arrow-left"></i> Back
+                        </a>
                     </div>
                 </div>
             </div>
@@ -25,18 +32,24 @@
                                 <div class="row g-md-4 g-3 mb-md-4 mb-3">
                                     <div class="col-sm-6">
                                         <label class="form-label">PROPERTY GOAL</label>
-                                        <input type="text" class="form-control" name="goals[0][property_goal]"
+                                        <input type="text" class="form-control"
+                                               name="{{ $isEdit ? 'property_goal' : 'goals[0][property_goal]' }}"
+                                               value="{{ $isEdit ? $kpi->property_goal : '' }}"
                                                placeholder="Property Goal" required>
                                     </div>
                                     <div class="col-sm-6">
                                         <label class="form-label">BUDGET</label>
-                                        <input type="number" class="form-control" name="goals[0][budget]"
+                                        <input type="number" class="form-control"
+                                               name="{{ $isEdit ? 'PropertyGoalbudget' : 'goals[0][budget]' }}"
+                                               value="{{ $isEdit ? $kpi->PropertyGoalbudget : '' }}"
                                                placeholder="Budget (optional)" min="1">
                                     </div>
                                     <div class="col-sm-6">
                                         <label class="form-label">WEIGHTAGE (VALUE)</label>
                                         <div class="input-group">
-                                            <input type="number" class="form-control weightage-input" name="goals[0][weightage]"
+                                            <input type="number" class="form-control weightage-input"
+                                                   name="{{ $isEdit ? 'PropertyGoalweightage' : 'goals[0][weightage]' }}"
+                                                   value="{{ $isEdit ? $kpi->PropertyGoalweightage : '' }}"
                                                    placeholder="Weightage" required min="1" max="100">
                                             <span class="input-group-text">%</span>
                                         </div>
@@ -48,37 +61,18 @@
                             </div>
                         </div>
 
-                        <div class="text-end mb-2 pe-2">
-                            <small class="text-muted">Total Weightage: <strong id="weightageTotal">0</strong>% / 100%</small>
-                        </div>
-
-                        <div class="md-mb-4 mb-3">
-                            <a href="#" class="btn btn-themeSkyblue btn-sm createKpi-add">Add More</a>
-                        </div>
-
-                        {{-- Actual section hidden for now
-                        <div class="card-title">
-                            <h3>Actual</h3>
-                        </div>
-                        <div class="row g-md-4 g-3 mb-md-4 mb-3">
-                            <div class="col-sm-6">
-                                <label class="form-label">BUDGET</label>
-                                <input type="number" class="form-control" name="actual_budget"
-                                       placeholder="Budget" min="1">
+                        @unless($isEdit)
+                            <div class="text-end mb-2 pe-2">
+                                <small class="text-muted">Total Weightage: <strong id="weightageTotal">0</strong>% / 100%</small>
                             </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">WEIGHTAGE (VALUE)</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" name="actual_weightage"
-                                           placeholder="Weightage" min="1" max="100">
-                                    <span class="input-group-text">%</span>
-                                </div>
+
+                            <div class="md-mb-4 mb-3">
+                                <a href="#" class="btn btn-themeSkyblue btn-sm createKpi-add">Add More</a>
                             </div>
-                        </div>
-                        --}}
+                        @endunless
 
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Send</button>
+                            <button type="submit" class="btn btn-themeBlue btn-sm">{{ $isEdit ? 'Update' : 'Send' }}</button>
                         </div>
                     </div>
                 </form>
@@ -90,22 +84,23 @@
 @section('import-scripts')
 <script>
 $(document).ready(function () {
+    var isEdit  = {{ $isEdit ? 'true' : 'false' }};
+    var storeUrl  = "{{ route('Performance.kpi.store') }}";
+    var updateUrl = "{{ $isEdit ? route('Performance.kpi.update', $kpi->id) : '' }}";
+    var listUrl   = "{{ route('Performance.kpi.KpiList') }}";
+
     $('#CreateKPIForm').parsley();
     var goalIndex = 1;
 
     function recalcWeightage() {
+        if (isEdit) return;
         var total = 0;
         $('.weightage-input').each(function() {
             var v = parseFloat($(this).val());
             if (!isNaN(v)) total += v;
         });
         $('#weightageTotal').text(total);
-        var $el = $('#weightageTotal');
-        if (total === 100) {
-            $el.css('color', '#28a745');
-        } else {
-            $el.css('color', '#d9534f');
-        }
+        $('#weightageTotal').css('color', total === 100 ? '#28a745' : '#d9534f');
     }
 
     $(document).on('input', '.weightage-input', recalcWeightage);
@@ -136,20 +131,22 @@ $(document).ready(function () {
         e.preventDefault();
         var form = $(this);
 
-        // Validate total weightage = 100
-        var total = 0;
-        $('.weightage-input').each(function() {
-            var v = parseFloat($(this).val());
-            if (!isNaN(v)) total += v;
-        });
-        if (total !== 100) {
-            toastr.error('Total weightage must be exactly 100%. Current total: ' + total + '%', 'Validation Error', { positionClass: 'toast-bottom-right' });
-            return;
+        // In create mode only: validate total weightage = 100
+        if (!isEdit) {
+            var total = 0;
+            $('.weightage-input').each(function() {
+                var v = parseFloat($(this).val());
+                if (!isNaN(v)) total += v;
+            });
+            if (total !== 100) {
+                toastr.error('Total weightage must be exactly 100%. Current total: ' + total + '%', 'Validation Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
         }
 
         if (form.parsley().isValid()) {
             $.ajax({
-                url: '{{ route("Performance.kpi.store") }}',
+                url: isEdit ? updateUrl : storeUrl,
                 type: 'POST',
                 data: form.serialize(),
                 dataType: 'json',
@@ -157,7 +154,7 @@ $(document).ready(function () {
                     if (response.success) {
                         toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                         setTimeout(function() {
-                            window.location.href = response.route;
+                            window.location.href = response.route || listUrl;
                         }, 600);
                     }
                 },

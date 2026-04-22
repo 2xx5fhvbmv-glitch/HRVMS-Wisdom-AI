@@ -90,7 +90,7 @@ class ReviewController extends Controller
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)
             ->where('pc.resort_id', $this->resort->resort_id)
-            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Start_Date as CycleStart', 'pc.End_Date as CycleEnd', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date']);
+            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Start_Date as CycleStart', 'pc.End_Date as CycleEnd', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date', 'pc.Self_Review_Templete', 'pc.Manager_Review_Templete']);
 
         if (!$childCycle) {
             abort(404, 'Review not found');
@@ -106,7 +106,12 @@ class ReviewController extends Controller
         // Check if self review window is open
         $windowStatus = $this->getSelfReviewWindowStatus($childCycle);
 
-        $template = $this->getTemplate($childCycle->template_id);
+        // Template resolution — child-level first, then parent cycle's Self_Review_Templete
+        $effectiveTemplateId = $childCycle->template_id;
+        if (empty($effectiveTemplateId) && !empty($childCycle->Self_Review_Templete)) {
+            $effectiveTemplateId = $childCycle->Self_Review_Templete;
+        }
+        $template = $this->getTemplate($effectiveTemplateId);
         $existingData = $childCycle->self_review_data ? json_decode($childCycle->self_review_data, true) : [];
         $page_title = "Self Review - " . $childCycle->Cycle_Name;
 
@@ -190,7 +195,7 @@ class ReviewController extends Controller
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)
             ->where('pc.resort_id', $this->resort->resort_id)
-            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date']);
+            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date', 'pc.Self_Review_Templete', 'pc.Manager_Review_Templete']);
 
         if (!$childCycle) {
             abort(404);
@@ -210,7 +215,12 @@ class ReviewController extends Controller
         $actualId = is_numeric($childCycle->Emp_main_id) ? $childCycle->Emp_main_id : base64_decode($childCycle->Emp_main_id);
         $employee = Employee::with(['resortAdmin', 'position'])->find($actualId);
 
-        $template = $this->getTemplate($childCycle->template_id);
+        // Template resolution — child-level first, then parent cycle's Manager_Review_Templete
+        $effectiveTemplateId = $childCycle->template_id;
+        if (empty($effectiveTemplateId) && !empty($childCycle->Manager_Review_Templete)) {
+            $effectiveTemplateId = $childCycle->Manager_Review_Templete;
+        }
+        $template = $this->getTemplate($effectiveTemplateId);
         $selfData = $childCycle->self_review_data ? json_decode($childCycle->self_review_data, true) : [];
         $existingData = $childCycle->manager_review_data ? json_decode($childCycle->manager_review_data, true) : [];
         $page_title = "Manager Review - " . $childCycle->Cycle_Name;

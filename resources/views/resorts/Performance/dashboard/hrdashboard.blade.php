@@ -19,11 +19,14 @@
                     </div>
                 </div>
                 <div class="col-xl-2 col-auto ms-auto">
-                    <select class="form-select select2t-none" id="select-budgeted"
-                        aria-label="Default select example">
-                        <option selected>Past 90 Days</option>
-                        <option value="1">bbb</option>
-                    </select>
+                    <form method="GET" action="{{ url()->current() }}" id="yearFilterForm">
+                        <select class="form-select select2t-none" id="select-year" name="year"
+                                onchange="document.getElementById('yearFilterForm').submit();">
+                            @foreach($availableYears as $year)
+                                <option value="{{ $year }}" {{ (int)$selectedYear === (int)$year ? 'selected' : '' }}>{{ $year }}</option>
+                            @endforeach
+                        </select>
+                    </form>
                 </div>
                 <!-- <div class="col-auto"><a href="#" class="btn btn-theme">Notify HOD</a></div> -->
             </div>
