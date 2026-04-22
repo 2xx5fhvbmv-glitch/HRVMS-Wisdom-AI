@@ -41,6 +41,19 @@ class PerformanceDashboardController extends Controller
         $resort_id = $this->globalUser->resort_id;
         $scopedIds = Common::getPerformanceScopedEmpIds();
 
+        // Year filter — dynamic from data + surrounding years
+        $cycleYears = DB::table('performance_cycles')
+                        ->where('resort_id', $resort_id)
+                        ->selectRaw('YEAR(Start_Date) as y')
+                        ->pluck('y')->filter()->unique();
+        $currentYear = (int) date('Y');
+        $availableYears = $cycleYears->merge([$currentYear - 1, $currentYear, $currentYear + 1])
+                                     ->unique()
+                                     ->filter()
+                                     ->sortDesc()
+                                     ->values();
+        $selectedYear = (int) ($request->year ?: $currentYear);
+
         $Employee_count = Employee::where('resort_id', $resort_id)
                                     ->where('status', 'Active')
                                     ->when(is_array($scopedIds), fn($q) => $q->whereIn('id', $scopedIds))
@@ -48,10 +61,14 @@ class PerformanceDashboardController extends Controller
                                         $query->where('status', 'Active');
                                     })->count();
 
-        // Appraisal pending: employees in active cycles who haven't completed manager review
+        // Appraisal pending: employees in active cycles for the selected year
         $activeCycleIds = DB::table('performance_cycles')
                             ->where('resort_id', $resort_id)
                             ->whereIn('status', ['OnGoing','Pending'])
+                            ->where(function ($q) use ($selectedYear) {
+                                $q->whereYear('Start_Date', $selectedYear)
+                                  ->orWhereYear('End_Date', $selectedYear);
+                            })
                             ->pluck('id');
 
         $appraisal_total = DB::table('performa_child_cycles')
@@ -75,9 +92,13 @@ class PerformanceDashboardController extends Controller
                             ->orderByDesc('count')
                             ->get();
 
-        // Performance Cycles with review counts
+        // Performance Cycles with review counts (filtered by selected year)
         $performance_cycles = DB::table('performance_cycles')
                             ->where('resort_id', $resort_id)
+                            ->where(function ($q) use ($selectedYear) {
+                                $q->whereYear('Start_Date', $selectedYear)
+                                  ->orWhereYear('End_Date', $selectedYear);
+                            })
                             ->orderByDesc('id')
                             ->limit(5)
                             ->get()
@@ -94,6 +115,7 @@ class PerformanceDashboardController extends Controller
         $approved_checkins_count = DB::table('monthly_checking_models')
             ->where('resort_id', $resort_id)
             ->where('approval_status', 'approved')
+            ->whereYear('date_discussion', $selectedYear)
             ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))
             ->count();
 
@@ -112,7 +134,7 @@ class PerformanceDashboardController extends Controller
         return view('resorts.Performance.dashboard.hrdashboard', compact(
             'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending',
             'department_data', 'performance_cycles', 'approved_checkins_count',
-            'pip_count', 'pdp_count'
+            'pip_count', 'pdp_count', 'availableYears', 'selectedYear'
         ));
 
     }

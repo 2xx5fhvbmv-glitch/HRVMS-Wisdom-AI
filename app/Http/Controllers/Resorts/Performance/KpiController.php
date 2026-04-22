@@ -35,15 +35,33 @@ class KpiController extends Controller
     }
 
     /**
-     * Create KPI page (GM only)
+     * Create KPI page (GM only — rank 8).
      */
     public function create()
     {
-        if(Common::checkRouteWisePermission('Performance.kpi.KpiList',config('settings.resort_permissions.create')) == false){
-            return abort(403, 'Unauthorized access');
+        if ((int) $this->getUserRank() !== 8) {
+            return abort(403, 'Only the GM can create a KPI.');
         }
         $page_title ="Create KPI";
-        return view('resorts.Performance.Kpi.create',compact('page_title'));
+        $kpi = null; // null => create mode
+        return view('resorts.Performance.Kpi.create',compact('page_title','kpi'));
+    }
+
+    /**
+     * Edit KPI page (GM only, only pending KPIs).
+     */
+    public function edit($id)
+    {
+        if ((int) $this->getUserRank() !== 8) {
+            return abort(403, 'Only the GM can edit a KPI.');
+        }
+        $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
+        if ($kpi->status !== 'pending') {
+            return redirect()->route('Performance.kpi.KpiList')
+                ->with('error', 'A KPI can only be edited while it is pending (before HOD/XCOM response).');
+        }
+        $page_title = 'Edit KPI';
+        return view('resorts.Performance.Kpi.create', compact('page_title', 'kpi'));
     }
 
     /**
@@ -51,6 +69,10 @@ class KpiController extends Controller
      */
     public function PerformanceKpiStore(Request $request)
     {
+        if ((int) $this->getUserRank() !== 8) {
+            return response()->json(['success' => false, 'message' => 'Only the GM can create a KPI.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'goals'                => 'required|array|min:1',
             'goals.*.property_goal' => 'required|string|max:255',
@@ -100,18 +122,14 @@ class KpiController extends Controller
 
             DB::commit();
 
-            // Notify outside transaction so notification failure doesn't rollback KPI creation
-            try {
-                if ($lastKpi) {
-                    $count = count($request->goals);
-                    $title = $count > 1 ? $count.' New KPIs Created' : 'New KPI Created';
-                    $msg   = $count > 1
-                        ? $count.' new KPIs have been created by GM. Please respond.'
-                        : 'A new KPI "'.$lastKpi->property_goal.'" has been created by GM. Please respond.';
-                    $this->notifyHodXcom($lastKpi, $title, $msg);
-                }
-            } catch (\Exception $ne) {
-                \Log::warning("KPI notification failed: " . $ne->getMessage());
+            // Notify outside transaction; notifyHodXcom wraps each recipient individually.
+            if ($lastKpi) {
+                $count = count($request->goals);
+                $title = $count > 1 ? $count.' New KPIs Created' : 'New KPI Created';
+                $msg   = $count > 1
+                    ? $count.' new KPIs have been created by GM. Please respond.'
+                    : 'A new KPI "'.$lastKpi->property_goal.'" has been created by GM. Please respond.';
+                $this->notifyHodXcom($lastKpi, $title, $msg);
             }
 
             return response()->json([
@@ -125,6 +143,69 @@ class KpiController extends Controller
             \Log::emergency("KpiStore Line: " . $e->getLine());
             \Log::emergency("KpiStore Message: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to create KPI'], 500);
+        }
+    }
+
+    /**
+     * Update a pending KPI (GM only).
+     */
+    public function updateKpi(Request $request, $id)
+    {
+        if ((int) $this->getUserRank() !== 8) {
+            return response()->json(['success' => false, 'message' => 'Only the GM can edit a KPI.'], 403);
+        }
+
+        $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
+        if ($kpi->status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'Only pending KPIs can be edited.'], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'property_goal'         => 'required|string|max:255',
+            'PropertyGoalbudget'    => 'nullable|numeric|min:1',
+            'PropertyGoalweightage' => 'required|numeric|min:1|max:100',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $kpi->update([
+            'property_goal'         => $request->property_goal,
+            'PropertyGoalbudget'    => $request->PropertyGoalbudget,
+            'PropertyGoalweightage' => $request->PropertyGoalweightage,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'KPI updated successfully.',
+            'route'   => route('Performance.kpi.KpiList'),
+        ]);
+    }
+
+    /**
+     * Delete a KPI (GM only). Cascades children + related records.
+     */
+    public function destroyKpi($id)
+    {
+        if ((int) $this->getUserRank() !== 8) {
+            return response()->json(['success' => false, 'message' => 'Only the GM can delete a KPI.'], 403);
+        }
+
+        $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$kpi) {
+            return response()->json(['success' => false, 'message' => 'KPI not found.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            PerformanceKpiChild::where('kpi_parents_id', $kpi->id)->delete();
+            $kpi->delete();
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'KPI deleted successfully.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('destroyKpi: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to delete KPI.'], 500);
         }
     }
 
@@ -179,9 +260,16 @@ class KpiController extends Controller
                         $html .= '<button class="btn btn-theme btn-sm me-1 gm-approve-btn" data-id="'.$row->id.'">Approve</button>';
                         $html .= '<button class="btn btn-danger btn-sm gm-reject-btn" data-id="'.$row->id.'">Reject</button>';
                     }
-                    // View for everyone
+                    // View for everyone on non-pending KPIs
                     if ($row->status !== 'pending') {
                         $html .= ' <a href="'.route('Performance.kpi.view', $row->id).'" class="btn btn-themeBlue btn-sm">View</a>';
+                    }
+                    // GM edit (only on pending KPIs) + delete (always)
+                    if ($rank == 8) {
+                        if ($row->status === 'pending') {
+                            $html .= ' <a href="'.route('Performance.kpi.edit', $row->id).'" class="btn btn-themeSkyblue btn-sm">Edit</a>';
+                        }
+                        $html .= ' <button class="btn btn-danger btn-sm kpi-delete-btn" data-id="'.$row->id.'">Delete</button>';
                     }
                     return $html ?: '-';
                 })
@@ -518,21 +606,30 @@ class KpiController extends Controller
         $resort_id = $this->resort->resort_id;
         $module    = 'Performance';
 
-        // rank 1 = XCOM, rank 2 = HOD
+        // rank 1 = XCOM, rank 2 = HOD — resort-wide (all departments)
         $employees = Employee::where('resort_id', $resort_id)
             ->where('status', 'Active')
             ->whereIn('rank', [1, 2])
             ->pluck('id')
             ->toArray();
 
+        // Fire each notification independently so one failure doesn't kill the rest
         foreach ($employees as $empId) {
-            event(new ResortNotificationEvent(
-                Common::nofitication($resort_id, 10, $title, $msg, $kpi->id, $empId, $module)
-            ));
+            try {
+                event(new ResortNotificationEvent(
+                    Common::nofitication($resort_id, 10, $title, $msg, $kpi->id, $empId, $module)
+                ));
+            } catch (\Exception $e) {
+                \Log::warning("KPI notify emp {$empId} failed: ".$e->getMessage());
+            }
         }
 
         if (!empty($employees)) {
-            Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $employees, $kpi->id);
+            try {
+                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $employees, $kpi->id);
+            } catch (\Exception $e) {
+                \Log::warning('KPI mobile push failed: '.$e->getMessage());
+            }
         }
     }
 
@@ -551,13 +648,21 @@ class KpiController extends Controller
             ->toArray();
 
         foreach ($gms as $gmId) {
-            event(new ResortNotificationEvent(
-                Common::nofitication($resort_id, 10, $title, $msg, $kpi->id, $gmId, $module)
-            ));
+            try {
+                event(new ResortNotificationEvent(
+                    Common::nofitication($resort_id, 10, $title, $msg, $kpi->id, $gmId, $module)
+                ));
+            } catch (\Exception $e) {
+                \Log::warning("KPI notify GM {$gmId} failed: ".$e->getMessage());
+            }
         }
 
         if (!empty($gms)) {
-            Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $gms, $kpi->id);
+            try {
+                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $gms, $kpi->id);
+            } catch (\Exception $e) {
+                \Log::warning('KPI GM mobile push failed: '.$e->getMessage());
+            }
         }
     }
 }

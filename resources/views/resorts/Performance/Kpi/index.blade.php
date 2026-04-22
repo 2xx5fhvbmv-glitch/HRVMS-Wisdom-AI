@@ -159,6 +159,35 @@ $(document).on('click', '.gm-approve-btn', function() {
     });
 });
 
+// GM Delete
+$(document).on('click', '.kpi-delete-btn', function() {
+    const id = $(this).data('id');
+    Swal.fire({
+        title: 'Delete this KPI?',
+        text: 'This will permanently remove the KPI and all its actual entries.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: "{{ url('resort/performance/kpi/destroy') }}/" + id,
+            type: 'DELETE',
+            data: { _token: '{{ csrf_token() }}' },
+            success: function(res) {
+                if (res.success) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    datatablelist();
+                }
+            },
+            error: function(xhr) {
+                toastr.error(xhr.responseJSON?.message || 'Failed to delete', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+});
+
 // GM Reject
 $(document).on('click', '.gm-reject-btn', function() {
     $('#rejectKpiId').val($(this).data('id'));

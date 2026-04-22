@@ -915,6 +915,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/kpi/view/{id}', 'Performance\KpiController@viewPage')->name('Performance.kpi.view');
     Route::get('performance/kpi/config', 'Performance\KpiController@kpiConfig')->name('Performance.kpi.config');
     Route::post('performance/kpi/config/{id}', 'Performance\KpiController@updateKpiConfig')->name('Performance.kpi.configUpdate');
+    Route::get('performance/kpi/edit/{id}', 'Performance\KpiController@edit')->name('Performance.kpi.edit');
+    Route::post('performance/kpi/update/{id}', 'Performance\KpiController@updateKpi')->name('Performance.kpi.update');
+    Route::delete('performance/kpi/destroy/{id}', 'Performance\KpiController@destroyKpi')->name('Performance.kpi.destroy');
     Route::get('performance/bonus-configuration', 'Performance\BonusConfigController@index')->name('Performance.bonusConfig');
     Route::post('performance/bonus-configuration/update', 'Performance\BonusConfigController@update')->name('Performance.bonusConfig.update');
     Route::post('performance/kpi/view/{id}/actual', 'Performance\KpiController@storeActual')->name('Performance.kpi.storeActual');
@@ -928,9 +931,13 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('performance/pip', 'Performance\PipPdpController@pipIndex')->name('Performance.pip.index');
     Route::post('performance/pip/store', 'Performance\PipPdpController@pipStore')->name('Performance.pip.store');
     Route::delete('performance/pip/{id}', 'Performance\PipPdpController@pipDestroy')->name('Performance.pip.destroy');
+    Route::post('performance/pip/{id}/archive', 'Performance\PipPdpController@pipArchive')->name('Performance.pip.archive');
+    Route::post('performance/pip/{id}/restore', 'Performance\PipPdpController@pipRestore')->name('Performance.pip.restore');
     Route::get('performance/pdp', 'Performance\PipPdpController@pdpIndex')->name('Performance.pdp.index');
     Route::post('performance/pdp/store', 'Performance\PipPdpController@pdpStore')->name('Performance.pdp.store');
     Route::delete('performance/pdp/{id}', 'Performance\PipPdpController@pdpDestroy')->name('Performance.pdp.destroy');
+    Route::post('performance/pdp/{id}/archive', 'Performance\PipPdpController@pdpArchive')->name('Performance.pdp.archive');
+    Route::post('performance/pdp/{id}/restore', 'Performance\PipPdpController@pdpRestore')->name('Performance.pdp.restore');
     Route::get('performance/create', 'Performance\CycleController@create')->name('Performance.create');
 
     Route::get('performance-cycle/fetch-employees', 'Performance\CycleController@CycleFetchEmployees')->name('Performance.cycle.FetchEmployees');

@@ -12,10 +12,19 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <div class="col-auto">
-                    <button type="button" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#addPdpModal">
-                        <i class="fa-solid fa-plus me-1"></i> Add to PDP
-                    </button>
+                <div class="col-auto d-flex gap-2">
+                    @if($archivedView ?? false)
+                        <a href="{{ route('Performance.pdp.index') }}" class="btn btn-themeGray">
+                            <i class="fa-solid fa-arrow-left me-1"></i> Active Plans
+                        </a>
+                    @else
+                        <a href="{{ route('Performance.pdp.index', ['archived' => 1]) }}" class="btn btn-themeBlue">
+                            <i class="fa-solid fa-box-archive me-1"></i> View Archived
+                        </a>
+                        <button type="button" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#addPdpModal">
+                            <i class="fa-solid fa-plus me-1"></i> Add to PDP
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
@@ -42,6 +51,7 @@
                             <th>Duration</th>
                             <th>Factors</th>
                             <th>Start Date</th>
+                            <th>End Date</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -63,13 +73,33 @@
                                 <td>{{ optional($plan->template)->FormName ?? '-' }}</td>
                                 <td>{{ $plan->duration }}</td>
                                 <td><small>{{ \Illuminate\Support\Str::limit($plan->factors, 60) }}</small></td>
-                                <td>{{ \Carbon\Carbon::parse($plan->created_at)->format('d M Y') }}</td>
+                                @php
+                                    $startDate = \Carbon\Carbon::parse($plan->created_at);
+                                    $endDate   = null;
+                                    if ($plan->duration && preg_match('/(\d+)\s*(day|week|month|year)s?/i', $plan->duration, $m)) {
+                                        $qty  = (int) $m[1];
+                                        $unit = strtolower($m[2]);
+                                        $endDate = match ($unit) {
+                                            'day'   => (clone $startDate)->addDays($qty),
+                                            'week'  => (clone $startDate)->addWeeks($qty),
+                                            'month' => (clone $startDate)->addMonths($qty),
+                                            'year'  => (clone $startDate)->addYears($qty),
+                                            default => null,
+                                        };
+                                    }
+                                @endphp
+                                <td>{{ $startDate->format('d M Y') }}</td>
+                                <td>{{ $endDate ? $endDate->format('d M Y') : '-' }}</td>
                                 <td>
-                                    <a href="javascript:void(0)" class="btn-tableIcon btnIcon-danger pdp-delete" data-id="{{ $plan->id }}"><i class="fa-regular fa-trash-can"></i></a>
+                                    @if($archivedView ?? false)
+                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-green pdp-restore" data-id="{{ $plan->id }}" title="Restore"><i class="fa-solid fa-rotate-left"></i></a>
+                                    @else
+                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow pdp-archive" data-id="{{ $plan->id }}" title="Archive"><i class="fa-solid fa-box-archive"></i></a>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="text-center text-muted py-4">No employees in PDP</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">No employees in PDP</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -201,13 +231,29 @@
             });
         });
 
-        $(document).on('click', '.pdp-delete', function() {
-            if (!confirm('Remove this employee from PDP?')) return;
+        $(document).on('click', '.pdp-archive', function() {
+            if (!confirm('Archive this PDP plan? It can be restored later.')) return;
             var id = $(this).data('id');
             var $row = $(this).closest('tr');
             $.ajax({
-                url: '{{ url("resort/performance/pdp") }}/' + id,
-                type: 'DELETE',
+                url: '{{ url("resort/performance/pdp") }}/' + id + '/archive',
+                type: 'POST',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function(response) {
+                    if (response.success) {
+                        $row.fadeOut(300, function() { $(this).remove(); });
+                        toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    }
+                }
+            });
+        });
+
+        $(document).on('click', '.pdp-restore', function() {
+            var id = $(this).data('id');
+            var $row = $(this).closest('tr');
+            $.ajax({
+                url: '{{ url("resort/performance/pdp") }}/' + id + '/restore',
+                type: 'POST',
                 data: { _token: '{{ csrf_token() }}' },
                 success: function(response) {
                     if (response.success) {

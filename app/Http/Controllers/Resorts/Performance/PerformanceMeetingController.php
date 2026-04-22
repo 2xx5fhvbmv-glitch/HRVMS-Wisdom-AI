@@ -81,10 +81,27 @@ class PerformanceMeetingController extends Controller
             })
             ->get()
             ->map(function ($meeting) {
-                $accepted = $meeting->participants()->where('status', 'accepted')->count();
-                $declined = $meeting->participants()->where('status', 'declined')->count();
-                $pending = $meeting->participants()->where('status', 'pending')->count();
-                $total = $accepted + $declined + $pending;
+                $parts = $meeting->participants()->with('employee.resortAdmin', 'employee.position')->get();
+
+                $formatList = function ($collection) {
+                    return $collection->map(function ($p) {
+                        return [
+                            'name'     => trim(optional(optional($p->employee)->resortAdmin)->first_name.' '.optional(optional($p->employee)->resortAdmin)->last_name) ?: 'Unknown',
+                            'position' => optional(optional($p->employee)->position)->position_title ?? '',
+                            'photo'    => Common::getResortUserPicture(optional($p->employee)->Admin_Parent_id ?? null),
+                            'reason'   => $p->reason,
+                        ];
+                    })->values();
+                };
+
+                $accepted_list = $formatList($parts->where('status', 'accepted'));
+                $pending_list  = $formatList($parts->where('status', 'pending'));
+                $declined_list = $formatList($parts->where('status', 'declined'));
+
+                $accepted = $accepted_list->count();
+                $pending  = $pending_list->count();
+                $declined = $declined_list->count();
+                $total    = $accepted + $declined + $pending;
 
                 $color = '#28a745';
                 if ($pending > 0) $color = '#EFB408';
@@ -103,6 +120,9 @@ class PerformanceMeetingController extends Controller
                     'declined' => $declined,
                     'pending' => $pending,
                     'total' => $total,
+                    'accepted_list' => $accepted_list,
+                    'pending_list'  => $pending_list,
+                    'declined_list' => $declined_list,
                 ];
             });
 
@@ -148,38 +168,44 @@ class PerformanceMeetingController extends Controller
         $html = '';
         foreach ($meetings as $meeting) {
             $dateParts = explode(' ', $meeting->formattedDate);
+            // $dateParts[0]=Wed, [1]=15, [2]=Apr, [3]=2026
+
             $statusBadge = '';
             if ($meeting->total > 0) {
-                $statusBadge = '<span class="badge badge-green">' . $meeting->accepted . ' Accepted</span> ';
-                if ($meeting->pending > 0) $statusBadge .= '<span class="badge badge-themeWarning">' . $meeting->pending . ' Pending</span> ';
-                if ($meeting->declined > 0) $statusBadge .= '<span class="badge badge-danger">' . $meeting->declined . ' Declined</span>';
+                $statusBadge  = '<span class="mtg-badge mtg-badge-green">'.$meeting->accepted.' Accepted</span>';
+                if ($meeting->pending > 0) $statusBadge  .= '<span class="mtg-badge mtg-badge-warn">'.$meeting->pending.' Pending</span>';
+                if ($meeting->declined > 0) $statusBadge .= '<span class="mtg-badge mtg-badge-danger">'.$meeting->declined.' Declined</span>';
             }
 
             $participantHtml = '';
             foreach ($meeting->participantList as $p) {
-                $statusIcon = $p['status'] === 'accepted' ? '<span class="text-success">&#10004;</span>' : ($p['status'] === 'declined' ? '<span class="text-danger">&#10006;</span>' : '<span class="text-warning">&#9679;</span>');
-                $participantHtml .= '<div class="d-flex align-items-center gap-2 mb-1">
-                    <div class="img-circle" style="width:30px;height:30px;"><img src="' . e($p['profileImg']) . '" alt="user" style="width:30px;height:30px;border-radius:50%;"></div>
-                    <span style="font-size:13px;">' . e($p['name']) . '</span> ' . $statusIcon . '
+                $statusPill = '';
+                if ($p['status'] === 'accepted') {
+                    $statusPill = '<span class="mtg-status mtg-status-accepted" title="Accepted"><i class="fa-solid fa-check"></i></span>';
+                } elseif ($p['status'] === 'declined') {
+                    $statusPill = '<span class="mtg-status mtg-status-declined" title="Declined"><i class="fa-solid fa-xmark"></i></span>';
+                } else {
+                    $statusPill = '<span class="mtg-status mtg-status-pending" title="Pending"><i class="fa-regular fa-clock"></i></span>';
+                }
+                $participantHtml .= '<div class="mtg-participant">
+                    <img src="'.e($p['profileImg']).'" alt="user" class="mtg-avatar"/>
+                    <span class="mtg-pname">'.e($p['name']).'</span>
+                    '.$statusPill.'
                 </div>';
             }
 
-            $html .= '<div class="leaveUser-block mb-3">
-                <div class="leaveUser-date">
-                    <div class="leaveDate-box">
-                        <span>' . ($dateParts[1] ?? '') . '</span>
-                        <p>' . ($dateParts[2] ?? '') . '</p>
-                        <small>' . ($dateParts[0] ?? '') . '</small>
-                    </div>
+            $html .= '<div class="mtg-card">
+                <div class="mtg-date">
+                    <div class="mtg-day">'.($dateParts[1] ?? '').'</div>
+                    <div class="mtg-month">'.($dateParts[2] ?? '').'</div>
+                    <div class="mtg-weekday">'.($dateParts[0] ?? '').'</div>
                 </div>
-                <div class="leaveUser-content" style="flex:1;">
-                    <h6 class="mb-1">' . e($meeting->title) . '</h6>
-                    <p class="mb-1" style="font-size:12px;color:#666;">
-                        <i class="fa-regular fa-clock"></i> ' . $meeting->start_time . ' - ' . $meeting->end_time . '
-                    </p>
-                    ' . (!empty($meeting->location) ? '<p class="mb-1" style="font-size:12px;color:#666;"><i class="fa-solid fa-location-dot"></i> ' . e($meeting->location) . '</p>' : '') . '
-                    <div class="mb-2">' . $statusBadge . '</div>
-                    ' . $participantHtml . '
+                <div class="mtg-body">
+                    <h6 class="mtg-title">'.e($meeting->title).'</h6>
+                    <div class="mtg-meta"><i class="fa-regular fa-clock"></i> '.e($meeting->start_time).' - '.e($meeting->end_time).'</div>'
+                    .(!empty($meeting->location) ? '<div class="mtg-meta"><i class="fa-solid fa-location-dot"></i> '.e($meeting->location).'</div>' : '').
+                    '<div class="mtg-badges">'.$statusBadge.'</div>
+                    <div class="mtg-participants">'.$participantHtml.'</div>
                 </div>
             </div>';
         }

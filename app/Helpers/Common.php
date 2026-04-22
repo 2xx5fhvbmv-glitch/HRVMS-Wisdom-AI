@@ -3106,8 +3106,10 @@ class Common
      * Performance module — returns the list of employee IDs the logged-in
      * resort user is allowed to see, or NULL for unrestricted (all).
      *
-     * GM (rank 8), HR (rank 3), super admin, and master admin see everything.
-     * All other ranks see only their subordinates + themselves.
+     * Tiers:
+     *   - Super admin / master admin / GM (rank 8) / HR (rank 3) → unrestricted (null)
+     *   - EXCOM (rank 1) / HOD (rank 2) → entire department (all employees in their Dept_id)
+     *   - Manager (4) / Supervisor (5) / Line Workers (6) / others → subordinates + self
      */
     public static function getPerformanceScopedEmpIds()
     {
@@ -3122,9 +3124,21 @@ class Common
         $emp = $user->GetEmployee ?? null;
         if (!$emp) return null;
 
+        $rank = (int) $emp->rank;
+
         // GM (8) and HR (3) see everything
-        if (in_array((int) $emp->rank, [3, 8])) {
+        if (in_array($rank, [3, 8])) {
             return null;
+        }
+
+        // EXCOM (1) / HOD (2) → whole department
+        if (in_array($rank, [1, 2]) && $emp->Dept_id) {
+            $ids = \App\Models\Employee::where('resort_id', $emp->resort_id)
+                ->where('Dept_id', $emp->Dept_id)
+                ->pluck('id')
+                ->toArray();
+            $ids[] = $emp->id;
+            return array_values(array_unique($ids));
         }
 
         // Everyone else is scoped to their subordinates + self
