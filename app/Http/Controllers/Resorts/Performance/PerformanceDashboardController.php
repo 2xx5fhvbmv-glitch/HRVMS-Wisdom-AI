@@ -54,9 +54,9 @@ class PerformanceDashboardController extends Controller
                                      ->values();
         $selectedYear = (int) ($request->year ?: $currentYear);
 
+        // Total Employee card shows resort-wide count (intentionally unscoped so dashboard acts as an overview)
         $Employee_count = Employee::where('resort_id', $resort_id)
                                     ->where('status', 'Active')
-                                    ->when(is_array($scopedIds), fn($q) => $q->whereIn('id', $scopedIds))
                                     ->whereHas('resortAdmin', function($query) {
                                         $query->where('status', 'Active');
                                     })->count();

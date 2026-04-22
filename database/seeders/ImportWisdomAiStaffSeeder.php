@@ -141,6 +141,9 @@ class ImportWisdomAiStaffSeeder extends Seeder
                 }
                 $deptId = $deptCache[$currentDept];
 
+                // ---- Compute rank (needed for both position + employee rows) ----
+                $rank = $levelToRank($row[$COL_LEVEL] ?? null, (string) $row[$COL_POSITION]);
+
                 // ---- Resolve / create position ----
                 $positionTitle = trim((string) $row[$COL_POSITION]);
                 $posKey = $deptId.'|'.strtolower($positionTitle);
@@ -155,6 +158,7 @@ class ImportWisdomAiStaffSeeder extends Seeder
                             'resort_id'      => $resortId,
                             'Dept_id'        => $deptId,
                             'position_title' => $positionTitle,
+                            'Rank'           => $rank,
                             'status'         => 'active',
                             'created_by'     => $createdBy,
                             'created_at'     => now(),
@@ -162,6 +166,13 @@ class ImportWisdomAiStaffSeeder extends Seeder
                         ]);
                     } else {
                         $positionId = $pos->id;
+                        // Backfill rank on existing position if missing/zero
+                        if (empty($pos->Rank ?? ($pos->rank ?? null))) {
+                            DB::table('resort_positions')->where('id', $pos->id)->update([
+                                'Rank' => $rank,
+                                'updated_at' => now(),
+                            ]);
+                        }
                     }
                     $positionCache[$posKey] = $positionId;
                 }
@@ -188,7 +199,7 @@ class ImportWisdomAiStaffSeeder extends Seeder
                     catch (\Exception $e) { $hireDate = null; }
                 }
 
-                $rank = $levelToRank($row[$COL_LEVEL] ?? null, $positionTitle);
+                // $rank already computed above before position creation
 
                 // Generate unique dummy email
                 $emailBase = Str::slug(strtolower($first.'.'.$last), '.') ?: 'emp';
