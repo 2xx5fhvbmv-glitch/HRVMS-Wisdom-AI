@@ -56,13 +56,13 @@
             var table = $('#employeeTable').DataTable({
                 "searching": true,
                 "processing": true,
+                "serverSide": true,
                 "ordering": true,
                 "paging": true,
                 "iDisplayLength": 10,
                 "ajax": {
                     "url": "{{ route('resort.employeelist') }}",
                     "type": "get",
-                    "dataSrc": "data", // "dataType": "JSON",
                 },
                 "columns": [{
                         "data": "name"

@@ -298,6 +298,9 @@ class ManningController extends Controller
             ->orderBy('resort_departments.created_at', 'DESC');
 
             return datatables()->of($departments)
+                ->filterColumn('division', function ($q, $kw) {
+                    $q->where('resort_divisions.name', 'like', "%{$kw}%");
+                })
                 ->addColumn('action', function ($row) use ($edit_class, $delete_class) {
 
                     return '
@@ -529,8 +532,14 @@ class ManningController extends Controller
                     }
 
             return datatables()->of($sections)
+                ->filterColumn('department', function ($q, $kw) {
+                    $q->where('resort_departments.name', 'like', "%{$kw}%");
+                })
+                ->filterColumn('division', function ($q, $kw) {
+                    $q->where('resort_divisions.name', 'like', "%{$kw}%");
+                })
                 ->addColumn('action', function ($row) use ($edit_class,$delete_class) {
-                    
+
                     return '
                         <div class="d-flex align-items-center">
                             <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn ' . $edit_class . '"
@@ -750,6 +759,21 @@ class ManningController extends Controller
                     }
 
             return datatables()->of($positions)
+                ->filterColumn('department', function ($q, $kw) {
+                    $q->where('resort_departments.name', 'like', "%{$kw}%");
+                })
+                ->filterColumn('section', function ($q, $kw) {
+                    $q->where('resort_sections.name', 'like', "%{$kw}%");
+                })
+                ->filterColumn('division', function ($q, $kw) {
+                    $q->where('resort_divisions.name', 'like', "%{$kw}%");
+                })
+                ->filterColumn('Rank', function ($q, $kw) {
+                    $ranks = config('settings.Position_Rank');
+                    $match = array_filter($ranks, fn($label) => stripos($label, $kw) !== false);
+                    $q->whereIn('resort_positions.Rank', array_keys($match ?: [-1 => null]));
+                })
+                ->filterColumn('no_of_positions', fn () => null) // aggregated column — no-op filter
                 ->addColumn('action', function ($row) use ($edit_class,$delete_class) {
                     
                     return '

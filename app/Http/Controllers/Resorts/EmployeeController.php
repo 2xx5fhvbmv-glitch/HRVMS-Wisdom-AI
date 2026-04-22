@@ -44,41 +44,46 @@ class EmployeeController extends Controller
             $Dept_id = $employee->Dept_id ?? null;
             $rank = $employee->rank ?? null;
 
-            $query = Employee::where('resort_id', $user->resort_id)
-                ->with('resortAdmin')
-                ->where('status', 'Active');
+            // Eager-load the relations the DataTable renders so we don't N+1 per row.
+            $query = Employee::where('employees.resort_id', $user->resort_id)
+                ->where('employees.status', 'Active')
+                ->with(['resortAdmin:id,first_name,middle_name,last_name,profile_picture', 'department:id,name', 'position:id,position_title']);
 
             // HR (rank 3), EXCOM (rank 1), or master admin see all employees
             if (!$user->is_master_admin && !in_array($rank, [1, 3])) {
-                $query->where('dept_id', $Dept_id);
+                $query->where('employees.Dept_id', $Dept_id);
             }
 
-            $employees = $query->get();
-
-            return datatables()->of($employees)
+            // Pass the QUERY (not a collection) so DataTables applies LIMIT/OFFSET server-side.
+            return datatables()->eloquent($query)
             ->addColumn('name', function ($row) {
                 $userprofile = Common::getResortUserPicture($row->Admin_Parent_id);
-
-                return '<img style="width:50px;height:50px" src="' . $userprofile . '" alt="user" class="profile-image">'
-                    . $row->resortAdmin->first_name . ' '
-                    . $row->resortAdmin->middle_name . ' '
-                    . $row->resortAdmin->last_name;
+                $ra = $row->resortAdmin;
+                $name = trim(($ra->first_name ?? '').' '.($ra->middle_name ?? '').' '.($ra->last_name ?? ''));
+                return '<img style="width:50px;height:50px" src="' . e($userprofile) . '" alt="user" class="profile-image">' . e($name);
             })
-            ->editColumn('Department', function ($row) {
-                return $row->department ? $row->department->name : 'No Department Selected';
+            ->addColumn('Department', fn($row) => $row->department ? e($row->department->name) : 'No Department Selected')
+            ->addColumn('Position', fn($row) => $row->position ? e($row->position->position_title) : 'No Position Selected')
+            ->addColumn('Rank', function ($row) {
+                $Rank = config('settings.Position_Rank');
+                return array_key_exists($row->rank, $Rank) ? $Rank[$row->rank] : '';
             })
-            ->editColumn('Position', function ($row) {
-                return $row->position ? $row->position->position_title : 'No Position Selected';
+            ->addColumn('Nation', fn($row) => e($row->nationality ?? ''))
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->whereHas('resortAdmin', function ($q) use ($keyword) {
+                    $q->where('first_name', 'like', "%{$keyword}%")
+                      ->orWhere('last_name', 'like', "%{$keyword}%")
+                      ->orWhere('middle_name', 'like', "%{$keyword}%");
+                });
             })
-            ->editColumn('Rank', function ($row) {
-                $Rank = config( 'settings.Position_Rank');
-                $AvilableRank = array_key_exists($row->rank, $Rank) ? $Rank[$row->rank] : '';
-                return $AvilableRank;
+            ->filterColumn('Department', function ($query, $keyword) {
+                $query->whereHas('department', fn($q) => $q->where('name', 'like', "%{$keyword}%"));
             })
-            ->editColumn('Nation', function ($row) {
-                return $row->nationality;
+            ->filterColumn('Position', function ($query, $keyword) {
+                $query->whereHas('position', fn($q) => $q->where('position_title', 'like', "%{$keyword}%"));
             })
-            ->rawColumns(['name', 'Department', 'Position', 'Rank', 'Nation']) // Added Nation to rawColumns
+            ->filterColumn('Nation', fn($q, $kw) => $q->where('nationality', 'like', "%{$kw}%"))
+            ->rawColumns(['name'])
             ->make(true);
         }
 
