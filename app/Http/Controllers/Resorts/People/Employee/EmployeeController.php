@@ -672,6 +672,7 @@ class EmployeeController extends Controller
         // dd($employee);
         $benefit_grid = DB::table('resort_benifit_grid as rbg')
             ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
+            ->where('rbg.resort_id', $this->resort->resort_id)
             ->where('rbg.emp_grade', $employee->position->Rank)
             ->where('rbg.status','active')
             ->get();
@@ -874,6 +875,24 @@ class EmployeeController extends Controller
                 'message' => 'Failed to send credentials: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Inline update of employee location only (from the summary panel pencil icon).
+     */
+    public function updateLocation(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'employee_id' => 'required|exists:employees,id',
+            'location'    => 'nullable|in:Malé,Resorts',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
+        $employee->location = $request->location ?: null;
+        $employee->save();
+        return response()->json(['success' => true, 'message' => 'Location updated', 'location' => $employee->location]);
     }
 
     public function updatePersonal(Request $request)

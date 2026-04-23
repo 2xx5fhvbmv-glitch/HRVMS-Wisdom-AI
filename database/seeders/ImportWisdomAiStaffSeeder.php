@@ -184,7 +184,21 @@ class ImportWisdomAiStaffSeeder extends Seeder
                 $last  = $parts[1] ?? '';
 
                 $gender = strtolower(trim((string) ($row[$COL_GENDER] ?? 'male')));
-                $nationality = ucwords(strtolower(trim((string) ($row[$COL_COUNTRY] ?? ''))));
+                $title  = $gender === 'female' ? 'Miss' : 'Mr';
+                $rawCountry = ucwords(strtolower(trim((string) ($row[$COL_COUNTRY] ?? ''))));
+                // Map Excel country name to dropdown demonym (reuses the migration's map so both stay in sync)
+                static $countryMap = null;
+                if ($countryMap === null) {
+                    $migrationFile = database_path('migrations/2026_04_22_010000_normalize_employee_nationalities.php');
+                    if (file_exists($migrationFile)) {
+                        require_once $migrationFile;
+                        if (class_exists(\NormalizeEmployeeNationalities::class)) {
+                            $countryMap = \NormalizeEmployeeNationalities::countryToDemonymMap();
+                        }
+                    }
+                    if (!$countryMap) $countryMap = [];
+                }
+                $nationality = $countryMap[$rawCountry] ?? $rawCountry;
                 $religionRaw = strtoupper(trim((string) ($row[$COL_RELIGION] ?? '')));
                 $religion = $religionRaw === 'MUSLIM' ? 1 : 0;
                 $empIdExternal = trim((string) ($row[$COL_ID] ?? ''));
@@ -244,14 +258,16 @@ class ImportWisdomAiStaffSeeder extends Seeder
                     'Admin_Parent_id' => $adminId,
                     'resort_id'       => $resortId,
                     'Emp_id'          => $empIdExternal ?: ('WAI-'.$num),
+                    'title'           => $title,
                     'division_id'     => $defaultDivision,
                     'Dept_id'         => $deptId,
                     'Position_id'     => $positionId,
                     'is_employee'     => 1,
                     'rank'            => $rank,
                     'main_rank'       => $rank,
+                    'benefit_grid_level' => $rank,
                     'nationality'     => $nationality,
-                    'location'        => $nationality === 'Maldives' ? 'Malé' : 'Resorts',
+                    'location'        => $nationality === 'Maldivian' ? 'Malé' : 'Resorts',
                     'joining_date'    => $hireDate,
                     'passport_number' => $passport,
                     'religion'        => $religion,

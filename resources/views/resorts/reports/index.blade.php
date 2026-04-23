@@ -96,9 +96,41 @@
                 { data: 'description', name: 'description', orderable: false, searchable: false },
                 { data: 'CareatedAt', name: 'CareatedAt', orderable: true, searchable: false },
                 { data: 'action', name: 'action', orderable: false, searchable: false }
-                
+
             ],
         });
     }
+
+    $(document).on('click', '.report-delete-btn', function() {
+        const id = $(this).data('id');
+        Swal.fire({
+            title: 'Delete this report?',
+            text: 'This cannot be undone.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Yes, delete it'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+            $.ajax({
+                url: "{{ url('resort/report') }}/" + id,
+                type: 'DELETE',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function(res) {
+                    if (res.success) {
+                        toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                        if ($.fn.DataTable.isDataTable('#ReportList')) {
+                            $('#ReportList').DataTable().ajax.reload();
+                        } else {
+                            location.reload();
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    toastr.error(xhr.responseJSON?.message || 'Failed to delete report', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+    });
 </script>
 @endsection

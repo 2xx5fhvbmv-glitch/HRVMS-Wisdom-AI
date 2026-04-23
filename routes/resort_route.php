@@ -1615,6 +1615,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::post('/people/employees/setp-save', 'People\Employee\EmployeeController@saveStep')->name('save.employeeinfo.step');
        Route::post('/people/employees/draft', 'People\Employee\EmployeeController@getDraft')->name('get.employeeinfo.draft');
        Route::post('/people/employees/delete', 'People\Employee\EmployeeController@delete')->name('employee.delete');
+       Route::post('/people/employees/update-location', 'People\Employee\EmployeeController@updateLocation')->name('people.employees.updateLocation');
       Route::post('/people/employees/bulk-delete', 'People\Employee\EmployeeController@bulkDelete')->name('employee.bulk.delete');
       Route::post('/people/employees/send-credentials', 'People\Employee\EmployeeController@sendCredentials')->name('people.employee.send-credentials');
 
@@ -1849,7 +1850,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/ai-inside', 'ReportController@AiInsideReport')->name('reports.AiInsideReport');
 
 
-    // Route::delete('Report/{report}', 'ReportController@destroy')->name('report.destroy');
+    Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
     Route::get('/get/updated-data','WorkforcePlanningDashboardController@getUpdatedData')->name('resort.occupancy.getUpdatedData');
 

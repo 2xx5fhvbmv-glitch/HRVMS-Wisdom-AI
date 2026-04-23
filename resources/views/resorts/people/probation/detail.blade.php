@@ -96,34 +96,38 @@
                             <div class="card-title">
                                 <h3>Manager Information</h3>
                             </div>
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="img-circle userImg-block me-md-3 me-2">
-                                    <img src="{{Common::getResortUserPicture($employee->reportingToAdmin->Admin_Parent_id ?? null)}}" alt="image">
+                            @if($employee->reportingTo)
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="img-circle userImg-block me-md-3 me-2">
+                                        <img src="{{ Common::getResortUserPicture(optional($employee->reportingToAdmin)->Admin_Parent_id ?? null) }}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h4 class="fw-600">{{ optional($employee->reportingToAdmin)->first_name }} {{ optional($employee->reportingToAdmin)->last_name }}</h4>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 class="fw-600">{{$employee->reportingToAdmin->first_name}} {{$employee->reportingToAdmin->last_name}} </h4>
+                                <div class="table-responsive">
+                                    <table class=" mb-0">
+                                        <tr>
+                                            <th>Position:</th>
+                                            <td>{{ optional(optional($employee->reportingTo)->position)->position_title ?? 'N/A' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Department:</th>
+                                            <td>{{ optional(optional($employee->reportingTo)->department)->name ?? 'N/A' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Section:</th>
+                                            <td>{{ optional(optional($employee->reportingTo)->section)->name ?? 'N/A' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Division:</th>
+                                            <td>{{ optional(optional($employee->reportingTo)->division)->name ?? 'N/A' }}</td>
+                                        </tr>
+                                    </table>
                                 </div>
-                            </div>
-                            <div class="table-responsive">
-                                <table class=" mb-0">
-                                    <tr>
-                                        <th>Position:</th>
-                                        <td>{{$employee->reportingTo->position->position_title}}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Department:</th>
-                                        <td>{{$employee->reportingTo->department->name}}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Section:</th>
-                                        <td>{{$employee->reportingTo->section->name ?? 'N/A'}}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Division:</th>
-                                        <td>{{$employee->reportingTo->division->name ?? 'N/A'}}</td>
-                                    </tr>
-                                </table>
-                            </div>
+                            @else
+                                <p class="text-muted mb-0">No manager assigned for this employee.</p>
+                            @endif
                         </div>
                     </div>
                     <div class="col-xl-9 col-lg-8 col-md-7">
