@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\Resorts;
 use DB;
 use Auth;
+use Schema;
 use Carbon\Carbon;
 use App\Models\Resort;
 use Illuminate\Http\Request;
@@ -27,10 +28,11 @@ class ReportController extends Controller
             $reports = ResortReports::where('resort_id', $r->resort_id)->orderBy("created_at","desc")->get();
         
             return datatables()->of($reports)
-            ->addColumn('action', function ($row) 
+            ->addColumn('action', function ($row)
             {
-                $route = route('reports.show', base64_encode($row->id));
-                return '<a target="_blank" href="'. $route .'" class="btn btn-success btn-sm edit-division" data-id="' . $row->id . '"><i class="fa fa-eye"></i></button>';
+                $viewRoute = route('reports.show', base64_encode($row->id));
+                return '<a target="_blank" href="'. $viewRoute .'" class="btn btn-success btn-sm me-1" title="View"><i class="fa fa-eye"></i></a>'
+                    . '<button type="button" class="btn btn-danger btn-sm report-delete-btn" data-id="'. $row->id .'" title="Delete"><i class="fa fa-trash"></i></button>';
             })
             ->editColumn('name', function ($row) 
             {
@@ -139,16 +141,37 @@ class ReportController extends Controller
         $columns = $queryParams['columns'] ?? [];
         $relationTables = $queryParams['relation_tables'] ?? [];
         $filters = $queryParams['filters'] ?? [];
-        $query = DB::table($tableName)
-            ->where('resort_id', $this->resort->resort_id);
-        
+        $query = DB::table($tableName);
+        // Only scope by resort if the target table actually has a resort_id column
+        if (Schema::hasColumn($tableName, 'resort_id')) {
+            $query->where("$tableName.resort_id", $this->resort->resort_id);
+        }
+
         $query->select("$tableName.*");
         
-        $formDate = Carbon::createFromFormat('d/m/Y', $fromDate)->format('Y-m-d');
-        $toDate = Carbon::createFromFormat('d/m/Y', $toDate)->format('Y-m-d');
-        
+        // Be resilient about both formats (d/m/Y and already-normalised Y-m-d)
+        $parseFlexible = function ($value, $endOfDay = false) {
+            if (empty($value)) return null;
+            foreach (['d/m/Y', 'Y-m-d', 'd-m-Y'] as $fmt) {
+                try {
+                    $c = Carbon::createFromFormat($fmt, $value);
+                    return $endOfDay ? $c->endOfDay() : $c->startOfDay();
+                } catch (\Exception) {}
+            }
+            try {
+                $c = Carbon::parse($value);
+                return $endOfDay ? $c->endOfDay() : $c->startOfDay();
+            } catch (\Exception) {}
+            return null;
+        };
+        $from = $parseFlexible($fromDate, false);
+        $to   = $parseFlexible($toDate, true);
 
-        $query->whereBetween('created_at', [Carbon::parse($toDate)->format("Y-m-d"),Carbon::parse($formDate)->format("Y-m-d"),]);
+        if ($from && $to) {
+            // Ensure correct order regardless of user input
+            if ($from->greaterThan($to)) { [$from, $to] = [$to, $from]; }
+            $query->whereBetween("$tableName.created_at", [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')]);
+        }
         $mainRecords = $query->get();
         if (!empty($filters)) {
             foreach ($filters as $filter) {
@@ -388,6 +411,17 @@ class ReportController extends Controller
         $columns = $queryParams['columns'] ?? [];
         $relationTables = $queryParams['relation_tables'] ?? [];
         return view('resorts.reports.edit', compact('report', 'tables', 'columns', 'relationTables'));
+    }
+
+    public function destroy($id)
+    {
+        $decoded = is_numeric($id) ? (int) $id : base64_decode($id);
+        $report = ResortReports::where('resort_id', $this->resort->resort_id)->find($decoded);
+        if (!$report) {
+            return response()->json(['success' => false, 'message' => 'Report not found'], 404);
+        }
+        $report->delete();
+        return response()->json(['success' => true, 'message' => 'Report deleted successfully.']);
     }
 
     public function AiInsideReport(Request $request)

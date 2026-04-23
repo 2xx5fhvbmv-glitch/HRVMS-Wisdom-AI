@@ -225,40 +225,41 @@ $(document).ready(function() {
     });
 
     // Handle form submission
-    $('#GetReportData').on('submit', function (e) {
-        alert('test');
-        e.preventDefault();
-        if ($(this).parsley().validate()) 
-        {
-            var formData = $(this).serialize();
-            $.ajax({
-                type: 'POST',
-                url: "{{route('reports.FetchReportData')}}",
-                data: formData,
-                success: function (response) {
-                    $('#reportTableData').empty();
-                    $('#reportTableData').append(response.html);
-                    if(response.columns != 0)
-                    {
-                        $(".exportData").removeAttr('disabled');
-                        $(".AIInSide").removeAttr('disabled');
-                                                $(".dropdown-toggle").removeAttr('disabled');
-
-                        
-                    }
-                    else
-                    {
-                        $(".AIInSide").attr('disabled', 'disabled');
-                        $(".exportData").attr('disabled', 'disabled');
-                        $(".dropdown-toggle").attr('disabled', 'disabled');
-                    }
-                },
-                error: function (xhr, status, error) {
-                    console.error(xhr.responseText);
+    function fetchReportData() {
+        var $form = $('#GetReportData');
+        var formData = $form.serialize();
+        $.ajax({
+            type: 'POST',
+            url: "{{route('reports.FetchReportData')}}",
+            data: formData,
+            success: function (response) {
+                $('#reportTableData').empty();
+                $('#reportTableData').append(response.html);
+                if (response.columns != 0) {
+                    $(".exportData").removeAttr('disabled');
+                    $(".AIInSide").removeAttr('disabled');
+                    $(".dropdown-toggle").removeAttr('disabled');
+                } else {
+                    $(".AIInSide").attr('disabled', 'disabled');
+                    $(".exportData").attr('disabled', 'disabled');
+                    $(".dropdown-toggle").attr('disabled', 'disabled');
                 }
-            });
+            },
+            error: function (xhr, status, error) {
+                console.error(xhr.responseText);
+            }
+        });
+    }
+
+    $('#GetReportData').on('submit', function (e) {
+        e.preventDefault();
+        if ($(this).parsley().validate()) {
+            fetchReportData();
         }
     });
+
+    // Auto-fetch once the page loads so data is visible without clicking Search
+    fetchReportData();
 
     
     $(".AIInSide").on("click",function(e)

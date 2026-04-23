@@ -294,8 +294,10 @@ class XpactEmployeeController extends Controller
     public function XpactEmpBudgetCost(Request $request)
     {
 
-        $ResortBudgetCost = ResortBudgetCost::whereIn('particulars',['QUOTA SLOT DEPOSIT','Quota Slot Deposit','quota slot deposit'])->where("details","Xpat Only")->where('status','active')->where('resort_id',$this->resort->resort_id)->orderBy('updated_at', 'DESC')->first(['particulars','amount','amount_unit']);          
-        $PayableAmt =  Common::RateConversion("DollerToMVR",$ResortBudgetCost->amount,$this->resort->resort_id);
+        $ResortBudgetCost = ResortBudgetCost::whereIn('particulars',['QUOTA SLOT DEPOSIT','Quota Slot Deposit','quota slot deposit'])->where("details","Xpat Only")->where('status','active')->where('resort_id',$this->resort->resort_id)->orderBy('updated_at', 'DESC')->first(['particulars','amount','amount_unit']);
+        // Guard against missing budget-cost row for this resort — avoid null read breaking the DataTable
+        $BudgetAmt = $ResortBudgetCost ? (float) $ResortBudgetCost->amount : 0;
+        $PayableAmt = Common::RateConversion("DollerToMVR", $BudgetAmt, $this->resort->resort_id);
 
 
         if($request->ajax())

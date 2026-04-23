@@ -60,6 +60,30 @@
                             </select>
                             <table class="table table-lable">
                                 <tbody>
+                                    <tr id="summary-location-row">
+                                        <td>Location:</td>
+                                        <td>
+                                            @php
+                                                $loc = $employee->location
+                                                    ?: ($employee->nationality === 'Maldivian' ? 'Malé' : ($employee->nationality ? 'Resorts' : ''));
+                                            @endphp
+                                            <span class="location-view">
+                                                <span class="location-text">{{ $loc ?: '-' }}</span>
+                                                <a href="javascript:void(0);" class="location-edit-btn ms-1" title="Edit Location" style="cursor:pointer;">
+                                                    <i class="fa-solid fa-pen text-primary" style="font-size:12px;"></i>
+                                                </a>
+                                            </span>
+                                            <span class="location-edit d-none">
+                                                <select class="form-select form-select-sm location-select" style="display:inline-block;width:auto;">
+                                                    <option value="">-</option>
+                                                    <option value="Malé" {{ $loc === 'Malé' ? 'selected' : '' }}>Malé</option>
+                                                    <option value="Resorts" {{ $loc === 'Resorts' ? 'selected' : '' }}>Resorts</option>
+                                                </select>
+                                                <a href="javascript:void(0);" class="location-save-btn ms-1" title="Save"><i class="fa-solid fa-check text-success"></i></a>
+                                                <a href="javascript:void(0);" class="location-cancel-btn ms-1" title="Cancel"><i class="fa-solid fa-xmark text-danger"></i></a>
+                                            </span>
+                                        </td>
+                                    </tr>
                                     <tr>
                                         <td>Leaves Remaining:</td>
                                         <td>{{$remianing_leaves ?? 0}}</td>
@@ -257,21 +281,6 @@
                                                                                 <option {{$val == $employee->nationality ? "Selected" : ""}} value="{{$val}}">{{$val}}</option>
                                                                             @endforeach
                                                                         @endif
-                                                                    </select>
-                                                                </td>
-                                                            </tr>
-                                                            <tr>
-                                                                @php
-                                                                    $loc = $employee->location
-                                                                        ?: ($employee->nationality === 'Maldivian' ? 'Malé' : ($employee->nationality ? 'Resorts' : ''));
-                                                                @endphp
-                                                                <th>Location:</th>
-                                                                <td>
-                                                                    <span class="view-mode">{{ $loc ?: '-' }}</span>
-                                                                    <select name="location" class="form-select edit-mode d-none">
-                                                                        <option value="">Select Location</option>
-                                                                        <option value="Malé" {{ $loc === 'Malé' ? 'selected' : '' }}>Malé</option>
-                                                                        <option value="Resorts" {{ $loc === 'Resorts' ? 'selected' : '' }}>Resorts</option>
                                                                     </select>
                                                                 </td>
                                                             </tr>
@@ -738,9 +747,17 @@
                                                                 <th>Joining date:</th>
                                                                  <td>
                                                                     @if(!empty($employee->joining_date) && $employee->joining_date !== '0000-00-00' && strtotime($employee->joining_date) && strtotime($employee->joining_date) > 0)
+                                                                        @php
+                                                                            $jd = \Carbon\Carbon::parse($employee->joining_date);
+                                                                            $now = \Carbon\Carbon::now();
+                                                                            $years = $jd->diffInYears($now);
+                                                                            $tenureLabel = $years >= 1
+                                                                                ? ($years . ' year' . ($years != 1 ? 's' : ''))
+                                                                                : ($jd->diffInMonths($now) . ' months');
+                                                                        @endphp
                                                                         <span class="view-mode">
-                                                                            {{ \Carbon\Carbon::parse($employee->joining_date)->format('d M Y') }}
-                                                                            ({{ \Carbon\Carbon::parse($employee->joining_date)->age }} years)
+                                                                            {{ $jd->format('d M Y') }}
+                                                                            ({{ $tenureLabel }})
                                                                         </span>
                                                                         <input type="text" name="joining_date" class="form-control edit-mode d-none datepicker" value="{{ \Carbon\Carbon::parse($employee->joining_date)->format('d/m/Y') }}">
                                                                     @else
@@ -781,12 +798,21 @@
                                                                     </select>
                                                                 </td>
                                                             </tr>
+                                                            @php
+                                                                // Fall back to employee's rank when benefit_grid_level is not set.
+                                                                // This aligns with how the benefit_grid table keys off emp_grade = rank.
+                                                                $eligibility = config('settings.eligibilty') ?? [];
+                                                                $effectiveBgl = $employee->benefit_grid_level;
+                                                                if (empty($effectiveBgl) && !empty($employee->rank) && isset($eligibility[$employee->rank])) {
+                                                                    $effectiveBgl = $employee->rank;
+                                                                }
+                                                            @endphp
                                                             <tr>
                                                                 <th>Benefit Grid Level:</th>
                                                                 <td>
                                                                     {{-- View Mode --}}
                                                                     <span class="view-mode">
-                                                                        {{ config('settings.eligibilty')[$employee->benefit_grid_level] ?? 'N/A' }}
+                                                                        {{ $effectiveBgl && isset($eligibility[$effectiveBgl]) ? $eligibility[$effectiveBgl] : 'N/A' }}
                                                                     </span>
 
                                                                     {{-- Edit Mode --}}
@@ -794,9 +820,9 @@
                                                                             id="benefit_grid_level"
                                                                             class="form-select edit-mode d-none"
                                                                             data-placeholder="Benefit Grid Level">
-                                                                        @if($employee->benefit_grid_level)
-                                                                            <option value="{{ $employee->benefit_grid_level }}" selected>
-                                                                                {{ config('settings.eligibilty')[$employee->benefit_grid_level] }}
+                                                                        @if($effectiveBgl && isset($eligibility[$effectiveBgl]))
+                                                                            <option value="{{ $effectiveBgl }}" selected>
+                                                                                {{ $eligibility[$effectiveBgl] }}
                                                                             </option>
                                                                         @endif
                                                                     </select>
@@ -3254,5 +3280,42 @@
             }
         }
 
+        // --- Inline Location edit in summary panel ---
+        $(document).on('click', '.location-edit-btn', function () {
+            var $row = $(this).closest('#summary-location-row');
+            $row.find('.location-view').addClass('d-none');
+            $row.find('.location-edit').removeClass('d-none');
+        });
+
+        $(document).on('click', '.location-cancel-btn', function () {
+            var $row = $(this).closest('#summary-location-row');
+            $row.find('.location-edit').addClass('d-none');
+            $row.find('.location-view').removeClass('d-none');
+        });
+
+        $(document).on('click', '.location-save-btn', function () {
+            var $row = $(this).closest('#summary-location-row');
+            var val = $row.find('.location-select').val();
+            $.ajax({
+                url: "{{ route('people.employees.updateLocation') }}",
+                type: 'POST',
+                data: {
+                    _token: '{{ csrf_token() }}',
+                    employee_id: '{{ $employee->id }}',
+                    location: val
+                },
+                success: function (res) {
+                    if (res.success) {
+                        $row.find('.location-text').text(res.location || '-');
+                        $row.find('.location-edit').addClass('d-none');
+                        $row.find('.location-view').removeClass('d-none');
+                        toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (xhr) {
+                    toastr.error(xhr.responseJSON?.message || 'Failed to update location', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
 </script>
 @endsection
