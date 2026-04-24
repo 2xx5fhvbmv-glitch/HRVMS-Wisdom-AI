@@ -53,9 +53,16 @@ class TrainingScheduleController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $page_title = "Learning Schedule";
-        $employees = Employee::with(['resortAdmin','department','position'])->where('resort_id',$this->resort->resort_id)->whereIn('status', ['Active', 'Probationary'])->get();
-        $programs= LearningProgram::where('resort_id',$this->resort->resort_id)->get();
-        $departments = ResortDepartment::where('resort_id',$this->resort->resort_id)->where('status','active')->get();
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employees = Employee::with(['resortAdmin','department','position'])
+            ->where('resort_id',$this->resort->resort_id)
+            ->whereIn('status', ['Active', 'Probationary'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
+        $programs = LearningProgram::where('resort_id',$this->resort->resort_id)->get();
+        $departments = ResortDepartment::where('resort_id',$this->resort->resort_id)->where('status','active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
         return view('resorts.learning.schedule.index',compact('page_title','employees','programs','departments'));
     }
 
@@ -253,7 +260,14 @@ class TrainingScheduleController extends Controller
             'deptID' => 'required|exists:resort_departments,id'
         ]);
 
+        // Block cross-resort queries + enforce department-visibility policy.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds) && !in_array((int) $request->deptID, $scopedDeptIds)) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+        }
+
         $employees = Employee::where('Dept_id', $request->deptID)
+            ->where('resort_id', $this->resort->resort_id)
             ->with(['resortAdmin', 'position'])
             ->get()
             ->map(function ($employee) {

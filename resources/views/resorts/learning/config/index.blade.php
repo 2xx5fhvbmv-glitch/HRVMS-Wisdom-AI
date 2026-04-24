@@ -349,9 +349,11 @@
                         <div class="col-12 mb-3">
                             <a href="{{route('evaluation-form.create')}}" class="btn btn-themeSkyblue btn-sm">Create Evaluation Form</a>
                         </div>
+                        {{-- "Set Rules for Automatic Reminders" — hidden per user request (2026-04-25).
+                             Backing field still exists in the DB for when reminders are re-enabled.
                         <form id="evaluation_settings">
                             @csrf
-                            
+
                             <div class="mb-md-4 mb-3">
                                 <label>Set Rules for Automatic Reminders:</label>
                                 <select class="form-control" name="evaluation_reminder" id="evaluation_reminder">
@@ -365,6 +367,7 @@
                                 <button type="submit" class="btn btn-themeBlue btn-sm" id="submitEvaluationSettings">Submit</button>
                             </div>
                         </form>
+                        --}}
                     </div>
 
                     <div class="card card-attendancePara mb-30">

@@ -101,8 +101,67 @@
 
             console.log('Existing Form Structure:', existingFormStructure);
 
-            // Initialize FormBuilder
-            const formBuilder = $('#form-builder').formBuilder();
+            // Shared custom field templates — star rating + rating table must survive round-trip.
+            var templates = {
+                starRating: function(fieldData) {
+                    return {
+                        field: '<div class="rating-field"><div class="rating-stars"></div></div>',
+                        onRender: function(evt) {
+                            var max = this.config.maxRating || 5;
+                            var $stars = $(evt).find('.rating-stars').empty();
+                            for (var i = 1; i <= max; i++) {
+                                $stars.append('<span class="rating-star" data-value="'+i+'">&#9733;</span>');
+                            }
+                            $stars.on('click', '.rating-star', function() {
+                                $(this).prevAll().addBack().css('color', '#EFB408');
+                                $(this).nextAll().css('color', '#ccc');
+                            });
+                        }
+                    };
+                },
+                ratingTable: function(fieldData) {
+                    return {
+                        field: '<div class="table-field-wrapper"></div>',
+                        onRender: function(evt) {
+                            var config = this.config;
+                            var colHeadings = (config.columnHeadings || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+                            var rowLabels = (config.rowLabels || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+                            var cols = colHeadings.length || 3;
+                            var rows = rowLabels.length || 3;
+                            var hasRowLabels = rowLabels.length > 0;
+                            var html = '<table class="table table-bordered table-field"><thead><tr>';
+                            if (hasRowLabels) html += '<th style="background:#014653;color:#fff;font-weight:500;padding:8px 12px;"></th>';
+                            for (var c = 0; c < cols; c++) html += '<th style="background:#014653;color:#fff;font-weight:500;padding:8px 12px;">' + (colHeadings[c] || 'Column '+(c+1)) + '</th>';
+                            html += '</tr></thead><tbody>';
+                            for (var r = 0; r < rows; r++) {
+                                html += '<tr>';
+                                if (hasRowLabels) html += '<td style="font-weight:600;background:#f0f0f0;">' + (rowLabels[r] || '') + '</td>';
+                                for (var c = 0; c < cols; c++) html += '<td style="padding:8px 12px;"><input type="text" class="form-control form-control-sm" placeholder=""></td>';
+                                html += '</tr>';
+                            }
+                            html += '</tbody></table>';
+                            $(evt).find('.table-field-wrapper').html(html);
+                        }
+                    };
+                }
+            };
+            var typeUserAttrs = {
+                starRating: { maxRating: { label: 'Max Rating', value: 5, type: 'number' } },
+                ratingTable: {
+                    columnHeadings: { label: 'Column Headings (comma separated)', value: 'Criteria, Rating, Comments', type: 'text' },
+                    rowLabels: { label: 'Row Labels (comma separated)', value: 'Communication, Teamwork, Leadership', type: 'text' }
+                }
+            };
+
+            const formBuilder = $('#form-builder').formBuilder({
+                disableFields: ['autocomplete', 'button'],
+                templates: templates,
+                typeUserAttrs: typeUserAttrs,
+                fields: [
+                    { label: 'Star Rating', type: 'starRating', icon: '⭐' },
+                    { label: 'Table / Matrix', type: 'ratingTable', icon: '▦' }
+                ]
+            });
 
             // Populate FormBuilder with the existing form structure
             formBuilder.promise.then(() => {

@@ -1120,6 +1120,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('learning/program/store', 'Learning\LearningProgramController@save')->name('learning.programs.save');
     Route::get('learning/program/index', 'Learning\LearningProgramController@index')->name('learning.programs.index');
     Route::get('learning/program/list', 'Learning\LearningProgramController@list')->name('learning.programs.list');
+    Route::get('learning/program/view/{id}', 'Learning\LearningProgramController@show')->name('learning.programs.show');
+    Route::get('learning/program/material/{id}', 'Learning\LearningProgramController@downloadMaterial')->name('learning.programs.material');
 
     Route::get('learning/program/calendar', 'Learning\LearningCalendarController@index')->name('learning.calendar.index');
     Route::post('learning/program/calendar/add-session', 'Learning\LearningCalendarController@store')->name('learning.calendar.save');
@@ -1177,6 +1179,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('/feedback-form', 'Learning\FeedbackFormController@index')->name('feedback-form.index');
     Route::get('/feedback-form/list', 'Learning\FeedbackFormController@list')->name('feedback-form.list');
     Route::get('/feedback-form/edit/{id}', 'Learning\FeedbackFormController@edit')->name('feedback-form.edit');
+    Route::get('/feedback-form/preview/{id}', 'Learning\FeedbackFormController@preview')->name('feedback-form.preview');
     Route::post('/feedback-form/update/{id}', 'Learning\FeedbackFormController@update')->name('feedback-form.update');
     Route::delete('/feedback-form/delete/{id}', 'Learning\FeedbackFormController@delete')->name('feedback-form.delete');
 

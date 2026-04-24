@@ -41,13 +41,61 @@ class LearningProgramController extends Controller
 
         $resort_id = $this->resort->resort_id;
         $page_title ='Learning Program';
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         $categories= LearningCategory::where('resort_id',$resort_id)->get();
         $positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();
-        $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
-        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary'])->get();
+        $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
+        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)
+            ->whereIn('status', ['Active', 'Probationary'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         $grades = config('settings.Position_Rank');
-        $trainers = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('rank',['1','2','3','4','5','7','8','9'])->whereIn('status', ['Active', 'Probationary'])->get();
+        $trainers = Employee::with('resortAdmin')->where('resort_id',$resort_id)
+            ->whereIn('rank',['1','2','3','4','5','7','8','9'])
+            ->whereIn('status', ['Active', 'Probationary'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         return view('resorts.learning.program.index',compact('page_title','categories','positions','departments','employees','grades','trainers'));
+    }
+
+    public function show($id)
+    {
+        if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized access');
+        }
+        $program = LearningProgram::with('category')
+            ->where('resort_id', $this->resort->resort_id)
+            ->find(base64_decode($id));
+        if (!$program) abort(404, 'Learning Program not found.');
+
+        $materials = LearningMaterials::where('learning_program_id', $program->id)->get();
+
+        // Resolve target audience labels for display
+        $audienceLabels = [];
+        if (is_array($program->target_audience) && !empty($program->target_audience)) {
+            switch ($program->audience_type) {
+                case 'departments':
+                    $audienceLabels = ResortDepartment::whereIn('id', $program->target_audience)->pluck('name')->toArray();
+                    break;
+                case 'positions':
+                    $audienceLabels = ResortPosition::whereIn('id', $program->target_audience)->pluck('position_title')->toArray();
+                    break;
+                case 'grades':
+                    $rankMap = config('settings.Position_Rank', []);
+                    $audienceLabels = array_values(array_filter(array_map(fn($g) => $rankMap[$g] ?? null, $program->target_audience)));
+                    break;
+                case 'employees':
+                    $audienceLabels = Employee::with('resortAdmin')->whereIn('id', $program->target_audience)->get()
+                        ->map(fn($e) => optional($e->resortAdmin)->full_name ?? '-')->toArray();
+                    break;
+            }
+        }
+
+        $trainer = $program->trainer ? Employee::with('resortAdmin')->find($program->trainer) : null;
+        $page_title = 'Learning Program Details';
+        return view('resorts.learning.program.show', compact('page_title', 'program', 'audienceLabels', 'trainer', 'materials'));
     }
 
     public function list(Request $request)
@@ -91,11 +139,11 @@ class LearningProgramController extends Controller
 
             $programs = $query->get();
 
-            // dd($programs);
-
             return datatables()->of($programs)
+                ->editColumn('description', fn($row) => $row->description ? e(\Illuminate\Support\Str::limit(strip_tags($row->description), 100)) : '-')
+                ->editColumn('objectives', fn($row) => $row->objectives ? e(\Illuminate\Support\Str::limit(strip_tags($row->objectives), 100)) : '-')
                 ->addColumn('category', function ($row) {
-                    return optional($row->category)->category ?? 'N/A'; // Prevents null errors
+                    return optional($row->category)->category ?? 'N/A';
                 })
                 ->addColumn('duration', function ($row) {
                     return "{$row->days} Days {$row->hours} hrs";
@@ -104,34 +152,44 @@ class LearningProgramController extends Controller
                     if (!is_array($row->target_audience)) {
                         return 'N/A';
                     }
-    
+
                     switch ($row->audience_type) {
                         case 'departments':
                             return ResortDepartment::whereIn('id', $row->target_audience)->pluck('name')->implode(', ');
-    
+
                         case 'positions':
-                            return ResortPosition::whereIn('id', $row->target_audience)->pluck('name')->implode(', ');
-    
+                            return ResortPosition::whereIn('id', $row->target_audience)->pluck('position_title')->implode(', ');
+
                         case 'grades':
-                             return $grades = config('settings.Position_Rank');
-                            
-    
+                            $rankMap = config('settings.Position_Rank', []);
+                            return collect($row->target_audience)->map(fn($g) => $rankMap[$g] ?? $g)->implode(', ');
+
                         case 'employees':
+                            // Scope: only return employee names in the logged-in user's dept-visibility scope.
+                            $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+                            $ids = $row->target_audience;
+                            if (is_array($scopedEmpIds)) {
+                                $ids = array_values(array_intersect($ids, $scopedEmpIds));
+                            }
                             return Employee::with('resortAdmin')
-                            ->whereIn('id', $row->target_audience)
-                            ->get()
-                            ->map(function ($employee) {
-                                return $employee->resortAdmin 
-                                    ? $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name 
-                                    : 'N/A'; // If no related admin found
-                            })
-                            ->implode(', ');
-                            
+                                ->whereIn('id', $ids)
+                                ->get()
+                                ->map(function ($employee) {
+                                    return $employee->resortAdmin
+                                        ? $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name
+                                        : 'N/A';
+                                })
+                                ->implode(', ');
+
                         default:
                             return 'N/A';
                     }
                 })
-                ->rawColumns(['name', 'description', 'objectives', 'category', 'target_audience', 'duration', 'frequency', 'delivery_mode'])
+                ->addColumn('action', function ($row) {
+                    $url = route('learning.programs.show', base64_encode($row->id));
+                    return '<a href="'.$url.'" class="btn-tableIcon btnIcon-blue" title="View"><i class="fa-solid fa-eye"></i></a>';
+                })
+                ->rawColumns(['name', 'description', 'objectives', 'category', 'target_audience', 'duration', 'frequency', 'delivery_mode', 'action'])
                 ->make(true);
         } catch (\Exception $e) {
             \Log::error("Error fetching Learning Programs: " . $e->getMessage());
@@ -195,6 +253,28 @@ class LearningProgramController extends Controller
             }
         }
         return response()->json(['success' => true, 'msg' => 'Learning Program saved successfully.']);
+    }
+
+    /**
+     * Stream a Learning Program material file (stored on the local disk under storage/app/).
+     * Access is gated to users who can view the parent program.
+     */
+    public function downloadMaterial($id)
+    {
+        $material = LearningMaterials::find(base64_decode($id));
+        if (!$material) abort(404, 'Material not found.');
+
+        $program = LearningProgram::where('resort_id', $this->resort->resort_id)->find($material->learning_program_id);
+        if (!$program) abort(403, 'You do not have access to this material.');
+
+        if (!\Illuminate\Support\Facades\Storage::disk('local')->exists($material->file_path)) {
+            abort(404, 'File missing from storage.');
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download(
+            $material->file_path,
+            basename($material->file_path)
+        );
     }
 
     public function getProgramDetails(Request $request)

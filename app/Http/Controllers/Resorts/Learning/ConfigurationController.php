@@ -45,11 +45,21 @@ class ConfigurationController extends Controller
         $categories= LearningCategory::where('resort_id',$resort_id)->get();
         $programs= LearningProgram::where('resort_id',$resort_id)->get();
 
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         $positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();
-        $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
-        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary'])->get();
+        $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
+        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)
+            ->whereIn('status', ['Active', 'Probationary'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         $grades = config('settings.Position_Rank');
-        $trainers = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('rank',['1','2','3','4','5','7','8','9'])->whereIn('status', ['Active', 'Probationary'])->get();
+        $trainers = Employee::with('resortAdmin')->where('resort_id',$resort_id)
+            ->whereIn('rank',['1','2','3','4','5','7','8','9'])
+            ->whereIn('status', ['Active', 'Probationary'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         $attenndanceParameters = AttendanceParameters::where('resort_id', $resort_id)->first();
         // dd($attenndanceParameters);
         return view('resorts.learning.config.index',compact('page_title','attenndanceParameters','categories','programs','positions','departments','employees','grades','trainers'));
