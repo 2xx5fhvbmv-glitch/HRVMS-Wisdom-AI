@@ -20,6 +20,26 @@
             </div>
         </div>
 
+        @php
+            $isRevision = $kpi->status === 'rejected';
+            $prefillEntries = [];
+            if ($isRevision && is_array($kpi->response_entries) && count($kpi->response_entries) > 0) {
+                $prefillEntries = $kpi->response_entries;
+            }
+            if (empty($prefillEntries)) {
+                // Single empty row for first-time response
+                $prefillEntries = [['individual_goal' => '', 'budget' => '', 'weightage' => '']];
+            }
+        @endphp
+
+        @if($isRevision && $kpi->gm_remarks)
+            <div class="alert alert-danger mb-3">
+                <strong>Your previous response was rejected by GM.</strong>
+                <div class="mt-1"><strong>Reason:</strong> {{ $kpi->gm_remarks }}</div>
+                <div class="small text-muted mt-1">Please update the response below and re-submit.</div>
+            </div>
+        @endif
+
         <div class="card">
             {{-- Creator info header --}}
             <div class="d-flex align-items-center mb-3 pb-3" style="border-bottom:1px solid #eee;">
@@ -44,7 +64,7 @@
                 <div><strong>PROPERTY GOAL:</strong> {{ $kpi->property_goal }}</div>
                 <div><strong>VALUE:</strong> {{ $kpi->PropertyGoalweightage }}%</div>
                 @if($kpi->PropertyGoalbudget)
-                    <div><strong>BUDGET:</strong> {{ number_format((float)$kpi->PropertyGoalbudget) }}</div>
+                    <div><strong>BUDGET:</strong> {{ \App\Helpers\Common::formatCurrency($kpi->PropertyGoalbudget, 'MVR', 0) }}</div>
                 @endif
             </div>
 
@@ -52,31 +72,36 @@
                 @csrf
 
                 <div class="responseGoal-main">
-                    <div class="responseGoal-block">
-                        <div class="row g-md-4 g-3 mb-md-4 mb-3">
-                            <div class="col-sm-6">
-                                <label class="form-label">CREATE INDIVIDUAL GOAL</label>
-                                <input type="text" class="form-control" name="responses[0][individual_goal]"
-                                       placeholder="Property Goal" required>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">BUDGET</label>
-                                <input type="number" class="form-control" name="responses[0][budget]"
-                                       placeholder="Budget (optional)" min="1">
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">WEIGHTAGE (VALUE)</label>
-                                <div class="input-group">
-                                    <input type="number" class="form-control" name="responses[0][weightage]"
-                                           placeholder="Weightage" required min="1">
-                                    <span class="input-group-text">%</span>
+                    @foreach($prefillEntries as $idx => $entry)
+                        <div class="responseGoal-block">
+                            <div class="row g-md-4 g-3 mb-md-4 mb-3">
+                                <div class="col-sm-6">
+                                    <label class="form-label">CREATE INDIVIDUAL GOAL</label>
+                                    <input type="text" class="form-control" name="responses[{{ $idx }}][individual_goal]"
+                                           value="{{ $entry['individual_goal'] ?? '' }}"
+                                           placeholder="Property Goal" required>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label">BUDGET</label>
+                                    <input type="number" class="form-control" name="responses[{{ $idx }}][budget]"
+                                           value="{{ $entry['budget'] ?? '' }}"
+                                           placeholder="Budget (optional)" min="1">
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label">WEIGHTAGE (VALUE)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="responses[{{ $idx }}][weightage]"
+                                               value="{{ $entry['weightage'] ?? '' }}"
+                                               placeholder="Weightage" required min="1">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                <div class="col-sm-6 d-flex align-items-end {{ $idx === 0 ? 'd-none' : '' }} remove-col">
+                                    <a href="#" class="btn btn-danger btn-sm responseGoal-remove">Remove</a>
                                 </div>
                             </div>
-                            <div class="col-sm-6 d-flex align-items-end d-none remove-col">
-                                <a href="#" class="btn btn-danger btn-sm responseGoal-remove">Remove</a>
-                            </div>
                         </div>
-                    </div>
+                    @endforeach
                 </div>
 
                 <div class="md-mb-4 mb-3">
@@ -125,7 +150,9 @@
                 --}}
 
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Send</button>
+                    <button type="submit" class="btn btn-themeBlue btn-sm">
+                        {{ $isRevision ? 'Re-submit Response' : 'Send' }}
+                    </button>
                 </div>
             </form>
         </div>
@@ -137,7 +164,7 @@
 <script>
 $(document).ready(function () {
     $('#KpiResponseForm').parsley();
-    var responseIndex = 1;
+    var responseIndex = {{ count($prefillEntries) }};
 
     $(document).on('click', '.responseGoal-add', function (e) {
         e.preventDefault();

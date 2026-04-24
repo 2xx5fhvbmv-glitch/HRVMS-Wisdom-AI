@@ -33,13 +33,16 @@ class OnboardingController extends Controller
     {
         $page_title ='Create Onboarding';
         $resort_id = $this->resort->resort_id;
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $employees = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resort_id)->where('status','Active')
             ->where('rank', 6)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         $participants = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resort_id)->where('status','Active')
             ->whereIn('rank', [1, 2, 3, 8])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         $transportations = ResortTransportation::where('resort_id', $resort_id)
             ->whereNotIn('transportation_option', ['International Flight'])
@@ -54,9 +57,11 @@ class OnboardingController extends Controller
         $resort_id = $this->resort->resort_id;
         $search = $request->search;
 
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $query = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resort_id)
-            ->whereDate('joining_date', '>', \Carbon\Carbon::today());
+            ->whereDate('joining_date', '>', \Carbon\Carbon::today())
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($search) {
             $query->where(function ($q) use ($search) {

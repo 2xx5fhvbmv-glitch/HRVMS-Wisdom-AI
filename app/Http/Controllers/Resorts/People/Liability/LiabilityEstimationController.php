@@ -18,7 +18,6 @@ use App\Models\PayrollReview;
 use App\Models\PayrollReviewAllowances;
 use Auth;
 use Config;
-use Common;
 use DB;
 use Carbon\Carbon;
 
@@ -44,8 +43,10 @@ class LiabilityEstimationController extends Controller
         $resort_departments = ResortDepartment::where('resort_id', $resortId)
             ->where('status', 'active')
             ->get(); 
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $employees = Employee::where('resort_id', $resortId)
             ->where('status', 'active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         
         $estimated_liability = StoreManningResponseParent::with(['manningbudget' => function($query) use ($currentYear) {
@@ -313,9 +314,11 @@ class LiabilityEstimationController extends Controller
             ->distinct()
             ->pluck('allowance_type');
 
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $query = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resortId)
             ->where('status', 'active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->select('id', 'Admin_Parent_id', 'Emp_id', 'Dept_id', 'Position_id', 'nationality', 'basic_salary', 'joining_date');
 
         $datatable = datatables()->of($query)

@@ -3108,7 +3108,8 @@ class Common
      *
      * Tiers:
      *   - Super admin / master admin / GM (rank 8) / HR (rank 3) → unrestricted (null)
-     *   - EXCOM (rank 1) / HOD (rank 2) → entire department (all employees in their Dept_id)
+     *   - Any user whose department is HR (incl. HR HOD rank 2, HR EXCOM rank 1) → unrestricted
+     *   - EXCOM (rank 1) / HOD (rank 2) in non-HR dept → entire department (all employees in their Dept_id)
      *   - Manager (4) / Supervisor (5) / Line Workers (6) / others → subordinates + self
      */
     public static function getPerformanceScopedEmpIds()
@@ -3131,6 +3132,11 @@ class Common
             return null;
         }
 
+        // HR department HOD / EXCOM see everything (same as GM)
+        if (in_array($rank, [1, 2]) && self::isHRDepartment($emp->Dept_id ?? null)) {
+            return null;
+        }
+
         // EXCOM (1) / HOD (2) → whole department
         if (in_array($rank, [1, 2]) && $emp->Dept_id) {
             $ids = \App\Models\Employee::where('resort_id', $emp->resort_id)
@@ -3146,6 +3152,124 @@ class Common
         if (!is_array($ids)) $ids = [];
         $ids[] = $emp->id;
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * Fan-out a notification to a list of employee IDs. One resort_notifications row per
+     * recipient (so the notification bell's user_id filter resolves it correctly) plus a
+     * single mobile push to the whole list. Each DB write is isolated so one failure doesn't
+     * block the rest. `$requestId` is the entity id (cycle id, KPI id, etc.) for deep-linking.
+     */
+    public static function notifyEmployees($resortId, array $empIds, $title, $message, $module = 'Performance', $requestId = null)
+    {
+        $empIds = array_values(array_unique(array_filter($empIds)));
+        if (empty($empIds)) return;
+
+        foreach ($empIds as $empId) {
+            try {
+                event(new \App\Events\ResortNotificationEvent(
+                    self::nofitication($resortId, 10, $title, $message, $requestId, $empId, $module)
+                ));
+            } catch (\Exception $e) {
+                \Log::warning("notifyEmployees emp {$empId} failed: " . $e->getMessage());
+            }
+        }
+
+        try {
+            self::sendMobileNotification($resortId, 2, null, null, $title, $message, $module, $empIds, $requestId);
+        } catch (\Exception $e) {
+            \Log::warning('notifyEmployees mobile push failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
+     * string like "DR-22") to a numeric employee primary key, or null if not found.
+     * Legacy cycle rows stored the Emp_id string instead of the numeric key, so all
+     * three formats need to be handled when comparing against Auth user's id.
+     */
+    public static function resolveEmpMainIdToNumeric($value, $resortId = null)
+    {
+        if ($value === null || $value === '') return null;
+        if (is_numeric($value)) return (int) $value;
+
+        $decoded = base64_decode($value, true);
+        if ($decoded !== false && is_numeric($decoded)) {
+            return (int) $decoded;
+        }
+
+        $query = \App\Models\Employee::where('Emp_id', $value);
+        if ($resortId) $query->where('resort_id', $resortId);
+        $emp = $query->first(['id']);
+        return $emp ? (int) $emp->id : null;
+    }
+
+    /**
+     * Returns true when the given department id refers to the HR / Human Resources department.
+     * Used to grant HR HOD and HR EXCOM the same full-system visibility as GM.
+     */
+    public static function isHRDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $hrAliases = ['hr', 'human resources', 'human resource'];
+        return in_array($name, $hrAliases, true)
+            || in_array($short, $hrAliases, true)
+            || in_array($code, $hrAliases, true);
+    }
+
+    /**
+     * True if the logged-in resort user has unrestricted access to all departments
+     * (Super admin, master admin, GM, or anyone in the HR department).
+     */
+    public static function hasFullDataAccess()
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) return false;
+
+        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+            return true;
+        }
+
+        $emp = $user->GetEmployee ?? null;
+        if (!$emp) return true;
+
+        $rank = (int) $emp->rank;
+
+        // GM (8) and HR role (3)
+        if (in_array($rank, [3, 8])) return true;
+
+        // HR department HOD / EXCOM
+        if (in_array($rank, [1, 2]) && self::isHRDepartment($emp->Dept_id ?? null)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns the department ids the logged-in resort user is allowed to see, or NULL
+     * for unrestricted (all departments). Mirrors getPerformanceScopedEmpIds() but at
+     * the department level — use it to filter department-keyed tables / dropdowns.
+     */
+    public static function getScopedDepartmentIds()
+    {
+        if (self::hasFullDataAccess()) return null;
+
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) return [];
+
+        $emp = $user->GetEmployee ?? null;
+        if (!$emp || !$emp->Dept_id) return [];
+
+        return [(int) $emp->Dept_id];
     }
 
     public static function getEmpGrade($rank){
@@ -3636,11 +3760,20 @@ class Common
 
     /**
      * Format amount with currency symbol and conversion.
+     * Converts from the stored source currency to the resort's active display
+     * currency, then prefixes the current symbol ($ / MVR).
+     *
+     * @param mixed $amount         Numeric amount (null/empty renders as '-').
+     * @param string $sourceCurrency 'USD' or 'MVR' — the currency the amount is stored in.
+     * @param int $decimals         Number of decimals to render (payroll uses 2; KPI usually 0).
      */
-    public static function formatCurrency($amount, $sourceCurrency = 'USD')
+    public static function formatCurrency($amount, $sourceCurrency = 'USD', $decimals = 2)
     {
+        if ($amount === null || $amount === '' || $amount === false) {
+            return '-';
+        }
         $converted = self::convertToDisplayCurrency($amount, $sourceCurrency);
-        return self::GetResortCurrencySymbol() . ' ' . number_format($converted, 2);
+        return self::GetResortCurrencySymbol() . ' ' . number_format($converted, $decimals);
     }
 
     public static function getDisplayCurrency()
@@ -3767,22 +3900,14 @@ class Common
 
     public static function ResortNotification($user_id,$resort_id)
     {
+        // Notifications are always scoped to the explicit recipient (user_id).
+        // Broadcasts (e.g. HR/EXCOM/GM) must be created as per-recipient rows by the sender
+        // so that other departments don't see notifications addressed to someone else.
         $query = ResortNotification::join('employees as t1',"t1.id","=","resort_notifications.user_id")
         ->join('resort_admins as t2',"t2.id","=","t1.Admin_Parent_id")
         ->where("resort_notifications.resort_id", $resort_id)
-        ->where('resort_notifications.status', 'unread');
-
-        // HR/EXCOM/GM see all resort notifications; others see only their own
-        $employee = Employee::find($user_id);
-        if ($employee) {
-            $rank = config('settings.Position_Rank');
-            $userRank = $rank[$employee->rank] ?? '';
-            if (!in_array($userRank, ['HR', 'EXCOM', 'GM'])) {
-                $query->where("resort_notifications.user_id", $user_id);
-            }
-        } else {
-            $query->where("resort_notifications.user_id", $user_id);
-        }
+        ->where('resort_notifications.status', 'unread')
+        ->where("resort_notifications.user_id", $user_id);
 
         $r = $query->latest()->take(10)->get(['resort_notifications.*','t2.id as Parentid']);
         $string='';
@@ -6039,20 +6164,11 @@ class Common
 
     public static function getNotificationCount($resort_id,$user_id){
 
+        // Always scope notifications to the explicit recipient — see ResortNotification()
+        // for the rationale. Broadcasts must be created as per-recipient rows.
         $query = ResortNotification::where('resort_id', $resort_id)
-                ->where('status', 'unread');
-
-        // HR/EXCOM/GM see all resort notifications; others see only their own
-        $employee = Employee::find($user_id);
-        if ($employee) {
-            $rank = config('settings.Position_Rank');
-            $userRank = $rank[$employee->rank] ?? '';
-            if (!in_array($userRank, ['HR', 'EXCOM', 'GM'])) {
-                $query->where('user_id', $user_id);
-            }
-        } else {
-            $query->where('user_id', $user_id);
-        }
+                ->where('status', 'unread')
+                ->where('user_id', $user_id);
 
         $resortNotificationCount = $query->count();
 

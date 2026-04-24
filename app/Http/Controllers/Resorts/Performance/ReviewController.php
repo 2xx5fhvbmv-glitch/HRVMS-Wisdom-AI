@@ -35,12 +35,18 @@ class ReviewController extends Controller
 
         $empId = $employee->id;
         $encodedId = base64_encode($empId);
+        // Legacy cycle rows stored the Emp_id string (e.g. "DR-22") instead of the numeric key,
+        // so include that as a third match option.
+        $empCode = $employee->Emp_id;
 
         $reviews = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('pc.resort_id', $this->resort->resort_id)
-            ->where(function ($q) use ($empId, $encodedId) {
+            ->where(function ($q) use ($empId, $encodedId, $empCode) {
                 $q->where('performa_child_cycles.Emp_main_id', $empId)
                   ->orWhere('performa_child_cycles.Emp_main_id', $encodedId);
+                if ($empCode) {
+                    $q->orWhere('performa_child_cycles.Emp_main_id', $empCode);
+                }
             })
             ->orderBy('pc.Start_Date', 'desc')
             ->get(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Start_Date as CycleStart', 'pc.End_Date as CycleEnd', 'pc.status as CycleStatus', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date']);
@@ -71,7 +77,7 @@ class ReviewController extends Controller
 
         // Attach employee details
         foreach ($reviews as $r) {
-            $actualId = is_numeric($r->Emp_main_id) ? $r->Emp_main_id : base64_decode($r->Emp_main_id);
+            $actualId = Common::resolveEmpMainIdToNumeric($r->Emp_main_id, $this->resort->resort_id);
             $emp = Employee::with(['resortAdmin', 'position'])->find($actualId);
             $r->employee_name = $emp ? optional($emp->resortAdmin)->first_name . ' ' . optional($emp->resortAdmin)->last_name : 'N/A';
             $r->employee_position = $emp && $emp->position ? $emp->position->position_title : 'N/A';
@@ -96,10 +102,12 @@ class ReviewController extends Controller
             abort(404, 'Review not found');
         }
 
-        // Verify current user is the participant
+        // Verify current user is the participant — OR an authorized overseer viewing a completed review read-only.
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
-        $participantId = is_numeric($childCycle->Emp_main_id) ? $childCycle->Emp_main_id : base64_decode($childCycle->Emp_main_id);
-        if ($currentEmpId != $participantId) {
+        $participantId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
+        $isOverseer = $childCycle->self_review_status === 'completed'
+            && Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view'));
+        if ($currentEmpId != $participantId && !$isOverseer) {
             abort(403, 'You are not authorized to view this review');
         }
 
@@ -123,14 +131,14 @@ class ReviewController extends Controller
         $id = base64_decode($id);
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)
-            ->first(['performa_child_cycles.*', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date']);
+            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date']);
 
         if (!$childCycle) {
             return response()->json(['success' => false, 'message' => 'Review not found'], 404);
         }
 
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
-        $participantId = is_numeric($childCycle->Emp_main_id) ? $childCycle->Emp_main_id : base64_decode($childCycle->Emp_main_id);
+        $participantId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
         if ($currentEmpId != $participantId) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
@@ -141,11 +149,40 @@ class ReviewController extends Controller
             return response()->json(['success' => false, 'message' => $windowStatus['message']], 422);
         }
 
+        // Validate all required template fields were submitted
+        $effectiveTemplateId = $childCycle->template_id ?: ($childCycle->Self_Review_Templete ?? null);
+        $template = $this->getTemplate($effectiveTemplateId);
+        $payload = $request->except(['_token']);
+        $errors = $this->validateAgainstTemplate($template, $payload);
+        if (!empty($errors)) {
+            return response()->json(['success' => false, 'message' => 'Please fill all required fields', 'errors' => $errors], 422);
+        }
+
         $realChild = PerformaChildCycle::find($id);
-        $realChild->self_review_data = json_encode($request->except(['_token']));
+        $realChild->self_review_data = json_encode($payload);
         $realChild->self_review_status = 'completed';
         $realChild->Self_review_date = now()->format('Y-m-d');
         $realChild->save();
+
+        // Notify the assigned manager that the self review is done and manager review is unlocked.
+        try {
+            if ($realChild->Manager_id) {
+                $employee = $this->resort->GetEmployee;
+                $empName = $employee && $employee->resortAdmin
+                    ? trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''))
+                    : 'Your team member';
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [(int) $realChild->Manager_id],
+                    'Self Review Completed',
+                    $empName . ' has completed their self review for "' . $childCycle->Cycle_Name . '". Please complete the manager review.',
+                    'Performance',
+                    $realChild->id
+                );
+            }
+        } catch (\Exception $ne) {
+            \Log::warning('Self review completion notification failed: ' . $ne->getMessage());
+        }
 
         return response()->json(['success' => true, 'message' => 'Self review submitted successfully']);
     }
@@ -202,17 +239,19 @@ class ReviewController extends Controller
         }
 
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
-        if ($currentEmpId != $childCycle->Manager_id) {
+        $isOverseer = $childCycle->manager_review_status === 'completed'
+            && Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view'));
+        if ($currentEmpId != $childCycle->Manager_id && !$isOverseer) {
             abort(403, 'You are not the assigned manager for this review');
         }
 
-        if ($childCycle->self_review_status !== 'completed') {
+        if (!$isOverseer && $childCycle->self_review_status !== 'completed') {
             abort(403, 'Employee has not completed self review yet');
         }
 
         $windowStatus = $this->getManagerReviewWindowStatus($childCycle);
 
-        $actualId = is_numeric($childCycle->Emp_main_id) ? $childCycle->Emp_main_id : base64_decode($childCycle->Emp_main_id);
+        $actualId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
         $employee = Employee::with(['resortAdmin', 'position'])->find($actualId);
 
         // Template resolution — child-level first, then parent cycle's Manager_Review_Templete
@@ -233,7 +272,7 @@ class ReviewController extends Controller
         $id = base64_decode($id);
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)
-            ->first(['performa_child_cycles.*', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date']);
+            ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date']);
 
         if (!$childCycle) {
             return response()->json(['success' => false, 'message' => 'Review not found'], 404);
@@ -250,11 +289,37 @@ class ReviewController extends Controller
             return response()->json(['success' => false, 'message' => $windowStatus['message']], 422);
         }
 
+        // Validate all required template fields were submitted
+        $effectiveTemplateId = $childCycle->template_id ?: ($childCycle->Manager_Review_Templete ?? null);
+        $template = $this->getTemplate($effectiveTemplateId);
+        $payload = $request->except(['_token']);
+        $errors = $this->validateAgainstTemplate($template, $payload);
+        if (!empty($errors)) {
+            return response()->json(['success' => false, 'message' => 'Please fill all required fields', 'errors' => $errors], 422);
+        }
+
         $realChild = PerformaChildCycle::find($id);
-        $realChild->manager_review_data = json_encode($request->except(['_token']));
+        $realChild->manager_review_data = json_encode($payload);
         $realChild->manager_review_status = 'completed';
         $realChild->Manager_review_date = now()->format('Y-m-d');
         $realChild->save();
+
+        // Notify the employee that their manager review is complete.
+        try {
+            $participantId = Common::resolveEmpMainIdToNumeric($realChild->Emp_main_id, $this->resort->resort_id);
+            if ($participantId) {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [$participantId],
+                    'Manager Review Completed',
+                    'Your manager has completed the review for "' . $childCycle->Cycle_Name . '". You can view the feedback in My Reviews.',
+                    'Performance',
+                    $realChild->id
+                );
+            }
+        } catch (\Exception $ne) {
+            \Log::warning('Manager review completion notification failed: ' . $ne->getMessage());
+        }
 
         return response()->json(['success' => true, 'message' => 'Manager review submitted successfully']);
     }
@@ -278,7 +343,7 @@ class ReviewController extends Controller
             return back()->with('error', 'GM has not completed self review yet');
         }
 
-        $actualId = is_numeric($childCycle->Emp_main_id) ? $childCycle->Emp_main_id : base64_decode($childCycle->Emp_main_id);
+        $actualId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
         $employee = Employee::with(['resortAdmin', 'position'])->find($actualId);
 
         $template = $this->getTemplate($childCycle->template_id);
@@ -303,16 +368,73 @@ class ReviewController extends Controller
         if (strpos($templateId, 'ninty_') === 0) {
             $realId = substr($templateId, 6);
             $form = NintyDayPeformanceForm::find($realId);
-            return $form ? ['name' => $form->FormName, 'structure' => json_decode($form->form_structure, true), 'type' => '90 Day'] : null;
+            return $form ? ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => '90 Day'] : null;
         }
         if (strpos($templateId, 'prof_') === 0) {
             $realId = substr($templateId, 5);
             if (class_exists(\App\Models\Professionalform::class)) {
                 $form = \App\Models\Professionalform::find($realId);
-                return $form ? ['name' => $form->FormName, 'structure' => json_decode($form->form_structure, true), 'type' => 'Professional'] : null;
+                return $form ? ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => 'Professional'] : null;
             }
         }
         $form = PerformanceTemplateForm::find($templateId);
-        return $form ? ['name' => $form->FormName, 'structure' => json_decode($form->form_structure, true), 'type' => 'Template'] : null;
+        return $form ? ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => 'Template'] : null;
+    }
+
+    /**
+     * Validate submitted payload against a template's required fields.
+     * Returns an associative array of field_name => error_message, or [] when valid.
+     */
+    private function validateAgainstTemplate($template, array $payload)
+    {
+        $errors = [];
+        if (!$template || empty($template['structure']) || !is_array($template['structure'])) {
+            return $errors;
+        }
+
+        foreach ($template['structure'] as $idx => $field) {
+            if (empty($field['required'])) continue;
+            $type = $field['type'] ?? null;
+            if (in_array($type, ['header', 'paragraph'])) continue;
+
+            $name = $field['name'] ?? ('field_' . $idx);
+
+            if ($type === 'ratingTable') {
+                // Accept any non-empty cell (stored under name_r_c keys)
+                $hasAny = false;
+                foreach ($payload as $k => $v) {
+                    if (strpos($k, $name . '_') === 0 && $v !== '' && $v !== null) {
+                        $hasAny = true;
+                        break;
+                    }
+                }
+                if (!$hasAny) {
+                    $errors[$name] = ($field['label'] ? strip_tags($field['label']) : $name) . ' is required.';
+                }
+                continue;
+            }
+
+            $val = $payload[$name] ?? null;
+            $empty = ($val === null || $val === '' || (is_array($val) && count($val) === 0));
+            if ($empty) {
+                $errors[$name] = ($field['label'] ? strip_tags($field['label']) : $name) . ' is required.';
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Decode a form_structure blob. Some rows were saved double-encoded
+     * (json_encode(json_encode($arr))), so the first decode yields a JSON
+     * string that needs a second pass. Returns an array or [] if neither works.
+     */
+    private function decodeFormStructure($raw)
+    {
+        $decoded = json_decode($raw, true);
+        if (is_string($decoded)) {
+            $decoded = json_decode($decoded, true);
+        }
+        return is_array($decoded) ? $decoded : [];
     }
 }

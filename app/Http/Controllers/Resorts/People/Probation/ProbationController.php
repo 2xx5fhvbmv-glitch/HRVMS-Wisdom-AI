@@ -38,10 +38,13 @@ class ProbationController extends Controller
     public function index(Request $request)
     {
         $page_title ='Probation';
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         if($request->ajax())
         {
             $query = Employee::with(['position', 'department','resortAdmin'])
-                    ->where('employment_type', 'Probationary');
+                    ->where('resort_id', $this->resort->resort_id)
+                    ->where('employment_type', 'Probationary')
+                    ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
             if ($request->filled('department_id')) {
                 $query->where('Dept_id', $request->department_id);
@@ -149,7 +152,10 @@ class ProbationController extends Controller
         $resort_id = $this->resort->resort_id;
         $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
-        $employees = Employee::with(['resortAdmin','position','department'])->where('resort_id',$resort_id)->get();
+        $employees = Employee::with(['resortAdmin','position','department'])
+            ->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         return view('resorts.people.probation.list',compact('page_title','resort_id','employees','departments','positions'));
     }
 

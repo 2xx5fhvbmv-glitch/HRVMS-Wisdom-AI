@@ -127,7 +127,11 @@ class PayrollController extends Controller
         $settings = ResortSiteSettings::where('resort_id', $resort_id)->first();
         $currency = $settings['currency'];
         // dd($settings);
-        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary','Resigned'])->get();
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)
+            ->whereIn('status', ['Active', 'Probationary','Resigned'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         $deductions = Deduction::where('resort_id',$resort_id)->get();
         // $earnings = Earnings::where('resort_id',$resort_id)->get();
         // $allowances = ResortBudgetCost::where('resort_id',$resort_id)->get();
@@ -197,9 +201,11 @@ class PayrollController extends Controller
         $startDate = $request->startDate;
         $endDate = $request->endDate;
 
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $query = Employee::with(['resortAdmin', 'position', 'department', 'section'])
             ->where('resort_id', $resort_id)
-            ->whereIn('status', ['Active', 'Probationary','Resigned']);
+            ->whereIn('status', ['Active', 'Probationary','Resigned'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($startDate && $endDate) {
             $query->whereHas('EmployeeAttandance', function($q) use ($startDate, $endDate) {

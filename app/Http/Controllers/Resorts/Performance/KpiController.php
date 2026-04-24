@@ -235,8 +235,8 @@ class KpiController extends Controller
 
             return datatables()->of($kpiList)
                 ->editColumn('PropertyGoals', fn($row) => ucfirst($row->property_goal))
-                ->editColumn('budget', fn($row) => $row->PropertyGoalbudget !== null && $row->PropertyGoalbudget !== '' ? number_format((float)$row->PropertyGoalbudget) : '-')
-                ->addColumn('Actual', fn($row) => $row->actual_budget_sum > 0 ? number_format($row->actual_budget_sum) : '-')
+                ->editColumn('budget', fn($row) => Common::formatCurrency($row->PropertyGoalbudget, 'MVR', 0))
+                ->addColumn('Actual', fn($row) => $row->actual_budget_sum > 0 ? Common::formatCurrency($row->actual_budget_sum, 'MVR', 0) : '-')
                 ->addColumn('Value', fn($row) => $row->PropertyGoalweightage !== null && $row->PropertyGoalweightage !== '' ? $row->PropertyGoalweightage.'%' : '-')
                 ->addColumn('Result', fn($row) => $row->actual_weightage_sum > 0 ? $row->actual_weightage_sum.'%' : '-')
                 ->addColumn('status_badge', function ($row) {
@@ -254,6 +254,10 @@ class KpiController extends Controller
                     // HOD (2) or XCOM (1) can respond if status=pending and no one has responded yet
                     if (in_array($rank, [1, 2]) && $row->status === 'pending') {
                         $html .= '<a href="'.route('Performance.kpi.respond', $row->id).'" class="btn btn-theme btn-sm me-1">Respond</a>';
+                    }
+                    // HOD (2) or XCOM (1) can revise & resubmit after GM rejection
+                    if (in_array($rank, [1, 2]) && $row->status === 'rejected') {
+                        $html .= '<a href="'.route('Performance.kpi.respond', $row->id).'" class="btn btn-themeSkyblue btn-sm me-1">Edit Response</a>';
                     }
                     // GM (8) can approve/reject if status=responded
                     if ($rank == 8 && $row->status === 'responded') {
@@ -285,6 +289,7 @@ class KpiController extends Controller
 
     /**
      * Response page — HOD/XCOM fills individual goals + budget + weightage for a KPI.
+     * Also used to revise a response that was rejected by the GM.
      */
     public function respond($id)
     {
@@ -292,11 +297,17 @@ class KpiController extends Controller
             ->where('resort_id', $this->resort->resort_id)
             ->findOrFail($id);
 
-        if ($kpi->status !== 'pending') {
-            return redirect()->route('Performance.kpi.KpiList')->with('error', 'This KPI has already been responded to.');
+        if (!in_array((int) $this->getUserRank(), [1, 2])) {
+            return redirect()->route('Performance.kpi.KpiList')
+                ->with('error', 'Only HOD/XCOM can respond to a KPI.');
         }
 
-        $page_title = 'Response KPI';
+        if (!in_array($kpi->status, ['pending', 'rejected'])) {
+            return redirect()->route('Performance.kpi.KpiList')
+                ->with('error', 'This KPI cannot be edited at its current stage.');
+        }
+
+        $page_title = $kpi->status === 'rejected' ? 'Edit KPI Response' : 'Response KPI';
         return view('resorts.Performance.Kpi.respond', compact('page_title', 'kpi'));
     }
 
@@ -319,10 +330,14 @@ class KpiController extends Controller
         }
 
         $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
-        if ($kpi->status !== 'pending') {
-            return response()->json(['success' => false, 'message' => 'Already responded'], 422);
+        if (!in_array((int) $this->getUserRank(), [1, 2])) {
+            return response()->json(['success' => false, 'message' => 'Only HOD/XCOM can respond to a KPI.'], 403);
+        }
+        if (!in_array($kpi->status, ['pending', 'rejected'])) {
+            return response()->json(['success' => false, 'message' => 'This KPI cannot be updated.'], 422);
         }
 
+        $wasRejected = $kpi->status === 'rejected';
         $authEmpId = optional($this->resort->GetEmployee)->id;
 
         // Combine multiple response entries
@@ -338,6 +353,10 @@ class KpiController extends Controller
             'responded_by'       => $authEmpId,
             'responded_at'       => now(),
             'status'             => 'responded',
+            // Clear previous GM decision so the revised response gets a fresh review.
+            'gm_action'    => null,
+            'gm_action_at' => null,
+            'gm_remarks'   => null,
         ]);
 
         // Also update child "Actual" rows if sent
@@ -352,7 +371,11 @@ class KpiController extends Controller
 
         // Notify GM (rank 8) — wrapped so notification failure doesn't break response
         try {
-            $this->notifyGm($kpi, 'KPI Response Received', 'HOD/XCOM has responded to KPI "'.$kpi->property_goal.'". Review and approve/reject.');
+            $notifTitle = $wasRejected ? 'KPI Response Re-submitted' : 'KPI Response Received';
+            $notifMsg   = $wasRejected
+                ? 'HOD/XCOM has revised the response to KPI "'.$kpi->property_goal.'" after rejection. Please review again.'
+                : 'HOD/XCOM has responded to KPI "'.$kpi->property_goal.'". Review and approve/reject.';
+            $this->notifyGm($kpi, $notifTitle, $notifMsg);
         } catch (\Exception $ne) {
             \Log::warning("KPI response notification failed: " . $ne->getMessage());
         }
@@ -464,6 +487,8 @@ class KpiController extends Controller
 
         $page_title = 'KPI Details';
         $canAddActual = in_array($this->getUserRank(), [1, 2, 8]); // XCOM, HOD, GM
+        // HOD/XCOM can re-open the response form when the GM has rejected.
+        $canEditResponse = in_array((int) $this->getUserRank(), [1, 2]) && $kpi->status === 'rejected';
 
         // Build Individual Goal dropdown options from response_entries JSON
         // or fall back to splitting the joined individual_goal string
@@ -480,7 +505,7 @@ class KpiController extends Controller
 
         $months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-        return view('resorts.Performance.Kpi.view', compact('page_title', 'kpi', 'canAddActual', 'goalOptions', 'months'));
+        return view('resorts.Performance.Kpi.view', compact('page_title', 'kpi', 'canAddActual', 'canEditResponse', 'goalOptions', 'months'));
     }
 
     /**
@@ -499,6 +524,7 @@ class KpiController extends Controller
             'entries.*.month'              => 'required|string|max:20',
             'entries.*.budget'             => 'nullable|numeric|min:1',
             'entries.*.weightage'          => 'required|numeric|min:1',
+            'entries.*.remarks'            => 'nullable|string|max:1000',
         ], [
             'entries.*.individual_goal.required' => 'Please select an Individual Goal.',
             'entries.*.month.required'           => 'Please select a month.',
@@ -510,6 +536,15 @@ class KpiController extends Controller
 
         $kpi = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
+        // Block adding actual entries when the KPI response has been rejected by the GM —
+        // it must be re-submitted and approved before new actuals can be logged.
+        if ($kpi->status === 'rejected') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot add actual entries while this KPI is rejected. Please revise and re-submit the response first.',
+            ], 422);
+        }
+
         foreach ($request->entries as $entry) {
             PerformanceKpiChild::create([
                 'kpi_parents_id'  => $kpi->id,
@@ -517,6 +552,7 @@ class KpiController extends Controller
                 'month'           => $entry['month'],
                 'budget'          => $entry['budget'] ?? null,
                 'weightage'       => $entry['weightage'],
+                'remarks'         => $entry['remarks'] ?? null,
                 'created_by'      => $this->resort->id,
             ]);
         }

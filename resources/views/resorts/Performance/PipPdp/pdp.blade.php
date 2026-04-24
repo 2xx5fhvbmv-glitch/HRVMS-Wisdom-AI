@@ -52,6 +52,7 @@
                             <th>Factors</th>
                             <th>Start Date</th>
                             <th>End Date</th>
+                            <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -91,6 +92,16 @@
                                 <td>{{ $startDate->format('d M Y') }}</td>
                                 <td>{{ $endDate ? $endDate->format('d M Y') : '-' }}</td>
                                 <td>
+                                    @if($plan->submitted_at)
+                                        <span class="badge badge-themeSuccess">Submitted</span>
+                                    @elseif(!$plan->template_id)
+                                        <span class="badge badge-themeLight">No Template</span>
+                                    @else
+                                        <span class="badge badge-themeWarning">Pending</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <a href="{{ route('Performance.pdp.view', $plan->id) }}" class="btn-tableIcon btnIcon-blue" title="View / Fill Form"><i class="fa-solid fa-eye"></i></a>
                                     @if($archivedView ?? false)
                                         <a href="javascript:void(0)" class="btn-tableIcon btnIcon-green pdp-restore" data-id="{{ $plan->id }}" title="Restore"><i class="fa-solid fa-rotate-left"></i></a>
                                     @else
@@ -99,7 +110,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="text-center text-muted py-4">No employees in PDP</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-4">No employees in PDP</td></tr>
                         @endforelse
                     </tbody>
                 </table>
