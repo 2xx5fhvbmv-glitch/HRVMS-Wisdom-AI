@@ -19,6 +19,7 @@ use App\Models\NintyDayPeformanceForm;
 use App\Models\Professionalform;
 use App\Models\PerformaChildCycle;
 use App\Models\PerformanceCycle;
+use App\Events\ResortNotificationEvent;
 class CycleController extends Controller
 {
 
@@ -81,10 +82,15 @@ class CycleController extends Controller
             $p->SelfReview = $ChildCycle->where('self_review_status', 'completed')->count();
             return $p;
         });
-        return view('resorts.Performance.Cycle.index', compact('page_title', 'PerformanceCycle', 'availableYears', 'selectedYear'));
+        // Only HR / GM / super-admin can create a new cycle.
+        $canCreateCycle = Common::hasFullDataAccess();
+        return view('resorts.Performance.Cycle.index', compact('page_title', 'PerformanceCycle', 'availableYears', 'selectedYear', 'canCreateCycle'));
     }
     function create()
     {
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Only HR and GM can create a performance cycle.');
+        }
         if(Common::checkRouteWisePermission('Performance.cycle',config('settings.resort_permissions.create')) == false){
             return abort(403, 'Unauthorized access');
         }
@@ -299,8 +305,10 @@ class CycleController extends Controller
 
     public function CycleStore(Request $request)
     {
-        
-     
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and GM can create a performance cycle.'], 403);
+        }
+
         $cycle_name =  $request->cycle_name;
         $CycleStartDate = $request->Step_One_start_date;
         $Step_One_end_date = $request->Step_One_end_date;
@@ -382,6 +390,8 @@ class CycleController extends Controller
                 if(isset($p_id->id))
                 {
                     $selectedTemplate = $request->CycleTemplate;
+                    $participantIds = [];
+                    $managerIds = [];
                     foreach ( $Emp_main_id as $key => $emp_id)
                     {
                         // Resolve employee — Emp_main_id could be numeric id, base64, or Emp_id string (e.g. DR-17)
@@ -432,9 +442,37 @@ class CycleController extends Controller
                             'Self_review_date' => null,
                             'Manager_review_date' => null,
                         ]);
+
+                        $participantIds[] = (int) $actualEmpId;
+                        if (!$isGm && $managerId) {
+                            $managerIds[] = (int) $managerId;
+                        }
                     }
-                }                 
+                }
                 DB::commit();
+
+                // Notify each participant that an appraisal is now pending for them.
+                try {
+                    $resortId = $this->resort->resort_id;
+                    Common::notifyEmployees(
+                        $resortId,
+                        $participantIds ?? [],
+                        'New Performance Review Assigned',
+                        'You have been added to the "' . $cycle_name . '" cycle. Please complete your self review.',
+                        'Performance',
+                        $p_id->id
+                    );
+                    Common::notifyEmployees(
+                        $resortId,
+                        $managerIds ?? [],
+                        'Team Performance Review Assigned',
+                        'One of your team members has been added to the "' . $cycle_name . '" cycle. A manager review will be required after they complete their self review.',
+                        'Performance',
+                        $p_id->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Cycle create notifications failed: ' . $ne->getMessage());
+                }
                 return response()->json([
                     'success' => true,
                     'message' => 'Cycle Created Successfully..',
@@ -450,6 +488,31 @@ class CycleController extends Controller
             return response()->json(['error' => 'Failed to create Cycle'], 500);
         }
     }
+    /**
+     * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
+     * string like "DR-22") to an Employee model. Legacy cycle rows stored the
+     * Emp_id string instead of the numeric key, so the lookup needs all three.
+     */
+    private function resolveEmployee($identifier, $resortId)
+    {
+        if ($identifier === null || $identifier === '') return null;
+
+        if (is_numeric($identifier)) {
+            return Employee::with(['resortAdmin', 'department', 'position'])->find($identifier);
+        }
+
+        $decoded = base64_decode($identifier, true);
+        if ($decoded !== false && is_numeric($decoded)) {
+            $emp = Employee::with(['resortAdmin', 'department', 'position'])->find($decoded);
+            if ($emp) return $emp;
+        }
+
+        return Employee::with(['resortAdmin', 'department', 'position'])
+            ->where('Emp_id', $identifier)
+            ->where('resort_id', $resortId)
+            ->first();
+    }
+
     public function viewCycle($id)
     {
         if (Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')) == false) {
@@ -480,9 +543,9 @@ class CycleController extends Controller
         $managerPct = $managerTotal > 0 ? round(($managerCompleted / $managerTotal) * 100) : 0;
 
         // Build participant list with review status
-        $participants = $children->map(function ($child) {
-            $empId = is_numeric($child->Emp_main_id) ? $child->Emp_main_id : base64_decode($child->Emp_main_id);
-            $employee = Employee::with(['resortAdmin', 'department', 'position'])->find($empId);
+        $resortId = $this->resort->resort_id;
+        $participants = $children->map(function ($child) use ($resortId) {
+            $employee = $this->resolveEmployee($child->Emp_main_id, $resortId);
             if (!$employee) return null;
 
             return (object)[
@@ -530,9 +593,9 @@ class CycleController extends Controller
         $children = $childQ->get();
 
         // Build employee list with optional rating from manager_review_data
-        $rows = $children->map(function ($child) {
-            $empId = is_numeric($child->Emp_main_id) ? $child->Emp_main_id : base64_decode($child->Emp_main_id);
-            $employee = Employee::with(['resortAdmin', 'department', 'position'])->find($empId);
+        $resortId = $this->resort->resort_id;
+        $rows = $children->map(function ($child) use ($resortId) {
+            $employee = $this->resolveEmployee($child->Emp_main_id, $resortId);
             if (!$employee) return null;
 
             $rating = $this->extractRating($child->manager_review_data);

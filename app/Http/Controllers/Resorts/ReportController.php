@@ -147,6 +147,29 @@ class ReportController extends Controller
             $query->where("$tableName.resort_id", $this->resort->resort_id);
         }
 
+        // Department-based visibility: restrict reports to the user's department scope
+        // unless they have full access (Super admin / GM / HR dept members).
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $scopedEmpIds  = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedDeptIds)) {
+            if (Schema::hasColumn($tableName, 'Dept_id')) {
+                $query->whereIn("$tableName.Dept_id", $scopedDeptIds);
+            } elseif (Schema::hasColumn($tableName, 'department_id')) {
+                $query->whereIn("$tableName.department_id", $scopedDeptIds);
+            } elseif (is_array($scopedEmpIds)) {
+                // Fall back to employee-level scoping for tables keyed by employee.
+                if (Schema::hasColumn($tableName, 'Emp_main_id')) {
+                    $query->whereIn("$tableName.Emp_main_id", $scopedEmpIds);
+                } elseif (Schema::hasColumn($tableName, 'emp_id')) {
+                    $query->whereIn("$tableName.emp_id", $scopedEmpIds);
+                } elseif (Schema::hasColumn($tableName, 'employee_id')) {
+                    $query->whereIn("$tableName.employee_id", $scopedEmpIds);
+                } elseif ($tableName === 'employees' && Schema::hasColumn($tableName, 'id')) {
+                    $query->whereIn("$tableName.id", $scopedEmpIds);
+                }
+            }
+        }
+
         $query->select("$tableName.*");
         
         // Be resilient about both formats (d/m/Y and already-normalised Y-m-d)

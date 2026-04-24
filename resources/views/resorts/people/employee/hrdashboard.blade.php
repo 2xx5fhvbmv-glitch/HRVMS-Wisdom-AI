@@ -782,7 +782,10 @@
                             <div class="col-lg-4 ">
                                 <h6 class="fw-600  mb-lg-3 mb-2">Exit Clearance Completion Rate</h6>
                                 @php
-                                        $departments = \App\Models\ResortDepartment::where('resort_id', $resort->resort_id)->get();
+                                        $_scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+                                        $departments = \App\Models\ResortDepartment::where('resort_id', $resort->resort_id)
+                                            ->when(is_array($_scopedDeptIds), fn($q) => $q->whereIn('id', $_scopedDeptIds))
+                                            ->get();
                                         $assignmentsByDept = $ExitClearanceFormAssignments->groupBy('department_id');
                                     @endphp
 

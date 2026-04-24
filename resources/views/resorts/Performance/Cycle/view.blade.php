@@ -81,6 +81,7 @@
                             <th>Position</th>
                             <th>Self Review</th>
                             <th>Manager Review</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -120,10 +121,31 @@
                                         <span class="badge badge-themeWarning">Pending</span>
                                     @endif
                                 </td>
+                                <td>
+                                    @if($p->self_status === 'completed')
+                                        <a href="{{ route('Performance.Review.showSelf', ['id' => base64_encode($p->child_id)]) }}"
+                                           target="_blank"
+                                           class="btn btn-themeBlue btn-sm mb-1"
+                                           title="View self review">
+                                            <i class="fa-solid fa-eye"></i> Self
+                                        </a>
+                                    @endif
+                                    @if($p->manager_status === 'completed')
+                                        <a href="{{ route('Performance.Review.showManager', ['id' => base64_encode($p->child_id)]) }}"
+                                           target="_blank"
+                                           class="btn btn-themeSkyblue btn-sm"
+                                           title="View manager review">
+                                            <i class="fa-solid fa-eye"></i> Manager
+                                        </a>
+                                    @endif
+                                    @if($p->self_status !== 'completed' && $p->manager_status !== 'completed')
+                                        <span class="text-muted small">—</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">No participants in this cycle</td>
+                                <td colspan="7" class="text-center text-muted py-4">No participants in this cycle</td>
                             </tr>
                         @endforelse
                     </tbody>

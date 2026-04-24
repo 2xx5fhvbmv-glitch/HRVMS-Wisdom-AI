@@ -106,6 +106,13 @@
     .form-render-field .table-field table { width: 100%; }
     .form-render-field .table-field th { background: #014653; color: #fff; padding: 8px 12px; }
     .form-render-field .table-field td { padding: 8px 12px; border: 1px solid #dee2e6; }
+    .form-render-section { margin: 20px 0 12px; padding: 8px 0; border-bottom: 1px solid #e9ecef; }
+    .form-render-section h2, .form-render-section h3, .form-render-section h4 { margin: 0; }
+    .form-render-field.is-invalid input,
+    .form-render-field.is-invalid textarea,
+    .form-render-field.is-invalid select { border-color: #dc3545; }
+    .form-render-field .field-error { color: #dc3545; font-size: 12px; margin-top: 4px; display: none; }
+    .form-render-field.is-invalid .field-error { display: block; }
 </style>
 @endsection
 
@@ -124,6 +131,11 @@
             e.preventDefault();
             var formData = collectFormData('manager-form-render');
 
+            if (!validateRequired('manager-form-render', formData)) {
+                toastr.error('Please fill all required fields', 'Validation error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+
             $.ajax({
                 url: "{{ route('Performance.Review.submitManager', ['id' => base64_encode($childCycle->id)]) }}",
                 type: 'POST',
@@ -136,8 +148,15 @@
                         }, 1500);
                     }
                 },
-                error: function() {
-                    toastr.error('Failed to submit review', 'Error', { positionClass: 'toast-bottom-right' });
+                error: function(xhr) {
+                    var payload = xhr.responseJSON || {};
+                    if (payload.errors) {
+                        var msg = '';
+                        $.each(payload.errors, function(field, err) { msg += err + '<br>'; });
+                        toastr.error(msg, 'Validation error', { positionClass: 'toast-bottom-right' });
+                    } else {
+                        toastr.error(payload.message || 'Failed to submit review', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
                 }
             });
         });
@@ -153,8 +172,14 @@
             var value = existingData[fieldName] || '';
             var disabled = isReadOnly ? 'disabled' : '';
 
-            html += '<div class="form-render-field">';
-            html += '<label>' + label + '</label>';
+            // Section headers / paragraph blocks have no input — render label only.
+            if (field.type === 'header' || field.type === 'paragraph') {
+                html += '<div class="form-render-section">' + label + '</div>';
+                return;
+            }
+
+            html += '<div class="form-render-field" data-field-name="' + fieldName + '" data-field-required="' + (field.required ? '1' : '0') + '" data-field-type="' + (field.type || '') + '">';
+            html += '<label>' + label + (field.required ? ' <span class="text-danger">*</span>' : '') + '</label>';
 
             switch(field.type) {
                 case 'text':
@@ -210,6 +235,7 @@
                 default:
                     html += '<input type="text" name="' + fieldName + '" value="' + value + '" ' + disabled + '>';
             }
+            html += '<div class="field-error">This field is required.</div>';
             html += '</div>';
         });
         $('#' + containerId).html(html);
@@ -235,6 +261,41 @@
             data[name] = $(this).val();
         });
         return data;
+    }
+
+    function validateRequired(containerId, formData) {
+        var $container = $('#' + containerId);
+        $container.find('.form-render-field').removeClass('is-invalid');
+        var firstInvalid = null;
+
+        $container.find('.form-render-field').each(function() {
+            var $f = $(this);
+            if ($f.data('field-required') != 1) return;
+            var name = $f.data('field-name');
+            var type = $f.data('field-type');
+            var val = formData[name];
+
+            var isEmpty = (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0));
+
+            if (type === 'ratingTable') {
+                var hasAny = false;
+                $.each(formData, function(k, v) {
+                    if (k.indexOf(name + '_') === 0 && v !== '' && v !== null && v !== undefined) hasAny = true;
+                });
+                isEmpty = !hasAny;
+            }
+
+            if (isEmpty) {
+                $f.addClass('is-invalid');
+                if (!firstInvalid) firstInvalid = $f;
+            }
+        });
+
+        if (firstInvalid) {
+            $('html, body').animate({ scrollTop: firstInvalid.offset().top - 100 }, 300);
+            return false;
+        }
+        return true;
     }
 </script>
 @endsection

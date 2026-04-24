@@ -52,9 +52,11 @@
                             </div>
                         </div>
                         <div class="col-auto text-end">
-                            @if($latestChildCycleId)
-                                <a href="{{ route('Performance.Review.showManager', base64_encode($latestChildCycleId)) }}"
+                            @if($latestChildCycleId && ($latestChildReviewRoute ?? null))
+                                <a href="{{ route($latestChildReviewRoute, base64_encode($latestChildCycleId)) }}"
                                    class="btn btn-theme btn-sm mb-1">View Appraisal Form</a>
+                            @elseif($latestChildCycleId)
+                                <button type="button" class="btn btn-theme btn-sm mb-1" disabled title="Appraisal form available once the self review is submitted">View Appraisal Form</button>
                             @else
                                 <button type="button" class="btn btn-theme btn-sm mb-1" disabled title="No appraisal cycle assigned">View Appraisal Form</button>
                             @endif
@@ -91,8 +93,14 @@
                                         $duration = $row->Start_Date && $row->End_Date
                                             ? \Carbon\Carbon::parse($row->Start_Date)->diffInMonths(\Carbon\Carbon::parse($row->End_Date)).' month'
                                             : '-';
-                                        $statusLabel = $row->manager_review_status === 'completed' ? 'Done'
-                                            : (($row->self_review_status === 'completed' || $row->manager_review_status === 'pending') ? 'In Progress' : 'Not Started');
+                                        if ($row->manager_review_status === 'completed'
+                                            || ($row->manager_review_status === 'not_applicable' && $row->self_review_status === 'completed')) {
+                                            $statusLabel = 'Done';
+                                        } elseif ($row->self_review_status === 'completed') {
+                                            $statusLabel = 'In Progress';
+                                        } else {
+                                            $statusLabel = 'Not Started';
+                                        }
                                         $rowBadge = $statusLabel === 'Done' ? 'badge-themeSuccess'
                                             : ($statusLabel === 'In Progress' ? 'badge-themeWarning' : 'badge-themeDanger');
                                     @endphp

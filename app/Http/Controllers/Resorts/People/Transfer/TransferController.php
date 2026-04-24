@@ -38,7 +38,12 @@ class TransferController extends Controller
     {
         $page_title ='Initiate Transfer';
         $resort_id = $this->resort->resort_id;
-        $employees = Employee::with(['resortAdmin','position','department'])->where('status','Active')->where('resort_id',$resort_id)->get();
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        $employees = Employee::with(['resortAdmin','position','department'])
+            ->where('status','Active')
+            ->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
         return view('resorts.people.transfer.index',compact('page_title','employees','departments'));
     }

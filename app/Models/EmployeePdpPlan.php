@@ -9,7 +9,7 @@ class EmployeePdpPlan extends Model
     protected $table = 'employee_pdp_plans';
     protected $fillable = [
         'resort_id', 'employee_id', 'position_id', 'template_id',
-        'duration', 'factors', 'status', 'created_by'
+        'duration', 'factors', 'response_data', 'submitted_at', 'submitted_by', 'status', 'created_by'
     ];
 
     public function employee()

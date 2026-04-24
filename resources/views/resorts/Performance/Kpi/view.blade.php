@@ -12,7 +12,12 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto d-flex gap-2">
+                    @if($canEditResponse ?? false)
+                        <a href="{{ route('Performance.kpi.respond', $kpi->id) }}" class="btn btn-themeSkyblue btn-sm">
+                            <i class="fa-solid fa-pen-to-square"></i> Edit Response
+                        </a>
+                    @endif
                     <a href="{{ route('Performance.kpi.KpiList') }}" class="btn btn-themeBlue btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
@@ -32,6 +37,10 @@
                 'rejected'  => 'badge-themeDanger',
             ];
             $badgeClass = $statusMap[$kpi->status] ?? 'badge-themeWarning';
+            // KPI budgets are stored in MVR — convert to active display currency.
+            $currencySymbol = Common::GetResortCurrencySymbol();
+            $fmtCurrency = fn($v) => Common::formatCurrency($v, 'MVR', 0);
+            $fmtCurrencyNumOnly = fn($v) => ($v !== null && $v !== '') ? number_format(Common::convertToDisplayCurrency($v, 'MVR'), 0) : '0';
         @endphp
 
         <div class="card mb-3">
@@ -64,7 +73,7 @@
                     </div>
                     <div class="col-md-3">
                         <strong>Budget:</strong>
-                        {{ $kpi->PropertyGoalbudget !== null && $kpi->PropertyGoalbudget !== '' ? number_format((float)$kpi->PropertyGoalbudget) : '-' }}
+                        {{ $fmtCurrency($kpi->PropertyGoalbudget) }}
                     </div>
                 </div>
             </div>
@@ -106,7 +115,7 @@
                                         <tr>
                                             <td>{{ $i + 1 }}</td>
                                             <td>{{ $entry['individual_goal'] ?? '-' }}</td>
-                                            <td>{{ isset($entry['budget']) && $entry['budget'] !== '' && $entry['budget'] !== null ? number_format((float)$entry['budget']) : '-' }}</td>
+                                            <td>{{ isset($entry['budget']) ? $fmtCurrency($entry['budget']) : '-' }}</td>
                                             <td>{{ isset($entry['weightage']) ? $entry['weightage'].'%' : '-' }}</td>
                                         </tr>
                                     @endforeach
@@ -114,7 +123,7 @@
                                 <tfoot>
                                     <tr class="fw-bold">
                                         <td colspan="2" class="text-end">Total</td>
-                                        <td>{{ number_format((float)$kpi->response_budget) }}</td>
+                                        <td>{{ $fmtCurrency($kpi->response_budget) }}</td>
                                         <td>{{ $kpi->response_weightage }}%</td>
                                     </tr>
                                 </tfoot>
@@ -149,7 +158,7 @@
                                     <tfoot>
                                         <tr class="fw-bold">
                                             <td colspan="2" class="text-end">Total</td>
-                                            <td>{{ $kpi->response_budget !== null ? number_format((float)$kpi->response_budget) : '-' }}</td>
+                                            <td>{{ $fmtCurrency($kpi->response_budget) }}</td>
                                             <td>{{ $kpi->response_weightage !== null ? $kpi->response_weightage.'%' : '-' }}</td>
                                         </tr>
                                     </tfoot>
@@ -191,6 +200,7 @@
                                     <th>Month</th>
                                     <th>Budget</th>
                                     <th>Weight</th>
+                                    <th>Remarks</th>
                                     <th>Created By</th>
                                     <th>Added On</th>
                                     @if($canAddActual ?? false)
@@ -209,8 +219,9 @@
                                         <td>{{ $i + 1 }}</td>
                                         <td>{{ $child->individual_goal ?: '-' }}</td>
                                         <td>{{ $child->month ?: '-' }}</td>
-                                        <td>{{ $child->budget !== null && $child->budget !== '' ? number_format((float)$child->budget) : '-' }}</td>
+                                        <td>{{ $fmtCurrency($child->budget) }}</td>
                                         <td>{{ $child->weightage !== null ? $child->weightage.'%' : '-' }}</td>
+                                        <td>{{ $child->remarks ?: '-' }}</td>
                                         <td>
                                             @if($cName)
                                                 <div>{{ $cName }}</div>
@@ -231,9 +242,9 @@
                             <tfoot>
                                 <tr class="fw-bold">
                                     <td colspan="{{ $colspan }}" class="text-end">Total Achieved</td>
-                                    <td>{{ number_format($usedBudget) }}</td>
+                                    <td>{{ $fmtCurrency($usedBudget) }}</td>
                                     <td>{{ $usedWeightage }}%</td>
-                                    <td colspan="{{ $trailingColspan }}"></td>
+                                    <td colspan="{{ $trailingColspan + 1 }}"></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -247,14 +258,14 @@
                     <div class="col-md-4">
                         <div class="p-3 rounded" style="background:#f1f5f9;">
                             <small class="text-muted d-block">TARGET</small>
-                            <div><strong>Budget:</strong> {{ number_format($allocatedBudget) }}</div>
+                            <div><strong>Budget:</strong> {{ $fmtCurrency($allocatedBudget) }}</div>
                             <div><strong>Weight:</strong> {{ $allocatedWeightage }}%</div>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="p-3 rounded" style="background:#fff4e5;">
                             <small class="text-muted d-block">ACHIEVED</small>
-                            <div><strong>Budget:</strong> {{ number_format($usedBudget) }}</div>
+                            <div><strong>Budget:</strong> {{ $fmtCurrency($usedBudget) }}</div>
                             <div><strong>Weight:</strong> {{ $usedWeightage }}%</div>
                         </div>
                     </div>
@@ -262,7 +273,7 @@
                         <div class="p-3 rounded" style="background:{{ ($balanceBudget < 0 || $balanceWeightage < 0) ? '#fde7e7' : '#e6f4ea' }};">
                             <small class="text-muted d-block">REMAINING</small>
                             <div><strong>Budget:</strong>
-                                <span style="color:{{ $balanceBudget < 0 ? '#d9534f' : '#28a745' }}">{{ number_format($balanceBudget) }}</span>
+                                <span style="color:{{ $balanceBudget < 0 ? '#d9534f' : '#28a745' }}">{{ $fmtCurrency($balanceBudget) }}</span>
                             </div>
                             <div><strong>Weight:</strong>
                                 <span style="color:{{ $balanceWeightage < 0 ? '#d9534f' : '#28a745' }}">{{ $balanceWeightage }}%</span>
@@ -272,10 +283,20 @@
                 </div>
 
                 @if($canAddActual ?? false)
+                    @php $isRejected = $kpi->status === 'rejected'; @endphp
                     <hr>
                     <h6 class="mb-3">Add Actual Entry</h6>
+
+                    @if($isRejected)
+                        <div class="alert alert-warning mb-3">
+                            <strong>Cannot add actual entries.</strong>
+                            This KPI response has been rejected by the GM. Please revise and re-submit the response before logging any actual entries.
+                        </div>
+                    @endif
+
                     <form id="AddActualForm" data-parsley-validate>
                         @csrf
+                        <fieldset {{ $isRejected ? 'disabled' : '' }}>
                         <div class="actualKpi-main">
                             <div class="actualKpi-block">
                                 <div class="row g-md-4 g-3 mb-md-4 mb-3">
@@ -310,6 +331,12 @@
                                             <span class="input-group-text">%</span>
                                         </div>
                                     </div>
+                                    <div class="col-12">
+                                        <label class="form-label">REMARKS</label>
+                                        <textarea class="form-control" name="entries[0][remarks]"
+                                                  rows="2" maxlength="1000"
+                                                  placeholder="Add any remarks for this entry (optional)"></textarea>
+                                    </div>
                                     <div class="col-sm-6 d-flex align-items-end d-none remove-col">
                                         <a href="#" class="btn btn-danger btn-sm actualKpi-remove">Remove</a>
                                     </div>
@@ -318,12 +345,15 @@
                         </div>
 
                         <div class="md-mb-4 mb-3">
-                            <a href="#" class="btn btn-themeSkyblue btn-sm actualKpi-add">Add More</a>
+                            <a href="#" class="btn btn-themeSkyblue btn-sm actualKpi-add {{ $isRejected ? 'disabled' : '' }}">Add More</a>
                         </div>
 
                         <div class="text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Save Actual Entries</button>
+                            <button type="submit" class="btn btn-themeBlue btn-sm" {{ $isRejected ? 'disabled' : '' }}>
+                                Save Actual Entries
+                            </button>
                         </div>
+                        </fieldset>
                     </form>
                 @endif
             </div>
@@ -368,10 +398,12 @@ $(document).ready(function () {
 
     $(document).on('click', '.actualKpi-add', function (e) {
         e.preventDefault();
+        if ($(this).hasClass('disabled')) return;
         var newBlock = $('.actualKpi-block').first().clone();
         newBlock.find('input').val('');
+        newBlock.find('textarea').val('');
         newBlock.find('select').prop('selectedIndex', 0);
-        newBlock.find('input, select').each(function() {
+        newBlock.find('input, select, textarea').each(function() {
             var name = $(this).attr('name');
             if (name) {
                 $(this).attr('name', name.replace(/entries\[\d+\]/, 'entries[' + entryIndex + ']'));

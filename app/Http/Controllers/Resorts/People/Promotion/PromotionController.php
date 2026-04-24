@@ -41,7 +41,12 @@ class PromotionController extends Controller
     {
         $page_title ='Initiate Promotion';
         $resort_id = $this->resort->resort_id;
-        $employees = Employee::with(['resortAdmin','position','department'])->where('resort_id',$resort_id)->where('status','Active')->get();
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employees = Employee::with(['resortAdmin','position','department'])
+            ->where('resort_id',$resort_id)
+            ->where('status','Active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $emp_grade = config('settings.eligibilty'); // Assuming this maps IDs to names
         $benefitGrids = ResortBenifitGrid::where('resort_id',$this->resort->resort_id)->get();
@@ -334,7 +339,11 @@ class PromotionController extends Controller
         // Accept either from query param or route param
         $employeeId = $request->employee_id ?? ($id ? base64_decode($id) : null);
         $decodedId = $employeeId;
-        $employees = Employee::where('resort_id',$resort_id)->where('status','Active')->get();
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employees = Employee::where('resort_id',$resort_id)
+            ->where('status','Active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
         if ($request->ajax()) {
             $promotions = EmployeePromotion::with([
                 'employee.position',

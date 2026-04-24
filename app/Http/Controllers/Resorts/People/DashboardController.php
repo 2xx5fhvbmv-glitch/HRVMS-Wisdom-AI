@@ -44,14 +44,35 @@ class DashboardController extends Controller
         $page_title ='People Dashboard';
         $resort_id = $this->resort->resort_id;
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
-        $total_active_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Active','Resigned'])->count();
-        $total_inactive_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])->count();
-        $total_new_hired = Employee::where('resort_id',$resort_id)->whereIn('probation_status',['Active','Extended'])->count();
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        $scopedEmpIds  = \App\Helpers\Common::getPerformanceScopedEmpIds();
+        $total_active_employees = Employee::where('resort_id',$resort_id)
+            ->whereIn('status',['Active','Resigned'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $total_inactive_employees = Employee::where('resort_id',$resort_id)
+            ->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $total_new_hired = Employee::where('resort_id',$resort_id)
+            ->whereIn('probation_status',['Active','Extended'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
         $expected_employees = 0;
-        $male_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','male')->where('status', 'Active')->where('is_employee', 1)->count();
-        $female_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','female')->where('status', 'Active')->where('is_employee', 1)->count();
-        $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)->count();
-        $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)->count();
+        $male_emp = ResortAdmin::with('EmployeeDetails')
+            ->where('resort_id', $resort_id)->where('gender','male')->where('status', 'Active')->where('is_employee', 1)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))
+            ->count();
+        $female_emp = ResortAdmin::with('EmployeeDetails')
+            ->where('resort_id', $resort_id)->where('gender','female')->where('status', 'Active')->where('is_employee', 1)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))
+            ->count();
+        $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
         $announcements = Announcement::where('resort_id',$this->resort->resort_id)->orderBy('id','desc')->limit(5)->get();
         $totalPublished = Announcement::where('resort_id', $this->resort->resort_id)
 
@@ -70,10 +91,14 @@ class DashboardController extends Controller
                'position'
           ])->where('status','Pending')->wherehas('employee.resortAdmin')->latest()->limit(5)->get();
 
-        $probationalEmployees = Employee::where('resort_id',$this->resort->resort_id)->where('employment_type','Probationary')->count();
-        $activeProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Active')->count();
-        $failedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Failed')->count();
-        $completedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Completed')->count();
+        $probationalEmployees = Employee::where('resort_id',$this->resort->resort_id)->where('employment_type','Probationary')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $activeProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $failedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Failed')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $completedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Completed')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $total_promotions = EmployeePromotion::where('resort_id',$resortId)->count();
 
         $recent_promotions = EmployeePromotion::with(
@@ -201,14 +226,23 @@ class DashboardController extends Controller
         $page_title ='People Dashboard';
         $resort_id = $this->resort->resort_id;
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
-        $total_active_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Active','Resigned'])->count();
-        $total_inactive_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])->count();
-        $total_new_hired = Employee::where('resort_id',$resort_id)->whereIn('probation_status',['Active','Extended'])->count();
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        $scopedEmpIds  = \App\Helpers\Common::getPerformanceScopedEmpIds();
+        $total_active_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Active','Resigned'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $total_inactive_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $total_new_hired = Employee::where('resort_id',$resort_id)->whereIn('probation_status',['Active','Extended'])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $expected_employees = 0;
-        $male_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','male')->count();
-        $female_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','female')->count();
-        $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)->count();
-        $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)->count();
+        $male_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','male')
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))->count();
+        $female_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','female')
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))->count();
+        $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $announcements = Announcement::where('resort_id',$this->resort->resort_id)->orderBy('id','desc')->limit(5)->get();
         $totalPublished = Announcement::where('resort_id', $this->resort->resort_id)
 
@@ -227,10 +261,14 @@ class DashboardController extends Controller
                'position'
           ])->where('status','Pending')->wherehas('employee.resortAdmin')->latest()->limit(5)->get();
 
-        $probationalEmployees = Employee::where('resort_id',$this->resort->resort_id)->where('employment_type','Probationary')->count();
-        $activeProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Active')->count();
-        $failedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Failed')->count();
-        $completedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Completed')->count();
+        $probationalEmployees = Employee::where('resort_id',$this->resort->resort_id)->where('employment_type','Probationary')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $activeProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $failedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Failed')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        $completedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Completed')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $total_promotions = EmployeePromotion::where('resort_id',$resortId)->count();
 
         $recent_promotions = EmployeePromotion::with(

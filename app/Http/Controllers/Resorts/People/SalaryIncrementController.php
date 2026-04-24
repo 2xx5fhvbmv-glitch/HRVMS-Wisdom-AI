@@ -181,8 +181,10 @@ class SalaryIncrementController extends Controller
 
     public function employeeGridView(Request $request)
     {
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $query = Employee::where('resort_id', $this->resort->resort_id)
-            ->where('status', 'active')->where('basic_salary', '>', 0);
+            ->where('status', 'active')->where('basic_salary', '>', 0)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
         if ($request->search) {
            $query->whereHas('resortAdmin', function ($q) use ($request) {
                 $q->where('first_name', 'like', '%' . $request->search . '%')

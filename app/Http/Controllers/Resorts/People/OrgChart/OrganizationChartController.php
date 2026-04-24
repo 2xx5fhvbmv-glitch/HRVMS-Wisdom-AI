@@ -56,9 +56,11 @@ class OrganizationChartController extends Controller
 
     private function getEmployeesData($departmentId = null)
     {
+        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $query = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $this->resort->resort_id)
-            ->where('status', 'active');
+            ->where('status', 'active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($departmentId) {
             $query->where('Dept_id', $departmentId);

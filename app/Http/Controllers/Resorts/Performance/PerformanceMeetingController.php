@@ -42,8 +42,12 @@ class PerformanceMeetingController extends Controller
 
         
 
+        // Department-based visibility: HR/GM see everyone, other HOD/XCOM only their own dept.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+
         $employees = Employee::with(['resortAdmin', 'position'])
         ->where('resort_id', $this->resort->resort_id)
+        ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
         ->get()
         ->map(function ($e)
         {
@@ -620,8 +624,12 @@ class PerformanceMeetingController extends Controller
         $employment_grade = $request->input('employment_grade');
         $gender = $request->input('gender');
 
+        // Restrict to the logged-in user's department unless they have full access (HR/GM).
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+
         $employees = Employee::with(['resortAdmin', 'position'])
-            ->where('resort_id', $this->resort->resort_id);
+            ->where('resort_id', $this->resort->resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($searchValue !== '') {
             $employees->where(function ($query) use ($searchValue) {

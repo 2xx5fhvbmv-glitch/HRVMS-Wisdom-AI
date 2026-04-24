@@ -54,9 +54,11 @@ class PerformanceDashboardController extends Controller
                                      ->values();
         $selectedYear = (int) ($request->year ?: $currentYear);
 
-        // Total Employee card shows resort-wide count (intentionally unscoped so dashboard acts as an overview)
+        // Total Employee card — scoped to the user's department unless they have full access (HR/GM).
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         $Employee_count = Employee::where('resort_id', $resort_id)
                                     ->where('status', 'Active')
+                                    ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
                                     ->whereHas('resortAdmin', function($query) {
                                         $query->where('status', 'Active');
                                     })->count();
@@ -82,11 +84,12 @@ class PerformanceDashboardController extends Controller
                             ->where('manager_review_status', 'pending')
                             ->count();
 
-        // Department wise performance (active employee distribution by department)
+        // Department wise performance (active employee distribution by department) — dept-scoped too.
         $department_data = DB::table('employees')
                             ->join('resort_departments', 'resort_departments.id', '=', 'employees.Dept_id')
                             ->where('employees.resort_id', $resort_id)
                             ->where('employees.status', 'Active')
+                            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('employees.Dept_id', $scopedDeptIds))
                             ->groupBy('resort_departments.id', 'resort_departments.name')
                             ->select('resort_departments.name', DB::raw('COUNT(employees.id) as count'))
                             ->orderByDesc('count')
@@ -131,10 +134,40 @@ class PerformanceDashboardController extends Controller
             ->when(is_array($scopedIds), fn($q) => $q->whereIn('employee_id', $scopedIds))
             ->count();
 
+        // Appraisal Pending Departments panel — only show departments the user can see.
+        $activeCycleIdsForPanel = DB::table('performance_cycles')
+            ->where('resort_id', $resort_id)
+            ->where('status', 'OnGoing')
+            ->pluck('id');
+        $appraisalDepartments = \App\Models\ResortDepartment::where('resort_id', $resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get()
+            ->map(function ($dept) use ($resort_id, $activeCycleIdsForPanel) {
+                $deptEmpIds = \App\Models\Employee::where('resort_id', $resort_id)
+                    ->where('Dept_id', $dept->id)
+                    ->where('status', 'Active')
+                    ->pluck('id');
+                $totalInCycle = DB::table('performa_child_cycles')
+                    ->whereIn('Parent_cycle_id', $activeCycleIdsForPanel)
+                    ->whereIn('Emp_main_id', $deptEmpIds)
+                    ->count();
+                $pendingCount = DB::table('performa_child_cycles')
+                    ->whereIn('Parent_cycle_id', $activeCycleIdsForPanel)
+                    ->whereIn('Emp_main_id', $deptEmpIds)
+                    ->whereNull('Manager_review_date')
+                    ->count();
+                $dept->emp_count = $deptEmpIds->count();
+                $dept->in_cycle_total = $totalInCycle;
+                $dept->pending_count = $pendingCount;
+                $dept->completed_count = $totalInCycle - $pendingCount;
+                return $dept;
+            });
+
         return view('resorts.Performance.dashboard.hrdashboard', compact(
             'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending',
             'department_data', 'performance_cycles', 'approved_checkins_count',
-            'pip_count', 'pdp_count', 'availableYears', 'selectedYear'
+            'pip_count', 'pdp_count', 'availableYears', 'selectedYear',
+            'appraisalDepartments'
         ));
 
     }
@@ -308,9 +341,13 @@ class PerformanceDashboardController extends Controller
 
         $status = $this->computeAppraisalStatus($empId, $activeCycleIds);
 
+        // Emp_main_id may be stored as numeric id, base64, or the Emp_id string (legacy rows).
+        $empMatchValues = [$empId, base64_encode($empId)];
+        if ($employee->Emp_id) $empMatchValues[] = $employee->Emp_id;
+
         $history = DB::table('performa_child_cycles')
             ->leftJoin('performance_cycles', 'performance_cycles.id', '=', 'performa_child_cycles.Parent_cycle_id')
-            ->where('performa_child_cycles.Emp_main_id', $empId)
+            ->whereIn('performa_child_cycles.Emp_main_id', $empMatchValues)
             ->where('performance_cycles.resort_id', $resort_id)
             ->orderBy('performa_child_cycles.created_at', 'desc')
             ->select(
@@ -321,7 +358,17 @@ class PerformanceDashboardController extends Controller
             )
             ->get();
 
-        $latestChildCycleId = $history->first()->id ?? null;
+        $latestChild = $history->first();
+        $latestChildCycleId = $latestChild->id ?? null;
+        // Pick the most informative view link: manager review if done, else self review if done, else null.
+        $latestChildReviewRoute = null;
+        if ($latestChild) {
+            if ($latestChild->manager_review_status === 'completed') {
+                $latestChildReviewRoute = 'Performance.Review.showManager';
+            } elseif ($latestChild->self_review_status === 'completed') {
+                $latestChildReviewRoute = 'Performance.Review.showSelf';
+            }
+        }
 
         $activePip = EmployeePipPlan::where('resort_id', $resort_id)
             ->where('employee_id', $empId)
@@ -336,7 +383,7 @@ class PerformanceDashboardController extends Controller
             ->first();
 
         return view('resorts.Performance.employee.details', compact(
-            'page_title', 'employee', 'status', 'history', 'latestChildCycleId', 'activePip', 'activePdp'
+            'page_title', 'employee', 'status', 'history', 'latestChildCycleId', 'latestChildReviewRoute', 'activePip', 'activePdp'
         ));
     }
 
@@ -346,8 +393,13 @@ class PerformanceDashboardController extends Controller
             return ['label' => 'Not Started', 'rating' => 0];
         }
 
+        // Emp_main_id may be stored as numeric id, base64 of id, or the Emp_id string.
+        $emp = Employee::find($empId);
+        $matchValues = [$empId, base64_encode($empId)];
+        if ($emp && $emp->Emp_id) $matchValues[] = $emp->Emp_id;
+
         $child = PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)
-            ->where('Emp_main_id', $empId)
+            ->whereIn('Emp_main_id', $matchValues)
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -355,9 +407,13 @@ class PerformanceDashboardController extends Controller
             return ['label' => 'Not Started', 'rating' => 0];
         }
 
-        if ($child->manager_review_status === 'completed') {
+        // Done: manager review finished (for GM reviews, manager_review_status is 'not_applicable'
+        // so treat self completion as done). In Progress: self done, manager pending.
+        // Not Started: nothing completed yet.
+        if ($child->manager_review_status === 'completed'
+            || ($child->manager_review_status === 'not_applicable' && $child->self_review_status === 'completed')) {
             $label = 'Done';
-        } elseif ($child->self_review_status === 'completed' || $child->manager_review_status === 'pending') {
+        } elseif ($child->self_review_status === 'completed') {
             $label = 'In Progress';
         } else {
             $label = 'Not Started';

@@ -160,46 +160,25 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @php
-                                $departments = \App\Models\ResortDepartment::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->get();
-                                $activeCycleIds = \DB::table('performance_cycles')
-                                    ->where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
-                                    ->where('status', 'OnGoing')
-                                    ->pluck('id');
-                            @endphp
-                            @foreach($departments as $dept)
-                                @php
-                                    $deptEmpIds = \App\Models\Employee::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
-                                        ->where('Dept_id', $dept->id)
-                                        ->where('status', 'Active')
-                                        ->pluck('id');
-                                    $totalInCycle = \DB::table('performa_child_cycles')
-                                        ->whereIn('Parent_cycle_id', $activeCycleIds)
-                                        ->whereIn('Emp_main_id', $deptEmpIds)
-                                        ->count();
-                                    $pendingCount = \DB::table('performa_child_cycles')
-                                        ->whereIn('Parent_cycle_id', $activeCycleIds)
-                                        ->whereIn('Emp_main_id', $deptEmpIds)
-                                        ->whereNull('Manager_review_date')
-                                        ->count();
-                                    $completedCount = $totalInCycle - $pendingCount;
-                                @endphp
+                            @forelse($appraisalDepartments ?? [] as $dept)
                                 <tr>
                                     <td>{{ $dept->name }} <span class="badge badge-themeLight">{{ $dept->code }}</span></td>
-                                    <td>{{ $deptEmpIds->count() }}</td>
-                                    <td>{{ $pendingCount }}</td>
-                                    <td>{{ $completedCount }}</td>
+                                    <td>{{ $dept->emp_count }}</td>
+                                    <td>{{ $dept->pending_count }}</td>
+                                    <td>{{ $dept->completed_count }}</td>
                                     <td>
-                                        @if($totalInCycle == 0)
+                                        @if($dept->in_cycle_total == 0)
                                             <span class="badge badge-themeLight">No Cycle</span>
-                                        @elseif($pendingCount == 0)
+                                        @elseif($dept->pending_count == 0)
                                             <span class="badge badge-themeSuccess">Done</span>
                                         @else
                                             <span class="badge badge-themeYellow">Pending</span>
                                         @endif
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr><td colspan="5" class="text-center text-muted">No departments to display</td></tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>

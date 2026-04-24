@@ -52,19 +52,30 @@ class EmployeeController extends Controller
     {
         $page_title ='Employees';
         $resort_id = $this->resort->resort_id;
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         $teams = SOSTeamManagementModel::where('resort_id',$resort_id)->get();
         $roles = SOSRolesAndPermission::where('resort_id',$resort_id)->get();
-        $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
+        $departments = ResortDepartment::where('resort_id',$resort_id)
+            ->where('status','active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
-        $employees = Employee::with(['resortAdmin','position','department'])->where('resort_id',$resort_id)->latest()->get();
+        $employees = Employee::with(['resortAdmin','position','department'])
+            ->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->latest()
+            ->get();
         return view('resorts.people.employee.list',compact('page_title','resort_id','resort_divisions','employees','departments','positions','teams','roles'));
     }
 
 
     public function fetchEmployeesGrid(Request $request)
     {
-        $query = Employee::with(['resortAdmin', 'position', 'department','education','experiance'])->where('resort_id',$this->resort->resort_id);
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $query = Employee::with(['resortAdmin', 'position', 'department','education','experiance'])
+            ->where('resort_id',$this->resort->resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
         if($request->status == null)
         {
             $query->where('status','!=','Inactive');
@@ -121,8 +132,11 @@ class EmployeeController extends Controller
 
     public function fetchEmployeesList(Request $request)
     {
-
-        $query = Employee::with(['resortAdmin', 'position', 'department','education','experiance'])->where('resort_id',$this->resort->resort_id)->where('status','!=','Inactive');
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $query = Employee::with(['resortAdmin', 'position', 'department','education','experiance'])
+            ->where('resort_id',$this->resort->resort_id)
+            ->where('status','!=','Inactive')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($request->searchTerm) {
             $searchTerm = $request->searchTerm;
@@ -225,9 +239,11 @@ class EmployeeController extends Controller
 
     public function getAllEmployeeIds(Request $request)
     {
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         // Start with a proper query
         $query = Employee::where('resort_id', $this->resort->resort_id)
-                        ->where('status', '!=', 'Inactive');
+                        ->where('status', '!=', 'Inactive')
+                        ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($request->department_id) {
             $query->where('department_id', $request->department_id);
@@ -275,11 +291,15 @@ class EmployeeController extends Controller
     {
         $page_title ='Create Employee';
         $resort_id = $this->resort->resort_id;
+        $scopedDeptIds = Common::getScopedDepartmentIds();
         $last_emp = Employee::orderBy('id', 'desc')->where('resort_id', $resort_id)->first();
         $resort_prefix = $this->resort->resort->resort_prefix;
         $last_emp ? $employee_id = $resort_prefix.'-'.$last_emp->id+ 1 : $employee_id = $resort_prefix.'-'. 1;
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
-        $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
+        $departments = ResortDepartment::where('resort_id',$resort_id)
+            ->where('status','active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $sections = ResortSection::where('resort_id',$resort_id)->where('status','active')->get();
         $payrollAllowance = ResortBudgetCost::where('resort_id', $resort_id)
@@ -662,12 +682,22 @@ class EmployeeController extends Controller
     {
         $page_title ='Employee Details';
         $resort_id = $this->resort->resort_id;
-        $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $departments = ResortDepartment::where('resort_id',$resort_id)
+            ->where('status','active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $sections = ResortSection::where('resort_id',$resort_id)->where('status','active')->get();
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
         $resort_allowances = ResortBudgetCost::where('resort_id', $resort_id)->where('is_payroll_allowance',1)->get();
-        $employee = Employee::with(['resortAdmin','position','department','division','section','education','experiance','allowance','language','sosTeams','document','bankDetails','reportingTo.resortAdmin'])->where('id',base64_decode($id))->first();
+        $employee = Employee::with(['resortAdmin','position','department','division','section','education','experiance','allowance','language','sosTeams','document','bankDetails','reportingTo.resortAdmin'])
+            ->where('id',base64_decode($id))
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->first();
+        if (!$employee) {
+            return abort(403, 'You do not have access to this employee.');
+        }
         $emp_benigit_grid = Common::getBenefitGrid($employee->position->Rank,$this->resort->resort_id);
         // dd($employee);
         $benefit_grid = DB::table('resort_benifit_grid as rbg')

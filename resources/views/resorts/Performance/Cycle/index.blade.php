@@ -18,7 +18,10 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <div class="col-auto ms-auto"><a href="{{ route('Performance.create') }}" class="btn btn-theme">Create New Cycle</a>
+                <div class="col-auto ms-auto">
+                    @if($canCreateCycle ?? false)
+                        <a href="{{ route('Performance.create') }}" class="btn btn-theme">Create New Cycle</a>
+                    @endif
                 </div>
             </div>
         </div>
