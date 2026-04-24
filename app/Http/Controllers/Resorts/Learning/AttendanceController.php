@@ -51,8 +51,13 @@ class AttendanceController extends Controller
     {
         $resort_id = $this->resort->resort_id;
 
+        // Department visibility: HR/GM see everything, non-HR HOD/XCOM only trainings
+        // that include at least one employee from their department.
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+
         $query = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])
-            ->where('training_schedules.resort_id', $resort_id);
+            ->where('training_schedules.resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)));
 
         // Search Filter
         if ($request->searchTerm) {
@@ -291,10 +296,12 @@ class AttendanceController extends Controller
     public function getTrainingParticipationData()
     {
         $resort_id = $this->resort->resort_id;
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
 
-        // Fetch all trainings with attendance records
+        // Fetch trainings that involve at least one employee in scope.
         $trainings = TrainingSchedule::with(['trainingAttendances.employee.department'])
             ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('trainingAttendances', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
             ->get();
 
         $data = [

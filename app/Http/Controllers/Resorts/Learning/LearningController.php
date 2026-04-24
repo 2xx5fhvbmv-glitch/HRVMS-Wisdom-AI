@@ -52,6 +52,10 @@ class LearningController extends Controller
         $isHR = ($available_rank === "HR");
         $employees_query = Employee::with(['resortAdmin','department','position'])->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary']);
 
+        // Additional department-visibility scope on top of the HR/HOD branching.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employees_query->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
+
         if ($isHR) {
             $employees_query->where('employees.id', '!=', $this->resort->getEmployee->id);
         }

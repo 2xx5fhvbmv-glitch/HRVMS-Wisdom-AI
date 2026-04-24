@@ -86,68 +86,29 @@
                                         <tr>
                                             <th>Employee Name</th>
                                             <th>Learning</th>
-                                            <th>Learning Period</th>
+                                            <th>Date</th>
                                         </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
+                                        @forelse(($overdueEmployees ?? []) as $att)
+                                            @php
+                                                $emp = $att->employee ?? null;
+                                                $ra  = $emp ? $emp->resortAdmin : null;
+                                                $prog = optional(optional($att->schedule)->learningProgram);
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    <div class="tableUser-block">
+                                                        <div class="img-circle">
+                                                            <img src="{{ Common::getResortUserPicture(optional($ra)->id) }}" alt="user">
+                                                        </div>
+                                                        <span class="userApplicants-btn">{{ trim((optional($ra)->first_name ?? '').' '.(optional($ra)->last_name ?? '')) ?: '-' }}</span>
                                                     </div>
-                                                    <span class="userApplicants-btn">John Doe</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">Christian Slater</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">Brijesh Pandey</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">Seerish Yadav</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">John Doe</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
+                                                </td>
+                                                <td>{{ $prog->learning_program_title ?? $prog->name ?? '-' }}</td>
+                                                <td>{{ $att->attendance_date ? \Carbon\Carbon::parse($att->attendance_date)->format('d M Y') : '-' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="3" class="text-center text-muted">No overdue learners</td></tr>
+                                        @endforelse
                                     </table>
                                 </div>
                             </div>
@@ -161,70 +122,29 @@
                                     <table class="table-lableNew table-empLDHod w-100">
                                         <tr>
                                             <th>Employee Name</th>
-                                            <th>Learning</th>
-                                            <th>Learning Period</th>
+                                            <th>Sessions Attended</th>
+                                            <th>Last Session</th>
                                         </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
+                                        @forelse(($topPerformers ?? []) as $row)
+                                            @php
+                                                $emp = $row->employee ?? null;
+                                                $ra  = $emp ? $emp->resortAdmin : null;
+                                            @endphp
+                                            <tr>
+                                                <td>
+                                                    <div class="tableUser-block">
+                                                        <div class="img-circle">
+                                                            <img src="{{ Common::getResortUserPicture(optional($ra)->id) }}" alt="user">
+                                                        </div>
+                                                        <span class="userApplicants-btn">{{ trim((optional($ra)->first_name ?? '').' '.(optional($ra)->last_name ?? '')) ?: '-' }}</span>
                                                     </div>
-                                                    <span class="userApplicants-btn">John Doe</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="assets/images/user-2.svg"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">Christian Slater</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">Brijesh Pandey</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle"><img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">Seerish Yadav</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="tableUser-block">
-                                                    <div class="img-circle">
-                                                        <img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}"
-                                                            alt="user">
-                                                    </div>
-                                                    <span class="userApplicants-btn">John Doe</span>
-                                                </div>
-                                            </td>
-                                            <td>Learning 1</td>
-                                            <td>01 Oct To 3 Oct</td>
-                                        </tr>
+                                                </td>
+                                                <td>{{ $row->present_count }}</td>
+                                                <td>{{ $row->last_date ? \Carbon\Carbon::parse($row->last_date)->format('d M Y') : '-' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="3" class="text-center text-muted">No completed sessions yet</td></tr>
+                                        @endforelse
                                     </table>
                                 </div>
                             </div>

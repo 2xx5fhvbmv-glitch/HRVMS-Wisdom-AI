@@ -94,6 +94,9 @@ class LearningCalendarController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
+        // Department-visibility scope for calendar sessions.
+        $scopedEmpIds = \App\Helpers\Common::getPerformanceScopedEmpIds();
+
         // Fetch Training Schedules with Participants
         $sessions = TrainingSchedule::where('resort_id', $resort_id)
         ->where(function ($query) use ($startDate, $endDate) {
@@ -104,6 +107,7 @@ class LearningCalendarController extends Controller
                             ->where('end_date', '>=', $endDate);
                 });
         })
+        ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
         ->with(['learningProgram', 'participants.employee.resortAdmin','participants.employee.position'])
         ->orderBy('created_at', 'desc')
         ->get();

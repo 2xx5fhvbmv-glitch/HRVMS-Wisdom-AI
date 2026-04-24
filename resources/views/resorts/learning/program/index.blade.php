@@ -56,20 +56,10 @@
                                 <th>Duration</th>
                                 <th>Frequency</th>
                                 <th>Delivery Mode</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr>
-                                <td>Lorem Ipsum dummy text</td>
-                                <td>Lorem Ipsum is simply dummy text</td>
-                                <td>Lorem Ipsum text</td>
-                                <td>Lorem Ipsum text</td>
-                                <td>1 oct 2019</td>
-                                <td>1Day 15 hrs</td>
-                                <td>Monthly</td>
-                                <td>Offline</td>
-                            </tr>
-                        </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
@@ -124,6 +114,7 @@
                     { data: 'duration', name: 'Duration', className: 'text-nowrap' },
                     { data: 'frequency', name: 'Frequency', className: 'text-nowrap' },
                     { data: 'delivery_mode', name: 'Delivery Mode', className: 'text-nowrap' },
+                    { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-center' },
                     {data:'created_at',visible:false,searchable:false},
                 ]
             });

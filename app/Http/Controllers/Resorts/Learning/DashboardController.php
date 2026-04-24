@@ -122,22 +122,56 @@ class DashboardController extends Controller
         $dashboardLabel = request('dashboard_label', 'HOD');
         $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
         $resort_id= $this->resort->resort_id;
-        // dd($this->resort->GetEmployee->Admin_Parent_id);
-        $ongoing_trainings_count = TrainingSchedule::where('status','Ongoing')->where('resort_id', $resort_id)->count();
-        $completed_trainings_count = TrainingSchedule::where('status','Completed')->where('resort_id', $resort_id)->count();
+
+        // Department-visibility scope: HR/GM see resort-wide; other HOD/XCOM only their own dept.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $scopedEmpIds  = Common::getPerformanceScopedEmpIds();
+
+        // Training counts scoped to schedules that involve at least one in-scope employee.
+        $countTrainingsByStatus = function ($status) use ($resort_id, $scopedEmpIds) {
+            $q = TrainingSchedule::where('status', $status)->where('resort_id', $resort_id);
+            if (is_array($scopedEmpIds)) {
+                $q->whereHas('trainingAttendances', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
+            }
+            return $q->count();
+        };
+        $ongoing_trainings_count  = $countTrainingsByStatus('Ongoing');
+        $completed_trainings_count = $countTrainingsByStatus('Completed');
         $scheduled_trainings_count = LearningRequest::where('status','Approved')->where('resort_id', $resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->count();
-        $pending_trainings_count = LearningRequest::where('status','Pending')->where('resort_id', $resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->count();
-        // dd( $pending_trainings_count);
+        $pending_trainings_count  = LearningRequest::where('status','Pending')->where('resort_id', $resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->count();
         $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->get();
-        
+
         $trainings = TrainingSchedule::with(['learningProgram', 'trainingAttendances'])
-        ->where('resort_id', $resort_id)
-        ->orderBy('start_date', 'desc')
-        ->limit(5)
-        ->get();
-        
-        return view('resorts.learning.dashboard.hoddashboard',compact('page_header','page_header','
-page_title','ongoing_trainings_count','completed_trainings_count','scheduled_trainings_count','pending_trainings_count','pending_learning_request','trainings'));
+            ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('trainingAttendances', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
+            ->orderBy('start_date', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Dynamic "Overdue" employees — most recent Absent attendance records (last 90 days),
+        // scoped to the user's department.
+        $overdueEmployees = TrainingAttendance::with(['employee.resortAdmin', 'schedule.learningProgram'])
+            ->whereHas('schedule', fn($sq) => $sq->where('resort_id', $resort_id))
+            ->where('status', 'Absent')
+            ->where('attendance_date', '>=', Carbon::now()->subDays(90))
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('employee_id', $scopedEmpIds))
+            ->orderByDesc('attendance_date')
+            ->limit(5)
+            ->get();
+
+        // Dynamic "Top performers" — employees with the most Present records in the last 90 days.
+        $topPerformers = TrainingAttendance::selectRaw('employee_id, COUNT(*) as present_count, MAX(attendance_date) as last_date')
+            ->whereHas('schedule', fn($sq) => $sq->where('resort_id', $resort_id))
+            ->where('status', 'Present')
+            ->where('attendance_date', '>=', Carbon::now()->subDays(90))
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('employee_id', $scopedEmpIds))
+            ->groupBy('employee_id')
+            ->orderByDesc('present_count')
+            ->limit(5)
+            ->with(['employee.resortAdmin'])
+            ->get();
+
+        return view('resorts.learning.dashboard.hoddashboard',compact('page_header','page_title','ongoing_trainings_count','completed_trainings_count','scheduled_trainings_count','pending_trainings_count','pending_learning_request','trainings','overdueEmployees','topPerformers'));
     }
 
     public function excom_dashboard()
@@ -188,10 +222,16 @@ page_title','ongoing_trainings_count','completed_trainings_count','scheduled_tra
     }
 
     public function getAllAbsenteesData(Request $request) {
+        $resort_id = $this->resort->resort_id;
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+
         $query = TrainingAttendance::where('status', 'Absent')
             ->with(['employee.resortAdmin', 'schedule.learningProgram'])
-            ->orderBy('attendance_date', 'desc'); // Order by date (latest first)
-    
+            // Bind to this resort + the user's department visibility scope.
+            ->whereHas('schedule', fn($sq) => $sq->where('resort_id', $resort_id))
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('employee_id', $scopedEmpIds))
+            ->orderBy('attendance_date', 'desc');
+
         // Apply search filter
         if ($request->has('searchTerm') && !empty($request->searchTerm)) {
             $query->whereHas('employee.resortAdmin', function ($q) use ($request) {

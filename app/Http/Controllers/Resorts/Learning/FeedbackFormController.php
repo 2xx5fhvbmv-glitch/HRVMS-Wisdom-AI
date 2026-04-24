@@ -49,11 +49,13 @@ class FeedbackFormController extends Controller
                 return $row->form_name;
             })
             ->addColumn('action', function ($row) {
+                $view_url = route('feedback-form.preview', $row->id);
                 $edit_url = route('feedback-form.edit', $row->id);
                 $editimg = asset('resorts_assets/images/edit.svg');
                 $deleteimg = asset('resorts_assets/images/trash-red.svg');
-    
-                return "<a href='$edit_url' class='edit-row-btn'><img src='$editimg' alt='Edit'></a>
+
+                return "<a href='$view_url' class='view-row-btn me-1' title='View'><i class='fa-solid fa-eye'></i></a>
+                        <a href='$edit_url' class='edit-row-btn'><img src='$editimg' alt='Edit'></a>
                         <a href='#' class='delete-row-btn' data-id='$row->id'><img src='$deleteimg' alt='Delete'></a>";
             })
             ->rawColumns(['form_name', 'action'])
@@ -91,6 +93,16 @@ class FeedbackFormController extends Controller
         $form = TrainingFeedbackForm::findOrFail($id);
         $form->form_structure = json_decode($form->form_structure, true);
         return view('resorts.learning.feedbackform.edit',compact('resortId','form','page_title'));
+    }
+
+    public function preview($id)
+    {
+        $page_title = "Preview Feedback Form";
+        $form = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)->findOrFail($id);
+        $structure = json_decode($form->form_structure, true);
+        if (is_string($structure)) $structure = json_decode($structure, true);
+        $structure = is_array($structure) ? $structure : [];
+        return view('resorts.learning.feedbackform.preview', compact('page_title', 'form', 'structure'));
     }
 
     public function update(Request $request, $id)
