@@ -368,12 +368,17 @@ class ReviewController extends Controller
     }
 
     /**
-     * Helper: Get template structure based on template_id format
-     * Template IDs from CycleFetchTemplate use prefixes: 'ninty_X', 'prof_X', or numeric
+     * Helper: Get template structure based on template_id format.
+     * Template IDs from CycleFetchTemplate use prefixes: 'ninty_X', 'prof_X', or numeric.
+     *
+     * Bare numeric ids are ambiguous — they could point at any of the three form
+     * tables. Legacy cycles saved Self_Review_Templete as a plain int (the result
+     * of `preg_match('/(\d+)/', 'ninty_2')` → 2), so when we fall back to the
+     * cycle column we must probe each table before declaring "not found".
      */
     private function getTemplate($templateId)
     {
-        if (!$templateId) return null;
+        if (empty($templateId) || $templateId === '0' || $templateId === 0) return null;
 
         if (strpos($templateId, 'ninty_') === 0) {
             $realId = substr($templateId, 6);
@@ -387,8 +392,23 @@ class ReviewController extends Controller
                 return $form ? ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => 'Professional'] : null;
             }
         }
-        $form = PerformanceTemplateForm::find($templateId);
-        return $form ? ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => 'Template'] : null;
+
+        // Bare numeric id — try each form table in order. Custom templates first
+        // (most specific); fall through to 90-day and professional forms.
+        if (is_numeric($templateId)) {
+            $form = PerformanceTemplateForm::find($templateId);
+            if ($form) return ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => 'Template'];
+
+            $form = NintyDayPeformanceForm::find($templateId);
+            if ($form) return ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => '90 Day'];
+
+            if (class_exists(\App\Models\Professionalform::class)) {
+                $form = \App\Models\Professionalform::find($templateId);
+                if ($form) return ['name' => $form->FormName, 'structure' => $this->decodeFormStructure($form->form_structure), 'type' => 'Professional'];
+            }
+        }
+
+        return null;
     }
 
     /**
