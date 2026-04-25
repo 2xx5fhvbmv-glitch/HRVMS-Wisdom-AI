@@ -23,6 +23,20 @@
             </div>
         </div>
 
+        @if(!($hasTemplate ?? true))
+            <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div>
+                    <strong>This cycle has no review template attached.</strong>
+                    <div class="small text-muted">Reviewers see "No template was assigned" until a template is selected.</div>
+                </div>
+                @if($canFixTemplate ?? false)
+                    <button type="button" class="btn btn-themeBlue btn-sm" data-bs-toggle="modal" data-bs-target="#attachTemplateModal">
+                        <i class="fa-solid fa-link me-1"></i> Attach Template
+                    </button>
+                @endif
+            </div>
+        @endif
+
         <div class="card">
             <div class="cycle-header mb-4">
                 <h3 class="mb-2">
@@ -154,6 +168,39 @@
         </div>
     </div>
 </div>
+
+@if($canFixTemplate ?? false)
+<div class="modal fade" id="attachTemplateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form id="attachTemplateForm" data-cycle-id="{{ $cycle->id }}">
+            @csrf
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Attach Review Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Selecting a template will apply it to this cycle and all its participants. Reviewers will be able to open the form right after.</p>
+                    <label class="form-label">Template <span class="text-danger">*</span></label>
+                    <select class="form-select" name="template_id" required>
+                        <option value="">— Select template —</option>
+                        @foreach($availableTemplates as $t)
+                            <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                        @endforeach
+                    </select>
+                    @if(empty($availableTemplates))
+                        <div class="alert alert-warning mt-3 mb-0 small">No templates exist for this resort yet. Create one first under Performance Configuration.</div>
+                    @endif
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-themeBlue btn-sm" {{ empty($availableTemplates) ? 'disabled' : '' }}>Attach</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('import-css')
@@ -171,4 +218,35 @@
     .tableUser-block { display: flex; align-items: center; gap: 10px; }
     .tableUser-block .img-circle img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
 </style>
+@endsection
+
+@section('import-scripts')
+<script>
+    $(document).on('submit', '#attachTemplateForm', function (e) {
+        e.preventDefault();
+        var $form = $(this);
+        var cycleId = $form.data('cycle-id');
+        $.ajax({
+            url: "{{ url('resort/performance/cycle') }}/" + cycleId + "/attach-template",
+            type: 'POST',
+            data: $form.serialize(),
+            success: function (res) {
+                if (res.success) {
+                    toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
+                    $('#attachTemplateModal').modal('hide');
+                    setTimeout(function () { location.reload(); }, 600);
+                }
+            },
+            error: function (xhr) {
+                var payload = xhr.responseJSON || {};
+                var msg = payload.message || 'Failed to attach template.';
+                if (payload.errors) {
+                    msg = '';
+                    $.each(payload.errors, function (k, v) { msg += v[0] + '<br>'; });
+                }
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+</script>
 @endsection
