@@ -116,6 +116,11 @@ class PipPdpController extends Controller
         return $this->storePlanResponse('pip', $request, $id);
     }
 
+    public function pipFile($id, $field)
+    {
+        return $this->streamPlanFile('pip', $id, $field);
+    }
+
     // ==================== PDP ====================
 
     public function pdpIndex(Request $request)
@@ -210,6 +215,11 @@ class PipPdpController extends Controller
         return $this->storePlanResponse('pdp', $request, $id);
     }
 
+    public function pdpFile($id, $field)
+    {
+        return $this->streamPlanFile('pdp', $id, $field);
+    }
+
     // ==================== SHARED ====================
 
     private function planModel($kind)
@@ -277,14 +287,36 @@ class PipPdpController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized to submit this plan.'], 403);
         }
 
-        // Validate required fields against the template
+        // Decode template structure (handles double-encoded blobs)
         $structure = [];
         if ($plan->template && $plan->template->form_structure) {
             $decoded = json_decode($plan->template->form_structure, true);
             if (is_string($decoded)) $decoded = json_decode($decoded, true);
             $structure = is_array($decoded) ? $decoded : [];
         }
+
+        // Build payload of scalar/array fields, then handle file uploads separately —
+        // store each uploaded file on the local disk and write the saved path into the
+        // payload so the same field name resolves to a path on read-back.
         $payload = $request->except(['_token']);
+        $existing = $plan->response_data ? json_decode($plan->response_data, true) : [];
+        if (!is_array($existing)) $existing = [];
+
+        foreach ($structure as $idx => $field) {
+            if (($field['type'] ?? null) !== 'file') continue;
+            $name = $field['name'] ?? ('field_' . $idx);
+
+            if ($request->hasFile($name)) {
+                $file = $request->file($name);
+                $dir  = 'pip_pdp_responses/' . $kind . '/' . $plan->id;
+                $stored = $file->storeAs($dir, time() . '_' . $file->getClientOriginalName());
+                $payload[$name] = $stored;
+            } elseif (isset($existing[$name]) && empty($payload[$name])) {
+                // No new upload — preserve any path stored on a previous draft.
+                $payload[$name] = $existing[$name];
+            }
+        }
+
         $errors = $this->validatePlanAgainstTemplate($structure, $payload);
         if (!empty($errors)) {
             return response()->json(['success' => false, 'message' => 'Please fill all required fields', 'errors' => $errors], 422);
@@ -380,6 +412,34 @@ class PipPdpController extends Controller
             if ($empty) $errors[$name] = strip_tags($field['label'] ?? $name) . ' is required.';
         }
         return $errors;
+    }
+
+    /**
+     * Stream a file uploaded against a PIP/PDP form field.
+     * Access is gated by the same canAccessPlan() check used by the view page.
+     */
+    private function streamPlanFile($kind, $id, $field)
+    {
+        $model = $this->planModel($kind);
+        $plan = $model::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$plan) abort(404, ucfirst($kind) . ' plan not found.');
+
+        if (!$this->canAccessPlan($plan)) {
+            abort(403, 'You do not have access to this file.');
+        }
+
+        $data = $plan->response_data ? json_decode($plan->response_data, true) : [];
+        $path = is_array($data) ? ($data[$field] ?? null) : null;
+        if (!$path) abort(404, 'File not found in this response.');
+
+        if (!\Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+            abort(404, 'File missing from storage.');
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download(
+            $path,
+            preg_replace('/^\d+_/', '', basename($path))
+        );
     }
 
     /**

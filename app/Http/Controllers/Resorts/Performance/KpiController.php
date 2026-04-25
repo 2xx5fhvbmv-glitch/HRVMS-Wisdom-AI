@@ -99,11 +99,15 @@ class KpiController extends Controller
         try {
             $lastKpi = null;
             $createdKpis = [];
+            // Capture the resort's active currency at save time so display can
+            // round-trip the entered value without USD↔MVR distortion.
+            $entryCurrency = Common::getDisplayCurrency();
             foreach ($request->goals as $goal) {
                 $kpi = PerformanceKpiParent::create([
                     'resort_id'              => $this->resort->resort_id,
                     'property_goal'          => $goal['property_goal'],
                     'PropertyGoalbudget'     => $goal['budget'] ?? null,
+                    'budget_currency'        => $entryCurrency,
                     'PropertyGoalweightage'  => $goal['weightage'],
                     'status'                 => 'pending',
                 ]);
@@ -172,6 +176,9 @@ class KpiController extends Controller
         $kpi->update([
             'property_goal'         => $request->property_goal,
             'PropertyGoalbudget'    => $request->PropertyGoalbudget,
+            // Re-stamp the currency on edit so the new value is interpreted in
+            // whatever the resort is set to right now.
+            'budget_currency'       => Common::getDisplayCurrency(),
             'PropertyGoalweightage' => $request->PropertyGoalweightage,
         ]);
 
@@ -235,8 +242,17 @@ class KpiController extends Controller
 
             return datatables()->of($kpiList)
                 ->editColumn('PropertyGoals', fn($row) => ucfirst($row->property_goal))
-                ->editColumn('budget', fn($row) => Common::formatCurrency($row->PropertyGoalbudget, 'MVR', 0))
-                ->addColumn('Actual', fn($row) => $row->actual_budget_sum > 0 ? Common::formatCurrency($row->actual_budget_sum, 'MVR', 0) : '-')
+                // Per-row currency: legacy rows (NULL budget_currency) are shown as-is
+                // in the resort's current display currency — no conversion, since we
+                // don't know what unit they were entered in.
+                ->editColumn('budget', fn($row) => Common::formatCurrency(
+                    $row->PropertyGoalbudget,
+                    $row->budget_currency ?: Common::getDisplayCurrency(),
+                    0
+                ))
+                ->addColumn('Actual', fn($row) => $row->actual_budget_sum > 0
+                    ? Common::formatCurrency($row->actual_budget_sum, $row->budget_currency ?: Common::getDisplayCurrency(), 0)
+                    : '-')
                 ->addColumn('Value', fn($row) => $row->PropertyGoalweightage !== null && $row->PropertyGoalweightage !== '' ? $row->PropertyGoalweightage.'%' : '-')
                 ->addColumn('Result', fn($row) => $row->actual_weightage_sum > 0 ? $row->actual_weightage_sum.'%' : '-')
                 ->addColumn('status_badge', function ($row) {
@@ -345,14 +361,16 @@ class KpiController extends Controller
         $totalBudget = collect($request->responses)->sum('budget');
         $totalWeightage = collect($request->responses)->sum('weightage');
 
+        $entryCurrency = Common::getDisplayCurrency();
         $kpi->update([
-            'individual_goal'    => $goals,
-            'response_budget'    => $totalBudget,
-            'response_weightage' => $totalWeightage,
-            'response_entries'   => $request->responses,
-            'responded_by'       => $authEmpId,
-            'responded_at'       => now(),
-            'status'             => 'responded',
+            'individual_goal'           => $goals,
+            'response_budget'           => $totalBudget,
+            'response_budget_currency'  => $entryCurrency,
+            'response_weightage'        => $totalWeightage,
+            'response_entries'          => $request->responses,
+            'responded_by'              => $authEmpId,
+            'responded_at'              => now(),
+            'status'                    => 'responded',
             // Clear previous GM decision so the revised response gets a fresh review.
             'gm_action'    => null,
             'gm_action_at' => null,
@@ -363,8 +381,9 @@ class KpiController extends Controller
         if ($request->child_budget && is_array($request->child_budget)) {
             foreach ($kpi->childrenKpi as $idx => $child) {
                 $child->update([
-                    'budget'    => $request->child_budget[$idx] ?? $child->budget,
-                    'weightage' => $request->child_weightage[$idx] ?? $child->weightage,
+                    'budget'          => $request->child_budget[$idx] ?? $child->budget,
+                    'budget_currency' => $entryCurrency,
+                    'weightage'       => $request->child_weightage[$idx] ?? $child->weightage,
                 ]);
             }
         }
@@ -545,12 +564,14 @@ class KpiController extends Controller
             ], 422);
         }
 
+        $entryCurrency = Common::getDisplayCurrency();
         foreach ($request->entries as $entry) {
             PerformanceKpiChild::create([
                 'kpi_parents_id'  => $kpi->id,
                 'individual_goal' => $entry['individual_goal'],
                 'month'           => $entry['month'],
                 'budget'          => $entry['budget'] ?? null,
+                'budget_currency' => $entryCurrency,
                 'weightage'       => $entry['weightage'],
                 'remarks'         => $entry['remarks'] ?? null,
                 'created_by'      => $this->resort->id,
@@ -587,9 +608,13 @@ class KpiController extends Controller
 
     /**
      * KPI Config page — shows all KPIs with editable Poor/Fair/Good/Superb thresholds.
+     * GM / HR only.
      */
     public function kpiConfig()
     {
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Only GM and HR can access KPI Config.');
+        }
         $kpis = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)
             ->orderByDesc('id')
             ->get();
@@ -599,10 +624,13 @@ class KpiController extends Controller
     }
 
     /**
-     * Update a KPI's Poor/Fair/Good/Superb ranges + points.
+     * Update a KPI's Poor/Fair/Good/Superb ranges + points. GM / HR only.
      */
     public function updateKpiConfig(Request $request, $id)
     {
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['success' => false, 'message' => 'Only GM and HR can update KPI config.'], 403);
+        }
         $validator = Validator::make($request->all(), [
             'poor_range'   => 'nullable|string|max:100',
             'fair_range'   => 'nullable|string|max:100',

@@ -37,10 +37,17 @@
                 'rejected'  => 'badge-themeDanger',
             ];
             $badgeClass = $statusMap[$kpi->status] ?? 'badge-themeWarning';
-            // KPI budgets are stored in MVR — convert to active display currency.
+            // KPI budgets carry their entry currency in budget_currency / response_budget_currency.
+            // Legacy rows (NULL) are rendered as-is in the resort's active display currency
+            // since we can't tell what unit they were typed in.
             $currencySymbol = Common::GetResortCurrencySymbol();
-            $fmtCurrency = fn($v) => Common::formatCurrency($v, 'MVR', 0);
-            $fmtCurrencyNumOnly = fn($v) => ($v !== null && $v !== '') ? number_format(Common::convertToDisplayCurrency($v, 'MVR'), 0) : '0';
+            $displayCurrency = Common::getDisplayCurrency();
+            $kpiTargetCurrency   = $kpi->budget_currency ?: $displayCurrency;
+            $kpiResponseCurrency = $kpi->response_budget_currency ?: ($kpi->budget_currency ?: $displayCurrency);
+            $fmtTargetCurrency   = fn($v) => Common::formatCurrency($v, $kpiTargetCurrency, 0);
+            $fmtResponseCurrency = fn($v) => Common::formatCurrency($v, $kpiResponseCurrency, 0);
+            // Default helper used by Total Achieved / cards — sums child rows; assume same as target.
+            $fmtCurrency = $fmtResponseCurrency;
         @endphp
 
         <div class="card mb-3">
@@ -73,7 +80,7 @@
                     </div>
                     <div class="col-md-3">
                         <strong>Budget:</strong>
-                        {{ $fmtCurrency($kpi->PropertyGoalbudget) }}
+                        {{ $fmtTargetCurrency($kpi->PropertyGoalbudget) }}
                     </div>
                 </div>
             </div>
