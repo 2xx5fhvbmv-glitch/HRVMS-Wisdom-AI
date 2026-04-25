@@ -120,10 +120,20 @@ class ReviewController extends Controller
             $effectiveTemplateId = $childCycle->Self_Review_Templete;
         }
         $template = $this->getTemplate($effectiveTemplateId);
+        $templateError = null;
+        if (!$template) {
+            if (empty($effectiveTemplateId)) {
+                $templateError = 'No template was assigned when this cycle was created. Ask HR to edit the cycle and pick a review template.';
+            } else {
+                $templateError = 'The configured template (id ' . e($effectiveTemplateId) . ') could not be found. It may have been deleted — ask HR to re-attach a template to this cycle.';
+            }
+        } elseif (empty($template['structure'])) {
+            $templateError = 'The configured template "' . e($template['name']) . '" has no fields. Ask HR to open it in the form builder and add at least one question.';
+        }
         $existingData = $childCycle->self_review_data ? json_decode($childCycle->self_review_data, true) : [];
         $page_title = "Self Review - " . $childCycle->Cycle_Name;
 
-        return view('resorts.Performance.Review.self-review-form', compact('page_title', 'childCycle', 'template', 'existingData', 'windowStatus'));
+        return view('resorts.Performance.Review.self-review-form', compact('page_title', 'childCycle', 'template', 'templateError', 'existingData', 'windowStatus'));
     }
 
     public function submitSelfReview(Request $request, $id)

@@ -57,8 +57,11 @@
                 @endif
             </div>
 
-            @if(!$template || !isset($template['structure']))
-                <div class="alert alert-warning">No template found for this review.</div>
+            @if(!$template || !isset($template['structure']) || empty($template['structure']))
+                <div class="alert alert-warning">
+                    <strong>This review form isn't ready yet.</strong>
+                    <div class="mt-1">{{ $templateError ?? 'No template found for this review.' }}</div>
+                </div>
             @else
                 <form id="selfReviewForm">
                     @csrf

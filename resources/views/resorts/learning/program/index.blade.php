@@ -49,8 +49,6 @@
                         <thead>
                             <tr>
                                 <th>Learning Name</th>
-                                <th>Description</th>
-                                <th>Objectives & Goals</th>
                                 <th>Category</th>
                                 <th>Target Audience</th>
                                 <th>Duration</th>
@@ -107,10 +105,8 @@
                 },
                 columns: [
                     { data: 'name', name: 'Learning Name', className: 'text-nowrap' },
-                    { data: 'description', name: 'Description', className: 'text-nowrap' },
-                    { data: 'objectives', name: 'Objectives', className: 'text-nowrap' },
                     { data: 'category', name: 'Category', className: 'text-nowrap' },
-                    { data: 'target_audience', name: 'Objectives', className: 'text-nowrap' },
+                    { data: 'target_audience', name: 'Target Audience', className: 'text-nowrap' },
                     { data: 'duration', name: 'Duration', className: 'text-nowrap' },
                     { data: 'frequency', name: 'Frequency', className: 'text-nowrap' },
                     { data: 'delivery_mode', name: 'Delivery Mode', className: 'text-nowrap' },
