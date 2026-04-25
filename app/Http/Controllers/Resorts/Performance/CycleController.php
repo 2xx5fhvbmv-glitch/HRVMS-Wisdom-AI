@@ -331,6 +331,15 @@ class CycleController extends Controller
                 'errors' => ['CycleTemplate' => ['Please select a review template before creating the cycle.']],
             ], 422);
         }
+
+        // Refuse to create a cycle with zero participants — the foreach below would
+        // produce a 500 ("foreach() argument must be of type array|object, null given").
+        if (!is_array($Emp_main_id) || count(array_filter($Emp_main_id)) === 0) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['Emp_main_id' => ['Please select at least one employee for this cycle.']],
+            ], 422);
+        }
         try {
             $CycleStartDate = Carbon::createFromFormat('d/m/Y', $CycleStartDate)->format('Y-m-d');
             $CycleEndDate = Carbon::createFromFormat('d/m/Y', $Step_One_end_date)->format('Y-m-d');
@@ -401,7 +410,7 @@ class CycleController extends Controller
                     $selectedTemplate = $request->CycleTemplate;
                     $participantIds = [];
                     $managerIds = [];
-                    foreach ( $Emp_main_id as $key => $emp_id)
+                    foreach ((is_array($Emp_main_id) ? $Emp_main_id : []) as $key => $emp_id)
                     {
                         // Resolve employee — Emp_main_id could be numeric id, base64, or Emp_id string (e.g. DR-17)
                         $actualEmpId = null;
