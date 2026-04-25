@@ -257,9 +257,11 @@ class CycleController extends Controller
                     $templateQuery = $templateQuery->where("Department_id", $deptId)->where("Position_id", $position);
                 }
             }
+            // Use plain associative arrays for the response. Eloquent silently casts the
+            // primary key column to int, which means assigning "ninty_2" to $model->id
+            // collapses the value to 0 — the bug that left CycleTemplate=0 in the form post.
             $templates = $templateQuery->get(['id', 'FormName'])->map(function($t) {
-                $t->FormName = $t->FormName . ' (Template)';
-                return $t;
+                return ['id' => (string) $t->id, 'FormName' => $t->FormName . ' (Template)'];
             });
             $allForms = $allForms->merge($templates);
 
@@ -267,9 +269,7 @@ class CycleController extends Controller
             $nintyDayForms = NintyDayPeformanceForm::where("resort_id", $resort_id)
                 ->get(['id', 'FormName'])
                 ->map(function($f) {
-                    $f->id = 'ninty_' . $f->id;
-                    $f->FormName = $f->FormName . ' (90 Day)';
-                    return $f;
+                    return ['id' => 'ninty_' . $f->id, 'FormName' => $f->FormName . ' (90 Day)'];
                 });
             $allForms = $allForms->merge($nintyDayForms);
 
@@ -278,9 +278,7 @@ class CycleController extends Controller
                 $professionalForms = \App\Models\Professionalform::where("resort_id", $resort_id)
                     ->get(['id', 'FormName'])
                     ->map(function($f) {
-                        $f->id = 'prof_' . $f->id;
-                        $f->FormName = $f->FormName . ' (Professional)';
-                        return $f;
+                        return ['id' => 'prof_' . $f->id, 'FormName' => $f->FormName . ' (Professional)'];
                     });
                 $allForms = $allForms->merge($professionalForms);
             }
@@ -324,8 +322,10 @@ class CycleController extends Controller
         }
 
         // Refuse to create a cycle without a usable template — otherwise reviewers
-        // get a "No template found" page with no way out.
-        if (empty($cycleTemplate)) {
+        // get a "No template found" page with no way out. Treat empty string AND "0"
+        // as missing (a "0" used to leak through when option values were mis-cast to int).
+        $cycleTemplateClean = is_string($cycleTemplate) ? trim($cycleTemplate) : $cycleTemplate;
+        if (empty($cycleTemplateClean) || $cycleTemplateClean === '0' || $cycleTemplateClean === 0) {
             return response()->json([
                 'success' => false,
                 'errors' => ['CycleTemplate' => ['Please select a review template before creating the cycle.']],
