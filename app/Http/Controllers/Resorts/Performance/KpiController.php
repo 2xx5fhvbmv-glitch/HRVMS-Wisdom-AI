@@ -242,16 +242,16 @@ class KpiController extends Controller
 
             return datatables()->of($kpiList)
                 ->editColumn('PropertyGoals', fn($row) => ucfirst($row->property_goal))
-                // Per-row currency: legacy rows (NULL budget_currency) are shown as-is
-                // in the resort's current display currency — no conversion, since we
-                // don't know what unit they were entered in.
+                // Per-row currency: legacy rows (NULL budget_currency) follow the
+                // payroll convention of "stored in USD" so they convert sensibly
+                // when the resort switches to MVR.
                 ->editColumn('budget', fn($row) => Common::formatCurrency(
                     $row->PropertyGoalbudget,
-                    $row->budget_currency ?: Common::getDisplayCurrency(),
+                    $row->budget_currency ?: 'USD',
                     0
                 ))
                 ->addColumn('Actual', fn($row) => $row->actual_budget_sum > 0
-                    ? Common::formatCurrency($row->actual_budget_sum, $row->budget_currency ?: Common::getDisplayCurrency(), 0)
+                    ? Common::formatCurrency($row->actual_budget_sum, $row->budget_currency ?: 'USD', 0)
                     : '-')
                 ->addColumn('Value', fn($row) => $row->PropertyGoalweightage !== null && $row->PropertyGoalweightage !== '' ? $row->PropertyGoalweightage.'%' : '-')
                 ->addColumn('Result', fn($row) => $row->actual_weightage_sum > 0 ? $row->actual_weightage_sum.'%' : '-')
@@ -430,7 +430,8 @@ class KpiController extends Controller
                 $msg     = 'Your response to KPI "'.$kpi->property_goal.'" has been approved by GM.';
                 $module  = 'Performance';
                 event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, $title, $msg, $kpi->id, $kpi->responded_by, $module)));
-                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id);
+                // skipDbInsert=true — nofitication() above already wrote the row.
+                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id, true);
             }
         } catch (\Exception $ne) {
             \Log::warning("KPI approve notification failed: " . $ne->getMessage());
@@ -469,7 +470,7 @@ class KpiController extends Controller
                 $msg     = 'Your response to KPI "'.$kpi->property_goal.'" has been rejected by GM. Reason: '.$request->remarks;
                 $module  = 'Performance';
                 event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, $title, $msg, $kpi->id, $kpi->responded_by, $module)));
-                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id);
+                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id, true);
             }
         } catch (\Exception $ne) {
             \Log::warning("KPI reject notification failed: " . $ne->getMessage());
@@ -608,12 +609,12 @@ class KpiController extends Controller
 
     /**
      * KPI Config page — shows all KPIs with editable Poor/Fair/Good/Superb thresholds.
-     * GM / HR only.
+     * Restricted to HR HOD only.
      */
     public function kpiConfig()
     {
-        if (!Common::hasFullDataAccess()) {
-            return abort(403, 'Only GM and HR can access KPI Config.');
+        if (!Common::isHRHOD()) {
+            return abort(403, 'Only the HR HOD can access KPI Config.');
         }
         $kpis = PerformanceKpiParent::where('resort_id', $this->resort->resort_id)
             ->orderByDesc('id')
@@ -624,12 +625,12 @@ class KpiController extends Controller
     }
 
     /**
-     * Update a KPI's Poor/Fair/Good/Superb ranges + points. GM / HR only.
+     * Update a KPI's Poor/Fair/Good/Superb ranges + points. HR HOD only.
      */
     public function updateKpiConfig(Request $request, $id)
     {
-        if (!Common::hasFullDataAccess()) {
-            return response()->json(['success' => false, 'message' => 'Only GM and HR can update KPI config.'], 403);
+        if (!Common::isHRHOD()) {
+            return response()->json(['success' => false, 'message' => 'Only the HR HOD can update KPI config.'], 403);
         }
         $validator = Validator::make($request->all(), [
             'poor_range'   => 'nullable|string|max:100',
@@ -690,7 +691,8 @@ class KpiController extends Controller
 
         if (!empty($employees)) {
             try {
-                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $employees, $kpi->id);
+                // skipDbInsert=true — nofitication() in the loop above already wrote rows.
+                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $employees, $kpi->id, true);
             } catch (\Exception $e) {
                 \Log::warning('KPI mobile push failed: '.$e->getMessage());
             }
@@ -723,7 +725,7 @@ class KpiController extends Controller
 
         if (!empty($gms)) {
             try {
-                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $gms, $kpi->id);
+                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $gms, $kpi->id, true);
             } catch (\Exception $e) {
                 \Log::warning('KPI GM mobile push failed: '.$e->getMessage());
             }

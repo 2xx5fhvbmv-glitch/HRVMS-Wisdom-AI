@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto d-flex gap-2">
-                    @if(\App\Helpers\Common::hasFullDataAccess())
+                    @if(\App\Helpers\Common::isHRHOD())
                         <a href="{{ route('Performance.kpi.config') }}" class="btn btn-theme">KPI Config</a>
                     @endif
                     @if(($userRank ?? null) == 8)

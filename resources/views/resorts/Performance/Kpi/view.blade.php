@@ -38,12 +38,10 @@
             ];
             $badgeClass = $statusMap[$kpi->status] ?? 'badge-themeWarning';
             // KPI budgets carry their entry currency in budget_currency / response_budget_currency.
-            // Legacy rows (NULL) are rendered as-is in the resort's active display currency
-            // since we can't tell what unit they were typed in.
+            // Legacy rows (NULL) follow the payroll convention: stored in USD, convert on display.
             $currencySymbol = Common::GetResortCurrencySymbol();
-            $displayCurrency = Common::getDisplayCurrency();
-            $kpiTargetCurrency   = $kpi->budget_currency ?: $displayCurrency;
-            $kpiResponseCurrency = $kpi->response_budget_currency ?: ($kpi->budget_currency ?: $displayCurrency);
+            $kpiTargetCurrency   = $kpi->budget_currency ?: 'USD';
+            $kpiResponseCurrency = $kpi->response_budget_currency ?: ($kpi->budget_currency ?: 'USD');
             $fmtTargetCurrency   = fn($v) => Common::formatCurrency($v, $kpiTargetCurrency, 0);
             $fmtResponseCurrency = fn($v) => Common::formatCurrency($v, $kpiResponseCurrency, 0);
             // Default helper used by Total Achieved / cards — sums child rows; assume same as target.

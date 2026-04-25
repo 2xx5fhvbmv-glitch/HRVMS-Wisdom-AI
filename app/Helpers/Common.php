@@ -3176,7 +3176,9 @@ class Common
         }
 
         try {
-            self::sendMobileNotification($resortId, 2, null, null, $title, $message, $module, $empIds, $requestId);
+            // Pass skipDbInsert=true — Common::nofitication() above already wrote one
+            // row per recipient; sendMobileNotification would otherwise duplicate them.
+            self::sendMobileNotification($resortId, 2, null, null, $title, $message, $module, $empIds, $requestId, true);
         } catch (\Exception $e) {
             \Log::warning('notifyEmployees mobile push failed: ' . $e->getMessage());
         }
@@ -3234,12 +3236,15 @@ class Common
         $user = \Auth::guard('resort-admin')->user();
         if (!$user) return false;
 
+        // Explicit admin types — always full access regardless of employee link.
         if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
             return true;
         }
 
+        // Beyond that, an employee record is required. Without one we can't
+        // verify rank or department, so default to RESTRICTED (not permissive).
         $emp = $user->GetEmployee ?? null;
-        if (!$emp) return true;
+        if (!$emp) return false;
 
         $rank = (int) $emp->rank;
 
@@ -3252,6 +3257,22 @@ class Common
         }
 
         return false;
+    }
+
+    /**
+     * Strict "HR HOD only" check — used by the few admin tools that should be
+     * locked down to the head of the HR department (e.g. KPI Config). Does NOT
+     * include GM, HR XCOM, or generic rank-3 HR users.
+     */
+    public static function isHRHOD()
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) return false;
+
+        $emp = $user->GetEmployee ?? null;
+        if (!$emp) return false;
+
+        return ((int) $emp->rank) === 2 && self::isHRDepartment($emp->Dept_id ?? null);
     }
 
     /**
@@ -4379,10 +4400,11 @@ class Common
         return $letters . $numbers;
     }
 
-    public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null)
+    public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null, $skipDbInsert = false)
     {
-        // Only store in ResortNotification if type is NOT 3
-        if ($type != 3) {
+        // Only store in ResortNotification if type is NOT 3, AND the caller didn't
+        // already insert via Common::nofitication() (which would double the DB rows).
+        if ($type != 3 && !$skipDbInsert) {
             $ids                        =   [];
             $statusData                 =   [];
             $time                       =   [];
@@ -4401,6 +4423,24 @@ class Common
                 $ids[]                  =   $resNotification->id;
                 $statusData[]           =   $resNotification->status;
                 $time[]                 =   $resNotification->created_at;
+            }
+        } else {
+            // Caller pre-inserted via nofitication() — fetch the freshly-created rows
+            // so the mobile push payload still has ids/status/time to send.
+            $ids                        =   [];
+            $statusData                 =   [];
+            $time                       =   [];
+            $rows = ResortNotification::where('resort_id', $resortId)
+                ->where('module', $module)
+                ->where('request_id', $request_id)
+                ->whereIn('user_id', $sendto)
+                ->latest('id')
+                ->take(count($sendto))
+                ->get();
+            foreach ($rows as $r) {
+                $ids[] = $r->id;
+                $statusData[] = $r->status;
+                $time[] = $r->created_at;
             }
         }
 
