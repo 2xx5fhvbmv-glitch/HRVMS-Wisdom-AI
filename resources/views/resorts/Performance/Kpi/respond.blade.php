@@ -64,7 +64,7 @@
                 <div><strong>PROPERTY GOAL:</strong> {{ $kpi->property_goal }}</div>
                 <div><strong>VALUE:</strong> {{ $kpi->PropertyGoalweightage }}%</div>
                 @if($kpi->PropertyGoalbudget)
-                    <div><strong>BUDGET:</strong> {{ \App\Helpers\Common::formatCurrency($kpi->PropertyGoalbudget, 'MVR', 0) }}</div>
+                    <div><strong>BUDGET:</strong> {{ \App\Helpers\Common::formatCurrency($kpi->PropertyGoalbudget, $kpi->budget_currency ?: 'USD', 0) }}</div>
                 @endif
             </div>
 

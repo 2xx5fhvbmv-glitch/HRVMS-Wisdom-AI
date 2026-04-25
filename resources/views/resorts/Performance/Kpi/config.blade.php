@@ -39,7 +39,7 @@
                         @forelse($kpis as $k)
                             <tr id="kpi-config-row-{{ $k->id }}">
                                 <td>{{ ucfirst($k->property_goal) }}</td>
-                                <td data-col="budget">{{ \App\Helpers\Common::formatCurrency($k->PropertyGoalbudget, 'MVR', 0) }}</td>
+                                <td data-col="budget">{{ \App\Helpers\Common::formatCurrency($k->PropertyGoalbudget, $k->budget_currency ?: 'USD', 0) }}</td>
                                 <td data-col="value">{{ $k->PropertyGoalweightage !== null && $k->PropertyGoalweightage !== '' ? $k->PropertyGoalweightage.'%' : '-' }}</td>
                                 <td class="bg-poor">
                                     <div data-col="poor_range">{{ $k->poor_range !== null && $k->poor_range !== '' ? $k->poor_range.'%' : '-' }}</div>

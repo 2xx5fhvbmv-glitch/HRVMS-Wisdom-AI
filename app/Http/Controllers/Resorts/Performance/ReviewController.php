@@ -105,8 +105,13 @@ class ReviewController extends Controller
         // Verify current user is the participant — OR an authorized overseer viewing a completed review read-only.
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
         $participantId = Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
-        $isOverseer = $childCycle->self_review_status === 'completed'
-            && Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view'));
+        // Overseer = anyone with full data access (HR / GM / HR-dept HOD/XCOM / super-admin)
+        // OR a user with the cycle-view permission. The previous check required only the
+        // explicit permission, which Engineering / non-HR-dept GM accounts on live were
+        // missing — so they got 403 even on completed reviews.
+        $isOverseer = (strtolower((string) $childCycle->self_review_status) === 'completed')
+            && (Common::hasFullDataAccess()
+                || Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')));
         if ($currentEmpId != $participantId && !$isOverseer) {
             abort(403, 'You are not authorized to view this review');
         }
@@ -169,10 +174,17 @@ class ReviewController extends Controller
         }
 
         $realChild = PerformaChildCycle::find($id);
+        if (!$realChild) {
+            return response()->json(['success' => false, 'message' => 'Review record disappeared mid-submit. Refresh and try again.'], 404);
+        }
         $realChild->self_review_data = json_encode($payload);
         $realChild->self_review_status = 'completed';
         $realChild->Self_review_date = now()->format('Y-m-d');
-        $realChild->save();
+        $saved = $realChild->save();
+        if (!$saved) {
+            \Log::warning("Self review save failed for child_id {$id}");
+            return response()->json(['success' => false, 'message' => 'Failed to save review. Please try again.'], 500);
+        }
 
         // Notify the assigned manager that the self review is done and manager review is unlocked.
         try {
@@ -249,8 +261,9 @@ class ReviewController extends Controller
         }
 
         $currentEmpId = $this->resort->GetEmployee->id ?? null;
-        $isOverseer = $childCycle->manager_review_status === 'completed'
-            && Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view'));
+        $isOverseer = (strtolower((string) $childCycle->manager_review_status) === 'completed')
+            && (Common::hasFullDataAccess()
+                || Common::checkRouteWisePermission('Performance.cycle', config('settings.resort_permissions.view')));
         if ($currentEmpId != $childCycle->Manager_id && !$isOverseer) {
             abort(403, 'You are not the assigned manager for this review');
         }
@@ -309,10 +322,17 @@ class ReviewController extends Controller
         }
 
         $realChild = PerformaChildCycle::find($id);
+        if (!$realChild) {
+            return response()->json(['success' => false, 'message' => 'Review record disappeared mid-submit. Refresh and try again.'], 404);
+        }
         $realChild->manager_review_data = json_encode($payload);
         $realChild->manager_review_status = 'completed';
         $realChild->Manager_review_date = now()->format('Y-m-d');
-        $realChild->save();
+        $saved = $realChild->save();
+        if (!$saved) {
+            \Log::warning("Manager review save failed for child_id {$id}");
+            return response()->json(['success' => false, 'message' => 'Failed to save review. Please try again.'], 500);
+        }
 
         // Notify the employee that their manager review is complete.
         try {
