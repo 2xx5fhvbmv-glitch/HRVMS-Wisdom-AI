@@ -9,7 +9,7 @@ class PerformanceKpiChild extends Model
 {
     use HasFactory;
     protected $table = 'performance_kpi_children';
-    protected $fillable =['budget','weightage','score','kpi_parents_id','individual_goal','month','remarks','created_by'];
+    protected $fillable =['budget','budget_currency','weightage','score','kpi_parents_id','individual_goal','month','remarks','created_by'];
 
     public function parentKpi()
     {

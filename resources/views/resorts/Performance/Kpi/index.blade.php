@@ -13,7 +13,9 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto d-flex gap-2">
-                    <a href="{{ route('Performance.kpi.config') }}" class="btn btn-theme">KPI Config</a>
+                    @if(\App\Helpers\Common::hasFullDataAccess())
+                        <a href="{{ route('Performance.kpi.config') }}" class="btn btn-theme">KPI Config</a>
+                    @endif
                     @if(($userRank ?? null) == 8)
                         <a href="{{ route('Performance.kpi.create') }}" class="btn btn-theme">Create New KPI</a>
                     @endif

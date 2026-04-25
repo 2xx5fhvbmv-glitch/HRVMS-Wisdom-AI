@@ -936,6 +936,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('performance/pip/{id}/restore', 'Performance\PipPdpController@pipRestore')->name('Performance.pip.restore');
     Route::get('performance/pip/{id}/view', 'Performance\PipPdpController@pipView')->name('Performance.pip.view');
     Route::post('performance/pip/{id}/submit', 'Performance\PipPdpController@pipSubmit')->name('Performance.pip.submit');
+    Route::get('performance/pip/{id}/file/{field}', 'Performance\PipPdpController@pipFile')->name('Performance.pip.file');
     Route::get('performance/pdp', 'Performance\PipPdpController@pdpIndex')->name('Performance.pdp.index');
     Route::post('performance/pdp/store', 'Performance\PipPdpController@pdpStore')->name('Performance.pdp.store');
     Route::delete('performance/pdp/{id}', 'Performance\PipPdpController@pdpDestroy')->name('Performance.pdp.destroy');
@@ -943,6 +944,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('performance/pdp/{id}/restore', 'Performance\PipPdpController@pdpRestore')->name('Performance.pdp.restore');
     Route::get('performance/pdp/{id}/view', 'Performance\PipPdpController@pdpView')->name('Performance.pdp.view');
     Route::post('performance/pdp/{id}/submit', 'Performance\PipPdpController@pdpSubmit')->name('Performance.pdp.submit');
+    Route::get('performance/pdp/{id}/file/{field}', 'Performance\PipPdpController@pdpFile')->name('Performance.pdp.file');
     Route::get('performance/create', 'Performance\CycleController@create')->name('Performance.create');
 
     Route::get('performance-cycle/fetch-employees', 'Performance\CycleController@CycleFetchEmployees')->name('Performance.cycle.FetchEmployees');

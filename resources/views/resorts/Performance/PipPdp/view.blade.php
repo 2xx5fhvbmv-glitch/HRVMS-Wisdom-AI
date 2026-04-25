@@ -118,10 +118,29 @@
                 return;
             }
 
+            // Build FormData so file inputs get uploaded as multipart/form-data,
+            // not stringified into the JSON body.
+            var fd = new FormData();
+            fd.append('_token', '{{ csrf_token() }}');
+            $.each(data, function(k, v) {
+                if (Array.isArray(v)) {
+                    v.forEach(function(item) { fd.append(k + '[]', item); });
+                } else {
+                    fd.append(k, v == null ? '' : v);
+                }
+            });
+            $('#form-render input[type="file"]').each(function() {
+                var name = $(this).attr('name');
+                if (!name) return;
+                if (this.files && this.files.length) fd.append(name, this.files[0]);
+            });
+
             $.ajax({
                 url: submitUrl,
                 type: 'POST',
-                data: $.extend({ _token: '{{ csrf_token() }}' }, data),
+                data: fd,
+                processData: false,
+                contentType: false,
                 success: function(res) {
                     if (res.success) {
                         toastr.success(res.message, 'Success', { positionClass: 'toast-bottom-right' });
@@ -192,6 +211,23 @@
                         html += '<span class="' + active + '" data-val="' + i + '">&#9733;</span>';
                     }
                     html += '<input type="hidden" name="' + fieldName + '" value="' + value + '"></div>'; break;
+                case 'file':
+                    if (isReadOnly) {
+                        // Saved files appear under 'value' as a relative path on the local disk.
+                        if (value) {
+                            var fileUrl = "{{ url('resort/performance/' . $kind . '/' . $plan->id . '/file') }}/" + encodeURIComponent(fieldName);
+                            var name = String(value).split('/').pop().replace(/^\d+_/, '');
+                            html += '<a href="' + fileUrl + '" class="btn btn-themeLight btn-sm"><i class="fa-solid fa-file-arrow-down me-1"></i>' + name + '</a>';
+                        } else {
+                            html += '<span class="text-muted">No file uploaded</span>';
+                        }
+                    } else {
+                        html += '<input type="file" name="' + fieldName + '" accept="' + (field.accept || '*/*') + '">';
+                        if (value) {
+                            html += '<div class="small text-muted mt-1">Current: ' + String(value).split('/').pop().replace(/^\d+_/, '') + ' (upload a new file to replace)</div>';
+                        }
+                    }
+                    break;
                 case 'ratingTable':
                     var cols = (field.columnHeadings || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
                     var rows = (field.rowLabels || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
@@ -235,7 +271,10 @@
         $('#form-render').find('input, textarea, select').each(function() {
             var name = $(this).attr('name');
             if (!name) return;
-            if ($(this).attr('type') === 'checkbox') {
+            var type = $(this).attr('type');
+            // Skip file inputs here — they're appended directly to FormData below.
+            if (type === 'file') return;
+            if (type === 'checkbox') {
                 if ($(this).is(':checked')) {
                     if (name.endsWith('[]')) {
                         var key = name.slice(0, -2);
@@ -268,6 +307,12 @@
                     if (k.indexOf(name + '_') === 0 && v !== '' && v !== null && v !== undefined) hasAny = true;
                 });
                 empty = !hasAny;
+            } else if (type === 'file') {
+                // Required files: pass if a new file is picked OR a previous upload exists.
+                var $input = $f.find('input[type="file"]');
+                var hasNew = $input.length && $input[0].files && $input[0].files.length > 0;
+                var hasExisting = !!(existingData[name]);
+                empty = !(hasNew || hasExisting);
             }
             if (empty) {
                 $f.addClass('is-invalid');
