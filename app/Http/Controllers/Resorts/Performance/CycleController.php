@@ -322,6 +322,15 @@ class CycleController extends Controller
         if (empty($CycleStartDate) || empty($Step_One_end_date)) {
             return response()->json(['success' => false, 'errors' => ['date' => ['Start date and end date are required']]], 422);
         }
+
+        // Refuse to create a cycle without a usable template — otherwise reviewers
+        // get a "No template found" page with no way out.
+        if (empty($cycleTemplate)) {
+            return response()->json([
+                'success' => false,
+                'errors' => ['CycleTemplate' => ['Please select a review template before creating the cycle.']],
+            ], 422);
+        }
         try {
             $CycleStartDate = Carbon::createFromFormat('d/m/Y', $CycleStartDate)->format('Y-m-d');
             $CycleEndDate = Carbon::createFromFormat('d/m/Y', $Step_One_end_date)->format('Y-m-d');
@@ -489,6 +498,62 @@ class CycleController extends Controller
         }
     }
     /**
+     * HR/GM can attach (or replace) the template on an existing cycle.
+     * Used to repair cycles that were created before template-required validation —
+     * the symptom is a "No template was assigned" banner on the self-review page.
+     */
+    public function attachTemplate(Request $request, $id)
+    {
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['success' => false, 'message' => 'Only HR and GM can change the cycle template.'], 403);
+        }
+
+        $request->validate([
+            'template_id' => 'required|string|max:50',
+        ]);
+        $templateId = $request->template_id;
+
+        $cycle = PerformanceCycle::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$cycle) {
+            return response()->json(['success' => false, 'message' => 'Cycle not found.'], 404);
+        }
+
+        // Verify the template_id resolves to a real form
+        if (!$this->resolveTemplateExists($templateId)) {
+            return response()->json(['success' => false, 'message' => 'That template does not exist.'], 422);
+        }
+
+        // Mirror what CycleStore does: legacy int columns hold the numeric id;
+        // child rows hold the prefixed string (e.g. "ninty_2").
+        $legacyId = is_numeric($templateId)
+            ? (int) $templateId
+            : (preg_match('/(\d+)/', $templateId, $m) ? (int) $m[1] : 0);
+
+        $cycle->update([
+            'Self_Review_Templete'    => $legacyId,
+            'Manager_Review_Templete' => $legacyId,
+        ]);
+        PerformaChildCycle::where('Parent_cycle_id', $cycle->id)
+            ->update(['template_id' => $templateId]);
+
+        return response()->json(['success' => true, 'message' => 'Template attached. Reviewers can now open the form.']);
+    }
+
+    private function resolveTemplateExists($templateId)
+    {
+        if (strpos($templateId, 'ninty_') === 0) {
+            return \App\Models\NintyDayPeformanceForm::where('id', substr($templateId, 6))->exists();
+        }
+        if (strpos($templateId, 'prof_') === 0) {
+            return \App\Models\Professionalform::where('id', substr($templateId, 5))->exists();
+        }
+        if (is_numeric($templateId)) {
+            return \App\Models\PerformanceTemplateForm::where('id', $templateId)->exists();
+        }
+        return false;
+    }
+
+    /**
      * Resolve an Emp_main_id value (stored as numeric id, base64 id, or Emp_id
      * string like "DR-22") to an Employee model. Legacy cycle rows stored the
      * Emp_id string instead of the numeric key, so the lookup needs all three.
@@ -565,7 +630,38 @@ class CycleController extends Controller
 
         $page_title = "Cycle Details";
 
-        return view('resorts.Performance.Cycle.view', compact('page_title', 'cycle', 'totalEmployees', 'selfCompleted', 'managerCompleted', 'selfPct', 'managerPct', 'participants'));
+        // Template diagnostics — if the cycle has no usable template, surface a fixer for HR/GM.
+        $sampleChild = PerformaChildCycle::where('Parent_cycle_id', $cycle->id)->first();
+        $hasTemplate = ($sampleChild && !empty($sampleChild->template_id))
+            || !empty($cycle->Self_Review_Templete) || !empty($cycle->Manager_Review_Templete);
+        $canFixTemplate = !$hasTemplate && Common::hasFullDataAccess();
+        $availableTemplates = [];
+        if ($canFixTemplate) {
+            $availableTemplates = $this->collectAvailableTemplates($cycle->resort_id);
+        }
+
+        return view('resorts.Performance.Cycle.view', compact('page_title', 'cycle', 'totalEmployees', 'selfCompleted', 'managerCompleted', 'selfPct', 'managerPct', 'participants', 'hasTemplate', 'canFixTemplate', 'availableTemplates'));
+    }
+
+    /**
+     * Build the list of templates HR can pick when repairing a cycle.
+     * Prefixes match the convention in getTemplate() / CycleStore().
+     */
+    private function collectAvailableTemplates($resortId)
+    {
+        $out = [];
+        foreach (\App\Models\NintyDayPeformanceForm::where('resort_id', $resortId)->get(['id', 'FormName']) as $f) {
+            $out[] = ['id' => 'ninty_' . $f->id, 'label' => $f->FormName . ' (90-Day)'];
+        }
+        if (class_exists(\App\Models\Professionalform::class)) {
+            foreach (\App\Models\Professionalform::where('resort_id', $resortId)->get(['id', 'FormName']) as $f) {
+                $out[] = ['id' => 'prof_' . $f->id, 'label' => $f->FormName . ' (Professional)'];
+            }
+        }
+        foreach (\App\Models\PerformanceTemplateForm::where('resort_id', $resortId)->get(['id', 'FormName']) as $f) {
+            $out[] = ['id' => (string) $f->id, 'label' => $f->FormName . ' (Template)'];
+        }
+        return $out;
     }
 
     /**

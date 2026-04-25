@@ -925,6 +925,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::get('performance/cycle', 'Performance\CycleController@index')->name('Performance.cycle');
     Route::get('performance/cycle/view/{id}', 'Performance\CycleController@viewCycle')->name('Performance.cycle.view');
+    Route::post('performance/cycle/{id}/attach-template', 'Performance\CycleController@attachTemplate')->name('Performance.cycle.attachTemplate');
     Route::get('performance/cycle/analytics/{id}', 'Performance\CycleController@cycleAnalytics')->name('Performance.cycle.analytics');
 
     // PIP & PDP
