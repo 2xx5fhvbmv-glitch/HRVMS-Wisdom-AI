@@ -1125,6 +1125,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('learning/program/list', 'Learning\LearningProgramController@list')->name('learning.programs.list');
     Route::get('learning/program/view/{id}', 'Learning\LearningProgramController@show')->name('learning.programs.show');
     Route::get('learning/program/material/{id}', 'Learning\LearningProgramController@downloadMaterial')->name('learning.programs.material');
+    Route::get('learning/program/trainer-image/{id}', 'Learning\LearningProgramController@trainerImage')->name('learning.programs.trainerImage');
 
     Route::get('learning/program/calendar', 'Learning\LearningCalendarController@index')->name('learning.calendar.index');
     Route::post('learning/program/calendar/add-session', 'Learning\LearningCalendarController@store')->name('learning.calendar.save');

@@ -146,7 +146,11 @@ class LearningProgramController extends Controller
                     return optional($row->category)->category ?? 'N/A';
                 })
                 ->addColumn('duration', function ($row) {
-                    return "{$row->days} Days {$row->hours} hrs";
+                    // Hours / Days are now mutually optional — render only the parts present.
+                    $parts = [];
+                    if (!empty($row->days))  $parts[] = $row->days . ' Days';
+                    if (!empty($row->hours)) $parts[] = $row->hours . ' hrs';
+                    return $parts ? implode(' ', $parts) : '-';
                 })
                 ->addColumn('target_audience', function ($row) {
                     if (!is_array($row->target_audience)) {
@@ -199,38 +203,71 @@ class LearningProgramController extends Controller
 
     public function save(Request $request)
     {
-        // dd($request->all());
         $resort_id = $this->resort->resort_id;
         $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',
-            'objectives' => 'required|string',
+            // Objectives can arrive as a single string (legacy) or as an array of strings
+            // (new repeating "Add More" UI). Accept both.
+            'objectives' => 'required',
+            'objectives.*' => 'nullable|string|max:1000',
             'category' => 'required|exists:learning_categories,id',
             'audience_type' => 'required|in:departments,grades,positions,employees',
             'target_audiance' => 'required|array',
-            'hours' => 'required|numeric|min:0.1',
-            'days' => 'required|integer',
-            'frequency' => 'required|string|in:one-time,recurring,quarterly,annually',
+            // Hours / Days are mutually optional — at least one must be filled.
+            'hours' => 'nullable|required_without:days|numeric|min:0.1',
+            'days'  => 'nullable|required_without:hours|integer|min:1',
+            // 'recurring' kept in the allow-list as a safety net for any in-flight client
+            // posting the old value before cache clears; the migration rewrites stored data.
+            'frequency' => 'required|string|in:one-time,monthly,recurring,quarterly,annually',
+            'frequency_day' => 'nullable|integer|min:1|max:30',
             'delivery_mode' => 'required|string|in:face-to-face,online,hybrid',
             'trainer' => 'required|exists:employees,id',
+            'external_training' => 'nullable|string|max:255',
+            'external_trainer_company' => 'nullable|string|max:255',
+            'trainer_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'prior_qualification' => 'nullable|string',
-            'learning_material.*' => 'nullable|mimes:pdf,ppt,pptx|max:2048', // Allow multiple files
+            'learning_material.*' => 'nullable|mimes:pdf,ppt,pptx|max:2048',
         ]);
+
+        // Normalize objectives — array of bullet lines or a single string.
+        $objectivesText = $this->normalizeObjectives($request->input('objectives'));
+        if ($objectivesText === '') {
+            return response()->json(['success' => false, 'msg' => 'Please enter at least one objective.'], 422);
+        }
+
+        // Trainer image — uploaded to storage/app/learning_trainer_images/{resort_id}/
+        $trainerImagePath = null;
+        if ($request->hasFile('trainer_image')) {
+            $img = $request->file('trainer_image');
+            $trainerImagePath = $img->storeAs(
+                'learning_trainer_images/' . $this->resort->resort_id,
+                time() . '_' . $img->getClientOriginalName()
+            );
+        }
 
         // Store the learning program details
         $learningProgram = LearningProgram::create([
             'resort_id'=>$this->resort->resort_id,
             'name' => $request->name,
             'description' => $request->description,
-            'objectives' => $request->objectives,
+            'objectives' => $objectivesText,
             'learning_category_id' => $request->category,
             'audience_type' => $request->audience_type,
             'target_audience' => $request->target_audiance, // Storing array
             'hours' => $request->hours,
             'days' => $request->days,
-            'frequency' => $request->frequency,
+            // Normalize the legacy "recurring" value at write time too.
+            'frequency' => $request->frequency === 'recurring' ? 'monthly' : $request->frequency,
+            // Day-of-month only applies to one-time / monthly / quarterly.
+            'frequency_day' => in_array($request->frequency, ['one-time', 'monthly', 'recurring', 'quarterly'])
+                ? $request->frequency_day
+                : null,
             'delivery_mode' => $request->delivery_mode,
             'trainer' => $request->trainer,
+            'external_training' => $request->external_training,
+            'external_trainer_company' => $request->external_trainer_company,
+            'trainer_image' => $trainerImagePath,
             'prior_qualification' => $request->prior_qualification ?? null,
         ]);
         if( $learningProgram ){
@@ -253,6 +290,43 @@ class LearningProgramController extends Controller
             }
         }
         return response()->json(['success' => true, 'msg' => 'Learning Program saved successfully.']);
+    }
+
+    /**
+     * Normalize the `objectives` input into a single bullet-prefixed string.
+     * Accepts either a string (legacy / pasted block) or an array of lines
+     * (the new "Add More" UI). Empty entries are dropped.
+     */
+    private function normalizeObjectives($input)
+    {
+        if (is_array($input)) {
+            $lines = collect($input)
+                ->map(fn($v) => trim((string) $v))
+                ->filter(fn($v) => $v !== '')
+                ->map(function ($line) {
+                    // Don't double-bullet existing lines that already start with one.
+                    return preg_match('/^[•\-\*]/', $line) ? $line : '• ' . $line;
+                })
+                ->values()
+                ->all();
+            return implode("\n", $lines);
+        }
+        return trim((string) $input);
+    }
+
+    /**
+     * Stream the trainer image for a Learning Program. Stored on the local disk
+     * (private) so it needs a controller route rather than asset(...) URL.
+     */
+    public function trainerImage($id)
+    {
+        $program = LearningProgram::where('resort_id', $this->resort->resort_id)->find(base64_decode($id));
+        if (!$program || !$program->trainer_image) abort(404, 'Trainer image not found.');
+
+        if (!\Illuminate\Support\Facades\Storage::disk('local')->exists($program->trainer_image)) {
+            abort(404, 'Image missing from storage.');
+        }
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($program->trainer_image);
     }
 
     /**

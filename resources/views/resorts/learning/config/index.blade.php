@@ -87,7 +87,18 @@
                                     <textarea class="form-control" name="description" id="description" placeholder="Description" rows="3"></textarea>
                                 </div>
                                 <div class="col-12">
-                                    <input type="text" name="objectives" id="objectives" class="form-control" placeholder="Objectives And Goals">
+                                    <label class="form-label small fw-600 mb-1">Objectives And Goals</label>
+                                    <div id="objectivesList">
+                                        <div class="objective-row d-flex align-items-center gap-2 mb-2">
+                                            <input type="text" name="objectives[]" class="form-control objective-input" placeholder="e.g. Understand company vision and values">
+                                            <button type="button" class="btn btn-sm btn-themeGray objective-remove" title="Remove" disabled>
+                                                <i class="fa-solid fa-xmark"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="addObjectiveBtn" class="btn btn-themeSkyblue btn-sm mt-1">
+                                        <i class="fa-solid fa-plus me-1"></i> Add More
+                                    </button>
                                 </div>
                                 <div class="col-12">
                                     <select class="form-select select2t-none" name="category" id="category" aria-label="Default select example">
@@ -180,9 +191,17 @@
                                     <select class="form-select select2t-none" aria-label="Default select example" name="frequency" id="frequency">
                                         <option selected value="">Frequency</option>
                                         <option value="one-time">One-time</option>
-                                        <option value="recurring">Recurring</option>
+                                        <option value="monthly">Monthly</option>
                                         <option value="quarterly">Quarterly</option>
                                         <option value="annually">Annually</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-6" id="frequencyDayWrap" style="display: none;">
+                                    <select class="form-select" name="frequency_day" id="frequency_day">
+                                        <option value="">Day of Month</option>
+                                        @for($d = 1; $d <= 30; $d++)
+                                            <option value="{{ $d }}">{{ $d }}</option>
+                                        @endfor
                                     </select>
                                 </div>
                                 <div class="col-sm-6">
@@ -202,6 +221,24 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                </div>
+                                <div class="col-xxl-6">
+                                    <input type="text" name="external_training" id="external_training" class="form-control" placeholder="External Training (optional)">
+                                </div>
+                                <div class="col-xxl-6">
+                                    <input type="text" name="external_trainer_company" id="external_trainer_company" class="form-control" placeholder="External Trainer Company (optional)">
+                                </div>
+                                <div class="col-xxl-6">
+                                    <div class="uploadFile-btn me-0">
+                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm"
+                                            onclick="document.getElementById('trainer_image').click();">
+                                            Upload Trainer Image
+                                        </a>
+                                        <input type="file" id="trainer_image" name="trainer_image"
+                                            accept="image/*" style="opacity: 0; position: absolute; z-index: -1;"
+                                            onchange="document.getElementById('trainerImageName').innerText = this.files[0]?.name || ''">
+                                        <div id="trainerImageName" style="margin-top: 10px; color: #333;"></div>
+                                    </div>
                                 </div>
                                 <div class="col-xxl-6">
                                     <div class="uploadFile-btn me-0">
@@ -655,6 +692,56 @@
             }
         });
 
+        // Hours / Days are mutually optional — re-trigger validation on the partner field.
+        $(document).on('input change', '#hours, #days', function () {
+            var $form = $('#learning-program-setup');
+            if ($form.length && $form.data('validator')) {
+                $form.validate().element('#hours');
+                $form.validate().element('#days');
+            }
+        });
+
+        // Frequency → toggle Day-of-Month picker for one-time / monthly / quarterly.
+        // Bind to both native change AND select2:select since #frequency is wrapped in Select2.
+        function syncFrequencyDay() {
+            var f = $('#frequency').val();
+            var needsDay = (f === 'one-time' || f === 'monthly' || f === 'quarterly');
+            if (needsDay) {
+                $('#frequencyDayWrap').show();
+            } else {
+                $('#frequencyDayWrap').hide();
+                $('#frequency_day').val('');
+            }
+        }
+        $('#frequency').on('change select2:select select2:unselect', syncFrequencyDay);
+        // Also re-run on page load AFTER select2 has initialised.
+        setTimeout(syncFrequencyDay, 0);
+
+        // Objectives And Goals — Add More / Remove handler
+        function syncObjectiveRemoveButtons() {
+            var $rows = $('#objectivesList .objective-row');
+            $rows.find('.objective-remove').prop('disabled', $rows.length <= 1);
+        }
+        $(document).on('click', '#addObjectiveBtn', function () {
+            var $row = $('#objectivesList .objective-row').first().clone(true);
+            $row.find('input').val('');
+            $('#objectivesList').append($row);
+            syncObjectiveRemoveButtons();
+        });
+        $(document).on('click', '.objective-remove', function () {
+            if ($('#objectivesList .objective-row').length <= 1) return;
+            $(this).closest('.objective-row').remove();
+            syncObjectiveRemoveButtons();
+        });
+        // Reset all but the first row when the form is reset.
+        $('#learning-program-setup').on('reset', function () {
+            setTimeout(function () {
+                $('#objectivesList .objective-row:not(:first)').remove();
+                $('#objectivesList .objective-row:first input').val('');
+                syncObjectiveRemoveButtons();
+            }, 0);
+        });
+
         // Trigger change event on page load to ensure the correct dropdown is shown
         $("input[name='audience_type']:checked").trigger("change");
 
@@ -666,7 +753,7 @@
                 description: {
                     required: true,
                 },
-                objectives: {
+                "objectives[]": {
                     required: true,
                 },
                 category: {
@@ -675,13 +762,14 @@
                 "target_audiance[]": {  // Corrected syntax
                     required: true,
                 },
+                // Hours and Days are mutually optional: at least one must be provided.
                 hours: {
-                    required: true,
+                    required: function () { return $('#days').val() === ''; },
                     number: true,
-                    min: 1
+                    min: 0.1
                 },
                 days: {
-                    required: true,
+                    required: function () { return $('#hours').val() === ''; },
                     number: true,
                     min: 1
                 },
@@ -702,8 +790,8 @@
                 description: {
                     required: "Please enter a description.",
                 },
-                objectives: {
-                    required: "Please enter objectives.",
+                "objectives[]": {
+                    required: "Please enter at least one objective.",
                 },
                 category: {
                     required: "Please select a category.",
@@ -712,12 +800,12 @@
                     required: "Please select a target audience.",
                 },
                 hours: {
-                    required: "Please enter hours.",
+                    required: "Enter Hours or Days (at least one is required).",
                     number: "Only numbers are allowed.",
-                    min: "Hours must be at least 1."
+                    min: "Hours must be at least 0.1."
                 },
                 days: {
-                    required: "Please enter days.",
+                    required: "Enter Hours or Days (at least one is required).",
                     number: "Only numbers are allowed.",
                     min: "Days must be at least 1."
                 },
