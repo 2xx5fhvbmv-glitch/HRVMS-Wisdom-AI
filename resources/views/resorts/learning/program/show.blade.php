@@ -24,11 +24,40 @@
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-md-4"><strong>Category:</strong> {{ optional($program->category)->category ?? '-' }}</div>
-                    <div class="col-md-4"><strong>Duration:</strong> {{ $program->days }} Days {{ $program->hours }} hrs</div>
-                    <div class="col-md-4"><strong>Frequency:</strong> {{ ucfirst($program->frequency) }}</div>
+                    <div class="col-md-4">
+                        <strong>Duration:</strong>
+                        @php
+                            $parts = [];
+                            if (!empty($program->days))  $parts[] = $program->days . ' Days';
+                            if (!empty($program->hours)) $parts[] = $program->hours . ' hrs';
+                        @endphp
+                        {{ $parts ? implode(' ', $parts) : '-' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Frequency:</strong> {{ ucfirst($program->frequency) }}
+                        @if($program->frequency_day)
+                            <span class="text-muted">— Day {{ $program->frequency_day }} of month</span>
+                        @endif
+                    </div>
                     <div class="col-md-4"><strong>Delivery Mode:</strong> {{ ucfirst($program->delivery_mode) }}</div>
                     <div class="col-md-4"><strong>Trainer:</strong> {{ $trainer && $trainer->resortAdmin ? trim($trainer->resortAdmin->first_name.' '.$trainer->resortAdmin->last_name) : '-' }}</div>
                     <div class="col-md-4"><strong>Audience Type:</strong> {{ ucfirst($program->audience_type ?? '-') }}</div>
+                    @if($program->external_training)
+                        <div class="col-md-4"><strong>External Training:</strong> {{ $program->external_training }}</div>
+                    @endif
+                    @if($program->external_trainer_company)
+                        <div class="col-md-4"><strong>External Trainer Company:</strong> {{ $program->external_trainer_company }}</div>
+                    @endif
+                    @if($program->trainer_image)
+                        <div class="col-md-4">
+                            <strong>Trainer Image:</strong>
+                            <div class="mt-1">
+                                <img src="{{ route('learning.programs.trainerImage', base64_encode($program->id)) }}"
+                                     alt="Trainer"
+                                     style="max-width: 140px; max-height: 140px; border-radius: 8px; border: 1px solid #dee2e6;">
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

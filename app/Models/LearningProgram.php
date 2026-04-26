@@ -24,8 +24,12 @@ class LearningProgram extends Model
         'hours',
         'days',
         'frequency',
+        'frequency_day',
         'delivery_mode',
         'trainer',
+        'external_training',
+        'external_trainer_company',
+        'trainer_image',
         'prior_qualification',
     ];
     protected $casts = [
