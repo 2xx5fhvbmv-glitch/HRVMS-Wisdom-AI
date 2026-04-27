@@ -11,7 +11,7 @@ class PeformanceMeeting extends Model
 
     protected $table = 'peformance_meetings';
     protected $fillable = [
-        'title',	'start_time','end_time','date','location','conference_links','description','resort_id'
+        'title','start_time','end_time','date','location','conference_links','description','resort_id','created_by'
     ];
 
     public function participants()

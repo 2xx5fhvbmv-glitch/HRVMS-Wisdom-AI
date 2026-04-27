@@ -49,6 +49,11 @@ class TrainingScheduleController extends Controller
     }
 
     public function schedule() {
+        // Only HR / GM / L&D Manager (or super-admin / master-admin) — matches the
+        // button-gate on the calendar page. Plus the existing route-permission check.
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Only HR, GM and L&D Managers can create a learning schedule.');
+        }
         if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.create')) == false){
             return abort(403, 'Unauthorized access');
         }
@@ -185,9 +190,12 @@ class TrainingScheduleController extends Controller
     }
 
     public function store(Request $request) {
-        // Debug the incoming request
-        // dd($request->all());
-    
+        // Server-side gate to mirror the schedule() page check — block anyone but
+        // HR / GM / L&D Manager from creating a schedule even via direct POST.
+        if (!Common::hasFullDataAccess()) {
+            return response()->json(['success' => false, 'message' => 'Only HR, GM and L&D Managers can create a learning schedule.'], 403);
+        }
+
         $request->validate([
             'learning_title' => 'required|exists:learning_programs,id',
             'start_date' => 'required|date',
@@ -288,11 +296,13 @@ class TrainingScheduleController extends Controller
     public function inlineUpdate(Request $request)
     {
         try {
-            // Validate the request data
+            // Validate the request data — accept HH:mm or HH:mm:ss for the times.
             $validated = $request->validate([
                 'id' => 'required|integer|exists:training_schedules,id',
                 'start_date' => 'sometimes|nullable|date_format:d/m/Y',
                 'end_date' => 'sometimes|nullable|date_format:d/m/Y',
+                'start_time' => 'sometimes|nullable|regex:/^\d{2}:\d{2}(:\d{2})?$/',
+                'end_time'   => 'sometimes|nullable|regex:/^\d{2}:\d{2}(:\d{2})?$/',
             ]);
 
             // Find the schedule record
@@ -313,11 +323,31 @@ class TrainingScheduleController extends Controller
                 $schedule->end_date = $endDateParts[2] . '-' . $endDateParts[1] . '-' . $endDateParts[0];
             }
 
+            // Times — normalize to HH:mm:ss for the DB.
+            $normalizeTime = fn($t) => strlen($t) === 5 ? $t . ':00' : $t;
+            if ($request->filled('start_time')) {
+                $schedule->start_time = $normalizeTime($request->start_time);
+            }
+            if ($request->filled('end_time')) {
+                $schedule->end_time = $normalizeTime($request->end_time);
+            }
+
             // Validate that the end date is after or equal to the start date
             if ($schedule->start_date && $schedule->end_date && strtotime($schedule->end_date) < strtotime($schedule->start_date)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'End date must be after or equal to start date'
+                ], 422);
+            }
+
+            // If start and end fall on the same day, end_time must be after start_time.
+            if ($schedule->start_date && $schedule->end_date
+                && $schedule->start_date === $schedule->end_date
+                && $schedule->start_time && $schedule->end_time
+                && strtotime($schedule->end_time) <= strtotime($schedule->start_time)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'End time must be after start time on the same day.'
                 ], 422);
             }
 

@@ -149,19 +149,31 @@
         var $row = $(this).closest("tr");
         var scheduleId = $(this).data('schedule-id');
 
-        // Fetch existing values
+        // Fetch existing values — columns: 1 Name | 2 Type | 3 Trainer | 4 Start Date | 5 End Date | 6 Start Time | 7 End Time | 8 Attendees | 9 Status | 10 Action
         var $startDateCell = $row.find("td:nth-child(4)");
-        var $endDateCell = $row.find("td:nth-child(5)");
+        var $endDateCell   = $row.find("td:nth-child(5)");
+        var $startTimeCell = $row.find("td:nth-child(6)");
+        var $endTimeCell   = $row.find("td:nth-child(7)");
 
         var currentStartDate = $startDateCell.text().trim();
-        var currentEndDate = $endDateCell.text().trim();
+        var currentEndDate   = $endDateCell.text().trim();
+        var currentStartTime = $startTimeCell.text().trim();
+        var currentEndTime   = $endTimeCell.text().trim();
+
+        // Trim seconds for the time input (HH:mm)
+        var startTimeForInput = currentStartTime.slice(0, 5);
+        var endTimeForInput   = currentEndTime.slice(0, 5);
 
         // Create empty input fields with unique IDs
         var startDateId = 'edit-start-date-' + scheduleId;
-        var endDateId = 'edit-end-date-' + scheduleId;
-        
-        $startDateCell.html(`<input type="text" id="${startDateId}" class="form-control"  />`);
-        $endDateCell.html(`<input type="text" id="${endDateId}" class="form-control"  />`);
+        var endDateId   = 'edit-end-date-' + scheduleId;
+        var startTimeId = 'edit-start-time-' + scheduleId;
+        var endTimeId   = 'edit-end-time-' + scheduleId;
+
+        $startDateCell.html(`<input type="text" id="${startDateId}" class="form-control" />`);
+        $endDateCell.html(`<input type="text" id="${endDateId}" class="form-control" />`);
+        $startTimeCell.html(`<input type="time" id="${startTimeId}" class="form-control" value="${startTimeForInput}" />`);
+        $endTimeCell.html(`<input type="time" id="${endTimeId}" class="form-control" value="${endTimeForInput}" />`);
 
         // Replace action buttons
         var $actionCell = $row.find("td:last-child");
@@ -170,9 +182,11 @@
             <button class="btn btn-sm btn-secondary cancel-row-btn" data-schedule-id="${scheduleId}">Cancel</button>
         `);
 
-        // Store original values as data attributes for cancel
+        // Store original values for cancel
         $row.data('original-start', currentStartDate);
-        $row.data('original-end', currentEndDate);
+        $row.data('original-end',   currentEndDate);
+        $row.data('original-start-time', currentStartTime);
+        $row.data('original-end-time',   currentEndTime);
 
         // Force jQuery to create new datepicker instances
         $('#' + startDateId).datepicker('destroy');
@@ -223,16 +237,17 @@
     $(document).on("click", ".cancel-row-btn", function () {
         var $row = $(this).closest("tr");
         var scheduleId = $row.find(".update-row-btn").data('schedule-id');
-        
-        // Get original values from jQuery data storage
+
         var originalStartDate = $row.data('original-start');
-        var originalEndDate = $row.data('original-end');
-        
-        // Restore original text
+        var originalEndDate   = $row.data('original-end');
+        var originalStartTime = $row.data('original-start-time');
+        var originalEndTime   = $row.data('original-end-time');
+
         $row.find("td:nth-child(4)").text(originalStartDate);
         $row.find("td:nth-child(5)").text(originalEndDate);
-        
-        // Restore original action buttons
+        $row.find("td:nth-child(6)").text(originalStartTime);
+        $row.find("td:nth-child(7)").text(originalEndTime);
+
         $row.find("td:last-child").html(`
             <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
                 <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
@@ -243,64 +258,61 @@
     $(document).on("click", ".update-row-btn", function () {
         var $row = $(this).closest("tr");
         var scheduleId = $(this).data('schedule-id');
-        
-        // Get the values from the input fields
+
         var startDateInput = $('#edit-start-date-' + scheduleId);
-        var endDateInput = $('#edit-end-date-' + scheduleId);
-        
-        // Prepare data object with only the required fields
+        var endDateInput   = $('#edit-end-date-' + scheduleId);
+        var startTimeInput = $('#edit-start-time-' + scheduleId);
+        var endTimeInput   = $('#edit-end-time-' + scheduleId);
+
         var data = {
             _token: '{{ csrf_token() }}',
             id: scheduleId
         };
-        
-        // Only include start_date if it has a value
-        if (startDateInput.val()) {
-            data.start_date = startDateInput.val();
-        }
-        
-        // Only include end_date if it has a value
-        if (endDateInput.val()) {
-            data.end_date = endDateInput.val();
-        }
-        
-        // Get original values for any field not being updated
+        if (startDateInput.val()) data.start_date = startDateInput.val();
+        if (endDateInput.val())   data.end_date   = endDateInput.val();
+        if (startTimeInput.val()) data.start_time = startTimeInput.val();
+        if (endTimeInput.val())   data.end_time   = endTimeInput.val();
+
         var originalStartDate = $row.data('original-start');
-        var originalEndDate = $row.data('original-end');
-        
+        var originalEndDate   = $row.data('original-end');
+        var originalStartTime = $row.data('original-start-time');
+        var originalEndTime   = $row.data('original-end-time');
+
         $.ajax({
             url: '{{ route("learning.schedule.update") }}',
             type: 'POST',
             data: data,
             success: function (response) {
                 if (response.success) {
-                    
-                    toastr.success("Date updated successfully!", "Success", {
+                    toastr.success("Schedule updated successfully!", "Success", {
                         positionClass: 'toast-bottom-right'
-                    });  
-                    // Update the text cells with new values or keep original if not changed
+                    });
                     var newStartDate = startDateInput.val() || originalStartDate;
-                    var newEndDate = endDateInput.val() || originalEndDate;
-                    
+                    var newEndDate   = endDateInput.val()   || originalEndDate;
+                    var newStartTime = startTimeInput.val() ? (startTimeInput.val().length === 5 ? startTimeInput.val() + ':00' : startTimeInput.val()) : originalStartTime;
+                    var newEndTime   = endTimeInput.val()   ? (endTimeInput.val().length   === 5 ? endTimeInput.val()   + ':00' : endTimeInput.val())   : originalEndTime;
+
                     $row.find("td:nth-child(4)").text(newStartDate);
                     $row.find("td:nth-child(5)").text(newEndDate);
-                    
-                    // Restore original action buttons
+                    $row.find("td:nth-child(6)").text(newStartTime);
+                    $row.find("td:nth-child(7)").text(newEndTime);
+
                     $row.find("td:last-child").html(`
                         <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
                             <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
                         </a>
                     `);
                 } else {
-                    toastr.error("Failed to update. Try again!", "Error", {
+                    toastr.error(response.message || "Failed to update. Try again!", "Error", {
                         positionClass: 'toast-bottom-right'
-                    });  
+                    });
                 }
             },
-            error: function () {
-                toastr.error("Error updating the date.", "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });  
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || "Error updating the schedule.";
+                toastr.error(msg, "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
             }
         });
     });

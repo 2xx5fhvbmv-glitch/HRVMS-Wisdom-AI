@@ -20,7 +20,17 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{route('learning.schedule')}}" class="btn btn-theme @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif">Add Learning Schedule</a>
+                        @php
+                            // Add Learning Schedule — only HR / GM / L&D Manager.
+                            $_curEmp = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
+                            $_curPos = optional(optional($_curEmp)->position)->position_title;
+                            $_ldTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+                            $_canAddSchedule = \App\Helpers\Common::hasFullDataAccess()
+                                || in_array($_curPos, $_ldTitles, true);
+                        @endphp
+                        @if($_canAddSchedule)
+                            <a href="{{route('learning.schedule')}}" class="btn btn-theme">Add Learning Schedule</a>
+                        @endif
                     </div>
                 </div>
             </div>

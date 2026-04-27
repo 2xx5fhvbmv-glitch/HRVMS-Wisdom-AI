@@ -243,20 +243,17 @@ class SitesettignsController extends Controller
             $employee = $resort->GetEmployee;
             $resortId = $resort->resort_id;
 
+            // Always scope to notifications addressed to the logged-in user, matching
+            // the bell-dropdown behavior in Common::ResortNotification(). Broadcasts
+            // (e.g. for HR/GM) are inserted as one row per recipient by the senders,
+            // so each user only sees their own here too.
+            $userEmpId = optional($employee)->id;
             $query = ResortNotification::select([
                     'id', 'module', 'type', 'message', 'status', 'created_at', 'user_id'
                 ])
                 ->where('resort_id', $resortId)
-                ->where('status', '!=', 'deleted');
-
-            // HR/EXCOM/GM see all resort notifications; others see only their own
-            if ($employee) {
-                $rank = config('settings.Position_Rank');
-                $userRank = $rank[$employee->rank] ?? '';
-                if (!in_array($userRank, ['HR', 'EXCOM', 'GM'])) {
-                    $query->where('user_id', $employee->id);
-                }
-            }
+                ->where('status', '!=', 'deleted')
+                ->where('user_id', $userEmpId);
 
             return datatables()->of($query)
                 ->order(function ($query) use ($request) {

@@ -3256,6 +3256,14 @@ class Common
             return true;
         }
 
+        // L&D Managers (rank 4 / MGR with a learning-leadership position title)
+        // need resort-wide visibility for training/attendance/schedule modules.
+        $positionTitle = optional($emp->position)->position_title;
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        if (in_array($positionTitle, $ldManagerTitles, true)) {
+            return true;
+        }
+
         return false;
     }
 

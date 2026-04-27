@@ -82,15 +82,18 @@
                                         </select>
                                     </div>
                                     <div class="col-lg-6">
-                                        <label for="start_date" class="form-label">START DATE <span class="req_span">*</span></label>
+                                        <label for="start_date" class="form-label">EXPECTED START DATE <span class="req_span">*</span></label>
                                         <input type="text" id="start_date" name="start_date" class="form-control datepicker"
-                                            placeholder="Select Start Date">
+                                            placeholder="Select Expected Start Date">
                                     </div>
+                                    {{-- END DATE field hidden 2026-04-26 — backing column is now nullable.
+                                         Re-enable along with the corresponding validator + label below.
                                     <div class="col-lg-6">
                                         <label for="end_date" class="form-label">END DATE <span class="req_span">*</span></label>
                                         <input type="text" id="end_date" name="end_date" class="form-control datepicker"
                                             placeholder="Select End Date">
                                     </div>
+                                    --}}
                                 </div>
                             </div>
 
@@ -158,11 +161,7 @@
                     required: true,
                     customDate: true, // Use the custom date validation
                 },
-                end_date: {
-                    required: true,
-                    customDate: true, // Use the custom date validation
-                    greaterThan: "#start_date", // Custom rule applied here
-                },
+                // end_date validator disabled — field commented out in markup.
             },
             messages: {
                 suggested_Learning: {
@@ -175,10 +174,7 @@
                     required: "Please Select a L&D Manager.",
                 },
                 start_date: {
-                    required: "Please select a start date.",
-                },
-                end_date: {
-                    required: "Please select an end date.",
+                    required: "Please select an expected start date.",
                 },
             },
             submitHandler: function (form) {

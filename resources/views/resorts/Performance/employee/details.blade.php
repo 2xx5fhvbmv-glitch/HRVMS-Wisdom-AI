@@ -45,10 +45,18 @@
                             </h4>
                             <div class="text-muted">{{ $employee->position->position_title ?? '' }}{{ !empty($employee->department->name) ? ' · '.$employee->department->name : '' }}</div>
                             <div class="rating-stars mt-1">
-                                @php $rating = (int) round($status['rating']); @endphp
-                                @for($i = 1; $i <= 5; $i++)
-                                    <i class="fa-{{ $i <= $rating ? 'solid' : 'regular' }} fa-star" style="color:#f5a623;"></i>
-                                @endfor
+                                @php
+                                    $rating = (int) round($status['rating'] ?? 0);
+                                    $hasRating = $status['has_rating'] ?? ($rating > 0);
+                                @endphp
+                                @if($hasRating)
+                                    @for($i = 1; $i <= 5; $i++)
+                                        <i class="fa-{{ $i <= $rating ? 'solid' : 'regular' }} fa-star" style="color:#f5a623;"></i>
+                                    @endfor
+                                    <span class="small text-muted ms-1">{{ number_format($status['rating'] ?? 0, 1) }}/5</span>
+                                @else
+                                    <span class="small text-muted">No rating yet</span>
+                                @endif
                             </div>
                         </div>
                         <div class="col-auto text-end">

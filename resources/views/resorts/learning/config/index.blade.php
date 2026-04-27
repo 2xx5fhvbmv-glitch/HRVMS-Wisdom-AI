@@ -226,7 +226,8 @@
                                     <input type="text" name="external_training" id="external_training" class="form-control" placeholder="External Training (optional)">
                                 </div>
                                 <div class="col-xxl-6">
-                                    <input type="text" name="external_trainer_company" id="external_trainer_company" class="form-control" placeholder="External Trainer Company (optional)">
+                                    <input type="text" name="external_trainer_company" id="external_trainer_company" class="form-control" placeholder="External Trainer Company">
+                                    <small class="text-muted">Pick an internal trainer above or fill this for an external trainer.</small>
                                 </div>
                                 <div class="col-xxl-6">
                                     <div class="uploadFile-btn me-0">
@@ -367,8 +368,9 @@
                     </div>
 
                     <div class="card mb-30">
-                        <div class="card-title">
-                            <h3>Feedback Forms</h3>
+                        <div class="card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h3 class="mb-0">Feedback Forms</h3>
+                            <a href="{{ route('feedback-form.index') }}" class="a-link">View All</a>
                         </div>
                         <div class="row g-2 mb-md-4 mb-3">
                             <div class="col-12">
@@ -379,10 +381,11 @@
                     </div>
 
                     <div class="card card-evaluationSet mb-30">
-                        <div class="card-title">
-                            <h3>Evaluation Settings</h3>
+                        <div class="card-title d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h3 class="mb-0">Evaluation Forms</h3>
+                            <a href="{{ route('evaluation-form.index') }}" class="a-link">View All</a>
                         </div>
-                        
+
                         <div class="col-12 mb-3">
                             <a href="{{route('evaluation-form.create')}}" class="btn btn-themeSkyblue btn-sm">Create Evaluation Form</a>
                         </div>
@@ -408,14 +411,22 @@
                     </div>
 
                     <div class="card card-attendancePara mb-30">
-                        <div class="card-title">
-                            <h3>Attendance Parameters</h3>
+                        <div class="card-title d-flex align-items-center gap-2">
+                            <h3 class="mb-0">Attendance Parameters</h3>
+                            <i class="fa-regular fa-circle-question text-muted"
+                               style="cursor: help;"
+                               data-bs-toggle="tooltip" data-bs-placement="top"
+                               title="Minimum attendance % required for an employee to be counted as having completed a training. Used on the HR Learning Dashboard to compute per-program completion rates. Example: setting 35 means anyone who attended 35% or more of a training's sessions counts as having completed it."></i>
                         </div>
                         <form id="attendance_parameters">
-                            <div class="row align-items-center g-2 mb-md-4 mb-3">                            
+                            <div class="row align-items-center g-2 mb-md-4 mb-3">
                                 <div class="col-xxl-6">
-                                    <input type="number" class="form-control" name="threshold_percentage" id="threshold_percentage" placeholder="Minimum Attendance Percentage" min="0" max="100" value="{{ $attenndanceParameters->threshold_percentage ?? '' }}">
+                                    <label class="form-label small text-muted mb-1">Minimum Attendance %</label>
+                                    <input type="number" class="form-control" name="threshold_percentage" id="threshold_percentage" placeholder="e.g. 70" min="0" max="100" value="{{ $attenndanceParameters->threshold_percentage ?? '' }}">
                                 </div>
+                                {{-- "Auto-Notifications To Employees" toggle hidden 2026-04-26: column is saved but
+                                     never read anywhere in the codebase, so the switch was a no-op. Re-enable when
+                                     a consumer is wired to honour $attenndanceParameters->auto_notifications.
                                 <div class="col-xxl-6">
                                     <div class="row align-items-center  g-1">
                                         <div class="col-auto">
@@ -432,6 +443,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                --}}
                             </div>
                             <div class="card-footer text-end">
                                 <button type="submit" class="btn btn-themeBlue">Submit</button>
@@ -692,6 +704,22 @@
             }
         });
 
+        // Bootstrap 5 tooltips need explicit init.
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            $('[data-bs-toggle="tooltip"]').each(function () {
+                new bootstrap.Tooltip(this);
+            });
+        }
+
+        // Trainer / External Trainer Company are mutually optional — re-validate the partner.
+        $(document).on('input change', '#external_trainer_company, #trainer', function () {
+            var $form = $('#learning-program-setup');
+            if ($form.length && $form.data('validator')) {
+                $form.validate().element('#trainer');
+                $form.validate().element('#external_trainer_company');
+            }
+        });
+
         // Hours / Days are mutually optional — re-trigger validation on the partner field.
         $(document).on('input change', '#hours, #days', function () {
             var $form = $('#learning-program-setup');
@@ -700,6 +728,42 @@
                 $form.validate().element('#days');
             }
         });
+
+        // Comprehensive reset for the Learning Program Setup form. Native .reset()
+        // ignores Select2 + custom dynamic rows + file-input labels, so we clear those
+        // explicitly here.
+        window.resetLearningProgramForm = function () {
+            var $form = $('#learning-program-setup');
+            if (!$form.length) return;
+
+            // Clear native form state + jQuery validator errors
+            $form[0].reset();
+            if ($form.data('validator')) $form.validate().resetForm();
+            $form.find('.error').removeClass('error');
+
+            // Re-sync every Select2 dropdown to its underlying value (now blank).
+            $form.find('select').each(function () {
+                $(this).val('').trigger('change.select2').trigger('change');
+            });
+
+            // Reset the dynamic objectives list back to a single empty row.
+            var $list = $('#objectivesList');
+            $list.find('.objective-row:not(:first)').remove();
+            $list.find('.objective-row:first input').val('');
+            if (typeof syncObjectiveRemoveButtons === 'function') syncObjectiveRemoveButtons();
+
+            // Hide the day-of-month picker (frequency cleared).
+            $('#frequencyDayWrap').hide();
+            $('#frequency_day').val('');
+
+            // Clear the audience-type radio + dependent dropdowns.
+            $('input[name="audience_type"]').prop('checked', false);
+            $('#department-dropdown,#grade-dropdown,#position-dropdown,#employee-dropdown').hide();
+
+            // Reset file inputs + their displayed filenames.
+            $form.find('input[type="file"]').val('');
+            $('#fileNameLearningMaterial,#trainerImageName').text('');
+        };
 
         // Frequency → toggle Day-of-Month picker for one-time / monthly / quarterly.
         // Bind to both native change AND select2:select since #frequency is wrapped in Select2.
@@ -779,8 +843,18 @@
                 delivery_mode: {
                     required: true,
                 },
+                // Trainer is either internal OR external — at least one is required.
                 trainer: {
-                    required: true,
+                    required: function () {
+                        return $('#external_trainer_company').val().trim() === '';
+                    }
+                },
+                external_trainer_company: {
+                    required: function () {
+                        var t = $('#trainer').val();
+                        return !t || t === 'Select Trainer';
+                    },
+                    maxlength: 255
                 }
             },
             messages: {
@@ -816,7 +890,11 @@
                     required: "Please select a delivery mode.",
                 },
                 trainer: {
-                    required: "Please select a trainer.",
+                    required: "Pick an internal trainer or fill the External Trainer Company field.",
+                },
+                external_trainer_company: {
+                    required: "Pick an internal trainer or fill the External Trainer Company field.",
+                    maxlength: "Up to 255 characters."
                 }
             },
             submitHandler: function(form) {
@@ -833,7 +911,7 @@
                             toastr.success(response.msg, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
-                            $('#learning-program-setup').get(0).reset();
+                            resetLearningProgramForm();
                         } else {
                             toastr.error(response.msg, "Error", {
                                 positionClass: 'toast-bottom-right'

@@ -1196,6 +1196,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('/evaluation-form', 'Learning\EvaluationFormController@index')->name('evaluation-form.index');
     Route::get('/evaluation-form/list', 'Learning\EvaluationFormController@list')->name('evaluation-form.list');
     Route::get('/evaluation-form/edit/{id}', 'Learning\EvaluationFormController@edit')->name('evaluation-form.edit');
+    Route::get('/evaluation-form/preview/{id}', 'Learning\EvaluationFormController@preview')->name('evaluation-form.preview');
     Route::post('/evaluation-form/update/{id}', 'Learning\EvaluationFormController@update')->name('evaluation-form.update');
     Route::delete('/evaluation-form/delete/{id}', 'Learning\EvaluationFormController@delete')->name('evaluation-form.delete');
 

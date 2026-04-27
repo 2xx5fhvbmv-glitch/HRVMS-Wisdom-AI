@@ -66,7 +66,7 @@
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Completed Compulsory Learning</p>
-                                <strong>80%</strong>
+                                <strong>{{ is_null($compulsoryPercent ?? null) ? '—' : ($compulsoryPercent . '%') }}</strong>
                             </div>
                             <a href="{{route('learning.schedule.index')}}">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
@@ -76,6 +76,44 @@
                 </div>
                 <div class="col-xxl-9 col-xl-8 h-auto" id="left-ldDash">
                     <div class="row g-3 g-xxl-4">
+
+                        @if(!empty($myCompulsoryPrograms))
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-title">
+                                        <h3>My Compulsory Learning Programs</h3>
+                                        <small class="text-muted">You're on probation — these are the trainings you need to complete.</small>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table-lableNew table-empLDHod w-100">
+                                            <tr>
+                                                <th>Program</th>
+                                                <th>Complete Within</th>
+                                                <th>Due By</th>
+                                                <th>Status</th>
+                                            </tr>
+                                            @foreach($myCompulsoryPrograms as $p)
+                                                <tr>
+                                                    <td>{{ $p->program_name }}</td>
+                                                    <td>{{ $p->completion_days ? $p->completion_days . ' days' : '—' }}</td>
+                                                    <td>{{ $p->due_on ? \Carbon\Carbon::parse($p->due_on)->format('d M Y') : '—' }}</td>
+                                                    <td>
+                                                        @if($p->is_completed)
+                                                            <span class="badge badge-themeSuccess"><i class="fa-solid fa-check me-1"></i>Completed</span>
+                                                        @elseif($p->is_overdue)
+                                                            <span class="badge badge-themeDanger">Overdue</span>
+                                                        @else
+                                                            <span class="badge badge-themeWarning">Pending</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="col-xxl-6 col-md-6 ">
                             <div class=" card">
                                 <div class=" card-title">

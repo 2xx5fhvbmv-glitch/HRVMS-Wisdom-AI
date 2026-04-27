@@ -222,9 +222,11 @@ class LearningProgramController extends Controller
             'frequency' => 'required|string|in:one-time,monthly,recurring,quarterly,annually',
             'frequency_day' => 'nullable|integer|min:1|max:30',
             'delivery_mode' => 'required|string|in:face-to-face,online,hybrid',
-            'trainer' => 'required|exists:employees,id',
+            // Trainer is either internal (employee FK) or external (company name).
+            // At least one is required. If both provided, both are saved.
+            'trainer' => 'nullable|required_without:external_trainer_company|exists:employees,id',
             'external_training' => 'nullable|string|max:255',
-            'external_trainer_company' => 'nullable|string|max:255',
+            'external_trainer_company' => 'nullable|required_without:trainer|string|max:255',
             'trainer_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'prior_qualification' => 'nullable|string',
             'learning_material.*' => 'nullable|mimes:pdf,ppt,pptx|max:2048',

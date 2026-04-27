@@ -95,7 +95,13 @@ class DashboardController extends Controller
             ];
         }
         // dd($completionData);
-        return view('resorts.learning.dashboard.hrdashboard',compact('page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count','pending_learning_request','trainings','completionData'));
+        // Dynamic dashboard widgets — replace hardcoded "70%" / "Learning 1" placeholders.
+        $feedbackAvgScore     = $this->computeAverageEvaluationScore($resort_id);
+        $onboardingProgress   = $this->computeCompulsoryCompletionPercent($resort_id, null);
+        $learningHoursByProg  = $this->computeLearningHoursByProgram($resort_id);
+        $learningAttendance   = $this->computeLearningAttendanceBreakdown($resort_id);
+
+        return view('resorts.learning.dashboard.hrdashboard',compact('page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count','pending_learning_request','trainings','completionData','feedbackAvgScore','onboardingProgress','learningHoursByProg','learningAttendance'));
     }
 
     public function admin_dashboard()
@@ -137,9 +143,31 @@ class DashboardController extends Controller
         };
         $ongoing_trainings_count  = $countTrainingsByStatus('Ongoing');
         $completed_trainings_count = $countTrainingsByStatus('Completed');
-        $scheduled_trainings_count = LearningRequest::where('status','Approved')->where('resort_id', $resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->count();
-        $pending_trainings_count  = LearningRequest::where('status','Pending')->where('resort_id', $resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->count();
-        $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->get();
+
+        // Pending / Approved Learning Requests — count any request that targets an employee
+        // in scope (not just ones created by the logged-in user). HOD/XCOM should see what's
+        // pending for their team, regardless of who initiated the request.
+        $countLearningReqs = function ($status) use ($resort_id, $scopedEmpIds) {
+            $q = LearningRequest::where('status', $status)->where('resort_id', $resort_id);
+            if (is_array($scopedEmpIds)) {
+                $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
+            }
+            return $q->count();
+        };
+        $scheduled_trainings_count = $countLearningReqs('Approved');
+        $pending_trainings_count   = $countLearningReqs('Pending');
+        $pending_learning_request  = LearningRequest::with('learning')
+            ->where('status','Pending')->where('resort_id',$resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
+            ->get();
+
+        // Compulsory Learning completion % — for probationary employees in scope, what fraction
+        // have completed every probationary program assigned to the resort?
+        $compulsoryPercent = $this->computeCompulsoryCompletionPercent($resort_id, $scopedEmpIds);
+
+        // "My Compulsory Programs" — if the logged-in user is on probation, list the programs
+        // they personally need to complete + their per-program status.
+        $myCompulsoryPrograms = $this->buildMyCompulsoryPrograms($resort_id);
 
         $trainings = TrainingSchedule::with(['learningProgram', 'trainingAttendances'])
             ->where('resort_id', $resort_id)
@@ -171,13 +199,224 @@ class DashboardController extends Controller
             ->with(['employee.resortAdmin'])
             ->get();
 
-        return view('resorts.learning.dashboard.hoddashboard',compact('page_header','page_title','ongoing_trainings_count','completed_trainings_count','scheduled_trainings_count','pending_trainings_count','pending_learning_request','trainings','overdueEmployees','topPerformers'));
+        return view('resorts.learning.dashboard.hoddashboard',compact('page_header','page_title','ongoing_trainings_count','completed_trainings_count','scheduled_trainings_count','pending_trainings_count','pending_learning_request','trainings','overdueEmployees','topPerformers','compulsoryPercent','myCompulsoryPrograms'));
     }
 
     public function excom_dashboard()
     {
         request()->merge(['dashboard_label' => 'XCOM']);
         return $this->hod_dashboard();
+    }
+
+    /**
+     * Average evaluation score (0-100) across all submitted training evaluation
+     * forms for this resort. Walks each evaluation_form's structure for starRating
+     * fields, reads the values from the response payloads, and averages.
+     * Returns null if no responses exist (UI can show "—" instead of 0%).
+     */
+    private function computeAverageEvaluationScore($resortId)
+    {
+        $tableExists = \Schema::hasTable('training_evaluation_form_responses') || \Schema::hasTable('training_evaluation_responses');
+        if (!$tableExists) return null;
+        $responsesTable = \Schema::hasTable('training_evaluation_form_responses') ? 'training_evaluation_form_responses' : 'training_evaluation_responses';
+        if (!\Schema::hasColumn($responsesTable, 'response_data')) return null;
+
+        $responses = \DB::table($responsesTable)
+            ->where('resort_id', $resortId)
+            ->whereNotNull('response_data')
+            ->pluck('response_data');
+        if ($responses->isEmpty()) return null;
+
+        $ratings = [];
+        foreach ($responses as $raw) {
+            $data = json_decode($raw, true);
+            if (!is_array($data)) continue;
+            foreach ($data as $val) {
+                // Accept any numeric value 1..5 — close enough as a starRating signal.
+                if (is_numeric($val) && $val >= 1 && $val <= 5) $ratings[] = (float) $val;
+            }
+        }
+        if (empty($ratings)) return null;
+        $avg5 = array_sum($ratings) / count($ratings);
+        return (int) round(($avg5 / 5) * 100);
+    }
+
+    /**
+     * Total hours per learning program for completed/ongoing training schedules.
+     * Returns up to 9 entries — used to feed the Learning Hours legend dynamically
+     * (replacing the nine hardcoded "Learning 1" labels).
+     */
+    private function computeLearningHoursByProgram($resortId)
+    {
+        return \DB::table('training_schedules as ts')
+            ->join('learning_programs as lp', 'lp.id', '=', 'ts.training_id')
+            ->where('ts.resort_id', $resortId)
+            ->selectRaw('lp.name as name, SUM(COALESCE(lp.hours, 0)) as total_hours, COUNT(ts.id) as session_count')
+            ->groupBy('lp.id', 'lp.name')
+            ->orderByDesc('session_count')
+            ->limit(9)
+            ->get();
+    }
+
+    /**
+     * Aggregate training-attendance breakdown for the Learning Attendance doughnut.
+     * Returns counts of Present / Absent / Late so the chart legend is real.
+     */
+    private function computeLearningAttendanceBreakdown($resortId)
+    {
+        return \DB::table('training_attendance as ta')
+            ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+            ->where('ts.resort_id', $resortId)
+            ->selectRaw('ta.status as status, COUNT(*) as n')
+            ->groupBy('ta.status')
+            ->pluck('n', 'status')
+            ->toArray();
+    }
+
+    /**
+     * If the logged-in user is on probation (or marked Probationary), return
+     * the resort's probationary programs along with their personal completion
+     * state so the dashboard can list "My Compulsory Programs". Empty array
+     * for non-probationary users — the blade hides the panel in that case.
+     */
+    private function buildMyCompulsoryPrograms($resortId)
+    {
+        $emp = $this->resort->GetEmployee ?? null;
+        if (!$emp) return [];
+
+        $isOnProbation = ($emp->employment_type === 'Probationary')
+            || in_array($emp->probation_status, ['Active', 'Extended']);
+        if (!$isOnProbation) return [];
+
+        $required = \App\Models\ProbationaryLearningProgram::with('program')
+            ->where('resort_id', $resortId)
+            ->get();
+        if ($required->isEmpty()) return [];
+
+        // Build a quick lookup of which required programs this employee has 'Present' attendance for.
+        $programIds = $required->pluck('program_id')->all();
+        $completedProgramIds = \DB::table('training_attendance as ta')
+            ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+            ->where('ts.resort_id', $resortId)
+            ->whereIn('ts.training_id', $programIds)
+            ->where('ta.employee_id', $emp->id)
+            ->where('ta.status', 'Present')
+            ->pluck('ts.training_id')
+            ->unique()
+            ->all();
+
+        $deadline = $emp->joining_date ? \Carbon\Carbon::parse($emp->joining_date) : null;
+
+        $list = $required->map(function ($r) use ($completedProgramIds, $deadline) {
+            $isCompleted = in_array($r->program_id, $completedProgramIds);
+            $dueOn = ($deadline && $r->completion_days)
+                ? (clone $deadline)->addDays((int) $r->completion_days)
+                : null;
+            return (object) [
+                'program_id'      => $r->program_id,
+                'program_name'    => optional($r->program)->name ?? '—',
+                'completion_days' => $r->completion_days,
+                'due_on'          => $dueOn,
+                'is_completed'    => $isCompleted,
+                'is_overdue'      => !$isCompleted && $dueOn && $dueOn->isPast(),
+            ];
+        })->all();
+
+        // Fire once-only reminder notifications for each pending/overdue program.
+        $this->sendProbationaryReminders($emp, $list);
+
+        return $list;
+    }
+
+    /**
+     * For each pending or overdue probationary program, send the user (and the manager,
+     * for overdue) a single notification — guarded by probationary_program_notifications
+     * so re-opening the dashboard doesn't re-spam.
+     */
+    private function sendProbationaryReminders($emp, $list)
+    {
+        if (!$emp || empty($list)) return;
+        $resortId = $emp->resort_id;
+
+        foreach ($list as $p) {
+            if ($p->is_completed) continue;
+
+            $kind = $p->is_overdue ? 'overdue' : 'pending';
+
+            // Idempotent: try to insert the tracker row; if a duplicate, skip the send.
+            $inserted = false;
+            try {
+                \DB::table('probationary_program_notifications')->insert([
+                    'employee_id' => $emp->id,
+                    'program_id'  => $p->program_id,
+                    'kind'        => $kind,
+                    'sent_at'     => now(),
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+                $inserted = true;
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Unique constraint hit — already notified; skip.
+            }
+            if (!$inserted) continue;
+
+            try {
+                $title = $kind === 'overdue' ? 'Compulsory Training Overdue' : 'Compulsory Training Reminder';
+                $msg = $kind === 'overdue'
+                    ? 'Your compulsory probation training "' . $p->program_name . '" is overdue. Please complete it as soon as possible.'
+                    : 'Reminder: please complete your probation training "' . $p->program_name . '"'
+                        . ($p->due_on ? ' by ' . \Carbon\Carbon::parse($p->due_on)->format('d M Y') : '') . '.';
+
+                $recipients = [(int) $emp->id];
+                if ($kind === 'overdue' && $emp->reporting_to) {
+                    $recipients[] = (int) $emp->reporting_to;
+                }
+
+                Common::notifyEmployees($resortId, $recipients, $title, $msg, 'Learning', $p->program_id);
+            } catch (\Exception $e) {
+                \Log::warning('Probationary reminder send failed: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Compulsory Learning completion % — for probationary employees in scope, what
+     * fraction of (employee × required-program) pairs have a completed training-
+     * attendance record. Returns an int 0..100 (or null if there's nothing to measure
+     * so the UI can show "—" instead of a misleading 0%).
+     */
+    private function computeCompulsoryCompletionPercent($resortId, $scopedEmpIds)
+    {
+        $programIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resortId)->pluck('program_id');
+        if ($programIds->isEmpty()) return null;
+
+        // "Probationary" = either employment_type='Probationary' OR probation_status='Active'/'Extended'.
+        // Test data on this app frequently has employment_type='Full-Time' while still in
+        // probation period, so we can't rely on the type alone.
+        $probationary = \App\Models\Employee::where('resort_id', $resortId)
+            ->where('status', 'Active')
+            ->where(function ($q) {
+                $q->where('employment_type', 'Probationary')
+                  ->orWhereIn('probation_status', ['Active', 'Extended']);
+            })
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('id', $scopedEmpIds))
+            ->pluck('id');
+        if ($probationary->isEmpty()) return null;
+
+        $totalPairs = $probationary->count() * $programIds->count();
+
+        // Count completions: an attendance record with status='Present' on a TrainingSchedule
+        // backed by one of the required programs, for one of the in-scope probationary employees.
+        $completedPairs = \DB::table('training_attendance as ta')
+            ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+            ->where('ts.resort_id', $resortId)
+            ->whereIn('ts.training_id', $programIds)
+            ->whereIn('ta.employee_id', $probationary)
+            ->where('ta.status', 'Present')
+            ->distinct()
+            ->count(\DB::raw('CONCAT(ta.employee_id, "-", ts.training_id)'));
+
+        return $totalPairs > 0 ? (int) round(($completedPairs / $totalPairs) * 100) : null;
     }
 
     public function manager_dashboard()

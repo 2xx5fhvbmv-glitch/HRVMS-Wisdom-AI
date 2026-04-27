@@ -50,17 +50,26 @@ class LearningController extends Controller
         $available_rank = $rank[$current_rank] ?? '';
         $isHOD = ($available_rank === "HOD");
         $isHR = ($available_rank === "HR");
+
+        // L&D Managers (and similar roles) need to file requests for any employee
+        // in the resort, not just their direct reports.
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
+        $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true);
+
         $employees_query = Employee::with(['resortAdmin','department','position'])->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary']);
 
-        // Additional department-visibility scope on top of the HR/HOD branching.
-        $scopedDeptIds = Common::getScopedDepartmentIds();
-        $employees_query->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
-
-        if ($isHR) {
-            $employees_query->where('employees.id', '!=', $this->resort->getEmployee->id);
+        // Department-visibility scope. L&D Managers + HR are explicitly given resort-wide
+        // visibility for this flow; everyone else falls under the standard scoping.
+        if (!$isHR && !$isLdManager) {
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            $employees_query->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
         }
-        else{
-            $employees_query->where('employees.reporting_to',$this->reporting_to );
+
+        if ($isHR || $isLdManager) {
+            $employees_query->where('employees.id', '!=', $this->resort->getEmployee->id);
+        } else {
+            $employees_query->where('employees.reporting_to', $this->reporting_to);
         }
         $employees = $employees_query->get();
         // dd($employees);
@@ -88,7 +97,8 @@ class LearningController extends Controller
             'reason' => 'required|string|max:255',
             'learning_manager' => 'required|exists:employees,id',
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            // End date temporarily optional — UI field is hidden; column is nullable.
+            'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
         $employeeIds = json_decode($request->employee_ids, true);
@@ -112,14 +122,15 @@ class LearningController extends Controller
             [
                 'reason' => $request->reason,
                 'start_date' => Carbon::parse($request->start_date)->format('Y-m-d'),
-                'end_date' => Carbon::parse($request->end_date)->format('Y-m-d'),
+                'end_date' => $request->filled('end_date') ? Carbon::parse($request->end_date)->format('Y-m-d') : null,
                 'status' => 'pending',
+                'created_by' => $this->resort->id,
             ]
         );
 
         // ✅ Remove old employees & insert new ones to avoid duplicates
         LearningRequestEmployee::where('learning_request_id', $learningRequest->id)->delete();
-        
+
         foreach ($employeeIds as $employeeId) {
             LearningRequestEmployee::create([
                 'learning_request_id' => $learningRequest->id,
@@ -127,28 +138,34 @@ class LearningController extends Controller
             ]);
         }
 
-        // ✅ Improved Notification Message
-        $notificationTitle = 'New Learning Request';
-        $notificationMessage = "A new learning request for **'{$learningProgramName}'** has been submitted for review.  
-                                **Dates:** {$request->start_date} to {$request->end_date}  
-                                **Employees:** " . count($employeeIds) . " participants.";
-
-        $moduleName = "Learning";
-
-        event(new ResortNotificationEvent(Common::nofitication(
-            $this->resort->resort_id, 
-            10, 
-            $notificationTitle, 
-            $notificationMessage, 
-            'Learning', 
-            $learningManagerId, 
-            $moduleName
-        )));
+        // Notification — wrap in try/catch so a notify failure can't kill the submit.
+        // (Earlier code passed the literal string 'Learning' as request_id; the column is
+        //  int(11), so MySQL strict mode rejected the insert and 500'd the entire request.)
+        try {
+            $title = 'New Learning Request';
+            $datesText = $request->filled('end_date')
+                ? "Dates: {$request->start_date} to {$request->end_date}."
+                : "Expected start: {$request->start_date}.";
+            $message = "A new learning request for '{$learningProgramName}' has been submitted for review. "
+                . $datesText
+                . " Employees: " . count($employeeIds) . " participants.";
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                [(int) $learningManagerId],
+                $title,
+                $message,
+                'Learning',
+                $learningRequest->id
+            );
+        } catch (\Exception $ne) {
+            \Log::warning('Learning request notification failed: ' . $ne->getMessage());
+        }
 
         return response()->json([
-            'success' => true, 
+            'success' => true,
             'msg' => 'Learning request submitted successfully!',
-            'redirect_url' => url('learning.request.index')
+            // url() doesn't resolve route names — use route() so the redirect actually lands on the requests list.
+            'redirect_url' => route('learning.request.index'),
         ]);
     }
 
