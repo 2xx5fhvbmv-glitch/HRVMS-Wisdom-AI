@@ -390,7 +390,7 @@ class PerformanceDashboardController extends Controller
     private function computeAppraisalStatus($empId, $activeCycleIds)
     {
         if ($activeCycleIds->isEmpty()) {
-            return ['label' => 'Not Started', 'rating' => 0];
+            return ['label' => 'Not Started', 'rating' => 0, 'has_rating' => false];
         }
 
         // Emp_main_id may be stored as numeric id, base64 of id, or the Emp_id string.
@@ -404,30 +404,103 @@ class PerformanceDashboardController extends Controller
             ->first();
 
         if (!$child) {
-            return ['label' => 'Not Started', 'rating' => 0];
+            return ['label' => 'Not Started', 'rating' => 0, 'has_rating' => false];
         }
 
-        // Done: manager review finished (for GM reviews, manager_review_status is 'not_applicable'
-        // so treat self completion as done). In Progress: self done, manager pending.
-        // Not Started: nothing completed yet.
+        // Three-state model that matches expectations:
+        //   Done        — manager review completed (or self done for GM-review rows where manager is N/A)
+        //   In Progress — a child cycle row exists for the employee (appraisal assigned), regardless of who has submitted yet
+        //   Not Started — no child cycle row at all (handled above by the early return)
         if ($child->manager_review_status === 'completed'
             || ($child->manager_review_status === 'not_applicable' && $child->self_review_status === 'completed')) {
             $label = 'Done';
-        } elseif ($child->self_review_status === 'completed') {
-            $label = 'In Progress';
         } else {
-            $label = 'Not Started';
+            $label = 'In Progress';
         }
 
-        $rating = 0;
-        if (!empty($child->manager_review_data)) {
-            $data = json_decode($child->manager_review_data, true);
-            if (is_array($data) && isset($data['rating'])) {
-                $rating = (float) $data['rating'];
+        $ratingInfo = $this->extractRatingFromChild($child);
+        return ['label' => $label, 'rating' => $ratingInfo['rating'], 'has_rating' => $ratingInfo['has_rating']];
+    }
+
+    /**
+     * Walk the cycle's template structure, find fields of type 'starRating',
+     * read their values from manager_review_data, and return the average (out of 5).
+     * Returns has_rating=false when nothing rateable was filled, so the UI can
+     * show a "—" instead of five hollow stars.
+     */
+    private function extractRatingFromChild($child)
+    {
+        if (empty($child->manager_review_data)) {
+            return ['rating' => 0, 'has_rating' => false];
+        }
+        $data = json_decode($child->manager_review_data, true);
+        if (!is_array($data)) return ['rating' => 0, 'has_rating' => false];
+
+        // Resolve the template that backed this child row (child level first, then parent fallback).
+        $templateId = $child->template_id;
+        if (empty($templateId)) {
+            $cycle = \App\Models\PerformanceCycle::find($child->Parent_cycle_id);
+            $templateId = $cycle->Manager_Review_Templete ?? $cycle->Self_Review_Templete ?? null;
+        }
+        $structure = $this->loadTemplateStructure($templateId);
+
+        // Pull every starRating field's value out of the manager_review_data.
+        $ratings = [];
+        $maxRatings = [];
+        foreach ($structure as $field) {
+            if (($field['type'] ?? null) !== 'starRating') continue;
+            $name = $field['name'] ?? null;
+            if (!$name || !isset($data[$name])) continue;
+            $val = (float) $data[$name];
+            if ($val <= 0) continue;
+            $ratings[]    = $val;
+            $maxRatings[] = (float) ($field['maxRating'] ?? 5);
+        }
+
+        if (empty($ratings)) {
+            // Legacy fallback: if a literal 'rating' key was used (older code path).
+            if (isset($data['rating']) && (float) $data['rating'] > 0) {
+                return ['rating' => min(5, (float) $data['rating']), 'has_rating' => true];
             }
+            return ['rating' => 0, 'has_rating' => false];
         }
 
-        return ['label' => $label, 'rating' => $rating];
+        // Normalize each star rating to a 0..5 scale, then average.
+        $normalized = [];
+        foreach ($ratings as $i => $r) {
+            $max = $maxRatings[$i] ?: 5;
+            $normalized[] = ($r / $max) * 5;
+        }
+        $avg = array_sum($normalized) / count($normalized);
+        return ['rating' => $avg, 'has_rating' => true];
+    }
+
+    /**
+     * Load and decode a performance template's form_structure given its prefixed id
+     * (ninty_X / prof_X / numeric). Mirrors ReviewController::getTemplate so the
+     * resolution is consistent across modules.
+     */
+    private function loadTemplateStructure($templateId)
+    {
+        if (empty($templateId) || $templateId === '0' || $templateId === 0) return [];
+
+        $form = null;
+        if (is_string($templateId) && strpos($templateId, 'ninty_') === 0) {
+            $form = \App\Models\NintyDayPeformanceForm::find(substr($templateId, 6));
+        } elseif (is_string($templateId) && strpos($templateId, 'prof_') === 0 && class_exists(\App\Models\Professionalform::class)) {
+            $form = \App\Models\Professionalform::find(substr($templateId, 5));
+        } elseif (is_numeric($templateId)) {
+            // Try each form table (PerformanceTemplateForm → 90-day → professional).
+            $form = \App\Models\PerformanceTemplateForm::find($templateId)
+                ?: \App\Models\NintyDayPeformanceForm::find($templateId)
+                ?: (class_exists(\App\Models\Professionalform::class) ? \App\Models\Professionalform::find($templateId) : null);
+        }
+        if (!$form || empty($form->form_structure)) return [];
+
+        $decoded = json_decode($form->form_structure, true);
+        // Some legacy rows are double-encoded.
+        if (is_string($decoded)) $decoded = json_decode($decoded, true);
+        return is_array($decoded) ? $decoded : [];
     }
 }
 

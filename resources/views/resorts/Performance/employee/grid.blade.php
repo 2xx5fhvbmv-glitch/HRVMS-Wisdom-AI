@@ -5,8 +5,9 @@
 @else
     @foreach($employees as $employee)
         @php
-            $st = $employeeStatus[$employee->id] ?? ['label' => 'Not Started', 'rating' => 0];
-            $rating = (int) round($st['rating']);
+            $st = $employeeStatus[$employee->id] ?? ['label' => 'Not Started', 'rating' => 0, 'has_rating' => false];
+            $rating = (int) round($st['rating'] ?? 0);
+            $hasRating = $st['has_rating'] ?? ($rating > 0);
             $badgeClass = match($st['label']) {
                 'Done'        => 'badge-themeSuccess',
                 'In Progress' => 'badge-themeWarning',
@@ -23,9 +24,14 @@
                 <p>{{ $employee->position->position_title ?? '' }}</p>
 
                 <div class="rating-stars mb-2">
-                    @for($i = 1; $i <= 5; $i++)
-                        <i class="fa-{{ $i <= $rating ? 'solid' : 'regular' }} fa-star" style="color:#f5a623;"></i>
-                    @endfor
+                    @if($hasRating)
+                        @for($i = 1; $i <= 5; $i++)
+                            <i class="fa-{{ $i <= $rating ? 'solid' : 'regular' }} fa-star" style="color:#f5a623;"></i>
+                        @endfor
+                        <span class="small text-muted ms-1">{{ number_format($st['rating'] ?? 0, 1) }}/5</span>
+                    @else
+                        <span class="small text-muted">No rating yet</span>
+                    @endif
                 </div>
 
                 <div class="block">

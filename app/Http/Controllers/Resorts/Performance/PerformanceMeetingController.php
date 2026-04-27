@@ -373,6 +373,8 @@ class PerformanceMeetingController extends Controller
             'location' => $request->location,
             'conference_links' => $request->conference_link,
             'description' => $request->description,
+            // Track the organizer so accept/decline can notify them.
+            'created_by' => $this->resort->id,
         ]);
 
         $content = PerformanceMeetingContent::where('resort_id', $this->resort->resort_id)->first();
@@ -724,6 +726,7 @@ class PerformanceMeetingController extends Controller
                 'status' => 'accepted',
                 'responded_at' => now(),
             ]);
+            $this->notifyMeetingResponse($participant, $meeting, 'accepted');
             return view('resorts.Performance.Meeting.response', [
                 'error' => null,
                 'meeting' => $meeting,
@@ -762,6 +765,8 @@ class PerformanceMeetingController extends Controller
             'responded_at' => now(),
         ]);
 
+        $this->notifyMeetingResponse($participant, $participant->meeting, $status, $reason);
+
         $message = $status === 'accepted'
             ? 'You have accepted the meeting invitation.'
             : 'You have declined the meeting invitation.';
@@ -773,5 +778,52 @@ class PerformanceMeetingController extends Controller
             'action' => $status,
             'message' => $message
         ]);
+    }
+
+    /**
+     * Tell the meeting organizer (and any GM, as a fallback for legacy meetings without
+     * created_by) that an invitee accepted or declined.
+     */
+    private function notifyMeetingResponse($participant, $meeting, $status, $reason = '')
+    {
+        if (!$meeting) return;
+
+        // Resolve the organizer's employee id from the resort_admin id stored on the meeting.
+        $recipients = [];
+        if (!empty($meeting->created_by)) {
+            $organizerEmp = Employee::where('Admin_Parent_id', $meeting->created_by)->first(['id']);
+            if ($organizerEmp) $recipients[] = (int) $organizerEmp->id;
+        }
+        // Fallback for legacy meetings (created_by is NULL) — notify GM(s).
+        if (empty($recipients)) {
+            $recipients = Employee::where('resort_id', $meeting->resort_id)
+                ->where('rank', 8)->pluck('id')->all();
+        }
+
+        // Resolve the responder's display name.
+        $responder = $participant->employee()->with('resortAdmin')->first();
+        $name = $responder && $responder->resortAdmin
+            ? trim(($responder->resortAdmin->first_name ?? '') . ' ' . ($responder->resortAdmin->last_name ?? ''))
+            : 'A participant';
+        if ($name === '') $name = 'A participant';
+
+        $title = $status === 'accepted' ? 'Meeting Accepted' : 'Meeting Declined';
+        $msg = $status === 'accepted'
+            ? $name . ' accepted "' . ($meeting->title ?? 'the meeting') . '".'
+            : $name . ' declined "' . ($meeting->title ?? 'the meeting') . '".'
+                . ($reason ? ' Reason: ' . $reason : '');
+
+        try {
+            Common::notifyEmployees(
+                $meeting->resort_id,
+                $recipients,
+                $title,
+                $msg,
+                'Performance',
+                $meeting->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Meeting response notification failed: ' . $e->getMessage());
+        }
     }
 }

@@ -117,52 +117,18 @@
                                     height="326"></canvas></div>
                             <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
                                 <div class="row g-2">
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>Learning 1
+                                    @php
+                                        $hoursColors = ['bg-theme','bg-themeLightBlue','bg-themeYellow','bg-themeSkyblueLight','bg-themeGray','bg-themeGreenLight','bg-themeRed','bg-themeRedLight','bg-themeSkyblueLightNew'];
+                                    @endphp
+                                    @forelse(($learningHoursByProg ?? collect()) as $idx => $row)
+                                        <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
+                                            <div class="doughnut-label" title="{{ $row->session_count }} sessions · {{ (int) $row->total_hours }} hrs">
+                                                <span class="{{ $hoursColors[$idx % count($hoursColors)] }}"></span>{{ $row->name ?: 'Untitled' }}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeLightBlue"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeYellow"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblueLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeGray"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeGreenLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeRed"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeRedLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblueLightNew"></span>Learning 1
-                                        </div>
-                                    </div>
-
+                                    @empty
+                                        <div class="col-12 text-muted small">No training programs scheduled yet.</div>
+                                    @endforelse
                                 </div>
                             </div>
                         </div>
@@ -179,37 +145,28 @@
                         <div class="trainingAttendance-chart mb-3">
                             <canvas id="myDoughnutChart"></canvas>
                         </div>
+                        @php
+                            $attBreakdown = $learningAttendance ?? [];
+                            $attLegend = [
+                                'Present' => 'bg-theme',
+                                'Late'    => 'bg-themeWarning',
+                                'Absent'  => 'bg-themeRed',
+                            ];
+                        @endphp
                         <div class="row g-2 justify-content-center">
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-theme"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblueLightNew"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeWarning"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblue"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeGray"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblueLight"></span>Learning 1
-                                </div>
-                            </div>
+                            @forelse($attLegend as $label => $cls)
+                                @if(($attBreakdown[$label] ?? 0) > 0)
+                                    <div class="col-auto">
+                                        <div class="doughnut-label" title="{{ $attBreakdown[$label] }} records">
+                                            <span class="{{ $cls }}"></span>{{ $label }} ({{ $attBreakdown[$label] }})
+                                        </div>
+                                    </div>
+                                @endif
+                            @empty
+                            @endforelse
+                            @if(empty(array_filter($attBreakdown)))
+                                <div class="col-auto text-muted small">No attendance recorded yet.</div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -222,15 +179,15 @@
                                     <h3>Feedback and Evaluation</h3>
                                 </div>
                                 <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="90" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Male Staff Occupied 90%">
+                                    <div class="progress-container blue " data-progress="{{ $feedbackAvgScore ?? 0 }}" data-bs-toggle="tooltip"
+                                        data-bs-placement="bottom" title="Average Trainer Performance Score">
                                         <svg class="progress-circle" viewBox="0 0 120 120">
                                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                             <circle class="progress" cx="60" cy="60" r="54"></circle>
                                         </svg>
                                     </div>
                                     <div class="text">
-                                        <h5>70%</h5>
+                                        <h5>{{ is_null($feedbackAvgScore) ? '—' : ($feedbackAvgScore . '%') }}</h5>
                                         <p>AVERAGE FEEDBACK SCORES</p>
                                     </div>
                                 </div>
@@ -246,21 +203,17 @@
                                     <h3>Onboarding Learning Progress</h3>
                                 </div>
                                 <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="90" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Male Staff Occupied 90%">
+                                    <div class="progress-container blue " data-progress="{{ $onboardingProgress ?? 0 }}" data-bs-toggle="tooltip"
+                                        data-bs-placement="bottom" title="New Hires Completing Compulsory Training">
                                         <svg class="progress-circle" viewBox="0 0 120 120">
                                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                             <circle class="progress" cx="60" cy="60" r="54"></circle>
                                         </svg>
                                     </div>
                                     <div class="text">
-                                        <h5>70%</h5>
+                                        <h5>{{ is_null($onboardingProgress) ? '—' : ($onboardingProgress . '%') }}</h5>
                                         <p>NEW HIRES COMPLETING THEIR COMPULSORY TRAINING</p>
                                     </div>
-                                </div>
-                                <div class="d-flex">
-                                    <p>Attendance:</p>
-                                    <p class="fw-500">60%</p>
                                 </div>
                             </div>
                         </div>
@@ -415,7 +368,7 @@
                     </div>
                 </div>
 
-                <div class="col-xxl-3 col-xl-4 col-lg-6 order-5 order-xxl-5 @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif" id="right-ldDash">
+                <div class="col-xxl-3 col-xl-4 col-lg-6 order-1 order-xxl-1 @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif" id="right-ldDash">
                     <div class="card calendar-card calendarLD-card">
                         <div class="ldDash-block">
                             <div class="mb-4 overflow-hidden">
@@ -424,7 +377,7 @@
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-3">
                                     <div class="col">
-                                        <h3>Upcoming Learning Sessions</h3>
+                                        <h3>Learning Attendance</h3>
                                     </div>
                                 </div>
                             </div>
