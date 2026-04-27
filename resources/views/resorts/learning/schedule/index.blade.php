@@ -36,8 +36,52 @@
                                                     <option value="{{$program->id}}">{{$program->name}}</option>
                                                 @endforeach
                                             @endif
-                                        </select>  
-                                        <div id="div-learning_title"></div>                              
+                                        </select>
+                                        <div id="div-learning_title"></div>
+                                        <div id="programDetailsCard" class="d-none mt-3">
+                                            <div class="row g-md-4 g-3">
+                                                <div class="col-sm-6">
+                                                    <label for="pdTrainer" class="form-label">TRAINER</label>
+                                                    <input type="text" id="pdTrainer" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label for="pdTrainerDept" class="form-label">TRAINER DEPARTMENT</label>
+                                                    <input type="text" id="pdTrainerDept" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label for="pdCategory" class="form-label">CATEGORY</label>
+                                                    <input type="text" id="pdCategory" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label for="pdMode" class="form-label">DELIVERY MODE</label>
+                                                    <input type="text" id="pdMode" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <label for="pdHours" class="form-label">HOURS</label>
+                                                    <input type="text" id="pdHours" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <label for="pdDays" class="form-label">DAYS</label>
+                                                    <input type="text" id="pdDays" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <label for="pdFrequency" class="form-label">FREQUENCY</label>
+                                                    <input type="text" id="pdFrequency" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <label for="pdAudienceType" class="form-label">AUDIENCE TYPE</label>
+                                                    <input type="text" id="pdAudienceType" class="form-control" readonly>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label for="pdAudience" class="form-label">AUDIENCE</label>
+                                                    <textarea id="pdAudience" class="form-control" rows="2" readonly></textarea>
+                                                </div>
+                                                <div class="col-12 d-none" id="pdObjectivesWrap">
+                                                    <label for="pdObjectives" class="form-label">OBJECTIVES</label>
+                                                    <textarea id="pdObjectives" class="form-control" rows="3" readonly></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="date" class="form-label">Start Date <span class="req_span">*</span></label>
@@ -258,6 +302,89 @@
                 }
             },
             errorElement: 'span'
+        });
+
+        // ── Auto-fill description / trainer / duration / audience when a program is picked ──
+        // Also auto-suggests end_date / end_time using the program's days+hours
+        // (only when start_date / start_time are already entered). The user can
+        // still edit any prefilled value manually.
+        $('#learning_title').on('change', function () {
+            var programId = $(this).val();
+            if (!programId) {
+                $('#description').val('');
+                $('#programDetailsCard').addClass('d-none');
+                return;
+            }
+
+            $.ajax({
+                url: '{{ url("/resort/learning/program") }}/' + programId + '/detail',
+                type: 'GET',
+                success: function (response) {
+                    if (!response.success) {
+                        $('#programDetailsCard').addClass('d-none');
+                        return;
+                    }
+                    var d = response.data;
+
+                    // Pre-fill the editable Description textarea.
+                    $('#description').val(d.description || '');
+
+                    // Populate the read-only form fields with program metadata.
+                    $('#pdTrainer').val(d.trainer_name
+                        ? d.trainer_name + (d.trainer_position ? ' (' + d.trainer_position + ')' : '')
+                        : '');
+                    $('#pdTrainerDept').val(d.trainer_department || '');
+                    $('#pdCategory').val(d.category || '');
+                    $('#pdMode').val(d.delivery_mode || '');
+                    $('#pdHours').val(d.hours ? d.hours + ' hr' : '');
+                    $('#pdDays').val(d.days || '');
+                    $('#pdFrequency').val(d.frequency || '');
+                    $('#pdAudienceType').val(d.audience_type || '');
+                    $('#pdAudience').val(
+                        (d.audience_labels && d.audience_labels.length)
+                            ? d.audience_labels.join(', ')
+                            : ''
+                    );
+                    if (d.objectives) {
+                        $('#pdObjectives').val(d.objectives);
+                        $('#pdObjectivesWrap').removeClass('d-none');
+                    } else {
+                        $('#pdObjectives').val('');
+                        $('#pdObjectivesWrap').addClass('d-none');
+                    }
+                    $('#programDetailsCard').removeClass('d-none');
+
+                    // Suggest end_date from start_date + days (only if end_date is empty).
+                    var startDateStr = $('#start_date').val();
+                    if (startDateStr && d.days && !$('#end_date').val()) {
+                        var p = startDateStr.split('-');
+                        if (p.length === 3) {
+                            var sd = new Date(p[2], parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+                            sd.setDate(sd.getDate() + (parseInt(d.days, 10) - 1));
+                            var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+                            $('#end_date').val(pad(sd.getDate()) + '-' + pad(sd.getMonth() + 1) + '-' + sd.getFullYear());
+                        }
+                    }
+
+                    // Suggest end_time from start_time + hours (only if end_time is empty).
+                    var startTimeStr = $('#start_time').val();
+                    if (startTimeStr && d.hours && !$('#end_time').val()) {
+                        var t = startTimeStr.split(':');
+                        if (t.length >= 2) {
+                            var startMins = parseInt(t[0], 10) * 60 + parseInt(t[1], 10);
+                            var endMins = startMins + Math.round(parseFloat(d.hours) * 60);
+                            endMins = Math.max(0, Math.min(endMins, 24 * 60 - 1));
+                            var hh = Math.floor(endMins / 60);
+                            var mm = endMins % 60;
+                            $('#end_time').val((hh < 10 ? '0' + hh : hh) + ':' + (mm < 10 ? '0' + mm : mm));
+                        }
+                    }
+                },
+                error: function (xhr) {
+                    $('#programDetailsCard').addClass('d-none');
+                    console.error('Failed to load program detail', xhr && xhr.status, xhr && xhr.responseText);
+                }
+            });
         });
 
         $('#departmentFilter').on('change', function () {

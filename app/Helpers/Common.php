@@ -1217,14 +1217,19 @@ class Common
         $response['html'] = $view;
         $response['type'] =$type;
         $response['resortid'] =(string)$resortid;
-        $client = new Client();
+
+        // Outbound push to the real-time notification service is optional —
+        // if NOTIFICATION_URL isn't configured (local dev, etc.), skip it
+        // rather than crashing every caller of Common::nofitication().
         $notificationUrl = env('NOTIFICATION_URL');
-
-        $response = $client->post($notificationUrl, [
-            'json' => $response
-        ]);
-
-
+        if (!empty($notificationUrl)) {
+            try {
+                $client = new Client();
+                $client->post($notificationUrl, ['json' => $response]);
+            } catch (\Throwable $e) {
+                \Log::warning('Notification push failed: ' . $e->getMessage());
+            }
+        }
 
         return $response;
     }

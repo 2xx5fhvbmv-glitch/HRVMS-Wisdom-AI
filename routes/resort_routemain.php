@@ -82,6 +82,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          Route::get('Learning/HOD-Dashboard', 'Learning\DashboardController@hod_dashboard')->name('learning.hod.dashboard');
          Route::get('Learning/Admin-Dashboard', 'Learning\DashboardController@admin_dashboard')->name('learning.admin.dashboard');
          Route::get('Learning/Manager-Dashboard', 'Learning\DashboardController@manager_dashboard')->name('learning.manager.dashboard');
+         Route::get('Learning/Manager-Dashboard/onboarding-chart-data', 'Learning\DashboardController@onboardingChartData')->name('learning.manager.onboarding.chart');
 
 
         //  GrievanceAndDisciplinery
@@ -1015,6 +1016,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('Learning/schedule/list', 'Learning\TrainingScheduleController@list')->name('learning.schedule.list');
 
     Route::post('Learning/employees/get-dept-wise','Learning\TrainingScheduleController@getEmployeesDeptwise')->name('get.employees.deptwise');
+    Route::get('Learning/program/{id}/detail','Learning\TrainingScheduleController@getProgramDetail')->name('learning.program.detail');
     Route::post('Learning/schedule/inlineUpdate','Learning\TrainingScheduleController@inlineUpdate')->name('learning.schedule.update');
  
     Route::get('Learning/schedule/attendance', 'Learning\AttendanceController@index')->name('learning.schedule.attendance');
@@ -1053,6 +1055,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('Learning/get-all-absentees-data', 'Learning\DashboardController@getAllAbsenteesData')->name('learning.absentees.getdata');
 
     Route::get('Learning/training-history', 'Learning\TrainingScheduleController@history')->name('training.history');
+    Route::get('Learning/training-history/{id}/detail', 'Learning\TrainingScheduleController@historyDetail')->name('training.history.detail');
 
 
     //  Survey Module

@@ -40,17 +40,19 @@
                             </select>
                         </div>
 
+                        {{--
                         <div class="col-xl-2 col-lg-4 col-md-5  col-6">
                             <select id="typeFilter" class="form-select select2t-none">
                                 <option value=""> By Learning Type</option>
                                 <option value="face-to-face">Face-to-Face</option>
                                 <option value="hybrid">Hybrid</option>
-                                <option value="online">Online</option>        
+                                <option value="online">Online</option>
                             </select>
                         </div>
                         <div class="col-xl-2 col-lg-4 col-md-5  col-6">
                             <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
                         </div>
+                        --}}
                     </div>
                    
                 </div>

@@ -423,24 +423,192 @@ class DashboardController extends Controller
     {
         $page_title ='Learning';
         $resort_id= $this->resort->resort_id;
+        $authEmpId = $this->resort->GetEmployee->id ?? null;
+        $authAdminParentId = $this->resort->GetEmployee->Admin_Parent_id ?? null;
+
         $ongoing_trainings_count = TrainingSchedule::where('status','Ongoing')->where('resort_id', $resort_id)->count();
         $completed_trainings_count = TrainingSchedule::where('status','Completed')->where('resort_id', $resort_id)->count();
-        $scheduled_trainings_count = LearningRequest::where('status','Approved')->where('resort_id', $resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->count();
+        $scheduled_trainings_count = LearningRequest::where('status','Approved')->where('resort_id', $resort_id)->where('created_by',$authAdminParentId)->count();
         $pending_trainings_count = TrainingSchedule::where('status','Scheduled')->where('resort_id', $resort_id)->count();
-        $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('learning_manager_id',$this->resort->GetEmployee->id)->get();
-        // dd($pending_learning_request);
-        $categories = LearningCategory::withCount('programs')->get();
-        $today = now()->toDateString(); // Get current date
+
+        // Completed compulsory learning = completed schedules whose program is in this resort's mandatory list.
+        $compulsory_completed_traing = TrainingSchedule::where('resort_id', $resort_id)
+            ->where('status', 'Completed')
+            ->whereIn('training_id', function ($q) use ($resort_id) {
+                $q->select('program_id')
+                    ->from('mandatory_learning_programs')
+                    ->where('resort_id', $resort_id);
+            })
+            ->count();
+
+        $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('learning_manager_id',$authEmpId)->get();
+        $categories = LearningCategory::withCount('programs')->where('resort_id', $resort_id)->get();
+        $today = now()->toDateString();
         $absentees = TrainingAttendance::where('status', 'Absent')
-            ->whereDate('attendance_date', $today) // Fetch only today's absentees
+            ->whereDate('attendance_date', $today)
             ->with('employee.resortAdmin', 'schedule.learningProgram')
             ->get();
         $trainings = TrainingSchedule::with(['learningProgram', 'trainingAttendances'])
-        ->where('resort_id', $resort_id)
-        ->orderBy('start_date', 'desc')
-        ->limit(5)
-        ->get();
-        return view('resorts.learning.dashboard.manager-dashboard',compact('page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count','pending_learning_request','trainings','categories','absentees'));
+            ->where('resort_id', $resort_id)
+            ->orderBy('start_date', 'desc')
+            ->limit(5)
+            ->get();
+
+        [$avgFeedbackScore, $topTrainerName] = $this->computeFeedbackStats($resort_id);
+
+        return view('resorts.learning.dashboard.manager-dashboard', compact(
+            'page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count',
+            'ongoing_trainings_count','compulsory_completed_traing','pending_learning_request',
+            'trainings','categories','absentees','avgFeedbackScore','topTrainerName'
+        ));
+    }
+
+    /**
+     * Aggregate feedback responses for a resort into a single percent score and
+     * the name of the highest-rated trainer. Responses are stored as form-builder
+     * JSON, so values are option-N strings — we map N to a numeric score and
+     * normalise against the highest option seen.
+     */
+    private function computeFeedbackStats($resort_id)
+    {
+        $responses = \DB::table('training_feedback_responses as tfr')
+            ->join('training_schedules as ts', 'ts.id', '=', 'tfr.training_id')
+            ->where('ts.resort_id', $resort_id)
+            ->select('tfr.responses', 'ts.training_id as schedule_id')
+            ->get();
+
+        if ($responses->isEmpty()) {
+            return [0, null];
+        }
+
+        $trainerByScheduleId = \DB::table('training_schedules as ts')
+            ->join('learning_programs as lp', 'lp.id', '=', 'ts.training_id')
+            ->where('ts.resort_id', $resort_id)
+            ->pluck('lp.trainer', 'ts.id');
+
+        $sumScore = 0;
+        $countScore = 0;
+        $maxOption = 1;
+        $perTrainer = [];
+
+        foreach ($responses as $r) {
+            $data = json_decode($r->responses, true);
+            if (!is_array($data)) continue;
+            $trainerId = $trainerByScheduleId[$r->schedule_id] ?? null;
+            foreach ($data as $val) {
+                if (is_string($val) && preg_match('/^option-(\d+)$/', $val, $m)) {
+                    $score = (int) $m[1];
+                    $sumScore += $score;
+                    $countScore++;
+                    if ($score > $maxOption) $maxOption = $score;
+                    if ($trainerId) {
+                        $perTrainer[$trainerId]['sum'] = ($perTrainer[$trainerId]['sum'] ?? 0) + $score;
+                        $perTrainer[$trainerId]['count'] = ($perTrainer[$trainerId]['count'] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+
+        $avgPercent = $countScore > 0 ? (int) round(($sumScore / $countScore) / max($maxOption, 1) * 100) : 0;
+
+        $topTrainerId = null;
+        $topAvg = -1;
+        foreach ($perTrainer as $tid => $s) {
+            $avg = $s['sum'] / $s['count'];
+            if ($avg > $topAvg) {
+                $topAvg = $avg;
+                $topTrainerId = $tid;
+            }
+        }
+
+        $topTrainerName = null;
+        if ($topTrainerId) {
+            $emp = Employee::with('resortAdmin')->find($topTrainerId);
+            if ($emp && $emp->resortAdmin) {
+                $topTrainerName = trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name);
+            }
+        }
+
+        return [$avgPercent, $topTrainerName];
+    }
+
+    /**
+     * AJAX: stacked bar data for the Onboarding Learning chart on the manager dashboard.
+     * X axis = onboarding learning programs in this resort. Stacks = participant counts
+     * per department across each program's schedules.
+     */
+    public function onboardingChartData()
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $onboardingCategoryIds = LearningCategory::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('category', 'like', '%Onboarding%')
+                  ->orWhere('category', 'like', '%Orientation%');
+            })
+            ->pluck('id');
+
+        $palette = ['#014653', '#2EACB3', '#FED049', '#8DC9C9', '#333333', '#3a88fe', '#a264f7', '#ff4013'];
+
+        if ($onboardingCategoryIds->isEmpty()) {
+            return response()->json(['success' => true, 'data' => ['labels' => [], 'datasets' => []]]);
+        }
+
+        $programs = \DB::table('learning_programs')
+            ->where('resort_id', $resort_id)
+            ->whereIn('learning_category_id', $onboardingCategoryIds)
+            ->select('id', 'name')
+            ->get();
+
+        if ($programs->isEmpty()) {
+            return response()->json(['success' => true, 'data' => ['labels' => [], 'datasets' => []]]);
+        }
+
+        $programIds = $programs->pluck('id');
+
+        $rows = \DB::table('training_participants as tp')
+            ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+            ->join('employees as e', 'e.id', '=', 'tp.employee_id')
+            ->join('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->where('ts.resort_id', $resort_id)
+            ->whereIn('ts.training_id', $programIds)
+            ->select('ts.training_id as program_id', 'd.id as dept_id', 'd.name as dept_name', \DB::raw('COUNT(DISTINCT tp.employee_id) as participants'))
+            ->groupBy('ts.training_id', 'd.id', 'd.name')
+            ->get();
+
+        $labels = $programs->pluck('name')->values()->all();
+        $programIdToIndex = [];
+        foreach ($programs as $i => $p) {
+            $programIdToIndex[$p->id] = $i;
+        }
+
+        $byDept = [];
+        foreach ($rows as $row) {
+            if (!isset($byDept[$row->dept_id])) {
+                $byDept[$row->dept_id] = [
+                    'name' => $row->dept_name,
+                    'data' => array_fill(0, count($labels), 0),
+                ];
+            }
+            $byDept[$row->dept_id]['data'][$programIdToIndex[$row->program_id]] = (int) $row->participants;
+        }
+
+        $datasets = [];
+        $i = 0;
+        foreach ($byDept as $dept) {
+            $color = $palette[$i % count($palette)];
+            $datasets[] = [
+                'label'           => $dept['name'],
+                'data'            => $dept['data'],
+                'backgroundColor' => $color,
+                'borderColor'     => '#fff',
+                'borderWidth'     => 2,
+                'borderRadius'    => 10,
+            ];
+            $i++;
+        }
+
+        return response()->json(['success' => true, 'data' => ['labels' => $labels, 'datasets' => $datasets]]);
     }
 
     public function details(Request $request, $id)

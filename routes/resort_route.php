@@ -110,6 +110,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          Route::get('learning/hod-dashboard', 'Learning\DashboardController@hod_dashboard')->name('learning.hod.dashboard');
          Route::get('learning/admin-dashboard', 'Learning\DashboardController@admin_dashboard')->name('learning.admin.dashboard');
          Route::get('learning/manager-dashboard', 'Learning\DashboardController@manager_dashboard')->name('learning.manager.dashboard');
+         Route::get('learning/manager-dashboard/onboarding-chart-data', 'Learning\DashboardController@onboardingChartData')->name('learning.manager.onboarding.chart');
 
 
         //  GrievanceAndDisciplinery
@@ -1156,6 +1157,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('learning/schedule/list', 'Learning\TrainingScheduleController@list')->name('learning.schedule.list');
 
     Route::post('learning/employees/get-dept-wise','Learning\TrainingScheduleController@getEmployeesDeptwise')->name('get.employees.deptwise');
+    Route::get('learning/program/{id}/detail','Learning\TrainingScheduleController@getProgramDetail')->name('learning.program.detail');
     Route::post('learning/schedule/inline-update','Learning\TrainingScheduleController@inlineUpdate')->name('learning.schedule.update');
 
     Route::get('learning/schedule/attendance', 'Learning\AttendanceController@index')->name('learning.schedule.attendance');
@@ -1175,6 +1177,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('learning/get-all-absentees-data', 'Learning\DashboardController@getAllAbsenteesData')->name('learning.absentees.getdata');
 
     Route::get('learning/training-history', 'Learning\TrainingScheduleController@history')->name('training.history');
+    Route::get('learning/training-history/{id}/detail', 'Learning\TrainingScheduleController@historyDetail')->name('training.history.detail');
 
 
     //Feedback form builder

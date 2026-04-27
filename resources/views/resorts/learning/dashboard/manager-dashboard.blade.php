@@ -217,21 +217,21 @@
                                     <h3>Feedback and Evaluation</h3>
                                 </div>
                                 <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="90" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Male Staff Occupied 90%">
+                                    <div class="progress-container blue " data-progress="{{ $avgFeedbackScore }}" data-bs-toggle="tooltip"
+                                        data-bs-placement="bottom" title="Average Feedback Score {{ $avgFeedbackScore }}%">
                                         <svg class="progress-circle" viewBox="0 0 120 120">
                                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                             <circle class="progress" cx="60" cy="60" r="54"></circle>
                                         </svg>
                                     </div>
                                     <div class="text">
-                                        <h5>70%</h5>
+                                        <h5>{{ $avgFeedbackScore }}%</h5>
                                         <p>AVERAGE FEEDBACK SCORES</p>
                                     </div>
                                 </div>
                                 <div class="d-flex">
-                                    <p>Over Time:</p>
-                                    <p class="fw-500">Trainer Performance</p>
+                                    <p>Top Trainer:</p>
+                                    <p class="fw-500">{{ $topTrainerName ?? '—' }}</p>
                                 </div>
                             </div>
                         </div>
@@ -254,7 +254,7 @@
                                             <div class="leaveUser-block">
                                                 <div>
                                                     <h6>{{$request->learning->name}}</h6>
-                                                    <p>{{$request->learning->description}}</p>
+                                                    <p>{{ \Illuminate\Support\Str::words($request->learning->description, 50, '…') }}</p>
                                                     <div>
                                                         <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">
                                                             View Details
@@ -278,32 +278,8 @@
                                         <canvas id="onboardingChart" width="544" height="326"></canvas>
                                     </div>
                                     <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                                        <div class="row g-2">
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-theme"></span>Department 1
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeLightBlue"></span>Department 2
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeYellow"></span>Department 3
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeSkyblueLight"></span>Department 4
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeGray"></span>Department 5
-                                                </div>
-                                            </div>
+                                        <div class="row g-2" id="onboardingChartLegend">
+                                            {{-- Legend rendered dynamically by fetchOnboardingChart() --}}
                                         </div>
                                     </div>
                                 </div>
@@ -410,6 +386,13 @@
 
 @section('import-scripts')
     <script type="text/javascript">
+        function truncateWords(text, wordLimit) {
+            if (!text) return '';
+            var words = String(text).trim().split(/\s+/);
+            if (words.length <= wordLimit) return text;
+            return words.slice(0, wordLimit).join(' ') + '…';
+        }
+
         $(document).ready(function () {
             $('.data-Table').dataTable({
                 "searching": false,
@@ -522,7 +505,7 @@
                                                     <h6>${session.title}</h6>
                                                 </div>
                                                 <div class="leaveUser-block">
-                                                    <p>${session.description || "No description available"}</p>
+                                                    <p>${truncateWords(session.description, 50) || "No description available"}</p>
                                                     <div class="time"><i class="fa-regular fa-clock"></i> ${session.start_time} to ${session.end_time}</div>
                                                     <div class="user-ovImg">${attendeeHtml}</div>
                                                 </div>
@@ -555,8 +538,10 @@
                 },
                 success: function(response) {
                     let sessionsHtml = '';
-                    if (response.data.length > 0) {
-                        response.data.forEach(session => {
+                    // Cap at 5 to keep the side panel free of an inner scrollbar.
+                    let sessionsToShow = (response.data || []).slice(0, 5);
+                    if (sessionsToShow.length > 0) {
+                        sessionsToShow.forEach(session => {
                                     let sessionDate = new Date(session.session_date);
                                     let day = sessionDate.getDate();
                                     let month = sessionDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
@@ -591,7 +576,7 @@
                                                     <h6>${session.title}</h6>
                                                 </div>
                                                 <div class="leaveUser-block">
-                                                    <p>${session.description || "No description available"}</p>
+                                                    <p>${truncateWords(session.description, 50) || "No description available"}</p>
                                                     <div class="time"><i class="fa-regular fa-clock"></i> ${session.start_time} to ${session.end_time}</div>
                                                     <div class="user-ovImg">${attendeeHtml}</div>
                                                 </div>
@@ -898,89 +883,77 @@
             });
         }
     </script>
-    <script type="module">
-        var cty = document.getElementById('onboardingChart').getContext('2d');
-        var onboardingChart = new Chart(cty, {
-            type: 'bar',
-            data: {
-                labels: ['Learning 1', 'Learning 2', 'Learning 3', 'Learning 4', 'Learning 5', 'Learning 6'],
-                datasets: [
-                    {
-                        label: 'Department  1',
-                        data: [8, 20, 25, 10, 10, 20, 10],
-                        backgroundColor: '#014653',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  2',
-                        data: [5, 10, 4, 20, 2, 5, 10],
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  3',
-                        data: [20, 5, 20, 40, 22, 5, 20],
-                        backgroundColor: '#FED049',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  4',
-                        data: [5, 20, 15, 5, 5, 5, 10],
-                        backgroundColor: '#8DC9C9',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  5',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#333333',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    }
-                ]
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: false // Hide legend
-                    },
-                    layout: {
-                        padding: 0 // Remove padding
-                    },
-                    tooltip: {
-                        enabled: false // Disable tooltips
+    <script>
+        $(document).ready(function () {
+            fetchOnboardingChart();
+        });
+
+        function fetchOnboardingChart() {
+            $.ajax({
+                url: "{{ route('learning.manager.onboarding.chart') }}",
+                type: "GET",
+                success: function (response) {
+                    if (response.success) {
+                        renderOnboardingChart(response.data);
                     }
                 },
-                hover: {
-                    mode: null // Disable hover effects
+                error: function () {
+                    renderOnboardingChart({ labels: [], datasets: [] });
+                }
+            });
+        }
+
+        function renderOnboardingChart(chartData) {
+            var ctx = document.getElementById('onboardingChart').getContext('2d');
+
+            if (window.onboardingChartInstance && typeof window.onboardingChartInstance.destroy === 'function') {
+                window.onboardingChartInstance.destroy();
+            }
+
+            window.onboardingChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: chartData.datasets
                 },
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: {
-                            display: false // Hide x-axis grid lines
-                        }
+                options: {
+                    plugins: {
+                        legend: { display: false },
+                        layout: { padding: 0 },
+                        tooltip: { enabled: true }
                     },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        grid: {
-                            display: false // Hide y-axis grid lines
-                        },
-                        ticks: {
-                            stepSize: 20
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            grid: { display: false },
+                            ticks: { stepSize: 5 }
                         }
                     }
                 }
+            });
+
+            renderOnboardingLegend(chartData.datasets);
+        }
+
+        function renderOnboardingLegend(datasets) {
+            var $legend = $('#onboardingChartLegend');
+            $legend.empty();
+            if (!datasets || datasets.length === 0) {
+                $legend.append('<div class="col-12"><p class="text-muted small mb-0">No onboarding data yet.</p></div>');
+                return;
             }
-        })
+            datasets.forEach(function (ds) {
+                $legend.append(
+                    '<div class="col-xxl-12 col-xl-auto col-md-12 col-auto">' +
+                        '<div class="doughnut-label">' +
+                            '<span style="background-color:' + ds.backgroundColor + ';"></span>' +
+                            $('<div>').text(ds.label).html() +
+                        '</div>' +
+                    '</div>'
+                );
+            });
+        }
     </script>
 @endsection

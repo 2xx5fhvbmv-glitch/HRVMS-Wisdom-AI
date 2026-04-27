@@ -69,9 +69,16 @@
                     </div>
                 </div>
                 <div class="mb-md-4 mb-3">
-                    <button class="btn btn-themeBlue btn-sm" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'Approved')">Approve</button>
-                    <button class="btn btn-sm btn-warning" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'On Hold')">On Hold</button>
-                    <button class="btn btn-danger btn-sm" onclick="rejectLearningRequest('{{ $request_detail->id }}')">Deny</button>
+                    @if(in_array($request_detail->status, ['Pending', 'On Hold']))
+                        <button class="btn btn-themeBlue btn-sm" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'Approved')">Approve</button>
+                        <button class="btn btn-sm btn-warning" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'On Hold')">On Hold</button>
+                        <button class="btn btn-danger btn-sm" onclick="rejectLearningRequest('{{ $request_detail->id }}')">Deny</button>
+                    @else
+                        @php
+                            $badgeClass = $request_detail->status === 'Approved' ? 'success' : ($request_detail->status === 'Denied' ? 'danger' : 'secondary');
+                        @endphp
+                        <span class="badge badge-{{ $badgeClass }}">{{ $request_detail->status }}</span>
+                    @endif
                 </div>
             </div>
         </div>
@@ -138,11 +145,11 @@
             },
             success: function(response) {
                 $('#statusModal').modal('hide');
-                $('#table-learning-request').DataTable().ajax.reload();
                 toastr.success("Status updated successfully!", "Success",
                 {
                     positionClass: 'toast-bottom-right'
                 });
+                setTimeout(function () { window.location.reload(); }, 800);
             },
             error: function(xhr) {
                 let errs = xhr.responseJSON.error || 'An unexpected error occurred. Please try again.';
@@ -164,11 +171,11 @@
                 status: status
             },
             success: function(response) {
-                $('#table-learning-request').DataTable().ajax.reload();
                 toastr.success("Learning request " + status + " successfully!", "Success",
                 {
                     positionClass: 'toast-bottom-right'
                 });
+                setTimeout(function () { window.location.reload(); }, 800);
             },
             error: function(xhr) {
                 let errs = xhr.responseJSON.error || 'An unexpected error occurred. Please try again.';
