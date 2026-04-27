@@ -50,6 +50,7 @@ class LearningController extends Controller
         $available_rank = $rank[$current_rank] ?? '';
         $isHOD = ($available_rank === "HOD");
         $isHR = ($available_rank === "HR");
+        $isGM = ($available_rank === "GM");
 
         // L&D Managers (and similar roles) need to file requests for any employee
         // in the resort, not just their direct reports.
@@ -57,16 +58,18 @@ class LearningController extends Controller
         $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
         $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true);
 
+        $hasResortWideAccess = $isHR || $isGM || $isLdManager;
+
         $employees_query = Employee::with(['resortAdmin','department','position'])->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary']);
 
-        // Department-visibility scope. L&D Managers + HR are explicitly given resort-wide
-        // visibility for this flow; everyone else falls under the standard scoping.
-        if (!$isHR && !$isLdManager) {
+        // Department-visibility scope. L&D Managers + HR + GM are explicitly given
+        // resort-wide visibility for this flow; everyone else falls under the standard scoping.
+        if (!$hasResortWideAccess) {
             $scopedDeptIds = Common::getScopedDepartmentIds();
             $employees_query->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
         }
 
-        if ($isHR || $isLdManager) {
+        if ($hasResortWideAccess) {
             $employees_query->where('employees.id', '!=', $this->resort->getEmployee->id);
         } else {
             $employees_query->where('employees.reporting_to', $this->reporting_to);
@@ -170,7 +173,7 @@ class LearningController extends Controller
     }
 
     public function request(){
-        
+
         if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized access');
         }
@@ -178,10 +181,14 @@ class LearningController extends Controller
         $rank = config('settings.Position_Rank');
         $current_rank = $this->resort->getEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
-        $isHOD = ($available_rank === "HOD");
         $isHR = ($available_rank === "HR");
-        $isManager = (!$isHR && !$isHOD); // If not HR or HOD, assume it's the Learning Manager
-        // dd($isManager);
+        $isGM = ($available_rank === "GM");
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
+        $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true);
+        // Approve / On Hold / Deny actions are available to HR, GM, and L&D Manager.
+        // The view treats "$isManager" as "can manage requests".
+        $isManager = ($isHR || $isGM || $isLdManager);
         return view('resorts.learning.request.index',compact('page_title','isManager'));
     }
 
@@ -196,8 +203,12 @@ class LearningController extends Controller
             $available_rank = $rank[$current_rank] ?? '';
             $isHOD = ($available_rank === "HOD");
             $isHR = ($available_rank === "HR");
-            $isManager = (!$isHR && !$isHOD); // If not HR or HOD, assume it's the Learning Manager
-            // dd($isManager);
+            $isGM = ($available_rank === "GM");
+            $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+            $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
+            $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true);
+            // HR / GM / L&D Manager can act on every request in the resort.
+            $isManager = ($isHR || $isGM || $isLdManager);
             // Fetch Learning Requests
             $query = LearningRequest::select(
                 'learning_requests.id',
@@ -217,9 +228,15 @@ class LearningController extends Controller
             ->leftJoin('resort_admins', 'resort_admins.id', '=', 'employees.Admin_Parent_id')
             ->where('learning_requests.resort_id', $resort_id);
 
-            if ($isHR || $isHOD) {
+            if ($isManager) {
+                // HR / GM / L&D Manager: see every learning request in the resort
+                // so they can approve, hold, or deny.
+                // (Already scoped to the resort by the WHERE above.)
+            } elseif ($isHOD) {
+                // HODs see the requests they created.
                 $query->where('learning_requests.created_by', $this->resort->GetEmployee->Admin_Parent_id);
             } else {
+                // Everyone else (regular Manager rank) sees requests assigned to them.
                 $query->where('learning_requests.learning_manager_id', $loginEmployee);
             }
 

@@ -22,10 +22,15 @@
                     <div class="d-flex justify-content-end">
                         @php
                             // Add Learning Schedule — only HR / GM / L&D Manager.
-                            $_curEmp = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
+                            $_curUser = Auth::guard('resort-admin')->user();
+                            $_curEmp = $_curUser->GetEmployee ?? null;
+                            $_curRank = (int) (optional($_curEmp)->rank ?? 0);
                             $_curPos = optional(optional($_curEmp)->position)->position_title;
                             $_ldTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-                            $_canAddSchedule = \App\Helpers\Common::hasFullDataAccess()
+                            $_isAdmin = (($_curUser->type ?? null) === 'super') || ($_curUser->is_master_admin ?? 0);
+                            // Rank 3 = HR, Rank 8 = GM (see config/settings.php Position_Rank).
+                            $_canAddSchedule = $_isAdmin
+                                || in_array($_curRank, [3, 8], true)
                                 || in_array($_curPos, $_ldTitles, true);
                         @endphp
                         @if($_canAddSchedule)

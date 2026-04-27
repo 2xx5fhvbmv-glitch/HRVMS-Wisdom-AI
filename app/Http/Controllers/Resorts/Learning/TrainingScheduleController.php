@@ -262,30 +262,128 @@ class TrainingScheduleController extends Controller
         ]);
     }
     
+    /**
+     * Returns the metadata for one learning program so the schedule form can
+     * pre-fill description / trainer / suggested hours+days when the user
+     * picks a title from the dropdown.
+     */
+    public function getProgramDetail($id)
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $program = LearningProgram::with('category')
+            ->where('resort_id', $resort_id)
+            ->find($id);
+
+        if (!$program) {
+            return response()->json(['success' => false, 'message' => 'Program not found.'], 404);
+        }
+
+        $trainerName = null;
+        $trainerPosition = null;
+        $trainerDepartment = null;
+        if ($program->trainer) {
+            $trainerEmp = Employee::with(['resortAdmin', 'position', 'department'])->find($program->trainer);
+            if ($trainerEmp) {
+                $trainerName = $trainerEmp->resortAdmin
+                    ? trim($trainerEmp->resortAdmin->first_name . ' ' . $trainerEmp->resortAdmin->last_name)
+                    : null;
+                $trainerPosition = optional($trainerEmp->position)->position_title;
+                $trainerDepartment = optional($trainerEmp->department)->name;
+            }
+        }
+
+        // target_audience is cast to array on the model, but tolerate raw JSON
+        // strings too in case older rows were saved differently.
+        $rawAudience = $program->target_audience;
+        $targetAudienceIds = [];
+        if (is_array($rawAudience)) {
+            $targetAudienceIds = $rawAudience;
+        } elseif (is_string($rawAudience) && $rawAudience !== '') {
+            $decoded = json_decode($rawAudience, true);
+            if (is_array($decoded)) $targetAudienceIds = $decoded;
+        }
+        // Coerce to ints so whereIn matches numeric PKs cleanly.
+        $targetAudienceIds = array_values(array_filter(array_map('intval', $targetAudienceIds)));
+
+        $audienceLabels = [];
+        if (!empty($targetAudienceIds)) {
+            switch ($program->audience_type) {
+                case 'departments':
+                    $audienceLabels = ResortDepartment::whereIn('id', $targetAudienceIds)
+                        ->pluck('name')->all();
+                    break;
+                case 'grades':
+                    $audienceLabels = ResortPosition::whereIn('id', $targetAudienceIds)
+                        ->pluck('position_title')->all();
+                    break;
+                case 'employees':
+                    $audienceLabels = Employee::with('resortAdmin')
+                        ->whereIn('id', $targetAudienceIds)
+                        ->get()
+                        ->map(fn($e) => optional($e->resortAdmin)->full_name
+                            ?? trim((optional($e->resortAdmin)->first_name ?? '') . ' ' . (optional($e->resortAdmin)->last_name ?? '')))
+                        ->filter()
+                        ->values()
+                        ->all();
+                    break;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id'                 => $program->id,
+                'name'               => $program->name,
+                'description'        => $program->description,
+                'objectives'         => $program->objectives,
+                'category'           => optional($program->category)->category,
+                'hours'              => $program->hours,
+                'days'               => $program->days,
+                'frequency'          => $program->frequency,
+                'delivery_mode'      => $program->delivery_mode,
+                'trainer_name'       => $trainerName,
+                'trainer_position'   => $trainerPosition,
+                'trainer_department' => $trainerDepartment,
+                'audience_type'      => $program->audience_type,
+                'audience_ids'       => $targetAudienceIds,
+                'audience_labels'    => $audienceLabels,
+            ],
+        ]);
+    }
+
     public function getEmployeesDeptwise(Request $request)
     {
+        // deptID is optional — empty / "all" means "every department the user can see".
         $request->validate([
-            'deptID' => 'required|exists:resort_departments,id'
+            'deptID' => 'nullable|exists:resort_departments,id'
         ]);
 
-        // Block cross-resort queries + enforce department-visibility policy.
         $scopedDeptIds = Common::getScopedDepartmentIds();
-        if (is_array($scopedDeptIds) && !in_array((int) $request->deptID, $scopedDeptIds)) {
+        $deptID = $request->filled('deptID') ? (int) $request->deptID : null;
+
+        if ($deptID !== null && is_array($scopedDeptIds) && !in_array($deptID, $scopedDeptIds)) {
             return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
         }
 
-        $employees = Employee::where('Dept_id', $request->deptID)
-            ->where('resort_id', $this->resort->resort_id)
-            ->with(['resortAdmin', 'position'])
-            ->get()
-            ->map(function ($employee) {
-                return [
-                    'id' => $employee->id,
-                    'full_name' => $employee->resortAdmin->full_name,
-                    'position_title' => $employee->position->position_title,
-                    'image' => Common::getResortUserPicture($employee->Admin_Parent_id)
-                ];
-            });
+        $query = Employee::where('resort_id', $this->resort->resort_id)
+            ->with(['resortAdmin', 'position']);
+
+        if ($deptID !== null) {
+            $query->where('Dept_id', $deptID);
+        } elseif (is_array($scopedDeptIds)) {
+            // No dept selected → still respect the user's department visibility scope.
+            $query->whereIn('Dept_id', $scopedDeptIds);
+        }
+
+        $employees = $query->get()->map(function ($employee) {
+            return [
+                'id' => $employee->id,
+                'full_name' => optional($employee->resortAdmin)->full_name,
+                'position_title' => optional($employee->position)->position_title,
+                'image' => Common::getResortUserPicture($employee->Admin_Parent_id)
+            ];
+        });
 
         return response()->json([
             'success' => true,
@@ -425,6 +523,12 @@ class TrainingScheduleController extends Controller
             return datatables()->of($trainings)
                 ->addColumn('title', fn($row) => $row->learningProgram->name ?? 'N/A')
                 ->addColumn('dates', fn($row) => date('d M Y', strtotime($row->start_date)) . ' - ' . date('d M Y', strtotime($row->end_date)))
+                ->addColumn('time', fn($row) => date('h:i A', strtotime($row->start_time)) . ' - ' . date('h:i A', strtotime($row->end_time)))
+                ->addColumn('venue', fn($row) => $row->venue ?? 'N/A')
+                ->addColumn('status', function ($row) {
+                    $badge = ['Completed' => 'success', 'Ongoing' => 'info', 'Scheduled' => 'warning', 'Pending' => 'secondary'][$row->status] ?? 'secondary';
+                    return '<span class="badge badge-' . $badge . '">' . $row->status . '</span>';
+                })
                 ->addColumn('participants', fn($row) => $row->participants->count())
                 ->addColumn('attendance', function ($row) {
                     $totalDays = \Carbon\Carbon::parse($row->start_date)->diffInDays(\Carbon\Carbon::parse($row->end_date)) + 1;
@@ -432,11 +536,85 @@ class TrainingScheduleController extends Controller
                     $actualPresent = $row->trainingAttendances->where('status', 'Present')->count();
                     return $totalExpected > 0 ? round(($actualPresent / $totalExpected) * 100, 2) . '%' : '0%';
                 })
-                ->rawColumns(['title', 'dates', 'participants', 'attendance'])
+                ->addColumn('action', function ($row) {
+                    return '<button type="button" class="btn btn-themeBlue btn-sm" onclick="viewTrainingDetail(' . $row->id . ')">View</button>';
+                })
+                ->rawColumns(['title', 'dates', 'time', 'venue', 'status', 'participants', 'attendance', 'action'])
                 ->make(true);
         }
 
         return view('resorts.learning.schedule.history',compact('trainings','page_title'));
+    }
+
+    /**
+     * Returns the full detail of a single training schedule for the View modal
+     * on the Training History page (program info, dates, trainer, venue,
+     * status, participants list and per-participant attendance %).
+     */
+    public function historyDetail($id)
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $training = TrainingSchedule::with([
+            'learningProgram.category',
+            'participants.employee.resortAdmin',
+            'trainingAttendances',
+        ])->where('resort_id', $resort_id)->find($id);
+
+        if (!$training) {
+            return response()->json(['success' => false, 'message' => 'Training not found.'], 404);
+        }
+
+        $totalDays = Carbon::parse($training->start_date)->diffInDays(Carbon::parse($training->end_date)) + 1;
+        $participantsCount = $training->participants->count();
+        $totalExpected = $totalDays * $participantsCount;
+        $actualPresent = $training->trainingAttendances->where('status', 'Present')->count();
+        $attendancePercent = $totalExpected > 0 ? round(($actualPresent / $totalExpected) * 100, 2) : 0;
+
+        $trainerEmp = null;
+        $trainerId = optional($training->learningProgram)->trainer;
+        if ($trainerId) {
+            $trainerEmp = Employee::with('resortAdmin')->find($trainerId);
+        }
+
+        $participants = $training->participants->map(function ($p) use ($training) {
+            $present = $training->trainingAttendances
+                ->where('employee_id', $p->employee_id)
+                ->where('status', 'Present')
+                ->count();
+            $total = $training->trainingAttendances
+                ->where('employee_id', $p->employee_id)
+                ->count();
+            $name = optional(optional($p->employee)->resortAdmin)->full_name
+                ?? trim((optional(optional($p->employee)->resortAdmin)->first_name ?? '') . ' ' . (optional(optional($p->employee)->resortAdmin)->last_name ?? ''));
+            return [
+                'name'             => $name ?: 'Unknown',
+                'attended'         => $present,
+                'total_marked'     => $total,
+                'percentage'       => $total > 0 ? round(($present / $total) * 100, 2) : 0,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'title'              => optional($training->learningProgram)->name,
+                'description'        => optional($training->learningProgram)->description,
+                'category'           => optional(optional($training->learningProgram)->category)->category,
+                'start_date'         => date('d M Y', strtotime($training->start_date)),
+                'end_date'           => date('d M Y', strtotime($training->end_date)),
+                'start_time'         => date('h:i A', strtotime($training->start_time)),
+                'end_time'           => date('h:i A', strtotime($training->end_time)),
+                'venue'              => $training->venue ?? 'N/A',
+                'status'             => $training->status,
+                'trainer'            => $trainerEmp && $trainerEmp->resortAdmin
+                    ? trim($trainerEmp->resortAdmin->first_name . ' ' . $trainerEmp->resortAdmin->last_name)
+                    : 'N/A',
+                'participants_count' => $participantsCount,
+                'attendance_percent' => $attendancePercent,
+                'participants'       => $participants,
+            ],
+        ]);
     }
 
 

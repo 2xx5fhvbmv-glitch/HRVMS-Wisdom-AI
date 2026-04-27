@@ -11,12 +11,15 @@
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
             <div class="page-hedding">
-                <div class="row justify-content-between g-3">
+                <div class="row justify-content-between g-3 align-items-center">
                     <div class="col-auto">
                         <div class="page-title">
                             <span>Learning & Development</span>
                             <h1>{{ $page_title }}</h1>
                         </div>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ route('learning.request.index') }}" class="btn btn-theme">View All</a>
                     </div>
                 </div>
             </div>
