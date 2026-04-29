@@ -142,7 +142,6 @@
                             <select class="form-select attendance-status" data-employee-id="${emp.id}">
                                 <option value="Present">Present</option>
                                 <option value="Absent">Absent</option>
-                                <option value="Late">Late</option>
                             </select>
                         </td>
                     </tr>

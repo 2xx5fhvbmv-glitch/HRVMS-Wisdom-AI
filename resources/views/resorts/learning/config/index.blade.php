@@ -214,7 +214,7 @@
                                 </div>
                                 <div class="col-xxl-6">
                                     <select class="form-select select2t-none" aria-label="Default select example" name="trainer" id="trainer">
-                                        <option selected>Select Trainer</option>
+                                        <option value="" selected>Select Trainer</option>
                                         @if($trainers)
                                             @foreach($trainers as $v)
                                                 <option value="{{$v->id}}">{{$v->resortAdmin->full_name}}</option>
@@ -740,6 +740,11 @@
             $form[0].reset();
             if ($form.data('validator')) $form.validate().resetForm();
             $form.find('.error').removeClass('error');
+            // resetForm() doesn't always remove the inserted <label class="error">
+            // nodes (especially when validation was triggered piecemeal via
+            // .element() during typing), so strip them here too.
+            $form.find('label.error, span.error').remove();
+            $form.find('.is-invalid').removeClass('is-invalid');
 
             // Re-sync every Select2 dropdown to its underlying value (now blank).
             $form.find('select').each(function () {

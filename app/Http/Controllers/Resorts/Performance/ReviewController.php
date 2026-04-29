@@ -186,18 +186,36 @@ class ReviewController extends Controller
             return response()->json(['success' => false, 'message' => 'Failed to save review. Please try again.'], 500);
         }
 
-        // Notify the assigned manager that the self review is done and manager review is unlocked.
+        // Notify the assigned manager that the self review is done and manager review is unlocked,
+        // and fan out the same alert to HR so they can track submission progress.
         try {
+            $employee = $this->resort->GetEmployee;
+            $empName = $employee && $employee->resortAdmin
+                ? trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''))
+                : 'Your team member';
+
             if ($realChild->Manager_id) {
-                $employee = $this->resort->GetEmployee;
-                $empName = $employee && $employee->resortAdmin
-                    ? trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''))
-                    : 'Your team member';
                 Common::notifyEmployees(
                     $this->resort->resort_id,
                     [(int) $realChild->Manager_id],
                     'Self Review Completed',
                     $empName . ' has completed their self review for "' . $childCycle->Cycle_Name . '". Please complete the manager review.',
+                    'Performance',
+                    $realChild->id
+                );
+            }
+
+            $hrEmpIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            // Avoid double-notifying the manager if they happen to be HR themselves.
+            if ($realChild->Manager_id) {
+                $hrEmpIds = array_values(array_diff($hrEmpIds, [(int) $realChild->Manager_id]));
+            }
+            if (!empty($hrEmpIds)) {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    $hrEmpIds,
+                    'Self Review Submitted',
+                    $empName . ' has submitted their self review for "' . $childCycle->Cycle_Name . '".',
                     'Performance',
                     $realChild->id
                 );
@@ -334,7 +352,8 @@ class ReviewController extends Controller
             return response()->json(['success' => false, 'message' => 'Failed to save review. Please try again.'], 500);
         }
 
-        // Notify the employee that their manager review is complete.
+        // Notify the employee that their manager review is complete, and fan out
+        // the same alert to HR so they can track team-review submissions.
         try {
             $participantId = Common::resolveEmpMainIdToNumeric($realChild->Emp_main_id, $this->resort->resort_id);
             if ($participantId) {
@@ -343,6 +362,28 @@ class ReviewController extends Controller
                     [$participantId],
                     'Manager Review Completed',
                     'Your manager has completed the review for "' . $childCycle->Cycle_Name . '". You can view the feedback in My Reviews.',
+                    'Performance',
+                    $realChild->id
+                );
+            }
+
+            $managerEmp = $this->resort->GetEmployee;
+            $managerName = $managerEmp && $managerEmp->resortAdmin
+                ? trim(($managerEmp->resortAdmin->first_name ?? '') . ' ' . ($managerEmp->resortAdmin->last_name ?? ''))
+                : 'A manager';
+
+            $hrEmpIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            // Don't double-notify the employee or the manager themselves if they fall in HR.
+            $hrEmpIds = array_values(array_diff(
+                $hrEmpIds,
+                array_filter([$participantId, $currentEmpId], fn($v) => $v !== null)
+            ));
+            if (!empty($hrEmpIds)) {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    $hrEmpIds,
+                    'Team Review Submitted',
+                    $managerName . ' has submitted a team review for "' . $childCycle->Cycle_Name . '".',
                     'Performance',
                     $realChild->id
                 );

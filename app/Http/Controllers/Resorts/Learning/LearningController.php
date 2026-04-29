@@ -49,29 +49,45 @@ class LearningController extends Controller
         $current_rank = $this->resort->getEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
         $isHOD = ($available_rank === "HOD");
-        $isHR = ($available_rank === "HR");
-        $isGM = ($available_rank === "GM");
+        $isGM  = ($available_rank === "GM");
 
-        // L&D Managers (and similar roles) need to file requests for any employee
-        // in the resort, not just their direct reports.
-        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-        $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
-        $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true);
+        // Position titles with full resort-wide access (L&D leadership, HR leadership, GM).
+        $emp = $this->resort->getEmployee;
+        $currentPositionTitle = optional(optional($emp)->position)->position_title;
+        $isFullAccessTitle = in_array($currentPositionTitle, Common::fullAccessPositionTitles(), true);
 
-        $hasResortWideAccess = $isHR || $isGM || $isLdManager;
+        // Anyone in the L&D department gets full module visibility — title is often
+        // misconfigured, dept is the reliable signal.
+        $isInLDDept = $emp && Common::isLDDepartment($emp->Dept_id ?? null);
 
-        $employees_query = Employee::with(['resortAdmin','department','position'])->where('resort_id',$resort_id)->whereIn('status', ['Active', 'Probationary']);
+        // HR identity = rank 3 (HR) or any rank in [1,2] inside the HR department —
+        // these users get DEPARTMENT-only scope (unless their title is in the full-access list).
+        $isHrIdentity = ($available_rank === "HR")
+            || ($emp && in_array((int) $emp->rank, [1, 2], true) && Common::isHRDepartment($emp->Dept_id ?? null));
 
-        // Department-visibility scope. L&D Managers + HR + GM are explicitly given
-        // resort-wide visibility for this flow; everyone else falls under the standard scoping.
-        if (!$hasResortWideAccess) {
-            $scopedDeptIds = Common::getScopedDepartmentIds();
-            $employees_query->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
-        }
+        $isAdmin = (($this->resort->type ?? null) === 'super') || ($this->resort->is_master_admin ?? 0);
+
+        // Resort-wide: GM rank, full-access titles, L&D-department members, or super/master admin.
+        $hasResortWideAccess = $isAdmin || $isGM || $isFullAccessTitle || $isInLDDept;
+
+        $employees_query = Employee::with(['resortAdmin','department','position'])
+            ->where('resort_id', $resort_id)
+            ->whereIn('status', ['Active', 'Probationary']);
 
         if ($hasResortWideAccess) {
-            $employees_query->where('employees.id', '!=', $this->resort->getEmployee->id);
+            // Exclude self when the auth user has an employee record.
+            $authEmpId = optional($emp)->id;
+            if ($authEmpId) {
+                $employees_query->where('employees.id', '!=', $authEmpId);
+            }
+        } elseif ($isHrIdentity && optional($emp)->Dept_id) {
+            // HR sees their own department's employees (excluding self).
+            $employees_query->where('Dept_id', $emp->Dept_id);
+            $employees_query->where('employees.id', '!=', $emp->id);
         } else {
+            // Everyone else (regular Manager rank, etc.) sees their reporting tree.
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            $employees_query->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
             $employees_query->where('employees.reporting_to', $this->reporting_to);
         }
         $employees = $employees_query->get();
@@ -115,6 +131,17 @@ class LearningController extends Controller
         $learningProgram = LearningProgram::find($request->suggested_Learning);
         $learningProgramName = $learningProgram ? $learningProgram->name : "Learning Program";
 
+        // L&D Managers / HR / GM raising requests for their own team don't need
+        // an approval round-trip — auto-approve their submission.
+        $rankConfig = config('settings.Position_Rank');
+        $currentRank = $this->resort->getEmployee->rank ?? null;
+        $availableRank = $rankConfig[$currentRank] ?? '';
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
+        $autoApprove = ($availableRank === 'HR'
+            || $availableRank === 'GM'
+            || in_array($currentPositionTitle, $ldManagerTitles, true));
+
         // ✅ Ensure no duplicate learning request exists
         $learningRequest = LearningRequest::updateOrCreate(
             [
@@ -126,7 +153,7 @@ class LearningController extends Controller
                 'reason' => $request->reason,
                 'start_date' => Carbon::parse($request->start_date)->format('Y-m-d'),
                 'end_date' => $request->filled('end_date') ? Carbon::parse($request->end_date)->format('Y-m-d') : null,
-                'status' => 'pending',
+                'status' => $autoApprove ? 'Approved' : 'Pending',
                 'created_by' => $this->resort->id,
             ]
         );
@@ -207,18 +234,25 @@ class LearningController extends Controller
             $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
             $currentPositionTitle = optional(optional($this->resort->getEmployee)->position)->position_title;
             $isLdManager = in_array($currentPositionTitle, $ldManagerTitles, true);
-            // HR / GM / L&D Manager can act on every request in the resort.
+            // HR / GM / L&D Manager can ACT on requests (Approve / Hold / Deny). Visibility
+            // is layered separately: HR sees only their own department, others (GM, L&D
+            // Manager, admin) see resort-wide via the scopedEmpIds helper below.
             $isManager = ($isHR || $isGM || $isLdManager);
+            $scopedEmpIds = Common::getPerformanceScopedEmpIds();
             // Fetch Learning Requests
             $query = LearningRequest::select(
                 'learning_requests.id',
                 'learning_requests.learning_id',
                 'learning_requests.reason',
+                'learning_requests.rejection_reason',
                 'learning_requests.start_date',
                 'learning_requests.end_date',
                 'learning_requests.status',
                 'learning_requests.created_at',
                 'learning_programs.name as learning_name',
+
+                // Creator (resort_admin who submitted the request) — second join below.
+                DB::raw("CONCAT(creator.first_name, ' ', creator.last_name) as requested_by"),
 
                 DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) SEPARATOR ', ') as employee_names")
             )
@@ -226,12 +260,22 @@ class LearningController extends Controller
             ->leftJoin('learning_requests_employees', 'learning_requests.id', '=', 'learning_requests_employees.learning_request_id')
             ->leftJoin('employees', 'learning_requests_employees.employee_id', '=', 'employees.id')
             ->leftJoin('resort_admins', 'resort_admins.id', '=', 'employees.Admin_Parent_id')
+            // Resolve the creator's display name from resort_admins (created_by stores resort_admins.id).
+            ->leftJoin('resort_admins as creator', 'creator.id', '=', 'learning_requests.created_by')
             ->where('learning_requests.resort_id', $resort_id);
 
             if ($isManager) {
-                // HR / GM / L&D Manager: see every learning request in the resort
-                // so they can approve, hold, or deny.
-                // (Already scoped to the resort by the WHERE above.)
+                // HR / GM / L&D Manager: can act on every request — but HR is now
+                // department-scoped (getPerformanceScopedEmpIds returns dept emp ids
+                // for HR, null for GM / L&D Manager / admin).
+                $query->when(is_array($scopedEmpIds), function ($q) use ($scopedEmpIds) {
+                    $q->whereExists(function ($sub) use ($scopedEmpIds) {
+                        $sub->selectRaw(1)
+                            ->from('learning_requests_employees as lre_scope')
+                            ->whereColumn('lre_scope.learning_request_id', 'learning_requests.id')
+                            ->whereIn('lre_scope.employee_id', $scopedEmpIds);
+                    });
+                });
             } elseif ($isHOD) {
                 // HODs see the requests they created.
                 $query->where('learning_requests.created_by', $this->resort->GetEmployee->Admin_Parent_id);
@@ -266,14 +310,22 @@ class LearningController extends Controller
             return datatables()->of($requests)
                 ->addColumn('learning_name', fn($row) => $row->learning_name ?? 'N/A')
                 ->addColumn('employees', fn($row) => $row->employee_names ?? 'N/A')
+                ->addColumn('requested_by', fn($row) => trim($row->requested_by ?? '') !== '' ? $row->requested_by : 'N/A')
                 ->addColumn('reason', fn($row) => $row->reason ?? 'N/A')
                 ->addColumn('start_date', fn($row) => $row->start_date ?? 'N/A')
                 ->addColumn('end_date', fn($row) => $row->end_date ?? 'N/A')
 
-                // Display Status Column (Always Visible)
+                // Status badge — for Denied / On Hold, attach the rejection_reason as a
+                // hover tooltip so reviewers can see WHY without opening the detail page.
                 ->addColumn('status', function ($row) {
                     $badgeClass = ($row->status == 'Approved') ? 'success' : (($row->status == 'Denied') ? 'danger' : 'warning');
-                    return '<span class="badge badge-' . $badgeClass . '">' . ucfirst($row->status) . '</span>';
+                    $tooltipAttrs = '';
+                    if (in_array($row->status, ['Denied', 'On Hold'], true) && !empty($row->rejection_reason)) {
+                        $tooltipAttrs = ' data-bs-toggle="tooltip" data-bs-placement="top"'
+                            . ' title="' . htmlspecialchars($row->rejection_reason, ENT_QUOTES, 'UTF-8') . '"'
+                            . ' style="cursor: help;"';
+                    }
+                    return '<span class="badge badge-' . $badgeClass . '"' . $tooltipAttrs . '>' . ucfirst($row->status) . '</span>';
                 })
 
                 // Conditionally Display Action Buttons (Only for Managers)
@@ -341,14 +393,14 @@ class LearningController extends Controller
             // ✅ Notify Request Creator (Sender)
             $notificationTitle = 'Learning Request Update';
             $notificationMessage = match ($request->status) {
-                'Approved' => "✅ **Good news!** Your learning request for **'{$trainingName}'** has been **approved!**  
-                            📅 **Training Dates:** {$learningRequest->start_date} - {$learningRequest->end_date}  
-                            📍 **Check your schedule for details.**",
-                'Denied' => "❌ Your learning request for **'{$trainingName}'** has been **denied.**  
-                            📌 **Reason:** {$request->reason}",
-                'On Hold' => "⏳ Your learning request for **'{$trainingName}'** is **on hold.**  
-                            📌 **Reason:** {$request->reason}",
-                default => "Your learning request for **'{$trainingName}'** has been updated."
+                'Approved' => "<strong>Good news!</strong> Your learning request for <strong>'{$trainingName}'</strong> has been <strong>approved</strong>. "
+                    . "<strong>Training Dates:</strong> {$learningRequest->start_date} - {$learningRequest->end_date}. "
+                    . "Check your schedule for details.",
+                'Denied' => "Your learning request for <strong>'{$trainingName}'</strong> has been <strong>denied</strong>. "
+                    . "<strong>Reason:</strong> {$request->reason}",
+                'On Hold' => "Your learning request for <strong>'{$trainingName}'</strong> is <strong>on hold</strong>. "
+                    . "<strong>Reason:</strong> {$request->reason}",
+                default => "Your learning request for <strong>'{$trainingName}'</strong> has been updated."
             };
 
             $moduleName = "Learning";
@@ -372,11 +424,11 @@ class LearningController extends Controller
                     ->get();
 
                 foreach ($employees as $emp) {
-                    $notificationTitle = '🎉 New Learning Assignment!';
-                    $notificationMessage = "🎉 **Congratulations!** 🎉  
-                                            You are selected for **'{$trainingName}'**.  
-                                            📅 **Training Dates:** {$learningRequest->start_date} - {$learningRequest->end_date}  
-                                            📍 **Check your schedule and be prepared!**";
+                    $notificationTitle = 'New Learning Assignment';
+                    $notificationMessage = "<strong>Congratulations!</strong> "
+                        . "You are selected for <strong>'{$trainingName}'</strong>. "
+                        . "<strong>Training Dates:</strong> {$learningRequest->start_date} - {$learningRequest->end_date}. "
+                        . "<strong>Check your schedule and be prepared.</strong>";
 
                     event(new ResortNotificationEvent(Common::nofitication(
                         $this->resort->resort_id, 

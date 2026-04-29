@@ -439,7 +439,12 @@
                 },
                 editable: false,
                 eventLimit: 0, // No extra "more" link
-                navLinks: true,
+                // Disable nav links — clicking a date should only refresh the side
+                // panel via dayClick, not switch FullCalendar into a day view.
+                navLinks: false,
+                // Let the day grid grow to its natural height instead of FullCalendar's
+                // default 213px scroller, which forces an internal vertical scrollbar.
+                contentHeight: 'auto',
 
                 events: function(start, end, timezone, callback) {
                     $.ajax({
@@ -450,20 +455,11 @@
                             end_date: end.format('YYYY-MM-DD')
                         },
                         success: function(response) {
-                            $('.fc-day').removeClass('custom-dot'); // Remove previous dots
-
-                            if (response.data.length > 0) {
-                                response.data.forEach(function(session) {
-                                    let formattedDate = moment(session.session_date).format('YYYY-MM-DD');
-                                    console.log(formattedDate);
-                                    let dayCell = $(`.fc-day[data-date="${formattedDate}"]`);
-                                    
-                                    if (dayCell.length) {
-                                        dayCell.addClass('custom-dot'); // Add class to mark event
-                                    }
-                                });
-                            }
+                            window._learningSessions = response.data || [];
                             callback([]); // No events displayed, just dots
+                            // FullCalendar v3 may build day cells AFTER the events callback
+                            // resolves — defer one tick so the addClass lands on real cells.
+                            setTimeout(paintLearningDots, 0);
                         },
                         error: function(xhr) {
                             console.error("Error fetching training sessions", xhr);
@@ -474,6 +470,8 @@
                     let startDate = view.start.format('YYYY-MM-DD');
                     let endDate = view.end.format('YYYY-MM-DD');
                     fetchUpcomingSessions(startDate, endDate); // Load sidebar when month changes
+                    // Re-apply dots once the new month's day cells exist.
+                    setTimeout(paintLearningDots, 0);
                 },
                 dayClick: function(date, jsEvent, view) {
                     $.ajax({
@@ -542,6 +540,31 @@
                 }
             });
         });
+
+        // Paint a marker dot on every day each cached training session covers.
+        // Called after the events: callback resolves AND on every viewRender, so
+        // the dots survive month-to-month navigation.
+        function paintLearningDots() {
+            $('.fc-day').removeClass('custom-dot');
+            var sessions = window._learningSessions || [];
+            sessions.forEach(function (session) {
+                var startStr = session.start_date || session.session_date;
+                var endStr   = session.end_date   || session.session_date;
+                if (!startStr) return;
+                var startDate = moment(startStr);
+                var endDate   = endStr ? moment(endStr) : startDate.clone();
+                if (!startDate.isValid()) return;
+                if (!endDate.isValid() || endDate.isBefore(startDate, 'day')) endDate = startDate.clone();
+
+                // moment 2.9.0 doesn't have isSameOrBefore — use !isAfter instead.
+                var cursor = startDate.clone();
+                while (!cursor.isAfter(endDate, 'day')) {
+                    var dayCell = $('.fc-day[data-date="' + cursor.format('YYYY-MM-DD') + '"]');
+                    if (dayCell.length) dayCell.addClass('custom-dot');
+                    cursor.add(1, 'day');
+                }
+            });
+        }
 
         function fetchUpcomingSessions() {
             $.ajax({
@@ -803,111 +826,95 @@
                 }
             });
 
-            // full-calendar   
-            $(function () {
-
-                var todayDate = moment().startOf('day');
-                var YM = todayDate.format('YYYY-MM');
-                var YESTERDAY = todayDate.clone().subtract(1, 'day').format('YYYY-MM-DD');
-                var TODAY = todayDate.format('YYYY-MM-DD');
-                var TOMORROW = todayDate.clone().add(1, 'day').format('YYYY-MM-DD');
-
-                var cal = $('#calendar').fullCalendar({
-                    header: {
-                        left: 'prev ',
-                        center: 'title',
-                        right: 'next'
-                    },
-                    editable: true,
-                    eventLimit: 0, // allow "more" link when too many events
-                    navLinks: true,
-                    dayRender: function (a) {
-                        //console.log(a)
-                    }
-                });
-
-            });
-
-
+            // (Duplicate fullCalendar() init removed — it re-initialised #calendar
+            //  without the events / dayClick handlers configured above and reverted
+            //  navLinks back to defaults, which is what produced the empty
+            //  "April 15, 2026 / Wednesday" day-view header on date click.)
         });
     </script>
     <script type="module">
+
+        // Learning Hours — bar per program with hours summed across all schedules.
+        var learningHoursPalette = ['#014653','#2EACB3','#FED049','#8DC9C9','#333333','#7AD45A','#FF4B4B','#F5738D','#53CAFF'];
+        var learningHoursRows = @json($learningHoursByProg ?? []);
+        var learningHoursLabels = learningHoursRows.map(function (r) { return r.name || 'Untitled'; });
+        var learningHoursData   = learningHoursRows.map(function (r) { return parseFloat(r.total_hours || 0); });
+        var learningHoursColors = learningHoursRows.map(function (_r, i) { return learningHoursPalette[i % learningHoursPalette.length]; });
 
         var ctx = document.getElementById('myStackedBarChart').getContext('2d');
         var myStackedBarChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Learning 1', 'Learning 1', 'Learning 1', 'Learning 1', 'Learning 1', 'Learning 1'],
+                labels: learningHoursLabels,
                 datasets: [
                     {
-                        label: 'Learning 1',
-                        data: [8, 20, 25, 10, 10, 20, 10],
-                        backgroundColor: '#014653',
+                        label: 'Hours',
+                        data: learningHoursData,
+                        backgroundColor: learningHoursColors,
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 10, 4, 20, 2, 5, 10],
-                        backgroundColor: '#2EACB3',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [20, 5, 20, 40, 22, 5, 20],
-                        backgroundColor: '#FED049',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 20, 15, 5, 5, 5, 10],
-                        backgroundColor: '#8DC9C9',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#333333',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#7AD45A',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#FF4B4B',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#F5738D',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderColor: '#fff',
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
-                        label: 'Learning 1',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#53CAFF',
-                        borderColor: '#fff',
+                        label: '',
+                        data: [],
+                        backgroundColor: '',
                         borderWidth: 2,
                         borderRadius: 10,
                     },

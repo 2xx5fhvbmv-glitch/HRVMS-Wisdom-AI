@@ -175,8 +175,12 @@
         $startTimeCell.html(`<input type="time" id="${startTimeId}" class="form-control" value="${startTimeForInput}" />`);
         $endTimeCell.html(`<input type="time" id="${endTimeId}" class="form-control" value="${endTimeForInput}" />`);
 
-        // Replace action buttons
+        // Stash the original action cell HTML (Edit + Mark Attendance) so cancel /
+        // update can restore both buttons. Replacing with only "Edit" lost the
+        // Mark Attendance link.
         var $actionCell = $row.find("td:last-child");
+        $row.data('original-action', $actionCell.html());
+
         $actionCell.html(`
             <button class="btn btn-sm btn-success update-row-btn" data-schedule-id="${scheduleId}">Update</button>
             <button class="btn btn-sm btn-secondary cancel-row-btn" data-schedule-id="${scheduleId}">Cancel</button>
@@ -248,11 +252,17 @@
         $row.find("td:nth-child(6)").text(originalStartTime);
         $row.find("td:nth-child(7)").text(originalEndTime);
 
-        $row.find("td:last-child").html(`
-            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
-                <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
-            </a>
-        `);
+        // Restore the full action cell (Edit + Mark Attendance) from the stash.
+        var originalAction = $row.data('original-action');
+        if (originalAction) {
+            $row.find("td:last-child").html(originalAction);
+        } else {
+            $row.find("td:last-child").html(`
+                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
+                    <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
+                </a>
+            `);
+        }
     });
 
     $(document).on("click", ".update-row-btn", function () {
@@ -297,11 +307,17 @@
                     $row.find("td:nth-child(6)").text(newStartTime);
                     $row.find("td:nth-child(7)").text(newEndTime);
 
-                    $row.find("td:last-child").html(`
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
-                            <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
-                        </a>
-                    `);
+                    // Restore the full action cell (Edit + Mark Attendance) from the stash.
+                    var originalAction = $row.data('original-action');
+                    if (originalAction) {
+                        $row.find("td:last-child").html(originalAction);
+                    } else {
+                        $row.find("td:last-child").html(`
+                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
+                                <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
+                            </a>
+                        `);
+                    }
                 } else {
                     toastr.error(response.message || "Failed to update. Try again!", "Error", {
                         positionClass: 'toast-bottom-right'

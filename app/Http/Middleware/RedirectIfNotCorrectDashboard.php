@@ -18,6 +18,14 @@ class RedirectIfNotCorrectDashboard
      */
     public function handle(Request $request, Closure $next)
     {
+        // The "redirect to your dashboard" rules below only make sense for full-page
+        // navigations. AJAX / JSON endpoints (chart data, calendar fetches, lookups, etc.)
+        // must return their original payload — otherwise the redirect HTML response
+        // breaks the caller's JSON parsing and the widget silently shows no data.
+        if ($request->ajax() || $request->wantsJson() || $request->expectsJson()) {
+            return $next($request);
+        }
+
         if (Auth::guard('resort-admin')->check()) {
             $Resort = Auth::guard('resort-admin')->user();
             $employee = $Resort->GetEmployee;

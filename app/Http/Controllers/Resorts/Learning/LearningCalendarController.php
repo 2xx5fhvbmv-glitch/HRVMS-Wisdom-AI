@@ -97,7 +97,9 @@ class LearningCalendarController extends Controller
         // Department-visibility scope for calendar sessions.
         $scopedEmpIds = \App\Helpers\Common::getPerformanceScopedEmpIds();
 
-        // Fetch Training Schedules with Participants
+        // Fetch Training Schedules with Participants — range overlap so a multi-day
+        // event (e.g. April 26 → April 27) shows on every day it runs, not only
+        // the start day.
         $sessions = TrainingSchedule::where('resort_id', $resort_id)
         ->where(function ($query) use ($startDate, $endDate) {
             $query->whereBetween('start_date', [$startDate, $endDate])
@@ -170,12 +172,104 @@ class LearningCalendarController extends Controller
 
         return response()->json(['data' => $events]);
     }
+    /**
+     * Returns the auth user's compulsory / probationary learning programs as
+     * FullCalendar events. start = joining_date, end = joining_date + completion_days,
+     * coloured by status (overdue / completed / pending).
+     */
+    public function myCompulsoryEvents()
+    {
+        $resort_id = $this->resort->resort_id;
+        $emp = $this->resort->GetEmployee ?? null;
+        if (!$emp) {
+            return response()->json(['data' => []]);
+        }
+
+        // Probationary programs apply to anyone on probation; mandatory programs
+        // apply by department / position. Both use the auth user's joining_date as
+        // the deadline anchor.
+        $probationary = \App\Models\ProbationaryLearningProgram::with('program')
+            ->where('resort_id', $resort_id)
+            ->get();
+
+        $mandatory = \DB::table('mandatory_learning_programs as mlp')
+            ->join('learning_programs as lp', 'lp.id', '=', 'mlp.program_id')
+            ->where('mlp.resort_id', $resort_id)
+            ->where(function ($q) use ($emp) {
+                $q->whereNull('mlp.department_id')->orWhere('mlp.department_id', $emp->Dept_id);
+            })
+            ->where(function ($q) use ($emp) {
+                $q->whereNull('mlp.position_id')->orWhere('mlp.position_id', $emp->Position_id);
+            })
+            ->select('lp.id as program_id', 'lp.name as program_name', 'mlp.notify_before_days')
+            ->get();
+
+        // Programs the user has already completed (Present in any session of that program).
+        $completed = \DB::table('training_attendance as ta')
+            ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+            ->where('ts.resort_id', $resort_id)
+            ->where('ta.employee_id', $emp->id)
+            ->where('ta.status', 'Present')
+            ->pluck('ts.training_id')
+            ->unique()
+            ->all();
+
+        $joining = $emp->joining_date ? Carbon::parse($emp->joining_date) : Carbon::now();
+        $events = [];
+
+        foreach ($probationary as $r) {
+            $programId = $r->program_id;
+            $name = optional($r->program)->name ?? '—';
+            $days = (int) ($r->completion_days ?? 0);
+            $due  = $days > 0 ? (clone $joining)->addDays($days) : (clone $joining);
+            $isDone = in_array($programId, $completed, true);
+            $isOverdue = !$isDone && $due->isPast();
+            $color = $isDone ? '#28a745' : ($isOverdue ? '#dc3545' : '#fd7e14');
+            $events[] = [
+                'title'        => 'My Program: ' . $name,
+                'session_date' => $joining->toDateString(),
+                'start_date'   => $joining->toDateString(),
+                'end_date'     => $due->toDateString(),
+                'start_time'   => '',
+                'end_time'     => '',
+                'description'  => $isDone ? 'Completed' : ($isOverdue ? 'Overdue — please complete ASAP.' : 'Compulsory program. Due by ' . $due->format('d M Y') . '.'),
+                'color'        => $color,
+                'participants' => [],
+            ];
+        }
+
+        foreach ($mandatory as $r) {
+            $days = (int) ($r->notify_before_days ?? 0);
+            $due  = $days > 0 ? (clone $joining)->addDays($days) : (clone $joining)->addDays(30);
+            $isDone = in_array($r->program_id, $completed, true);
+            $isOverdue = !$isDone && $due->isPast();
+            $color = $isDone ? '#28a745' : ($isOverdue ? '#dc3545' : '#fd7e14');
+            $events[] = [
+                'title'        => 'My Program: ' . $r->program_name,
+                'session_date' => $joining->toDateString(),
+                'start_date'   => $joining->toDateString(),
+                'end_date'     => $due->toDateString(),
+                'start_time'   => '',
+                'end_time'     => '',
+                'description'  => $isDone ? 'Completed' : ($isOverdue ? 'Overdue — please complete ASAP.' : 'Mandatory program. Due by ' . $due->format('d M Y') . '.'),
+                'color'        => $color,
+                'participants' => [],
+            ];
+        }
+
+        return response()->json(['data' => $events]);
+    }
+
     // Format Training Session Data
     private function formatSessionData($session)
     {
         return [
             'title' => $session->learningProgram->name,
             'session_date' => $session->start_date,
+            // Calendar uses [start_date..end_date] to drop a dot on every day a
+            // multi-day program runs — not only the start day.
+            'start_date' => $session->start_date,
+            'end_date' => $session->end_date,
             'start_time' => date('h:i A', strtotime($session->start_time)),
             'end_time' => date('h:i A', strtotime($session->end_time)),
             'description' => $session->learningProgram->description,
@@ -194,10 +288,12 @@ class LearningCalendarController extends Controller
     {
         // Fetch the creator's ResortAdmin details
         $creator = ResortAdmin::find($request->created_by);
-    
+
         return [
             'title' => "Learning Request: " . $request->learning->name,
             'session_date' => $request->start_date,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
             'start_time' => '09:00 AM', // Adjust if necessary
             'end_time' => '05:00 PM', // Adjust if necessary
             'description' => "Learning request from " . ($creator ? $creator->full_name : 'Unknown') . ". " . $request->learning->description,
@@ -205,8 +301,8 @@ class LearningCalendarController extends Controller
             'participants' => $request->employees->map(function ($emp) {
                 return [
                     'name' => $emp->employee->first_name . ' ' . $emp->employee->last_name,
-                    'image' => $emp->employee->profile_picture 
-                        ? asset('storage/' . $emp->employee->profile_picture) 
+                    'image' => $emp->employee->profile_picture
+                        ? asset('storage/' . $emp->employee->profile_picture)
                         : asset('default-profile.png'),
                 ];
             }),

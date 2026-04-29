@@ -153,23 +153,24 @@ class AttendanceController extends Controller
             'training_schedule_id' => 'required',
             'employees' => 'required|array',
             'employees.*.employee_id' => 'required|exists:employees,id',
-            'employees.*.status' => 'required|in:Present,Absent,Late',
+            'employees.*.status' => 'required|in:Present,Absent',
         ]);
 
         $trainingSchedule = TrainingSchedule::find($request->training_schedule_id);
-        $currentDate = now()->toDateString();
-        
-        // Ensure training is within the valid date range
-        if ($currentDate < $trainingSchedule->start_date || $currentDate > $trainingSchedule->end_date) {
-            return response()->json(['success' => false, 'message' => 'Attendance cannot be marked outside the training date range.'], 422);
+        if (!$trainingSchedule) {
+            return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
         }
+        // Backfill is allowed: no longer reject submissions whose current date sits
+        // outside [start_date, end_date]. Persist against the schedule's start_date
+        // so the record falls inside the training window for downstream reports.
+        $attendanceDate = $trainingSchedule->start_date;
 
         foreach ($request->employees as $employeeData) {
             TrainingAttendance::updateOrCreate(
                 [
                     'training_schedule_id' => $request->training_schedule_id,
                     'employee_id' => $employeeData['employee_id'],
-                    'attendance_date' => $currentDate,
+                    'attendance_date' => $attendanceDate,
                 ],
                 [
                     'status' => $employeeData['status'],
@@ -177,7 +178,7 @@ class AttendanceController extends Controller
             );
         }
 
-        return response()->json(['message' => 'Attendance updated successfully']);
+        return response()->json(['success' => true, 'message' => 'Attendance updated successfully']);
     }
 
     public function attendanceHistoryPage($employee_id)

@@ -37,24 +37,64 @@ class DashboardController extends Controller
     {
         $page_title ='Learning';
         $resort_id= $this->resort->resort_id;
-        $ongoing_trainings_count = TrainingSchedule::where('status','Ongoing')->where('resort_id', $resort_id)->count();
-        $completed_trainings_count = TrainingSchedule::where('status','Completed')->where('resort_id', $resort_id)->count();
-        $scheduled_trainings_count = TrainingSchedule::where('status','Scheduled')->where('resort_id', $resort_id)->count();
-        $pending_trainings_count = LearningRequest::where('status','Pending')->where('resort_id', $resort_id)->count();
-        if($this->resort->is_master_admin == 0){
-            $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('created_by',$this->resort->GetEmployee->Admin_Parent_id)->get();
-        }else{
-            $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->get();
-        }
-        // dd( $pending_trainings_count);
+
+        // HR (and HR-dept HOD/EXCOM) is now scoped to their own department.
+        // Counts and lists below filter to schedules / requests that involve at
+        // least one in-scope employee, mirroring the HOD dashboard's pattern.
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+        $today = \Carbon\Carbon::now()->toDateString();
+
+        // Date-derived counts (status field is rarely advanced manually). See
+        // manager_dashboard() for the same scheme.
+        $countByDateRule = function ($builderTweak) use ($resort_id, $scopedEmpIds) {
+            $q = TrainingSchedule::where('resort_id', $resort_id);
+            $builderTweak($q);
+            if (is_array($scopedEmpIds)) {
+                $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
+            }
+            return $q->count();
+        };
+        $ongoing_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where(function ($qq) use ($today) {
+                $qq->where('status', 'Ongoing')
+                   ->orWhere(function ($qqq) use ($today) {
+                       $qqq->where('start_date', '<=', $today)->where('end_date', '>=', $today);
+                   });
+            });
+        });
+        $completed_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where(function ($qq) use ($today) {
+                $qq->where('status', 'Completed')->orWhere('end_date', '<', $today);
+            });
+        });
+        $scheduled_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where(function ($qq) use ($today) {
+                $qq->whereIn('status', ['Scheduled', 'Pending'])->orWhere('start_date', '>', $today);
+            });
+        });
+
+        $pending_trainings_count = LearningRequest::where('status', 'Pending')
+            ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
+            ->count();
+
+        $pending_learning_request = LearningRequest::with('learning')
+            ->where('status', 'Pending')
+            ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
+            ->get();
+
         $trainings = TrainingSchedule::with(['learningProgram', 'trainingAttendances','participants'])
-        ->where('resort_id', $resort_id)
-        ->orderBy('start_date', 'desc')
-        ->limit(5)
-        ->get();
-        // dd($trainings[0]->participants);
-        // Fetch all training schedules
-        $trainingSchedules = TrainingSchedule::with('participants.employee', 'trainingAttendances')->get();
+            ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
+            ->orderBy('start_date', 'desc')
+            ->limit(5)
+            ->get();
+
+        $trainingSchedulesQuery = TrainingSchedule::with('participants.employee', 'trainingAttendances')
+            ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)));
+        $trainingSchedules = $trainingSchedulesQuery->get();
 
         // Define the threshold for completion (e.g., 70%)
         $AttendanceParameters = AttendanceParameters::where('resort_id',$resort_id)->first();
@@ -423,17 +463,43 @@ class DashboardController extends Controller
     {
         $page_title ='Learning';
         $resort_id= $this->resort->resort_id;
-        $authEmpId = $this->resort->GetEmployee->id ?? null;
-        $authAdminParentId = $this->resort->GetEmployee->Admin_Parent_id ?? null;
+        $today = \Carbon\Carbon::now()->toDateString();
 
-        $ongoing_trainings_count = TrainingSchedule::where('status','Ongoing')->where('resort_id', $resort_id)->count();
-        $completed_trainings_count = TrainingSchedule::where('status','Completed')->where('resort_id', $resort_id)->count();
-        $scheduled_trainings_count = LearningRequest::where('status','Approved')->where('resort_id', $resort_id)->where('created_by',$authAdminParentId)->count();
-        $pending_trainings_count = TrainingSchedule::where('status','Scheduled')->where('resort_id', $resort_id)->count();
+        // Tile counts derive directly from dates so they reflect reality even when
+        // nobody manually advanced TrainingSchedule.status. Falls back to the
+        // explicit status field too so genuinely-set values still count.
+        //   Ongoing  → today is between start_date and end_date  (or status = Ongoing)
+        //   Completed → end_date already in the past             (or status = Completed)
+        //   Pending  → start_date in the future                  (or status = Scheduled / Pending)
+        $ongoing_trainings_count = TrainingSchedule::where('resort_id', $resort_id)
+            ->where(function ($q) use ($today) {
+                $q->where('status', 'Ongoing')
+                  ->orWhere(function ($qq) use ($today) {
+                      $qq->where('start_date', '<=', $today)
+                         ->where('end_date', '>=', $today);
+                  });
+            })
+            ->count();
+        $completed_trainings_count = TrainingSchedule::where('resort_id', $resort_id)
+            ->where(function ($q) use ($today) {
+                $q->where('status', 'Completed')
+                  ->orWhere('end_date', '<', $today);
+            })
+            ->count();
+        $scheduled_trainings_count = TrainingSchedule::where('resort_id', $resort_id)
+            ->where(function ($q) use ($today) {
+                $q->whereIn('status', ['Scheduled', 'Pending'])
+                  ->orWhere('start_date', '>', $today);
+            })
+            ->count();
+        $pending_trainings_count = $scheduled_trainings_count;
 
-        // Completed compulsory learning = completed schedules whose program is in this resort's mandatory list.
+        // Completed compulsory learning = mandatory-program schedules whose end_date
+        // has passed (or status explicitly Completed).
         $compulsory_completed_traing = TrainingSchedule::where('resort_id', $resort_id)
-            ->where('status', 'Completed')
+            ->where(function ($q) use ($today) {
+                $q->where('status', 'Completed')->orWhere('end_date', '<', $today);
+            })
             ->whereIn('training_id', function ($q) use ($resort_id) {
                 $q->select('program_id')
                     ->from('mandatory_learning_programs')
@@ -441,12 +507,21 @@ class DashboardController extends Controller
             })
             ->count();
 
-        $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('learning_manager_id',$authEmpId)->get();
+        // All pending learning requests in the resort (no per-user scoping).
+        $pending_learning_request = LearningRequest::with('learning')
+            ->where('status', 'Pending')
+            ->where('resort_id', $resort_id)
+            ->get();
+
         $categories = LearningCategory::withCount('programs')->where('resort_id', $resort_id)->get();
-        $today = now()->toDateString();
+        // Recent absentees (last 90 days) — "today only" produced an empty list when
+        // no one was marked absent today. Mirrors the HOD dashboard's overdue list.
         $absentees = TrainingAttendance::where('status', 'Absent')
-            ->whereDate('attendance_date', $today)
+            ->where('attendance_date', '>=', \Carbon\Carbon::now()->subDays(90))
+            ->whereHas('schedule', fn($q) => $q->where('resort_id', $resort_id))
             ->with('employee.resortAdmin', 'schedule.learningProgram')
+            ->orderByDesc('attendance_date')
+            ->limit(10)
             ->get();
         $trainings = TrainingSchedule::with(['learningProgram', 'trainingAttendances'])
             ->where('resort_id', $resort_id)
@@ -456,11 +531,121 @@ class DashboardController extends Controller
 
         [$avgFeedbackScore, $topTrainerName] = $this->computeFeedbackStats($resort_id);
 
+        // Show "My Compulsory Programs" panel only when the auth user is on probation
+        // (re-uses the HOD/XCOM dashboard's logic so behaviour is identical).
+        $myCompulsoryPrograms = $this->buildMyCompulsoryPrograms($resort_id);
+
+        // Team-wide list of employees with pending or overdue compulsory programs,
+        // so the L&D Manager can spot who needs scheduling and click through to
+        // /resort/learning/schedule with the employee + program pre-selected.
+        // Dashboard shows the most-urgent 5 — full list lives on a separate page
+        // accessed via the "View All" link.
+        $teamCompulsoryPendingAll = $this->buildTeamCompulsoryPending($resort_id);
+        $teamCompulsoryPendingCount = count($teamCompulsoryPendingAll);
+        $teamCompulsoryPending = array_slice($teamCompulsoryPendingAll, 0, 10);
+
         return view('resorts.learning.dashboard.manager-dashboard', compact(
             'page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count',
             'ongoing_trainings_count','compulsory_completed_traing','pending_learning_request',
-            'trainings','categories','absentees','avgFeedbackScore','topTrainerName'
+            'trainings','categories','absentees','avgFeedbackScore','topTrainerName',
+            'myCompulsoryPrograms','teamCompulsoryPending','teamCompulsoryPendingCount'
         ));
+    }
+
+    /**
+     * Full-page list (with pagination) of every probationer's pending / overdue
+     * compulsory programs. Linked from the dashboard's "View All".
+     */
+    public function teamCompulsoryPendingAll(Request $request)
+    {
+        $page_title = 'Compulsory Trainings — Action Needed';
+        $resort_id = $this->resort->resort_id;
+        $rows = $this->buildTeamCompulsoryPending($resort_id);
+
+        $perPage = (int) ($request->input('per_page') ?: 15);
+        $perPage = max(5, min($perPage, 100));
+        $current = \Illuminate\Pagination\Paginator::resolveCurrentPage('page');
+        $items = array_slice($rows, ($current - 1) * $perPage, $perPage);
+
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            count($rows),
+            $perPage,
+            $current,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return view('resorts.learning.dashboard.compulsory-pending', compact('page_title', 'paginator'));
+    }
+
+    /**
+     * Returns one row per (probationer × required-compulsory-program) where the
+     * employee hasn't yet been marked Present in any session of that program.
+     * Each row includes an `is_overdue` flag for the UI badge.
+     */
+    private function buildTeamCompulsoryPending($resortId)
+    {
+        $required = \App\Models\ProbationaryLearningProgram::with('program')
+            ->where('resort_id', $resortId)
+            ->get();
+        if ($required->isEmpty()) return [];
+
+        $probationers = Employee::with(['resortAdmin', 'department', 'position'])
+            ->where('resort_id', $resortId)
+            ->where(function ($q) {
+                $q->where('employment_type', 'Probationary')
+                  ->orWhereIn('probation_status', ['Active', 'Extended']);
+            })
+            ->get();
+        if ($probationers->isEmpty()) return [];
+
+        // Pre-compute who has already completed which program (Present in any session).
+        $programIds = $required->pluck('program_id')->all();
+        $completed = \DB::table('training_attendance as ta')
+            ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+            ->where('ts.resort_id', $resortId)
+            ->whereIn('ts.training_id', $programIds)
+            ->where('ta.status', 'Present')
+            ->select('ta.employee_id', 'ts.training_id')
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn($rows) => $rows->pluck('training_id')->unique()->all())
+            ->toArray();
+
+        $rows = [];
+        foreach ($probationers as $emp) {
+            $deadlineAnchor = $emp->joining_date ? \Carbon\Carbon::parse($emp->joining_date) : null;
+            $empCompleted = $completed[$emp->id] ?? [];
+
+            foreach ($required as $r) {
+                if (in_array($r->program_id, $empCompleted, true)) continue; // already completed
+
+                $dueOn = ($deadlineAnchor && $r->completion_days)
+                    ? (clone $deadlineAnchor)->addDays((int) $r->completion_days)
+                    : null;
+                $rows[] = (object) [
+                    'employee_id'   => $emp->id,
+                    'employee_name' => optional($emp->resortAdmin)->full_name
+                        ?? trim((optional($emp->resortAdmin)->first_name ?? '') . ' ' . (optional($emp->resortAdmin)->last_name ?? '')),
+                    'department'    => optional($emp->department)->name,
+                    'position'      => optional($emp->position)->position_title,
+                    'program_id'    => $r->program_id,
+                    'program_name'  => optional($r->program)->name ?? '—',
+                    'due_on'        => $dueOn,
+                    'is_overdue'    => $dueOn && $dueOn->isPast(),
+                ];
+            }
+        }
+
+        // Sort overdue first, then by due date ascending.
+        usort($rows, function ($a, $b) {
+            if ($a->is_overdue !== $b->is_overdue) return $a->is_overdue ? -1 : 1;
+            $aT = $a->due_on ? $a->due_on->timestamp : PHP_INT_MAX;
+            $bT = $b->due_on ? $b->due_on->timestamp : PHP_INT_MAX;
+            return $aT <=> $bT;
+        });
+
+        return $rows;
     }
 
     /**
@@ -536,28 +721,25 @@ class DashboardController extends Controller
      * AJAX: stacked bar data for the Onboarding Learning chart on the manager dashboard.
      * X axis = onboarding learning programs in this resort. Stacks = participant counts
      * per department across each program's schedules.
+     *
+     * Broadened from "onboarding category only" to "every learning program with
+     * at least one scheduled session" — see Option B in the dashboard discussion.
+     * Endpoint name kept for backwards compatibility with the blade's AJAX call.
      */
     public function onboardingChartData()
     {
         $resort_id = $this->resort->resort_id;
-
-        $onboardingCategoryIds = LearningCategory::where('resort_id', $resort_id)
-            ->where(function ($q) {
-                $q->where('category', 'like', '%Onboarding%')
-                  ->orWhere('category', 'like', '%Orientation%');
-            })
-            ->pluck('id');
-
         $palette = ['#014653', '#2EACB3', '#FED049', '#8DC9C9', '#333333', '#3a88fe', '#a264f7', '#ff4013'];
 
-        if ($onboardingCategoryIds->isEmpty()) {
-            return response()->json(['success' => true, 'data' => ['labels' => [], 'datasets' => []]]);
-        }
-
-        $programs = \DB::table('learning_programs')
-            ->where('resort_id', $resort_id)
-            ->whereIn('learning_category_id', $onboardingCategoryIds)
-            ->select('id', 'name')
+        // Only show programs that actually have scheduled sessions in this resort —
+        // otherwise the x-axis fills with empty bars for every program ever defined.
+        $programs = \DB::table('learning_programs as lp')
+            ->join('training_schedules as ts', 'ts.training_id', '=', 'lp.id')
+            ->where('lp.resort_id', $resort_id)
+            ->where('ts.resort_id', $resort_id)
+            ->select('lp.id', 'lp.name')
+            ->distinct()
+            ->orderBy('lp.name')
             ->get();
 
         if ($programs->isEmpty()) {
