@@ -49,6 +49,7 @@
                             <tr>
                                 <th>Learning Name</th>
                                 <th>Suggested Employees</th>
+                                <th>Requested By</th>
                                 <th>Reason</th>
                                 <th>Start Date</th>
                                 <th>End Date</th>
@@ -120,7 +121,7 @@
             pageLength: 6,
             processing: true,
             serverSide: true,
-            order: [[7, 'desc']], 
+            order: [[8, 'desc']], // hidden created_at column index — bumped after adding "Requested By"
             ajax: {
                 url: '{{ route("learning.request.list") }}',
                 data: function (d) {
@@ -132,18 +133,30 @@
             columns: [
                 { data: 'learning_name', name: 'Learning Name', className: 'text-nowrap' },
                 { data: 'employees', name: 'Suggested Employees', className: 'text-nowrap' },
+                { data: 'requested_by', name: 'Requested By', className: 'text-nowrap' },
                 { data: 'reason', name: 'Reason', className: 'text-nowrap' },
                 { data: 'start_date', name: 'Start Date', className: 'text-nowrap' },
                 { data: 'end_date', name: 'End Date', className: 'text-nowrap' },
                 { data: 'status', name: 'Status', className: 'text-nowrap' },
-                { 
-                    data: 'action', 
-                    name: 'Action', 
+                {
+                    data: 'action',
+                    name: 'Action',
                     className: 'text-nowrap',
                     visible: isManager // Only show if the user is a manager
                 },
                 {data:'created_at',visible:false,searchable:false},
-            ]
+            ],
+            // After every redraw, (re-)init Bootstrap tooltips on the status badges
+            // so the rejection_reason hover popover works for Denied / On Hold rows.
+            drawCallback: function () {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                    document.querySelectorAll('#table-learning-request [data-bs-toggle="tooltip"]').forEach(function (el) {
+                        var existing = bootstrap.Tooltip.getInstance(el);
+                        if (existing) existing.dispose();
+                        new bootstrap.Tooltip(el);
+                    });
+                }
+            }
         });
     }
 

@@ -3131,15 +3131,41 @@ class Common
         if (!$emp) return null;
 
         $rank = (int) $emp->rank;
+        $positionTitle = optional($emp->position)->position_title;
 
-        // GM (8) and HR (3) see everything
-        if (in_array($rank, [3, 8])) {
+        // GM (rank 8) sees everything
+        if ($rank === 8) {
             return null;
         }
 
-        // HR department HOD / EXCOM see everything (same as GM)
-        if (in_array($rank, [1, 2]) && self::isHRDepartment($emp->Dept_id ?? null)) {
+        // Position titles that always get full resort-wide visibility for Learning /
+        // Performance modules — L&D leadership, HR leadership, and General Manager
+        // (covered by rank 8 too, kept here in case a record has the title without
+        // the rank set correctly).
+        $fullAccessTitles = self::fullAccessPositionTitles();
+        if (in_array($positionTitle, $fullAccessTitles, true)) {
             return null;
+        }
+
+        // Anyone working in the L&D department gets full visibility for Learning /
+        // Performance modules — title is often misconfigured (e.g. "Club Floor Manager"
+        // assigned to the Learning and Development dept), so the dept itself is the
+        // reliable signal for L&D-team membership.
+        if (self::isLDDepartment($emp->Dept_id ?? null)) {
+            return null;
+        }
+
+        // Other HR personnel (rank 3, or rank 1/2 inside the HR department) see
+        // their own department only. Their named leaders are already promoted above.
+        if ($rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null))) {
+            if (!empty($emp->Dept_id)) {
+                $ids = \App\Models\Employee::where('resort_id', $emp->resort_id)
+                    ->where('Dept_id', $emp->Dept_id)
+                    ->pluck('id')
+                    ->toArray();
+                $ids[] = $emp->id;
+                return array_values(array_unique($ids));
+            }
         }
 
         // EXCOM (1) / HOD (2) → whole department
@@ -3209,6 +3235,85 @@ class Common
         if ($resortId) $query->where('resort_id', $resortId);
         $emp = $query->first(['id']);
         return $emp ? (int) $emp->id : null;
+    }
+
+    /**
+     * Returns the employee IDs in a resort that should receive HR-side notifications:
+     * everyone with rank 3 (HR), plus the HOD / EXCOM (rank 1 or 2) of the HR department.
+     * Used by Performance / Learning flows to fan out submission alerts to HR.
+     */
+    public static function getResortHrEmployeeIds($resortId)
+    {
+        $hrDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->get(['id', 'name', 'short_name', 'code'])
+            ->filter(function ($d) {
+                $hrAliases = ['hr', 'human resources', 'human resource'];
+                return in_array(strtolower(trim($d->name ?? '')), $hrAliases, true)
+                    || in_array(strtolower(trim($d->short_name ?? '')), $hrAliases, true)
+                    || in_array(strtolower(trim($d->code ?? '')), $hrAliases, true);
+            })
+            ->pluck('id')
+            ->all();
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->where(function ($q) use ($hrDeptIds) {
+                $q->where('rank', 3);
+                if (!empty($hrDeptIds)) {
+                    $q->orWhere(function ($qq) use ($hrDeptIds) {
+                        $qq->whereIn('Dept_id', $hrDeptIds)
+                           ->whereIn('rank', [1, 2]);
+                    });
+                }
+            })
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
+     * Position titles that grant full resort-wide visibility for Learning / Performance
+     * modules. Treated equivalently to GM (rank 8) and super/master admin.
+     * Update this list when product confirms additional leadership roles need
+     * cross-department visibility.
+     */
+    public static function fullAccessPositionTitles()
+    {
+        return [
+            // L&D leadership
+            'Training Director',
+            'L&D Manager',
+            'Learning & Development Head',
+            // HR leadership
+            'Human Resources Manager',
+            'Director Of Human Resources',
+            // GM (also covered by rank 8 — safety net for rows with title set but rank unset)
+            'General Manager',
+        ];
+    }
+
+    /**
+     * Returns true when the given department id refers to the Learning & Development
+     * department. Anyone in this department is considered an L&D Manager-equivalent
+     * for module-wide visibility purposes (regardless of their actual position title).
+     */
+    public static function isLDDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['l&d', 'l & d', 'l and d', 'learning and development', 'learning & development', 'training and development'];
+        return in_array($name, $aliases, true)
+            || in_array($short, $aliases, true)
+            || in_array($code, $aliases, true);
     }
 
     /**

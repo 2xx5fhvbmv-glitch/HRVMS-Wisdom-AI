@@ -204,6 +204,14 @@ class LearningProgramController extends Controller
     public function save(Request $request)
     {
         $resort_id = $this->resort->resort_id;
+
+        // Older form caches can post the placeholder label ("Select Trainer")
+        // as the trainer value, which then fails the exists rule. Normalise
+        // anything non-numeric to null so the external-trainer path works.
+        if ($request->has('trainer') && !is_numeric($request->input('trainer'))) {
+            $request->merge(['trainer' => null]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',

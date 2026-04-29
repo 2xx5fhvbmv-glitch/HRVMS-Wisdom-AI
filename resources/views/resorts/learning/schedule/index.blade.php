@@ -172,7 +172,35 @@
         });
 
         $('.select2t-none').select2();
-      
+
+        // Pre-fill from query string (?program_id=X&employee_id=Y) so dashboard
+        // "Schedule" buttons land on this page with the program selected and the
+        // target employee's checkbox ticked.
+        (function preselectFromQuery() {
+            var params = new URLSearchParams(window.location.search);
+            var programId = params.get('program_id');
+            var employeeId = params.get('employee_id');
+
+            if (programId) {
+                $('#learning_title').val(programId).trigger('change');
+            }
+            if (employeeId) {
+                // Wait for the employee list (some renders are async); a short delay
+                // also lets Select2 settle first.
+                setTimeout(function () {
+                    var $cb = $('.employee-item input[type="checkbox"][value="' + employeeId + '"]');
+                    if ($cb.length) {
+                        $cb.prop('checked', true);
+                        var $row = $cb.closest('.employee-item');
+                        if ($row.length && $row[0].scrollIntoView) {
+                            $row[0].scrollIntoView({block: 'center', behavior: 'smooth'});
+                        }
+                    }
+                }, 200);
+            }
+        })();
+
+
         $.validator.addMethod("greaterThan", function (value, element, param) {
             let startDate = $(param).val();
             if (!startDate) return true; // Allow empty start date to avoid premature errors

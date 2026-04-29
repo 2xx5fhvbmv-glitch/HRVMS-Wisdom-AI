@@ -110,6 +110,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          Route::get('learning/hod-dashboard', 'Learning\DashboardController@hod_dashboard')->name('learning.hod.dashboard');
          Route::get('learning/admin-dashboard', 'Learning\DashboardController@admin_dashboard')->name('learning.admin.dashboard');
          Route::get('learning/manager-dashboard', 'Learning\DashboardController@manager_dashboard')->name('learning.manager.dashboard');
+         Route::get('learning/compulsory-pending', 'Learning\DashboardController@teamCompulsoryPendingAll')->name('learning.compulsory.pending');
          Route::get('learning/manager-dashboard/onboarding-chart-data', 'Learning\DashboardController@onboardingChartData')->name('learning.manager.onboarding.chart');
 
 
@@ -1132,6 +1133,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('learning/program/calendar/add-session', 'Learning\LearningCalendarController@store')->name('learning.calendar.save');
     Route::get('/learning/program/details',  'Learning\LearningProgramController@getProgramDetails')->name('learning.program.details');
     Route::get('learning/get-sessions', 'Learning\LearningCalendarController@getSessions')->name('get.learning.sessions');
+    Route::get('learning/my-compulsory-events', 'Learning\LearningCalendarController@myCompulsoryEvents')->name('learning.my.compulsory.events');
 
     Route::post('learning/mandatory-program/save', 'Learning\ConfigurationController@save_mandatory_program')->name('mandatory.learning.save');
     Route::get('/get-mandatory-positions', 'Learning\ConfigurationController@getMandatoryPositions')->name('get.mandatory.positions');

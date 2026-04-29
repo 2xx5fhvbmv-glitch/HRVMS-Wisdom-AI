@@ -54,7 +54,12 @@ class ConfigurationController extends Controller
             ->whereIn('status', ['Active', 'Probationary'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
-        $grades = config('settings.Position_Rank');
+        // Position_Rank also contains functional roles (HR=3, Finance=7) that aren't
+        // hierarchy grades — drop them so only true grade levels appear in the
+        // Learning Program audience selector.
+        $grades = collect(config('settings.Position_Rank'))
+            ->except([3, 7, '3', '7'])
+            ->all();
         $trainers = Employee::with('resortAdmin')->where('resort_id',$resort_id)
             ->whereIn('rank',['1','2','3','4','5','7','8','9'])
             ->whereIn('status', ['Active', 'Probationary'])

@@ -35,7 +35,6 @@
                             <select class="form-select select2t-none" id="statusFilter">
                                 <option value="">Select Status</option>
                                 <option value="Absent">Absent</option>
-                                <option value="Late">Late</option>
                                 <option value="Present">Present</option>
                             </select>
                         </div>
@@ -270,7 +269,7 @@
         $('#attendanceNotes').val(notes);
 
         // Populate dropdown for status selection
-        let statusOptions = ['Present', 'Absent', 'Late'];
+        let statusOptions = ['Present', 'Absent'];
         let selectHTML = `<select class="form-select attendance-status">`;
         statusOptions.forEach(opt => {
             selectHTML += `<option value="${opt}" ${opt === status ? 'selected' : ''}>${opt}</option>`;

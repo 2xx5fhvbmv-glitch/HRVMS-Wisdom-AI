@@ -75,6 +75,9 @@ class TrainingScheduleController extends Controller
     {
         try {
             $resort_id = $this->resort->resort_id;
+            // Department-visibility scope — HR (and HR-dept HOD/EXCOM) only see schedules
+            // with at least one in-scope participant. GM / L&D Manager / admin = null = all.
+            $scopedEmpIds = Common::getPerformanceScopedEmpIds();
 
             $query = TrainingSchedule::select(
                 'training_schedules.id',
@@ -96,8 +99,17 @@ class TrainingScheduleController extends Controller
             ->leftJoin('training_participants', 'training_schedules.id', '=', 'training_participants.training_schedule_id')
             ->leftJoin('employees', 'training_participants.employee_id', '=', 'employees.id')
             ->leftJoin('resort_admins', 'resort_admins.id', '=', 'employees.Admin_Parent_id') // Fetch attendees' names from resort_admins
-            ->where('training_schedules.resort_id', $resort_id);
-            
+            ->where('training_schedules.resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), function ($q) use ($scopedEmpIds) {
+                // Surface only schedules where one of the user's in-scope employees participates.
+                $q->whereExists(function ($sub) use ($scopedEmpIds) {
+                    $sub->selectRaw(1)
+                        ->from('training_participants as tp_scope')
+                        ->whereColumn('tp_scope.training_schedule_id', 'training_schedules.id')
+                        ->whereIn('tp_scope.employee_id', $scopedEmpIds);
+                });
+            });
+
             // Apply search
             if ($request->searchTerm) {
                 $searchTerm = $request->searchTerm;
@@ -506,8 +518,14 @@ class TrainingScheduleController extends Controller
         $page_title = 'Training History';
         $resortId = $this->resort->resort_id;
 
+        // HR (and HR-dept HOD/EXCOM) is now department-scoped — restrict to schedules
+        // that have at least one in-scope participant. GM / L&D Manager / admin keep
+        // resort-wide visibility (helper returns null for them).
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+
         $query = TrainingSchedule::with(['learningProgram', 'trainingAttendances', 'participants'])
             ->where('resort_id', $resortId)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
             ->orderBy('start_date', 'desc');
         $trainings = $query->get();
         

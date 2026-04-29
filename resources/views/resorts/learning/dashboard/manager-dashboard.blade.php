@@ -30,7 +30,7 @@
                                 <p class="mb-0  fw-500">Ongoing Learning Programs</p>
                                 <strong>{{$ongoing_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
+                            <a href="{{ route('learning.schedule.index') }}">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
@@ -43,7 +43,7 @@
                                 <p class="mb-0  fw-500">Completed Learning Programs</p>
                                 <strong>{{$completed_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
+                            <a href="{{ route('training.history') }}">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
@@ -56,7 +56,7 @@
                                 <p class="mb-0  fw-500">Pending Learning Programs</p>
                                 <strong>{{$pending_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
+                            <a href="{{ route('learning.schedule.index') }}">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
@@ -69,7 +69,7 @@
                                 <p class="mb-0  fw-500">Completed Compulsory Learning</p>
                                 <strong>{{$compulsory_completed_traing ?? 0}}</strong>
                             </div>
-                            <a href="#">
+                            <a href="{{ route('training.history') }}">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
@@ -104,7 +104,7 @@
                                 <div class="col-auto">
                                     <div class="doughnut-label">
                                         <span style="background-color: {{ $category->color }};"></span>
-                                        {{ $category->category }} <br>{{ $category->programs_count }} 
+                                        {{ $category->category }} <br>{{ $category->programs_count }}
                                     </div>
                                 </div>
                             @endforeach
@@ -112,6 +112,61 @@
 
                     </div>
                 </div>
+
+                @if(!empty($teamCompulsoryPending))
+                <div class="col-xl-9 col-12 order-1 order-xxl-1">
+                    <div class="card h-100">
+                        <div class="card-title mb-md-3">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap mb-1">Compulsory Trainings — Action Needed</h3>
+                                    <p class="mb-0 small text-muted">Probationers with pending or overdue compulsory programs. Click <strong>Schedule</strong> to add a session.</p>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{ route('learning.compulsory.pending') }}" class="a-link">View All ({{ $teamCompulsoryPendingCount }})</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-LearningProgram w-100 mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Department</th>
+                                        <th>Position</th>
+                                        <th>Program</th>
+                                        <th>Due By</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($teamCompulsoryPending as $row)
+                                        <tr>
+                                            <td>{{ $row->employee_name ?: '—' }}</td>
+                                            <td>{{ $row->department ?: '—' }}</td>
+                                            <td>{{ $row->position ?: '—' }}</td>
+                                            <td>{{ $row->program_name }}</td>
+                                            <td>{{ $row->due_on ? $row->due_on->format('d M Y') : '—' }}</td>
+                                            <td>
+                                                @if($row->is_overdue)
+                                                    <span class="badge badge-danger">Overdue</span>
+                                                @else
+                                                    <span class="badge badge-warning">Pending</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <a href="{{ route('learning.schedule') }}?program_id={{ $row->program_id }}&employee_id={{ $row->employee_id }}"
+                                                   class="btn btn-themeBlue btn-sm">Schedule</a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                @endif
 
                 <div class="col-xl-6 order-3 order-xxl-2">
                     <div class="card card-participation">
@@ -126,7 +181,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 order-2 order-xxl-3 ">
+                <div class="col-xxl-3 col-xl-4 col-lg-6 order-5 order-xxl-5">
                     <div class="card">
                         <div class="card-title">
                             <h3>Learning Attendance</h3>
@@ -342,7 +397,7 @@
 
                 </div>
 
-                <div class="col-xxl-3 col-xl-4 col-lg-6 order-5 order-xxl-5" id="right-ldDash">
+                <div class="col-xl-6 col-sm-12 order-2 order-xxl-3" id="right-ldDash">
                     <div class="card calendar-card calendarLD-card">
                         <div class="ldDash-block">
                             <div class="mb-4 overflow-hidden">
@@ -422,7 +477,13 @@
                 },
                 editable: false,
                 eventLimit: 0, // No extra "more" link
-                navLinks: true,
+                // navLinks: true switches FullCalendar v3 into a day-view on date click
+                // and renders an empty "April 8, Wednesday" header. We just want to update
+                // the side panel via dayClick, so disable nav links.
+                navLinks: false,
+                // Let the day grid grow to its natural height instead of FullCalendar's
+                // default 213px scroller, which forces an internal vertical scrollbar.
+                contentHeight: 'auto',
 
                 events: function(start, end, timezone, callback) {
                     $.ajax({
@@ -433,20 +494,14 @@
                             end_date: end.format('YYYY-MM-DD')
                         },
                         success: function(response) {
-                            $('.fc-day').removeClass('custom-dot'); // Remove previous dots
-
-                            if (response.data.length > 0) {
-                                response.data.forEach(function(session) {
-                                    let formattedDate = moment(session.session_date).format('YYYY-MM-DD');
-                                    console.log(formattedDate);
-                                    let dayCell = $(`.fc-day[data-date="${formattedDate}"]`);
-                                    
-                                    if (dayCell.length) {
-                                        dayCell.addClass('custom-dot'); // Add class to mark event
-                                    }
-                                });
-                            }
+                            // Cache the latest payload so navigation re-paints dots without
+                            // re-fetching, and so we can repaint after the day grid renders.
+                            window._learningSessions = response.data || [];
                             callback([]); // No events displayed, just dots
+                            // Defer to next tick: FullCalendar v3 sometimes builds .fc-day
+                            // cells AFTER the events callback resolves, so applying the
+                            // class synchronously can land on a torn-down grid.
+                            setTimeout(paintLearningDots, 0);
                         },
                         error: function(xhr) {
                             console.error("Error fetching training sessions", xhr);
@@ -457,6 +512,8 @@
                     let startDate = view.start.format('YYYY-MM-DD');
                     let endDate = view.end.format('YYYY-MM-DD');
                     fetchUpcomingSessions(startDate, endDate); // Load sidebar when month changes
+                    // Re-paint dots once the new month's day cells exist.
+                    setTimeout(paintLearningDots, 0);
                 },
                 dayClick: function(date, jsEvent, view) {
                     $.ajax({
@@ -527,6 +584,31 @@
             });
         });
 
+
+        // Paint a marker dot on every day the cached training sessions cover.
+        // Called after `events:` resolves AND after each `viewRender`, so the dots
+        // survive month navigation even if the day grid is rebuilt.
+        function paintLearningDots() {
+            $('.fc-day').removeClass('custom-dot');
+            var sessions = window._learningSessions || [];
+            sessions.forEach(function (session) {
+                var startStr = session.start_date || session.session_date;
+                var endStr   = session.end_date   || session.session_date;
+                if (!startStr) return;
+                var startDate = moment(startStr);
+                var endDate   = endStr ? moment(endStr) : startDate.clone();
+                if (!startDate.isValid()) return;
+                if (!endDate.isValid() || endDate.isBefore(startDate, 'day')) endDate = startDate.clone();
+
+                // moment 2.9.0 doesn't have isSameOrBefore — use !isAfter instead.
+                var cursor = startDate.clone();
+                while (!cursor.isAfter(endDate, 'day')) {
+                    var dayCell = $('.fc-day[data-date="' + cursor.format('YYYY-MM-DD') + '"]');
+                    if (dayCell.length) dayCell.addClass('custom-dot');
+                    cursor.add(1, 'day');
+                }
+            });
+        }
 
         function fetchUpcomingSessions() {
             $.ajax({
@@ -682,11 +764,12 @@
                         right: 'next'
                     },
                     editable: true,
-                    eventLimit: 0, // allow "more" link when too many events
-                    navLinks: true,
-                    dayRender: function (a) {
-                        //console.log(a)
-                    }
+                    eventLimit: 0,
+                    navLinks: false,
+                    contentHeight: 'auto',
+                    dayRender: function () {}
+                    // (Duplicate init kept harmless — see above. Real config is in
+                    // the first $('#calendar').fullCalendar({...}) call.)
                 });
 
             });
@@ -941,7 +1024,7 @@
             var $legend = $('#onboardingChartLegend');
             $legend.empty();
             if (!datasets || datasets.length === 0) {
-                $legend.append('<div class="col-12"><p class="text-muted small mb-0">No onboarding data yet.</p></div>');
+                $legend.append('<div class="col-12"><p class="text-muted small mb-0">No scheduled learning yet.</p></div>');
                 return;
             }
             datasets.forEach(function (ds) {

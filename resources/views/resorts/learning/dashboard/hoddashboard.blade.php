@@ -393,31 +393,25 @@
                 },
                 editable: false,
                 eventLimit: 0, // No extra "more" link
-                navLinks: true,
+                // Disable nav links so date click only refreshes the side panel
+                // (no v3 day-view header artifact in the empty space).
+                navLinks: false,
+                // Avoid the default 213px inner scroller on the day grid.
+                contentHeight: 'auto',
 
                 events: function(start, end, timezone, callback) {
                     $.ajax({
-                        url: "{{ route('get.learning.sessions') }}", // Adjusted for training sessions
+                        url: "{{ route('get.learning.sessions') }}",
                         type: "GET",
                         data: {
                             start_date: start.format('YYYY-MM-DD'),
                             end_date: end.format('YYYY-MM-DD')
                         },
                         success: function(response) {
-                            $('.fc-day').removeClass('custom-dot'); // Remove previous dots
-
-                            if (response.data.length > 0) {
-                                response.data.forEach(function(session) {
-                                    let formattedDate = moment(session.session_date).format('YYYY-MM-DD');
-                                    console.log(formattedDate);
-                                    let dayCell = $(`.fc-day[data-date="${formattedDate}"]`);
-                                    
-                                    if (dayCell.length) {
-                                        dayCell.addClass('custom-dot'); // Add class to mark event
-                                    }
-                                });
-                            }
+                            window._learningSessions = response.data || [];
                             callback([]); // No events displayed, just dots
+                            // Defer one tick so the day cells are guaranteed in DOM.
+                            setTimeout(paintLearningDots, 0);
                         },
                         error: function(xhr) {
                             console.error("Error fetching training sessions", xhr);
@@ -428,6 +422,8 @@
                     let startDate = view.start.format('YYYY-MM-DD');
                     let endDate = view.end.format('YYYY-MM-DD');
                     fetchUpcomingSessions(startDate, endDate); // Load sidebar when month changes
+                    // Re-apply dots once the new month's grid is rendered.
+                    setTimeout(paintLearningDots, 0);
                 },
                 dayClick: function(date, jsEvent, view) {
                     $.ajax({
@@ -498,6 +494,29 @@
             });
         });
 
+
+        // Paint a dot on every day each cached training session covers (start..end).
+        // Called after events: resolves AND on every viewRender so the dots survive
+        // month navigation. moment 2.9.0 lacks isSameOrBefore — use !isAfter instead.
+        function paintLearningDots() {
+            $('.fc-day').removeClass('custom-dot');
+            var sessions = window._learningSessions || [];
+            sessions.forEach(function (session) {
+                var startStr = session.start_date || session.session_date;
+                var endStr   = session.end_date   || session.session_date;
+                if (!startStr) return;
+                var startDate = moment(startStr);
+                var endDate   = endStr ? moment(endStr) : startDate.clone();
+                if (!startDate.isValid()) return;
+                if (!endDate.isValid() || endDate.isBefore(startDate, 'day')) endDate = startDate.clone();
+                var cursor = startDate.clone();
+                while (!cursor.isAfter(endDate, 'day')) {
+                    var dayCell = $('.fc-day[data-date="' + cursor.format('YYYY-MM-DD') + '"]');
+                    if (dayCell.length) dayCell.addClass('custom-dot');
+                    cursor.add(1, 'day');
+                }
+            });
+        }
 
         function fetchUpcomingSessions() {
             $.ajax({
@@ -758,32 +777,9 @@
                 }
             });
 
-            // full-calendar   
-            $(function () {
-
-                var todayDate = moment().startOf('day');
-                var YM = todayDate.format('YYYY-MM');
-                var YESTERDAY = todayDate.clone().subtract(1, 'day').format('YYYY-MM-DD');
-                var TODAY = todayDate.format('YYYY-MM-DD');
-                var TOMORROW = todayDate.clone().add(1, 'day').format('YYYY-MM-DD');
-
-                var cal = $('#calendar').fullCalendar({
-                    header: {
-                        left: 'prev ',
-                        center: 'title',
-                        right: 'next'
-                    },
-                    editable: true,
-                    eventLimit: 0, // allow "more" link when too many events
-                    navLinks: true,
-                    dayRender: function (a) {
-                        //console.log(a)
-                    }
-                });
-
-            });
-
-
+            // (Duplicate fullCalendar() init removed — it re-initialised #calendar
+            //  without the events: / dayClick handlers above and reverted navLinks
+            //  to defaults, breaking the side panel + dot painting.)
         });
     </script>
 

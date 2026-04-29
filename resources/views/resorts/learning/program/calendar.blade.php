@@ -140,24 +140,62 @@
             navLinks: true,
             eventLimit: true,
             events: function (start, end, timezone, callback) {
-                $.ajax({
+                // Fetch both the resort's training sessions AND the auth user's own
+                // compulsory programs so the user sees their personal course start /
+                // end window alongside the broader schedule.
+                var sessionsXhr = $.ajax({
                     url: "{{route('get.learning.sessions')}}",
                     type: "GET",
                     data: {
                         start_date: start.format('YYYY-MM-DD'),
                         end_date: end.format('YYYY-MM-DD')
                     },
-                    dataType: "json",
-                    success: function (response) {
-                        let events = response.data.map(session => ({
+                    dataType: "json"
+                });
+                var compulsoryXhr = $.ajax({
+                    url: "{{route('learning.my.compulsory.events')}}",
+                    type: "GET",
+                    dataType: "json"
+                });
+
+                $.when(sessionsXhr, compulsoryXhr).done(function (sessionsRes, compulsoryRes) {
+                    var combined = (sessionsRes[0].data || []).concat(compulsoryRes[0].data || []);
+                    var events = combined.map(function (session) {
+                        // Span the event from start_date through end_date so multi-day
+                        // sessions paint on every day they run. FullCalendar v3 treats
+                        // `end` as EXCLUSIVE for all-day events — add 1 day to include
+                        // the actual final day.
+                        var startStr = session.start_date || session.session_date;
+                        var endStr   = session.end_date   || session.session_date || startStr;
+                        var endExclusive = moment(endStr).add(1, 'day').format('YYYY-MM-DD');
+                        return {
                             title: session.title,
-                            start: session.session_date,
+                            start: startStr,
+                            end: endExclusive,
+                            allDay: true,
                             backgroundColor: session.color,
                             textColor: "#fff"
-                        }));
-
+                        };
+                    });
+                    callback(events);
+                }).fail(function () {
+                    // If the personal endpoint fails, fall back to sessions only.
+                    sessionsXhr.done(function (sessionsRes) {
+                        var events = (sessionsRes.data || []).map(function (session) {
+                            var startStr = session.start_date || session.session_date;
+                            var endStr   = session.end_date   || session.session_date || startStr;
+                            var endExclusive = moment(endStr).add(1, 'day').format('YYYY-MM-DD');
+                            return {
+                                title: session.title,
+                                start: startStr,
+                                end: endExclusive,
+                                allDay: true,
+                                backgroundColor: session.color,
+                                textColor: "#fff"
+                            };
+                        });
                         callback(events);
-                    }
+                    });
                 });
             },
             viewRender: function (view) {
