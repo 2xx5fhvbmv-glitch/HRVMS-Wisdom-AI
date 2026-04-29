@@ -172,30 +172,38 @@ class DashboardController extends Controller
         // Department-visibility scope: HR/GM see resort-wide; other HOD/XCOM only their own dept.
         $scopedDeptIds = Common::getScopedDepartmentIds();
         $scopedEmpIds  = Common::getPerformanceScopedEmpIds();
+        $today = \Carbon\Carbon::now()->toDateString();
 
-        // Training counts scoped to schedules that involve at least one in-scope employee.
-        $countTrainingsByStatus = function ($status) use ($resort_id, $scopedEmpIds) {
-            $q = TrainingSchedule::where('status', $status)->where('resort_id', $resort_id);
+        // Tile counts derive from dates (status field rarely advanced manually) AND
+        // scope by participants — matching the schedule list. So a Chief Engineer
+        // sees counts of every schedule he or his subordinates are enrolled in.
+        $countByDateRule = function ($builderTweak) use ($resort_id, $scopedEmpIds) {
+            $q = TrainingSchedule::where('resort_id', $resort_id);
+            $builderTweak($q);
             if (is_array($scopedEmpIds)) {
-                $q->whereHas('trainingAttendances', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
+                $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
             }
             return $q->count();
         };
-        $ongoing_trainings_count  = $countTrainingsByStatus('Ongoing');
-        $completed_trainings_count = $countTrainingsByStatus('Completed');
-
-        // Pending / Approved Learning Requests — count any request that targets an employee
-        // in scope (not just ones created by the logged-in user). HOD/XCOM should see what's
-        // pending for their team, regardless of who initiated the request.
-        $countLearningReqs = function ($status) use ($resort_id, $scopedEmpIds) {
-            $q = LearningRequest::where('status', $status)->where('resort_id', $resort_id);
-            if (is_array($scopedEmpIds)) {
-                $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
-            }
-            return $q->count();
-        };
-        $scheduled_trainings_count = $countLearningReqs('Approved');
-        $pending_trainings_count   = $countLearningReqs('Pending');
+        $ongoing_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where(function ($qq) use ($today) {
+                $qq->where('status', 'Ongoing')
+                   ->orWhere(function ($qqq) use ($today) {
+                       $qqq->where('start_date', '<=', $today)->where('end_date', '>=', $today);
+                   });
+            });
+        });
+        $completed_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where(function ($qq) use ($today) {
+                $qq->where('status', 'Completed')->orWhere('end_date', '<', $today);
+            });
+        });
+        $scheduled_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where(function ($qq) use ($today) {
+                $qq->whereIn('status', ['Scheduled', 'Pending'])->orWhere('start_date', '>', $today);
+            });
+        });
+        $pending_trainings_count = $scheduled_trainings_count;
         $pending_learning_request  = LearningRequest::with('learning')
             ->where('status','Pending')->where('resort_id',$resort_id)
             ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))

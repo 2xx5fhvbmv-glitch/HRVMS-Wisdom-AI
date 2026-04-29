@@ -22,6 +22,7 @@
             </div>
 
             <div class="row g-3 g-xxl-4 card-heigth">
+                {{-- Compulsory % is a static placeholder; no destination route — drop the arrow --}}
                 <div class="col-lg-3 col-sm-6 ">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
@@ -29,118 +30,151 @@
                                 <p class="mb-0  fw-500">Completed Compulsory Learning</p>
                                 <strong>70%</strong>
                             </div>
-                            <a href="#">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 ">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Scheduled Learning</p>
                                 <strong>{{$scheduled_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{route('learning.schedule.index')}}">
+                            <a href="{{route('learning.schedule.index')}}?status=Scheduled">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 ">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Completed Learning Programs</p>
                                 <strong>{{$completed_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{route('learning.schedule.index')}}">
+                            <a href="{{route('training.history')}}">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 ">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Pending Learning Programs</p>
                                 <strong>{{$pending_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{route('learning.schedule.index')}}">
+                            <a href="{{route('learning.request.index')}}?status=Pending">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 order-1 order-xxl-1 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card">
-                        <div class="card-title mb-md-4">
-                            <h3>Learning Completion Rates</h3>
+                {{-- Row 2: Pending Actions (wide) + Calendar (narrow) — same layout pattern as the manager dashboard --}}
+                <div class="col-xl-9 col-12 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card h-100" id="card-pendingActions">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">Pending Actions</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div class="three-progressbar mb-md-4 mb-3">
-                            @if($completionData)
-                                @foreach($completionData as $data)
-                                    <div class="progress-container blue " data-progress="{{ $data['completion_rate'] }}" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="{{ $data['training_name'] }} - {{ $data['completion_rate'] }}">
-                                        <svg class="progress-circle" viewBox="0 0 120 120">
-                                            <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                            <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                        </svg>
+                        <div class="leaveUser-main">
+                            @if($pending_learning_request && count($pending_learning_request))
+                                @foreach($pending_learning_request->take(4) as $request)
+                                    <div class="leaveUser-block">
+                                        <div>
+                                            <h6>{{$request->learning->name}}</h6>
+                                            <p>{{ \Illuminate\Support\Str::words($request->learning->description, 30, '…') }}</p>
+                                            <div>
+                                                <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">View Details</a>
+                                            </div>
+                                        </div>
                                     </div>
                                 @endforeach
+                            @else
+                                <p class="text-muted small mb-0">No pending requests.</p>
                             @endif
-                        </div>
-                        <div class="row g-2 justify-content-center doughnut-labelTop">
-                            @foreach ($completionData as $data)
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span ></span>
-                                        {{ $data['training_name'] }} <br>{{ $data['completion_rate'] }} 
-                                    </div>
-                                </div>
-                            @endforeach
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xl-6 order-3 order-xxl-2 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card card-participation">
-                        <div class="card-title mb-md-3">
-                            <h3>Learning Hours</h3>
-                        </div>
-                        <div class="row g-md-4 g-2">
-                            <div class="col-xxl-9 col-xl-12 col-md-9"> <canvas id="myStackedBarChart" width="544"
-                                    height="326"></canvas></div>
-                            <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                                <div class="row g-2">
-                                    @php
-                                        $hoursColors = ['bg-theme','bg-themeLightBlue','bg-themeYellow','bg-themeSkyblueLight','bg-themeGray','bg-themeGreenLight','bg-themeRed','bg-themeRedLight','bg-themeSkyblueLightNew'];
-                                    @endphp
-                                    @forelse(($learningHoursByProg ?? collect()) as $idx => $row)
-                                        <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                            <div class="doughnut-label" title="{{ $row->session_count }} sessions · {{ (int) $row->total_hours }} hrs">
-                                                <span class="{{ $hoursColors[$idx % count($hoursColors)] }}"></span>{{ $row->name ?: 'Untitled' }}
-                                            </div>
-                                        </div>
-                                    @empty
-                                        <div class="col-12 text-muted small">No training programs scheduled yet.</div>
-                                    @endforelse
-                                </div>
+                <div class="col-xl-3 col-md-6 @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif" id="right-ldDash">
+                    <div class="card calendar-card calendarLD-card h-100">
+                        <div class="ldDash-block">
+                            <div class="mb-4 overflow-hidden">
+                                <div id="calendar"></div>
+                            </div>
+                            <div class="card-title">
+                                <h3>Upcoming Learning Sessions</h3>
+                            </div>
+                            <div class="leaveUser-main" id="leaveUser-main">
+                                <!-- Dynamic content will be loaded here -->
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 order-2 order-xxl-3 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card">
+                {{-- Row 3: three donut/score cards (Feedback · Onboarding Progress · Learning Attendance) --}}
+                <div class="col-xl-4 col-md-6">
+                    <div class="card card-feedbackEvaluation h-100" id="card-feedbackEvaluationHR">
+                        <div class="card-title">
+                            <h3>Feedback and Evaluation</h3>
+                        </div>
+                        <div class="progress-block">
+                            <div class="progress-container blue" data-progress="{{ $feedbackAvgScore ?? 0 }}" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="Average Trainer Performance Score">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="text">
+                                <h5>{{ is_null($feedbackAvgScore) ? '—' : ($feedbackAvgScore . '%') }}</h5>
+                                <p>AVERAGE FEEDBACK SCORES</p>
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            <p>Over Time:</p>
+                            <p class="fw-500">Trainer Performance</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-6">
+                    <div class="card card-feedbackEvaluation h-100">
+                        <div class="card-title">
+                            <h3>Onboarding Learning Progress</h3>
+                        </div>
+                        <div class="progress-block">
+                            <div class="progress-container blue" data-progress="{{ $onboardingProgress ?? 0 }}" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="New Hires Completing Compulsory Training">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="text">
+                                <h5>{{ is_null($onboardingProgress) ? '—' : ($onboardingProgress . '%') }}</h5>
+                                <p>NEW HIRES COMPLETING THEIR COMPULSORY TRAINING</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-12 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card h-100">
                         <div class="card-title">
                             <h3>Learning Attendance</h3>
                         </div>
-                        <p id="lateAttendanceText">Late Attendance: --%</p> <!-- Placeholder, will be updated dynamically -->
+                        <p id="lateAttendanceText" class="small mb-2">Late Attendance: --%</p>
 
                         <div class="trainingAttendance-chart mb-3">
                             <canvas id="myDoughnutChart"></canvas>
@@ -171,219 +205,101 @@
                     </div>
                 </div>
 
-                <div class="col-xxl-9 col-xl-8 h-auto order-4 order-xxl-4" id="left-ldDash">
-                    <div class="row g-3 g-xxl-4">
-                        <div class="col-xxl-4 col-sm-6 ">
-                            <div class="card card-feedbackEvaluation h-auto" id="card-feedbackEvaluationHR">
-                                <div class="card-title">
-                                    <h3>Feedback and Evaluation</h3>
-                                </div>
-                                <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="{{ $feedbackAvgScore ?? 0 }}" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Average Trainer Performance Score">
+                {{-- Row 4: Learning Hours bar chart (wide) + Learning Completion Rates (narrow) --}}
+                <div class="col-xl-8 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card card-participation h-100">
+                        <div class="card-title mb-md-3">
+                            <h3>Learning Hours</h3>
+                        </div>
+                        @php
+                            $hasLearningHours = ($learningHoursByProg ?? collect())->count() > 0;
+                            $learningHoursHeight = max(220, (($learningHoursByProg ?? collect())->count()) * 36);
+                        @endphp
+                        @if($hasLearningHours)
+                            <div class="chart-flex-wrap" style="height: {{ $learningHoursHeight }}px;">
+                                <canvas id="myStackedBarChart"></canvas>
+                            </div>
+                        @else
+                            <p class="text-muted small mb-0">No training programs scheduled yet.</p>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="col-xl-4 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card h-100">
+                        <div class="card-title mb-md-4">
+                            <h3>Learning Completion Rates</h3>
+                        </div>
+
+                        <div class="three-progressbar mb-md-4 mb-3">
+                            @if($completionData)
+                                @foreach($completionData as $data)
+                                    <div class="progress-container blue" data-progress="{{ $data['completion_rate'] }}" data-bs-toggle="tooltip"
+                                        data-bs-placement="bottom" title="{{ $data['training_name'] }} - {{ $data['completion_rate'] }}">
                                         <svg class="progress-circle" viewBox="0 0 120 120">
                                             <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                             <circle class="progress" cx="60" cy="60" r="54"></circle>
                                         </svg>
                                     </div>
-                                    <div class="text">
-                                        <h5>{{ is_null($feedbackAvgScore) ? '—' : ($feedbackAvgScore . '%') }}</h5>
-                                        <p>AVERAGE FEEDBACK SCORES</p>
-                                    </div>
-                                </div>
-                                <div class="d-flex">
-                                    <p>Over Time:</p>
-                                    <p class="fw-500">Trainer Performance</p>
-                                </div>
-                            </div>
+                                @endforeach
+                            @endif
                         </div>
-                        <div class="col-xxl-4 col-sm-6">
-                            <div class="card card-feedbackEvaluation h-auto">
-                                <div class="card-title">
-                                    <h3>Onboarding Learning Progress</h3>
-                                </div>
-                                <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="{{ $onboardingProgress ?? 0 }}" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="New Hires Completing Compulsory Training">
-                                        <svg class="progress-circle" viewBox="0 0 120 120">
-                                            <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                            <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                        </svg>
-                                    </div>
-                                    <div class="text">
-                                        <h5>{{ is_null($onboardingProgress) ? '—' : ($onboardingProgress . '%') }}</h5>
-                                        <p>NEW HIRES COMPLETING THEIR COMPULSORY TRAINING</p>
+                        <div class="row g-2 justify-content-center doughnut-labelTop">
+                            @forelse ($completionData as $data)
+                                <div class="col-auto">
+                                    <div class="doughnut-label">
+                                        <span></span>
+                                        {{ $data['training_name'] }} <br>{{ $data['completion_rate'] }}
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6  @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
-                            <div class="card" id="card-pendingActions" >
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Pending Actions</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if($pending_learning_request)
-                                        @foreach($pending_learning_request->take(2) as $request)
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <h6>{{$request->learning->name}}</h6>
-                                                    <p>{{$request->learning->description}}</p>
-                                                    <div>
-                                                        <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">
-                                                            View Details
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- <div class="col-xxl-8 order-2 order-xxl-1">
-                            <div class="card card-participation  h-auto" id="card-onboardingHR">
-                                <div class="card-title mb-md-3">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Onboarding Learning</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <div class="form-group">
-                                                <select class="form-select" aria-label="Default select example">
-                                                    <option selected="">Percentage completion</option>
-                                                    <option value="1">AAA</option>
-                                                    <option value="2">AAA</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="col-auto">
-                                            <div class="form-group">
-                                                <select class="form-select" aria-label="Default select example">
-                                                    <option selected="">Department-wise</option>
-                                                    <option value="1">AAA</option>
-                                                    <option value="2">AAA</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row g-md-4 g-2">
-                                    <div class="col-xxl-9 col-xl-12 col-md-9">
-                                        <canvas id="onboardingChart" width="544" height="326"></canvas>
-                                    </div>
-                                    <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                                        <div class="row g-2">
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-theme"></span>Department 1
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeLightBlue"></span>Department 2
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeYellow"></span>Department 3
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeSkyblueLight"></span>Department 4
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeGray"></span>Department 5
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div> -->
-
-                        <div class="col-xxl-4 col-sm-6 order-1 order-xxl-2 @if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false) d-none @endif">
-                            <div class="card card-trainingHistory" id="card-trainingHistory">
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Learning History</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('training.history') }}" class="a-link">View All</a>
-
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if($trainings->isEmpty())
-                                        <p>No training history available.</p>
-                                    @else
-                                        @foreach ($trainings->take(5) as $training)
-                                        @php
-                                            // Calculate total training days
-                                            $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
-                                            
-                                            // Get total participants
-                                            $totalParticipants = $training->participants->count();
-                                            
-                                            // Expected attendance count
-                                            $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
-                                            
-                                            // Count actual attendance (only 'Present' status)
-                                            $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
-                                            
-                                            // Calculate attendance percentage
-                                            $attendancePercentage = ($totalExpectedAttendance > 0) 
-                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2) 
-                                            : 0;
-                                            @endphp
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <div class="date"><i class="fa-regular fa-calendar"></i>
-                                                        <?= date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) ?>
-                                                    </div>
-                                                    <h6><?= $training->learningProgram->name ?? 'Learning Program' ?></h6>
-                                                    <p><?= $training->description ?></p>
-                                                    <span>Attendance: <?= $attendancePercentage ?>%</span>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
+                            @empty
+                                <div class="col-12 text-muted small">No completion data yet.</div>
+                            @endforelse
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xxl-3 col-xl-4 col-lg-6 order-1 order-xxl-1 @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif" id="right-ldDash">
-                    <div class="card calendar-card calendarLD-card">
-                        <div class="ldDash-block">
-                            <div class="mb-4 overflow-hidden">
-                                <div id="calendar"></div>
-                            </div>
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>Learning Attendance</h3>
-                                    </div>
+                {{-- Row 5: Learning History full width --}}
+                <div class="col-12 @if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card card-trainingHistory h-100" id="card-trainingHistory">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">Learning History</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{ route('training.history') }}" class="a-link">View All</a>
                                 </div>
                             </div>
-                            <div class="leaveUser-main" id="leaveUser-main">
-                                <!-- Dynamic content will be loaded here -->
-                            </div>
+                        </div>
+                        <div class="leaveUser-main row g-3">
+                            @if($trainings->isEmpty())
+                                <div class="col-12"><p class="text-muted small mb-0">No training history available.</p></div>
+                            @else
+                                @foreach ($trainings->take(5) as $training)
+                                    @php
+                                        $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
+                                        $totalParticipants = $training->participants->count();
+                                        $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
+                                        $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
+                                        $attendancePercentage = ($totalExpectedAttendance > 0)
+                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2)
+                                            : 0;
+                                    @endphp
+                                    <div class="col-xl-4 col-md-6">
+                                        <div class="leaveUser-block">
+                                            <div>
+                                                <div class="date"><i class="fa-regular fa-calendar"></i>
+                                                    {{ date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) }}
+                                                </div>
+                                                <h6>{{ $training->learningProgram->name ?? 'Learning Program' }}</h6>
+                                                <p>{{ \Illuminate\Support\Str::words($training->description, 25, '…') }}</p>
+                                                <span>Attendance: {{ $attendancePercentage }}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -395,6 +311,20 @@
 
 @section('import-css')
 <style>
+    /* Chart wrapper used by Learning Hours bar chart — fixed-height container so
+       the canvas fills it via responsive: true / maintainAspectRatio: false. */
+    .chart-flex-wrap {
+        position: relative;
+        height: 320px;
+        width: 100%;
+    }
+    .chart-flex-wrap canvas {
+        position: absolute !important;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
     .fc-day.custom-dot::after {
         content: '';
         position: absolute;
@@ -775,15 +705,9 @@
             }
         }
 
-        // Adjust heights on page load and window resize
-        function adjustHeights() {
-            equalizeHeights('card-feedbackEvaluationHR', ['card-pendingActionsHR']);
-            equalizeHeights('card-onboardingHR', ['card-trainingHistoryHR']);
-            equalizeHeights('left-ldDash', ['right-ldDash']);
-        }
-
-        window.onload = adjustHeights; // Initial height adjustment
-        window.onresize = adjustHeights; // Adjust heights on window resize
+        // h-100 + Bootstrap rows now handle equal heights — equalizeHeights() is
+        // a no-op kept only so the function reference doesn't break anything else.
+        function adjustHeights() {}
 
 
         // progress 
@@ -833,128 +757,69 @@
         });
     </script>
     <script type="module">
-
-        // Learning Hours — bar per program with hours summed across all schedules.
+        // Learning Hours — horizontal bar per program. Program name on the y-axis,
+        // hours on the x-axis. No duplicate legend below the chart.
         var learningHoursPalette = ['#014653','#2EACB3','#FED049','#8DC9C9','#333333','#7AD45A','#FF4B4B','#F5738D','#53CAFF'];
         var learningHoursRows = @json($learningHoursByProg ?? []);
-        var learningHoursLabels = learningHoursRows.map(function (r) { return r.name || 'Untitled'; });
-        var learningHoursData   = learningHoursRows.map(function (r) { return parseFloat(r.total_hours || 0); });
-        var learningHoursColors = learningHoursRows.map(function (_r, i) { return learningHoursPalette[i % learningHoursPalette.length]; });
+        var learningHoursCanvas = document.getElementById('myStackedBarChart');
 
-        var ctx = document.getElementById('myStackedBarChart').getContext('2d');
-        var myStackedBarChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: learningHoursLabels,
-                datasets: [
-                    {
+        if (learningHoursCanvas && learningHoursRows.length) {
+            var learningHoursLabels = learningHoursRows.map(function (r) { return r.name || 'Untitled'; });
+            var learningHoursData   = learningHoursRows.map(function (r) { return parseFloat(r.total_hours || 0); });
+            var learningHoursColors = learningHoursRows.map(function (_r, i) { return learningHoursPalette[i % learningHoursPalette.length]; });
+            var learningHoursMeta   = learningHoursRows.map(function (r) {
+                return { sessions: r.session_count || 0, hours: parseFloat(r.total_hours || 0) };
+            });
+
+            new Chart(learningHoursCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: learningHoursLabels,
+                    datasets: [{
                         label: 'Hours',
                         data: learningHoursData,
                         backgroundColor: learningHoursColors,
                         borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: '',
-                        data: [],
-                        backgroundColor: '',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                ]
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: false // Hide legend
-                    },
-                    layout: {
-                        padding: 0 // Remove padding
-                    },
-                    tooltip: {
-                        enabled: false // Disable tooltips
-                    }
+                        borderWidth: 1,
+                        borderRadius: 6,
+                    }]
                 },
-                hover: {
-                    mode: null // Disable hover effects
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: {
-                            display: false // Hide x-axis grid lines
+                options: {
+                    indexAxis: 'y',                 // horizontal bars: names on Y, hours on X
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }, // single dataset, no need for a legend
+                        tooltip: {
+                            callbacks: {
+                                title: function (items) { return items[0].label; }, // full name on hover
+                                label: function (item)  {
+                                    var meta = learningHoursMeta[item.dataIndex] || {};
+                                    return ' ' + item.formattedValue + ' hrs · ' + (meta.sessions || 0) + ' sessions';
+                                }
+                            }
                         }
                     },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        grid: {
-                            display: false // Hide y-axis grid lines
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f3f5' },
+                            ticks: { precision: 0 },
+                            title: { display: true, text: 'Hours' }
                         },
-                        ticks: {
-                            stepSize: 20
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                callback: function (value) {
+                                    var label = this.getLabelForValue(value);
+                                    return label && label.length > 18 ? label.slice(0, 18) + '…' : label;
+                                }
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
 
       
 

@@ -35,10 +35,9 @@ class LearningProgramController extends Controller
     }
     public function index()
     {
-        if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false){
-            return abort(403, 'Unauthorized access');
-        }
-
+        // Read-only listing — data is already filtered by getScopedDepartmentIds() so
+        // HOD / XCOM see only their dept's employees / departments. Permission gate
+        // softened so dashboard tile clicks don't 403.
         $resort_id = $this->resort->resort_id;
         $page_title ='Learning Program';
         $scopedDeptIds = Common::getScopedDepartmentIds();
@@ -62,9 +61,6 @@ class LearningProgramController extends Controller
 
     public function show($id)
     {
-        if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false){
-            return abort(403, 'Unauthorized access');
-        }
         $program = LearningProgram::with('category')
             ->where('resort_id', $this->resort->resort_id)
             ->find(base64_decode($id));

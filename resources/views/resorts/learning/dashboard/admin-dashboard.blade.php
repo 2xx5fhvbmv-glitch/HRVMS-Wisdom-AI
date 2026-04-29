@@ -75,376 +75,43 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 order-1 order-xxl-1">
-                    <div class="card">
-                        <div class="card-title mb-md-4">
-                            <h3>Learning Completion Rates</h3>
-                        </div>
-                        <div class="three-progressbar mb-md-4 mb-3">
-                            <div class="progress-container blue " data-progress="90" data-bs-toggle="tooltip"
-                                data-bs-placement="bottom" title="Male Staff Occupied 90%">
-                                <svg class="progress-circle" viewBox="0 0 120 120">
-                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                </svg>
-                            </div>
-                            <div class="progress-container skyblue" data-progress="92" data-bs-toggle="tooltip"
-                                data-bs-placement="bottom" title="Female Staff Occupied 92%">
-                                <svg class="progress-circle" viewBox="0 0 120 120">
-                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                </svg>
-                            </div>
-                            <div class="progress-container yellow" data-progress="92" data-bs-toggle="tooltip"
-                                data-bs-placement="bottom" title="Female Staff Occupied 92%">
-                                <svg class="progress-circle" viewBox="0 0 120 120">
-                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="row g-2 justify-content-center doughnut-labelTop">
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-theme"></span>Department 1 <br>142
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeLightBlue"></span>Department 2
-                                    <br>14
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeYellow"></span>Department 3
-                                    <br>84
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-6 order-3 order-xxl-2">
-                    <div class="card card-participation">
-                        <div class="card-title mb-md-3">
-                            <h3>Learning Hours</h3>
-                        </div>
-                        <div class="row g-md-4 g-2">
-                            <div class="col-xxl-9 col-xl-12 col-md-9"> <canvas id="myStackedBarChart" width="544"
-                                    height="326"></canvas></div>
-                            <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                                <div class="row g-2">
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeLightBlue"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeYellow"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblueLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeGray"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeGreenLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeRed"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeRedLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblueLightNew"></span>Learning 1
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-sm-6 order-2 order-xxl-3 ">
-                    <div class="card">
+                {{-- Row 2: Pending Actions (wide) + Calendar --}}
+                <div class="col-xl-9 col-12">
+                    <div class="card h-100" id="card-pendingActions">
                         <div class="card-title">
-                            <h3>Learning Attendance</h3>
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col"><h3 class="text-nowrap">Pending Actions</h3></div>
+                                <div class="col-auto">
+                                    <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
                         </div>
-                        <p id="lateAttendanceText">Late Attendance: --%</p> <!-- Placeholder, will be updated dynamically -->
-
-                        <div class="trainingAttendance-chart mb-3">
-                            <canvas id="myDoughnutChart"></canvas>
-                        </div>
-                        <div class="row g-2 justify-content-center">
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-theme"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblueLightNew"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeWarning"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblue"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeGray"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblueLight"></span>Learning 1
-                                </div>
-                            </div>
+                        <div class="leaveUser-main">
+                            @if($pending_learning_request && $pending_learning_request->isNotEmpty())
+                                @foreach($pending_learning_request->take(4) as $request)
+                                    <div class="leaveUser-block">
+                                        <div>
+                                            <h6>{{$request->learning->name}}</h6>
+                                            <p>{{ \Illuminate\Support\Str::words($request->learning->description, 30, '…') }}</p>
+                                            <div><a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">View Details</a></div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @else
+                                <p class="text-muted small mb-0">No pending requests.</p>
+                            @endif
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xxl-9 col-xl-8 h-auto order-4 order-xxl-4" id="left-ldDash">
-                    <div class="row g-3 g-xxl-4">
-                        <div class="col-xxl-4 col-sm-6 ">
-                            <div class="card card-feedbackEvaluation h-auto" id="card-feedbackEvaluationHR">
-                                <div class="card-title">
-                                    <h3>Feedback and Evaluation</h3>
-                                </div>
-                                <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="90" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Male Staff Occupied 90%">
-                                        <svg class="progress-circle" viewBox="0 0 120 120">
-                                            <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                            <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                        </svg>
-                                    </div>
-                                    <div class="text">
-                                        <h5>70%</h5>
-                                        <p>AVERAGE FEEDBACK SCORES</p>
-                                    </div>
-                                </div>
-                                <div class="d-flex">
-                                    <p>Over Time:</p>
-                                    <p class="fw-500">Trainer Performance</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xxl-4 col-sm-6">
-                            <div class="card card-feedbackEvaluation h-auto">
-                                <div class="card-title">
-                                    <h3>Onboarding Learning Progress</h3>
-                                </div>
-                                <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="90" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Male Staff Occupied 90%">
-                                        <svg class="progress-circle" viewBox="0 0 120 120">
-                                            <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                            <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                        </svg>
-                                    </div>
-                                    <div class="text">
-                                        <h5>70%</h5>
-                                        <p>NEW HIRES COMPLETING THEIR COMPULSORY TRAINING</p>
-                                    </div>
-                                </div>
-                                <div class="d-flex">
-                                    <p>Attendance:</p>
-                                    <p class="fw-500">60%</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6 ">
-                            <div class=" card " id="card-pendingActions">
-                                <div class=" card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Pending Actions</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if($pending_learning_request->isNotEmpty())
-                                        @foreach($pending_learning_request as $request)
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <h6>{{$request->learning->name}}</h6>
-                                                    <p>{{$request->learning->description}}</p>
-                                                    <div>
-                                                        <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">
-                                                            View Details
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-8 order-2 order-xxl-1">
-                            <div class="card card-participation  h-auto" id="card-onboardingHR">
-                                <div class="card-title mb-md-3">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Onboarding Learning</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <div class="form-group">
-                                                <select class="form-select" aria-label="Default select example">
-                                                    <option selected="">Percentage completion</option>
-                                                    <option value="1">AAA</option>
-                                                    <option value="2">AAA</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="col-auto">
-                                            <div class="form-group">
-                                                <select class="form-select" aria-label="Default select example">
-                                                    <option selected="">Department-wise</option>
-                                                    <option value="1">AAA</option>
-                                                    <option value="2">AAA</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row g-md-4 g-2">
-                                    <div class="col-xxl-9 col-xl-12 col-md-9">
-                                        <canvas id="onboardingChart" width="544" height="326"></canvas>
-                                    </div>
-                                    <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                                        <div class="row g-2">
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-theme"></span>Department 1
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeLightBlue"></span>Department 2
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeYellow"></span>Department 3
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeSkyblueLight"></span>Department 4
-                                                </div>
-                                            </div>
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span class="bg-themeGray"></span>Department 5
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6 order-1 order-xxl-2">
-                            <div class="card card-trainingHistory" id="card-trainingHistory">
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Learning History</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('training.history') }}" class="a-link">View All</a>
-
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if($trainings->isEmpty())
-                                        <p>No training history available.</p>
-                                    @else
-                                        @foreach ($trainings as $training)
-                                        @php
-                                            // Calculate total training days
-                                            $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
-                                            
-                                            // Get total participants
-                                            $totalParticipants = $training->participants->count();
-                                            
-                                            // Expected attendance count
-                                            $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
-                                            
-                                            // Count actual attendance (only 'Present' status)
-                                            $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
-                                            
-                                            // Calculate attendance percentage
-                                            $attendancePercentage = ($totalExpectedAttendance > 0) 
-                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2) 
-                                            : 0;
-                                            @endphp
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <div class="date"><i class="fa-regular fa-calendar"></i>
-                                                        <?= date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) ?>
-                                                    </div>
-                                                    <h6><?= $training->learningProgram->name ?? 'Learning Program' ?></h6>
-                                                    <p><?= $training->description ?></p>
-                                                    <span>Attendance: <?= $attendancePercentage ?>%</span>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xxl-3 col-xl-4 col-lg-6 order-5 order-xxl-5" id="right-ldDash">
-                    <div class="card calendar-card calendarLD-card">
+                <div class="col-xl-3 col-md-6" id="right-ldDash">
+                    <div class="card calendar-card calendarLD-card h-100">
                         <div class="ldDash-block">
                             <div class="mb-4 overflow-hidden">
                                 <div id="calendar"></div>
                             </div>
                             <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>Upcoming Learning Sessions</h3>
-                                    </div>
-                                </div>
+                                <h3>Upcoming Learning Sessions</h3>
                             </div>
                             <div class="leaveUser-main" id="leaveUser-main">
                                 <!-- Dynamic content will be loaded here -->
@@ -453,6 +120,167 @@
                     </div>
                 </div>
 
+                {{-- Row 3: Feedback · Onboarding Progress · Learning Attendance (3 score cards) --}}
+                <div class="col-xl-4 col-md-6">
+                    <div class="card card-feedbackEvaluation h-100" id="card-feedbackEvaluationHR">
+                        <div class="card-title"><h3>Feedback and Evaluation</h3></div>
+                        <div class="progress-block">
+                            <div class="progress-container blue" data-progress="90" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="Average Feedback Score">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="text">
+                                <h5>70%</h5>
+                                <p>AVERAGE FEEDBACK SCORES</p>
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            <p>Over Time:</p>
+                            <p class="fw-500">Trainer Performance</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-6">
+                    <div class="card card-feedbackEvaluation h-100">
+                        <div class="card-title"><h3>Onboarding Learning Progress</h3></div>
+                        <div class="progress-block">
+                            <div class="progress-container blue" data-progress="90" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="New Hires Completion">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="text">
+                                <h5>70%</h5>
+                                <p>NEW HIRES COMPLETING THEIR COMPULSORY TRAINING</p>
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            <p>Attendance:</p>
+                            <p class="fw-500">60%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-12">
+                    <div class="card h-100">
+                        <div class="card-title"><h3>Learning Attendance</h3></div>
+                        <p id="lateAttendanceText" class="small mb-2">Late Attendance: --%</p>
+
+                        <div class="trainingAttendance-chart mb-3">
+                            <canvas id="myDoughnutChart"></canvas>
+                        </div>
+                        <div class="row g-2 justify-content-center">
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-theme"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblueLightNew"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeWarning"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblue"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeGray"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblueLight"></span>Learning 1</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 4: Learning Hours bar (8) + Learning Completion Rates (4) --}}
+                <div class="col-xl-8">
+                    <div class="card card-participation h-100">
+                        <div class="card-title mb-md-3"><h3>Learning Hours</h3></div>
+                        <div class="chart-flex-wrap">
+                            <canvas id="myStackedBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card h-100">
+                        <div class="card-title mb-md-4"><h3>Learning Completion Rates</h3></div>
+                        <div class="three-progressbar mb-md-4 mb-3">
+                            <div class="progress-container blue" data-progress="90" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="Department 1">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="progress-container skyblue" data-progress="92" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="Department 2">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="progress-container yellow" data-progress="92" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="Department 3">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="row g-2 justify-content-center doughnut-labelTop">
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-theme"></span>Department 1 <br>142</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeLightBlue"></span>Department 2 <br>14</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeYellow"></span>Department 3 <br>84</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 5: Onboarding Learning bar chart + Learning History --}}
+                <div class="col-xl-8">
+                    <div class="card card-participation h-100" id="card-onboardingHR">
+                        <div class="card-title mb-md-3">
+                            <h3>Onboarding Learning</h3>
+                        </div>
+                        <div class="chart-flex-wrap">
+                            <canvas id="onboardingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card card-trainingHistory h-100" id="card-trainingHistory">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col"><h3 class="text-nowrap">Learning History</h3></div>
+                                <div class="col-auto">
+                                    <a href="{{ route('training.history') }}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main">
+                            @if($trainings->isEmpty())
+                                <p class="text-muted small mb-0">No training history available.</p>
+                            @else
+                                @foreach ($trainings as $training)
+                                    @php
+                                        $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
+                                        $totalParticipants = $training->participants->count();
+                                        $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
+                                        $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
+                                        $attendancePercentage = ($totalExpectedAttendance > 0)
+                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2)
+                                            : 0;
+                                    @endphp
+                                    <div class="leaveUser-block">
+                                        <div>
+                                            <div class="date"><i class="fa-regular fa-calendar"></i>
+                                                {{ date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) }}
+                                            </div>
+                                            <h6>{{ $training->learningProgram->name ?? 'Learning Program' }}</h6>
+                                            <p>{{ \Illuminate\Support\Str::words($training->description, 25, '…') }}</p>
+                                            <span>Attendance: {{ $attendancePercentage }}%</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
+                </div>
 
             </div>
         </div>

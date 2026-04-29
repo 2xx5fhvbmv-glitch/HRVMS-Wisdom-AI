@@ -36,6 +36,14 @@ class RedirectIfNotCorrectDashboard
 
             Log::info("Redirect Middleware: User Rank - $availableRank | Current Route - $currentRoute");
 
+            // The redirect rules below only make sense when the user lands on
+            // a *dashboard* route (e.g. learning.hod.dashboard) — they shouldn't
+            // bounce them away from sub-pages like learning.compulsory.pending or
+            // learning.schedule.index. Allow every non-dashboard route through.
+            if ($currentRoute && !str_contains(strtolower($currentRoute), 'dashboard')) {
+                return $next($request);
+            }
+
             $allowedRoutesForMasterAdmin = [
                 'resort.workforceplan.resortadmindashboard',
                 'resort.recruitement.admindashboard',

@@ -13,7 +13,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('learning.manager.dashboard') }}" class="btn btn-themeBlue btn-sm">Back to Dashboard</a>
+                        <a href="{{ route('learning.manager.dashboard') }}" class="btn btn-theme">Back to Dashboard</a>
                     </div>
                 </div>
             </div>
@@ -52,7 +52,7 @@
                                     </td>
                                     <td>
                                         <a href="{{ route('learning.schedule') }}?program_id={{ $row->program_id }}&employee_id={{ $row->employee_id }}"
-                                           class="btn btn-themeBlue btn-sm">Schedule</a>
+                                           class="btn btn-theme btn-sm">Schedule</a>
                                     </td>
                                 </tr>
                             @empty

@@ -30,7 +30,7 @@
                                 <p class="mb-0  fw-500">Ongoing Learning Programs</p>
                                 <strong>{{$ongoing_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{ route('learning.schedule.index') }}">
+                            <a href="{{ route('learning.schedule.index') }}?status=Ongoing">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
@@ -56,12 +56,14 @@
                                 <p class="mb-0  fw-500">Pending Learning Programs</p>
                                 <strong>{{$pending_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{ route('learning.schedule.index') }}">
+                            <a href="{{ route('learning.schedule.index') }}?status=Scheduled">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
+                {{-- Compulsory % is currently a real count but only meaningful when mandatory schedules
+                     exist; no canonical destination yet so the arrow is suppressed. --}}
                 <div class="col-lg-3 col-sm-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
@@ -69,53 +71,13 @@
                                 <p class="mb-0  fw-500">Completed Compulsory Learning</p>
                                 <strong>{{$compulsory_completed_traing ?? 0}}</strong>
                             </div>
-                            <a href="{{ route('training.history') }}">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
                         </div>
                     </div>
                 </div>
                 
-                <div class="col-xl-3 col-sm-6">
-                    <div class="card">
-                        <div class="card-title mb-md-4">
-                            <h3>Breakdown of Learning Programs</h3>
-                        </div>
-
-                        <div class="three-progressbar mb-md-4 mb-3">
-                            @foreach ($categories as $category)
-                                <div class="progress-container" 
-                                    style="border-color: {{ $category->color }};" 
-                                    data-progress="{{ $category->programs_count }}" 
-                                    data-bs-toggle="tooltip"
-                                    data-bs-placement="bottom" 
-                                    title="{{ $category->category }} - {{ $category->programs_count }}">
-
-                                    <svg class="progress-circle" viewBox="0 0 120 120">
-                                        <circle class="progress-background" cx="60" cy="60" r="54" style="stroke: #eee;"></circle>
-                                        <circle class="progress" cx="60" cy="60" r="54" style="stroke: {{ $category->color }};"></circle>
-                                    </svg>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <div class="row g-2 justify-content-center doughnut-labelTop">
-                            @foreach ($categories as $category)
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span style="background-color: {{ $category->color }};"></span>
-                                        {{ $category->category }} <br>{{ $category->programs_count }}
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-
-                    </div>
-                </div>
-
                 @if(!empty($teamCompulsoryPending))
-                <div class="col-xl-9 col-12 order-1 order-xxl-1">
-                    <div class="card h-100">
+                <div class="col-xl-9 col-12">
+                    <div class="card compulsory-action-card h-100">
                         <div class="card-title mb-md-3">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
@@ -157,7 +119,7 @@
                                             </td>
                                             <td>
                                                 <a href="{{ route('learning.schedule') }}?program_id={{ $row->program_id }}&employee_id={{ $row->employee_id }}"
-                                                   class="btn btn-themeBlue btn-sm">Schedule</a>
+                                                   class="btn btn-theme btn-sm">Schedule</a>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -168,247 +130,15 @@
                 </div>
                 @endif
 
-                <div class="col-xl-6 order-3 order-xxl-2">
-                    <div class="card card-participation">
-                        <div class="card-title mb-md-3">
-                            <h3>Participation</h3>
-                        </div>
-                        <div class="row g-md-4 g-2">
-                            <div class="col-xxl-9 col-xl-12 col-md-9"> <canvas id="myStackedBarChart" width="544"
-                                    height="326"></canvas></div>
-                           
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xxl-3 col-xl-4 col-lg-6 order-5 order-xxl-5">
-                    <div class="card">
-                        <div class="card-title">
-                            <h3>Learning Attendance</h3>
-                        </div>
-                        <p id="lateAttendanceText">Late Attendance: --%</p> <!-- Placeholder, will be updated dynamically -->
-
-                        <div class="trainingAttendance-chart mb-3">
-                            <canvas id="myDoughnutChart"></canvas>
-                        </div>
-                        <div class="row g-2 justify-content-center" id="doughnut-label">
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-theme"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblueLightNew"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeWarning"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblue"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeGray"></span>Learning 1
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeSkyblueLight"></span>Learning 1
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xxl-9 col-xl-8 h-auto order-4 order-xxl-4" id="left-ldDash">
-                    <div class="row g-3 g-xxl-4">
-                        <div class="col-xxl-4 col-sm-6 ">
-                            <div class=" card">
-                                <div class=" card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">List of Absentees</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('learning.absentees.getall')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table-lableNew w-100">
-                                        <tr>
-                                            <th>Employee Name</th>
-                                            <th>Learning</th>
-                                        </tr>
-                                        @if($absentees)
-                                            @foreach($absentees as $absentee)
-                                                <tr>
-                                                    <td>
-                                                        <div class="tableUser-block">
-                                                            <div class="img-circle">
-                                                                <img src="{{Common::getResortUserPicture($absentee->employee->resortAdmin->id)}}" alt="user">
-                                                            </div>
-                                                            <span class="userApplicants-btn">{{$absentee->employee->resortAdmin->full_name}}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>{{$absentee->schedule->learningProgram->name}}</td>
-                                                </tr>
-                                            @endforeach
-                                        @endif
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6">
-                            <div class="card card-feedbackEvaluation h-auto" id="card-feedbackEvaluation">
-                                <div class="card-title">
-                                    <h3>Feedback and Evaluation</h3>
-                                </div>
-                                <div class="progress-block">
-                                    <div class="progress-container blue " data-progress="{{ $avgFeedbackScore }}" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="Average Feedback Score {{ $avgFeedbackScore }}%">
-                                        <svg class="progress-circle" viewBox="0 0 120 120">
-                                            <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                            <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                        </svg>
-                                    </div>
-                                    <div class="text">
-                                        <h5>{{ $avgFeedbackScore }}%</h5>
-                                        <p>AVERAGE FEEDBACK SCORES</p>
-                                    </div>
-                                </div>
-                                <div class="d-flex">
-                                    <p>Top Trainer:</p>
-                                    <p class="fw-500">{{ $topTrainerName ?? '—' }}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6 ">
-                            <div class=" card " id="card-pendingActions">
-                                <div class=" card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Pending Actions</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if($pending_learning_request)
-                                        @foreach($pending_learning_request as $request)
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <h6>{{$request->learning->name}}</h6>
-                                                    <p>{{ \Illuminate\Support\Str::words($request->learning->description, 50, '…') }}</p>
-                                                    <div>
-                                                        <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">
-                                                            View Details
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-xxl-8 order-2 order-xxl-1">
-                            <div class="card card-participation  h-auto" id="card-onboarding">
-                                <div class="card-title mb-md-3">
-                                    <h3>Onboarding Learning</h3>
-                                </div>
-                                <div class="row g-md-4 g-2">
-                                    <div class="col-xxl-9 col-xl-12 col-md-9">
-                                        <canvas id="onboardingChart" width="544" height="326"></canvas>
-                                    </div>
-                                    <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                                        <div class="row g-2" id="onboardingChartLegend">
-                                            {{-- Legend rendered dynamically by fetchOnboardingChart() --}}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6 order-1 order-xxl-2">
-                            <div class="card card-trainingHistory" id="card-trainingHistory">
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Learning History</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('training.history') }}" class="a-link">View All</a>
-
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if($trainings->isEmpty())
-                                        <p>No training history available.</p>
-                                    @else
-                                        @foreach ($trainings as $training)
-                                      
-                                        @php
-                                            // Calculate total training days
-                                            $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
-                                            
-                                            // Get total participants
-                                            $totalParticipants = $training->participants->count();
-                                            
-                                            // Expected attendance count
-                                            $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
-                                            
-                                            // Count actual attendance (only 'Present' status)
-                                            $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
-                                            
-                                            // Calculate attendance percentage
-                                            $attendancePercentage = ($totalExpectedAttendance > 0) 
-                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2) 
-                                            : 0;
-                                            @endphp
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <div class="date"><i class="fa-regular fa-calendar"></i>
-                                                        <?= date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) ?>
-                                                    </div>
-                                                    <h6><?= $training->learningProgram->name ?? 'Learning Program' ?></h6>
-                                                    <p><?= $training->description ?></p>
-                                                    <span>Attendance: <?= $attendancePercentage ?>%</span>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="col-xl-6 col-sm-12 order-2 order-xxl-3" id="right-ldDash">
-                    <div class="card calendar-card calendarLD-card">
+                {{-- Calendar sits alongside the Compulsory Trainings table --}}
+                <div class="col-xl-3 col-md-6" id="right-ldDash">
+                    <div class="card calendar-card calendarLD-card h-100">
                         <div class="ldDash-block">
                             <div class="mb-4 overflow-hidden">
                                 <div id="calendar"></div>
                             </div>
                             <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>Upcoming Learning Sessions</h3>
-                                    </div>
-                                </div>
+                                <h3>Upcoming Learning Sessions</h3>
                             </div>
                             <div class="leaveUser-main" id="leaveUser-main">
                                 <!-- Dynamic content will be loaded here -->
@@ -417,6 +147,215 @@
                     </div>
                 </div>
 
+                {{-- Row 3: action panels (Pending Actions · Absentees · Feedback) --}}
+                <div class="col-xl-4 col-md-6">
+                    <div class="card h-100" id="card-pendingActions">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">Pending Actions</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main">
+                            @if($pending_learning_request && count($pending_learning_request))
+                                @foreach($pending_learning_request as $request)
+                                    <div class="leaveUser-block">
+                                        <div>
+                                            <h6>{{$request->learning->name}}</h6>
+                                            <p>{{ \Illuminate\Support\Str::words($request->learning->description, 30, '…') }}</p>
+                                            <div>
+                                                <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">View Details</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @else
+                                <p class="text-muted small mb-0">No pending requests.</p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-6">
+                    <div class="card h-100">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">List of Absentees</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{route('learning.absentees.getall')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table-lableNew w-100">
+                                <tr>
+                                    <th>Employee Name</th>
+                                    <th>Learning</th>
+                                </tr>
+                                @if($absentees && count($absentees))
+                                    @foreach($absentees as $absentee)
+                                        <tr>
+                                            <td>
+                                                <div class="tableUser-block">
+                                                    <div class="img-circle">
+                                                        <img src="{{Common::getResortUserPicture($absentee->employee->resortAdmin->id)}}" alt="user">
+                                                    </div>
+                                                    <span class="userApplicants-btn">{{$absentee->employee->resortAdmin->full_name}}</span>
+                                                </div>
+                                            </td>
+                                            <td>{{$absentee->schedule->learningProgram->name}}</td>
+                                        </tr>
+                                    @endforeach
+                                @else
+                                    <tr><td colspan="2" class="text-center text-muted small">No recent absentees.</td></tr>
+                                @endif
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-12">
+                    <div class="card card-feedbackEvaluation h-100" id="card-feedbackEvaluation">
+                        <div class="card-title">
+                            <h3>Feedback and Evaluation</h3>
+                        </div>
+                        <div class="progress-block">
+                            <div class="progress-container blue" data-progress="{{ $avgFeedbackScore }}" data-bs-toggle="tooltip"
+                                data-bs-placement="bottom" title="Average Feedback Score {{ $avgFeedbackScore }}%">
+                                <svg class="progress-circle" viewBox="0 0 120 120">
+                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                            </div>
+                            <div class="text">
+                                <h5>{{ $avgFeedbackScore }}%</h5>
+                                <p>AVERAGE FEEDBACK SCORES</p>
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            <p>Top Trainer:</p>
+                            <p class="fw-500">{{ $topTrainerName ?? '—' }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 4: paired bar charts --}}
+                <div class="col-xl-6">
+                    <div class="card card-participation h-100">
+                        <div class="card-title mb-md-3">
+                            <h3>Participation</h3>
+                        </div>
+                        <div class="chart-flex-wrap">
+                            <canvas id="myStackedBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card card-participation h-100" id="card-onboarding">
+                        <div class="card-title mb-md-3">
+                            <h3>Onboarding Learning</h3>
+                        </div>
+                        <div class="chart-flex-wrap">
+                            <canvas id="onboardingChart"></canvas>
+                        </div>
+                        <div class="row g-2 mt-2" id="onboardingChartLegend">
+                            {{-- Legend rendered horizontally below the chart by fetchOnboardingChart() --}}
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 5: doughnut/list cards (Breakdown · Learning Attendance · Learning History) --}}
+                <div class="col-xl-4 col-md-6">
+                    <div class="card h-100">
+                        <div class="card-title mb-md-3">
+                            <h3>Breakdown of Learning Programs</h3>
+                        </div>
+                        @php
+                            $breakdownRows = $categories->sortByDesc('programs_count')->values();
+                            $breakdownLabels = $breakdownRows->pluck('category')->all();
+                            $breakdownData   = $breakdownRows->pluck('programs_count')->all();
+                            $breakdownColors = $breakdownRows->pluck('color')->all();
+                        @endphp
+                        <div class="chart-flex-wrap" style="height: {{ max(220, count($breakdownLabels) * 28) }}px;">
+                            <canvas id="breakdownChart"
+                                data-labels='@json($breakdownLabels)'
+                                data-values='@json($breakdownData)'
+                                data-colors='@json($breakdownColors)'></canvas>
+                        </div>
+                        @if(empty($breakdownData))
+                            <p class="text-muted small mb-0 mt-2">No categories yet.</p>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-6">
+                    <div class="card h-100">
+                        <div class="card-title">
+                            <h3>Learning Attendance</h3>
+                        </div>
+                        <p id="lateAttendanceText" class="small mb-2">Late Attendance: --%</p>
+                        <div class="trainingAttendance-chart mb-3">
+                            <canvas id="myDoughnutChart"></canvas>
+                        </div>
+                        <div class="row g-2 justify-content-center" id="doughnut-label">
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-theme"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblueLightNew"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeWarning"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblue"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeGray"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblueLight"></span>Learning 1</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4 col-md-12">
+                    <div class="card card-trainingHistory h-100" id="card-trainingHistory">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">Learning History</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{ route('training.history') }}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main">
+                            @if($trainings->isEmpty())
+                                <p class="text-muted small mb-0">No training history available.</p>
+                            @else
+                                @foreach ($trainings as $training)
+                                    @php
+                                        $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
+                                        $totalParticipants = $training->participants->count();
+                                        $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
+                                        $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
+                                        $attendancePercentage = ($totalExpectedAttendance > 0)
+                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2)
+                                            : 0;
+                                    @endphp
+                                    <div class="leaveUser-block">
+                                        <div>
+                                            <div class="date"><i class="fa-regular fa-calendar"></i>
+                                                {{ date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) }}
+                                            </div>
+                                            <h6>{{ $training->learningProgram->name ?? 'Learning Program' }}</h6>
+                                            <p>{{ \Illuminate\Support\Str::words($training->description, 25, '…') }}</p>
+                                            <span>Attendance: {{ $attendancePercentage }}%</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
+                </div>
 
             </div>
         </div>
@@ -425,6 +364,51 @@
 
 @section('import-css')
 <style>
+    /* Chart cards size to their content (no h-100). The chart wrapper itself
+       has a fixed height so the card stays compact regardless of what other
+       cards in the row look like. */
+    .chart-flex-wrap {
+        position: relative;
+        height: 320px;
+        width: 100%;
+    }
+    .chart-flex-wrap canvas {
+        position: absolute !important;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Compulsory Trainings — Action Needed table polish */
+    .compulsory-action-card thead th {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #6c757d;
+        background: #f7f9fb;
+        border-bottom: 1px solid #e6e9ec;
+        padding: 10px 12px;
+    }
+    .compulsory-action-card tbody td {
+        padding: 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f3f5;
+    }
+    .compulsory-action-card tbody tr:last-child td {
+        border-bottom: 0;
+    }
+    .compulsory-action-card tbody tr:hover {
+        background: #f8fafc;
+    }
+    .compulsory-action-card .badge {
+        padding: 6px 10px;
+        font-weight: 500;
+        letter-spacing: 0.2px;
+    }
+    .compulsory-action-card .btn.btn-themeBlue {
+        padding: 6px 14px;
+    }
+
     .fc-day.custom-dot::after {
         content: '';
         position: absolute;
@@ -698,15 +682,9 @@
             }
         }
 
-        // Adjust heights on page load and window resize
-        function adjustHeights() {
-            equalizeHeights('card-feedbackEvaluation', ['card-pendingActions']);
-            equalizeHeights('card-onboarding', ['card-trainingHistory']);
-            equalizeHeights('left-ldDash', ['right-ldDash']);
-        }
-
-        window.onload = adjustHeights; // Initial height adjustment
-        window.onresize = adjustHeights; // Adjust heights on window resize
+        // h-100 + Bootstrap rows now handle equal heights — equalizeHeights() is
+        // a no-op kept only so the function reference doesn't break anything else.
+        function adjustHeights() {}
 
         // progress 
         const radius = 54; // Circle radius
@@ -936,30 +914,38 @@
                     datasets: chartData.datasets // Department-wise participation data
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: true // Show legend for departments
-                        },
+                        legend: { display: true },
                         tooltip: {
-                            enabled: true // Enable tooltips
+                            enabled: true,
+                            callbacks: {
+                                // Full untruncated label on hover
+                                title: function (items) {
+                                    return items[0].label;
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
                             stacked: true,
-                            grid: {
-                                display: false // Hide x-axis grid lines
+                            grid: { display: false },
+                            ticks: {
+                                // Show only the first ~12 chars; full label still in tooltip.
+                                callback: function (value) {
+                                    var label = this.getLabelForValue(value);
+                                    return label && label.length > 12 ? label.slice(0, 12) + '…' : label;
+                                },
+                                autoSkip: false
                             }
                         },
                         y: {
                             stacked: true,
                             beginAtZero: true,
-                            grid: {
-                                display: false // Hide y-axis grid lines
-                            },
-                            ticks: {
-                                stepSize: 5
-                            }
+                            grid: { display: false },
+                            ticks: { stepSize: 5 }
                         }
                     }
                 }
@@ -969,7 +955,59 @@
     <script>
         $(document).ready(function () {
             fetchOnboardingChart();
+            renderBreakdownChart();
         });
+
+        function renderBreakdownChart() {
+            var canvas = document.getElementById('breakdownChart');
+            if (!canvas) return;
+            var labels = JSON.parse(canvas.dataset.labels || '[]');
+            var values = JSON.parse(canvas.dataset.values || '[]');
+            var colors = JSON.parse(canvas.dataset.colors || '[]');
+            if (!labels.length) return;
+
+            new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Programs',
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: '#fff',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // horizontal bars
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function (items) { return items[0].label; },
+                                label:  function (item)  { return ' ' + item.formattedValue + ' programs'; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: '#f1f3f5' }, ticks: { precision: 0, stepSize: 1 } },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                // Truncate long category names; full name still in the tooltip.
+                                callback: function (value) {
+                                    var label = this.getLabelForValue(value);
+                                    return label && label.length > 18 ? label.slice(0, 18) + '…' : label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         function fetchOnboardingChart() {
             $.ajax({
@@ -1000,13 +1038,30 @@
                     datasets: chartData.datasets
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
                         layout: { padding: 0 },
-                        tooltip: { enabled: true }
+                        tooltip: {
+                            enabled: true,
+                            callbacks: {
+                                title: function (items) { return items[0].label; }
+                            }
+                        }
                     },
                     scales: {
-                        x: { stacked: true, grid: { display: false } },
+                        x: {
+                            stacked: true,
+                            grid: { display: false },
+                            ticks: {
+                                callback: function (value) {
+                                    var label = this.getLabelForValue(value);
+                                    return label && label.length > 12 ? label.slice(0, 12) + '…' : label;
+                                },
+                                autoSkip: false
+                            }
+                        },
                         y: {
                             stacked: true,
                             beginAtZero: true,
@@ -1028,8 +1083,10 @@
                 return;
             }
             datasets.forEach(function (ds) {
+                // Inline pill — sits horizontally under the chart now (legend
+                // row was moved out of the right-side empty col).
                 $legend.append(
-                    '<div class="col-xxl-12 col-xl-auto col-md-12 col-auto">' +
+                    '<div class="col-auto">' +
                         '<div class="doughnut-label">' +
                             '<span style="background-color:' + ds.backgroundColor + ';"></span>' +
                             $('<div>').text(ds.label).html() +

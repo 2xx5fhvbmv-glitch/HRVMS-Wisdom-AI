@@ -74,270 +74,227 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-xxl-9 col-xl-8 h-auto" id="left-ldDash">
-                    <div class="row g-3 g-xxl-4">
-
-                        @if(!empty($myCompulsoryPrograms))
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-title">
-                                        <h3>My Compulsory Learning Programs</h3>
-                                        <small class="text-muted">You're on probation — these are the trainings you need to complete.</small>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table-lableNew table-empLDHod w-100">
-                                            <tr>
-                                                <th>Program</th>
-                                                <th>Complete Within</th>
-                                                <th>Due By</th>
-                                                <th>Status</th>
-                                            </tr>
-                                            @foreach($myCompulsoryPrograms as $p)
-                                                <tr>
-                                                    <td>{{ $p->program_name }}</td>
-                                                    <td>{{ $p->completion_days ? $p->completion_days . ' days' : '—' }}</td>
-                                                    <td>{{ $p->due_on ? \Carbon\Carbon::parse($p->due_on)->format('d M Y') : '—' }}</td>
-                                                    <td>
-                                                        @if($p->is_completed)
-                                                            <span class="badge badge-themeSuccess"><i class="fa-solid fa-check me-1"></i>Completed</span>
-                                                        @elseif($p->is_overdue)
-                                                            <span class="badge badge-themeDanger">Overdue</span>
-                                                        @else
-                                                            <span class="badge badge-themeWarning">Pending</span>
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </table>
-                                    </div>
-                                </div>
+                {{-- Row 2: My Compulsory (full width when on probation) + Calendar.
+                     If the user isn't on probation, Pending Actions takes the wide slot. --}}
+                @if(!empty($myCompulsoryPrograms))
+                    <div class="col-xl-9 col-12">
+                        <div class="card h-100">
+                            <div class="card-title">
+                                <h3>My Compulsory Learning Programs</h3>
+                                <small class="text-muted">You're on probation — these are the trainings you need to complete.</small>
                             </div>
-                        @endif
-
-                        <div class="col-xxl-6 col-md-6 ">
-                            <div class=" card">
-                                <div class=" card-title">
-                                    <h3>Employees With Overdue Learning Programs</h3>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table-lableNew table-empLDHod w-100">
+                            <div class="table-responsive">
+                                <table class="table-lableNew table-empLDHod w-100">
+                                    <tr>
+                                        <th>Program</th>
+                                        <th>Complete Within</th>
+                                        <th>Due By</th>
+                                        <th>Status</th>
+                                    </tr>
+                                    @foreach($myCompulsoryPrograms as $p)
                                         <tr>
-                                            <th>Employee Name</th>
-                                            <th>Learning</th>
-                                            <th>Date</th>
+                                            <td>{{ $p->program_name }}</td>
+                                            <td>{{ $p->completion_days ? $p->completion_days . ' days' : '—' }}</td>
+                                            <td>{{ $p->due_on ? \Carbon\Carbon::parse($p->due_on)->format('d M Y') : '—' }}</td>
+                                            <td>
+                                                @if($p->is_completed)
+                                                    <span class="badge badge-themeSuccess"><i class="fa-solid fa-check me-1"></i>Completed</span>
+                                                @elseif($p->is_overdue)
+                                                    <span class="badge badge-themeDanger">Overdue</span>
+                                                @else
+                                                    <span class="badge badge-themeWarning">Pending</span>
+                                                @endif
+                                            </td>
                                         </tr>
-                                        @forelse(($overdueEmployees ?? []) as $att)
-                                            @php
-                                                $emp = $att->employee ?? null;
-                                                $ra  = $emp ? $emp->resortAdmin : null;
-                                                $prog = optional(optional($att->schedule)->learningProgram);
-                                            @endphp
-                                            <tr>
-                                                <td>
-                                                    <div class="tableUser-block">
-                                                        <div class="img-circle">
-                                                            <img src="{{ Common::getResortUserPicture(optional($ra)->id) }}" alt="user">
-                                                        </div>
-                                                        <span class="userApplicants-btn">{{ trim((optional($ra)->first_name ?? '').' '.(optional($ra)->last_name ?? '')) ?: '-' }}</span>
-                                                    </div>
-                                                </td>
-                                                <td>{{ $prog->learning_program_title ?? $prog->name ?? '-' }}</td>
-                                                <td>{{ $att->attendance_date ? \Carbon\Carbon::parse($att->attendance_date)->format('d M Y') : '-' }}</td>
-                                            </tr>
-                                        @empty
-                                            <tr><td colspan="3" class="text-center text-muted">No overdue learners</td></tr>
-                                        @endforelse
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xxl-6 col-md-6 ">
-                            <div class=" card">
-                                <div class=" card-title">
-                                    <h3>Employees Who Excelled In Learning Evaluations</h3>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table-lableNew table-empLDHod w-100">
-                                        <tr>
-                                            <th>Employee Name</th>
-                                            <th>Sessions Attended</th>
-                                            <th>Last Session</th>
-                                        </tr>
-                                        @forelse(($topPerformers ?? []) as $row)
-                                            @php
-                                                $emp = $row->employee ?? null;
-                                                $ra  = $emp ? $emp->resortAdmin : null;
-                                            @endphp
-                                            <tr>
-                                                <td>
-                                                    <div class="tableUser-block">
-                                                        <div class="img-circle">
-                                                            <img src="{{ Common::getResortUserPicture(optional($ra)->id) }}" alt="user">
-                                                        </div>
-                                                        <span class="userApplicants-btn">{{ trim((optional($ra)->first_name ?? '').' '.(optional($ra)->last_name ?? '')) ?: '-' }}</span>
-                                                    </div>
-                                                </td>
-                                                <td>{{ $row->present_count }}</td>
-                                                <td>{{ $row->last_date ? \Carbon\Carbon::parse($row->last_date)->format('d M Y') : '-' }}</td>
-                                            </tr>
-                                        @empty
-                                            <tr><td colspan="3" class="text-center text-muted">No completed sessions yet</td></tr>
-                                        @endforelse
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xxl-4 col-xl-6 col-lg-4 col-sm-6 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                            <div class="card h-auto" id="card-trainingAttendanceHOD">
-                                <div class="card-title">
-                                    <h3>Learning Attendance</h3>
-                                </div>
-                                <div class="trainingAttendance-chart mb-3">
-                                    <canvas id="myDoughnutChart"></canvas>
-                                </div>
-                                <div class="row g-2 justify-content-center">
-                                    <div class="col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblueLightNew"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeWarning"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblue"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeGray"></span>Learning 1
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-themeSkyblueLight"></span>Learning 1
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-sm-6 order-1 order-xxl-2 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                            <div class="card card-trainingHistory" id="card-trainingHistory">
-                                <div class="card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Learning History</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('training.history') }}" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="leaveUser-main">
-                                    @if($trainings->isEmpty())
-                                        <p>No training history available.</p>
-                                    @else
-                                        @foreach ($trainings as $training)
-                                        @php
-                                            // Calculate total training days
-                                            $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
-                                            
-                                            // Get total participants
-                                            $totalParticipants = $training->participants->count();
-                                            
-                                            // Expected attendance count
-                                            $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
-                                            
-                                            // Count actual attendance (only 'Present' status)
-                                            $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
-                                            
-                                            // Calculate attendance percentage
-                                            $attendancePercentage = ($totalExpectedAttendance > 0) 
-                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2) 
-                                            : 0;
-                                            @endphp
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <div class="date"><i class="fa-regular fa-calendar"></i>
-                                                        <?= date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) ?>
-                                                    </div>
-                                                    <h6><?= $training->learningProgram->name ?? 'Learning Program' ?></h6>
-                                                    <p><?= $training->description ?></p>
-                                                    <span>Attendance: <?= $attendancePercentage ?>%</span>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-xxl-4 col-xl-6 col-lg-4 col-md-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
-                            <div class=" card " id="card-pendingActionsHOD">
-                                <div class=" card-title">
-                                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                        <div class="col">
-                                            <h3 class="text-nowrap">Pending Actions</h3>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="a-link">View All</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="leaveUser-main">
-                                    @if(count($pending_learning_request)>0)
-                                        @foreach($pending_learning_request as $request)
-                                            <div class="leaveUser-block">
-                                                <div>
-                                                    <h6>{{$request->learning->name}}</h6>
-                                                    <p>{{$request->learning->description}}</p>
-                                                    <div>
-                                                        <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">
-                                                            View Details
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    @else
-                                        <div class="leaveUser-block">
-                                            <div>
-                                                <p>No Pending Request Found</p>
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
+                                    @endforeach
+                                </table>
                             </div>
                         </div>
                     </div>
-                </div>
+                @else
+                    <div class="col-xl-9 col-12 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                        <div class="card h-100" id="card-pendingActionsHOD">
+                            <div class="card-title">
+                                <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                    <div class="col"><h3 class="text-nowrap">Pending Actions</h3></div>
+                                    <div class="col-auto"><a href="#" class="a-link">View All</a></div>
+                                </div>
+                            </div>
+                            <div class="leaveUser-main">
+                                @if(count($pending_learning_request)>0)
+                                    @foreach($pending_learning_request as $request)
+                                        <div class="leaveUser-block">
+                                            <div>
+                                                <h6>{{$request->learning->name}}</h6>
+                                                <p>{{ \Illuminate\Support\Str::words($request->learning->description, 30, '…') }}</p>
+                                                <div><a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">View Details</a></div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                @else
+                                    <p class="text-muted small mb-0">No pending requests.</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
-                <div class="col-xxl-3 col-xl-4 col-lg-6 order-5 order-xxl-5" id="right-ldDash">
-                    <div class="card calendar-card calendarLD-card">
+                <div class="col-xl-3 col-md-6" id="right-ldDash">
+                    <div class="card calendar-card calendarLD-card h-100">
                         <div class="ldDash-block">
                             <div class="mb-4 overflow-hidden">
                                 <div id="calendar"></div>
                             </div>
                             <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>Upcoming Learning Sessions</h3>
-                                    </div>
-                                </div>
+                                <h3>Upcoming Learning Sessions</h3>
                             </div>
                             <div class="leaveUser-main" id="leaveUser-main">
                                 <!-- Dynamic content will be loaded here -->
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 3: Overdue + Top Performers (paired tables) --}}
+                <div class="col-xl-6 col-md-12">
+                    <div class="card h-100">
+                        <div class="card-title"><h3>Employees With Overdue Learning Programs</h3></div>
+                        <div class="table-responsive">
+                            <table class="table-lableNew table-empLDHod w-100">
+                                <tr><th>Employee Name</th><th>Learning</th><th>Date</th></tr>
+                                @forelse(($overdueEmployees ?? []) as $att)
+                                    @php
+                                        $emp = $att->employee ?? null;
+                                        $ra  = $emp ? $emp->resortAdmin : null;
+                                        $prog = optional(optional($att->schedule)->learningProgram);
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            <div class="tableUser-block">
+                                                <div class="img-circle"><img src="{{ Common::getResortUserPicture(optional($ra)->id) }}" alt="user"></div>
+                                                <span class="userApplicants-btn">{{ trim((optional($ra)->first_name ?? '').' '.(optional($ra)->last_name ?? '')) ?: '-' }}</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ $prog->learning_program_title ?? $prog->name ?? '-' }}</td>
+                                        <td>{{ $att->attendance_date ? \Carbon\Carbon::parse($att->attendance_date)->format('d M Y') : '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="3" class="text-center text-muted">No overdue learners</td></tr>
+                                @endforelse
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6 col-md-12">
+                    <div class="card h-100">
+                        <div class="card-title"><h3>Employees Who Excelled In Learning Evaluations</h3></div>
+                        <div class="table-responsive">
+                            <table class="table-lableNew table-empLDHod w-100">
+                                <tr><th>Employee Name</th><th>Sessions Attended</th><th>Last Session</th></tr>
+                                @forelse(($topPerformers ?? []) as $row)
+                                    @php
+                                        $emp = $row->employee ?? null;
+                                        $ra  = $emp ? $emp->resortAdmin : null;
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            <div class="tableUser-block">
+                                                <div class="img-circle"><img src="{{ Common::getResortUserPicture(optional($ra)->id) }}" alt="user"></div>
+                                                <span class="userApplicants-btn">{{ trim((optional($ra)->first_name ?? '').' '.(optional($ra)->last_name ?? '')) ?: '-' }}</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ $row->present_count }}</td>
+                                        <td>{{ $row->last_date ? \Carbon\Carbon::parse($row->last_date)->format('d M Y') : '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="3" class="text-center text-muted">No completed sessions yet</td></tr>
+                                @endforelse
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Row 4: Learning Attendance · Pending Actions (when probationary card already shows above) · Learning History --}}
+                <div class="col-xl-4 col-md-6 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card h-100" id="card-trainingAttendanceHOD">
+                        <div class="card-title"><h3>Learning Attendance</h3></div>
+                        <div class="trainingAttendance-chart mb-3">
+                            <canvas id="myDoughnutChart"></canvas>
+                        </div>
+                        <div class="row g-2 justify-content-center">
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-theme"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblueLightNew"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeWarning"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblue"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeGray"></span>Learning 1</div></div>
+                            <div class="col-auto"><div class="doughnut-label"><span class="bg-themeSkyblueLight"></span>Learning 1</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                @if(!empty($myCompulsoryPrograms))
+                    <div class="col-xl-4 col-md-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                        <div class="card h-100" id="card-pendingActionsHOD">
+                            <div class="card-title">
+                                <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                    <div class="col"><h3 class="text-nowrap">Pending Actions</h3></div>
+                                    <div class="col-auto"><a href="#" class="a-link">View All</a></div>
+                                </div>
+                            </div>
+                            <div class="leaveUser-main">
+                                @if(count($pending_learning_request)>0)
+                                    @foreach($pending_learning_request as $request)
+                                        <div class="leaveUser-block">
+                                            <div>
+                                                <h6>{{$request->learning->name}}</h6>
+                                                <p>{{ \Illuminate\Support\Str::words($request->learning->description, 25, '…') }}</p>
+                                                <div><a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">View Details</a></div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                @else
+                                    <p class="text-muted small mb-0">No pending requests.</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="col-xl-4 col-md-12 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card card-trainingHistory h-100" id="card-trainingHistory">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col"><h3 class="text-nowrap">Learning History</h3></div>
+                                <div class="col-auto"><a href="{{ route('training.history') }}" class="a-link">View All</a></div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main">
+                            @if($trainings->isEmpty())
+                                <p class="text-muted small mb-0">No training history available.</p>
+                            @else
+                                @foreach ($trainings as $training)
+                                    @php
+                                        $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
+                                        $totalParticipants = $training->participants->count();
+                                        $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
+                                        $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
+                                        $attendancePercentage = ($totalExpectedAttendance > 0)
+                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2)
+                                            : 0;
+                                    @endphp
+                                    <div class="leaveUser-block">
+                                        <div>
+                                            <div class="date"><i class="fa-regular fa-calendar"></i>
+                                                {{ date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) }}
+                                            </div>
+                                            <h6>{{ $training->learningProgram->name ?? 'Learning Program' }}</h6>
+                                            <p>{{ \Illuminate\Support\Str::words($training->description, 25, '…') }}</p>
+                                            <span>Attendance: {{ $attendancePercentage }}%</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -727,14 +684,9 @@
             }
         }
 
-        // Adjust heights on page load and window resize
-        function adjustHeights() {
-            equalizeHeights('card-trainingAttendanceHOD', ['card-trainingHistoryHOD', 'card-pendingActionsHOD']);
-            equalizeHeights('left-ldDash', ['right-ldDash']);
-        }
-
-        window.onload = adjustHeights; // Initial height adjustment
-        window.onresize = adjustHeights; // Adjust heights on window resize
+        // h-100 + Bootstrap rows now handle equal heights — no-op stub kept so
+        // any external reference to adjustHeights() doesn't blow up.
+        function adjustHeights() {}
 
 
         // progress 

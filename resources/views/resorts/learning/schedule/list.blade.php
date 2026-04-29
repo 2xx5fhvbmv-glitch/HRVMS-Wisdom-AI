@@ -109,7 +109,13 @@
                 data: function (d) {
                     d.searchTerm = $('#searchInput').val();
                     d.type = $('#typeFilter').val();
-                    
+                    // Pre-filter from ?status=… query string when the user lands here
+                    // from a dashboard tile (e.g. "Scheduled Learning").
+                    var qs = new URLSearchParams(window.location.search);
+                    if (qs.get('status')) {
+                        d.status = qs.get('status');
+                    }
+
                     // Convert date format from d/m/Y to Y-m-d
                     let selectedDate = $('.datepicker').val();
                     if (selectedDate) {
