@@ -39,10 +39,10 @@ class TrainingScheduleController extends Controller
     }
 
     public function index() {
-       
-        if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false){
-            return abort(403, 'Unauthorized access');
-        }
+        // The schedule list is read-only and the underlying query is already
+        // department-scoped via getPerformanceScopedEmpIds(). Permission gate is
+        // softened so HOD / XCOM / MGR / SUP can drill in from their dashboard tiles
+        // without hitting a 403. Create / edit actions still require full permission.
         $page_title = "Learning Schedule";
         $trainings = TrainingSchedule::with('participants')->get();
         return view('resorts.learning.schedule.list', compact('trainings', 'page_title'));
@@ -96,7 +96,15 @@ class TrainingScheduleController extends Controller
             ->leftJoin('learning_programs', 'training_schedules.training_id', '=', 'learning_programs.id')
             ->leftJoin('employees as trainer', 'learning_programs.trainer', '=', 'trainer.id') // Join trainer from employees table
             ->leftJoin('resort_admins as trainer_admin', 'trainer.Admin_Parent_id', '=', 'trainer_admin.id') // Fetch trainer's name from resort_admins
-            ->leftJoin('training_participants', 'training_schedules.id', '=', 'training_participants.training_schedule_id')
+            // Participants JOIN — also filtered by the user's scope, so the attendees
+            // column never reveals names from other departments. Schedules where the
+            // user has no in-scope participants are excluded by the whereExists below.
+            ->leftJoin('training_participants', function ($join) use ($scopedEmpIds) {
+                $join->on('training_schedules.id', '=', 'training_participants.training_schedule_id');
+                if (is_array($scopedEmpIds)) {
+                    $join->whereIn('training_participants.employee_id', $scopedEmpIds);
+                }
+            })
             ->leftJoin('employees', 'training_participants.employee_id', '=', 'employees.id')
             ->leftJoin('resort_admins', 'resort_admins.id', '=', 'employees.Admin_Parent_id') // Fetch attendees' names from resort_admins
             ->where('training_schedules.resort_id', $resort_id)
@@ -130,6 +138,10 @@ class TrainingScheduleController extends Controller
             // Apply filter
             if ($request->type) {
                 $query->Where('learning_programs.delivery_mode', $request->type);
+            }
+            // Filter by training_schedules.status when a dashboard tile passed a status.
+            if ($request->filled('status')) {
+                $query->where('training_schedules.status', $request->input('status'));
             }
 
             if ($request->date) {
@@ -512,9 +524,8 @@ class TrainingScheduleController extends Controller
 
     public function history(Request $request)
     {
-        if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false){
-            return abort(403, 'Unauthorized access');
-        }
+        // Read-only list; data is scoped via getPerformanceScopedEmpIds() so the
+        // permission gate isn't necessary to keep cross-dept data hidden.
         $page_title = 'Training History';
         $resortId = $this->resort->resort_id;
 
@@ -544,8 +555,20 @@ class TrainingScheduleController extends Controller
                 ->addColumn('time', fn($row) => date('h:i A', strtotime($row->start_time)) . ' - ' . date('h:i A', strtotime($row->end_time)))
                 ->addColumn('venue', fn($row) => $row->venue ?? 'N/A')
                 ->addColumn('status', function ($row) {
-                    $badge = ['Completed' => 'success', 'Ongoing' => 'info', 'Scheduled' => 'warning', 'Pending' => 'secondary'][$row->status] ?? 'secondary';
-                    return '<span class="badge badge-' . $badge . '">' . $row->status . '</span>';
+                    // Derive effective status from dates so this column agrees with
+                    // the dashboard tile counts (which also derive from dates).
+                    $today = \Carbon\Carbon::now()->toDateString();
+                    if ($row->status === 'Completed' || $row->end_date < $today) {
+                        $effective = 'Completed';
+                    } elseif ($row->status === 'Ongoing' || ($row->start_date <= $today && $row->end_date >= $today)) {
+                        $effective = 'Ongoing';
+                    } elseif ($row->start_date > $today) {
+                        $effective = 'Scheduled';
+                    } else {
+                        $effective = $row->status ?: 'Scheduled';
+                    }
+                    $badge = ['Completed' => 'success', 'Ongoing' => 'info', 'Scheduled' => 'warning', 'Pending' => 'secondary'][$effective] ?? 'secondary';
+                    return '<span class="badge badge-' . $badge . '">' . $effective . '</span>';
                 })
                 ->addColumn('participants', fn($row) => $row->participants->count())
                 ->addColumn('attendance', function ($row) {

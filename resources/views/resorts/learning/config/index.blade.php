@@ -736,38 +736,42 @@
             var $form = $('#learning-program-setup');
             if (!$form.length) return;
 
-            // Clear native form state + jQuery validator errors
-            $form[0].reset();
-            if ($form.data('validator')) $form.validate().resetForm();
-            $form.find('.error').removeClass('error');
-            // resetForm() doesn't always remove the inserted <label class="error">
-            // nodes (especially when validation was triggered piecemeal via
-            // .element() during typing), so strip them here too.
-            $form.find('label.error, span.error').remove();
-            $form.find('.is-invalid').removeClass('is-invalid');
+            var validator = $form.data('validator');
 
-            // Re-sync every Select2 dropdown to its underlying value (now blank).
+            // Step 1 — clear native form state.
+            $form[0].reset();
+
+            // Step 2 — re-sync every Select2 dropdown to the cleared value, but
+            // suppress the change event with `.trigger('change.select2')` only
+            // (no plain `.trigger('change')`) so we don't fire jQuery Validate's
+            // re-validate on every cleared field, which previously re-painted
+            // every "this field is required" error right after a successful save.
             $form.find('select').each(function () {
-                $(this).val('').trigger('change.select2').trigger('change');
+                $(this).val('').trigger('change.select2');
             });
 
-            // Reset the dynamic objectives list back to a single empty row.
+            // Step 3 — reset dynamic UI (objectives list, frequency picker,
+            // audience radios + dropdowns, file inputs).
             var $list = $('#objectivesList');
             $list.find('.objective-row:not(:first)').remove();
             $list.find('.objective-row:first input').val('');
             if (typeof syncObjectiveRemoveButtons === 'function') syncObjectiveRemoveButtons();
 
-            // Hide the day-of-month picker (frequency cleared).
             $('#frequencyDayWrap').hide();
             $('#frequency_day').val('');
 
-            // Clear the audience-type radio + dependent dropdowns.
             $('input[name="audience_type"]').prop('checked', false);
             $('#department-dropdown,#grade-dropdown,#position-dropdown,#employee-dropdown').hide();
 
-            // Reset file inputs + their displayed filenames.
             $form.find('input[type="file"]').val('');
             $('#fileNameLearningMaterial,#trainerImageName').text('');
+
+            // Step 4 — finally clear validator state AFTER all the value resets,
+            // so any change events fired above can't re-paint errors.
+            if (validator) validator.resetForm();
+            $form.find('.error').removeClass('error');
+            $form.find('.is-invalid').removeClass('is-invalid');
+            $form.find('label.error, span.error').remove();
         };
 
         // Frequency → toggle Day-of-Month picker for one-time / monthly / quarterly.
