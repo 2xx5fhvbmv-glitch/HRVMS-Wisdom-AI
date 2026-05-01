@@ -140,35 +140,11 @@ class LearningCalendarController extends Controller
             $events[] = $sessionData;
         }
 
-        // Fetch Approved Learning Requests
-        $learningRequests = LearningRequest::where('resort_id', $resort_id)
-            ->where('status', 'Approved')
-            ->whereBetween('start_date', [$startDate, $endDate])
-            ->with(['learning', 'employees.employee.resortAdmin','employees.employee.position']) // Load employee and resortAdmin
-            ->get();
-
-        // Process Learning Requests
-        foreach ($learningRequests as $request) {
-            $requestData = $this->formatLearningRequestData($request);
-
-            // Fetch Employees Attending
-            $attendees = [];
-            foreach ($request->employees as $learningRequestEmployee) {
-                $employee = $learningRequestEmployee->employee;
-                if ($employee) {
-                    $attendees[] = [
-                        'name' => $employee->resortAdmin ? $employee->resortAdmin->full_name : $employee->first_name . ' ' . $employee->last_name,
-                        'image' => $employee->resortAdmin
-                            ? Common::getResortUserPicture($employee->resortAdmin->id)
-                            : ($employee->profile_picture ?? asset('default-profile.png')),
-                        'position' => $employee->position ? $employee->position->position_title : "",
-                    ];
-                }
-            }
-
-            $requestData['participants'] = $attendees;
-            $events[] = $requestData;
-        }
+        // Note: previously this method also surfaced approved LearningRequest rows
+        // here. Dropped — they aren't real training_schedules, so they appeared on
+        // the calendar but never in dashboard counts / history / schedule list,
+        // which was confusing. Calendar now only shows real schedules. Approved
+        // requests are visible through the Learning Requests page instead.
 
         return response()->json(['data' => $events]);
     }

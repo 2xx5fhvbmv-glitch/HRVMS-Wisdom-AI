@@ -3155,17 +3155,11 @@ class Common
             return null;
         }
 
-        // Other HR personnel (rank 3, or rank 1/2 inside the HR department) see
-        // their own department only. Their named leaders are already promoted above.
+        // HR rank (3) and HR-department HOD / EXCOM (rank 1 or 2 inside HR dept)
+        // are treated as HR for the L&D / Performance modules and get full
+        // resort-wide visibility — same as GM and L&D Manager.
         if ($rank === 3 || (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null))) {
-            if (!empty($emp->Dept_id)) {
-                $ids = \App\Models\Employee::where('resort_id', $emp->resort_id)
-                    ->where('Dept_id', $emp->Dept_id)
-                    ->pluck('id')
-                    ->toArray();
-                $ids[] = $emp->id;
-                return array_values(array_unique($ids));
-            }
+            return null;
         }
 
         // EXCOM (1) / HOD (2) → whole department

@@ -82,8 +82,9 @@
                         let weekday = sessionDate.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
                         let bgColorClass = session.color || "success"; // Set color dynamically
 
-                        // Generate Attendee Images
+                        // Generate Attendee Images and collect names
                         let attendeeHtml = "";
+                        let participantNamesHtml = "";
                         if (session.participants && session.participants.length > 0) {
                             session.participants.forEach((attendee, index) => {
                                 if (index < 5) { // Show only first 5 images
@@ -100,6 +101,12 @@
                                 let remainingCount = session.participants.length - 5;
                                 attendeeHtml += `<div class="num">+${remainingCount}</div>`;
                             }
+
+                            // Build comma-separated participant names list
+                            let names = session.participants.map(p => p.name).filter(Boolean);
+                            if (names.length > 0) {
+                                participantNamesHtml = `<p style="font-size: inherit; margin-bottom: 4px;"><b>Attendees:</b> ${names.join(', ')}</p>`;
+                            }
                         }
 
                         sidebarContent += `
@@ -111,6 +118,7 @@
                                     </div>
                                     <div class="leaveUser-block">
                                         <p>${session.description || "No description available"}</p>
+                                        ${participantNamesHtml}
                                         <div class="time"><i class="fa-regular fa-clock"></i> ${session.start_time} to ${session.end_time}</div>
                                         <div class="user-ovImg">${attendeeHtml}</div>
                                     </div>
@@ -140,9 +148,28 @@
             navLinks: true,
             eventLimit: true,
             events: function (start, end, timezone, callback) {
-                // Fetch both the resort's training sessions AND the auth user's own
-                // compulsory programs so the user sees their personal course start /
-                // end window alongside the broader schedule.
+                // Calendar shows two layers:
+                //   1. Real training_schedules (from get.learning.sessions)
+                //   2. The auth user's personal compulsory / probationary windows
+                //      (from learning.my.compulsory.events) — these are window
+                //      ranges, not real schedules, so they only paint dots on the
+                //      calendar. The sidebar's "Upcoming Learning Sessions" still
+                //      uses sessions only, keeping that panel clean.
+                var toEvent = function (session) {
+                    var startStr = session.start_date || session.session_date;
+                    var endStr   = session.end_date   || session.session_date || startStr;
+                    // FullCalendar v3 treats `end` as EXCLUSIVE for all-day events.
+                    var endExclusive = moment(endStr).add(1, 'day').format('YYYY-MM-DD');
+                    return {
+                        title: session.title,
+                        start: startStr,
+                        end: endExclusive,
+                        allDay: true,
+                        backgroundColor: session.color,
+                        textColor: "#fff"
+                    };
+                };
+
                 var sessionsXhr = $.ajax({
                     url: "{{route('get.learning.sessions')}}",
                     type: "GET",
@@ -158,44 +185,17 @@
                     dataType: "json"
                 });
 
-                $.when(sessionsXhr, compulsoryXhr).done(function (sessionsRes, compulsoryRes) {
-                    var combined = (sessionsRes[0].data || []).concat(compulsoryRes[0].data || []);
-                    var events = combined.map(function (session) {
-                        // Span the event from start_date through end_date so multi-day
-                        // sessions paint on every day they run. FullCalendar v3 treats
-                        // `end` as EXCLUSIVE for all-day events — add 1 day to include
-                        // the actual final day.
-                        var startStr = session.start_date || session.session_date;
-                        var endStr   = session.end_date   || session.session_date || startStr;
-                        var endExclusive = moment(endStr).add(1, 'day').format('YYYY-MM-DD');
-                        return {
-                            title: session.title,
-                            start: startStr,
-                            end: endExclusive,
-                            allDay: true,
-                            backgroundColor: session.color,
-                            textColor: "#fff"
-                        };
+                $.when(sessionsXhr).then(function (sessRes) {
+                    var sessEvents = ((sessRes && sessRes.data) || []).map(toEvent);
+                    compulsoryXhr.done(function (compRes) {
+                        var compEvents = ((compRes && compRes.data) || []).map(toEvent);
+                        callback(sessEvents.concat(compEvents));
+                    }).fail(function () {
+                        // If compulsory fetch fails, still render real sessions.
+                        callback(sessEvents);
                     });
-                    callback(events);
-                }).fail(function () {
-                    // If the personal endpoint fails, fall back to sessions only.
-                    sessionsXhr.done(function (sessionsRes) {
-                        var events = (sessionsRes.data || []).map(function (session) {
-                            var startStr = session.start_date || session.session_date;
-                            var endStr   = session.end_date   || session.session_date || startStr;
-                            var endExclusive = moment(endStr).add(1, 'day').format('YYYY-MM-DD');
-                            return {
-                                title: session.title,
-                                start: startStr,
-                                end: endExclusive,
-                                allDay: true,
-                                backgroundColor: session.color,
-                                textColor: "#fff"
-                            };
-                        });
-                        callback(events);
-                    });
+                }, function () {
+                    callback([]);
                 });
             },
             viewRender: function (view) {

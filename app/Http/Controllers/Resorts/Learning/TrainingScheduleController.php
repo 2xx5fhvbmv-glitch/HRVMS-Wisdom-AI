@@ -139,9 +139,23 @@ class TrainingScheduleController extends Controller
             if ($request->type) {
                 $query->Where('learning_programs.delivery_mode', $request->type);
             }
-            // Filter by training_schedules.status when a dashboard tile passed a status.
+            // Filter by status when a dashboard tile passed one. Pure date-derived
+            // (raw `status` column is unreliable — it defaults to 'Scheduled' for
+            // every row, so using it would make every tile click return the same
+            // entries). Matches the dashboard tile counts exactly.
             if ($request->filled('status')) {
-                $query->where('training_schedules.status', $request->input('status'));
+                $today = \Carbon\Carbon::now()->toDateString();
+                $statusParam = $request->input('status');
+                if ($statusParam === 'Ongoing') {
+                    $query->where('training_schedules.start_date', '<=', $today)
+                          ->where('training_schedules.end_date', '>=', $today);
+                } elseif ($statusParam === 'Completed') {
+                    $query->where('training_schedules.end_date', '<', $today);
+                } elseif ($statusParam === 'Scheduled' || $statusParam === 'Pending') {
+                    $query->where('training_schedules.start_date', '>', $today);
+                } else {
+                    $query->where('training_schedules.status', $statusParam);
+                }
             }
 
             if ($request->date) {
@@ -159,6 +173,22 @@ class TrainingScheduleController extends Controller
 
             // dd($trainings);
             return datatables()->of($trainings)
+            ->addColumn('status', function ($row) {
+                // Date-derived status — same rule as the dashboard tile counts and
+                // the training-history page so all three views agree.
+                $today = \Carbon\Carbon::now()->toDateString();
+                if ($row->status === 'Completed' || $row->end_date < $today) {
+                    $effective = 'Completed';
+                } elseif ($row->status === 'Ongoing' || ($row->start_date <= $today && $row->end_date >= $today)) {
+                    $effective = 'Ongoing';
+                } elseif ($row->start_date > $today) {
+                    $effective = 'Scheduled';
+                } else {
+                    $effective = $row->status ?: 'Scheduled';
+                }
+                $badge = ['Completed' => 'success', 'Ongoing' => 'info', 'Scheduled' => 'warning', 'Pending' => 'secondary'][$effective] ?? 'secondary';
+                return '<span class="badge badge-' . $badge . '">' . $effective . '</span>';
+            })
             ->addColumn('trainer', function ($row) {
                 $trainerImage = Common::getResortUserPicture($row->trainer_id); // Get trainer's profile picture
                 return '
@@ -204,7 +234,7 @@ class TrainingScheduleController extends Controller
                             <i class="fas fa-calendar-check" aria-hidden="true"></i>
                         </a>';
             })
-            ->rawColumns(['trainer', 'attendees', 'action'])
+            ->rawColumns(['trainer', 'attendees', 'action', 'status'])
             ->make(true);
         
         } catch (\Exception $e) {
@@ -538,8 +568,6 @@ class TrainingScheduleController extends Controller
             ->where('resort_id', $resortId)
             ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
             ->orderBy('start_date', 'desc');
-        $trainings = $query->get();
-        
 
         // Apply date filter
         if ($request->has('date') && $request->date !== '') {
@@ -547,6 +575,24 @@ class TrainingScheduleController extends Controller
             $query->whereDate('start_date', '<=', $date)
                 ->whereDate('end_date', '>=', $date);
         }
+
+        // Status filter — pure date-derived (raw `status` column is unreliable since
+        // every row defaults to 'Scheduled'). Matches the dashboard tile counts.
+        if ($request->filled('status')) {
+            $today = \Carbon\Carbon::now()->toDateString();
+            $statusParam = $request->input('status');
+            if ($statusParam === 'Ongoing') {
+                $query->where('start_date', '<=', $today)->where('end_date', '>=', $today);
+            } elseif ($statusParam === 'Completed') {
+                $query->where('end_date', '<', $today);
+            } elseif ($statusParam === 'Scheduled' || $statusParam === 'Pending') {
+                $query->where('start_date', '>', $today);
+            } else {
+                $query->where('status', $statusParam);
+            }
+        }
+
+        $trainings = $query->get();
 
         if ($request->ajax()) {
             return datatables()->of($trainings)

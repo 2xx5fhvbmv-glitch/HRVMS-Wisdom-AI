@@ -27,50 +27,48 @@
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Ongoing Learning Programs</p>
-                                <strong>{{$ongoing_trainings_count??0}}</strong>
+                                <strong>{{$ongoing_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
+                            <a href="{{ route('learning.schedule.index') }}?status=Ongoing">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Completed Learning Programs</p>
                                 <strong>{{$completed_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{route('learning.schedule.index')}}">
+                            <a href="{{ route('training.history') }}?status=Completed">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Pending Learning Programs</p>
                                 <strong>{{$pending_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{route('learning.schedule.index')}}">
+                            <a href="{{ route('learning.schedule.index') }}?status=Scheduled">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                {{-- Compulsory % is informational; no canonical filtered destination — drop the arrow. --}}
+                <div class="col-lg-3 col-sm-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
                                 <p class="mb-0  fw-500">Completed Compulsory Learning</p>
                                 <strong>{{ is_null($compulsoryPercent ?? null) ? '—' : ($compulsoryPercent . '%') }}</strong>
                             </div>
-                            <a href="{{route('learning.schedule.index')}}">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
                         </div>
                     </div>
                 </div>
