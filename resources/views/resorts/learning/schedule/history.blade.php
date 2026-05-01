@@ -120,7 +120,7 @@
         ]
     });
 
-    function viewTrainingDetail(id) {
+    window.viewTrainingDetail = function (id) {
         var $body = $('#trainingDetailBody');
         $body.html('<p class="text-center text-muted my-4">Loading…</p>');
         $('#trainingDetailModal').modal('show');
@@ -171,7 +171,7 @@
                 $body.html('<p class="text-danger text-center my-3">Failed to load training detail.</p>');
             }
         });
-    }
+    };
 
     // Trigger search & filters
     $('#searchInput').on('keyup', function () {

@@ -22,6 +22,7 @@
             </div>
 
             <div class="row g-3 g-xxl-4 card-heigth">
+                {{-- Compulsory % is informational; no canonical filtered destination — drop the arrow. --}}
                 <div class="col-lg-3 col-sm-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
@@ -29,9 +30,6 @@
                                 <p class="mb-0  fw-500">Completed Compulsory Learning</p>
                                 <strong>70%</strong>
                             </div>
-                            <a href="#">
-                                <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -42,8 +40,8 @@
                                 <p class="mb-0  fw-500">Scheduled Learning</p>
                                 <strong>{{$scheduled_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
-                                <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <a href="{{ route('learning.schedule.index') }}?status=Scheduled">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
@@ -55,8 +53,8 @@
                                 <p class="mb-0  fw-500">Completed Learning Programs</p>
                                 <strong>{{$completed_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
-                                <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <a href="{{ route('training.history') }}">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>
@@ -68,8 +66,8 @@
                                 <p class="mb-0  fw-500">Pending Learning Programs</p>
                                 <strong>{{$pending_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="#">
-                                <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <a href="{{ route('learning.request.index') }}?status=Pending">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>
                     </div>

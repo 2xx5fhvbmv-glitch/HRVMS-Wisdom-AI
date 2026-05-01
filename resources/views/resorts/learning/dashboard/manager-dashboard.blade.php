@@ -43,7 +43,7 @@
                                 <p class="mb-0  fw-500">Completed Learning Programs</p>
                                 <strong>{{$completed_trainings_count ?? 0}}</strong>
                             </div>
-                            <a href="{{ route('training.history') }}">
+                            <a href="{{ route('training.history') }}?status=Completed">
                                 <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
                             </a>
                         </div>

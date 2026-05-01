@@ -54,23 +54,16 @@ class DashboardController extends Controller
             }
             return $q->count();
         };
+        // Pure date-derived counts so they exactly match the schedule list filters
+        // (raw `status` column is unreliable — every row defaults to 'Scheduled').
         $ongoing_trainings_count = $countByDateRule(function ($q) use ($today) {
-            $q->where(function ($qq) use ($today) {
-                $qq->where('status', 'Ongoing')
-                   ->orWhere(function ($qqq) use ($today) {
-                       $qqq->where('start_date', '<=', $today)->where('end_date', '>=', $today);
-                   });
-            });
+            $q->where('start_date', '<=', $today)->where('end_date', '>=', $today);
         });
         $completed_trainings_count = $countByDateRule(function ($q) use ($today) {
-            $q->where(function ($qq) use ($today) {
-                $qq->where('status', 'Completed')->orWhere('end_date', '<', $today);
-            });
+            $q->where('end_date', '<', $today);
         });
         $scheduled_trainings_count = $countByDateRule(function ($q) use ($today) {
-            $q->where(function ($qq) use ($today) {
-                $qq->whereIn('status', ['Scheduled', 'Pending'])->orWhere('start_date', '>', $today);
-            });
+            $q->where('start_date', '>', $today);
         });
 
         $pending_trainings_count = LearningRequest::where('status', 'Pending')
@@ -185,23 +178,16 @@ class DashboardController extends Controller
             }
             return $q->count();
         };
+        // Pure date-derived counts so they exactly match the schedule list filters
+        // (raw `status` column is unreliable — every row defaults to 'Scheduled').
         $ongoing_trainings_count = $countByDateRule(function ($q) use ($today) {
-            $q->where(function ($qq) use ($today) {
-                $qq->where('status', 'Ongoing')
-                   ->orWhere(function ($qqq) use ($today) {
-                       $qqq->where('start_date', '<=', $today)->where('end_date', '>=', $today);
-                   });
-            });
+            $q->where('start_date', '<=', $today)->where('end_date', '>=', $today);
         });
         $completed_trainings_count = $countByDateRule(function ($q) use ($today) {
-            $q->where(function ($qq) use ($today) {
-                $qq->where('status', 'Completed')->orWhere('end_date', '<', $today);
-            });
+            $q->where('end_date', '<', $today);
         });
         $scheduled_trainings_count = $countByDateRule(function ($q) use ($today) {
-            $q->where(function ($qq) use ($today) {
-                $qq->whereIn('status', ['Scheduled', 'Pending'])->orWhere('start_date', '>', $today);
-            });
+            $q->where('start_date', '>', $today);
         });
         $pending_trainings_count = $scheduled_trainings_count;
         $pending_learning_request  = LearningRequest::with('learning')
@@ -473,52 +459,58 @@ class DashboardController extends Controller
         $resort_id= $this->resort->resort_id;
         $today = \Carbon\Carbon::now()->toDateString();
 
+        // Department-visibility scope. GM / HR / L&D Manager (and admins) get null
+        // (full resort access); HOD / EXCOM / regular managers get only their own
+        // department's employee IDs. All counts and lists below honour this.
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+
+        // Helper closures so we don't duplicate the scope-when clause everywhere.
+        $applyScope = function ($q) use ($scopedEmpIds) {
+            if (is_array($scopedEmpIds)) {
+                $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds));
+            }
+        };
+
         // Tile counts derive directly from dates so they reflect reality even when
-        // nobody manually advanced TrainingSchedule.status. Falls back to the
-        // explicit status field too so genuinely-set values still count.
-        //   Ongoing  → today is between start_date and end_date  (or status = Ongoing)
-        //   Completed → end_date already in the past             (or status = Completed)
-        //   Pending  → start_date in the future                  (or status = Scheduled / Pending)
-        $ongoing_trainings_count = TrainingSchedule::where('resort_id', $resort_id)
-            ->where(function ($q) use ($today) {
-                $q->where('status', 'Ongoing')
-                  ->orWhere(function ($qq) use ($today) {
-                      $qq->where('start_date', '<=', $today)
-                         ->where('end_date', '>=', $today);
-                  });
-            })
-            ->count();
-        $completed_trainings_count = TrainingSchedule::where('resort_id', $resort_id)
-            ->where(function ($q) use ($today) {
-                $q->where('status', 'Completed')
-                  ->orWhere('end_date', '<', $today);
-            })
-            ->count();
-        $scheduled_trainings_count = TrainingSchedule::where('resort_id', $resort_id)
-            ->where(function ($q) use ($today) {
-                $q->whereIn('status', ['Scheduled', 'Pending'])
-                  ->orWhere('start_date', '>', $today);
-            })
-            ->count();
+        // nobody manually advanced TrainingSchedule.status. Plus the participants
+        // scope so HOD/MGR only see their own dept's training counts.
+        $countByDateRule = function ($builderTweak) use ($resort_id, $applyScope) {
+            $q = TrainingSchedule::where('resort_id', $resort_id);
+            $builderTweak($q);
+            $applyScope($q);
+            return $q->count();
+        };
+        // Pure date-derived counts so they exactly match the schedule list filters
+        // (raw `status` column is unreliable — every row defaults to 'Scheduled').
+        $ongoing_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where('start_date', '<=', $today)->where('end_date', '>=', $today);
+        });
+        $completed_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where('end_date', '<', $today);
+        });
+        $scheduled_trainings_count = $countByDateRule(function ($q) use ($today) {
+            $q->where('start_date', '>', $today);
+        });
         $pending_trainings_count = $scheduled_trainings_count;
 
         // Completed compulsory learning = mandatory-program schedules whose end_date
-        // has passed (or status explicitly Completed).
-        $compulsory_completed_traing = TrainingSchedule::where('resort_id', $resort_id)
-            ->where(function ($q) use ($today) {
-                $q->where('status', 'Completed')->orWhere('end_date', '<', $today);
+        // has passed (or status explicitly Completed) — scoped to in-scope participants.
+        $compulsory_completed_traing = $countByDateRule(function ($q) use ($today, $resort_id) {
+            $q->where(function ($qq) use ($today) {
+                $qq->where('status', 'Completed')->orWhere('end_date', '<', $today);
             })
             ->whereIn('training_id', function ($q) use ($resort_id) {
                 $q->select('program_id')
                     ->from('mandatory_learning_programs')
                     ->where('resort_id', $resort_id);
-            })
-            ->count();
+            });
+        });
 
-        // All pending learning requests in the resort (no per-user scoping).
+        // Pending learning requests for in-scope employees only.
         $pending_learning_request = LearningRequest::with('learning')
             ->where('status', 'Pending')
             ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('employees', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
             ->get();
 
         $categories = LearningCategory::withCount('programs')->where('resort_id', $resort_id)->get();
@@ -527,12 +519,14 @@ class DashboardController extends Controller
         $absentees = TrainingAttendance::where('status', 'Absent')
             ->where('attendance_date', '>=', \Carbon\Carbon::now()->subDays(90))
             ->whereHas('schedule', fn($q) => $q->where('resort_id', $resort_id))
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('employee_id', $scopedEmpIds))
             ->with('employee.resortAdmin', 'schedule.learningProgram')
             ->orderByDesc('attendance_date')
             ->limit(10)
             ->get();
         $trainings = TrainingSchedule::with(['learningProgram', 'trainingAttendances'])
             ->where('resort_id', $resort_id)
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
             ->orderBy('start_date', 'desc')
             ->limit(5)
             ->get();
@@ -598,12 +592,17 @@ class DashboardController extends Controller
             ->get();
         if ($required->isEmpty()) return [];
 
+        // HOD / MGR / SUP only see probationers within their dept; GM / HR /
+        // L&D Manager / admin see every probationer (helper returns null).
+        $scopedEmpIds = Common::getPerformanceScopedEmpIds();
+
         $probationers = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resortId)
             ->where(function ($q) {
                 $q->where('employment_type', 'Probationary')
                   ->orWhereIn('probation_status', ['Active', 'Extended']);
             })
+            ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('id', $scopedEmpIds))
             ->get();
         if ($probationers->isEmpty()) return [];
 

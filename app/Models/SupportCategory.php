@@ -22,12 +22,22 @@ class SupportCategory extends Model {
         parent::boot();
 
         self::saving(function ($model) {
-            if (!$model->exists) {
-                 $model->created_by = Auth::guard('resort-admin')->user()->id;
+            // Support categories are managed from BOTH the admin panel
+            // (auth:admin guard) and the resort-admin panel (resort-admin guard).
+            // Pick whichever guard is currently authenticated — hard-coding
+            // resort-admin throws "property id on null" when an admin saves.
+            $userId = null;
+            if (Auth::guard('admin')->check()) {
+                $userId = Auth::guard('admin')->user()->id;
+            } elseif (Auth::guard('resort-admin')->check()) {
+                $userId = Auth::guard('resort-admin')->user()->id;
             }
 
-            if(Auth::guard('resort-admin')->check()) {
-                $model->created_by = Auth::guard('resort-admin')->user()->id;
+            if (!$model->exists && $userId) {
+                $model->created_by = $userId;
+            }
+            if ($userId) {
+                $model->modified_by = $userId;
             }
         });
     }
