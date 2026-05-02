@@ -169,6 +169,9 @@ class DashboardController extends Controller
                                         '#0E8509',
                                     ];
                        
+            // Aggregate by DEPARTMENT only (was grouping by survey_title too,
+            // which produced one row per dept-per-survey and made the doughnut
+            // legend show duplicate department pills).
             $departmentWise = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
                                             ->join('resort_departments as t3', 't3.id', '=', 't2.Dept_id')
@@ -176,24 +179,19 @@ class DashboardController extends Controller
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                             ->where('t1.emp_status', 'yes')
                                             ->select(
-                                                'parent_surveys.Surevey_title',
                                                 't3.name as Department_name',
-                                                DB::raw("COUNT(t1.id) as completed_count") 
+                                                DB::raw("COUNT(t1.id) as completed_count")
                                             )
-                                            ->groupBy('t2.Dept_id', 't3.name', 'parent_surveys.Surevey_title')
+                                            ->groupBy('t2.Dept_id', 't3.name')
                                             ->get()
                                             ->map(function ($department) use (&$i, $colors) {
-                                                if ($i < count($colors)) {
-                                                    $department->color = $colors[$i]; // Assign color if available
-                                                }
-                                                else 
-                                                {
-                                                    $i=0; 
-                                                    $department->color = $colors[$i]; 
-                                                }
-                                                $i++; 
+                                                if ($i >= count($colors)) { $i = 0; }
+                                                $department->color = $colors[$i];
+                                                $i++;
                                                 return $department;
                                             });
+            // Reset color cursor so the next chart starts from #014653 again.
+            $i = 0;
 
         $SurveyWiseParticipationRates = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                                     ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
@@ -268,7 +266,8 @@ class DashboardController extends Controller
                                             ->get()
                                             ->map(function ($a) { 
                                                 $a->Newid = base64_encode($a->id);
-                                                $a->count = SurveyEmployee::where("Parent_survey_id",$a->id)->count();
+                                                // Avoid N+1 — the SELECT above already aggregates total_count.
+                                                $a->count = (int) ($a->total_count ?? 0);
                                                 $a->startDate = \Carbon\Carbon::parse($a->Start_date)->format('d M Y');
                                                 $a->endDate = \Carbon\Carbon::parse($a->End_date)->format('d M Y');
                                                 return $a;
@@ -278,19 +277,21 @@ class DashboardController extends Controller
     }
     public function HR_Dashobard(Request $request)
     {
-        $page_title ="Surevy Dashboard";
+        $page_title ="Survey Dashboard";
         $SaveAsDraft = ParentSurvey::where('resort_id', $this->resort->resort_id)
                 ->where('Status', 'SaveAsDraft')
                 ->latest()
                 ->limit(5)
-                ->get()->map(function($a){ $a->Surevey_title = ucfirst($a->Surevey_title); 
-                    $a->route =  route('Survey.view', base64_encode($a->id));
+                ->get()->map(function($a){ $a->Surevey_title = ucfirst($a->Surevey_title);
+                    // Drafts go to the edit form (resume editing) — the read-only
+                    // view doesn't make sense for unfinished work.
+                    $a->route =  route('Survey.edit', base64_encode($a->id));
 
                     $a->Start_date = date('d-m-Y', strtotime($a->Start_date));
                     $a->End_date =  date('d-m-Y', strtotime($a->End_date));
-                    
+
                     return $a;
-                
+
                 });
             
         $total_Survey_count = ParentSurvey::where('resort_id', $this->resort->resort_id)->count();
@@ -370,6 +371,9 @@ class DashboardController extends Controller
                                         '#0E8509',
                                     ];
                        
+            // Aggregate by DEPARTMENT only (was grouping by survey_title too,
+            // which produced one row per dept-per-survey and made the doughnut
+            // legend show duplicate department pills).
             $departmentWise = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
                                             ->join('resort_departments as t3', 't3.id', '=', 't2.Dept_id')
@@ -377,24 +381,19 @@ class DashboardController extends Controller
                                             ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                             ->where('t1.emp_status', 'yes')
                                             ->select(
-                                                'parent_surveys.Surevey_title',
                                                 't3.name as Department_name',
-                                                DB::raw("COUNT(t1.id) as completed_count") 
+                                                DB::raw("COUNT(t1.id) as completed_count")
                                             )
-                                            ->groupBy('t2.Dept_id', 't3.name', 'parent_surveys.Surevey_title')
+                                            ->groupBy('t2.Dept_id', 't3.name')
                                             ->get()
                                             ->map(function ($department) use (&$i, $colors) {
-                                                if ($i < count($colors)) {
-                                                    $department->color = $colors[$i]; // Assign color if available
-                                                }
-                                                else 
-                                                {
-                                                    $i=0; 
-                                                    $department->color = $colors[$i]; 
-                                                }
-                                                $i++; 
+                                                if ($i >= count($colors)) { $i = 0; }
+                                                $department->color = $colors[$i];
+                                                $i++;
                                                 return $department;
                                             });
+            // Reset color cursor so the next chart starts from #014653 again.
+            $i = 0;
 
         $SurveyWiseParticipationRates = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                                                     ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
@@ -469,7 +468,8 @@ class DashboardController extends Controller
                                             ->get()
                                             ->map(function ($a) { 
                                                 $a->Newid = base64_encode($a->id);
-                                                $a->count = SurveyEmployee::where("Parent_survey_id",$a->id)->count();
+                                                // Avoid N+1 — the SELECT above already aggregates total_count.
+                                                $a->count = (int) ($a->total_count ?? 0);
                                                 $a->startDate = \Carbon\Carbon::parse($a->Start_date)->format('d M Y');
                                                 $a->endDate = \Carbon\Carbon::parse($a->End_date)->format('d M Y');
                                                 return $a;

@@ -28,6 +28,23 @@
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
                                 <h3 class="text-nowrap">{{ $ParentSurvey->Surevey_title }}</h3>
+                                @php
+                                    $badgeClass = 'badge-success';
+                                    $privacyNote = 'Respondent identities are visible to all viewers.';
+                                    if (($privacy ?? null) === 'Confidential') {
+                                        $badgeClass = 'badge-info';
+                                        $privacyNote = $showRespondentIdentity
+                                            ? 'Confidential — identities are visible to you because you are an authorised admin (HR / L&D / GM).'
+                                            : 'Confidential — respondent identities are hidden. Only authorised admins (HR / L&D / GM) can see who responded.';
+                                    } elseif (($privacy ?? null) === 'Anonymous') {
+                                        $badgeClass = 'badge-secondary';
+                                        $privacyNote = 'Anonymous — respondent identities are hidden for everyone, including admins.';
+                                    }
+                                @endphp
+                                <div class="mt-1">
+                                    <span class="badge {{ $badgeClass }}">{{ ucfirst($privacy ?? 'Neutral') }}</span>
+                                    <small class="text-muted ms-2">{{ $privacyNote }}</small>
+                                </div>
                             </div>
                             <div class="col-auto">
                                 <ul class="userDetailList-wrapper">
@@ -71,12 +88,15 @@
                             <div class="col-lg-4 col-md-6">
                                 <select class="form-select select2t-none" name="respondent"  id="respondent">
                                     <option value="{{ base64_encode('All') }}">All Respondents</option>
-                                    @if($ResponedEmp->isNotEmpty())
+                                    @if($showRespondentIdentity && $ResponedEmp->isNotEmpty())
                                         @foreach ($ResponedEmp as $item)
                                             <option value="{{ $item->emp_id }}">{{ $item->EmployeeName }}</option>
                                         @endforeach
                                     @endif
                                 </select>
+                                @if(!$showRespondentIdentity)
+                                    <small class="text-muted">Per-respondent selection is disabled for {{ $privacy }} surveys.</small>
+                                @endif
                             </div>
                             <div class="col-auto">
                                 <button type="submit" class="btn btn-themeBlue">Export Results</button>

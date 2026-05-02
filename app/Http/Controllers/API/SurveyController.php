@@ -170,7 +170,16 @@ class SurveyController extends Controller
             }
 
             $parent->EmployeeName                       =   ucfirst($parent->first_name . ' ' .  $parent->last_name);
-            $parent->profileImg                         =   Common::getResortUserPicture($parent->Parentid);              
+            $parent->profileImg                         =   Common::getResortUserPicture($parent->Parentid);
+            // Privacy hints for the mobile client so it can render the right
+            // banner before the participant starts answering.
+            $parent->privacy_type                       =   $parent->survey_privacy_type ?? 'Neutral';
+            $privacyNotes = [
+                'Anonymous'    => 'This is an Anonymous survey. Your responses will not be linked to your identity — even admins cannot see who answered.',
+                'Confidential' => 'This is a Confidential survey. Your identity is recorded but only authorised admins (HR / L&D / GM) can see who responded.',
+                'Neutral'      => 'This survey is Neutral. Your identity will be visible alongside your answers.',
+            ];
+            $parent->privacy_note                       =   $privacyNotes[$parent->privacy_type] ?? $privacyNotes['Neutral'];
             $surveyQuestionAnsData = ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
                 ->leftJoin('survey_questions as sq', 'sq.Parent_survey_id', '=', 'parent_surveys.id')
                 ->where('se.Emp_id', $employee_id)
