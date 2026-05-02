@@ -1210,6 +1210,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('survey/create', 'Survey\SurveyController@index')->name('Survey.create');
     Route::get('survey/get-all-employees', 'Survey\SurveyController@getSurveyAllEmployees')->name('Survey.getAllEmployees');
     Route::post('/survey/store', 'Survey\SurveyController@SaveSurvey')->name('Survey.store');
+    Route::get('/survey/edit/{id}', 'Survey\SurveyController@SurveyEdit')->name('Survey.edit');
+    Route::post('/survey/update/{id}', 'Survey\SurveyController@UpdateSurvey')->name('Survey.update');
     Route::get('/survey/view/{id}', 'Survey\SurveyController@SurveyView')->name('Survey.view');
     Route::get('survey/list', 'Survey\SurveyController@Surveylist')->name('Survey.Surveylist');
     Route::delete('survey/destroy/{id}', 'Survey\SurveyController@SurveyDestory')->name('Survey.Destory');

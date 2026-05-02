@@ -24,7 +24,7 @@
                             <a href="{{ route('Survey.create') }}" class="btn btn-theme me-2 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
                    
                
-                            <a href="{{ route('Survey.CompleteSurvey') }}" class="btn btn-themeLightNew me-2">Complete Survey</a>
+                            <a href="{{ route('Survey.CompleteSurvey') }}" class="btn btn-themeLightNew me-2">Completed Survey</a>
                       
                             <a href="{{ route('Survey.DarftSurvey') }}" class="btn btn-themeLightNew">Draft Survey</a>
                         </div>
@@ -54,6 +54,7 @@
                                 <th>Privacy</th>
                                 <th>Start Date</th>
                                 <th>End Date</th>
+                                <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -110,11 +111,11 @@
             iDisplayLength: 6,
             processing: true,
             serverSide: true,
-            order:[[6, 'desc']],
+            order:[[7, 'desc']],
             ajax: {
                 url: '{{ route("Survey.Surveylist") }}',
                 type: 'GET',
-                data: function(d) 
+                data: function(d)
                 {
                     d.search = $('.search').val();
                 }
@@ -125,6 +126,7 @@
                 { data: 'Privacy', name: 'Privacy', className: 'text-nowrap' },
                 { data: 'StartDate', name: 'StartDate', className: 'text-nowrap' },
                 { data: 'EndDate', name: 'EndDate', className: 'text-nowrap' },
+                { data: 'Status', name: 'Status', className: 'text-nowrap', orderable: false, searchable: false },
                 { data: 'Action', name: 'Action', orderable: false, searchable: false },
                 {data:'created_at', visible:false,searchable:false},
             ]

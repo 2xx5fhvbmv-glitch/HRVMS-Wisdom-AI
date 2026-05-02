@@ -166,6 +166,10 @@
                                         <p class="text-muted small mb-0 d-none" id="everyoneLabel">All resort employees are selected (non-editable).</p>
                                     </div>
                                     <input type="text" class="form-control" id="searchEmployee" placeholder="Search employees...">
+                                    <div class="form-check mt-2 mb-2 select-all-wrap">
+                                        <input class="form-check-input" type="checkbox" id="selectAllParticipants">
+                                        <label class="form-check-label fw-500" for="selectAllParticipants">Select All</label>
+                                    </div>
                                     <div class="overflow-auto pe-1" id="employeeList">                                      
                                         
                                         @if( $emp->isNotEmpty())
@@ -198,7 +202,7 @@
                         <div class="mb-3">
                             <label for="select_emp" class="form-label">PRIVACY</label>
                             <div>
-                                <div class="form-check form-check-inline">
+                                <div class="form-check form-check-inline" title="Identity stored. Only authorised admins (HR / L&D / GM) can see who responded. Hidden in aggregate reports and exports.">
                                     <input class="form-check-input" type="radio" name="survey_privacy_type" id="privacy1"
                                         value="Confidential" data-parsley-required="true"
                                         data-parsley-required-message="Please select a privacy type"
@@ -206,18 +210,23 @@
                                         data-parsley-group="block-2" checked>
                                     <label class="form-check-label" for="privacy1">Confidential</label>
                                 </div>
-                                <div class="form-check form-check-inline">
+                                <div class="form-check form-check-inline" title="Identity fully visible to anyone who can view results.">
                                     <input class="form-check-input" type="radio" name="survey_privacy_type" id="privacy2"
                                         value="Neutral">
                                     <label class="form-check-label" for="privacy2">Neutral</label>
                                 </div>
-                                <div class="form-check form-check-inline">
+                                <div class="form-check form-check-inline" title="Identity hidden everywhere — even admins only see aggregate / pseudonymous responses.">
                                     <input class="form-check-input" type="radio" name="survey_privacy_type" id="privacy3"
                                         value="Anonymous">
                                     <label class="form-check-label" for="privacy3">Anonymous</label>
                                 </div>
                             </div>
                             <div id="privacy_error"></div>
+                            <small class="text-muted d-block mt-1" id="privacyHint">
+                                <strong>Confidential:</strong> only HR / L&D / GM see respondent identities.
+                                <strong>Neutral:</strong> identities visible to all viewers.
+                                <strong>Anonymous:</strong> identities hidden from everyone.
+                            </small>
                         </div>
                         
                         <div class="card-title">
@@ -327,8 +336,17 @@
 
 @section('import-scripts')
 <script >
+    // Edit-mode globals — set when resuming a draft. UpdateSurvey wipes & rebuilds
+    // questions/participants, so the form payload shape is identical to create.
+    window.SURVEY_EDIT_MODE = @json($editMode ?? false);
+    window.SURVEY_EDIT_DATA = @json($editData ?? null);
+    @if(($editMode ?? false) && !empty($editData['id'] ?? null))
+    window.SURVEY_SUBMIT_URL = "{{ route('Survey.update', $editData['id']) }}";
+    @else
+    window.SURVEY_SUBMIT_URL = "{{ route('Survey.store') }}";
+    @endif
 
-    $(document).ready(function () 
+    $(document).ready(function ()
     {
         $('.datepicker').datepicker({});
 
@@ -496,7 +514,7 @@
             var formData = new FormData($('#msform')[0]); // Correct FormData initialization
             formData.append('Status', flag);
             $.ajax({
-                url: "{{ route('Survey.store') }}", 
+                url: window.SURVEY_SUBMIT_URL,
                 type: "POST",
                 data: formData,
                 processData: false,
@@ -605,6 +623,7 @@
                     } else {
                         employeeList.append("<p class='text-muted'>No employees found for this resort.</p>");
                     }
+                    if (typeof window.syncSelectAllState === 'function') window.syncSelectAllState();
                 },
                 error: function () {
                     $("#employeeList").empty().append("<p class='text-danger'>Failed to load employees.</p>");
@@ -615,6 +634,10 @@
 
         /** Selective: load all employees with checkboxes enabled (no filters applied); user can use Filters to narrow down. */
         function loadSelectiveEmployees() {
+            // Preserve current ticks across re-loads (e.g., toggling Selective).
+            var previouslyChecked = $("#employeeList input[name='Emp_id[]']:checked").map(function () {
+                return $(this).val();
+            }).get();
             $.ajax({
                 url: "{{ route('Survey.getAllEmployees') }}",
                 type: "GET",
@@ -623,16 +646,18 @@
                     employeeList.empty();
                     if (response.success && response.data && response.data.length > 0) {
                         response.data.forEach(function (e) {
+                            var checked = previouslyChecked.indexOf(e.Emp_id) !== -1 ? ' checked' : '';
                             var html = '<div class="d-flex employee-item">' +
                                 '<div class="img-circle userImg-block"><img src="' + (e.profileImg || '') + '" alt="user"></div>' +
                                 '<div class="employee-details"><h6 class="employee-name">' + (e.EmployeeName || '') + '</h6><p class="position-name">' + (e.positionName || '') + '</p></div>' +
-                                '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '"></div>' +
+                                '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '"' + checked + '></div>' +
                                 '</div>';
                             employeeList.append(html);
                         });
                     } else {
                         employeeList.append("<p class='text-muted'>No employees found for this resort.</p>");
                     }
+                    if (typeof window.syncSelectAllState === 'function') window.syncSelectAllState();
                 },
                 error: function () {
                     $("#employeeList").empty().append("<p class='text-danger'>Failed to load employees.</p>");
@@ -882,6 +907,34 @@
         filterdata();
     });
 
+    // Select All — toggles every visible (non-disabled) participant checkbox.
+    // Skips disabled rows so it doesn't fight the "Everyone" mode.
+    $(document).on('change', '#selectAllParticipants', function () {
+        var checked = $(this).is(':checked');
+        $("#employeeList input[name='Emp_id[]']").not(':disabled').prop('checked', checked);
+    });
+
+    // Keep the master Select All in sync when individual rows change, or when
+    // the participant list is re-rendered (filter / loadSelectiveEmployees).
+    $(document).on('change', "#employeeList input[name='Emp_id[]']", function () {
+        syncSelectAllState();
+    });
+    window.syncSelectAllState = function () {
+        var $boxes = $("#employeeList input[name='Emp_id[]']").not(':disabled');
+        var total = $boxes.length;
+        var checked = $boxes.filter(':checked').length;
+        var $master = $('#selectAllParticipants');
+        if (!total) {
+            $master.prop('checked', false).prop('indeterminate', false);
+        } else if (checked === total) {
+            $master.prop('checked', true).prop('indeterminate', false);
+        } else if (checked === 0) {
+            $master.prop('checked', false).prop('indeterminate', false);
+        } else {
+            $master.prop('checked', false).prop('indeterminate', true);
+        }
+    };
+
 
     function loadPositionOptions(deptIds, callback) {
         var $pos = $("#position");
@@ -966,6 +1019,12 @@
                 employment_grade: Array.isArray(employment_grade) ? employment_grade : (employment_grade ? [employment_grade] : []),
                 gender: gender ? gender : ''
             };
+            // Preserve current ticks so filter rebuilds don't lose selections —
+            // hardcoding `checked` on every result was the root cause of the
+            // "click filter and everyone gets selected" bug.
+            var previouslyChecked = $("#employeeList input[name='Emp_id[]']:checked").map(function () {
+                return $(this).val();
+            }).get();
             $.ajax({
                 url: "{{ route('Performance.Meeting.GetPerformanceEmp') }}",
                 type: "POST",
@@ -980,13 +1039,15 @@
                             employeeList.append("<p class='text-muted'>No results found. Try different filters.</p>");
                         } else {
                             data.forEach(function (e) {
+                                var checked = previouslyChecked.indexOf(e.Emp_id) !== -1 ? ' checked' : '';
                                 var employeeHtml = '<div class="employee-item"><div class="d-flex">' +
                                     '<div class="img-circle userImg-block"><img src="' + (e.profileImg || '') + '" alt="user"></div>' +
                                     '<div><h6 class="employee-name">' + (e.EmployeeName || '') + '</h6><p class="position-name">' + (e.positionName || '') + '</p></div>' +
-                                    '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '" checked></div>' +
+                                    '<div class="form-check no-label"><input class="form-check-input" type="checkbox" name="Emp_id[]" value="' + (e.Emp_id || '') + '"' + checked + '></div>' +
                                     '</div></div>';
                                 employeeList.append(employeeHtml);
                             });
+                            syncSelectAllState();
                         }
                     } else {
                         employeeList.append("<p class='text-muted'>No results found. Try different filters.</p>");
@@ -1109,7 +1170,122 @@
         // Call initialization when document is ready
         $(document).ready(initializeFormValidation);
     });
-    
+
+    // ----- Draft edit prefill ---------------------------------------------------
+    // Hydrate the create form with existing draft data when SURVEY_EDIT_MODE is on.
+    // Runs after the other initializers so select2 / datepickers are ready.
+    $(window).on('load', function () {
+        if (!window.SURVEY_EDIT_MODE || !window.SURVEY_EDIT_DATA) return;
+        var d = window.SURVEY_EDIT_DATA;
+
+        // --- Step 3 fields (text/dates/recurring/reminder/allow_edit/privacy) ---
+        $('#survey_title').val(d.title || '');
+        $('#startDate_step_3').val(d.start_date || '');
+        $('#endDate').val(d.end_date || '');
+        if (d.recurring_survey) {
+            $('#recurringSurvey').val(d.recurring_survey).trigger('change');
+        }
+        if (d.reminder && d.reminder.length) {
+            $('#reminderNotification').val(d.reminder.map(String)).trigger('change');
+        }
+        if (d.allow_edit) {
+            $('#flexSwitchCheckDefault').prop('checked', true);
+        }
+        if (d.survey_privacy_type) {
+            $("input[name='survey_privacy_type'][value='" + d.survey_privacy_type + "']").prop('checked', true);
+        }
+
+        // --- Participants (Selective mode + tick saved IDs) ---------------------
+        $("input[name='selectParticipants'][value='Selective']").prop('checked', true);
+        if (d.participant_ids && d.participant_ids.length) {
+            d.participant_ids.forEach(function (eid) {
+                $("input[name='Emp_id[]'][value='" + eid + "']").prop('checked', true);
+            });
+        }
+
+        // --- Questions: rebuild via the same HTML AddMore appends --------------
+        if (d.questions && d.questions.length) {
+            $(".AppendHerer").empty();
+            d.questions.forEach(function (q, idx) {
+                var nos = idx + 1;
+                var typeKey = 'text';
+                var nameKey = 'text';
+                if (q.type === 'Multi-Choice') { typeKey = 'multiple'; nameKey = 'multiple'; }
+                else if (q.type === 'Single-Choice') { typeKey = 'Radio'; nameKey = 'radio'; }
+                else if (q.type === 'Rating') { typeKey = 'Rating'; nameKey = 'Rating'; }
+
+                var optsCount = (q.options && q.options.length) ? q.options.length : 0;
+                var inner = '';
+
+                if (typeKey === 'text') {
+                    inner = '<div class="row gx-md-4 gx-3 g-2">' +
+                        '<div class="col-6 select_option select_text" data-id="' + nos + '">' +
+                        '<input type="text" class="form-control" placeholder="Question" name="AddQuestion[text][' + nos + '][]" required>' +
+                        '</div>' +
+                        '<div class="col-auto align-self-center"><div class="d-flex align-items-center">' +
+                        '<label class="form-label mb-0 me-3">Compulsory Question</label>' +
+                        '<div class="form-check form-switch form-switchTheme">' +
+                        '<input class="form-check-input" type="checkbox" role="switch" name="AddquestionReq[' + nos + '][]">' +
+                        '<label class="form-check-label"></label></div></div></div></div>';
+                } else if (typeKey === 'multiple' || typeKey === 'Radio') {
+                    var optInputName = typeKey === 'Radio' ? 'RadioOption[' + nos + '][]' : 'CheckBoxOption[' + nos + '][]';
+                    var optsHtml = '';
+                    for (var i = 0; i < optsCount; i++) {
+                        optsHtml += '<li><input type="text" class="form-control" name="' + optInputName + '" value="' + $('<div/>').text(q.options[i] || '').html() + '" placeholder="' + typeKey + ' Option ' + (i + 1) + '"></li>';
+                    }
+                    inner = '<div class="col-12 select_option select_multiple"><div class="row gx-md-4 gx-3 g-2">' +
+                        '<div class="col-md-4">' +
+                        '<input type="text" class="form-control" placeholder="Question" name="AddQuestion[' + nameKey + '][' + nos + '][]" required>' +
+                        '</div>' +
+                        '<div class="col-lg-2 col-md-4 col-sm-10">' +
+                        '<input type="number" class="form-control total-options" data-id="' + nos + '" data-que_type="' + typeKey + '" placeholder="Total option number" value="' + optsCount + '">' +
+                        '<ol class="listingNo-wrapper wrapper_' + nos + ' mt-2 ' + (optsCount ? '' : 'd-none') + '">' + optsHtml + '</ol>' +
+                        '</div>' +
+                        '<div class="col-auto align-self-center"><div class="d-flex align-items-center">' +
+                        '<label class="form-label mb-0 me-3">Compulsory Question</label>' +
+                        '<div class="form-check form-switch form-switchTheme">' +
+                        '<input class="form-check-input" type="checkbox" role="switch" name="AddquestionReq[' + nos + '][]">' +
+                        '<label class="form-check-label"></label></div></div></div></div></div>';
+                } else if (typeKey === 'Rating') {
+                    inner = '<div class="col-12 select_option select_multiple"><div class="row gx-md-4 gx-3 g-2">' +
+                        '<div class="col-md-4">' +
+                        '<input type="text" class="form-control" placeholder="Question" name="AddQuestion[Rating][' + nos + '][]" required>' +
+                        '</div>' +
+                        '<div class="col-auto"><div class="negPosi-block total-options_' + nos + '">' +
+                        '<a href="#" class="btn btn-neg">Negative</a>' +
+                        '<a href="#" class="btn">1</a><a href="#" class="btn">2</a><a href="#" class="btn">3</a><a href="#" class="btn">4</a>' +
+                        '<a href="#" class="btn">5</a><a href="#" class="btn">6</a><a href="#" class="btn">7</a><a href="#" class="btn">8</a>' +
+                        '<a href="#" class="btn">9</a><a href="#" class="btn">10</a>' +
+                        '<a href="#" class="btn btn-posi">Positive</a></div></div>' +
+                        '<div class="col-auto align-self-center"><div class="d-flex align-items-center">' +
+                        '<label class="form-label mb-0 me-3">Compulsory Question</label>' +
+                        '<div class="form-check form-switch form-switchTheme">' +
+                        '<input class="form-check-input" type="checkbox" role="switch" name="AddquestionReq[' + nos + '][]">' +
+                        '<label class="form-check-label"></label></div></div></div></div></div>';
+                }
+
+                var block = '<div class="talentAc-block mb-3" id="remove_id_' + nos + '">' +
+                    '<div class="title mb-2">' +
+                    '<label class="form-label"> QUESTION ' + nos + '</label>' +
+                    '<button type="button" class="btn btn-danger btn-sm remove-btn" data-id="' + nos + '"><i class="fa-solid fa-xmark"></i></button>' +
+                    '</div>' + inner + '</div>';
+
+                var $row = $(block);
+                $(".AppendHerer").append($row);
+
+                // Fill question text + compulsory toggle for the row we just appended
+                $row.find('input[name^="AddQuestion["]').first().val(q.text || '');
+                if (q.compulsory) {
+                    $row.find('input[name="AddquestionReq[' + nos + '][]"]').prop('checked', true);
+                }
+            });
+            $('#increment').val(d.questions.length + 1);
+        }
+
+        // --- Submit-button label tweak so users know they're updating -----------
+        $('.SubmitAsPublish').text('Update & Publish Survey');
+        $('.SubmitAsSaveAsDraft').text('Update Draft');
+    });
 
 </script>
 @endsection

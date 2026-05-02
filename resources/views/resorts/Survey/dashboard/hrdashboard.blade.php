@@ -40,7 +40,7 @@
                             <strong>{{ $total_Survey_count }}</strong>
                         </div>
                         <a href="{{ route('Survey.Surveylist') }}">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <img src="{{ asset('assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -53,7 +53,7 @@
                             <strong>{{ $OngoingSurvey_count }}</strong>
                         </div>
                         <a href="{{ route('Survey.Surveylist') }}">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <img src="{{ asset('assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -66,7 +66,7 @@
                             <strong>{{ $DraftSurvey_count }}</strong>
                         </div>
                         <a href="{{ route('Survey.DarftSurvey') }}">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <img src="{{ asset('assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -79,7 +79,7 @@
                             <strong>{{ $CompleteSurvey_count }}</strong>
                         </div>
                         <a href="{{ route('Survey.CompleteSurvey') }}">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                            <img src="{{ asset('assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -91,6 +91,11 @@
                     </div>
                     @if($OngoingSurvey->isEmpty())
                         <p class="text-muted mb-0 py-3">No open or ongoing surveys at the moment.</p>
+                    @else
+                    {{-- Bounded scroll list — long survey lists no longer stretch the
+                         card and (via equalizeHeights) the Surveys-Nearing-Deadline
+                         card next to it. --}}
+                    <div class="surveyStatus-list">
                     @endif
                     @foreach($OngoingSurvey as $survey)
                         @php
@@ -102,9 +107,11 @@
                                     <h6>{{ $survey->title }}</h6>
                                     <p>Creation Date: {{ \Carbon\Carbon::parse($survey->Start_date)->format('d M Y') }} | 
                                         Closing Date: {{ \Carbon\Carbon::parse($survey->End_date)->format('d M Y') }}</p>                                </div>
-                                <span class="badge badge-green">
-                                    {{ $survey->Status }}
-                                </span>
+                                @php
+                                    $statusLabel = $survey->Status === 'OnGoing' ? 'Ongoing' : ($survey->Status === 'Publish' ? 'Published' : $survey->Status);
+                                    $statusBadge = $survey->Status === 'OnGoing' ? 'badge-info' : 'badge-green';
+                                @endphp
+                                <span class="badge {{ $statusBadge }}">{{ $statusLabel }}</span>
                             </div>
                             <div class="body">
                                 <div class="d-flex">
@@ -122,15 +129,16 @@
                                 <div class="d-flex align-items-center">
                                     <a target="_blank" href="{{ $view}}" class="btn-tableIcon btnIcon-skyblue"><i
                                             class="fa-regular fa-eye"></i></a>
-                                    <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotifcation btn-tableIcon btnIcon-yellow"><i
+                                    <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotification btn-tableIcon btnIcon-yellow"><i
                                             class="fa-regular fa-bell"></i></a>
                                     {{-- <a href="#" class="btn-tableIcon btnIcon-blue"><i class="fa-regular fa-pen"></i></a> --}}
                                 </div>
                             </div>
                         </div>
                     @endforeach
-                    
-                  
+                    @if(!$OngoingSurvey->isEmpty())
+                    </div>
+                    @endif
 
                 </div>
             </div>
@@ -192,7 +200,7 @@
                                     </div>
                                     <h6>{{ $n->title }}</h6>
                                     <span>{{ $progress }}%</span>
-                                    <a href="javascript:void(0)" id="PendingParticipants" class="a-link " data-id="{{ $n->Newid }}">View Pending Participants</a>
+                                    <a href="javascript:void(0)" class="a-link PendingParticipants" data-id="{{ $n->Newid }}">View Pending Participants</a>
                                 </div>
                             </div>
                             @endforeach
@@ -239,37 +247,21 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
+            {{-- Survey-wise Participation Rates now pairs with Recent Survey
+                 Results above (6 + 6). Department-wise Participation has been
+                 moved to the bottom row, after Draft Surveys. --}}
+            <div class="col-xl-6 col-sm-12 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
                         <h3>Survey-wise Participation Rates</h3>
                     </div>
-                    <canvas id="myAttendance" width="363" height="298"></canvas>
-                </div>
-            </div>
-
-            <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card">
-                    <div class="card-title">
-                        <h3>Department-wise Participation</h3>
-                    </div>
-                    <div class="departmentPart-chart mb-3">
-                        <canvas id="myDoughnutChart"></canvas>
-                    </div>
-                    <div class="row g-2 justify-content-center ">
-
-                        @if($departmentWise->isNotEmpty())
-                            @foreach($departmentWise as  $d)
-                                
-                            <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span style="background-color: {{ $d->color }}"></span>{{ $d->Department_name }}
-                                </div>
-                            </div>
-                            @endforeach
-                        @endif
-                   
-                    </div>
+                    @if($SurveyWiseParticipationRates->isEmpty())
+                        <p class="text-muted mb-0 py-3">No survey participation data yet.</p>
+                    @else
+                        <div class="surveyWiseChart-wrap">
+                            <canvas id="myAttendance"></canvas>
+                        </div>
+                    @endif
                 </div>
             </div>
             <div class="col-xl-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -277,24 +269,25 @@
                     <div class="card-title mb-md-3">
                         <h3>Comparison Of Participation In Different Types Of Surveys</h3>
                     </div>
-                    <div class="row g-md-4 g-2 align-items-center">
-                        <div class="col-xxl-9 col-xl-12 col-md-9"> <canvas id="myStackedBarChart" width="544"
-                                height="326"></canvas></div>
-                        <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
-                            <div class="row g-2 doughnut-labelTop">
-                                @if($SurveyComparison->isNotEmpty())
+                    @if($SurveyComparison->isEmpty())
+                        <p class="text-muted mb-0 py-3">No survey comparison data for the last 3 months.</p>
+                    @else
+                        <div class="row g-md-4 g-2 align-items-center">
+                            <div class="col-xxl-9 col-xl-12 col-md-9"> <canvas id="myStackedBarChart" width="544"
+                                    height="326"></canvas></div>
+                            <div class="col-xxl-3 col-xl-auto col-lg-2 col-md-3 offset-lg-1 offset-xl-0 ">
+                                <div class="row g-2 doughnut-labelTop">
                                     @foreach ($SurveyComparison as $com)
                                     <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                        <div class="doughnut-label">
+                                        <div class="doughnut-label" title="{{ $com->title }}">
                                             <span style="background-color: {{ $com->color }}"></span>{{ $com->title }}
-
                                         </div>
                                     </div>
                                     @endforeach
-                                @endif
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
             </div>
             <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -326,6 +319,33 @@
                     </div>
                 </div>
             </div>
+
+            {{-- Department-wise Participation sits right after Draft Surveys on the
+                 same bottom row (Comparison 6 + Draft 3 + Dept 3 = 12 cols). --}}
+            <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card">
+                    <div class="card-title">
+                        <h3>Department-wise Participation</h3>
+                    </div>
+                    @if($departmentWise->isEmpty())
+                        <p class="text-muted mb-0 py-3">No department-wise participation data yet.</p>
+                    @else
+                        <div class="departmentPart-chart mb-3">
+                            <canvas id="myDoughnutChart"></canvas>
+                        </div>
+                        <div class="row g-2 justify-content-center ">
+                            @foreach($departmentWise as  $d)
+                                <div class="col-auto">
+                                    <div class="doughnut-label" title="{{ $d->Department_name }}">
+                                        <span style="background-color: {{ $d->color }}"></span>{{ $d->Department_name }}
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </div>
+
             <!-- <div class="col-xl-3 col-sm-6">
                 <div class="card" id="card-wiInsightsSurvey">
                     <div class=" card-title">
@@ -423,39 +443,91 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Truncate long department / survey names in the chart legend pills.
+       Full text remains in the title attribute so hover shows it. */
+    .doughnut-label {
+        max-width: 160px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .surveyStatus-block .head h6,
+    .leaveUser-block h6 {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    .table-recentSurvey td:first-child {
+        max-width: 220px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Bounded-height scroll for the Survey Status / Nearing-Deadline / Draft
+       cards so a long list doesn't push other cards taller via the
+       equalizeHeights JS. Items inside scroll vertically. */
+    .surveyStatus-list,
+    #card-surveysDeadline .leaveUser-main,
+    #card-draftedSurveys .leaveUser-main {
+        max-height: 360px;
+        overflow-y: auto;
+        padding-right: 4px; /* leave room for the scrollbar */
+    }
+
+    /* Cap the Survey-wise chart so it doesn't dictate a tall row height.
+       Pair this with maintainAspectRatio:false in the Chart.js options. */
+    .surveyWiseChart-wrap {
+        position: relative;
+        height: 260px;
+    }
+    .surveyWiseChart-wrap > canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    /* Keep the Recent Survey Results table scrollable instead of growing. */
+    .table-recentSurvey {
+        display: block;
+    }
+    .table-recentSurvey tbody,
+    .table-recentSurvey thead {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+    }
+    /* Slim scrollbar so it doesn't dominate visually */
+    .surveyStatus-list::-webkit-scrollbar,
+    #card-surveysDeadline .leaveUser-main::-webkit-scrollbar,
+    #card-draftedSurveys .leaveUser-main::-webkit-scrollbar {
+        width: 6px;
+    }
+    .surveyStatus-list::-webkit-scrollbar-thumb,
+    #card-surveysDeadline .leaveUser-main::-webkit-scrollbar-thumb,
+    #card-draftedSurveys .leaveUser-main::-webkit-scrollbar-thumb {
+        background: #c9d1d9;
+        border-radius: 3px;
+    }
+</style>
 @endsection
 
 @section('import-scripts') <script type="text/javascript">
-    $(document).ready(function () {
-        $('.data-Table').dataTable({
-            "searching": false,
-            "bLengthChange": false,
-            "bFilter": true,
-            "bInfo": false,
-            "bAutoWidth": false,
-            scrollX: true,
-            "iDisplayLength": 10,
-        });
-    });
-
-    // Generic function to equalize heights of two or more elements based on a reference element
+    // Generic function to equalize heights of two or more elements based on a reference element.
+    // Skips when the reference card is hidden (offsetHeight === 0) — otherwise the surviving
+    // card collapses to height:0 when permission gating hides one side.
     function equalizeHeights(referenceId, targetIds) {
-        // Get the reference element
         const reference = document.getElementById(referenceId);
+        if (!reference) return;
+        const referenceHeight = reference.offsetHeight;
+        if (referenceHeight <= 0) return;
 
-        // Check if the reference element exists
-        if (reference) {
-            // Get the height of the reference element
-            const referenceHeight = reference.offsetHeight;
-
-            // Loop through target element IDs and set their height
-            targetIds.forEach(targetId => {
-                const target = document.getElementById(targetId);
-                if (target) {
-                    target.style.height = referenceHeight + 'px';
-                }
-            });
-        }
+        targetIds.forEach(targetId => {
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.style.height = referenceHeight + 'px';
+            }
+        });
     }
 
     // Adjust heights on page load and window resize
@@ -505,36 +577,29 @@
             }
         });
 
-        // full-calendar   
-        $(function () {
-
-            var todayDate = moment().startOf('day');
-            var YM = todayDate.format('YYYY-MM');
-            var YESTERDAY = todayDate.clone().subtract(1, 'day').format('YYYY-MM-DD');
-            var TODAY = todayDate.format('YYYY-MM-DD');
-            var TOMORROW = todayDate.clone().add(1, 'day').format('YYYY-MM-DD');
-
-            var cal = $('#calendar').fullCalendar({
-                header: {
-                    left: 'prev ',
-                    center: 'title',
-                    right: 'next'
-                },
-                editable: true,
-                eventLimit: 0, // allow "more" link when too many events
-                navLinks: true,
-                dayRender: function (a) {
-                    //console.log(a)
-                }
-            });
-
-        });
-
-
     });
 </script>
 <script type="module">
- 
+
+   // Truncate long labels for chart axes / legends by character count.
+   // Full text is preserved and shown in tooltips so nothing is lost.
+   function truncateLabel(s, max) {
+       if (s == null) return '';
+       s = String(s);
+       max = max || 18;
+       return s.length > max ? s.slice(0, max - 1) + '…' : s;
+   }
+
+   // Truncate by WORD count — show first N words, then "…" if more remain.
+   // Used for chart axis labels where character truncation chops mid-word.
+   function truncateWords(s, maxWords) {
+       if (s == null) return '';
+       var words = String(s).trim().split(/\s+/);
+       maxWords = maxWords || 2;
+       if (words.length <= maxWords) return words.join(' ');
+       return words.slice(0, maxWords).join(' ') + '…';
+   }
+
    // Fetch data from Laravel (passed from controller)
    var surveyData = @json($SurveyComparison);
    function getLastThreeMonths() {
@@ -555,25 +620,31 @@ var labels = getLastThreeMonths();
 
 
 var groupedData = {};
-var surveyColors = {}; // Store survey type and corresponding color
+var surveyColors = {};
+var surveyTitles = {};
 
-// Group data by survey type
+// Group data by survey row (id + title) so two distinct surveys with the same
+// title don't collapse into one stacked dataset on the chart.
 surveyData.forEach(s => {
-    if (!groupedData[s.survey_type]) {
-        groupedData[s.survey_type] = Array(labels.length).fill(0);
-        surveyColors[s.survey_type] = s.color; // Store assigned color
+    var key = s.id + '::' + s.survey_type;
+    if (!groupedData[key]) {
+        groupedData[key] = Array(labels.length).fill(0);
+        surveyColors[key] = s.color;
+        surveyTitles[key] = s.survey_type;
     }
     let index = labels.indexOf(s.survey_month);
     if (index !== -1) {
-        groupedData[s.survey_type][index] = s.completed_count; // Use completed_count for stacking
+        groupedData[key][index] = s.completed_count;
     }
 });
 
-// Create datasets dynamically
-var datasets = Object.keys(groupedData).map(type => ({
-    label: type, // Use the survey title
-    data: groupedData[type],
-    backgroundColor: surveyColors[type], // Use the assigned color
+// Create datasets dynamically. Keep the FULL title in `fullLabel` so the
+// tooltip can show it even though the legend uses the truncated form.
+var datasets = Object.keys(groupedData).map(key => ({
+    label: truncateLabel(surveyTitles[key], 22),
+    fullLabel: surveyTitles[key],
+    data: groupedData[key],
+    backgroundColor: surveyColors[key],
     borderColor: '#fff',
     borderWidth: 2,
     borderRadius: 10,
@@ -592,14 +663,17 @@ myStackedBarChart = new Chart(ctx, {
     },
     options: {
         plugins: {
+            // Hide Chart.js built-in legend — the side panel already renders
+            // colored pills for each survey, so the in-chart legend duplicated
+            // every survey name.
             legend: {
-                display: true // Show legend with correct titles
+                display: false
             },
             tooltip: {
                 callbacks: {
                     label: function(tooltipItem) {
                         let index = tooltipItem.datasetIndex;
-                        return datasets[index].label + ": " + tooltipItem.raw; // Show correct survey type in tooltip
+                        return (datasets[index].fullLabel || datasets[index].label) + ": " + tooltipItem.raw;
                     }
                 }
             }
@@ -694,7 +768,9 @@ myStackedBarChart = new Chart(ctx, {
     });
     }
 
-    var surveyLabels = {!! json_encode($SurveyWiseParticipationRates->pluck('title')) !!}; // Survey titles
+    var surveyLabels = {!! json_encode($SurveyWiseParticipationRates->pluck('title')) !!}; // Full survey titles (kept for tooltip)
+    // Show first 2 words of each survey name on the x-axis, then "…" if longer.
+    var surveyLabelsTrunc = surveyLabels.map(function (s) { return truncateWords(s, 2); });
     var completedData = {!! json_encode($SurveyWiseParticipationRates->pluck('completed_count')) !!}; // Completed count
 
     var attendanceEl = document.getElementById('myAttendance');
@@ -704,10 +780,10 @@ myStackedBarChart = new Chart(ctx, {
     myAttendance = new Chart(ctp, {
         type: 'bar',
         data: {
-            labels: surveyLabels,
+            labels: surveyLabelsTrunc,
             datasets: [
                 {
-                    label: surveyLabels,
+                    label: 'Completed',
                     data: completedData,
                     backgroundColor: '#014653',
                     borderColor: '#014653',
@@ -718,49 +794,45 @@ myStackedBarChart = new Chart(ctx, {
             ]
         },
         options: {
+            // Let the canvas fill the .surveyWiseChart-wrap (260px) instead of
+            // dictating its own size from width/height attrs.
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
-                },
-                layout: {
-                    padding: {
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        right: 0
-                    }
-                },
+                legend: { display: false },
+                layout: { padding: { top: 0, bottom: 0, left: 0, right: 0 } },
                 tooltip: {
-                    enabled: true, // Enable tooltips
+                    enabled: true,
                     callbacks: {
+                        // Show the full survey title in the tooltip even though
+                        // the axis label is truncated.
+                        title: function (items) {
+                            if (!items || !items.length) return '';
+                            return surveyLabels[items[0].dataIndex] || items[0].label;
+                        },
                         label: function (tooltipItem) {
-                            // const datasetLabel = tooltipItem.dataset.label || '';
-                            const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                            return ` ${value}`; // Custom tooltip format
+                            const value = tooltipItem.raw.toLocaleString();
+                            return ` ${value}`;
                         }
                     }
                 }
             },
             scales: {
                 x: {
-                    beginAtZero: true, // Start x-axis at zero
-                    grid: {
-                        display: false // Hide grid lines on the x-axis
-                    },
-                    border: {
-                        display: true // Show the x-axis border
+                    beginAtZero: true,
+                    grid: { display: false },
+                    border: { display: true },
+                    ticks: {
+                        autoSkip: false,
+                        maxRotation: 30,
+                        minRotation: 0
                     }
                 },
                 y: {
-                    beginAtZero: true, // Do not start y-axis at zero
-                    grid: {
-                        display: false // Hide grid lines on the y-axis
-                    }, ticks: {
-                        stepSize: 100,
-                    },
-                    border: {
-                        display: true // Show the y-axis border
-                    },
+                    beginAtZero: true,
+                    grid: { display: false },
+                    ticks: { stepSize: 100 },
+                    border: { display: true }
                 }
             }
         }
@@ -782,45 +854,44 @@ myStackedBarChart = new Chart(ctx, {
         progressCircle.style.strokeDashoffset = offset;
     });
     
-    $(document).on("click",".SendNotifcation",function(){
-        var id = $(this).data('id');
+    $(document).on("click",".SendNotification",function(){
+        var $btn = $(this);
+        if ($btn.data('busy')) return; // prevent double-clicks
+        $btn.data('busy', true).css('pointer-events', 'none').css('opacity', 0.6);
+        var id = $btn.data('id');
         $.ajax({
-            url: "{{ route('Survey.notifyToParticipants') }}", // Update with actual route
+            url: "{{ route('Survey.notifyToParticipants') }}",
             type: "post",
             data: {"id":id,"_token":"{{ csrf_token() }}"},
             success: function (response) {
                 if (response.success) {
                     toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
-                } 
-                else
-                {
+                } else {
                     toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
                 }
             },
-            error: function (xhr) {
+            error: function () {
                 toastr.error("An error occurred.", "Error", { positionClass: 'toast-bottom-right' });
+            },
+            complete: function () {
+                $btn.data('busy', false).css('pointer-events', '').css('opacity', '');
             }
         });
-        
-        
     });
 
 
-    $(document).on("click","#PendingParticipants",function(){
+    $(document).on("click",".PendingParticipants",function(){
     var id = $(this).data('id');
     $("#Surveyparticipant").modal('show');
     $('.AppendinRow').html('No Record Found.     ');
         $.ajax({
-            url: "{{ route('Survey.getPendingParticipants') }}", // Update with actual route
+            url: "{{ route('Survey.getPendingParticipants') }}",
             type: "get",
             data: {"id":id,"_token":"{{ csrf_token() }}"},
             success: function (response) {
-              
                     $('.AppendinRow').html(response);
-
-               
             },
-            error: function (xhr) {
+            error: function () {
                 toastr.error("An error occurred.", "Error", { positionClass: 'toast-bottom-right' });
             }
         });

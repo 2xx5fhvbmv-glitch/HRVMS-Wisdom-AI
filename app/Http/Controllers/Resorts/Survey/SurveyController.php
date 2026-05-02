@@ -39,6 +39,45 @@ class SurveyController extends Controller
             $this->newdates[] =  Carbon::today()->addDays($i)->format('Y-m-d');
         }
     }
+
+    /**
+     * Whether the current viewer is allowed to see respondent identities for
+     * Confidential surveys. Mirrors the L&D admin set used elsewhere in the
+     * project: super-admins, HR (rank 3), GM (rank 8), and L&D leadership.
+     * Anonymous surveys are NEVER de-masked, even for privileged viewers.
+     */
+    private function isPrivilegedSurveyViewer(): bool
+    {
+        if (!$this->resort) return false;
+        if (($this->resort->type ?? null) === 'super' || ($this->resort->is_master_admin ?? 0)) {
+            return true;
+        }
+        $emp = $this->resort->GetEmployee ?? null;
+        if (!$emp) return false;
+
+        $rank = (int) ($emp->rank ?? 0);
+        // Rank 3 = HR, Rank 8 = GM (config/settings.php Position_Rank).
+        if (in_array($rank, [3, 8], true)) return true;
+
+        $position = optional($emp->position)->position_title;
+        $ldTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        if ($position && in_array($position, $ldTitles, true)) return true;
+
+        return false;
+    }
+
+    /**
+     * Resolve effective visibility flag for a survey's respondent identities.
+     *  - 'Neutral'      → always visible
+     *  - 'Confidential' → visible only to privileged viewers
+     *  - 'Anonymous'    → never visible (even to privileged viewers)
+     */
+    private function canSeeRespondentIdentity(?string $privacy): bool
+    {
+        if ($privacy === 'Anonymous') return false;
+        if ($privacy === 'Confidential') return $this->isPrivilegedSurveyViewer();
+        return true; // Neutral or anything unrecognised defaults to visible.
+    }
     public function index()
     {
         $emp = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
@@ -67,7 +106,216 @@ class SurveyController extends Controller
         $ResortDepartment = ResortDepartment::where('resort_id', $this->resort->resort_id)->get();
 
         $page_title = "Create Survey";
-        return view('resorts.Survey.SurveyPages.create',compact('emp','page_title','ResortDepartment'));
+        $editMode = false;
+        $editData = null;
+        return view('resorts.Survey.SurveyPages.create',compact('emp','page_title','ResortDepartment','editMode','editData'));
+    }
+
+    /**
+     * Resume editing an existing draft survey. Reuses the create view but
+     * passes $editMode + $editData so the form prefills + posts to the update
+     * endpoint instead of store. Only SaveAsDraft surveys are editable.
+     */
+    public function SurveyEdit($id)
+    {
+        if (Common::checkRouteWisePermission('Survey.Surveylist', config('settings.resort_permissions.create')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+
+        $rawId = base64_decode($id);
+        $survey = ParentSurvey::where('id', $rawId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('Status', 'SaveAsDraft')
+            ->first();
+
+        if (!$survey) {
+            return redirect()->route('Survey.DarftSurvey')->with('error', 'Draft survey not found.');
+        }
+
+        $emp = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
+            ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
+            ->select(
+                't1.id as Parentid',
+                't1.first_name',
+                't1.last_name',
+                't1.profile_picture',
+                'employees.id as emp_id',
+                'employees.Emp_id as EmployeeId',
+                't2.position_title',
+            )
+            ->groupBy('employees.id')
+            ->where("t1.resort_id", $this->resort->resort_id)
+            ->get()
+            ->map(function ($item) {
+                $item->Emp_id = base64_encode($item->emp_id);
+                $item->EmployeeName = ucfirst($item->first_name . ' ' . $item->last_name);
+                $item->positionName = ucfirst($item->position_title ?? '');
+                $item->Position = ucfirst($item->position_title ?? '');
+                $item->profileImg = Common::getResortUserPicture($item->Parentid);
+                return $item;
+            });
+        $ResortDepartment = ResortDepartment::where('resort_id', $this->resort->resort_id)->get();
+
+        $questions = SurveyQuestion::where('Parent_survey_id', $rawId)->get()->map(function ($q) {
+            return [
+                'text'        => $q->Question_Text,
+                'type'        => $q->Question_Type,            // 'Text' | 'Multi-Choice' | 'Single-Choice' | 'Rating'
+                'compulsory'  => $q->Question_Complusory === 'yes',
+                'options'     => $q->Total_Option_Json ? json_decode($q->Total_Option_Json, true) : [],
+            ];
+        })->values();
+
+        $participantIds = SurveyEmployee::where('Parent_survey_id', $rawId)
+            ->pluck('Emp_id')
+            ->map(fn($eid) => base64_encode($eid))
+            ->values();
+
+        $reminderArr = [];
+        if (!empty($survey->Reminder_notification)) {
+            $reminderArr = array_filter(array_map('trim', explode(',', $survey->Reminder_notification)));
+        }
+
+        $editData = [
+            'id'                  => $id,
+            'title'               => $survey->Surevey_title,
+            'start_date'          => $survey->Start_date ? date('d/m/Y', strtotime($survey->Start_date)) : '',
+            'end_date'            => $survey->End_date ? date('d/m/Y', strtotime($survey->End_date)) : '',
+            'recurring_survey'    => $survey->Recurring_survey,
+            'reminder'            => $reminderArr,
+            'min_response'        => $survey->Min_response,
+            'allow_edit'          => $survey->Allow_edit === 'yes',
+            'survey_privacy_type' => $survey->survey_privacy_type,
+            'participant_ids'     => $participantIds,
+            'questions'           => $questions,
+        ];
+
+        $page_title = "Edit Survey";
+        $editMode = true;
+        return view('resorts.Survey.SurveyPages.create', compact('emp', 'page_title', 'ResortDepartment', 'editMode', 'editData'));
+    }
+
+    /**
+     * Update an existing draft survey. Mirrors SaveSurvey() but updates the
+     * parent row in place and rebuilds questions + participants from scratch.
+     */
+    public function UpdateSurvey(Request $request, $id)
+    {
+        $rawId = base64_decode($id);
+
+        DB::beginTransaction();
+        try {
+            $survey = ParentSurvey::where('id', $rawId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+
+            if (!$survey) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Survey not found.'], 404);
+            }
+            // Only drafts can be edited; once published they are locked.
+            if ($survey->Status !== 'SaveAsDraft') {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Only draft surveys can be edited.'], 403);
+            }
+
+            $survey_privacy_type = $request->survey_privacy_type;
+            $startDate  = Carbon::createFromFormat('d/m/Y', $request->startDate)->format('Y-m-d');
+            $endDate    = Carbon::createFromFormat('d/m/Y', $request->endDate)->format('Y-m-d');
+
+            $recurring_survey = $request->recurring_survey;
+            $reminderNotification = $request->reminderNotification;
+            if (is_array($reminderNotification)) {
+                $reminderNotification = implode(',', array_filter($reminderNotification));
+            }
+            $reminderNotification = $reminderNotification ?? '';
+            $minimum_responses = $request->minimum_responses ?? 0;
+            $surevey_editable = isset($request->surevey_editable) ? 'yes' : 'No';
+
+            $Emp_id = $request->Emp_id;
+            if (!is_array($Emp_id)) {
+                $Emp_id = $Emp_id ? [$Emp_id] : [];
+            }
+            if (empty($Emp_id) && $request->selectParticipants === 'Everyone') {
+                $Emp_id = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                    ->where('ra.resort_id', $this->resort->resort_id)
+                    ->pluck('employees.id')
+                    ->map(fn($eid) => base64_encode($eid))
+                    ->values()
+                    ->toArray();
+            }
+            if (empty($Emp_id)) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Please select at least one participant.'], 422);
+            }
+
+            $survey->update([
+                'Surevey_title'        => $request->survey_title,
+                'Start_date'           => $startDate,
+                'End_date'             => $endDate,
+                'Recurring_survey'     => $recurring_survey,
+                'Reminder_notification'=> $reminderNotification,
+                'Min_response'         => $minimum_responses,
+                'Allow_edit'           => $surevey_editable,
+                'Status'               => $request->Status,
+                'survey_privacy_type'  => $survey_privacy_type,
+            ]);
+
+            // Wipe & rebuild children — simpler than diffing.
+            SurveyQuestion::where('Parent_survey_id', $survey->id)->delete();
+            SurveyEmployee::where('Parent_survey_id', $survey->id)->delete();
+
+            if (!empty($request->AddQuestion)) {
+                foreach ($request->AddQuestion as $type => $questions) {
+                    foreach ($questions as $qIndex => $questionArray) {
+                        foreach ($questionArray as $questionText) {
+                            $question_is_required = 'no';
+                            if (!empty($request->AddquestionReq) && array_key_exists($qIndex, $request->AddquestionReq)) {
+                                $question_is_required = $request->AddquestionReq[$qIndex][0] == 'on' ? 'yes' : 'no';
+                            }
+                            $ots = null;
+                            if ($type == "multiple" && !empty($request->CheckBoxOption) && array_key_exists($qIndex, $request->CheckBoxOption)) {
+                                $ots = json_encode($request->CheckBoxOption[$qIndex]);
+                                $questionType = "Multi-Choice";
+                            } elseif ($type == "radio" && !empty($request->RadioOption) && array_key_exists($qIndex, $request->RadioOption)) {
+                                $ots = json_encode($request->RadioOption[$qIndex]);
+                                $questionType = "Single-Choice";
+                            } elseif ($type == "Rating") {
+                                $questionType = "Rating";
+                            } else {
+                                $questionType = "Text";
+                            }
+
+                            SurveyQuestion::create([
+                                "Parent_survey_id"     => $survey->id,
+                                "Question_Text"        => $questionText,
+                                "Question_Type"        => $questionType,
+                                "type"                 => $questionType,
+                                "Total_Option_Json"    => $ots,
+                                "Question_Complusory"  => $question_is_required,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            foreach ($Emp_id as $e) {
+                $employeeId = (int) base64_decode($e);
+                if ($employeeId <= 0) continue;
+                SurveyEmployee::create(["Emp_id" => $employeeId, "Parent_survey_id" => (int) $survey->id]);
+            }
+
+            DB::commit();
+            $route = route('Survey.view', base64_encode($survey->id));
+            return response()->json(['success' => true, 'message' => 'Survey updated successfully.', 'msg' => 'Survey updated successfully.', 'route' => $route], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("Survey UpdateSurvey: " . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            $message = config('app.debug') ? $e->getMessage() : 'Failed to update survey. Please try again.';
+            return response()->json(['success' => false, 'message' => $message], 500);
+        }
     }
 
     /**
@@ -329,7 +577,7 @@ class SurveyController extends Controller
             ->addColumn('NoOfApplicant', function ($row) {
                 $count = SurveyEmployee::where("Parent_survey_id",$row->id)->count();
                 $id = base64_encode($row->id); 
-                return  '<a href="javascipt:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
+                return  '<a href="javascript:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
             })
             ->addColumn('Privacy', function ($row) {
                 return $row->survey_privacy_type;
@@ -341,6 +589,15 @@ class SurveyController extends Controller
             
             ->addColumn('EndDate', function ($row) {
                 return  date('d-m-Y', strtotime($row->End_date));
+            })
+            ->addColumn('Status', function ($row) {
+                // Surveylist only ever surfaces 'Publish' or 'OnGoing' rows; render a
+                // human label so users see "Published" / "Ongoing" instead of the raw
+                // enum value stored in the DB.
+                if ($row->Status === 'OnGoing') {
+                    return '<span class="badge badge-info">Ongoing</span>';
+                }
+                return '<span class="badge badge-success">Published</span>';
             })
             ->addColumn('Action', function ($row) use ($delete_class) {
                 $id = base64_encode($row->id);
@@ -358,7 +615,7 @@ class SurveyController extends Controller
 
             })
 
-            ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate','Action'])
+            ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate','Status','Action'])
             ->make(true);
         }
 
@@ -515,7 +772,7 @@ class SurveyController extends Controller
             ->addColumn('NoOfApplicant', function ($row) {
                 $count = SurveyEmployee::where("Parent_survey_id",$row->id)->count();
                 $id = base64_encode($row->id); 
-                return  '<a href="javascipt:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
+                return  '<a href="javascript:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
             })
             ->addColumn('Privacy', function ($row) {
                 return $row->survey_privacy_type;
@@ -528,6 +785,10 @@ class SurveyController extends Controller
             ->addColumn('EndDate', function ($row) {
                 return  date('d-m-Y', strtotime($row->End_date));
             })
+            ->addColumn('Status', function ($row) {
+                // Only 'Complete' rows reach this listing.
+                return '<span class="badge badge-secondary">Completed</span>';
+            })
             ->addColumn('Action', function ($row) {
                 $id = base64_encode($row->id);
 
@@ -536,12 +797,11 @@ class SurveyController extends Controller
                             <div  class="d-flex align-items-center">
                                 <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
                             </div>';
-                                                            // <a href="#" class="btn-lg-icon icon-bg-blue"><img src="' . asset("resorts_assets/images/copy.svg") . '" alt="icon"></a>
 
 
             })
 
-            ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate','Action'])
+            ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate','Status','Action'])
             ->make(true);
         }
 
@@ -600,7 +860,7 @@ class SurveyController extends Controller
             ->addColumn('NoOfApplicant', function ($row) {
                 $count = SurveyEmployee::where("Parent_survey_id",$row->id)->count();
                 $id = base64_encode($row->id); 
-                return  '<a href="javascipt:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
+                return  '<a href="javascript:void(0)" class="a-link showTotalapplicant" data-id="'.$id.'">'.$count.'</a>';
             })
             ->addColumn('Privacy', function ($row) {
                 return $row->survey_privacy_type;
@@ -613,23 +873,28 @@ class SurveyController extends Controller
             ->addColumn('EndDate', function ($row) {
                 return  date('d-m-Y', strtotime($row->End_date));
             })
+            ->addColumn('Status', function ($row) {
+                // Only 'SaveAsDraft' rows reach this listing.
+                return '<span class="badge badge-warning">Draft</span>';
+            })
             ->addColumn('Action', function ($row) use ($delete_class) {
                 $id = base64_encode($row->id);
 
                 $view = route('Survey.view',$id);
+                $edit = route('Survey.edit',$id);
                             return '
                             <div  class="d-flex align-items-center">
                                 <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
+                                <a href="'.$edit.'" class="btn-lg-icon icon-bg-blue" title="Edit Draft"><img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit"></a>
                                 <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
                                     <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
                                 </a>
                             </div>';
-                                                            // <a href="#" class="btn-lg-icon icon-bg-blue"><img src="' . asset("resorts_assets/images/copy.svg") . '" alt="icon"></a>
 
 
             })
 
-            ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate','Action'])
+            ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate','Status','Action'])
             ->make(true);
         }
 
@@ -869,21 +1134,35 @@ class SurveyController extends Controller
 
         $responseRate = ($TotalResponed  > 0) ? ($TotalResponed  / $Min_responsed) * 100 : 0;
    
+        $privacy = $ParentSurvey->survey_privacy_type;
+        $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
+
         $ResponedEmp =  SurveyEmployee::join('employees as t1',"t1.id","=","survey_employees.Emp_id")
                                         ->join("resort_admins as t2","t2.id","=","t1.Admin_Parent_id")
-                                        ->where("survey_employees.Parent_survey_id",$id)    
-                                        ->where('survey_employees.emp_status','yes') 
+                                        ->where("survey_employees.Parent_survey_id",$id)
+                                        ->where('survey_employees.emp_status','yes')
                                         ->get(['t1.id as emp_id','t2.first_name','t2.last_name','t2.id as ParentId'] )
-                                        ->map(function($i){
-                                            $i->emp_id  = base64_encode($i->emp_id);
-                                            $i->EmployeeName = ucfirst($i->first_name . ' ' .  $i->last_name);
-                                            $i->profileImg = Common::getResortUserPicture($i->Parentid);
+                                        ->values()
+                                        ->map(function($i, $idx) use ($showRespondentIdentity, $privacy) {
+                                            if ($showRespondentIdentity) {
+                                                $i->emp_id  = base64_encode($i->emp_id);
+                                                $i->EmployeeName = ucfirst($i->first_name . ' ' .  $i->last_name);
+                                                $i->profileImg = Common::getResortUserPicture($i->ParentId);
+                                            } else {
+                                                // Mask: stable per-row label, no real ID surfaced to the client.
+                                                $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                                                $i->emp_id  = base64_encode('All'); // disable per-respondent export
+                                                $i->EmployeeName = $label . ' #' . ($idx + 1);
+                                                $i->profileImg = asset('resorts_assets/images/user.svg');
+                                                $i->first_name = $label;
+                                                $i->last_name = '';
+                                            }
                                             return $i;
                                         });
 
         $page_title = "Survey Results";
         $id = base64_encode($id);
-        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey'));
+        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy'));
 
     }
 
@@ -955,6 +1234,15 @@ class SurveyController extends Controller
             //     $i++;
             // }
 
+            // Privacy enforcement: when the survey hides identity for this viewer,
+            // ignore any per-respondent filter (force All) and replace participant
+            // names with stable Anonymous/Confidential labels in the export.
+            $privacy = $ParentSurvey->survey_privacy_type ?? null;
+            $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
+            if (!$showRespondentIdentity) {
+                $respondent_id = 'All';
+            }
+
             $fetchQuestions = ParentSurvey::join('survey_questions as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
                             ->join('survey_employees as t2', 't2.Parent_survey_id', '=', 'parent_surveys.id')
                             ->join('employees as t3', 't3.id', '=', 't2.Emp_id')
@@ -971,6 +1259,10 @@ class SurveyController extends Controller
 
         $array = [];
         $i = 1;
+        // Map Survey_emp_ta_id → masked label so each unique respondent keeps
+        // a stable pseudonym across all their answers.
+        $maskedLabelByEmpTaId = [];
+        $maskedSeq = 0;
 
         foreach ($fetchQuestions as $q) {
             // Check if the employee has answered the question
@@ -981,13 +1273,24 @@ class SurveyController extends Controller
 
             $ans = isset($surveyResult->Emp_Ans) ? $surveyResult->Emp_Ans : '';
 
+            if ($showRespondentIdentity) {
+                $participantName = $q->first_name . ' ' . $q->last_name;
+            } else {
+                if (!isset($maskedLabelByEmpTaId[$q->Emp_id])) {
+                    $maskedSeq++;
+                    $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                    $maskedLabelByEmpTaId[$q->Emp_id] = $label . ' #' . $maskedSeq;
+                }
+                $participantName = $maskedLabelByEmpTaId[$q->Emp_id];
+            }
+
             $array[] = [
                 "id" => $i,
-                "ParticipantName" => $q->first_name . ' ' . $q->last_name,
+                "ParticipantName" => $participantName,
                 "Question" => $q->Question_Text,
                 "Ans" => $ans
             ];
-            
+
             $i++;
         }
 
@@ -1018,18 +1321,28 @@ class SurveyController extends Controller
 
         $Question = SurveyQuestion::where('Parent_survey_id', $decodedId)->get();
 
+        $privacy = $parent->survey_privacy_type ?? null;
+        $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
+
         $participantEmp = SurveyEmployee::join('employees as t1', 't1.id', '=', 'survey_employees.Emp_id')
             ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
             ->where('survey_employees.Parent_survey_id', $decodedId)
             ->get(['t2.first_name', 't2.last_name', 't2.id as ParentId'])
-            ->map(function ($i) {
-                $i->EmployeeName = ucfirst($i->first_name . ' ' . $i->last_name);
-                $i->profileImg = Common::getResortUserPicture($i->ParentId);
+            ->values()
+            ->map(function ($i, $idx) use ($showRespondentIdentity, $privacy) {
+                if ($showRespondentIdentity) {
+                    $i->EmployeeName = ucfirst($i->first_name . ' ' . $i->last_name);
+                    $i->profileImg = Common::getResortUserPicture($i->ParentId);
+                } else {
+                    $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                    $i->EmployeeName = $label . ' #' . ($idx + 1);
+                    $i->profileImg = asset('resorts_assets/images/user.svg');
+                }
                 return $i;
             });
 
         $filename = 'Survey_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $parent->Surevey_title) . '_' . date('Y-m-d') . '.pdf';
-        return Pdf::loadView('resorts.Survey.SurveyPages.survey-download-pdf', compact('parent', 'Question', 'participantEmp'))
+        return Pdf::loadView('resorts.Survey.SurveyPages.survey-download-pdf', compact('parent', 'Question', 'participantEmp', 'showRespondentIdentity', 'privacy'))
             ->setPaper('a4', 'portrait')
             ->download($filename);
     }
