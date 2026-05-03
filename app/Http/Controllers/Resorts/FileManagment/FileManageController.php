@@ -450,11 +450,15 @@ class FileManageController extends Controller
                             
             $parent_unique_id = $File_structure->Folder_unique_id;
             $mergedFiles = collect();
+            // withSum aggregates child file sizes per folder in ONE query —
+            // was firing one SUM per folder on every drill-in.
             $File_structure1 = FilemangementSystem::where('resort_id', $this->resort->resort_id)
                                 ->where('UnderON', $File_structure->id)
-                                ->orderByDesc('Folder_Name')
                                 ->where('Folder_Type',$flag)
-
+                                ->withSum(['children as children_size_sum' => function ($q) {
+                                    $q->where('resort_id', $this->resort->resort_id);
+                                }], 'File_Size')
+                                ->orderByDesc('Folder_Name')
                                 ->get()
                                 ->map(function($ak){
                                     $img='';
@@ -462,11 +466,7 @@ class FileManageController extends Controller
                                     $ak->File_Name =  htmlspecialchars($ak->Folder_Name, ENT_QUOTES, 'UTF-8');
                                     $ak->ModifiedDate = $ak->updated_at->format('d-m-Y');
                                     $ak->Permission = URL::asset('resorts_assets/images/user-4.svg');
-                                    $File_Size = ChildFileManagement::where("Parent_File_ID", $ak->id)
-                                                                    ->where("resort_id", $this->resort->resort_id)
-                                                                    ->sum('File_Size');
-                                    $ak->File_Size = $File_Size;
-                                    $ak->Permission = URL::asset( 'resorts_assets/images/user-4.svg');
+                                    $ak->File_Size = (float) ($ak->children_size_sum ?? 0);
                                     $ak->File_img =  URL::asset('resorts_assets/images/folder.svg');
                                     $ak->unique_id = $ak->Folder_unique_id;
                                     return $ak;
