@@ -99,37 +99,57 @@ class FilePermissionController extends Controller
 
     public function StoreFilePermission(Request $request)
     {
-       
         $department = $request->department;
-        
-        $department = $request->department;
-        if(isset($request->position))
-        {
+        if (isset($request->position)) {
             $positions = $request->position;
+        } else {
+            $positions = ResortPosition::where('resort_id', $this->resort->resort_id)
+                ->where('dept_id', $department)
+                ->pluck('id')
+                ->toArray();
         }
-        else
-        {
-            $positions = ResortPosition::where('resort_id',$this->resort->resort_id)->where("dept_id",$department)->pluck('id')->toArray();
+        $permissions = $request->Permission;
+
+        if (empty($positions) || empty($permissions)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Department, position and at least one file are required.',
+            ], 422);
         }
-        $permissions =  $request->Permission;
-        $FilePermissions = FilePermissions::where('resort_id',$this->resort->resort_id)
-                        ->whereIn('Position_id',$positions)
-                        ->where('Department_id',$department)
-                        ->delete();
-        $resortid = $this->resort->resort_id;
+
+        // Wrap delete + re-insert in a transaction so a failed insert mid-loop
+        // doesn't leave the user with permissions partially wiped.
+        DB::beginTransaction();
+        try {
+            FilePermissions::where('resort_id', $this->resort->resort_id)
+                ->whereIn('Position_id', $positions)
+                ->where('Department_id', $department)
+                ->delete();
+
+            $resortid = $this->resort->resort_id;
             foreach ($positions as $position_id) {
                 foreach ($permissions as $permission_id) {
                     FilePermissions::create([
-                        "resort_id"=>$resortid,
-                        "Department_id"=>$department,
-                        'Position_id' => $position_id,
-                        'file_id' => $permission_id,
+                        'resort_id'     => $resortid,
+                        'Department_id' => $department,
+                        'Position_id'   => $position_id,
+                        'file_id'       => $permission_id,
                     ]);
                 }
             }
-
+            DB::commit();
             return response()->json(['success' => true, 'message' => 'File Permission Updated successfully'], 200);
-
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('StoreFilePermission failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update file permissions. No changes were saved.',
+            ], 500);
+        }
     }
 
     public function SearchPermissionfile(Request $request)

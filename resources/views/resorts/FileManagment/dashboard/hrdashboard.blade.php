@@ -122,164 +122,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- <div class="col-12">
-                        <div class=" card">
-                            <div class=" card-title">
-                                <h3>Documents Expiring Soon</h3>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table-lableNew table-docExpiring  w-100">
-                                    <tr>
-                                        <th>Document Type</th>
-                                        <th>No. Of Document</th>
-                                        <th>Employee Name</th>
-                                        <th>Expiry Date</th>
-                                        <th>Days Left</th>
-                                    </tr>
-                                    <tr>
-                                        <td>Visa</td>
-                                        <td>10</td>
-                                        <td>
-                                            <div class="user-ovImg user-ovImgTable">
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-4')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-5')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>15 Mar 2025</td>
-                                        <td>68 Days</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Passport</td>
-                                        <td>8</td>
-                                        <td>
-                                            <div class="user-ovImg user-ovImgTable">
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-4')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-5')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>10 Feb 2025</td>
-                                        <td>32 Days</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Contract</td>
-                                        <td>12</td>
-                                        <td>
-                                            <div class="user-ovImg user-ovImgTable">
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-4')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-5')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>20 Jan 2025</td>
-                                        <td>11 Days</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Work Permit</td>
-                                        <td>15</td>
-                                        <td>
-                                            <div class="user-ovImg user-ovImgTable">
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-4')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-5')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>05 Apr 2025</td>
-                                        <td>86 Days</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Visa</td>
-                                        <td>15</td>
-                                        <td>
-                                            <div class="user-ovImg user-ovImgTable">
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-4')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-5')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-2')}}.svg" alt="image">
-                                                </div>
-                                                <div class="img-circle">
-                                                    <img src="{{ URL::asset('resorts_assets/images/user-3')}}.svg" alt="image">
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>15 Mar 2025</td>
-                                        <td>68 Days</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                    </div> -->
                 </div>
             </div>
             <!-- <div class="col-lg-6">
@@ -436,7 +278,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg modal-uploadFile">
         <form class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="selectFolderLocation-modal">Upload Document sdfds</h5>
+                <h5 class="modal-title" id="selectFolderLocation-modal">Upload Document</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
          
@@ -507,7 +349,7 @@
         <div class="modal-dialog modal-dialog-centered modal-small modal-CropImage">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Interview Details </h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Crop Image</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -518,7 +360,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:vpid(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+                    <a href="javascript:void(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
                     <a href="javascript:void(0)" id="crop-btn" class="btn btn-themeBlue">Crop</a>
                 </div>
             </div>

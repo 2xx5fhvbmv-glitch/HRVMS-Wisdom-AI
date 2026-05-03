@@ -27,25 +27,83 @@ class DashboardController extends Controller
         $this->reporting_to = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id:0;
         $this->underEmp_id = Common::getSubordinates($this->reporting_to);
     }
-    
+
+    /**
+     * Apply the same role-based visibility filter that IncidentController@list
+     * uses, so dashboard tile counts match what the user can actually open.
+     *
+     *  - HR (rank "HR")  → no extra filter (sees all).
+     *  - GM (rank "GM")  → only approved incidents (approval = 1).
+     *  - Everyone else   → only incidents assigned to one of their committees
+     *                      or reported by someone in their own department.
+     */
+    private function scopeForCurrentViewer($query)
+    {
+        $resort_id = $this->resort->resort_id;
+        $loggedInEmployee = $this->resort->getEmployee ?? $this->resort->GetEmployee ?? null;
+        $query->where('resort_id', $resort_id);
+
+        if (!$loggedInEmployee) {
+            // No employee record — treat as "no visibility" rather than leaking.
+            return $query->whereRaw('0=1');
+        }
+
+        $rankMap = config('settings.Position_Rank');
+        $current_rank = $loggedInEmployee->rank ?? null;
+        $available_rank = $rankMap[$current_rank] ?? '';
+        $isHR = ($available_rank === 'HR');
+        $isGM = ($available_rank === 'GM');
+
+        if ($isHR) return $query;
+
+        if ($isGM) return $query->where('approval', 1);
+
+        $userCommittees = \App\Models\IncidentCommitteeMember::where('member_id', $loggedInEmployee->id)
+            ->pluck('commitee_id')
+            ->toArray();
+        $departmentId = $loggedInEmployee->Dept_id ?? null;
+
+        return $query->where(function ($q) use ($userCommittees, $departmentId) {
+            if (!empty($userCommittees)) {
+                $q->orWhere(function ($subQ) use ($userCommittees) {
+                    foreach ($userCommittees as $committeeId) {
+                        $subQ->orWhereRaw("JSON_CONTAINS(assigned_to, ?)", [json_encode((string)$committeeId)]);
+                    }
+                });
+            }
+            if ($departmentId) {
+                $q->orWhereHas('reporter', function ($subQ) use ($departmentId) {
+                    $subQ->where('Dept_id', $departmentId);
+                });
+            }
+        });
+    }
+
     public function HR_Dashobard()
     {
         $page_title ='Incident';
         $resort_id= $this->resort->resort_id;
-        $total_incidents = Incidents::where('resort_id',$resort_id)->count();
-        $open_incidents = Incidents::where('resort_id', $resort_id)
-        ->whereNotIn('status', ['Reported', 'Resolved'])
-        ->count();
-        $under_investigation_incidents = Incidents::where('resort_id', $resort_id)
-        ->where('status', 'Investigation In Progress')
-        ->count();
-        $averageResolutionDays = DB::table('incidents as i')
-        ->join('incidents_investigation as ii','ii.incident_id','=','i.id')
-        ->where('i.status', 'Resolved')
-        ->whereNotNull('ii.start_date')
-        ->whereColumn('i.updated_at', '>', 'ii.start_date')
-        ->select(DB::raw('AVG(DATEDIFF(i.updated_at, ii.start_date)) as avg_days'))
-        ->value('avg_days');
+        $total_incidents = $this->scopeForCurrentViewer(Incidents::query())->count();
+        $open_incidents = $this->scopeForCurrentViewer(Incidents::query())
+            ->whereNotIn('status', ['Reported', 'Resolved'])
+            ->count();
+        $under_investigation_incidents = $this->scopeForCurrentViewer(Incidents::query())
+            ->where('status', 'Investigation In Progress')
+            ->count();
+        // Restrict the resolution-days average to the same incident set the
+        // viewer can actually see (otherwise non-HR users see resort-wide
+        // numbers in tiles that don't match the list page).
+        $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
+        $averageResolutionDays = $visibleIncidentIds
+            ? DB::table('incidents as i')
+                ->join('incidents_investigation as ii','ii.incident_id','=','i.id')
+                ->whereIn('i.id', $visibleIncidentIds)
+                ->where('i.status', 'Resolved')
+                ->whereNotNull('ii.start_date')
+                ->whereColumn('i.updated_at', '>', 'ii.start_date')
+                ->select(DB::raw('AVG(DATEDIFF(i.updated_at, ii.start_date)) as avg_days'))
+                ->value('avg_days')
+            : 0;
         // dd($averageResolutionDays);
         $committees = IncidentCommittee::where('resort_id', $resort_id)->get();
 
@@ -69,11 +127,11 @@ class DashboardController extends Controller
             ];
         }
 
-        $severityCounts = Incidents::where('resort_id', $resort_id)
-        ->select('severity', \DB::raw('count(*) as total'))
-        ->groupBy('severity')
-        ->pluck('total', 'severity')
-        ->toArray();
+        $severityCounts = $this->scopeForCurrentViewer(Incidents::query())
+            ->select('severity', \DB::raw('count(*) as total'))
+            ->groupBy('severity')
+            ->pluck('total', 'severity')
+            ->toArray();
 
         // Ensure all severity types are present even if count is 0
         $allSeverities = ['Minor', 'Moderate', 'Severe'];
@@ -83,26 +141,28 @@ class DashboardController extends Controller
             }
         }
 
-        $resolvedCount = Incidents::where('resort_id', $resort_id)
+        $resolvedCount = $this->scopeForCurrentViewer(Incidents::query())
             ->where('status', 'Resolved')
             ->count();
 
-        $unresolvedCount = Incidents::where('resort_id', $resort_id)
+        $unresolvedCount = $this->scopeForCurrentViewer(Incidents::query())
             ->where('status', '!=', 'Resolved')
             ->count();
 
 
-        $categoryCounts = Incidents::where('incidents.resort_id', $resort_id)
+        // Reuse $visibleIncidentIds (computed above for the avg-days query) so
+        // the category chart only shows categories the viewer is allowed to see.
+        $categoryCounts = Incidents::query()
+            ->whereIn('incidents.id', $visibleIncidentIds ?: [0])
             ->join('incident_categories', 'incidents.category', '=', 'incident_categories.id')
             ->select('incident_categories.category_name as category_name', \DB::raw('count(*) as total'))
             ->groupBy('incident_categories.category_name')
             ->get();
-        
+
         $categoryLabels = $categoryCounts->pluck('category_name')->toArray();
         $categoryData = $categoryCounts->pluck('total')->toArray();
         $totalIncidents = array_sum($categoryData);
 
-        // dd($severityCounts);
         return view('resorts.incident.dashboard.hrdashboard',compact('page_title','total_incidents','open_incidents','under_investigation_incidents','averageResolutionDays','committeeSummary','severityCounts','resolvedCount','unresolvedCount','categoryLabels','categoryData','totalIncidents'));
     }
 
@@ -555,8 +615,20 @@ class DashboardController extends Controller
         $totalIncidents = array_sum($categoryData);
 
         // dd($severityCounts);
-        return view('resorts.incident.dashboard.hoddashboard',compact('page_header','page_header','
-page_title','total_incidents','pending_incidents','under_investigation_incidents','averageResolutionDays','committeeSummary','severityCounts','resolvedCount','unresolvedCount','categoryLabels','categoryData','totalIncidents'));
+        return view('resorts.incident.dashboard.hoddashboard', compact(
+            'page_title',
+            'total_incidents',
+            'pending_incidents',
+            'under_investigation_incidents',
+            'averageResolutionDays',
+            'committeeSummary',
+            'severityCounts',
+            'resolvedCount',
+            'unresolvedCount',
+            'categoryLabels',
+            'categoryData',
+            'totalIncidents'
+        ));
     }
 
     public function excom_dashboard()

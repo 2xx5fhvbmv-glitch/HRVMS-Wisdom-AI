@@ -58,23 +58,19 @@ class DashboardController extends Controller
                                                     ->count();
         $colors = ['#014653','#53CAFF','#EFB408','#2EACB3','#333333','#8DC9C9','#7AD45A','#FF4B4B','#F5738D', '#0E8509'];
         $i=0;
+        // withCount aggregates children per folder in ONE query — was N+1
+        // (one count per folder) on every dashboard load.
         $FolderFiles = FilemangementSystem::where('resort_id', $this->resort->resort_id)
-                                            ->orderByDesc('id')
                                             ->where("Folder_Type", "uncategorized")
+                                            ->withCount(['children as Folder_Files_count' => function ($q) {
+                                                $q->where('resort_id', $this->resort->resort_id);
+                                            }])
+                                            ->orderByDesc('id')
                                             ->get(['Folder_Name','id'])->map(function($ak) use(&$i,$colors)
                                             {
-                                                if ($i < count($colors)) 
-                                                {
-                                                    $ak->color = $colors[$i]; // Assign color if available
-                                                }
-                                                else 
-                                                {
-                                                    $i=0; 
-                                                    $ak->color = $colors[$i]; 
-                                                }
-                                                $i++; 
-                                                $ak->Folder_Name;
-                                                $ak->Folder_Files_count = ChildFileManagement::where('Parent_File_ID', $ak->id)->where('resort_id', $this->resort->resort_id)->count();
+                                                if ($i >= count($colors)) { $i = 0; }
+                                                $ak->color = $colors[$i];
+                                                $i++;
                                                 return $ak;
                                             });
         return view('resorts.FileManagment.dashboard.admindashboard',compact('page_title','FolderList','UnassignedDocumentsCounts','FolderCount','TotalDocument','FolderFiles'));
@@ -84,9 +80,12 @@ class DashboardController extends Controller
     
     public function HR_Dashobard()
     {
-       
+        if (Common::checkRouteWisePermission('FileManagment.hr.dashboard', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized action.');
+        }
+
         $page_title ="File Managment";
-        
+
         $FolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)
         // ->where('UnderON', 0)
         ->where("Folder_Type", "uncategorized")
@@ -109,23 +108,19 @@ class DashboardController extends Controller
                                                     ->count();
         $colors = ['#014653','#53CAFF','#EFB408','#2EACB3','#333333','#8DC9C9','#7AD45A','#FF4B4B','#F5738D', '#0E8509'];
         $i=0;
+        // withCount aggregates children per folder in ONE query — was N+1
+        // (one count per folder) on every dashboard load.
         $FolderFiles = FilemangementSystem::where('resort_id', $this->resort->resort_id)
-                                            ->orderByDesc('id')
                                             ->where("Folder_Type", "uncategorized")
+                                            ->withCount(['children as Folder_Files_count' => function ($q) {
+                                                $q->where('resort_id', $this->resort->resort_id);
+                                            }])
+                                            ->orderByDesc('id')
                                             ->get(['Folder_Name','id'])->map(function($ak) use(&$i,$colors)
                                             {
-                                                if ($i < count($colors)) 
-                                                {
-                                                    $ak->color = $colors[$i]; // Assign color if available
-                                                }
-                                                else 
-                                                {
-                                                    $i=0; 
-                                                    $ak->color = $colors[$i]; 
-                                                }
-                                                $i++; 
-                                                $ak->Folder_Name;
-                                                $ak->Folder_Files_count = ChildFileManagement::where('Parent_File_ID', $ak->id)->where('resort_id', $this->resort->resort_id)->count();
+                                                if ($i >= count($colors)) { $i = 0; }
+                                                $ak->color = $colors[$i];
+                                                $i++;
                                                 return $ak;
                                             });
         return view('resorts.FileManagment.dashboard.hrdashboard',compact('page_title','FolderList','UnassignedDocumentsCounts','FolderCount','TotalDocument','FolderFiles'));

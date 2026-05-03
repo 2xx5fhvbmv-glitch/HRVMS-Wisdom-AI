@@ -164,7 +164,7 @@
                     <div class="col-12">
                         <label for="file_type" class="form-label">FILE TYPE</label>
                         <input type="text" class="form-control" name="file_type" id="file_type">
-                        <input type="hidden" class="form-control" id="MainFolderType" name="MainFolderType" values="categorized">
+                        <input type="hidden" class="form-control" id="MainFolderType" name="MainFolderType" value="categorized">
                     </div>
                     <!-- <div class="col-12">
                         <label for="employee_name" class="form-label">EMPLOYEE NAME</label>

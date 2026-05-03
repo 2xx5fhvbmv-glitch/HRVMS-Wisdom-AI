@@ -164,7 +164,7 @@
                     <div class="col-12">
                         <label for="file_type" class="form-label">FILE TYPE</label>
                         <input type="text" class="form-control" name="file_type" id="file_type">
-                        <input type="hidden" class="form-control" id="MainFolderType" name="MainFolderType" values="uncategorized">
+                        <input type="hidden" class="form-control" id="MainFolderType" name="MainFolderType" value="uncategorized">
                     </div>
                     <!-- <div class="col-12">
                         <label for="employee_name" class="form-label">EMPLOYEE NAME</label>
@@ -220,7 +220,7 @@
                         <div class="col-md-12">
                             <input type="text" name="Folder_Name" id="Folder_Name" class="form-control"
                                 placeholder="Folder Name">
-                            <input type="hidden" name="flag" id="FolderType" class="form-control" values="uncategorized">
+                            <input type="hidden" name="flag" id="FolderType" class="form-control" value="uncategorized">
                         </div>
                     </div>
 

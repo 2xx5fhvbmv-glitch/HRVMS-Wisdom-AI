@@ -37,4 +37,13 @@ class FilemangementSystem extends Model
             }
         });
     }
+
+    /**
+     * Files directly stored under this folder. Enables withCount('children')
+     * and withSum('children', 'File_Size') so listing pages can avoid N+1.
+     */
+    public function children()
+    {
+        return $this->hasMany(ChildFileManagement::class, 'Parent_File_ID', 'id');
+    }
 }
