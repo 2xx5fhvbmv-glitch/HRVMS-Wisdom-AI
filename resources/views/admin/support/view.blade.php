@@ -13,12 +13,31 @@
             </div>
             <div class="card-body">
                 <p><strong>Ticket Id: </strong> {{$support->ticketID}}</p>
-                <p><strong>Employee Name:</strong> {{ $support->createdBy->first_name }} {{ $support->createdBy->last_name }}</p>
+                <p><strong>Employee Name:</strong> {{ optional($support->createdBy)->first_name }} {{ optional($support->createdBy)->last_name }}</p>
                 <p><strong>Category:</strong> {{ $support->support_category->name ?? 'N/A' }}</p>
                 <p><strong>Subject:</strong> {{ $support->subject }}</p>
                 @if($supportEmails->isEmpty())
                   <p><strong>Description:</strong> {{ $support->description }}</p>
                 @endif
+
+                {{-- Files the employee attached when raising the ticket. Stored
+                     as JSON [{Filename, Child_id}, …] on support.attachments. --}}
+                @php
+                    $ticketAttachments = $support->attachments ? json_decode($support->attachments, true) : [];
+                @endphp
+                @if(!empty($ticketAttachments))
+                    <p class="mb-1"><strong>Attachments:</strong></p>
+                    <div class="attachments mb-2">
+                        @foreach($ticketAttachments as $attachment)
+                            @if(isset($attachment['Filename']) && isset($attachment['Child_id']))
+                                <a href="javascript:void(0)" class="download-link d-inline-block me-3 mb-1" data-id="{{ base64_encode($attachment['Child_id']) }}">
+                                    <i class="fas fa-paperclip"></i> {{ $attachment['Filename'] }}
+                                </a>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
+
                 <p><strong>Status:</strong> <span class="badge badge-primary">{{ $support->status }}</span></p>
                 <p><strong>Created At:</strong> {{ \Carbon\Carbon::parse($support->created_at)->format('d M Y') }}</p>
 

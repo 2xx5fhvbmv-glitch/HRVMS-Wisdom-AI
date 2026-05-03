@@ -26,16 +26,24 @@
                         <div class="card-title">
                             <div class="row g-3 g-2 align-items-center justify-content-between">
                                 <div class="col-auto">
+                                    @php
+                                        // assignedAdmin is null for tickets that haven't been
+                                        // picked up by an admin yet — show a placeholder so
+                                        // the page doesn't 500 on first chat open.
+                                        $admin       = $support->assignedAdmin;
+                                        $adminFirst  = $admin->first_name ?? '';
+                                        $adminLast   = $admin->last_name ?? '';
+                                        $adminFull   = trim($adminFirst.' '.$adminLast);
+                                        $initials    = $adminFirst !== '' || $adminLast !== ''
+                                            ? strtoupper(substr($adminFirst, 0, 1).substr($adminLast, 0, 1))
+                                            : '—';
+                                    @endphp
                                     <div class="d-flex align-items-center">
                                         <div class="me-md-3 me-2">
-                                            <div class="profile-initials">
-                                                {{ strtoupper(substr($support->assignedAdmin->first_name, 0, 1)) }}{{ strtoupper(substr($support->assignedAdmin->last_name, 0, 1)) }}
-                                            </div>                                         
+                                            <div class="profile-initials">{{ $initials }}</div>
                                         </div>
                                         <div>
-                                            <h6>
-                                                {{$support->assignedAdmin->first_name." ".$support->assignedAdmin->last_name}}
-                                            </h6>
+                                            <h6>{{ $adminFull !== '' ? $adminFull : 'Unassigned' }}</h6>
                                             <p>Admin Support</p>
                                         </div>
                                     </div>
@@ -52,11 +60,9 @@
                                         <div class="chat-msg {{ $msg->sender_type === 'employee' ? 'right' : '' }}">
                                             <div class="img-circle">
                                                 @if($msg->sender_type === 'employee')
-                                                    <img src="{{Common::getResortUserPicture('$support->createdBy')}}" alt="user"/>
+                                                    <img src="{{ Common::getResortUserPicture(optional($support->createdBy)->id) }}" alt="user"/>
                                                 @else
-                                                    <div class="profile-initials">
-                                                        {{ strtoupper(substr($support->assignedAdmin->first_name, 0, 1)) }}{{ strtoupper(substr($support->assignedAdmin->last_name, 0, 1)) }}
-                                                    </div>
+                                                    <div class="profile-initials">{{ $initials }}</div>
                                                 @endif
                                             </div>
                                             <div class="msg">
@@ -82,8 +88,8 @@
                             <div class="chatSend-input">
                                 <input type="hidden" id="support_id" value="{{ $support->id }}">
                                 <input type="hidden" id="receiver_id" value="{{ $support->assigned_to }}">
-                                <input type="hidden" id="receiver_name" value="{{ $support->assignedAdmin->first_name.' '.$support->assignedAdmin->last_name }}">
-                                <input type="hidden" id="receiver_image" value="{{ $support->assignedAdmin->profile_pic }}">
+                                <input type="hidden" id="receiver_name" value="{{ $adminFull }}">
+                                <input type="hidden" id="receiver_image" value="{{ optional($admin)->profile_pic }}">
                                 <input type="text" id="message" class="form-control" placeholder="Type a message...">
                                  <!-- Attachment Input (Hidden) -->
                                 <input type="file" id="attachment" name="attachments[]" class="d-none" accept="image/*, .pdf, .docx, .xlsx" multiple>

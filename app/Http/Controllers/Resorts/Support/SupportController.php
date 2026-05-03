@@ -77,11 +77,16 @@ class SupportController extends Controller
             5 => 'status',
         ];
 
-        // Build query
-        $query = Support::with(['support_category', 'createdBy']);
+        // Build query — always scope by resort so HR users don't accidentally
+        // see other tenants' tickets.
+        $query = Support::with(['support_category', 'createdBy'])
+            ->where('resort_id', $this->resort->resort_id);
 
         if (!$isHR) {
-            $query->where('created_by', $loggedInEmployee->id);
+            // Support::boot() writes created_by = Auth::guard('resort-admin')->user()->id
+            // (the resort_admins row id), NOT the employee id. Filter against the
+            // logged-in resort_admin id to actually find the user's own tickets.
+            $query->where('created_by', $this->resort->id);
         }
 
         // Apply filters
@@ -156,24 +161,35 @@ class SupportController extends Controller
                     return '<span class="badge badge-warning">Support available during business hours</span>';
                 }
 
-                $buttons = '';
-                if ($support->support_preference == "LiveChat") {
-                    $chat_url = route('support.chat.system', base64_encode($support->id));
-                    $buttons .= '<a href="'.$chat_url.'" title="Open Chat" class="btn-lg-icon icon-bg-blue mx-1">
-                                    <i class="fas fa-comments"></i>
-                                </a>';
-                }
+                // Support preference UI hidden — show all available actions
+                // regardless of the per-ticket preference. (Original gated
+                // behaviour kept commented below for restoration.)
+                $email_url = route('resort.email.replypage', base64_encode($support->id));
+                $view_url  = route('resort.supports.view',   base64_encode($support->id));
+                $chat_url  = route('support.chat.system',    base64_encode($support->id));
 
-                if ($support->support_preference == "Email" && !empty($supportEmail)) {
-                    $email_url = route('resort.email.replypage', base64_encode($support->id));
-                    $view_url = route('resort.supports.view', base64_encode($support->id));
+                $buttons = '';
+                if (!empty($supportEmail)) {
                     $buttons .= '<a href="'.$email_url.'" title="Reply via Email" class="btn-lg-icon icon-bg-yellow mx-1 reply-email">
-                                    <i class="fas fa-envelope"></i> 
-                                </a>';
-                    $buttons .= '<a href="'.$view_url.'" class="btn-lg-icon icon-bg-skyblue">
-                                    <img src="'.asset('resorts_assets/images/eye.svg').'" alt="icon">
+                                    <i class="fas fa-envelope"></i>
                                 </a>';
                 }
+                $buttons .= '<a href="'.$chat_url.'" title="Open Chat" class="btn-lg-icon icon-bg-blue mx-1">
+                                <i class="fas fa-comments"></i>
+                            </a>';
+                $buttons .= '<a href="'.$view_url.'" title="View Ticket" class="btn-lg-icon icon-bg-skyblue">
+                                <img src="'.asset('resorts_assets/images/eye.svg').'" alt="icon">
+                            </a>';
+
+                /*
+                if ($support->support_preference == "LiveChat") {
+                    $buttons .= '<a href="'.$chat_url.'" title="Open Chat" class="btn-lg-icon icon-bg-blue mx-1"><i class="fas fa-comments"></i></a>';
+                }
+                if ($support->support_preference == "Email" && !empty($supportEmail)) {
+                    $buttons .= '<a href="'.$email_url.'" title="Reply via Email" class="btn-lg-icon icon-bg-yellow mx-1 reply-email"><i class="fas fa-envelope"></i></a>';
+                    $buttons .= '<a href="'.$view_url.'" class="btn-lg-icon icon-bg-skyblue"><img src="'.asset('resorts_assets/images/eye.svg').'" alt="icon"></a>';
+                }
+                */
 
                 return $buttons;
             })
@@ -258,7 +274,9 @@ class SupportController extends Controller
         $ticket = Support::create([
             'resort_id' => $this->resort->resort_id,
             'ticketID' => $ticketId,
-            'support_preference'=>$request->supportPreference,
+            // Support preference field hidden from the form per request — keep
+            // the column write commented so it can be re-enabled later.
+            // 'support_preference' => $request->supportPreference,
             'category_id' => $request->category,
             'subject' => $request->subject,
             'description' => $request->description,

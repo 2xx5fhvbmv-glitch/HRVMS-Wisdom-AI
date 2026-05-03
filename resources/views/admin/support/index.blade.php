@@ -23,6 +23,8 @@
                             <th><input type="checkbox" name="all_chk" id="all_chk"></th>
                             <th>Ticket ID</th>
                             <th>Employee Name</th>
+                            <th>Position</th>
+                            <th>Resort</th>
                             <th>Category</th>
                             <th>Subject</th>
                             <th>Date</th>
@@ -197,6 +199,8 @@
             { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
             { data: 'ticketID', name: 'ticketID' },
             { data: 'employee_name', name: 'employee_name', orderable: false, searchable: false },
+            { data: 'position', name: 'position', orderable: false, searchable: false },
+            { data: 'resort_name', name: 'resort_name', orderable: false, searchable: false },
             { data: 'category', name: 'category' },
             { data: 'subject', name: 'subject' },
             { data: 'created_at', name: 'created_at' },

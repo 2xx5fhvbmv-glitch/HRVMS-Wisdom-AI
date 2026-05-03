@@ -14,6 +14,26 @@
                 </div>
 
                 <div class="card-body">
+                    @php
+                        // Either side of the chat can be null on a fresh ticket
+                        // (no admin assigned yet, or createdBy relation broken).
+                        // Pre-compute safe display values once instead of
+                        // dereferencing inside the loop.
+                        $admin            = $support->assignedAdmin;
+                        $adminFirst       = $admin->first_name ?? '';
+                        $adminLast        = $admin->last_name ?? '';
+                        $adminFullName    = trim($adminFirst.' '.$adminLast) ?: 'Unassigned';
+                        $adminInitials    = ($adminFirst !== '' || $adminLast !== '')
+                            ? strtoupper(substr($adminFirst, 0, 1).substr($adminLast, 0, 1))
+                            : '—';
+
+                        $customer         = $support->createdBy;
+                        $customerFirst    = optional($customer)->first_name ?? '';
+                        $customerLast     = optional($customer)->last_name ?? '';
+                        $customerFullName = trim($customerFirst.' '.$customerLast) ?: 'Customer';
+                        $customerImage    = $customer ? \App\Helpers\Common::getResortUserPicture($customer->id) : asset('admin_assets/files/user-image.png');
+                        $customerEmpId    = optional(optional($customer)->GetEmployee)->id;
+                    @endphp
                     <!-- Chat Messages -->
                     <div id="chat-messages" class="direct-chat-messages">
                         @foreach($messages as $msg)
@@ -21,20 +41,18 @@
                             <div class="direct-chat-msg {{ $msg->sender_type === 'admin' ? 'right' : '' }}">
                                 <div class="direct-chat-infos clearfix">
                                     @if($msg->sender_type === 'admin')
-                                        <span class="direct-chat-name float-right">{{$support->assignedAdmin->first_name}} {{$support->assignedAdmin->last_name}}</span>
+                                        <span class="direct-chat-name float-right">{{ $adminFullName }}</span>
                                         <span class="direct-chat-timestamp float-left"> {{ $msg->created_at->format('h:i A') }}</span>
                                     @else
-                                        <span class="direct-chat-name float-left">{{$support->createdBy->first_name}} {{$support->createdBy->last_name}}</span>
+                                        <span class="direct-chat-name float-left">{{ $customerFullName }}</span>
                                         <span class="direct-chat-timestamp float-right"> {{ $msg->created_at->format('h:i A') }}</span>
                                     @endif
                                 </div>
                                 <!-- /.direct-chat-infos -->
                                 @if($msg->sender_type === 'admin')
-                                    <div class="profile-initials direct-chat-img">
-                                        {{ strtoupper(substr($support->assignedAdmin->first_name, 0, 1)) }}{{ strtoupper(substr($support->assignedAdmin->last_name, 0, 1)) }}
-                                    </div>
+                                    <div class="profile-initials direct-chat-img">{{ $adminInitials }}</div>
                                 @else
-                                    <img class="direct-chat-img" src="{{Common::getResortUserPicture('$support->createdBy->GetEmployee->Admin_Parent_id')}}" alt="message user image">
+                                    <img class="direct-chat-img" src="{{ $customerImage }}" alt="message user image">
                                 @endif
                                 <!-- /.direct-chat-img -->
                                 <div class="direct-chat-text">
@@ -61,9 +79,9 @@
                     <form id="chat-form" enctype="multipart/form-data">
                         <div class="input-group">
                             <input type="hidden" id="support_id" value="{{ $support->id }}">
-                            <input type="hidden" id="receiver_id" value="{{ $support->createdBy->GetEmployee->id }}">
-                            <input type="hidden" id="receiver_name" value="{{ $support->createdBy->first_name.' '.$support->createdBy->last_name }}">
-                            <input type="hidden" id="receiver_image" value="{{ Common::getResortUserPicture($support->createdBy) }}">
+                            <input type="hidden" id="receiver_id" value="{{ $customerEmpId }}">
+                            <input type="hidden" id="receiver_name" value="{{ $customerFullName }}">
+                            <input type="hidden" id="receiver_image" value="{{ $customerImage }}">
 
                             <input type="text" id="message" name="message" placeholder="Type Message..." class="form-control">
 
