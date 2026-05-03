@@ -43,8 +43,13 @@ class IncidentMeetingController extends Controller
     {
         $page_title ='Investigation Meeting';
         $resort_id = $this->resort->resort_id;
-        // $categories = IncidentMeeting::where('resort_id',$resort_id)->get();        
-        return view('resorts.incident.meeting.index',compact('page_title'));
+        // Incidents available for new-meeting creation (exclude resolved ones).
+        $incidents = Incidents::where('resort_id', $resort_id)
+            ->where('status', '!=', 'Resolved')
+            ->orderByDesc('id')
+            ->get(['id','incident_id','incident_name']);
+        $canCreate = Common::checkRouteWisePermission('incident.meeting', config('settings.resort_permissions.create'));
+        return view('resorts.incident.meeting.index', compact('page_title','incidents','canCreate'));
     }
 
     public function list(Request $request)
@@ -165,8 +170,15 @@ class IncidentMeetingController extends Controller
         $incident = Incidents::findOrFail($incident_id);
         $status = ['Active','OnLeave','Probationary','contractual'];
         $participants = Employee::with('resortAdmin')->where('resort_id',$resort_id)->wherein('status',$status)->get();
-        // dd($participants);
-        return view('resorts.incident.meeting.create',compact('page_title','participants','incident'));
+
+        // Past meetings on this incident — surfaced in the "Previous Notes /
+        // Findings" section so the user has context before scheduling a new one.
+        $previousMeetings = IncidentsMeeting::where('incident_id', $incident->id)
+            ->orderByDesc('meeting_date')
+            ->orderByDesc('meeting_time')
+            ->get(['id','meeting_subject','meeting_date','meeting_time','meeting_agenda']);
+
+        return view('resorts.incident.meeting.create', compact('page_title','participants','incident','previousMeetings'));
     }
 
     public function store(Request $request)

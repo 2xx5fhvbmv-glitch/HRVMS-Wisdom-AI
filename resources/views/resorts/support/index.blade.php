@@ -35,9 +35,15 @@
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
+                        {{-- Date filter hidden per request — keep markup commented so it's
+                             easy to restore. The init JS still references #dateFilter so
+                             we keep a hidden input around to avoid undefined-val errors. --}}
+                        {{--
                         <div class="col-xl-2 col-lg-4 col-md-5  col-6">
                             <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
                         </div>
+                        --}}
+                        <input type="hidden" name="dateFilter" id="dateFilter" value=""/>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                             <select class="form-select select2t-none" id="statusFilter">
                                 <option value="">Select Status</option>
@@ -81,6 +87,9 @@
                 <form id="raiseTicketForm" enctype="multipart/form-data">
                     <div class="modal-body pb-md-4">
                         <div class="row g-md-4 g-3">
+                            {{-- Support Preference hidden per request — keep markup commented
+                                 so it's easy to restore later. --}}
+                            {{--
                             <div class="col-12">
                                 <label for="category" class="form-label">Support Preference </label>
                                 @foreach($supportPreferences as $key => $preference)
@@ -93,6 +102,7 @@
                                     </div>
                                 @endforeach
                             </div>
+                            --}}
                             <div class="col-12">
                                 <label for="category" class="form-label">Category <span class="req_span">*</span></label>
                                 <select name="category" id="category" class="form-select select2t-modal" required>
@@ -169,16 +179,23 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        $('#raiseATicket-modal').modal('hide'); // Close modal
-                        $('#raiseTicketForm')[0].reset(); // Reset form
+                        // Defer table reload until AFTER the modal hide animation
+                        // completes, otherwise focus/scroll churn can suppress
+                        // the AJAX or interleave with select2 teardown.
+                        $('#raiseATicket-modal').one('hidden.bs.modal', function () {
+                            $('#raiseTicketForm')[0].reset();
+                            $('#raiseTicketForm .select2t-modal').val('').trigger('change');
+                            loadSupportlist();
+                        });
+                        $('#raiseATicket-modal').modal('hide');
+
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
-                       
-                        $('#table-billingInvoiceSupportList').DataTable().ajax.reload(); // Reload DataTable
                     } else {
-                     
-                        
+                        toastr.error(response.message || 'Failed to submit ticket.', 'Error', {
+                            positionClass: 'toast-bottom-right'
+                        });
                     }
                 },
                 error: function(xhr) {
@@ -232,10 +249,11 @@
             ajax: {
                 url: "{{ route('support.get.data') }}",
                 type: 'GET',
+                cache: false, // prevent the browser from serving the previous list
                 data: function(d) {
                     d.searchTerm = $('#searchInput').val();
                     d.status = $('#statusFilter').val();
-                    
+
                     let selectedDate = $('#dateFilter').val();
                     if (selectedDate) {
                         let parts = selectedDate.split('/');
@@ -243,6 +261,15 @@
                     } else {
                         d.date = '';
                     }
+                },
+                error: function (xhr) {
+                    // Surface backend errors instead of a silent "No data".
+                    console.error('Support list AJAX failed', xhr.status, xhr.responseText);
+                    toastr.error(
+                        'Failed to load support tickets (' + xhr.status + '). Check console for details.',
+                        'Error',
+                        { positionClass: 'toast-bottom-right' }
+                    );
                 }
             },
             columns: [

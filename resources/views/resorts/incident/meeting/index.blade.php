@@ -11,13 +11,20 @@
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
             <div class="page-hedding">
-                <div class="row justify-content-between g-3">
+                <div class="row justify-content-between g-3 align-items-center">
                     <div class="col-auto">
                         <div class="page-title">
                             <span>Incident</span>
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
+                    @if($canCreate)
+                    <div class="col-auto">
+                        <a href="javascript:void(0)" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
+                            <i class="fa-solid fa-plus me-1"></i> Create Meeting
+                        </a>
+                    </div>
+                    @endif
                 </div>
             </div>
 
@@ -56,6 +63,37 @@
             </div>
         </div>
     </div>
+    {{-- Create-meeting flow needs an incident first; this picker routes to
+         incident.meeting.create/{base64-id} once the user chooses one. --}}
+    @if($canCreate)
+    <div class="modal fade" id="selectIncidentForMeetingModal" tabindex="-1" aria-labelledby="selectIncidentForMeetingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="selectIncidentForMeetingModalLabel">Select Incident</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="select_incident_for_meeting" class="form-label">INCIDENT <span class="red-mark">*</span></label>
+                    <select class="form-select select2t-none" id="select_incident_for_meeting">
+                        <option value="">Select Incident</option>
+                        @foreach($incidents as $inc)
+                            <option value="{{ base64_encode($inc->id) }}">{{ $inc->incident_id }} — {{ $inc->incident_name }}</option>
+                        @endforeach
+                    </select>
+                    @if($incidents->isEmpty())
+                        <p class="text-muted mt-2 mb-0">No active incidents available. Resolve or create an incident first.</p>
+                    @endif
+                </div>
+                <div class="modal-footer">
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Cancel</a>
+                    <a href="javascript:void(0)" id="proceedToCreateMeeting" class="btn btn-themeBlue {{ $incidents->isEmpty() ? 'disabled' : '' }}">Proceed</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
      <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -100,6 +138,25 @@
 
 <script>
     $(document).ready(function () {
+        // Initialize select2 inside the create-meeting picker modal once it opens
+        // so the dropdown doesn't render with zero width.
+        $('#selectIncidentForMeetingModal').on('shown.bs.modal', function () {
+            $('#select_incident_for_meeting').select2({
+                dropdownParent: $('#selectIncidentForMeetingModal'),
+                placeholder: 'Select Incident',
+                width: '100%'
+            });
+        });
+
+        $('#proceedToCreateMeeting').on('click', function () {
+            var encodedId = $('#select_incident_for_meeting').val();
+            if (!encodedId) {
+                toastr.error('Please choose an incident.', 'Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            window.location.href = "{{ route('incident.meeting.create', ':id') }}".replace(':id', encodedId);
+        });
+
         $('#dateFilter').datepicker({
             format: 'dd/mm/yyyy',
             autoclose: true

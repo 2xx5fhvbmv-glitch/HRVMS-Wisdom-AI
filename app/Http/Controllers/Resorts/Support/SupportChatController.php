@@ -50,19 +50,28 @@ class SupportChatController extends Controller
         {
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
+        // Receiver fields are nullable: tickets that haven't been assigned to
+        // an admin yet have no concrete recipient. We still record the
+        // employee's outbound message and notify the support pool generically.
         $validatedData = $request->validate([
-            'support_id' => 'required|exists:support,id',
-            'senderId' => 'required',
-            'senderType' => 'required|string',
-            'receiverId' => 'required',
-            'receiverType' => 'required|string',
-            'receiver_name' => 'required|string',
+            'support_id'     => 'required|exists:support,id',
+            'senderId'       => 'required',
+            'senderType'     => 'required|string',
+            'receiverId'     => 'nullable',
+            'receiverType'   => 'nullable|string',
+            'receiver_name'  => 'nullable|string',
             'receiver_image' => 'nullable|string',
-            'senderName' => 'required|string',
-            'senderImage' => 'nullable|string',
-            'message' => 'nullable|string',
-            'attachments.*' => 'nullable|file|max:51200' // 50MB max size
+            'senderName'     => 'required|string',
+            'senderImage'    => 'nullable|string',
+            'message'        => 'nullable|string',
+            'attachments.*'  => 'nullable|file|max:51200' // 50MB max size
         ]);
+
+        // Fall back so downstream insert + broadcast never see nulls/empty.
+        $validatedData['receiverId']     = $validatedData['receiverId']     ?: 0;
+        $validatedData['receiverType']   = $validatedData['receiverType']   ?: 'admin';
+        $validatedData['receiver_name']  = $validatedData['receiver_name']  ?: 'Support Team';
+        $validatedData['receiver_image'] = $validatedData['receiver_image'] ?: '';
 
         $uploadedFiles = []; 
 

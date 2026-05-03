@@ -36,8 +36,13 @@ class SupportController extends Controller
         $type = Auth::guard('admin')->user()->type;
         $loginAdmin = Auth::guard('admin')->user()->id;
     
-        // Fetch support tickets with related categories and creators
-        $query = Support::with(['support_category', 'createdBy'])->orderBy('created_at', 'DESC');
+        // Fetch support tickets with related categories and creators.
+        // Eager-load the employee + position chain so the per-row Position
+        // column doesn't trigger N+1 queries.
+        $query = Support::with([
+            'support_category',
+            'createdBy.GetEmployee.position',
+        ])->orderBy('created_at', 'DESC');
     
         // If the user is not a super admin, filter tickets assigned to them
         if ($type != "super") {
@@ -72,6 +77,14 @@ class SupportController extends Controller
                             <div class="img-circle"><img src="' . $image . '" alt="user"></div>
                             <span class="userApplicants-btn">' . $name . '</span>
                         </div>';
+            })
+            ->addColumn('position', function ($support) {
+                $employee = optional($support->createdBy)->GetEmployee;
+                return optional(optional($employee)->position)->position_title ?? 'N/A';
+            })
+            ->addColumn('resort_name', function ($support) use ($resorts) {
+                $resort = $resorts[$support->resort_id] ?? null;
+                return $resort->resort_name ?? 'N/A';
             })
             ->addColumn('category', function ($support) {
                 return $support->support_category->name ?? 'N/A';
@@ -146,14 +159,15 @@ class SupportController extends Controller
             
                 // If the logged-in admin is assigned to this ticket or is a super admin
                 if ($isAssignedToMe || $type == "super") {
-                    if ($support->support_preference == "LiveChat") {
-                        $chatButton = '<a href="' . $chat_url . '" title="Open Chat" class="btn btn-secondary btn-sm mx-1">
-                                            <i class="fas fa-comments"></i> Chat
-                                        </a>';
-                    }
-            
-                    // Ensure email support is enabled and user has an email
-                    if ($support->support_preference == "Email" && !empty($support->createdBy->email)) {
+                    // Support preference UI was removed from the resort side, so
+                    // new tickets have NULL preference. Show Chat + Email Reply
+                    // unconditionally — they were previously hidden, which is
+                    // why "Reply Ticket" went missing from the Actions column.
+                    $chatButton = '<a href="' . $chat_url . '" title="Open Chat" class="btn btn-secondary btn-sm mx-1">
+                                        <i class="fas fa-comments"></i> Chat
+                                    </a>';
+
+                    if (!empty($support->createdBy->email)) {
                         $emailReplyButton = '<button title="Reply via Email" class="btn btn-warning btn-sm mx-1 reply-email"
                             data-toggle="modal" data-target="#replyModal"
                             data-subject="' . htmlspecialchars($support->subject, ENT_QUOTES) . '"
@@ -162,7 +176,7 @@ class SupportController extends Controller
                             <i class="fas fa-envelope"></i> Email Reply
                         </button>';
                     }
-            
+
                     $editButton = '<button title="Change Status" class="btn btn-success btn-sm mx-1 change-status"
                                 data-id="' . $support->id . '" data-status="' . $support->status . '" >
                                 <i class="fas fa-edit"></i> Change Status
