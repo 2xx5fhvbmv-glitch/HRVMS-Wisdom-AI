@@ -16,6 +16,7 @@ use App\Models\ActionStore;
 use App\Models\SeverityStore;
 use App\Models\DisciplinaryCategoriesModel;
 use App\Models\CodeOfCounduct;
+use App\Models\disciplinarySubmit;
 use Illuminate\Validation\Rule;
 use App\Models\Employee;
 use Illuminate\Support\Facades\Validator;
@@ -687,10 +688,23 @@ class ConfigurationController extends Controller
     }
     public function SeverityDestory($id)
     {
+        $id = (int) base64_decode($id);
 
+        // Refuse the delete if the severity is referenced by any Code-of-Conduct
+        // row or any raised Disciplinary case — otherwise those rows would be
+        // left with an orphan Severity_id (no FK constraint exists).
+        $codeOfConductCount = CodeOfCounduct::where('Severity_id', $id)->count();
+        $disciplinaryCount  = disciplinarySubmit::where('Severity_id', $id)->count();
 
-        $id = base64_decode($id);
-
+        if ($codeOfConductCount > 0 || $disciplinaryCount > 0) {
+            $parts = [];
+            if ($codeOfConductCount) $parts[] = $codeOfConductCount . ' Code of Conduct row' . ($codeOfConductCount > 1 ? 's' : '');
+            if ($disciplinaryCount)  $parts[] = $disciplinaryCount  . ' Disciplinary case' . ($disciplinaryCount  > 1 ? 's' : '');
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete this Severity — it is referenced by ' . implode(' and ', $parts) . '. Reassign or remove those records first.',
+            ], 422);
+        }
 
         DB::beginTransaction();
         try
@@ -2051,8 +2065,10 @@ class ConfigurationController extends Controller
                             </div>';
             })
             ->addColumn('Grievance_Cat_id', function ($row) {
-
-                            return $row->category->Category_Name;
+                // Parent category can be missing if it was deleted but sub-cat
+                // wasn't cascaded — fall back to a placeholder instead of
+                // crashing the whole DataTables response with a null-deref.
+                return optional($row->category)->Category_Name ?? '—';
             })
             ->rawColumns(['Action'])
             ->make(true);
@@ -2163,46 +2179,51 @@ class ConfigurationController extends Controller
 
         $resort_id = $this->resort->resort_id;
 
+        // Rows are (category, subcategory) pairs — two rows are allowed to
+        // share a category as long as their subcategory differs. The previous
+        // `distinct` rule on each array independently rejected that valid
+        // case. Pair-level uniqueness (within the form AND against the DB)
+        // is enforced in the after() callback below.
         $validator = Validator::make($request->all(), [
             'Grievance_Cat_id' => ['required', 'array', 'min:1'],
-            'Grievance_Cat_id.*' => ['required', 'distinct'],
+            'Grievance_Cat_id.*' => ['required'],
 
             'Gri_Sub_cat_id' => ['required', 'array', 'min:1'],
-            'Gri_Sub_cat_id.*' => ['required', 'distinct'],
+            'Gri_Sub_cat_id.*' => ['required'],
 
             'priority_level' => ['required', 'array', 'min:1'],
             'priority_level.*' => ['required', 'string', 'in:High,Medium,Low'],
-
-            // Custom Rule to ensure uniqueness for each Category-Subcategory pair
         ], [
             'Grievance_Cat_id.required' => 'Please select at least one Grievance Category.',
             'Grievance_Cat_id.*.required' => 'Each Grievance Category is required.',
-            'Grievance_Cat_id.*.distinct' => 'Duplicate Grievance Categories are not allowed.',
 
             'Gri_Sub_cat_id.required' => 'Please select at least one Grievance Subcategory.',
             'Gri_Sub_cat_id.*.required' => 'Each Grievance Subcategory is required.',
-            'Gri_Sub_cat_id.*.distinct' => 'Duplicate Grievance Subcategories are not allowed.',
 
             'priority_level.required' => 'Please select at least one Priority Level.',
             'priority_level.*.required' => 'Each Priority Level is required.',
             'priority_level.*.in' => 'Priority Level must be High, Medium, or Low.',
         ]);
 
-        $validator->after(function ($validator) use ($request, $resort_id) {
+        $validator->after(function ($validator) use ($request) {
+            // In-payload duplicate guard only — the same (cat, subcat) pair
+            // can't be added twice in the same form. If the pair ALREADY
+            // exists in the DB we don't error any more; the loop below uses
+            // updateOrCreate() to update its priority_level instead.
+            $seenPairs = [];
             foreach ($request->Grievance_Cat_id as $index => $categoryId) {
                 $subcategoryId = $request->Gri_Sub_cat_id[$index] ?? null;
+                if (!$subcategoryId) continue;
 
-                if ($subcategoryId) {
-                    $exists = DB::table('grievance_category_and_subcat_models')
-                        ->where('resort_id', $resort_id)
-                        ->where('Grievance_Cat_id', $categoryId)
-                        ->where('Gri_Sub_cat_id', $subcategoryId)
-                        ->exists();
-
-                    if ($exists) {
-                        $validator->errors()->add("Grievance_Cat_id.$index", "This category and subcategory combination already exists for this resort.");
-                    }
+                $key = $categoryId . '|' . $subcategoryId;
+                if (isset($seenPairs[$key])) {
+                    $validator->errors()->add(
+                        "Gri_Sub_cat_id.$index",
+                        "This category and subcategory combination is repeated in this form."
+                    );
+                    continue;
                 }
+                $seenPairs[$key] = true;
             }
         });
 
@@ -2217,25 +2238,42 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            foreach($request->Grievance_Cat_id as $ak=>$g)
-                {
-
-                    GrievanceCategoryAndSubcatModel::create(
-                        [
-                            'resort_id'=>$resort_id,
-                            'Grievance_Cat_id'=>$g,
-                            'Gri_Sub_cat_id'=>$request->Gri_Sub_cat_id[$ak],
-                            'priority_level'=>$request->priority_level[$ak]
-                        ]
-                    );
-                }
-
-
+            $created = 0;
+            $updated = 0;
+            foreach ($request->Grievance_Cat_id as $ak => $g) {
+                // Upsert by (resort, category, subcategory) — if the pair
+                // already exists, refresh its priority_level instead of
+                // erroring out as a duplicate.
+                $row = GrievanceCategoryAndSubcatModel::updateOrCreate(
+                    [
+                        'resort_id'        => $resort_id,
+                        'Grievance_Cat_id' => $g,
+                        'Gri_Sub_cat_id'   => $request->Gri_Sub_cat_id[$ak],
+                    ],
+                    [
+                        'priority_level'   => $request->priority_level[$ak],
+                    ]
+                );
+                $row->wasRecentlyCreated ? $created++ : $updated++;
+            }
 
             DB::commit();
+
+            // Friendly, scenario-specific success message.
+            if ($created && $updated) {
+                $message = $created . ' added · ' . $updated . ' priority updated for existing pair'
+                    . ($updated > 1 ? 's' : '') . '.';
+            } elseif ($updated && !$created) {
+                $message = ($updated === 1)
+                    ? 'Priority updated for the existing (Category + Subcategory) pair.'
+                    : 'Priority updated for ' . $updated . ' existing (Category + Subcategory) pairs.';
+            } else {
+                $message = 'Grievance Category and Subcategory saved successfully.';
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Grievance Category And Sub Category Create Successfully',
+                'message' => $message,
             ], 200);
         }
         catch (\Exception $e)
@@ -2244,7 +2282,7 @@ class ConfigurationController extends Controller
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to Create Grievance Category And Sub Category'], 500);
+            return response()->json(['error' => 'Failed to save Grievance Category and Sub Category'], 500);
         }
     }
     public function IndexGrievanceCatAndSubCategory(Request $request)
@@ -2303,18 +2341,9 @@ class ConfigurationController extends Controller
             'Priority_Level.required' => 'Please select a Priority Level.',
             'Priority_Level.in' => 'Priority Level must be High, Medium, or Low.',
         ]);
-        $validator->after(function ($validator) use ($request, $resort_id) {
-            $exists = DB::table('grievance_category_and_subcat_models')
-                ->where('resort_id', $resort_id)
-                ->where('Grievance_Cat_id', $request->Grievance_Cat_id)
-                ->where('Gri_Sub_cat_id', $request->Gri_Sub_cat_id)
-                ->where('id', '!=', base64_decode($request->Main_id)) // Exclude the current record from check
-                ->exists();
-            if($exists)
-            {
-                $validator->errors()->add('Grievance_Cat_id', "This category and subcategory combination already exists for this resort.");
-            }
-        });
+        // No more "already exists" error — if the user edits a row to match an
+        // existing (cat, subcat) pair, we merge: update the existing pair's
+        // priority and remove the now-duplicate row being edited.
         if ($validator->fails())
         {
             return response()->json([
@@ -2325,20 +2354,38 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-                   GrievanceCategoryAndSubcatModel::where('resort_id',$resort_id)
-                                        ->where('id',base64_decode($request->Main_id))
-                                        ->update([
-                                                            'resort_id'=>$resort_id,
-                                                            'Grievance_Cat_id'=>$request->Grievance_Cat_id,
-                                                            'Gri_Sub_cat_id'=>$request->Gri_Sub_cat_id,
-                                                            'priority_level'=>$request->Priority_Level
-                                                        ]);
+            $editingId = (int) base64_decode($request->Main_id);
 
+            $existing = GrievanceCategoryAndSubcatModel::where('resort_id', $resort_id)
+                ->where('Grievance_Cat_id', $request->Grievance_Cat_id)
+                ->where('Gri_Sub_cat_id', $request->Gri_Sub_cat_id)
+                ->where('id', '!=', $editingId)
+                ->first();
 
-        DB::commit();
+            if ($existing) {
+                // Merge into the existing pair: refresh its priority and
+                // delete the row the user was editing so no duplicate remains.
+                $existing->update(['priority_level' => $request->Priority_Level]);
+                GrievanceCategoryAndSubcatModel::where('resort_id', $resort_id)
+                    ->where('id', $editingId)
+                    ->delete();
+                $message = 'Priority updated for the existing (Category + Subcategory) pair.';
+            } else {
+                GrievanceCategoryAndSubcatModel::where('resort_id', $resort_id)
+                    ->where('id', $editingId)
+                    ->update([
+                        'resort_id'        => $resort_id,
+                        'Grievance_Cat_id' => $request->Grievance_Cat_id,
+                        'Gri_Sub_cat_id'   => $request->Gri_Sub_cat_id,
+                        'priority_level'   => $request->Priority_Level,
+                    ]);
+                $message = 'Grievance Category and Sub Category updated successfully.';
+            }
+
+            DB::commit();
             return response()->json([
                 'success' => true,
-                'message' => 'Grievance Category And Sub Category Update Successfully',
+                'message' => $message,
             ], 200);
         }
         catch (\Exception $e)

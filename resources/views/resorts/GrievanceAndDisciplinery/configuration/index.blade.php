@@ -51,11 +51,10 @@
                                         data-parsley-nohtml-message="HTML tags are not allowed.">
                                 </div>
                                 <div class="col-sm-6">
-                                    <label for="subcategories" class="form-label">DESCRIPTION <span class="red-mark">*</span></label>
+                                    <label for="subcategories" class="form-label">DESCRIPTION</label>
 
                                             <textarea class="form-control" id="Category_Description" name="Category_Description"
-                                                placeholder="Grievance Category Description" required
-                                                data-parsley-required-message="Description is required"
+                                                placeholder="Grievance Category Description (optional)"
                                                 data-parsley-nohtml
                                                 data-parsley-nohtml-message="HTML tags are not allowed."></textarea>
                                 </div>
@@ -673,12 +672,10 @@
                                             class="form-control"></input>
                                         </div>
                                         <div class="col-sm-6">
-                                            <label for="disciplinary_cate" class="form-label"> CATEGORY DESCRIPTION <span class="red-mark">*</span></label>
-                                            <textarea  name="description" placeholder="Category Description" 
+                                            <label for="disciplinary_cate" class="form-label"> CATEGORY DESCRIPTION</label>
+                                            <textarea  name="description" placeholder="Category Description (optional)"
                                             data-parsley-nohtml
                                             data-parsley-nohtml-message="HTML tags are not allowed."
-                                             required
-                                                        data-parsley-required-message="Please enter category description"
                                             class="form-control"></textarea>
                                         </div>
                                     </div>
@@ -699,7 +696,7 @@
                             </div>
 
                         </div>
-                        <form id="OffensesForm" data-p arsley-validate>
+                        <form id="OffensesForm" data-parsley-validate>
                             @csrf
                             <div class="OFFENSES-main">
                                 <div class="disciplinaryOFFENSES-block">
@@ -737,10 +734,9 @@
                                                         data-parsley-nohtml-message="HTML tags are not allowed.">
                                         </div>
                                         <div class="col-sm-4">
-                                            <label for="disciplinary_cate" class="form-label"> Offenses Description <span class="red-mark">*</span></label>
+                                            <label for="disciplinary_cate" class="form-label"> Offenses Description</label>
                                             <textarea  name="offensesdescription"  data-parsley-nohtml
-                                                  
-                                                    data-parsley-nohtml-message="HTML tags are not allowed." placeholder="offenses description" class="form-control"></textarea>
+                                                    data-parsley-nohtml-message="HTML tags are not allowed." placeholder="offenses description (optional)" class="form-control"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -750,6 +746,45 @@
                             </div>
                         </form>
                     </div>
+                    {{-- SEVERITY shown above ACTION (positions swapped per request). --}}
+                    <div class="body">
+                        <div class="card-title">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <h3>SEVERITY </h3>
+                                </div>
+                                <div class="col-auto ms-auto"><a href="{{ route('GrievanceAndDisciplinery.config.IndexSeverity') }}" class="a-link">View Existing</a></div>
+                            </div>
+                        </div>
+                        <form id="SEVERITY">
+                            @csrf
+                            <div class="SEVERITY-main">
+                                <div class="SEVERITY-block">
+                                    <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3">
+                                        <div class="col-sm-6">
+                                            <label for="ActionName" class="form-label">SEVERITY  NAME <span class="red-mark">*</span></label>
+                                            <input type="text" name="SeverityName"
+                                            data-parsley-nohtml
+                                            data-parsley-nohtml-message="HTML tags are not allowed."
+                                            required
+                                            data-parsley-required-message="Please enter severity name"
+                                            placeholder="Severity Name" class="form-control"></input>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label for="description" class="form-label"> DESCRIPTION</label>
+                                            <textarea  name="description"
+                                            data-parsley-nohtml
+                                            data-parsley-nohtml-message="HTML tags are not allowed." placeholder="Severity Description (optional)" class="form-control"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer text-end">
+                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            </div>
+                        </form>
+                    </div>
+
                     <div class="body">
                         <div class="card-title">
                             <div class="row align-items-center">
@@ -768,7 +803,7 @@
                                         <div class="col-sm-6">
                                             <label for="ActionName" class="form-label"> ACTION  NAME <span class="red-mark">*</span></label>
                                             <input type="text" name="ActionName"
-                                                
+
                                                 data-parsley-required="true"
                                               required
                                                 data-parsley-nohtml
@@ -777,11 +812,11 @@
                                                 placeholder="Action Name" class="form-control"></input>
                                         </div>
                                         <div class="col-sm-6">
-                                            <label for="description" class="form-label">  DESCRIPTION <span class="red-mark">*</span></label>
+                                            <label for="description" class="form-label">  DESCRIPTION</label>
                                             <textarea  name="description"
                                                         data-parsley-nohtml
                                                         data-parsley-nohtml-message="HTML tags are not allowed."
-                                                     placeholder="Action Description" class="form-control"></textarea>
+                                                     placeholder="Action Description (optional)" class="form-control"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -791,44 +826,6 @@
                             </div>
                         </form>
                     </div>
-                  
-                    <div class="body">
-                        <div class="card-title">
-                            <div class="row align-items-center">
-                                <div class="col-auto">
-                                    <h3>SEVERITY </h3>
-                                </div>
-                                <div class="col-auto ms-auto"><a href="{{ route('GrievanceAndDisciplinery.config.IndexSeverity') }}" class="a-link">View Existing</a></div>
-                            </div>
-                        </div>
-                        <form id="SEVERITY">
-                            @csrf
-                            <div class="SEVERITY-main">
-                                <div class="SEVERITY-block">
-                                    <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3">
-                                        <div class="col-sm-6">
-                                            <label for="ActionName" class="form-label">SEVERITY  NAME <span class="red-mark">*</span></label>
-                                            <input type="text" name="SeverityName" 
-                                            data-parsley-nohtml
-                                            data-parsley-nohtml-message="HTML tags are not allowed."
-                                            required
-                                            data-parsley-required-message="Please enter severity name"
-                                            placeholder="Severity Name" class="form-control"></input>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label for="description" class="form-label"> DESCRIPTION  <span class="red-mark">*</span></label>
-                                            <textarea  name="description"
-                                            data-parsley-nohtml
-                                            data-parsley-nohtml-message="HTML tags are not allowed." placeholder="Severity Description" class="form-control"></textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
-                            </div>
-                        </form>
-                    </div>  
                     <div class="body">
                         <div class="card-title">
                             <div class="row align-items-center">
@@ -1401,6 +1398,46 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Treat each `.body` section inside the Grievance / Disciplinary container
+       as its own visually-separated card so the page reads as individual modules
+       instead of one giant scroll. The existing markup nests many sections
+       under one `.card` wrapper; this CSS gives each section the look without
+       requiring a full markup refactor. */
+    .card-grievance,
+    .card-disciplinary {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+    }
+    .card-grievance > .head,
+    .card-disciplinary > .head {
+        margin-bottom: 16px;
+    }
+    .card-grievance > .body,
+    .card-disciplinary > .body {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(20, 31, 51, 0.06), 0 4px 12px rgba(20, 31, 51, 0.04);
+    }
+    .card-grievance > .body:last-child,
+    .card-disciplinary > .body:last-child {
+        margin-bottom: 0;
+    }
+    .card-grievance > .body .card-title h3,
+    .card-disciplinary > .body .card-title h3 {
+        margin-bottom: 0;
+    }
+    @media (max-width: 575.98px) {
+        .card-grievance > .body,
+        .card-disciplinary > .body {
+            padding: 16px;
+        }
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -1720,24 +1757,16 @@
             
             $('#DisciplinaryCategory').validate({
                 rules: {
+                    // Description is optional — only the category name is required.
                     DisciplinaryCategoryName:
                     {
                         required: true,
                     },
-                    description:
-                    {
-                        required: true,
-                    },
-                    
                 },
                 messages: {
                     DisciplinaryCategoryName:
                     {
                         required: "Please Enter Disciplinary Category Name.",
-                    },
-                    description:
-                    {
-                        required: "Please Enter Description.",
                     },
                 },
                 submitHandler: function(form) {
@@ -1755,6 +1784,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -1779,24 +1817,24 @@
             });
             $('#OffensesForm').validate({
                 rules: {
+                    // Description is optional — only OffensesName + category are required.
                     OffensesName:
                     {
                         required: true,
                     },
-                    offensesdescription:
+                    disciplinary_cat_id:
                     {
                         required: true,
                     },
-                    
                 },
                 messages: {
                     OffensesName:
                     {
                         required: "Please Enter Offenses Name.",
                     },
-                    offensesdescription:
+                    disciplinary_cat_id:
                     {
-                        required: "Please Enter Description.",
+                        required: "Please Select Disciplinary Category.",
                     },
                 },
                 submitHandler: function(form) {
@@ -1814,6 +1852,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -1838,24 +1885,16 @@
             });
             $('#ACTION').validate({
                 rules: {
+                    // Description is optional — only ActionName is required.
                     ActionName:
                     {
                         required: true,
                     },
-                    description:
-                    {
-                        required: true,
-                    },
-                    
                 },
                 messages: {
                     ActionName:
                     {
                         required: "Please Enter Action Name.",
-                    },
-                    description:
-                    {
-                        required: "Please Enter Description.",
                     },
                 },
                 submitHandler: function(form) {
@@ -1873,6 +1912,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -1897,24 +1945,16 @@
             });    
             $('#SEVERITY').validate({
                 rules: {
+                    // Description is optional — only SeverityName is required.
                     SeverityName:
                     {
                         required: true,
                     },
-                    description:
-                    {
-                        required: true,
-                    },
-                    
                 },
                 messages: {
                     SeverityName:
                     {
                         required: "Please Enter severity Name.",
-                    },
-                    description:
-                    {
-                        required: "Please Enter Description.",
                     },
                 },
                 submitHandler: function(form) {
@@ -1932,6 +1972,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -1982,6 +2031,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -2147,6 +2205,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -2189,6 +2256,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -2300,6 +2376,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -2547,7 +2632,6 @@
             $(document).on('change', '.Code_of_disciplinary_cate', function() {
                 var id= $(this).val();
                 var Location = $(this).data('id');
-                alert("test"+Location+"=="+id);
                 $.ajax({
                     url: "{{ route('GrievanceAndDisciplinery.config.GetCategoryOffenses') }}", 
                     type: "POST",
@@ -2900,12 +2984,8 @@
             });
             $('#GrievanceCategoryForm').validate({
                 rules: {
-                  
+                    // Description is optional — only Category_Name is required.
                     Category_Name:
-                    {
-                        required: true,
-                    },
-                    Category_Description:
                     {
                         required: true,
                     },
@@ -2914,10 +2994,6 @@
                     Category_Name:
                     {
                         required: "Please Enter Category Name.",
-                    },
-                    Category_Description:
-                    {
-                        required: "Please Enter Description.",
                     },
                 },
                 submitHandler: function(form) {
@@ -2935,8 +3011,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
-
-                                window.location.reload();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -2996,7 +3079,15 @@
                                     positionClass: 'toast-bottom-right'
                                 });
                                 form.reset();
-                                window.location.reload();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             }
                             else
                             {
@@ -3058,6 +3149,16 @@
                         success: function(response) {
                             if (response.success) {
                                 toastr.success(response.msg, "Success", { positionClass: 'toast-bottom-right' });
+                                form.reset();
+                                // Clear select2 widgets + validation styling so the
+                                // form visibly returns to its empty state after submit.
+                                $(form).find('select.select2t-none, select.select2-multi, select[multiple]').val(null).trigger('change');
+                                $(form).find('.is-invalid, .is-valid').removeClass('is-invalid is-valid');
+                                // Reload so dependent dropdowns/lists across the
+                                // page (e.g. Offenses category list after creating
+                                // a new Disciplinary Category) reflect the new
+                                // data. 900ms gives the success toast time to show.
+                                setTimeout(function () { window.location.reload(); }, 900);
                             } else {
                                 toastr.error(response.msg, "Error", { positionClass: 'toast-bottom-right' });
                             }

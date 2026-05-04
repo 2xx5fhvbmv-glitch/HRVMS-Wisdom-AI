@@ -33,7 +33,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Open Cases</p>
-                            <strong>48</strong>
+                            <strong>{{ $openCases ?? 0 }}</strong>
                         </div>
                         <a href="#">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -46,7 +46,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Pending Cases</p>
-                            <strong>26</strong>
+                            <strong>{{ $pendingCases ?? 0 }}</strong>
                         </div>
                         <a href="#">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -59,7 +59,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Closed Cases</p>
-                            <strong>21</strong>
+                            <strong>{{ $closedCases ?? 0 }}</strong>
                         </div>
                         <a href="#">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -72,7 +72,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Expired Offense</p>
-                            <strong>5</strong>
+                            <strong>{{ $expiredOffense ?? 0 }}</strong>
                         </div>
                         <a href="#">
                             <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -129,15 +129,15 @@
                             </div>
                             <div class="d-flex">
                                 <div class="progress progress-custom progress-themeskyblue">
-                                    <div class="progress-bar" role="progressbar" style="width: 80%"
-                                        aria-valuenow="80" aria-valuemin="0" aria-valuemax="100">80%</div>
+                                    <div class="progress-bar" role="progressbar" style="width: {{ $confidentialResolvedPct ?? 0 }}%"
+                                        aria-valuenow="{{ $confidentialResolvedPct ?? 0 }}" aria-valuemin="0" aria-valuemax="100">{{ $confidentialResolvedPct ?? 0 }}%</div>
                                 </div>
                                 <span>Resolved</span>
                             </div>
                             <div class="d-flex mb-lg-4 mb-md-3">
                                 <div class="progress progress-custom progress-themeskyblue">
-                                    <div class="progress-bar" role="progressbar" style="width: 20%"
-                                        aria-valuenow="20" aria-valuemin="0" aria-valuemax="100">20%</div>
+                                    <div class="progress-bar" role="progressbar" style="width: {{ $confidentialUnresolvedPct ?? 0 }}%"
+                                        aria-valuenow="{{ $confidentialUnresolvedPct ?? 0 }}" aria-valuemin="0" aria-valuemax="100">{{ $confidentialUnresolvedPct ?? 0 }}%</div>
                                 </div>
                                 <span>Unresolved</span>
                             </div>
@@ -213,7 +213,7 @@
                         <div class="card dashboard-boxcard timeAttend-boxcard">
                             <div class="d-flex align-items-center justify-content-between">
                                 <p class="mb-0  fw-600">Retaliation Reports Filed</p>
-                                <strong>32</strong>
+                                <strong>{{ $retaliationReports ?? 0 }}</strong>
                             </div>
                         </div>
                     </div>
@@ -248,51 +248,31 @@
                     <div class="card-title mb-md-3">
                         <h3>Case Timelines</h3>
                     </div>
-                    <div class="caseTimelines-block">
-                        <p>Safety/Compliance Issues</p>
-                        <div class="progress progress-custom progress-customDot progress-themeGreen">
-                            <div class="progress-bar" role="progressbar" style="width: 50%" aria-valuenow="50"
-                                aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <div>
-                            <div>
-                                <p>Filled date:</p><span>28/10/2024</span>
+                    @forelse(($caseTimelines ?? collect()) as $tl)
+                        @php
+                            // Color the progress bar by how close we are to the
+                            // deadline: <40 % green, 40–70 % amber, >70 % red.
+                            $pct = $tl['progress_pct'];
+                            $color = $pct < 40 ? 'progress-themeGreen' : ($pct < 70 ? 'progress-themeWarning' : 'progress-themeRed');
+                        @endphp
+                        <div class="caseTimelines-block">
+                            <p>{{ $tl['name'] }}</p>
+                            <div class="progress progress-custom progress-customDot {{ $color }}">
+                                <div class="progress-bar" role="progressbar" style="width: {{ $pct }}%"
+                                    aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
                             <div>
-                                <p>Deadline:</p><span>25/11/2024</span>
+                                <div>
+                                    <p>Filled date:</p><span>{{ $tl['filed_date'] }}</span>
+                                </div>
+                                <div>
+                                    <p>Deadline:</p><span>{{ $tl['deadline'] }}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="caseTimelines-block">
-                        <p>Performance Problems</p>
-                        <div class="progress progress-custom progress-customDot progress-themeWarning">
-                            <div class="progress-bar" role="progressbar" style="width: 20%" aria-valuenow="20"
-                                aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <div>
-                            <div>
-                                <p>Filled date:</p><span>28/10/2024</span>
-                            </div>
-                            <div>
-                                <p>Deadline:</p><span>25/11/2024</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="caseTimelines-block">
-                        <p>Attendance Issues</p>
-                        <div class="progress progress-custom progress-customDot progress-themeRed">
-                            <div class="progress-bar" role="progressbar" style="width: 80%" aria-valuenow="80"
-                                aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <div>
-                            <div>
-                                <p>Filled date:</p><span>28/10/2024</span>
-                            </div>
-                            <div>
-                                <p>Deadline:</p><span>25/11/2024</span>
-                            </div>
-                        </div>
-                    </div>
+                    @empty
+                        <p class="text-muted mb-0">No active cases on the timeline.</p>
+                    @endforelse
                 </div>
             </div>
            
@@ -570,8 +550,13 @@
     });
 </script>
 <script type="module">
-
-    const cty = document.getElementById('appealsByCategory').getContext('2d');
+    // The canvases referenced below (appealsByCategory, myDoughnutChartPeopleRelation,
+    // breakdownCases) live inside HTML blocks that are currently commented out.
+    // Guard each Chart init so getElementById(...).getContext() doesn't crash
+    // and prevent the rest of the page JS from running.
+    const _appealsByCategoryEl = document.getElementById('appealsByCategory');
+    if (_appealsByCategoryEl) {
+    const cty = _appealsByCategoryEl.getContext('2d');
     const appealsByCategory = new Chart(cty, {
         type: 'bar',
         data: {
@@ -638,7 +623,11 @@
     });
 
 
-    var ctx = document.getElementById('myDoughnutChartPeopleRelation').getContext('2d');
+    } // end appealsByCategory guard
+
+    const _doughnutEl = document.getElementById('myDoughnutChartPeopleRelation');
+    if (_doughnutEl) {
+    var ctx = _doughnutEl.getContext('2d');
 
     // Custom plugin only registered for this chart
     const doughnutLabelsInside = {
@@ -712,7 +701,11 @@
         plugins: [doughnutLabelsInside] // Attach the plugin to this chart only
     });
 
-    const ctz = document.getElementById('breakdownCases').getContext('2d');
+    } // end myDoughnutChartPeopleRelation guard
+
+    const _breakdownEl = document.getElementById('breakdownCases');
+    if (_breakdownEl) {
+    const ctz = _breakdownEl.getContext('2d');
     const breakdownCases = new Chart(ctz, {
         type: 'bar',
         data: {
@@ -777,6 +770,7 @@
             }
         }
     });
+    } // end breakdownCases guard
 </script>
 @endsection
 
