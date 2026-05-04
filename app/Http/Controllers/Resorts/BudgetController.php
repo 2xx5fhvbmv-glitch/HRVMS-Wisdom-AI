@@ -102,111 +102,126 @@ class BudgetController extends Controller
             $departments = ResortDepartment::where('resort_id', $resortId)->get();
         }
 
+        // Batch-prefetch every relation the inner loop needs ONCE per request
+        // (was firing 4–5 queries per position × N positions × N departments,
+        // which made the page sit on a "loading…" spinner for 30–60 s+).
+        $departmentIds = $departments->pluck('id')->all();
+
+        $allPositionsRaw = DB::table('resort_positions as p')
+            ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
+            ->leftJoin('manning_responses as mr', function ($join) use ($year, $resortId) {
+                $join->on('pmd.manning_response_id', '=', 'mr.id')
+                    ->where('mr.year', '=', $year)
+                    ->where('mr.resort_id', '=', $resortId);
+            })
+            ->where('p.resort_id', '=', $resortId)
+            ->whereIn('p.dept_id', $departmentIds)
+            ->select(
+                'p.id',
+                'mr.id as Budget_id',
+                'p.position_title',
+                'p.dept_id',
+                DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
+                DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
+            )
+            ->groupBy('p.id', 'p.position_title', 'mr.id', 'p.dept_id')
+            ->get();
+        $positionsByDept = $allPositionsRaw->groupBy('dept_id');
+        $positionIds = $allPositionsRaw->pluck('id')->unique()->all();
+
+        // 1) Active employees for every position in a single query.
+        $employeesByPosition = empty($positionIds) ? collect() : DB::table('employees as e')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->whereIn('e.position_id', $positionIds)
+            ->where('e.status', 'Active')
+            ->get([
+                'e.position_id',
+                'e.resort_id',
+                'e.id as Empid',
+                'ra.first_name',
+                'ra.last_name',
+                'e.Admin_Parent_id',
+                'e.rank',
+                'e.Dept_id',
+                'e.nationality',
+                'e.basic_salary',
+            ])->groupBy('position_id');
+
+        // 2) BudgetStatus rows keyed by Budget_id.
+        $budgetIds = $allPositionsRaw->pluck('Budget_id')->filter()->unique()->all();
+        $budgetStatusByBudgetId = empty($budgetIds) ? collect() : BudgetStatus::whereIn('Budget_id', $budgetIds)
+            ->get()->keyBy('Budget_id');
+
+        // 3) Child notifications keyed by (message_id|position_id|department_id).
+        $messageIds = $budgetStatusByBudgetId->pluck('message_id')->filter()->unique()->all();
+        $childNotificationsLookup = collect();
+        if (!empty($messageIds)) {
+            ResortsChildNotifications::whereIn('Parent_msg_id', $messageIds)
+                ->whereIn('Position_id', $positionIds)
+                ->whereIn('Department_id', $departmentIds)
+                ->get()
+                ->each(function ($row) use ($childNotificationsLookup) {
+                    $childNotificationsLookup[$row->Parent_msg_id . '|' . $row->Position_id . '|' . $row->Department_id] = $row;
+                });
+        }
+
+        // 4) Position monthly data grouped by (position_id, manning_response_id).
+        $monthlyDataLookup = empty($positionIds) ? collect() : PositionMonthlyData::whereIn('position_id', $positionIds)
+            ->whereIn('manning_response_id', $budgetIds ?: [0])
+            ->get()
+            ->groupBy(function ($row) {
+                return $row->position_id . '|' . $row->manning_response_id;
+            });
+
+        // 5) Vacant budget cost rows for the year, grouped by (position_id, department_id).
+        $vacantRecordsLookup = empty($positionIds) ? collect() : ResortVacantBudgetCost::whereIn('position_id', $positionIds)
+            ->whereIn('department_id', $departmentIds)
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->orderBy('vacant_index')
+            ->get()
+            ->groupBy(function ($row) {
+                return $row->position_id . '|' . $row->department_id;
+            });
+
         foreach ($departments as $department) {
-            // Get positions for each department
-            // Ensure we get vacant count from manning_responses properly filtered by position, dept_id, year, resort_id
-            $departmentPositions = DB::table('resort_positions as p')
-                ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
-                ->leftJoin('manning_responses as mr', function($join) use ($year, $resortId, $department) {
-                    $join->on('pmd.manning_response_id', '=', 'mr.id')
-                         ->where('mr.year', '=', $year)
-                         ->where('mr.resort_id', '=', $resortId)
-                         ->where('mr.dept_id', '=', $department->id);
-                })
-                ->where('p.resort_id', '=', $resortId)
-                ->where('p.dept_id', '=', $department->id)
-                ->select(
-                    'p.id',
-                    'mr.id as Budget_id',
-                    'p.position_title',
-                    'p.dept_id',
-                    DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
-                    DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
-                )
-                ->groupBy('p.id', 'p.position_title', 'mr.id')
-                ->get();
+            // Pull the department's positions out of the prefetched bucket.
+            $departmentPositions = collect($positionsByDept->get($department->id, collect()))->values();
 
-            // Get employees for each position
             foreach ($departmentPositions as $position) {
-                $position->employees = DB::table('employees as e')
-                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                    ->where('position_id', $position->id)
-                    ->where('e.status', 'Active')
-                    ->get([
-                        'e.resort_id',
-                        'e.id as Empid',
-                        'ra.first_name',
-                        'ra.last_name',
-                        'e.Admin_Parent_id',
-                        'e.rank',
-                        'e.Dept_id',
-                        'e.nationality',
-                        'e.basic_salary'
-                    ]);
+                $position->employees = collect($employeesByPosition->get($position->id, collect()))->values();
 
-                // Initialize vacant position properties
+                // Initialise vacant position properties.
                 $position->proper_vacant_count = 0;
                 $position->is_in_manning_request = false;
                 $position->vacant_details = [];
 
-                // Get vacant count using resorts_child_notifications table (joined with manning_responses)
-                // resorts_child_notifications -> budget_statuses -> manning_responses -> position_monthly_data
-                $budgetStatus = BudgetStatus::where('Budget_id', $position->Budget_id)->first();
+                $budgetStatus = $budgetStatusByBudgetId->get($position->Budget_id);
+                if (!$budgetStatus) continue;
 
-                if ($budgetStatus) {
-                    // Check if THIS specific position is in the manning request via resorts_child_notifications
-                    $childNotification = ResortsChildNotifications::where('Parent_msg_id', $budgetStatus->message_id)
-                        ->where('Position_id', $position->id)
-                        ->where('Department_id', $position->dept_id)
-                        ->first();
+                $childKey = $budgetStatus->message_id . '|' . $position->id . '|' . $position->dept_id;
+                if (!isset($childNotificationsLookup[$childKey])) continue;
 
-                    if ($childNotification) {
-                        $position->is_in_manning_request = true;
+                $position->is_in_manning_request = true;
 
-                        // Get vacant count from position_monthly_data for this position
-                        // Filtered by the correct manning_response_id (from Budget_id)
-                        $positionMonthlyData = PositionMonthlyData::where('position_id', $position->id)
-                            ->where('manning_response_id', $position->Budget_id)
-                            ->get();
+                // Vacant count = MAX(vacantcount) across the position's monthly data.
+                $monthlyKey = $position->id . '|' . $position->Budget_id;
+                $monthlyRows = $monthlyDataLookup->get($monthlyKey, collect());
+                $maxVacantCount = $monthlyRows->max('vacantcount') ?? 0;
+                $position->proper_vacant_count = $maxVacantCount;
 
-                        // Get maximum vacant count across all months for this position
-                        $maxVacantCount = 0;
-                        foreach ($positionMonthlyData as $monthlyData) {
-                            $vacantCount = $monthlyData->vacantcount ?? 0;
-                            $maxVacantCount = max($maxVacantCount, $vacantCount);
-                        }
+                // Fallback to distinct vacant_index count from the cost rows
+                // when monthly data has no vacant entry. We can derive both
+                // the count and the details from the same prefetched bucket.
+                $vacantKey = $position->id . '|' . $position->dept_id;
+                $vacantRecords = $vacantRecordsLookup->get($vacantKey, collect());
+                if ($position->proper_vacant_count == 0 && $vacantRecords->isNotEmpty()) {
+                    $position->proper_vacant_count = $vacantRecords->pluck('vacant_index')->unique()->count();
+                }
 
-                        // Set vacant count from position_monthly_data (from manning_responses)
-                        $position->proper_vacant_count = $maxVacantCount;
-
-                        // If no vacant count from position_monthly_data, check resort_vacant_budget_costs as fallback
-                        if ($position->proper_vacant_count == 0) {
-                            $actualVacantCount = DB::table('resort_vacant_budget_costs')
-                                ->where('position_id', $position->id)
-                                ->where('department_id', $position->dept_id)
-                                ->where('resort_id', $resortId)
-                                ->where('year', $year)
-                                ->distinct('vacant_index')
-                                ->count('vacant_index');
-
-                            if ($actualVacantCount > 0) {
-                                $position->proper_vacant_count = $actualVacantCount;
-                            }
-                        }
-
-                        // Get vacant details from resort_vacant_budget_costs for each vacant index
-                        if ($position->proper_vacant_count > 0) {
-                            $vacantRecords = ResortVacantBudgetCost::where('position_id', $position->id)
-                                ->where('department_id', $position->dept_id)
-                                ->where('resort_id', $resortId)
-                                ->where('year', $year)
-                                ->orderBy('vacant_index')
-                                ->get();
-
-                            foreach ($vacantRecords as $vacantBudgetCost) {
-                                $position->vacant_details[$vacantBudgetCost->vacant_index] = $vacantBudgetCost;
-                            }
-                        }
+                if ($position->proper_vacant_count > 0 && $vacantRecords->isNotEmpty()) {
+                    foreach ($vacantRecords as $vacantBudgetCost) {
+                        $position->vacant_details[$vacantBudgetCost->vacant_index] = $vacantBudgetCost;
                     }
                 }
             }
@@ -294,14 +309,23 @@ class BudgetController extends Controller
                 }
             }
 
-            $Budget_id = ManningResponse::where('year', $year)->where('resort_id', $resortId)->where('dept_id', $department->id)->latest()->first();
-            // Add department data to collection
-            if($Budget_id){
+            // IMPORTANT: do NOT reuse $Budget_id here — the outer-scope variable
+            // is checked at the top of the next loop iteration. Stomping it
+            // with a Model instance makes line 216/251's `if ($Budget_id)`
+            // fire with a Model (not an ID), which corrupts the WHERE clauses
+            // on subsequent iterations (and was a major reason the page hung).
+            $latestBudget = ManningResponse::where('year', $year)
+                ->where('resort_id', $resortId)
+                ->where('dept_id', $department->id)
+                ->latest()
+                ->first();
+
+            if ($latestBudget) {
                 $departmentsData->push([
                     'department' => $department,
                     'positions' => $departmentPositions,
                     'vacant_positions' => $vacant_positions,
-                    'Budget_id' => $Budget_id->id ?? null
+                    'Budget_id' => $latestBudget->id ?? null,
                 ]);
             }
         }

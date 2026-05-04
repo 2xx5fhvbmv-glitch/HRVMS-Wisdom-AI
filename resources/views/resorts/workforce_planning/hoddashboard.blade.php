@@ -165,7 +165,7 @@
                                     <img src="{{Common::getResortUserPicture($getNotifications->loginid) }}" alt="image">
                                     </div>
                                     <div class="">
-                                        <h6>{{ $getNotifications->first_name }}{{ $getNotifications->middle_name }}</h6></h6>
+                                        <h6>{{ $getNotifications->first_name }} {{ $getNotifications->middle_name }}</h6>
                                         <p>{{ strtoupper($getNotifications->DepartmentName) }}</p>
                                     </div>
                                 </div>
@@ -180,7 +180,7 @@
                             </div>
                         @elseif(!empty($BudgetStatus) && count($BudgetStatus))
                             <div class="card-title d-flex justify-content-between">
-                                <h3>Manning {{ (isset($Year)) ? date('Y')+1 : date('Y')+1  }}</h3>
+                                <h3>Manning {{ ($Year ?? date('Y')) + 1 }}</h3>
                             </div>
                             <ul class="manning-timeline">
                                 @php
@@ -209,7 +209,7 @@
                                     <img src="{{Common::getResortUserPicture($BudgetRejactedStatus->loginid) }}" alt="image">
                                     </div>
                                     <div class="">
-                                        <h6>{{ $BudgetRejactedStatus->first_name }}{{ $BudgetRejactedStatus->middle_name }}</h6></h6>
+                                        <h6>{{ $BudgetRejactedStatus->first_name }} {{ $BudgetRejactedStatus->middle_name }}</h6>
                                         <p>{{ strtoupper($BudgetRejactedStatus->DepartmentName) }}</p>
                                     </div>
                                 </div>
@@ -512,7 +512,12 @@
         });
     </script>
     <script type="module">
-        var ctz = document.getElementById('myLineChart').getContext('2d');
+        // The #myLineChart canvas lives inside a commented-out HTML block;
+        // calling getContext on a missing element throws and was killing
+        // the rest of this module. Guard the init.
+        const _myLineChartEl = document.getElementById('myLineChart');
+        if (_myLineChartEl) {
+        var ctz = _myLineChartEl.getContext('2d');
         var myLineChart = new Chart(ctz, {
             type: 'line',
             data: {
@@ -589,6 +594,7 @@
                 }
             }
         });
+        } // end _myLineChartEl guard
     </script>
     <script>
         // Global object to store headcounts per position and month
@@ -936,13 +942,15 @@
             event.stopPropagation();
         }
 
-        // Function to decrement headcount
+        // Function to decrement headcount. Floor is 0 (matches the input's
+        // min="0"), not 1 — otherwise users get stuck at 1 and can't reset
+        // a position back to "no headcount this month".
         function decrementValue(button) {
             let inputGroup = button.closest('.inputCounter-group');
             let input = inputGroup.querySelector('.input-number');
             let currentValue = parseInt(input.value);
 
-            if (currentValue > 1) {
+            if (currentValue > 0) {
                 input.value = currentValue - 1;
 
                 let positionId = input.getAttribute('data-position-id');
@@ -1115,11 +1123,12 @@
             document.getElementById('overall_vacant_positions').textContent = totalVacantCount;
         }
 
-        //Function to update the minus button state
+        //Function to update the minus button state — disable only at the
+        // actual floor (0), not at 1, so the user can decrement 1 → 0.
         function updateMinusButtonState(input) {
             let currentValue = parseInt(input.value);
             let decrementButton = input.closest('.inputCounter-group').querySelector('[data-type="minus"]');
-            if (currentValue <= 1) {
+            if (currentValue <= 0) {
                 decrementButton.setAttribute('disabled', true);
             } else {
                 decrementButton.removeAttribute('disabled');
