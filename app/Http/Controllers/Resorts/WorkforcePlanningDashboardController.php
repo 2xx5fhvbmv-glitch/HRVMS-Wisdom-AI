@@ -359,25 +359,27 @@ class WorkforcePlanningDashboardController extends Controller
 
     public function get_filledpositions(Request $request)
     {
-        // dd($request);
-        $resort_id =$this->globalUser->resort_id;
+        $resort_id = (int) $this->globalUser->resort_id;
 
         if ($request->ajax())
         {
+            // Compute employee count per position with a correlated subquery
+            // INSIDE the base query — avoids the N+1 that fired one COUNT()
+            // per row in the previous addColumn callback.
             $resort_positions = DB::table('resort_positions as p')
                 ->leftJoin('resort_departments as rd', 'p.dept_id', '=', 'rd.id')
                 ->where('p.resort_id', '=', $resort_id)
-                ->select('p.id', 'p.position_title', 'rd.name as department', 'p.created_at')
-                ->groupBy('p.id', 'p.position_title', 'rd.name', 'p.created_at')
+                ->select(
+                    'p.id',
+                    'p.position_title',
+                    'rd.name as department',
+                    'p.created_at',
+                    DB::raw("(SELECT COUNT(*) FROM employees e WHERE e.Position_id = p.id AND e.resort_id = {$resort_id}) as no_of_employees")
+                )
                 ->orderBy('p.created_at', 'desc');
+
             return datatables()
                 ->of($resort_positions)
-                ->addColumn('no_of_employees', function ($row) {
-                    return Employee::where("resort_id", $this->globalUser->resort_id)
-                        ->where("Position_id", $row->id)
-                        ->count();
-                })
-                ->rawColumns(['position_title', 'department', 'no_of_employees'])
                 ->make(true);
         }
 
@@ -430,14 +432,24 @@ class WorkforcePlanningDashboardController extends Controller
                 ->groupBy('p.id', 'p.position_title')
                 ->get();
 
-                // Attach employees to each position
-            foreach ($vacant_positions as $position)
-            {
-                $position->employees = DB::table('employees as e') // Assuming you have an employees table
-                    ->leftJoin('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
-                    ->where('position_id', $position->id)
-                    // ->where('rank','others')
-                    ->get(['first_name', 'last_name','Admin_Parent_id','rank','nationality']); // Adjust according to your employee table fields
+                // Attach employees to each vacant position — batch into ONE query
+            // (was firing one query per position in a hot dashboard path).
+            $vacantPositionIds = collect($vacant_positions)->pluck('id')->all();
+            $employeesByVacantPosition = DB::table('employees as e')
+                ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                ->whereIn('e.position_id', $vacantPositionIds)
+                ->get([
+                    'e.position_id',
+                    'ra.first_name',
+                    'ra.last_name',
+                    'e.Admin_Parent_id',
+                    'e.rank',
+                    'e.nationality',
+                ])
+                ->groupBy('position_id');
+
+            foreach ($vacant_positions as $position) {
+                $position->employees = $employeesByVacantPosition->get($position->id, collect())->values();
             }
 
 
@@ -574,56 +586,68 @@ class WorkforcePlanningDashboardController extends Controller
 
                 ->count();
 
+            // Batch fetch the first employee for every position in ONE query —
+            // was firing N positions × 12 months = up to 120 identical queries
+            // (the inner loop didn't even vary the WHERE by month).
+            $positionIds = collect($positions)->pluck('id')->all();
+            $employeesByPosition = Employee::with('resortAdmin')
+                ->whereIn('position_id', $positionIds)
+                ->where('dept_id', $Dept_id)
+                ->where('resort_id', $resort->resort_id)
+                ->where('rank', '=', 'others')
+                ->whereNotIn('id', $leftemp)
+                ->get()
+                ->groupBy('position_id');
+
             $positionsWithEmployees = [];
-
             foreach ($positions as $pos) {
-                $employeesForMonths = [];
-
-                for ($i = 1; $i <= 12; $i++) { // Loop through months
-                    // Use the Employee Eloquent model instead of DB::table()
-                    $employee = Employee::with('resortAdmin') // Eager load the resortAdmin relationship
-                        ->where('position_id', $pos->id) // Assuming $pos->id is the position ID
-                        ->where('dept_id', $Dept_id)
-                        ->where('resort_id', $resort->resort_id)
-                        ->where('rank', '=', 'others')
-                        ->first(); // Fetch the employee for the given month and year
-
-                    $employeesForMonths[$i] = $employee;
-                }
-                $positionsWithEmployees[$pos->id] = $employeesForMonths;
+                $employee = optional($employeesByPosition->get($pos->id))->first();
+                // Same employee object referenced for every month — preserves
+                // the original view contract while saving 11 redundant lookups.
+                $positionsWithEmployees[$pos->id] = array_fill(1, 12, $employee);
             }
 
             $currentYear = date('Y');
             $nextYear = $currentYear + 1;
 
+            // CASE WHEN inside MAX — see GetYearBasePositions for context;
+            // the previous LEFT JOIN-only filter didn't restrict which pmd
+            // rows fed the aggregate, so vacant/head counts were the same
+            // regardless of the selected year.
             $vacant_positions = DB::table('resort_positions as p')
                 ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
-                ->leftJoin('manning_responses as mr', function($join) use ($resort, $Dept_id, $currentYear) {
+                ->leftJoin('manning_responses as mr', function ($join) use ($resort, $Dept_id) {
                     $join->on('pmd.manning_response_id', '=', 'mr.id')
-                    ->where('mr.year', '=', $currentYear);
-
+                        ->where('mr.resort_id', '=', $resort->resort_id)
+                        ->where('mr.dept_id', '=', $Dept_id);
                 })
                 ->where('p.resort_id', '=', $resort->resort_id)
-                        ->where('p.dept_id', '=', $Dept_id)
-
-                ->select(
-                    'p.id',
-                    'p.position_title',
-                    DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
-                    DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
-                )
+                ->where('p.dept_id', '=', $Dept_id)
+                ->select('p.id', 'p.position_title')
+                ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.vacantcount END), 0) as vacantcount', [$currentYear])
+                ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.headcount END), 0) as headcount', [$currentYear])
                 ->groupBy('p.id', 'p.position_title')
                 ->get();
 
 
-            // Attach employees to each position
-            foreach ($vacant_positions as $position)
-            {
-                $position->employees = DB::table('employees as e') // Assuming you have an employees table
-                    ->leftJoin('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
-                    ->where('position_id', $position->id)
-                    // ->where('rank','others')
-                    ->get(['first_name', 'last_name','Admin_Parent_id','rank','nationality']); // Adjust according to your employee table fields
+            // Attach employees to each vacant position — batch into ONE query
+            // (was firing one query per position in a hot dashboard path).
+            $vacantPositionIds = collect($vacant_positions)->pluck('id')->all();
+            $employeesByVacantPosition = DB::table('employees as e')
+                ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                ->whereIn('e.position_id', $vacantPositionIds)
+                ->get([
+                    'e.position_id',
+                    'ra.first_name',
+                    'ra.last_name',
+                    'e.Admin_Parent_id',
+                    'e.rank',
+                    'e.nationality',
+                ])
+                ->groupBy('position_id');
+
+            foreach ($vacant_positions as $position) {
+                $position->employees = $employeesByVacantPosition->get($position->id, collect())->values();
             }
             return view('resorts.workforce_planning.hoddashboard',compact('page_header','totalemployees','BudgetRejactedStatus','BudgetStatus','getNotifications','employees','LeftemployeesCount','HODpendingResponse','ManningPendingRequestCount','resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','total_emp','positions','department_details','positionsWithEmployees','nextYear','Dept_id','vacant_positions'));
         }
@@ -647,32 +671,46 @@ class WorkforcePlanningDashboardController extends Controller
             $ResortId =  $request->ResortId;
             $Position_id = $request->Position_id;
             $Dept_id = $request->Dept_id;
-            $year = $request->year;
-            $vacant_positions = DB::table('resort_positions as p')
-            ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
-            ->leftJoin('manning_responses as mr', function($join) use ($ResortId, $Dept_id, $year) {
-                $join->on('pmd.manning_response_id', '=', 'mr.id')
-                ->where('mr.year', '=', $year);
-            })
-            ->where('p.resort_id', '=', $ResortId)
-                     ->where('p.dept_id', '=', $Dept_id)
-            ->select(
-                'p.id',
-                'p.position_title',
-                DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
-                DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
-            )
-            ->groupBy('p.id', 'p.position_title')
-            ->get();
+            $year = (int) $request->year;
 
-            // Attach employees to each position
-            foreach ($vacant_positions as $position)
-            {
-                $position->employees = DB::table('employees as e') // Assuming you have an employees table
-                    ->leftJoin('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
-                    ->where('position_id', $position->id)
-                    // ->where('rank','others')
-                    ->get(['first_name', 'last_name','Admin_Parent_id','rank','nationality']); // Adjust according to your employee table fields
+            // Use CASE WHEN inside the MAX so the headcount / vacantcount only
+            // aggregate position_monthly_data rows belonging to manning
+            // responses of the selected year. Previously the MAX ran over
+            // ALL pmd rows regardless of mr.year — so changing the dropdown
+            // had no visible effect on the numbers.
+            $vacant_positions = DB::table('resort_positions as p')
+                ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
+                ->leftJoin('manning_responses as mr', function ($join) use ($ResortId, $Dept_id) {
+                    $join->on('pmd.manning_response_id', '=', 'mr.id')
+                        ->where('mr.resort_id', '=', $ResortId)
+                        ->where('mr.dept_id', '=', $Dept_id);
+                })
+                ->where('p.resort_id', '=', $ResortId)
+                ->where('p.dept_id', '=', $Dept_id)
+                ->select('p.id', 'p.position_title')
+                ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.vacantcount END), 0) as vacantcount', [$year])
+                ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.headcount END), 0) as headcount', [$year])
+                ->groupBy('p.id', 'p.position_title')
+                ->get();
+
+            // Attach employees to each vacant position — batch into ONE query
+            // (was firing one query per position in a hot dashboard path).
+            $vacantPositionIds = collect($vacant_positions)->pluck('id')->all();
+            $employeesByVacantPosition = DB::table('employees as e')
+                ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                ->whereIn('e.position_id', $vacantPositionIds)
+                ->get([
+                    'e.position_id',
+                    'ra.first_name',
+                    'ra.last_name',
+                    'e.Admin_Parent_id',
+                    'e.rank',
+                    'e.nationality',
+                ])
+                ->groupBy('position_id');
+
+            foreach ($vacant_positions as $position) {
+                $position->employees = $employeesByVacantPosition->get($position->id, collect())->values();
             }
             $html =  view('resorts.renderfiles.DepartmentWisePositions',compact('vacant_positions'))->render();
             $response['success'] = true;

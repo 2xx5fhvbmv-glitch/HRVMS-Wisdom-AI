@@ -50,10 +50,18 @@ class ResortAllNotificationController extends Controller
         // })
         // ->pluck('id') ->toArray();
 
+        // HODs (rank 2) — primary recipients who must respond per department.
         $employee = Employee::where('resort_id', $resort_id)
-            ->where('Rank', 2)  // two  no means HOD or Manager
-            ->whereIn('Dept_id',$DepartmentIds)
+            ->where('Rank', 2)
+            ->whereIn('Dept_id', $DepartmentIds)
             ->get(['Admin_Parent_id','id','Rank','Dept_id','Position_id']);
+
+        // HR users (rank 3) — should also be alerted that a manning request
+        // went out, but they don't generate per-department response rows.
+        $hrEmployees = Employee::where('resort_id', $resort_id)
+            ->where('Rank', 3)
+            ->get(['Admin_Parent_id','id','Rank','Dept_id','Position_id']);
+
         DB::beginTransaction();
         try{
             $inactiveMsgId = ResortsParentNotifications::where('resort_id', $resort_id)
@@ -70,13 +78,33 @@ class ResortAllNotificationController extends Controller
             $parentmesgid= $parentNotification->message_id;
             foreach($employee as $key => $value)
             {
-                $parentNotification =ResortsChildNotifications::create([
+                $parentNotification = ResortsChildNotifications::create([
                     'Parent_msg_id'=>$parentmesgid,
                     'Department_id'=>$value->Dept_id,
                     'Position_id'=>$value->Position_id,
                     'response'=>  'No',
                 ]);
-// event( new ResortNotificationEvent(  Common::nofitication($resort_id, $this->type[1],$parentmesgid,0,0,$value->id,"WorkForce Planning")));
+                // Fire the in-app notification — was commented out, which is
+                // why HODs never received the manning-request alert.
+                try {
+                    event(new ResortNotificationEvent(
+                        Common::nofitication($resort_id, $this->type[1], $parentmesgid, 0, '', $value->id, 'WorkForce Planning')
+                    ));
+                } catch (\Exception $notifErr) {
+                    \Log::warning('Manning notification dispatch failed for HOD ' . $value->id . ': ' . $notifErr->getMessage());
+                }
+            }
+
+            // Also notify HR — they raised the request and need confirmation
+            // it went out, plus a per-HR copy in the bell-tray.
+            foreach ($hrEmployees as $hr) {
+                try {
+                    event(new ResortNotificationEvent(
+                        Common::nofitication($resort_id, $this->type[1], $parentmesgid, 0, '', $hr->id, 'WorkForce Planning')
+                    ));
+                } catch (\Exception $notifErr) {
+                    \Log::warning('Manning notification dispatch failed for HR ' . $hr->id . ': ' . $notifErr->getMessage());
+                }
             }
 
             DB::commit();
