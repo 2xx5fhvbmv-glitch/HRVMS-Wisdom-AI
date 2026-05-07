@@ -35,6 +35,7 @@
 <script src="{{ URL::asset('resorts_assets/js/jQuery.print.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/chartjs-chart-treemap.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/socket.io.min.js')}}"></script>
+@include('partials.pusher-init')
 {{-- <script type="text/JavaScript" src="https://cdnjs.cloudflare.com/ajax/libs/jQuery.print/1.6.0/jQuery.print.js"></script> --}}
 {{-- <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script> --}}
 
@@ -156,7 +157,13 @@
                 $('.carosel-menu').slick({
                     variableWidth: true,
                     slidesToShow: 1,
-                    infinite: true,
+                    // `infinite: true` makes Slick clone slides at the head/tail
+                    // so the carousel can loop seamlessly. With variableWidth +
+                    // slidesToShow:1 those clones can render adjacent to the
+                    // originals at certain viewport widths, showing each
+                    // module twice. Disable cloning — users don't need an
+                    // infinite-loop nav anyway.
+                    infinite: false,
                     slidesToScroll: 3,
                     initialSlide: activeIndex >= 0 ? activeIndex : 0,
                     dots: false,
@@ -335,7 +342,15 @@
     //     transports: ["websocket"]
     // });
 
-    const socket = io("{{env('BASE_URL')}}", {transports: ["websocket"]});
+    // Legacy Node socket.io server (BASE_URL) — wrapped to avoid console
+    // spam when the server isn't running. Real-time delivery is handled by
+    // Pusher/Echo (see partials.pusher-init included in this layout).
+    var socket;
+    try {
+        socket = io("{{env('BASE_URL')}}", {transports: ["websocket"], reconnection: false, timeout: 2000});
+    } catch (e) {
+        socket = { emit: function () {}, on: function () {} };
+    }
 
 
     // Register user ID
@@ -497,15 +512,29 @@
             : `<div class="profile-initials direct-chat-img">${senderInitials}</div>`;
 
         // **Attachments HTML**
+        // Server returns each attachment as { Filename, Child_id }. Render them
+        // as `.download-link` elements so the existing click handler in
+        // chat.blade.php (which fetches a presigned URL by Child_id) picks them up.
         let attachmentsHtml = "";
         if (data.attachments && data.attachments.length > 0) {
             attachmentsHtml = `<div class="attachments">`;
             data.attachments.forEach(file => {
+                if (!file) return;
+                if (typeof file === "string") {
+                    attachmentsHtml += `
+                        <a href="${file}" target="_blank" class="attachment-link">
+                            <i class="fa fa-file"></i> ${file.split('/').pop()}
+                        </a>`;
+                    return;
+                }
+                const filename = file.Filename || file.filename || 'file';
+                const childId = file.Child_id || file.child_id;
+                if (!childId) return;
+                const encodedId = btoa(String(childId));
                 attachmentsHtml += `
-                    <a href="${file}" target="_blank" class="attachment-link">
-                        <i class="fa fa-file"></i> ${file.split('/').pop()}
-                    </a>
-                `;
+                    <a href="javascript:void(0)" class="download-link" data-id="${encodedId}">
+                        <i class="fa fa-file"></i> ${filename}
+                    </a>`;
             });
             attachmentsHtml += `</div>`;
         }
@@ -1043,67 +1072,71 @@
             "iDisplayLength": 10,
         });
 
-        // Pusher Notification
-        //  Resort Notification
-        // Pusher.logToConsole = true;
-        // var pusher = new Pusher('55d404203d5a8231840a', {
-        // cluster: 'ap2'
-        // });
+        // === Real-time resort notifications via Laravel Echo / Pusher ===
+        // The server fires ResortNotificationEvent on the public 'Resortevent-channel'
+        // (broadcastAs: ResorteNotification-event). This subscriber routes each
+        // notification to the right card by `type`. Guarded so it silently
+        // no-ops if Echo isn't loaded (e.g. when BROADCAST_DRIVER=log).
+        if (typeof window.Echo !== 'undefined') {
+            const ReciverResortId  = '{{ Auth::guard("resort-admin")->user()->resort_id }}';
+            const RankOfResort     = '{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->rank : "" }}';
+            const Dept_id          = parseInt('{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->Dept_id : "0" }}', 10);
 
-        //     var channel = pusher.subscribe('Resortevent-channel');
-        //     channel.bind('ResorteNotification-event', function(data) {
+            window.Echo.channel('Resortevent-channel')
+                .listen('.ResorteNotification-event', function (data) {
+                    if (!data || !data.html) return;
+                    const htmlview            = data.html.html;
+                    const type                = data.html.type;
+                    const SenderResortId      = data.html.resortid;
+                    const PendingDepartment_id = data.html.PendingDepartment_id;
 
-        //         let htmlview = data.html.html;
-        //         let ReciverResortId="{{  Auth::guard('resort-admin')->user()->resort_id }}";
-        //       // Check if GetEmployee exists before trying to access its properties
-        //         let RankOfResort = "{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->rank : '' }}";
-        //         let Dept_id = parseInt("{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->Dept_id : '' }}");
-        //         let type = data.html.type;
-        //         let SenderResortId = data.html.resortid;
-        //         let PendingDepartment_id = data.html.PendingDepartment_id;
-        //         console.log(type,PendingDepartment_id,Dept_id);
-        //             if(type == 1)
-        //             {
-        //                 $(".notification-body").html(htmlview);
-        //             }
-        //             else if(type == 2)
-        //             {
-        //                 if(SenderResortId == ReciverResortId &&  RankOfResort == "2")
-        //                 {
-        //                     $(".AppendRequestManningRequest").html(htmlview);
-        //                 }
-        //             }
-
-
-        //             else if(type ==3) // Remainder for Department
-        //             {
-        //                 let PendingDepartment_id = data.html.PendingDepartment_id;
-        //                 if (Array.isArray(PendingDepartment_id) && PendingDepartment_id.includes(Dept_id)) {
-
-        //                     if (SenderResortId == ReciverResortId && RankOfResort == "2") {
-        //                         $(".AppendRequestManningRequest").html(htmlview);
-        //                     }
-        //                 }
-        //             }
-        //             else if(type == 4) // HOD will send Mainning request based on maning HR dasbhoard to get a response to pading response Department list
-        //             {
-        //                 if(SenderResortId == ReciverResortId &&  RankOfResort == "3")
-        //                 {
-        //                     $(".HrRequestViewCard").html(htmlview);
-        //                 }
-        //             }
-        //             else if(type  == 5  && SenderResortId == ReciverResortId && RankOfResort == "2")
-        //             {
-        //                 $(".AppendRequestManningRequest").html(htmlview);
-        //             }
-        //             else if(type == 6 && SenderResortId == ReciverResortId && RankOfResort == "2")
-        //             {
-        //                 $(".AppendRequestManningRequest").html(htmlview);
-        //             }
-        //     });
-
-        // End of notfications
-        // End of Pusher Notification
+                    if (type == 1) {
+                        $('.notification-body').html(htmlview);
+                    } else if (type == 2) {
+                        if (SenderResortId == ReciverResortId && RankOfResort == '2') {
+                            $('.AppendRequestManningRequest').html(htmlview);
+                        }
+                    } else if (type == 3) {
+                        // Reminder for the named department(s) only
+                        if (Array.isArray(PendingDepartment_id) && PendingDepartment_id.includes(Dept_id)) {
+                            if (SenderResortId == ReciverResortId && RankOfResort == '2') {
+                                $('.AppendRequestManningRequest').html(htmlview);
+                            }
+                        }
+                    } else if (type == 4) {
+                        // HOD response → HR pending-response panel
+                        if (SenderResortId == ReciverResortId && RankOfResort == '3') {
+                            $('.HrRequestViewCard').html(htmlview);
+                        }
+                    } else if (type == 5 && SenderResortId == ReciverResortId && RankOfResort == '2') {
+                        $('.AppendRequestManningRequest').html(htmlview);
+                    } else if (type == 6 && SenderResortId == ReciverResortId && RankOfResort == '2') {
+                        $('.AppendRequestManningRequest').html(htmlview);
+                    } else if (type == 10) {
+                        // Per-recipient notifications (committee assignment,
+                        // birthdays, exit clearance, etc). The server fans
+                        // out one event per recipient and stamps `sendto`
+                        // with the target user's employee id, so each
+                        // listener accepts only the broadcast meant for it.
+                        var sendto = data.html.sendto;
+                        if (typeof userId !== 'undefined' && String(sendto) === String(userId)) {
+                            // Prepend so newest is on top of the bell dropdown.
+                            $('.notification-body').prepend(htmlview);
+                            // Bump the small unread counter next to the bell.
+                            var $badge = $('.notification-nav > span').first();
+                            if ($badge.length) {
+                                var n = parseInt($badge.text(), 10);
+                                if (isNaN(n)) n = 0;
+                                $badge.text(n + 1);
+                            }
+                            if (typeof toastr !== 'undefined') {
+                                toastr.info('You have a new notification', '', { positionClass: 'toast-bottom-right' });
+                            }
+                        }
+                    }
+                });
+        }
+        // End of real-time resort notifications
         $(document).on("keyup", "#occupancytotalRooms", function () {
             let totalRooms = $(this).val();
             let occupiedRooms = $('#occupancyOccupiedRooms').val();

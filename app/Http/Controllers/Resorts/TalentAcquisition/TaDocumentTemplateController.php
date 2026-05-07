@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Resorts\TalentAcquisition;
 
+use App\Helpers\StorageHelper;
 use App\Http\Controllers\Controller;
 use App\Models\TaDocumentTemplate;
 use Illuminate\Http\Request;
@@ -73,15 +74,12 @@ class TaDocumentTemplateController extends Controller
                 $downloadBtn = '';
                 if ($row->file_path) {
                     $downloadUrl = null;
-                    $configDisk = config('filesystems.default', 'local');
-                    $disk = Storage::disk($configDisk);
+                    $disk = StorageHelper::disk();
                     try {
                         if ($disk->exists($row->file_path)) {
-                            if (method_exists($disk, 'temporaryUrl') && $configDisk === 's3') {
-                                $downloadUrl = $disk->temporaryUrl($row->file_path, now()->addMinutes(30));
-                            } else {
-                                $downloadUrl = $disk->url($row->file_path);
-                            }
+                            $downloadUrl = StorageHelper::isCloud()
+                                ? $disk->temporaryUrl($row->file_path, now()->addMinutes(30))
+                                : $disk->url($row->file_path);
                         }
                     } catch (\Exception $e) {}
                     if (!$downloadUrl && Storage::disk('public')->exists($row->file_path)) {
@@ -205,8 +203,7 @@ class TaDocumentTemplateController extends Controller
 
             // Delete file from storage (check configured disk first, then fallbacks)
             if ($template->file_path) {
-                $configDisk = config('filesystems.default', 'local');
-                $disk = Storage::disk($configDisk);
+                $disk = StorageHelper::disk();
                 try {
                     if ($disk->exists($template->file_path)) {
                         $disk->delete($template->file_path);

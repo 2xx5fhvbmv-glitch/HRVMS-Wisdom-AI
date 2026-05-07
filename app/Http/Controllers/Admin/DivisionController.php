@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Admin;
 use App\Models\Division;
 use App\Helpers\Common;
+use App\Exports\Admin\DivisionSampleExport;
+use App\Imports\Admin\DivisionImport;
+use Maatwebsite\Excel\Facades\Excel;
 use File;
 use DB;
 
@@ -272,5 +275,24 @@ class DivisionController extends Controller
       $response['msg'] = $e->getMessage();
       return response()->json($response);
     }
+  }
+
+  public function downloadSample()
+  {
+      return Excel::download(new DivisionSampleExport, 'divisions-sample.xlsx');
+  }
+
+  public function import(Request $request)
+  {
+      $request->validate([
+          'file' => 'required|file|mimes:xlsx,xls,csv',
+      ]);
+      $importer = new DivisionImport;
+      Excel::import($importer, $request->file('file'));
+      return response()->json([
+          'success' => true,
+          'msg'     => "Imported {$importer->created} division(s); skipped {$importer->skipped} duplicate(s).",
+          'errors'  => $importer->errors,
+      ]);
   }
 }

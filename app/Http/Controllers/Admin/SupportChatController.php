@@ -22,11 +22,21 @@ class SupportChatController extends Controller
 {
     public function index($support_id)
     {
-        // return view('admin.manufecturers.index');
-        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',base64_decode($support_id))->first();
+        $decodedId = base64_decode($support_id);
+        $support = Support::with(['support_category','createdBy.GetEmployee','assignedAdmin'])->where('id',$decodedId)->first();
 
-        // dd($support);
-        $messages = SupportChatMessage::where('support_id', base64_decode($support_id))->orderBy('created_at', 'asc')->get();
+        // Mark all admin-bound messages on this ticket as read for the
+        // current admin so the unread badge on the support list clears.
+        $loginAdminId = Auth::guard('admin')->id();
+        if ($loginAdminId) {
+            SupportChatMessage::where('support_id', $decodedId)
+                ->where('receiver_id', $loginAdminId)
+                ->where('receiver_type', 'admin')
+                ->where('is_read', 0)
+                ->update(['is_read' => 1]);
+        }
+
+        $messages = SupportChatMessage::where('support_id', $decodedId)->orderBy('created_at', 'asc')->get();
         return view('admin.support.chat',compact('messages','support'));
     }
 
@@ -54,20 +64,39 @@ class SupportChatController extends Controller
             'support_id' => 'required|exists:support,id',
             'senderId' => 'required',
             'senderType' => 'required|string',
-            'receiverId' => 'required',
-            'receiverType' => 'required|string',
-            'receiver_name' => 'required|string',
+            'receiverId' => 'nullable',
+            'receiverType' => 'nullable|string',
+            'receiver_name' => 'nullable|string',
             'receiver_image' => 'nullable|string',
             'senderName' => 'required|string',
             'senderImage' => 'nullable|string',
             'message' => 'nullable|string',
-            'attachments.*' => 'nullable|file|max:51200' 
+            'attachments.*' => 'nullable|file|max:51200'
         ]);
+
+        // Resolve the actual receiver from the support ticket. We don't trust
+        // the form's receiverId — the customer's GetEmployee->id rendered in
+        // the page may be stale (employee renamed/deleted, ticket reassigned).
+        // Use the live DB value so the broadcast always lands on the right
+        // channel (chat.{employee_id}).
+        $resolvedReceiverId = optional($employee)->id;
+        if (!$resolvedReceiverId) {
+            \Illuminate\Support\Facades\Log::warning('Support chat: no employee for support', [
+                'support_id'  => $validatedData['support_id'],
+                'createdBy'   => optional($support->createdBy)->id,
+            ]);
+        }
+        $validatedData['receiverId']     = $resolvedReceiverId ?: 0;
+        $validatedData['receiverType']   = $validatedData['receiverType'] ?: 'employee';
+        $validatedData['receiver_name']  = $validatedData['receiver_name']
+            ?: trim(optional($support->createdBy)->first_name . ' ' . optional($support->createdBy)->last_name)
+            ?: 'Customer';
+        $validatedData['receiver_image'] = $validatedData['receiver_image'] ?: '';
         $uploadedFiles = []; 
 
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
-                $status =   Common::AWSEmployeeFileUpload($support->resort_id, $file, $employee->Emp_id,true );
+                $status =   Common::AWSEmployeeFileUpload($support->resort_id, $file, $employee->Emp_id, null, true);
 
                 if ($status['status'] == false) 
                 {
@@ -96,20 +125,23 @@ class SupportChatController extends Controller
 
         if(!empty($uploadedFiles))
         {
-            $msg = SupportChatMessage::findOrFail($message->id);
-            $msg->attachment = json_encode($uploadedFiles);
-            $msg->save();
+            // Save on the same instance so $message->attachment is set in
+            // the JSON response; the sender-side appendMessage() reads
+            // response.message.attachments to render the bubble.
+            $message->attachment = json_encode($uploadedFiles);
+            $message->save();
         }
 
         // Send WebSocket event
         broadcast(new NewChatMessage(
-            $validatedData['message'], 
-            $validatedData['senderId'], 
-            $validatedData['receiverId'], 
-            $validatedData['senderName'], 
-            $validatedData['senderImage'], 
-            $validatedData['receiver_name'], 
-            $validatedData['receiver_image']
+            $validatedData['message'],
+            $validatedData['senderId'],
+            $validatedData['receiverId'],
+            $validatedData['senderName'],
+            $validatedData['senderImage'],
+            $validatedData['receiver_name'],
+            $validatedData['receiver_image'],
+            $uploadedFiles
         ))->toOthers();
 
         return response()->json([

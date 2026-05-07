@@ -26,5 +26,6 @@
     @include('admin.layouts.footer')
   </div>
   @include('admin.layouts.js')
+  @include('partials.global-loader')
 </body>
 </html>

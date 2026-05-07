@@ -1,6 +1,7 @@
 <?php
 namespace App\Mail;
 
+use App\Helpers\StorageHelper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -87,17 +88,17 @@ class SupportReplyEmail extends Mailable
                    // Assuming 'Filename' contains the S3 key
                     $s3Key = $attachment['Filename'];
 
-                    // Get file content from S3
-                    if (Storage::disk('s3')->exists($s3Key)) {
+                    // Get file content from configured cloud disk
+                    if (StorageHelper::exists($s3Key)) {
                         $tempFile = tempnam(sys_get_temp_dir(), 'mail_attachment_');
-                        file_put_contents($tempFile, Storage::disk('s3')->get($s3Key));
+                        file_put_contents($tempFile, StorageHelper::get($s3Key));
 
                         $mail->attach($tempFile, [
                             'as' => basename($s3Key),
-                            'mime' => Storage::disk('s3')->mimeType($s3Key),
+                            'mime' => StorageHelper::mimeType($s3Key),
                         ]);
                     } else {
-                        \Log::warning("S3 attachment not found: $s3Key");
+                        \Log::warning("Attachment not found in storage: $s3Key");
                     }
                 }
             }

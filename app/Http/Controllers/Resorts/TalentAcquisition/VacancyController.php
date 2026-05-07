@@ -1221,8 +1221,8 @@ class VacancyController extends Controller
             $v->DepartmentCode;
             $v->NoOfVacnacy = $v->Total_position_required; // No of positions
             $v->NoOfApplication;
-            $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d-m-Y');
-            $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
+            $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
+            $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
             $v->ApplicationId= $v->application_id;
             $v->allJobAdImages = json_encode($allJobAdImages);
         }
@@ -1637,11 +1637,11 @@ class VacancyController extends Controller
 
             ->get();
                     $SorlistedApplicants->map(function ($item) use($config) {
-                        $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+                        $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
                         $item->Rank =$item->As_ApprovedBy;
-                        $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+                        $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
                         $item->Score = 90 ;
-                        $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d-m-Y') : '-';
+                        $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
                         $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
                         $item->ApplicantTime = $item->ApplicantInterviewtime ?? '-';
                         $item->InterviewStatus = $item->InterviewStatus ?? 'Slot Not Booked';
@@ -1795,9 +1795,9 @@ class VacancyController extends Controller
         ')
         ->get()
         ->map(function ($item) {
-            $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+            $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
-            $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d-m-Y') : '-';
+            $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
             $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
 
@@ -1948,9 +1948,9 @@ class VacancyController extends Controller
                             ')
                             ->get()
                             ->map(function ($item) use($config) {
-                                $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+                                $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
-                                $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d-m-Y') : '-';
+                                $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
                                 $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
 
@@ -2081,9 +2081,9 @@ class VacancyController extends Controller
                             ')
                             ->get()
                             ->map(function ($item) {
-                                $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+                                $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
-                                $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d-m-Y') : '-';
+                                $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
                                 $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
 
@@ -2225,7 +2225,7 @@ class VacancyController extends Controller
                 'position_title' => $Final_response_data->Position,
                 'department' => $Final_response_data->Department,
                 'resort_name' => $resort_details->resort_name,
-                'interview_date' => Carbon::parse($InterViewDate)->format('d-m-Y'),
+                'interview_date' => Carbon::parse($InterViewDate)->format('d M Y'),
                 'interview_time' => $Final_response_data->ApplicantInterviewtime,
                 'interview_link' => $Final_response_data->MeetingLink,  // Can be added based on your logic
                 'interview_type' =>  $Interview_type,

@@ -739,6 +739,28 @@
                                                     data-parsley-nohtml-message="HTML tags are not allowed." placeholder="offenses description (optional)" class="form-control"></textarea>
                                         </div>
                                     </div>
+                                    {{-- Optional defaults — auto-fill Severity / Action when this offence
+                                         is selected on a new disciplinary case. Both nullable. --}}
+                                    <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">DEFAULT SEVERITY <small class="text-muted">(auto-fills on disciplinary)</small></label>
+                                            <select name="default_severity_id" class="form-select select2t-none">
+                                                <option value="">— optional —</option>
+                                                @foreach($SeverityStore ?? [] as $sev)
+                                                    <option value="{{ $sev->id }}">{{ $sev->SeverityName }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">DEFAULT ACTION <small class="text-muted">(auto-fills on disciplinary)</small></label>
+                                            <select name="default_action_id" class="form-select select2t-none">
+                                                <option value="">— optional —</option>
+                                                @foreach($ActionStore ?? [] as $act)
+                                                    <option value="{{ $act->id }}">{{ $act->ActionName }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
@@ -825,6 +847,46 @@
                                 <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                             </div>
                         </form>
+                    </div>
+                    {{-- FOLLOW-UP ACTIONS — populates the dropdown on the
+                         disciplinary investigation form. --}}
+                    <div class="body">
+                        <div class="card-title">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <h3>FOLLOW-UP ACTIONS</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <form id="FollowUpActionForm" data-parsley-validate>
+                            @csrf
+                            <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3">
+                                <div class="col-sm-5">
+                                    <label class="form-label">ACTION NAME <span class="red-mark">*</span></label>
+                                    <input type="text" name="name" class="form-control" placeholder="e.g. Inspect Site"
+                                        required data-parsley-required="true"
+                                        data-parsley-required-message="Please enter the action name">
+                                </div>
+                                <div class="col-sm-5">
+                                    <label class="form-label">DESCRIPTION</label>
+                                    <input type="text" name="description" class="form-control" placeholder="Short description (optional)">
+                                </div>
+                                <div class="col-sm-2 text-end">
+                                    <button type="submit" class="btn btn-themeBlue btn-sm w-100">Add</button>
+                                </div>
+                            </div>
+                        </form>
+                        <div class="table-responsive">
+                            <table id="FollowUpActionsTable" class="table w-100">
+                                <thead>
+                                    <tr>
+                                        <th>Action Name</th>
+                                        <th>Description</th>
+                                        <th class="text-nowrap" style="width:120px;">Actions</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                        </div>
                     </div>
                     <div class="body">
                         <div class="card-title">
@@ -4181,6 +4243,95 @@
 
 
     // End of Grievance
+
+    // ── FOLLOW-UP ACTIONS card ─────────────────────────────────────────
+    var followUpTable = $('#FollowUpActionsTable').DataTable({
+        searching: false, lengthChange: false, info: false, paging: true, autoWidth: false,
+        processing: true, serverSide: true,
+        ajax: '{{ route("GrievanceAndDisciplinery.config.FollowUpActionList") }}',
+        order: [[0, 'asc']],
+        columns: [
+            { data: 'name', name: 'name' },
+            { data: 'description', name: 'description', defaultContent: '' },
+            { data: 'action', name: 'action', orderable: false, searchable: false },
+        ]
+    });
+
+    $('#FollowUpActionForm').on('submit', function (e) {
+        e.preventDefault();
+        var $f = $(this);
+        $.ajax({
+            url: "{{ route('GrievanceAndDisciplinery.config.FollowUpActionStore') }}",
+            type: 'POST',
+            data: $f.serialize(),
+            success: function (resp) {
+                toastr.success(resp.message || 'Added', 'Success', { positionClass: 'toast-bottom-right' });
+                $f[0].reset();
+                followUpTable.ajax.reload();
+            },
+            error: function (xhr) {
+                var msg = 'An error occurred';
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    msg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
+                }
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    $(document).on('click', '.followup-edit-btn', function () {
+        var $row = $(this).closest('tr');
+        var id   = $(this).data('id');
+        var name = $row.find('td:nth-child(1)').text().trim();
+        var desc = $row.find('td:nth-child(2)').text().trim();
+        $row.html(`
+            <td><input type="text" class="form-control fu-edit-name" value="${$('<div>').text(name).html()}"></td>
+            <td><input type="text" class="form-control fu-edit-desc" value="${$('<div>').text(desc).html()}"></td>
+            <td><a href="javascript:void(0)" class="btn btn-theme btn-sm followup-update-btn" data-id="${id}">Save</a></td>
+        `);
+    });
+
+    $(document).on('click', '.followup-update-btn', function () {
+        var $row = $(this).closest('tr');
+        var id   = $(this).data('id');
+        var name = $row.find('.fu-edit-name').val();
+        var desc = $row.find('.fu-edit-desc').val();
+        $.ajax({
+            url: "{{ route('GrievanceAndDisciplinery.config.FollowUpActionInlineUpdate', '') }}/" + id,
+            type: 'PUT',
+            data: { _token: "{{ csrf_token() }}", name: name, description: desc },
+            success: function (resp) {
+                toastr.success(resp.message || 'Updated', 'Success', { positionClass: 'toast-bottom-right' });
+                followUpTable.ajax.reload();
+            },
+            error: function (xhr) {
+                var msg = 'An error occurred';
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    msg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
+                }
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
+    });
+
+    $(document).on('click', '.followup-delete-btn', function () {
+        var id = $(this).data('id');
+        Swal.fire({
+            title: 'Delete this follow-up action?',
+            icon: 'warning', showCancelButton: true,
+            confirmButtonText: 'Yes', cancelButtonText: 'No', confirmButtonColor: '#DD6B55'
+        }).then((r) => {
+            if (!r.isConfirmed) return;
+            $.ajax({
+                url: "{{ route('GrievanceAndDisciplinery.config.FollowUpActionDestroy', ':id') }}".replace(':id', id),
+                type: 'DELETE',
+                success: function (resp) {
+                    toastr.success(resp.message || 'Deleted', 'Success', { positionClass: 'toast-bottom-right' });
+                    followUpTable.ajax.reload();
+                }
+            });
+        });
+    });
 
 </script>
 

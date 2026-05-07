@@ -105,11 +105,20 @@ $(document).ready(function () {
                     const max = 6;
 
                     meeting.participants.slice(0, max).forEach(p => {
-                        avatars += `<div class="img-circle"><img src="${p.avatar}" alt="image"></div>`;
+                        const safeName = $('<div>').text(p.name || 'Unknown').html();
+                        avatars += `<div class="img-circle" title="${safeName}"><img src="${p.avatar}" alt="${safeName}"></div>`;
                     });
                     if (total > max) {
                         avatars += `<div class="num">+${total - max}</div>`;
                     }
+
+                    // Comma-separated participant names (caps to first 5 to keep
+                    // the row visually short; extra count shown via the avatars).
+                    const namesPreview = meeting.participants
+                        .slice(0, 5)
+                        .map(p => $('<div>').text(p.name || 'Unknown').html())
+                        .join(', ');
+                    const moreCount = total > 5 ? ` <span class="text-muted">+${total - 5} more</span>` : '';
 
                     sidebarHTML += `
                         <div class="d-flex mb-3">
@@ -122,6 +131,7 @@ $(document).ready(function () {
                                     <p>${meeting.location}</p>
                                     <div class="time"><i class="fa-regular fa-clock"></i> ${meeting.time}</div>
                                     <div class="user-ovImg">${avatars}</div>
+                                    ${namesPreview ? `<div class="participant-names small text-muted mt-1">${namesPreview}${moreCount}</div>` : ''}
                                 </div>
                             </div>
                         </div>

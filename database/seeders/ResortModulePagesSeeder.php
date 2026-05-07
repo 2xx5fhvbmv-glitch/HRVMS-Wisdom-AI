@@ -555,7 +555,7 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "0"
             ],
            [
-              "page_name"       => "Disciplinary List",
+              "page_name"       => "Disciplinary",
               "Module_Id"       => "12",
               "internal_route"  => "GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex",
               "TypeOfPage"      => "InsideOfMenu",

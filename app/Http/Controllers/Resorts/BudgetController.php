@@ -2766,7 +2766,7 @@ class BudgetController extends Controller
         while ($currentDate->lte($endDate)) {
             if ($currentDate->dayOfWeek === Carbon::FRIDAY) {
                 // Format as 'dd-mm-yyyy' to match database format
-                $fridays[] = $currentDate->format('d-m-Y');
+                $fridays[] = $currentDate->format('d M Y');
             }
             $currentDate->addDay();
         }

@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Department;
 use App\Models\Position;
+use App\Exports\Admin\PositionSampleExport;
+use App\Imports\Admin\PositionImport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Models\ResortModule;
 use App\Models\ResortModulePermission;
 use App\Models\ResortPermission;
@@ -544,6 +547,25 @@ class PositionController extends Controller
             $response['msg'] = $e->getMessage();
             return response()->json($response);
         }
+    }
+
+    public function downloadSample()
+    {
+        return Excel::download(new PositionSampleExport, 'positions-sample.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+        $importer = new PositionImport;
+        Excel::import($importer, $request->file('file'));
+        return response()->json([
+            'success' => true,
+            'msg'     => "Imported {$importer->created} position(s); skipped {$importer->skipped} duplicate(s).",
+            'errors'  => $importer->errors,
+        ]);
     }
 
 }

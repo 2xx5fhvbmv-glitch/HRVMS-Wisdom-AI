@@ -335,7 +335,7 @@ class AttandanceRegisterController extends Controller
                     for ($i = 0; $i < $totalDays; $i++)
                     {
                         $dayName = $headerDate->format('D');
-                        $newdate = $headerDate->format('d-m-Y');
+                        $newdate = $headerDate->format('d M Y');
                         $monthwiseheaders[] = ["day"=>$headerDate->format('d'),"dayname" => $dayName,'newdate'=>$newdate,'month'=>$headerDate->format('M')];
                         $headerDate->addDay();
                     }

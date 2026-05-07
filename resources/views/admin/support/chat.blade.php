@@ -5,113 +5,109 @@
 <div class="content-wrapper">
   <section class="content">
     <div class="container-fluid">
-      <div class="row">
-        <div class="col-12">            
-           <!-- DIRECT CHAT -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Direct Chat</h3>
-                </div>
+      @php
+          $admin            = $support->assignedAdmin;
+          $adminFirst       = $admin->first_name ?? '';
+          $adminLast        = $admin->last_name ?? '';
+          $adminFullName    = trim($adminFirst.' '.$adminLast) ?: 'Unassigned';
+          $adminInitials    = ($adminFirst !== '' || $adminLast !== '')
+              ? strtoupper(substr($adminFirst, 0, 1).substr($adminLast, 0, 1))
+              : '—';
 
-                <div class="card-body">
-                    @php
-                        // Either side of the chat can be null on a fresh ticket
-                        // (no admin assigned yet, or createdBy relation broken).
-                        // Pre-compute safe display values once instead of
-                        // dereferencing inside the loop.
-                        $admin            = $support->assignedAdmin;
-                        $adminFirst       = $admin->first_name ?? '';
-                        $adminLast        = $admin->last_name ?? '';
-                        $adminFullName    = trim($adminFirst.' '.$adminLast) ?: 'Unassigned';
-                        $adminInitials    = ($adminFirst !== '' || $adminLast !== '')
-                            ? strtoupper(substr($adminFirst, 0, 1).substr($adminLast, 0, 1))
-                            : '—';
-
-                        $customer         = $support->createdBy;
-                        $customerFirst    = optional($customer)->first_name ?? '';
-                        $customerLast     = optional($customer)->last_name ?? '';
-                        $customerFullName = trim($customerFirst.' '.$customerLast) ?: 'Customer';
-                        $customerImage    = $customer ? \App\Helpers\Common::getResortUserPicture($customer->id) : asset('admin_assets/files/user-image.png');
-                        $customerEmpId    = optional(optional($customer)->GetEmployee)->id;
-                    @endphp
-                    <!-- Chat Messages -->
-                    <div id="chat-messages" class="direct-chat-messages">
-                        @foreach($messages as $msg)
-                            <!-- Message to the right -->
-                            <div class="direct-chat-msg {{ $msg->sender_type === 'admin' ? 'right' : '' }}">
-                                <div class="direct-chat-infos clearfix">
-                                    @if($msg->sender_type === 'admin')
-                                        <span class="direct-chat-name float-right">{{ $adminFullName }}</span>
-                                        <span class="direct-chat-timestamp float-left"> {{ $msg->created_at->format('h:i A') }}</span>
-                                    @else
-                                        <span class="direct-chat-name float-left">{{ $customerFullName }}</span>
-                                        <span class="direct-chat-timestamp float-right"> {{ $msg->created_at->format('h:i A') }}</span>
-                                    @endif
-                                </div>
-                                <!-- /.direct-chat-infos -->
-                                @if($msg->sender_type === 'admin')
-                                    <div class="profile-initials direct-chat-img">{{ $adminInitials }}</div>
-                                @else
-                                    <img class="direct-chat-img" src="{{ $customerImage }}" alt="message user image">
-                                @endif
-                                <!-- /.direct-chat-img -->
-                                <div class="direct-chat-text">
-                                {{ $msg->message }}
-                                    @if($msg->attachment)
-                                        <div class="attachments">
-                                            @foreach(json_decode($msg->attachment, true) as $attachment)
-                                                @if(isset($attachment['Filename']) && isset($attachment['Child_id']))
-                                                    <a href="javascript:void(0)" class="download-link" data-id="{{base64_encode($attachment['Child_id'])}}">
-                                                        {{$attachment['Filename']}}
-                                                    </a>
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                                <!-- /.direct-chat-text -->
-                            </div>
-                        @endforeach
+          $customer         = $support->createdBy;
+          $customerFirst    = optional($customer)->first_name ?? '';
+          $customerLast     = optional($customer)->last_name ?? '';
+          $customerFullName = trim($customerFirst.' '.$customerLast) ?: 'Customer';
+          $customerInitials = ($customerFirst !== '' || $customerLast !== '')
+              ? strtoupper(substr($customerFirst, 0, 1).substr($customerLast, 0, 1))
+              : '—';
+          $customerImage    = $customer ? \App\Helpers\Common::getUserPictureForAdmin($customer->id) : asset('admin_assets/files/user-image.png');
+          $customerEmpId    = optional(optional($customer)->GetEmployee)->id;
+      @endphp
+      <div class="row g-3 g-xxl-4">
+        <div class="col-lg-8 mx-auto">
+          <div class="card card-billingInvoiceSupport">
+            <div class="card-title">
+              <div class="row g-3 g-2 align-items-center justify-content-between">
+                <div class="col-auto">
+                  <div class="d-flex align-items-center">
+                    <div class="me-md-3 me-2">
+                      <img src="{{ $customerImage }}" alt="customer" class="img-circle"/>
                     </div>
-                </div>
-
-                <div class="card-footer">
-                    <form id="chat-form" enctype="multipart/form-data">
-                        <div class="input-group">
-                            <input type="hidden" id="support_id" value="{{ $support->id }}">
-                            <input type="hidden" id="receiver_id" value="{{ $customerEmpId }}">
-                            <input type="hidden" id="receiver_name" value="{{ $customerFullName }}">
-                            <input type="hidden" id="receiver_image" value="{{ $customerImage }}">
-
-                            <input type="text" id="message" name="message" placeholder="Type Message..." class="form-control">
-
-                            <input type="file" id="attachment" name="attachments[]" class="d-none" accept="image/*, .pdf, .docx, .xlsx" multiple>
-                            <label for="attachment" class="attachment-icon">
-                                <i class="fa fa-paperclip"></i>
-                            </label>
-                            
-                            <span class="input-group-append">
-                                <button type="submit" class="btn btn-primary">Send</button>
-                            </span>
-                        </div>
-                    </form>
-                    <!-- File Preview Before Sending -->
-                    <div id="file-preview-container" style="display: none; margin-top: 10px;">
-                        <div class="file-preview">
-                            <div class="file-icon">
-                                <i id="file-icon" class="fa fa-file"></i>
-                            </div>
-                            <div class="file-info">
-                                <p id="file-name"></p>
-                                <span id="file-size"></span>
-                            </div>
-                            <div class="remove-file" onclick="removeAttachment()">
-                                <i class="fa fa-times"></i>
-                            </div>
-                        </div>
+                    <div>
+                      <h6>{{ $customerFullName }}</h6>
+                      <p class="mb-0 text-muted">Customer</p>
                     </div>
+                  </div>
                 </div>
+                <div class="col-auto">
+                  <span id="chatStatus" class="chatStatus-text online">Online</span>
+                </div>
+              </div>
             </div>
+            <div class="billingInvoiceChart-block">
+              <div>
+                <div id="chat-messages" class="chat-messages">
+                  @foreach($messages as $msg)
+                    <div class="chat-msg {{ $msg->sender_type === 'admin' ? 'right' : '' }}">
+                      <div class="img-circle">
+                        @if($msg->sender_type === 'admin')
+                          <div class="profile-initials">{{ $adminInitials }}</div>
+                        @else
+                          <img src="{{ $customerImage }}" alt="customer"/>
+                        @endif
+                      </div>
+                      <div class="msg">
+                        <div class="time">{{ $msg->created_at->format('h:i A') }}</div>
+                        <p>{{ $msg->message }}</p>
+                        @if($msg->attachment)
+                          <div class="attachments">
+                            @foreach(json_decode($msg->attachment, true) as $attachment)
+                              @if(isset($attachment['Filename']) && isset($attachment['Child_id']))
+                                <a href="javascript:void(0)" class="download-link" data-id="{{ base64_encode($attachment['Child_id']) }}">
+                                  {{ $attachment['Filename'] }}
+                                </a>
+                              @endif
+                            @endforeach
+                          </div>
+                        @endif
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
+              </div>
+              <form id="chat-form" enctype="multipart/form-data" class="chatSend-input">
+                <input type="hidden" id="support_id" value="{{ $support->id }}">
+                <input type="hidden" id="receiver_id" value="{{ $customerEmpId }}">
+                <input type="hidden" id="receiver_name" value="{{ $customerFullName }}">
+                <input type="hidden" id="receiver_image" value="{{ $customerImage }}">
+
+                <input type="text" id="message" name="message" class="form-control" placeholder="Type a message...">
+                <input type="file" id="attachment" name="attachments[]" class="d-none" accept="image/*, .pdf, .docx, .xlsx" multiple>
+                <label for="attachment" class="attachment-icon">
+                  <i class="fa-solid fa-paperclip"></i>
+                </label>
+                <button type="submit" class="btn btn-primary chat-send-btn">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </button>
+              </form>
+              <!-- File Preview Before Sending -->
+              <div id="file-preview-container" style="display: none; margin-top: 10px;">
+                <div class="file-preview">
+                  <div class="file-icon">
+                    <i id="file-icon" class="fa-solid fa-file"></i>
+                  </div>
+                  <div class="file-info">
+                    <p id="file-name"></p>
+                    <span id="file-size"></span>
+                  </div>
+                  <div class="remove-file" onclick="removeAttachment()">
+                    <i class="fa-solid fa-xmark"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -143,58 +139,202 @@
 @endsection
 
 @section('import-css')
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
+    /* Chat container — ported from resort_assets/css/default.css so the
+       admin support chat looks identical to the resort one. */
+    .card.card-billingInvoiceSupport {
+        padding: 20px 30px;
+        border-radius: 12px;
+    }
+    .card-billingInvoiceSupport .card-title {
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #E7E7E7;
+    }
+    .card-billingInvoiceSupport .img-circle {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+        border-radius: 50%;
+        overflow: hidden;
+        display: inline-block;
+    }
+    .card-billingInvoiceSupport .img-circle img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+    .card-billingInvoiceSupport h6 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+    }
+    .chatStatus-text.online  { --chatStatus: #7AD45A; }
+    .chatStatus-text.offline { --chatStatus: #A90000; }
+    .chatStatus-text {
+        display: flex;
+        align-items: center;
+        color: var(--chatStatus);
+    }
+    .chatStatus-text:before {
+        content: '';
+        width: 14px;
+        height: 14px;
+        background: var(--chatStatus);
+        border-radius: 50%;
+        margin-right: 4px;
+    }
+    .billingInvoiceChart-block {
+        display: flex;
+        flex-direction: column;
+    }
+    .billingInvoiceChart-block > div:first-child {
+        height: 595px;
+        overflow: auto;
+        padding-right: 4px;
+    }
+    .billingInvoiceChart-block > div:first-child > div {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-height: 100%;
+    }
+    .chat-msg {
+        display: flex;
+        align-items: end;
+        gap: 12px;
+        margin-bottom: 30px;
+    }
+    .chat-msg.right {
+        flex-direction: row-reverse;
+        justify-content: flex-start;
+        text-align: right;
+    }
+    .chat-msg .img-circle {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+    }
+    .chat-msg .img-circle img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .chat-msg .msg {
+        padding: 18px 24px;
+        background: #FFFFFF;
+        border: 1px solid #E7E7E7;
+        border-radius: 8px;
+        max-width: 80%;
+    }
+    .chat-msg.right .msg {
+        background: #F0F8FF;
+    }
+    .chat-msg .time {
+        font-size: 12px;
+        opacity: .6;
+        margin-bottom: 4px;
+    }
+    .chat-msg p {
+        font-size: 16px;
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    /* Composer */
+    .chatSend-input {
+        position: relative;
+        margin-top: 8px;
+    }
+    .chatSend-input .form-control {
+        padding-right: 90px;
+        border-radius: 8px;
+        height: 50px;
+    }
+    .chatSend-input .attachment-icon {
+        position: absolute;
+        top: 50%;
+        right: 60px;
+        transform: translateY(-50%);
+        font-size: 16px;
+        color: #888;
+        cursor: pointer;
+        margin: 0;
+    }
+    .chatSend-input .chat-send-btn {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        font-size: 18px;
+        padding: 10px 18px;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+
+    /* Avatar fallback (initials) */
     .profile-initials {
         width: 40px;
         height: 40px;
-        background-color: #2eacb3; /* Change color as needed */
+        background-color: #2eacb3;
         color: white;
         font-weight: bold;
-        font-size: 18px;
+        font-size: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%; /* Makes it circular */
+        border-radius: 50%;
         text-transform: uppercase;
     }
-    .attachment-icon {
-        position: absolute;
-        top: 50%;
-        right: 72px;
-        transform: translateY(-50%);
-        font-size: 14px;
-        color: #DDDDDD;
-        cursor: pointer;
-        margin-right: 10px;
+    .card-billingInvoiceSupport > .card-title .img-circle .profile-initials {
+        width: 50px;
+        height: 50px;
+        font-size: 18px;
     }
+
+    /* Attachment list */
+    .attachments {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .attachments a.download-link,
+    .attachments a.attachment-link {
+        color: #007bff;
+        text-decoration: underline;
+        word-break: break-all;
+    }
+
+    /* File preview card before send */
     .file-preview {
         display: flex;
         align-items: center;
         background: #f9f9f9;
         padding: 8px 12px;
         border-radius: 8px;
-        max-width: 250px;
-        margin-top: 5px;
+        max-width: 280px;
         box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
     }
-
     .file-icon {
         font-size: 20px;
         color: #007bff;
         margin-right: 10px;
     }
-
     .file-info p {
         margin: 0;
         font-size: 14px;
         font-weight: bold;
     }
-
     .file-info span {
         font-size: 12px;
         color: #666;
     }
-
     .remove-file {
         margin-left: auto;
         cursor: pointer;
@@ -205,80 +345,113 @@
 @endsection
 
 @section('import-scripts')
+@include('partials.pusher-init')
 <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 <script>
     $(document).ready(function () {
-        const socket = io("{{ env('BASE_URL', 'http://localhost:3000') }}"); // WebSocket server from env
+        // Legacy Node socket.io server (BASE_URL) — wrapped in try/catch so
+        // a stopped/missing server doesn't spam the console or break the
+        // page. Real-time delivery is handled by Pusher/Echo above.
+        var socket;
+        try {
+            socket = io("{{ env('BASE_URL', 'http://localhost:3000') }}", { reconnection: false, timeout: 2000 });
+        } catch (e) { socket = { emit: function () {}, on: function () {} }; }
         const userId = "{{ Auth::guard('admin')->user()->id }}"; // Admin ID
         const userType = "admin"; // Change dynamically for resort users
-        const supportId = $("#support_id").val(); 
-        const receiverId = $("#receiver_id").val(); 
-        const receiverName = $("#receiver_name").val(); 
-        const receiverImage = $("#receiver_image").val(); 
+        const supportId = $("#support_id").val();
+        const receiverId = $("#receiver_id").val();
+        const receiverName = $("#receiver_name").val();
+        const receiverImage = $("#receiver_image").val();
         const panelType = "{{ Auth::guard('admin')->check() ? 'admin' : 'resort' }}"; // Detect panel type
         const senderName = "{{Auth::guard('admin')->user()->first_name }} {{ Auth::guard('admin')->user()->last_name }}";
         const senderImage = "{{ Auth::guard('admin')->user()->profile_pic }}";
         socket.emit("register-user", userId);
 
-        // Function to append message on the correct panel
+        // Scroll to the latest message on initial load.
+        (function () {
+            const c = $('#chat-messages');
+            if (c.length) c.scrollTop(c[0].scrollHeight);
+        })();
+
+        // === Real-time incoming messages via Laravel Echo / Pusher ===
+        // Server fires NewChatMessage on the public 'chat.{receiver_id}'
+        // channel. The admin subscribes on its own admin id; messages from the
+        // resort employee will surface here without page reload. Guarded so it
+        // silently no-ops when Echo isn't bundled (BROADCAST_DRIVER=log).
+        if (typeof window.Echo !== 'undefined' && userId) {
+            window.Echo.channel('chat.' + userId)
+                .listen('NewChatMessage', function (e) {
+                    console.log('[chat] incoming', { senderId: e.senderId, receiverId: e.receiverId, message: e.message });
+                    // Channel `chat.{userId}` is scoped to this admin, so
+                    // any event here is meant for us. Just skip our own
+                    // echoes — don't filter by senderId/receiverId match.
+                    if (String(e.senderId) === String(userId)) return;
+                    appendMessage({
+                        senderName:  e.senderName,
+                        senderImage: e.senderImage,
+                        message:     e.message,
+                        attachments: e.attachments || [],
+                    }, false);
+                    if (typeof window.playChatPing === 'function') window.playChatPing();
+                    const c = $('#chat-messages');
+                    if (c.length) c.scrollTop(c[0].scrollHeight);
+                });
+        }
+
+        // Render a chat bubble in the new resort-style markup. Both incoming
+        // and outgoing messages use this — `isSender=true` flips the bubble
+        // to the right-hand side via the `.right` class.
         function appendMessage(data, isSender) {
-            let position = isSender ? "right" : "";
-            let senderName = data.senderName || "Unknown";
-            let time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const position = isSender ? "right" : "";
+            const senderName = data.senderName || "Unknown";
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const senderImage = data.senderImage || null;
+            const senderInitials = senderName.split(" ").map(n => n.charAt(0)).join("").toUpperCase();
+            const safeMessage = $('<div>').text(data.message || '').html();
 
-            let senderImage = data.senderImage ? data.senderImage : null;
-            let senderInitials = senderName.split(" ").map(n => n.charAt(0)).join("").toUpperCase();
-            let imageHtml = senderImage
-                ? `<img class="direct-chat-img" src="${senderImage}" alt="user"/>`
-                : `<div class="profile-initials direct-chat-img">${senderInitials}</div>`;
+            const imageHtml = senderImage
+                ? `<img src="${senderImage}" alt="user"/>`
+                : `<div class="profile-initials">${senderInitials}</div>`;
 
-            // **Attachments HTML**
+            // Attachments — server returns { Filename, Child_id }; render as
+            // `.download-link` so the existing click handler picks them up.
             let attachmentsHtml = "";
             if (data.attachments && data.attachments.length > 0) {
                 attachmentsHtml = `<div class="attachments">`;
                 data.attachments.forEach(file => {
+                    if (!file) return;
+                    if (typeof file === "string") {
+                        attachmentsHtml += `
+                            <a href="${file}" target="_blank" class="attachment-link">
+                                <i class="fa fa-file"></i> ${file.split('/').pop()}
+                            </a>`;
+                        return;
+                    }
+                    const filename = file.Filename || file.filename || 'file';
+                    const childId  = file.Child_id || file.child_id;
+                    if (!childId) return;
+                    const encodedId = btoa(String(childId));
                     attachmentsHtml += `
-                        <a href="${file}" target="_blank" class="attachment-link">
-                            <i class="fa fa-file"></i> ${file.split('/').pop()}
-                        </a>
-                    `;
+                        <a href="javascript:void(0)" class="download-link" data-id="${encodedId}">
+                            <i class="fa fa-file"></i> ${filename}
+                        </a>`;
                 });
                 attachmentsHtml += `</div>`;
             }
 
-            let chatHtml = "";
-
-            // **Admin Panel HTML**
-            if (panelType === "admin") {
-                chatHtml = `
-                    <div class="direct-chat-msg ${position}">
-                        <div class="direct-chat-infos clearfix">
-                            <span class="direct-chat-name float-${position}">${senderName}</span>
-                            <span class="direct-chat-timestamp float-${position === "right" ? "left" : "right"}">${time}</span>
-                        </div>
+            const chatHtml = `
+                <div class="chat-msg ${position}">
+                    <div class="img-circle">
                         ${imageHtml}
-                        <div class="direct-chat-text">${data.message || ''} ${attachmentsHtml}</div>
                     </div>
-                `;
-            }
-            
-            // **Resort Panel HTML**
-            else if (panelType === "resort") {
-                chatHtml = `
-                    <div class="chat-msg ${position}">
-                        <div class="img-circle">
-                            ${imageHtml}
-                        </div>
-                        <div class="msg">
-                            <div class="time">${time}</div>
-                            <p>${data.message || ''}</p>
-                            ${attachmentsHtml}
-                        </div>
+                    <div class="msg">
+                        <div class="time">${time}</div>
+                        <p>${safeMessage}</p>
+                        ${attachmentsHtml}
                     </div>
-                `;
-            }
+                </div>
+            `;
 
-            // Append message to both Admin and Resort chat boxes
             $("#chat-messages").append(chatHtml);
         }
 

@@ -85,8 +85,8 @@ class DashboardController extends Controller
                 ->get()->map(function($a){ $a->Surevey_title = ucfirst($a->Surevey_title); 
                     $a->route =  route('Survey.view', base64_encode($a->id));
 
-                    $a->Start_date = date('d-m-Y', strtotime($a->Start_date));
-                    $a->End_date =  date('d-m-Y', strtotime($a->End_date));
+                    $a->Start_date = date('d M Y', strtotime($a->Start_date));
+                    $a->End_date =  date('d M Y', strtotime($a->End_date));
                     
                     return $a;
                 
@@ -287,8 +287,8 @@ class DashboardController extends Controller
                     // view doesn't make sense for unfinished work.
                     $a->route =  route('Survey.edit', base64_encode($a->id));
 
-                    $a->Start_date = date('d-m-Y', strtotime($a->Start_date));
-                    $a->End_date =  date('d-m-Y', strtotime($a->End_date));
+                    $a->Start_date = date('d M Y', strtotime($a->Start_date));
+                    $a->End_date =  date('d M Y', strtotime($a->End_date));
 
                     return $a;
 

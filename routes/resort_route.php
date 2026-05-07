@@ -977,6 +977,10 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     // People and Relation (Disiciplinery)
     Route::get('grievance-and-disciplinary/configuration', 'GrievanceAndDisciplinery\ConfigurationController@index')->name('GrievanceAndDisciplinery.config.index');
+    Route::get('grievance-and-disciplinary/followup-actions/list', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionList')->name('GrievanceAndDisciplinery.config.FollowUpActionList');
+    Route::post('grievance-and-disciplinary/followup-actions/store', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionStore')->name('GrievanceAndDisciplinery.config.FollowUpActionStore');
+    Route::put('grievance-and-disciplinary/followup-actions/inline-update/{id}', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionInlineUpdate')->name('GrievanceAndDisciplinery.config.FollowUpActionInlineUpdate');
+    Route::delete('grievance-and-disciplinary/followup-actions/destroy/{id}', 'GrievanceAndDisciplinery\ConfigurationController@FollowUpActionDestroy')->name('GrievanceAndDisciplinery.config.FollowUpActionDestroy');
 
     Route::get('grievance-and-disciplinary', 'GrievanceAndDisciplinery\ConfigurationController@IndexDisciplineryCategory')->name('GrievanceAndDisciplinery.config.Disciplineryindex');
     Route::post('grievance-and-disciplinary/disciplinery-category/store', 'GrievanceAndDisciplinery\ConfigurationController@StoreDisciplineryCategory')->name('GrievanceAndDisciplinery.config.Disciplinerystore');
@@ -1097,6 +1101,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('grievance-and-disciplinary/disciplinary-index', 'GrievanceAndDisciplinery\DisciplinaryController@DisciplinaryIndex')->name('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex');
     Route::get('grievance-and-disciplinary/create-disciplinary', 'GrievanceAndDisciplinery\DisciplinaryController@CreateDisciplinary')->name('GrievanceAndDisciplinery.Disciplinary.CreateDisciplinary');
     Route::post('grievance-and-disciplinary/get-category-wise-offence', 'GrievanceAndDisciplinery\DisciplinaryController@GetCategoryWiseOffence')->name('GrievanceAndDisciplinery.Disciplinary.GetCategoryWiseOffence');
+    Route::post('grievance-and-disciplinary/get-offence-defaults', 'GrievanceAndDisciplinery\DisciplinaryController@GetOffenceDefaults')->name('GrievanceAndDisciplinery.Disciplinary.GetOffenceDefaults');
     Route::post('grievance-and-disciplinary/key-personnel', 'GrievanceAndDisciplinery\ConfigurationController@KeyPersonnel')->name('GrievanceAndDisciplinery.config.KeyPersonnel');
 
     // Disciplinary Module start

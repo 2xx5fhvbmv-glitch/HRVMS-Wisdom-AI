@@ -52,9 +52,9 @@
                         <th>Consent Expiry Date:</th>
                         <td>
                             @if($a->consent_expiry_date && $a->consent_status === 'approved')
-                                {{ \Carbon\Carbon::parse($a->consent_expiry_date)->format('d-m-Y') }}
+                                {{ \Carbon\Carbon::parse($a->consent_expiry_date)->format('d M Y') }}
                             @elseif($a->consent_expiry_date && $a->consent_status === 'pending')
-                                {{ \Carbon\Carbon::parse($a->consent_expiry_date)->format('d-m-Y') }} <span class="badge bg-warning text-dark">Pending</span>
+                                {{ \Carbon\Carbon::parse($a->consent_expiry_date)->format('d M Y') }} <span class="badge bg-warning text-dark">Pending</span>
                             @else
                                 {{ $a->data_retention_month }} M/{{ $a->data_retention_year }} Y
                             @endif

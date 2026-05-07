@@ -1427,7 +1427,7 @@ class PayrollController extends Controller
     //             }
 
     //             // Check if it's a public holiday
-    //             $PublicHoliday = PublicHoliday::where('holiday_date', date('d-m-Y', strtotime($record->date)))->first();
+    //             $PublicHoliday = PublicHoliday::where('holiday_date', date('d M Y', strtotime($record->date)))->first();
     //             if (isset($PublicHoliday)) {
     //                 list($hours, $minutes) = explode(':', $record->OverTime ?? '00:00');
     //                 $holidayOT += (int)$hours + ((int)$minutes / 60);
@@ -1686,7 +1686,7 @@ class PayrollController extends Controller
     //                 $otInHours = (int)$hours + ((int)$minutes / 60);
     //                 $totalHours += $otInHours;
 
-    //                 $isHoliday = PublicHoliday::where('holiday_date', date('d-m-Y', strtotime($record->date)))->exists();
+    //                 $isHoliday = PublicHoliday::where('holiday_date', date('d M Y', strtotime($record->date)))->exists();
     //                 if ($isHoliday) {
     //                     $holidayOT += $otInHours;
     //                 } else {
@@ -1811,7 +1811,7 @@ class PayrollController extends Controller
             $payroll = DB::table('payroll')->where('id', $request->payrollId)->first(['start_date', 'end_date']);
             $dateRange = '';
             if ($payroll) {
-                $dateRange = \Carbon\Carbon::parse($payroll->start_date)->format('d-m-Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d-m-Y');
+                $dateRange = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
             }
             return response()->json([
                 'success' => !empty($empIds),
@@ -1954,7 +1954,7 @@ class PayrollController extends Controller
         // Check if next month is Ramadan (based on start date)
         $nextMonthDate = Carbon::parse($request->startDate)->addMonthNoOverflow()->startOfMonth();
         $response = Http::get("https://api.aladhan.com/v1/gToH", [
-            'date' => $nextMonthDate->format('d-m-Y')
+            'date' => $nextMonthDate->format('d M Y')
         ]);
         $isNextMonthRamadan = $response->successful()
             && ($response['data']['hijri']['month']['number'] == 9);
@@ -2104,7 +2104,7 @@ class PayrollController extends Controller
                     $totalHours += $hours;
 
                     // Classify OT: Friday OT, Holiday OT (public/resort holiday or DayOff), Regular OT
-                    $dateFormatted = date('d-m-Y', strtotime($rec->date));
+                    $dateFormatted = date('d M Y', strtotime($rec->date));
                     $isFriday = Carbon::parse($rec->date)->isFriday();
                     $isPublicHoliday = PublicHoliday::where('holiday_date', $dateFormatted)->exists();
                     $isResortHoliday = \DB::table('resortholidays')

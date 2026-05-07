@@ -318,7 +318,7 @@ class ConfigrationController extends Controller
                     ';
                 })
                 ->editColumn('PublicHolidaydate', function ($row) {
-                    return $row->PublicHolidaydate ? Carbon::parse($row->PublicHolidaydate)->format('d-m-Y') :'--';
+                    return $row->PublicHolidaydate ? Carbon::parse($row->PublicHolidaydate)->format('d M Y') :'--';
                 })
                     ->addColumn('day', function ($row) {
                         return $row->PublicHolidaydate ? Carbon::parse($row->PublicHolidaydate)->format('l') : '--';

@@ -15,6 +15,8 @@ class OffensesModel extends Model
     protected $fillable = [
         'resort_id',
         'disciplinary_cat_id',
+        'default_severity_id',
+        'default_action_id',
         'OffensesName',
         'offensesdescription',
         'created_by',

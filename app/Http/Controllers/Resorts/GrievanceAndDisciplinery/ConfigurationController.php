@@ -103,7 +103,91 @@ class ConfigurationController extends Controller
                 ->whereIn('employees.rank',[1,2,3,8])
                 ->get(['t1.id as Admin_id','t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
 
-        return view('resorts.GrievanceAndDisciplinery.configuration.index',compact('GrivanceResoultionTimeLineModel','GrivanceKeys','GrievanceAppealDeadlineModel','GrievanceNonRetaliation','GrievanceRightToBeAccompanied','GrievanceCategory','RightToBeAccompanied','Committee','OtherMembers','DisciplinaryAppeal','InvestingHearingTempleteModel','ApprovalRoles','page_title','DisciplinaryCategories','Offenses','ActionStore','SeverityStore','CommitteeMembers','KeyPerson'));
+        $FollowUpActions = \App\Models\DisciplinaryFollowUpAction::where('resort_id', $this->resort->resort_id)
+            ->orderBy('name')
+            ->get();
+
+        return view('resorts.GrievanceAndDisciplinery.configuration.index',compact('GrivanceResoultionTimeLineModel','GrivanceKeys','GrievanceAppealDeadlineModel','GrievanceNonRetaliation','GrievanceRightToBeAccompanied','GrievanceCategory','RightToBeAccompanied','Committee','OtherMembers','DisciplinaryAppeal','InvestingHearingTempleteModel','ApprovalRoles','page_title','DisciplinaryCategories','Offenses','ActionStore','SeverityStore','CommitteeMembers','KeyPerson','FollowUpActions'));
+    }
+
+    public function FollowUpActionList(Request $request)
+    {
+        $rows = \App\Models\DisciplinaryFollowUpAction::where('resort_id', $this->resort->resort_id)
+            ->orderByDesc('id')
+            ->get();
+        return datatables()->of($rows)
+            ->addColumn('action', function ($row) {
+                $id = base64_encode($row->id);
+                return '<div class="d-flex align-items-center">
+                    <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 followup-edit-btn" data-id="'.e($id).'">
+                        <img src="'.asset("resorts_assets/images/edit.svg").'" alt="Edit" class="img-fluid">
+                    </a>
+                    <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red followup-delete-btn" data-id="'.e($id).'">
+                        <img src="'.asset("resorts_assets/images/trash-red.svg").'" alt="Delete" class="img-fluid">
+                    </a>
+                </div>';
+            })
+            ->rawColumns(['action'])
+            ->make(true);
+    }
+
+    public function FollowUpActionStore(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $validator = Validator::make($request->all(), [
+            'name' => [
+                'required', 'max:100',
+                Rule::unique('disciplinary_followup_actions')->where(fn ($q) => $q->where('resort_id', $resort_id)),
+            ],
+            'description' => 'nullable|string|max:500',
+        ], [
+            'name.required' => 'Action name is required.',
+            'name.unique'   => 'A follow-up action with this name already exists.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+        \App\Models\DisciplinaryFollowUpAction::create([
+            'resort_id'   => $resort_id,
+            'name'        => $request->name,
+            'description' => $request->description,
+            'status'      => 'active',
+        ]);
+        return response()->json(['success' => true, 'message' => 'Follow-Up Action added']);
+    }
+
+    public function FollowUpActionInlineUpdate(Request $request, $id)
+    {
+        $rid       = (int) base64_decode($id);
+        $resort_id = $this->resort->resort_id;
+        $validator = Validator::make($request->all(), [
+            'name' => [
+                'required', 'max:100',
+                Rule::unique('disciplinary_followup_actions')
+                    ->where(fn ($q) => $q->where('resort_id', $resort_id))
+                    ->ignore($rid),
+            ],
+            'description' => 'nullable|string|max:500',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+        \App\Models\DisciplinaryFollowUpAction::where('resort_id', $resort_id)
+            ->where('id', $rid)
+            ->update([
+                'name'        => $request->name,
+                'description' => $request->description,
+            ]);
+        return response()->json(['success' => true, 'message' => 'Follow-Up Action updated']);
+    }
+
+    public function FollowUpActionDestroy($id)
+    {
+        $rid = (int) base64_decode($id);
+        \App\Models\DisciplinaryFollowUpAction::where('resort_id', $this->resort->resort_id)
+            ->where('id', $rid)
+            ->delete();
+        return response()->json(['success' => true, 'message' => 'Follow-Up Action deleted']);
     }
     public function IndexDisciplineryCategory(Request $request)
     {
@@ -314,7 +398,14 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            OffensesModel::create(['disciplinary_cat_id'=>$request->disciplinary_cat_id,'resort_id'=>$this->resort->resort_id,"OffensesName"=>$request->OffensesName,"offensesdescription"=>$request->offensesdescription]);
+            OffensesModel::create([
+                'disciplinary_cat_id'  => $request->disciplinary_cat_id,
+                'resort_id'            => $this->resort->resort_id,
+                'OffensesName'         => $request->OffensesName,
+                'offensesdescription'  => $request->offensesdescription,
+                'default_severity_id'  => $request->default_severity_id ?: null,
+                'default_action_id'    => $request->default_action_id   ?: null,
+            ]);
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -368,9 +459,11 @@ class ConfigurationController extends Controller
             OffensesModel::where('resort_id', $this->resort->resort_id)
             ->where('id', $Main_id)
             ->update([
-                'disciplinary_cat_id'=>$request->disciplinary_cat_id,
-                'OffensesName' => $request->OffensesName,
-                'offensesdescription' => $request->offensesdescription
+                'disciplinary_cat_id'  => $request->disciplinary_cat_id,
+                'OffensesName'         => $request->OffensesName,
+                'offensesdescription'  => $request->offensesdescription,
+                'default_severity_id'  => $request->default_severity_id ?: null,
+                'default_action_id'    => $request->default_action_id   ?: null,
             ]);
 
             DB::commit();
@@ -1281,7 +1374,7 @@ class ConfigurationController extends Controller
                 return '
                             <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-AssignCommittee"
                             data
-                            data-date= "'.date('d-m-Y',strtotime($row->date)).'"  data-committeename="'.$row->CommitteeName.'" data-members="'.implode(",",$members).'"data-cat-id="' . e($id) . '">
+                            data-date= "'.date('d M Y',strtotime($row->date)).'"  data-committeename="'.$row->CommitteeName.'" data-members="'.implode(",",$members).'"data-cat-id="' . e($id) . '">
                                     <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
                                 </a>
                                 <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-Self_id="' . e($id) . '">
@@ -1308,7 +1401,7 @@ class ConfigurationController extends Controller
                 return $names;
             })
             ->addColumn('date', function ($row) {
-                return date('d-m-Y',strtotime($row->date));
+                return date('d M Y',strtotime($row->date));
             })
             ->rawColumns(['CreateNewTemplate','date','CommiteeMembers','Action'])
             ->make(true);
@@ -1618,7 +1711,7 @@ class ConfigurationController extends Controller
 
                 return ' <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn"
                             data
-                            data-date= "'.date('d-m-Y',strtotime($row->date)).'" data-del_cat_id="'.base64_encode($row->Del_cat_id).'" data-cat-id="' . e($id) . '">
+                            data-date= "'.date('d M Y',strtotime($row->date)).'" data-del_cat_id="'.base64_encode($row->Del_cat_id).'" data-cat-id="' . e($id) . '">
                                     <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
                                 </a>
                                 <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-Self_id="' . e($id) . '">
@@ -3233,7 +3326,7 @@ class ConfigurationController extends Controller
 
                 return ' <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-AssignCommittee"
                             data
-                            data-date= "'.date('d-m-Y',strtotime($row->date)).'"  data-committeename="'.$row->CommitteeName.'" data-members="'.implode(",",$members).'"data-cat-id="' . e($id) . '">
+                            data-date= "'.date('d M Y',strtotime($row->date)).'"  data-committeename="'.$row->CommitteeName.'" data-members="'.implode(",",$members).'"data-cat-id="' . e($id) . '">
                                     <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
                                 </a>
                                 <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-Self_id="' . e($id) . '">
@@ -3260,7 +3353,7 @@ class ConfigurationController extends Controller
                 return $names;
             })
             ->addColumn('date', function ($row) {
-                return date('d-m-Y',strtotime($row->date));
+                return date('d M Y',strtotime($row->date));
             })
             ->rawColumns(['CreateNewTemplate','date','CommiteeMembers','Action'])
             ->make(true);

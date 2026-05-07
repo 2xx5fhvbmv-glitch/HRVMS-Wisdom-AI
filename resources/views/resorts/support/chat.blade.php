@@ -213,13 +213,56 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        const supportId = $("#support_id").val(); 
-        const receiverId = $("#receiver_id").val(); 
-        const receiverName = $("#receiver_name").val(); 
-        const receiverImage = $("#receiver_image").val(); 
+        const supportId = $("#support_id").val();
+        const receiverId = $("#receiver_id").val();
+        const receiverName = $("#receiver_name").val();
+        const receiverImage = $("#receiver_image").val();
+
+        // === Real-time incoming messages ===
+        // Server broadcasts NewChatMessage on chat.{receiver_id} (public).
+        // userId here is the logged-in resort employee's id, declared in
+        // resources/views/resorts/layouts/js.blade.php. Subscribe on our own
+        // id and append messages we receive from the admin side. Guard for
+        // when Echo isn't loaded (e.g. BROADCAST_DRIVER=log on dev).
+        if (typeof window.Echo !== 'undefined' && typeof userId !== 'undefined' && userId) {
+            window.Echo.channel('chat.' + userId)
+                .listen('NewChatMessage', function (e) {
+                    console.log('[chat] incoming', { senderId: e.senderId, receiverId: e.receiverId, message: e.message });
+                    // The channel `chat.{userId}` is already scoped to THIS
+                    // user, so any event we receive on it is meant for us.
+                    // Don't add a senderId filter — for unassigned tickets
+                    // assigned_to is null and the comparison would always
+                    // drop messages.
+                    if (String(e.senderId) === String(userId)) return; // skip own echo
+
+                    appendMessage({
+                        message: e.message,
+                        senderId: e.senderId,
+                        receiverId: e.receiverId,
+                        senderName: e.senderName,
+                        senderImage: e.senderImage || receiverImage || '',
+                        receiverName: e.receiverName,
+                        receiverImage: e.receiverImage,
+                        attachments: e.attachments || []
+                    }, false, 'employee');
+                    if (typeof window.playChatPing === 'function') window.playChatPing();
+
+                    const c = $('#chat-messages');
+                    if (c.length) c.scrollTop(c[0].scrollHeight);
+                });
+        }
+
         const senderName = "{{Auth::guard('resort-admin')->user()->first_name }} {{ Auth::guard('resort-admin')->user()->last_name }}";
         const senderImage = "{{ Common::getResortUserPicture(Auth::guard('resort-admin')->user()->id) }}";
    
+        // Press Enter in the message input to send
+        $("#message").on("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                $("#sendMessage").trigger("click");
+            }
+        });
+
         // **Send Message & Emit WebSocket Event**
         $("#sendMessage").click(function (e) {
             e.preventDefault();

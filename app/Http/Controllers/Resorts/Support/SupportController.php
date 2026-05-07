@@ -290,7 +290,7 @@ class SupportController extends Controller
             {
                 foreach ($request->file('attachments') as $file) 
                 {
-                    $status =   Common::AWSEmployeeFileUpload($this->resort->resort_id, $file, $employee->Emp_id,true );
+                    $status =   Common::AWSEmployeeFileUpload($this->resort->resort_id, $file, $employee->Emp_id, null, true);
                   
                     if ($status['status'] == false) 
                     {
@@ -351,30 +351,31 @@ class SupportController extends Controller
 
     public function replyEMail($ticketId){
         $ticketId = base64_decode($ticketId);
-        $resort = Resort::findOrFail( $this->resort->resort_id);
-        $loggedInEmployee = $this->resort->getEmployee->id;
-        $page_title ="Support Email View";
+        $resort = Resort::findOrFail($this->resort->resort_id);
+        // Guard: resort-admin users without a linked Employee record would
+        // otherwise hit "property on null" before the page can render.
+        $loggedInEmployee = optional($this->resort->getEmployee)->id ?? 0;
+        $page_title = 'Support Email View';
         $support = Support::findOrFail($ticketId);
-        $supportEmails = SupportMessages::where('ticket_id',$ticketId)->get();
-         // Send Email Notification if enabled
+        $supportEmails = SupportMessages::where('ticket_id', $ticketId)->get();
         $settings = Settings::first();
-        $supportEmail = $settings->support_email;
-        // dd($support);
-        return view('resorts.support.email-reply',compact('page_title','support','supportEmails','loggedInEmployee','ticketId','supportEmail'));
+        $supportEmail = optional($settings)->support_email ?? '';
+        return view('resorts.support.email-reply', compact('page_title','support','supportEmails','loggedInEmployee','ticketId','supportEmail'));
     }
 
     public function sendReply(Request $request)
     {
-        // dd($request->all());
         $request->validate([
-            'ticket_id' => 'required|exists:support,id',
-            'to_email' => 'required|email',
-            'subject' => 'required|string|max:255',
-            'message' => 'required|string',
-            'attachments.*' => 'nullable|file|mimes:pdf,xlsx|max:2048',
+            'ticket_id'      => 'required|exists:support,id',
+            'to_email'       => 'required|email',
+            'subject'        => 'required|string|max:255',
+            'message'        => 'required|string',
+            'attachments.*'  => 'nullable|file|mimes:pdf,xlsx|max:2048',
         ]);
+
         $ticket = Support::findOrFail($request->ticket_id);
-        $resort = Resort::findorFail($ticket->resort_id);
+        $resort = Resort::findOrFail($ticket->resort_id);
+
         $uploadedFiles = [];
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
@@ -383,22 +384,34 @@ class SupportController extends Controller
                 $uploadedFiles[] = $filePath;
             }
         }
-        // Store the reply in the database
+
+        // Guard the employee lookup — resort-admins without a linked Employee
+        // would otherwise hit "property on null" on sender_id.
+        $employee = optional(Auth::guard('resort-admin')->user())->GetEmployee;
         $message = SupportMessages::create([
-            'ticket_id' => $ticket->id,
-            'message' => strip_tags($request->message), // Remove HTML for security
+            'ticket_id'   => $ticket->id,
+            'message'     => strip_tags($request->message),
             'attachments' => count($uploadedFiles) > 0 ? json_encode($uploadedFiles) : null,
-            'sender' => 'employee', // Assuming employee is replying
-            'sender_id' =>  Auth::guard('resort-admin')->user()->GetEmployee->id,
+            'sender'      => 'employee',
+            'sender_id'   => optional($employee)->id ?? 0,
         ]);
-        $recipientEmail =$request->to_email;
-        $replyBy = Auth::guard('resort-admin')->user()->first_name." ".Auth::guard('resort-admin')->user()->last_name;
-        Mail::to($recipientEmail)->send(new SupportReplyEmail(
-            $ticket,         // Ticket Information
-            $resort,         // Resort Information
-            $request->message, // Reply Message
-            $replyBy         // Admin (Reply Sender)
-        ));
+
+        $replyBy = Auth::guard('resort-admin')->user()->first_name . ' ' . Auth::guard('resort-admin')->user()->last_name;
+        try {
+            Mail::to($request->to_email)->send(new SupportReplyEmail($ticket, $resort, $request->message, $replyBy));
+        } catch (\Exception $mailErr) {
+            \Log::warning('Support reply email failed: ' . $mailErr->getMessage());
+            // Don't fail the request — the message is already stored in DB.
+        }
+
+        // Return JSON for AJAX callers, fall back to redirect for legacy
+        // form posts (any caller without X-Requested-With).
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Reply sent successfully!',
+            ]);
+        }
         return redirect()->back()->with('success', 'Reply sent successfully!');
     }
 }

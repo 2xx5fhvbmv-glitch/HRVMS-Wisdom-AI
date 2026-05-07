@@ -128,8 +128,8 @@ class BoardingPassController extends Controller
             $passData->EmpId = $passData->employee->Emp_id;
             $passData->Transportation = isset($passData->ResortTransportation) ? $passData->ResortTransportation->transportation_option : ' - ';
             $passData->EmployeeName = $passData->employee->resortAdmin->first_name.' '.$passData->employee->resortAdmin->last_name;
-            $passData->arrival_date = date('d-m-Y', strtotime($passData->arrival_date));
-            $passData->departure_date = date('d-m-Y', strtotime($passData->departure_date));
+            $passData->arrival_date = date('d M Y', strtotime($passData->arrival_date));
+            $passData->departure_date = date('d M Y', strtotime($passData->departure_date));
             $passData->arrival_time1 = Carbon::parse($passData->arrival_time)->format('h:i A');
             $passData->departure_time1 = Carbon::parse($passData->departure_time)->format('h:i A');
             
@@ -378,8 +378,8 @@ class BoardingPassController extends Controller
         $empId = $employee ? ($employee->Emp_id ?? '—') : '—';
 
         // Use same formatting as index DataTable so modal matches table
-        $depDate = $pass->departure_date ? date('d-m-Y', strtotime($pass->departure_date)) : '—';
-        $arrDate = $pass->arrival_date ? date('d-m-Y', strtotime($pass->arrival_date)) : '—';
+        $depDate = $pass->departure_date ? date('d M Y', strtotime($pass->departure_date)) : '—';
+        $arrDate = $pass->arrival_date ? date('d M Y', strtotime($pass->arrival_date)) : '—';
         $depTime = $this->formatTimeLikeIndex($depTimeRaw);
         $arrTime = $this->formatTimeLikeIndex($arrTimeRaw);
         $depTransport = isset($pass->ResortTransportation) && $pass->ResortTransportation
@@ -446,7 +446,7 @@ class BoardingPassController extends Controller
             return '—';
         }
         try {
-            return Carbon::parse($value)->format('d-m-Y');
+            return Carbon::parse($value)->format('d M Y');
         } catch (\Exception $e) {
             return is_string($value) ? $value : '—';
         }

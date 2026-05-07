@@ -584,16 +584,30 @@ class SurveyController extends Controller
             })
            
             ->addColumn('StartDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->Start_date));
+                return  date('d M Y', strtotime($row->Start_date));
             })
             
             ->addColumn('EndDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->End_date));
+                return  date('d M Y', strtotime($row->End_date));
             })
             ->addColumn('Status', function ($row) {
-                // Surveylist only ever surfaces 'Publish' or 'OnGoing' rows; render a
-                // human label so users see "Published" / "Ongoing" instead of the raw
-                // enum value stored in the DB.
+                // Derive the user-facing status from start/end dates so "Expired"
+                // and "In Progress" surface automatically without a daily cron.
+                // Dates are stored as d/m/Y strings in the DB.
+                $today = \Carbon\Carbon::today();
+                try {
+                    $start = $row->Start_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $row->Start_date)->startOfDay() : null;
+                    $end   = $row->End_date   ? \Carbon\Carbon::createFromFormat('d/m/Y', $row->End_date)->endOfDay()     : null;
+                } catch (\Exception $e) {
+                    $start = $end = null;
+                }
+
+                if ($end && $today->greaterThan($end)) {
+                    return '<span class="badge badge-danger">Expired</span>';
+                }
+                if ($start && $end && $today->between($start, $end)) {
+                    return '<span class="badge badge-info">In Progress</span>';
+                }
                 if ($row->Status === 'OnGoing') {
                     return '<span class="badge badge-info">Ongoing</span>';
                 }
@@ -779,11 +793,11 @@ class SurveyController extends Controller
             })
            
             ->addColumn('StartDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->Start_date));
+                return  date('d M Y', strtotime($row->Start_date));
             })
             
             ->addColumn('EndDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->End_date));
+                return  date('d M Y', strtotime($row->End_date));
             })
             ->addColumn('Status', function ($row) {
                 // Only 'Complete' rows reach this listing.
@@ -867,11 +881,11 @@ class SurveyController extends Controller
             })
            
             ->addColumn('StartDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->Start_date));
+                return  date('d M Y', strtotime($row->Start_date));
             })
             
             ->addColumn('EndDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->End_date));
+                return  date('d M Y', strtotime($row->End_date));
             })
             ->addColumn('Status', function ($row) {
                 // Only 'SaveAsDraft' rows reach this listing.
@@ -1073,10 +1087,10 @@ class SurveyController extends Controller
             })
            
             ->addColumn('StartDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->Start_date));
+                return  date('d M Y', strtotime($row->Start_date));
             })
             ->addColumn('EndDate', function ($row) {
-                return  date('d-m-Y', strtotime($row->End_date));
+                return  date('d M Y', strtotime($row->End_date));
             })
         
             ->rawColumns(['SurveyName','NoOfApplicant','Privacy','StartDate','EndDate'])

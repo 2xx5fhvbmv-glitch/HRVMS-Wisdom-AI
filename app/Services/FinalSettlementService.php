@@ -70,7 +70,7 @@ class FinalSettlementService
             if (!empty($record->OverTime) && str_contains($record->OverTime, ':')) {
                 [$h, $m] = explode(':', $record->OverTime);
                 $hours = (int)$h + ((int)$m / 60);
-                $isHoliday = PublicHoliday::where('holiday_date', date('d-m-Y', strtotime($record->date)))->exists();
+                $isHoliday = PublicHoliday::where('holiday_date', date('d M Y', strtotime($record->date)))->exists();
                 $isHoliday ? $holidayOT += $hours : $regularOT += $hours;
             }
         }
@@ -107,7 +107,7 @@ class FinalSettlementService
             now()->addDays(10),
             function () use ($nextMonth) {
                 $response = Http::get("https://api.aladhan.com/v1/gToH", [
-                    'date' => $nextMonth->format('d-m-Y')
+                    'date' => $nextMonth->format('d M Y')
                 ]);
                 return $response->successful() && ($response['data']['hijri']['month']['number'] == 9);
             }

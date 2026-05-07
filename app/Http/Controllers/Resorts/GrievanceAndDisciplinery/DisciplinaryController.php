@@ -60,42 +60,49 @@ class DisciplinaryController extends Controller
         }
 
         $flag_to_show="";
-        if($rankKey =="HOD")
-        {
-            $DisciplinarySubmissionModel =  disciplinarySubmit::with(['category','offence','GetEmployee'])
-                                        ->join('disciplinery_assign_committees as t2',"t2.id","=","disciplinary_submits.Committee_id")
-                                        ->join('disciplinery_committee_members as t3',"t3.Parent_committee_id","=","t2.id")
-                                        ->where('disciplinary_submits.resort_id',$this->resort->resort_id)
-                                        ->where('t3.MemberId',$assinged_id)
-                                        ->whereNotIn('disciplinary_submits.status',['resolved','rejected'])
-                                        ->groupby('disciplinary_submits.id')
-                                        ->where('disciplinary_submits.Assigned',"Yes")
-                                        ->where('disciplinary_submits.SendtoHr',"No")
-                                        
-                                        ->get(['disciplinary_submits.*']);
+        // Default empty collection so $DisciplinarySubmissionModel is always
+        // defined even for ranks not handled below.
+        $DisciplinarySubmissionModel = collect();
+        $rankKey = $rankKey ?? null;
 
+        if($rankKey =="HOD" || $rankKey =="EXCOM")
+        {
+            // Committee members see cases assigned to a committee they
+            // belong to (status not resolved/rejected). They also see
+            // cases they created themselves so a creator never loses
+            // visibility of their own submission, even when it's
+            // unassigned (Committee_id IS NULL).
+            $loginAdminId = $this->resort->id;
 
+            $committeeCaseIds = disciplinarySubmit::query()
+                ->join('disciplinery_assign_committees as t2', 't2.id', '=', 'disciplinary_submits.Committee_id')
+                ->join('disciplinery_committee_members as t3', 't3.Parent_committee_id', '=', 't2.id')
+                ->where('disciplinary_submits.resort_id', $this->resort->resort_id)
+                ->where('t3.MemberId', $assinged_id)
+                ->whereNotIn('disciplinary_submits.status', ['resolved', 'rejected'])
+                ->where('disciplinary_submits.Assigned', 'Yes')
+                ->when($rankKey === 'HOD', fn ($q) => $q->where('disciplinary_submits.SendtoHr', 'No'))
+                ->pluck('disciplinary_submits.id');
+
+            $DisciplinarySubmissionModel = disciplinarySubmit::with(['category', 'offence', 'GetEmployee'])
+                ->where('disciplinary_submits.resort_id', $this->resort->resort_id)
+                ->whereNotIn('disciplinary_submits.status', ['resolved', 'rejected'])
+                ->where(function ($q) use ($committeeCaseIds, $loginAdminId) {
+                    $q->whereIn('disciplinary_submits.id', $committeeCaseIds)
+                      ->orWhere('disciplinary_submits.created_by', $loginAdminId);
+                })
+                ->get(['disciplinary_submits.*']);
         }
-        elseif($rankKey =="EXCOM")
+        else
         {
-            // Committee members
-            $DisciplinarySubmissionModel =  disciplinarySubmit::with(['category','offence','GetEmployee'])
-            ->join('disciplinery_assign_committees as t2',"t2.id","=","disciplinary_submits.Committee_id")
-            ->join('disciplinery_committee_members as t3',"t3.Parent_committee_id","=","t2.id")
-            ->where('disciplinary_submits.resort_id',$this->resort->resort_id)
-            ->where('t3.MemberId',$assinged_id)
-            ->whereNotIn('disciplinary_submits.status',['resolved','rejected'])
-            ->groupby('disciplinary_submits.id')
-            ->where('disciplinary_submits.Assigned',"Yes")
-            ->get(['disciplinary_submits.*']);
-        }
-        elseif($rankKey =="HR" || $rankKey =="GM")
-        {
+            // HR / GM and any other rank with view permission see the
+            // resort-wide list (cases not yet resolved/rejected). The page
+            // itself is gated by the permission check above, so falling
+            // through here is safe.
             $DisciplinarySubmissionModel= disciplinarySubmit::with(['category','offence','GetEmployee'])
             ->whereNotIn('status',['resolved','rejected'])
-            ->where('resort_id',$this->resort->resort_id) //show all and history of all the committe members
+            ->where('resort_id',$this->resort->resort_id)
             ->get();
-
         }
            
 
@@ -155,12 +162,12 @@ class DisciplinaryController extends Controller
             ->make(true);
         }
         
-        $page_title="Disciplinary Index";
+        $page_title="Disciplinary";
         return view('resorts.GrievanceAndDisciplinery.diciplinary.index',compact('page_title'));
     }
     public function CreateDisciplinary()
     {
-        $page_title="Disciplinary Dashboard";
+        $page_title="Create Disciplinary";
         $Employee =  Employee::with(['resortAdmin'])->where('resort_id',$this->resort->resort_id)->get();
         $DisciplinaryCategories = DisciplinaryCategoriesModel::where('resort_id',$this->resort->resort_id)->get();
 
@@ -175,17 +182,57 @@ class DisciplinaryController extends Controller
 
 
 
+    /**
+     * Resolve the most recent Severity + Action used on prior disciplinary
+     * submissions for this offence at this resort. Powers the auto-fill
+     * shortcut on the create form so admins don't re-pick the same defaults
+     * over and over. Returns base64-encoded ids so the frontend can match
+     * the option values directly.
+     */
+    public function GetOffenceDefaults(Request $request)
+    {
+        $offenceId = (int) base64_decode($request->offence_id);
+        $payload = ['Severity_id' => null, 'Action_id' => null, 'description' => null];
+
+        if (!$offenceId) {
+            return response()->json(['success' => true, 'data' => $payload]);
+        }
+
+        $offence = OffensesModel::where('id', $offenceId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first(['offensesdescription', 'default_severity_id', 'default_action_id']);
+        if ($offence) {
+            $payload['description'] = $offence->offensesdescription;
+            if ($offence->default_severity_id) $payload['Severity_id'] = base64_encode($offence->default_severity_id);
+            if ($offence->default_action_id)   $payload['Action_id']   = base64_encode($offence->default_action_id);
+        }
+
+        // Fallback to most-recent submission's severity/action if the offence
+        // doesn't have admin-set defaults yet.
+        if (!$payload['Severity_id'] || !$payload['Action_id']) {
+            $latest = disciplinarySubmit::where('Offence_id', $offenceId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->orderByDesc('id')
+                ->first(['Severity_id', 'Action_id']);
+            if ($latest) {
+                if (!$payload['Severity_id'] && $latest->Severity_id) $payload['Severity_id'] = base64_encode($latest->Severity_id);
+                if (!$payload['Action_id']   && $latest->Action_id)   $payload['Action_id']   = base64_encode($latest->Action_id);
+            }
+        }
+
+        return response()->json(['success' => true, 'data' => $payload]);
+    }
+
     public function GetCategoryWiseOffence(Request $request)
     {
         $id = Base64_decode($request->id);
        
         $OffensesModel = OffensesModel::where("disciplinary_cat_id",$id)
                                         ->where('resort_id',$this->resort->resort_id)
-                                        ->get(['id','OffensesName'])
+                                        ->get(['id','OffensesName','disciplinary_cat_id'])
                                         ->map(function ($item) {
-                                            
                                             $item->newid = base64_encode($item->id);
-
+                                            $item->cat   = base64_encode($item->disciplinary_cat_id);
                                             return $item;
                                         });
 
@@ -206,11 +253,11 @@ class DisciplinaryController extends Controller
         $Expiry_date = $request->Expiry_date;
         $priority_level = $request->priority_level;
         $Incident_description = $request->incident_description;
-        $committiee_id = $request->assign_to;
+        $committiee_id = $request->filled('assign_to') ? $request->assign_to : null;
         $Request_For_Statement = ($request->Request_For_Statement == "on")? 'Yes':'No';
         $Attachment  = $request->attachment;
         $upload_signed_document  = $request->upload_signed_document;
-        $witnessisapplicable =  count($request->select_witness) >  0 ?  "Yes":"No";
+        $witnessisapplicable = !empty($request->select_witness) && count((array) $request->select_witness) > 0 ? "Yes" : "No";
         $new_upload_signed_document ='';
         $emp = Employee::join("resort_admins as t1","t1.id","=","employees.Admin_Parent_id")
                         ->join("resort_departments as t2","t2.id","=","employees.Dept_id")
@@ -219,11 +266,13 @@ class DisciplinaryController extends Controller
                         ->where("employees.id",$Employee_id)
                         ->first(['t1.email','t1.first_name','t1.last_name','t2.name as DepartmentName','t3.position_title as PositionName']);
       
-        $disciplinary_email =  DisciplinaryEmailmodel::where('resort_id',$this->resort->resort_id)->where( 'Action_id',$Action_id)->first();
-       if(!isset(  $disciplinary_email ))
-       {
-         return response()->json(['error' => 'We are not found any email template for this action'], 500);
-       } 
+        // Email template lookup is best-effort — the disciplinary record
+        // should save even when no template has been configured for this
+        // action yet. We just skip the notification and surface a warning
+        // in the success response so the user knows.
+        $disciplinary_email = DisciplinaryEmailmodel::where('resort_id', $this->resort->resort_id)
+            ->where('Action_id', $Action_id)
+            ->first();
         
         $currentOffence = OffensesModel::where('resort_id',$this->resort->resort_id)->where("id",$Offence_id)->first('OffensesName');
         $Category = DisciplinaryCategoriesModel::where('resort_id',$this->resort->resort_id)->where("id",$Category_id)->first('DisciplinaryCategoryName');
@@ -310,22 +359,29 @@ class DisciplinaryController extends Controller
             'Category_name' =>   $Category->DisciplinaryCategoryName,
             'Offense' => $currentOffence->OffensesName,
             'Priority_Level'=> $priority_level,
-            'Date_Submitted' => date('d-m-Y'),
+            'Date_Submitted' => date('d M Y'),
             'Case_Description' => $Incident_description,
         ];
 
-        // Send email using the BeyondTestApprovalEmail class
-        $recipientEmail = $emp->email;
-        $templateId = $disciplinary_email->id;
+        // Send email only when a template is configured for this action.
+        $emailWarning = null;
+        if ($disciplinary_email) {
+            Common::sendTemplateEmail("Disciplinary", $disciplinary_email->id, $emp->email, $dynamic_data);
+        } else {
+            $emailWarning = 'Saved, but no email template is configured for this action. The employee was not notified by email.';
+            \Log::warning('Disciplinary saved without email notification', [
+                'resort_id' => $this->resort->resort_id,
+                'action_id' => $Action_id,
+                'case_id'   => $disciplinarySubmit->Disciplinary_id ?? null,
+            ]);
+        }
 
-
-        $result = Common::sendTemplateEmail("Disciplinary",$templateId, $recipientEmail, $dynamic_data);
-        
         return response()->json([
-                                    'success' => true,
-                                    'message' => 'Disciplinary Created Successfully',
-                                ],200);
-    
+            'success' => true,
+            'message' => 'Disciplinary Created Successfully',
+            'warning' => $emailWarning,
+        ], 200);
+
     }
 
 
@@ -374,10 +430,11 @@ class DisciplinaryController extends Controller
                                                     ->join('resort_positions as t4',"t4.id","=","t1.Position_id")
                                                     ->join('offenses_models as t6',"t6.id","=","disciplinary_submits.Offence_id")
                                                     ->join('disciplinary_categories_models as t7',"t7.id","=","disciplinary_submits.Category_id")
+                                                    ->leftJoin('disciplinery_assign_committees as t9',"t9.id","=","disciplinary_submits.Committee_id")
                                                     ->where("t1.resort_id",$this->resort->resort_id)
                                                     ->where("disciplinary_submits.id",$id)
                                                     ->where('disciplinary_submits.status','In_Review')
-                                                    ->first(['t8.ActionName','t7.DisciplinaryCategoryName as  CatName','t6.OffensesName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','disciplinary_submits.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
+                                                    ->first(['t8.ActionName','t7.DisciplinaryCategoryName as  CatName','t6.OffensesName','t2.personal_phone','t2.email as employee_email','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','t1.Emp_id as employee_code','t9.CommitteeName','disciplinary_submits.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
        
         $page_title ="Disciplinary Investigation";
         $path = config('settings.DisciplinaryAttachments');
@@ -400,7 +457,12 @@ class DisciplinaryController extends Controller
         $id = $parent->pluck("id")->toArray();
         $child = DisciplinaryInvestigationChild::whereIn("Disciplinary_P_id",$id)->get(); 
 
-        return view('resorts.GrievanceAndDisciplinery.diciplinary.investigationreport',compact('parent','child','page_title','Disciplinary_parent','Path','committee_member_id'));
+        $FollowUpActions = \App\Models\DisciplinaryFollowUpAction::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        return view('resorts.GrievanceAndDisciplinery.diciplinary.investigationreport',compact('parent','child','page_title','Disciplinary_parent','Path','committee_member_id','FollowUpActions'));
     }
     public function RequestForStatement(Request $request)
     {

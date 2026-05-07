@@ -203,7 +203,7 @@ $(document).ready(function() {
                                 toastr.success(response.msg, "Success", {
                                     positionClass: 'toast-bottom-right'
                                 });
-                                $('#AddoccupancyForm').get(0).reset();
+                                $('#ResortInteranlPemissionForm').get(0).reset();
                             } else {
                                 toastr.error(response.msg, "Error", {
                                     positionClass: 'toast-bottom-right'

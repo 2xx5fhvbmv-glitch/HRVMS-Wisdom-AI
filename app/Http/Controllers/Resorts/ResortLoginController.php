@@ -258,12 +258,8 @@ class ResortLoginController extends Controller
                     return response()->json($response);
                 }
                     $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
-            
-                    $fileName = $request->profile_picture->getClientOriginalName();
+
                     $main_folder = $resortAdmin->resort->resort_id;
-                    $s3 = Storage::disk('s3');
-                    $newFileName = $request->profile_picture->getClientOriginalName();
-                    $mimeType = $request->profile_picture->getClientMimeType();
                     $basePath = $main_folder . '/public/categorized/' .$emp->Emp_id.'/Profile';
                     $path     = Common::UploadProfileAwsPic($basePath,$request->profile_picture);
         
@@ -275,11 +271,8 @@ class ResortLoginController extends Controller
             }
             if ($request->file('signature_img'))
             {
-                  $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+                $emp = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
                 $main_folder = $resortAdmin->resort->resort_id;
-                $s3          = Storage::disk('s3');
-                $newFileName = $request->signature_img->getClientOriginalName();
-                $mimeType    = $request->signature_img->getClientMimeType();
                 $basePath    = $main_folder . '/public/categorized/' .$emp->Emp_id.'/Signature';
                 $path        = Common::UploadProfileAwsPic($basePath,$request->signature_img);
                 if($path['status'] == false)

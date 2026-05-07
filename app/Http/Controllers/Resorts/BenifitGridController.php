@@ -66,7 +66,7 @@ class BenifitGridController extends Controller
                     $query->orderBy('emp_grade', $order);
                 })
                 ->editColumn('effective_date', function ($data) {
-                    return $formattedDate = Carbon::parse($data->effective_date)->format('d-m-Y');
+                    return $formattedDate = Carbon::parse($data->effective_date)->format('d M Y');
                  })
                 ->orderColumn('effective_date', function ($query, $order) {
                     $query->orderBy('effective_date', $order);
