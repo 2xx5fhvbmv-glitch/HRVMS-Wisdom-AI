@@ -1216,7 +1216,12 @@ class Common
 
         $response['html'] = $view;
         $response['type'] =$type;
-        $response['resortid'] =(string)$resortid;
+        // Admin-fan-out paths (e.g. type=1 from NotificationController@store)
+        // pass an array of resort ids; broadcaster expects a scalar in the
+        // payload. Join arrays into a CSV string instead of crashing on cast.
+        $response['resortid'] = is_array($resortid)
+            ? implode(',', array_map('strval', $resortid))
+            : (string) $resortid;
 
         // Outbound push to the real-time notification service is optional —
         // if NOTIFICATION_URL isn't configured (local dev, etc.), skip it
@@ -1362,6 +1367,51 @@ class Common
 
         return $defaultPicture;
 	}
+
+    /**
+     * Resolve a ResortAdmin's profile picture without enforcing resort-route
+     * context. Used in admin-side views (e.g. support chat) where the admin
+     * legitimately needs to see the customer's avatar across tenants.
+     *
+     * Same resolution logic as getResortUserPicture(): tries the AWS/Wasabi
+     * disk first, then public-path fallbacks, then a default image.
+     *
+     * @param  int|null  $userId  ResortAdmin id
+     * @return string  Absolute URL to the image
+     */
+    public static function getUserPictureForAdmin($userId)
+    {
+        $defaultPicture = url(config('settings.default_picture'));
+
+        if (!$userId) {
+            return $defaultPicture;
+        }
+
+        $admin = ResortAdmin::find($userId);
+        if (!$admin || empty($admin->profile_picture)) {
+            return $defaultPicture;
+        }
+
+        $aws = self::GetApplicantAWSFile($admin->profile_picture);
+        if (!empty($aws['success']) && !empty($aws['NewURLshow'])) {
+            return $aws['NewURLshow'];
+        }
+
+        $path = $admin->profile_picture;
+        if (strpos($path, 'http') === 0) {
+            return $path;
+        }
+        $path = ltrim($path, '/');
+        if (file_exists(public_path($path))) {
+            return asset($path);
+        }
+        $folder = config('settings.ResortProfile_folder', 'uploads/resortprofile');
+        if (file_exists(public_path($folder . '/' . basename($path)))) {
+            return asset($folder . '/' . basename($path));
+        }
+
+        return $defaultPicture;
+    }
 
     public static function CheckResortPermissions($module_id,$pageid,$Permission_id)
     {
@@ -2447,8 +2497,25 @@ class Common
      */
     private static function replacePlaceholders($template, $data)
     {
+        // Templates in the DB are inconsistent: some use {{candidate_name}},
+        // some use {{candidate name}} (with a space, copy-pasted from a doc),
+        // some use {{Candidate Name}} (title case). Replace all common
+        // variants for each key so the email body never leaks raw placeholders.
         foreach ($data as $key => $value) {
-            $template = str_replace("{{" . $key . "}}", $value, $template);
+            $val          = (string) ($value ?? '');
+            $underscore   = $key;                                    // candidate_name
+            $spaced       = str_replace('_', ' ', $key);             // candidate name
+            $titleSpaced  = ucwords($spaced);                        // Candidate Name
+            $titleSnake   = ucwords($underscore, '_');               // Candidate_Name
+
+            foreach (array_unique([$underscore, $spaced, $titleSpaced, $titleSnake]) as $variant) {
+                // Tolerate optional whitespace inside {{ }} too: {{ candidate name }}.
+                $template = preg_replace(
+                    '/\{\{\s*' . preg_quote($variant, '/') . '\s*\}\}/',
+                    $val,
+                    $template
+                );
+            }
         }
         return $template;
     }
@@ -4214,7 +4281,7 @@ class Common
                 $folderPath = $main_folder . '/public/categorized/' . $uniqueString . '/.gitkeep';
 
 
-                Storage::disk('s3')->put($folderPath, '');
+                StorageHelper::disk()->put($folderPath, '');
                 DB::commit();
 
                return true;
@@ -4245,8 +4312,8 @@ class Common
             $Emp_main_folder = $main_folder . '/' . $basePath . '/.gitkeep';
 
             // Check and create main folder in S3
-            if (!Storage::disk('s3')->exists($Emp_main_folder)) {
-                $s3Result = Storage::disk('s3')->put($Emp_main_folder, '');
+            if (!StorageHelper::disk()->exists($Emp_main_folder)) {
+                $s3Result = StorageHelper::disk()->put($Emp_main_folder, '');
             } else {
                 $s3Result = true;
             }
@@ -4298,8 +4365,8 @@ class Common
                 $subFolderPath = $main_folder . '/' . $basePath . '/' . $cleanFolder . '/.gitkeep';
 
                 // Check if subfolder already exists
-                if (!Storage::disk('s3')->exists($subFolderPath)) {
-                    $s3SubResult = Storage::disk('s3')->put($subFolderPath, '');
+                if (!StorageHelper::disk()->exists($subFolderPath)) {
+                    $s3SubResult = StorageHelper::disk()->put($subFolderPath, '');
 
                     if (!$s3SubResult) {
                         throw new \Exception("Failed to create subfolder {$folder} in S3");
@@ -4793,7 +4860,7 @@ class Common
     //                 return $data;
     //             }
 
-    //         $uploadResult = Storage::disk('s3')->put($path, $encrypted, [
+    //         $uploadResult = StorageHelper::disk()->put($path, $encrypted, [
     //             'ContentType' => 'application/octet-stream',
     //             'ContentDisposition' => 'attachment; filename="' . $originalName . '"'
     //         ]);
@@ -4872,39 +4939,39 @@ class Common
     // New code with secure logic
     public static function AWSEmployeeFileUpload($resort_id, $FolderFiles, $FolderName, $SubFolder=null, $is_secure = null)
     {
-        $data = [];
-        if($is_secure == true)
-        {
-            $is_secure = 1;
-        }
-        else
-        {
-            $is_secure =0;
-        }
+        $is_secure = $is_secure ? 1 : 0;
 
         $Resort = Resort::where("id", $resort_id)->first();
         if (!$Resort) return ['status' => false, 'msg' => 'Resort not found'];
 
-            $main_folder = $Resort->resort_id;
-            ini_set('memory_limit', '-1');
-            $file = $FolderFiles;
+        $main_folder = $Resort->resort_id;
+        ini_set('memory_limit', '-1');
+        $file = $FolderFiles;
 
-           $File_structure = FilemangementSystem::where('resort_id', $resort_id)
-                ->where('Folder_Name', $FolderName)
-                ->where('Folder_Type', 'categorized')
-                ->first();
+        $tempPdfPath = null;
+        $fullImagePath = null;
 
-            if (!$File_structure) {
-                return ['status' => false, 'msg' => "Folder does not exist"];
+        try {
+            // Backfill folder row + placeholder for employees who pre-date the file-management feature.
+            $File_structure = FilemangementSystem::firstOrCreate(
+                [
+                    'resort_id'   => $resort_id,
+                    'Folder_Name' => $FolderName,
+                    'Folder_Type' => 'categorized',
+                ],
+                [
+                    'Folder_unique_id' => substr(md5(uniqid($FolderName, true)), 0, 10),
+                    'UnderON'          => 0,
+                ]
+            );
+            if ($File_structure->wasRecentlyCreated) {
+                StorageHelper::disk()->put($main_folder . '/public/categorized/' . $File_structure->Folder_unique_id . '/.gitkeep', '');
             }
 
             $originalName = $file->getClientOriginalName();
             $extension = strtolower($file->getClientOriginalExtension());
             $fileSizeMB = round($file->getSize() / 1024, 2);
             $isImage = in_array($extension, ['jpg', 'jpeg', 'png']);
-
-            $tempPdfPath = null;
-            $fullImagePath = null;
 
             // Convert image to PDF
             if ($isImage) {
@@ -4928,24 +4995,20 @@ class Common
                     $extension = 'pdf';
                     $fileSizeMB = round(strlen($fileContent) / 1024, 2);
                 } else {
-
                     return ['status' => false, 'msg' => 'Failed to process image'];
                 }
             } else {
                 $fileContent = file_get_contents($file->getRealPath());
-                if ($fileContent === false)
-
-
+                if ($fileContent === false) {
                     return ['status' => false, 'msg' => 'Failed to read file'];
+                }
             }
 
             $uniqueString = substr(md5(uniqid($originalName, true)), 0, 10);
             $finalExtension = $extension;
             $uploadContent = $fileContent;
 
-            // If encryption is required
-            if ($is_secure == 1)
-            {
+            if ($is_secure == 1) {
                 $key = hash('sha256', env('ENCRYPTION_KEY'), true);
                 $iv = random_bytes(16);
                 $encrypted = $iv . openssl_encrypt(
@@ -4956,8 +5019,7 @@ class Common
                     $iv
                 );
 
-                if ($encrypted === false)
-                {
+                if ($encrypted === false) {
                     return ['status' => false, 'msg' => 'Encryption failed'];
                 }
 
@@ -4966,11 +5028,8 @@ class Common
             }
 
             $newFileName = $uniqueString . '.' . $finalExtension;
-             $Parent_id = '';
-            $NewFolder_id='';
-            $NewFile_structure='';
-            if ($SubFolder !=null && $SubFolder != '')
-            {
+
+            if ($SubFolder != null && $SubFolder != '') {
                 $parentPath = FilemangementSystem::where('resort_id', $resort_id)
                     ->where('UnderON', $File_structure->id)
                     ->where('Folder_Name', $SubFolder)
@@ -4979,24 +5038,20 @@ class Common
                 if (!$parentPath) return ['status' => false, 'msg' => 'Parent folder missing'];
 
                 $path = $main_folder . '/public/' . $File_structure->Folder_Type . '/' . $File_structure->Folder_unique_id . '/' . $parentPath->Folder_unique_id . '/' . $newFileName;
-                $NewFolder_id=$parentPath->id;
-                $NewFile_structure=$parentPath->id;
-            }
-            else
-            {
+                $NewFolder_id = $parentPath->id;
+                $NewFile_structure = $parentPath->id;
+            } else {
                 $path = $main_folder . '/public/' . $File_structure->Folder_Type . '/' . $File_structure->Folder_unique_id . '/' . $newFileName;
-                $NewFolder_id=$File_structure->id;
-                $NewFile_structure=$File_structure->id;
+                $NewFolder_id = $File_structure->id;
+                $NewFile_structure = $File_structure->id;
             }
 
-            $uploadResult = Storage::disk('s3')->put($path, $uploadContent, [
+            $uploadResult = StorageHelper::disk()->put($path, $uploadContent, [
                 'ContentType' => 'application/octet-stream',
                 'ContentDisposition' => 'inline; filename="' . $originalName . '"'
             ]);
 
-            if (!$uploadResult)
-            {
-
+            if (!$uploadResult) {
                 return ['status' => false, 'msg' => 'Upload to S3 failed'];
             }
 
@@ -5024,26 +5079,21 @@ class Common
                 "file_path" => $path
             ]);
 
-            // Cleanup
-            if ($fullImagePath && file_exists($fullImagePath)) unlink($fullImagePath);
-            if ($tempPdfPath && file_exists($tempPdfPath)) unlink($tempPdfPath);
-
             return [
                 'status' => true,
                 'Chil_file_id' => $fileRecord->id,
                 'path' => $path
             ];
-        try {  } catch (\Exception $e) {
+        } catch (\Exception $e) {
             \Log::error('AWSEmployeeFileUpload failed: ' . $e->getMessage());
-
-            if (isset($fullImagePath) && file_exists($fullImagePath)) unlink($fullImagePath);
-            if (isset($tempPdfPath) && file_exists($tempPdfPath)) unlink($tempPdfPath);
-
             return [
                 'status' => false,
                 'msg' => $e->getMessage(),
                 'path' => ""
             ];
+        } finally {
+            if ($fullImagePath && file_exists($fullImagePath)) @unlink($fullImagePath);
+            if ($tempPdfPath && file_exists($tempPdfPath)) @unlink($tempPdfPath);
         }
     }
 
@@ -5053,7 +5103,7 @@ class Common
             ->where("resort_id", $resort_id)
             ->first();
 
-        if (!$ChildFiles || !Storage::disk('s3')->exists($ChildFiles->File_Path)) {
+        if (!$ChildFiles || !StorageHelper::disk()->exists($ChildFiles->File_Path)) {
             return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
         }
 
@@ -5064,7 +5114,7 @@ class Common
 
 
             $key = hash('sha256', env('ENCRYPTION_KEY'), true);
-            $encryptedData = Storage::disk('s3')->get($ChildFiles->File_Path);
+            $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
 
             if (empty($encryptedData) || strlen($encryptedData) < 16) {
                 throw new \Exception('Invalid or corrupted encrypted data');
@@ -5086,11 +5136,11 @@ class Common
 
             $tempFilePath = "temp/decrypted_" . time() . "_{$decryptedFileName}";
 
-            Storage::disk('s3')->put($tempFilePath, $decryptedData, [
+            StorageHelper::disk()->put($tempFilePath, $decryptedData, [
                 'ContentType' => $mimeType
             ]);
 
-            $newUrl = Storage::disk('s3')->temporaryUrl($tempFilePath, now()->addMinutes(30));
+            $newUrl = StorageHelper::temporaryUrl($tempFilePath, 30);
             if(empty($newUrl) && $$newUrl == null){
                 return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
@@ -5104,14 +5154,16 @@ class Common
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         $mimeType = self::guessMimeType($extension);
 
-        $temporaryUrl = Storage::disk('s3')->temporaryUrl(
-            $filePath,
-            now()->addMinutes(30),
-            [
-                'ResponseContentDisposition' => 'inline',
-                'ResponseContentType' => $mimeType,
-            ]
-        );
+        $temporaryUrl = StorageHelper::isCloud()
+            ? StorageHelper::disk()->temporaryUrl(
+                $filePath,
+                now()->addMinutes(30),
+                [
+                    'ResponseContentDisposition' => 'inline',
+                    'ResponseContentType' => $mimeType,
+                ]
+            )
+            : StorageHelper::url($filePath);
 
         return [
             'success' => true,
@@ -5298,11 +5350,11 @@ class Common
     // public static function GetAWSFile($id,$resort_id)
     // {
     //     $ChildFiles = ChildFileManagement::where("id",$id)->where("resort_id"   ,$resort_id)->first();
-    //     if (isset($ChildFiles) && Storage::disk('s3')->exists($ChildFiles->File_Path))
+    //     if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path))
     //     {
     //         $key = hash('sha256', env('ENCRYPTION_KEY'), true);
 
-    //         $encryptedData = Storage::disk('s3')->get($ChildFiles->File_Path);
+    //         $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
 
     //         if (empty($encryptedData) || strlen($encryptedData) < 16) {
     //             throw new \Exception('Invalid or corrupted encrypted data');
@@ -5393,7 +5445,7 @@ class Common
     //             }
 
     //             // Store the decrypted file with proper content type
-    //             Storage::disk('s3')->put($tempFilePath, $decryptedData, [
+    //             StorageHelper::disk()->put($tempFilePath, $decryptedData, [
     //                 'ContentType' => $mimeType
     //             ]);
 
@@ -5416,7 +5468,7 @@ class Common
     //                 'zip'  => 'application/zip',
     //                 default => 'application/octet-stream' // Fallback for unknown types
     //             };
-    //             $newUrl = Storage::disk('s3')->temporaryUrl($tempFilePath, now()->addMinutes(30));
+    //             $newUrl = StorageHelper::disk()->temporaryUrl($tempFilePath, now()->addMinutes(30));
     //         } else {
     //             $mimeType='';
     //         $newUrl = "No";
@@ -5527,7 +5579,7 @@ class Common
     //             return $data['status']=false;
     //         }
 
-    //         $uploadResult = Storage::disk('s3')->put($path, $encrypted, [
+    //         $uploadResult = StorageHelper::disk()->put($path, $encrypted, [
     //             'ContentType' => 'application/octet-stream',
     //             'ContentDisposition' => 'attachment; filename="' . $originalName . '"'
     //         ]);
@@ -5654,7 +5706,7 @@ class Common
             }
 
             // Upload directly to S3
-            $uploadResult = Storage::disk('s3')->put($path, file_get_contents($file), [
+            $uploadResult = StorageHelper::disk()->put($path, file_get_contents($file), [
                 'ContentType' => $mimeType,
                 'ContentDisposition' => 'attachment; filename="' . $originalName . '"',
             ]);
@@ -5752,7 +5804,7 @@ class Common
                     $folderPath = $base_path . $uniqueString . '/';
                 }
             }
-            Storage::disk('s3')->put($folderPath, '');
+            StorageHelper::disk()->put($folderPath, '');
             DB::commit();
 
         return $fileManagement;
@@ -6090,7 +6142,7 @@ class Common
             }
 
 
-            $s3 = Storage::disk('s3');
+            $s3 = StorageHelper::disk();
 
             $basePath = $main_folder;
             $publicPath = $basePath . '/public';
@@ -6124,7 +6176,7 @@ class Common
                  $data['status'] = false;
             }
             $main_folder = $resort->resort_id;
-            $s3 = Storage::disk('s3');
+            $s3 = StorageHelper::disk();
 
             // Define the base path for talent acquisition
             $basePath = $main_folder . '/public/talent_acquisition/'.base64_encode($vacancy_id);
@@ -6204,7 +6256,7 @@ class Common
 
             if ($driver === 's3') {
                 try {
-                    $s3 = Storage::disk('s3');
+                    $s3 = StorageHelper::disk();
 
                     $folderExists = $s3->exists($basePath . '/.gitkeep');
                     if (!$folderExists) {
@@ -6477,7 +6529,7 @@ class Common
                 $data['filename'] = $newFileName;
             } else {
                 // Default to S3
-                $s3 = Storage::disk('s3');
+                $s3 = StorageHelper::disk();
                 $s3->put($filePath, file_get_contents($file->getRealPath()));
                 $data['status'] = true;
                 $data['path'] = $filePath;

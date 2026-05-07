@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use Auth;
 use Carbon\Carbon;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\FilemangementSystem;
@@ -20,6 +21,9 @@ use App\Models\AuditLogs;
 use App\Models\FileVersion;
 use App\Models\ResortDepartment;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Aws\S3\Exception\S3Exception;
+use Exception;
 use Barryvdh\DomPDF\Facade\Pdf;
 class FileManageController extends Controller
 {
@@ -130,7 +134,7 @@ class FileManageController extends Controller
                             }
 
                   
-                        Storage::disk('s3')->put($folderPath, '');
+                        StorageHelper::disk()->put($folderPath, '');
                         DB::commit();
                     }
                     catch (S3Exception $e) 
@@ -360,7 +364,7 @@ class FileManageController extends Controller
                         }
         
                         // Upload to S3 with proper metadata
-                        Storage::disk('s3')->put($path, $encrypted, [
+                        StorageHelper::disk()->put($path, $encrypted, [
                             'ContentType' => 'application/octet-stream',
                             'ContentDisposition' => 'attachment; filename="' . $originalName . '"'
                         ]);
@@ -464,7 +468,7 @@ class FileManageController extends Controller
                                     $img='';
                                     $ak->new_id = base64_encode($ak->id);
                                     $ak->File_Name =  htmlspecialchars($ak->Folder_Name, ENT_QUOTES, 'UTF-8');
-                                    $ak->ModifiedDate = $ak->updated_at->format('d-m-Y');
+                                    $ak->ModifiedDate = $ak->updated_at->format('d M Y');
                                     $ak->Permission = URL::asset('resorts_assets/images/user-4.svg');
                                     $ak->File_Size = (float) ($ak->children_size_sum ?? 0);
                                     $ak->File_img =  URL::asset('resorts_assets/images/folder.svg');
@@ -504,7 +508,7 @@ class FileManageController extends Controller
                                     $img='';
                                     $i->new_id = base64_encode($i->id);
                                     $i->File_Name = !empty($i->NewFileName) ?   htmlspecialchars($i->NewFileName, ENT_QUOTES, 'UTF-8') : htmlspecialchars($i->File_Name, ENT_QUOTES, 'UTF-8');
-                                    $i->ModifiedDate = $i->updated_at->format('d-m-Y');
+                                    $i->ModifiedDate = $i->updated_at->format('d M Y');
                                     $i->Permission = URL::asset(path: 'resorts_assets/images/user-4.svg');
                                     $i->File_Size = $i->File_Size.' KB';
             
@@ -669,7 +673,7 @@ class FileManageController extends Controller
                                 $img='';
                                 $ak->new_id = base64_encode($ak->id);
                                 $ak->File_Name = htmlspecialchars($ak->Folder_Name, ENT_QUOTES, 'UTF-8');
-                                $ak->ModifiedDate = $ak->updated_at->format('d-m-Y');
+                                $ak->ModifiedDate = $ak->updated_at->format('d M Y');
                                 $ak->Permission = URL::asset('resorts_assets/images/user-4.svg');
                                 $File_Size = ChildFileManagement::where("Parent_File_ID", $ak->id)
                                                                 ->where("resort_id", $this->resort->resort_id)
@@ -715,7 +719,7 @@ class FileManageController extends Controller
                             $img='';
                             $i->new_id = base64_encode($i->id);
                             $i->File_Name =  !empty($i->NewFileName) ?   htmlspecialchars($i->NewFileName, ENT_QUOTES, 'UTF-8') : htmlspecialchars($i->File_Name, ENT_QUOTES, 'UTF-8');
-                            $i->ModifiedDate = $i->updated_at->format('d-m-Y');
+                            $i->ModifiedDate = $i->updated_at->format('d M Y');
                             $i->Permission = URL::asset(path: 'resorts_assets/images/user-4.svg');
                             $i->File_Size = $i->File_Size.' KB';
 
@@ -842,13 +846,13 @@ class FileManageController extends Controller
                 $ChildFiles = ChildFileManagement::where("unique_id"   , $unique_id)
                 ->where("resort_id"   , $this->resort->resort_id)->first();
                 $tr="";
-                if (isset($ChildFiles) && Storage::disk('s3')->exists($ChildFiles->File_Path)) {
+                if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path)) {
                    
                         // Generate encryption key from environment variable
                         $key = hash('sha256', env('ENCRYPTION_KEY'), true);
                         
                         // Get encrypted data from S3
-                        $encryptedData = Storage::disk('s3')->get($ChildFiles->File_Path);
+                        $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
                         
                         // Validate encrypted data
                         if (empty($encryptedData) || strlen($encryptedData) < 16) {
@@ -949,7 +953,7 @@ class FileManageController extends Controller
                         }
                         
                         // Store the decrypted file with proper content type
-                        Storage::disk('s3')->put($tempFilePath, $decryptedData, [
+                        StorageHelper::disk()->put($tempFilePath, $decryptedData, [
                             'ContentType' => $mimeType
                         ]);
                         
@@ -972,7 +976,7 @@ class FileManageController extends Controller
                             'zip'  => 'application/zip',
                             default => 'application/octet-stream' // Fallback for unknown types
                         };
-                        $newUrl = Storage::disk('s3')->temporaryUrl($tempFilePath, now()->addMinutes(30));
+                        $newUrl = StorageHelper::temporaryUrl($tempFilePath, 30);
                     } 
                     else 
                     {
@@ -1095,7 +1099,7 @@ class FileManageController extends Controller
                             $folderPath = $main_folder . '/public/categorized/' . $uniqueString . '/.gitkeep';
                         }
                     
-                        Storage::disk('s3')->put($folderPath, '');
+                        StorageHelper::disk()->put($folderPath, '');
                         DB::commit();
                     } 
                     catch (S3Exception $e) 
@@ -1185,7 +1189,7 @@ class FileManageController extends Controller
         //                     $oldFilePath = $child->File_Path;
         //                     $newFilePath = $newFolderPath . basename($oldFilePath);
         //                     try {
-        //                         Storage::disk('s3')->move($oldFilePath, $newFilePath);
+        //                         StorageHelper::disk()->move($oldFilePath, $newFilePath);
         //                         $child->update([
         //                             "Parent_File_ID" => $parent->id,
         //                             "File_Path" => $newFilePath
@@ -1205,7 +1209,7 @@ class FileManageController extends Controller
         //                         $oldFolderPath = $newFolderPath = "{$main_folder}/public/{$oldfolderPath->Folder_unique_id}/";
         //                         $newFolderPath = $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/";
         //                         dd($newFolderPath, $oldFolderPath);
-        //                         Storage::disk('s3')->move($oldFolderPath, $newFilePath);
+        //                         StorageHelper::disk()->move($oldFolderPath, $newFilePath);
         //                     }
         //                 }
         //             }
@@ -1284,7 +1288,7 @@ class FileManageController extends Controller
                 $oldFilePath = $child->File_Path;
                 $newFilePath = "{$main_folder}/public/{$parent->Folder_Type}/{$parent->Folder_unique_id}/" . basename($oldFilePath);
                
-                    Storage::disk('s3')->move($oldFilePath, $newFilePath);
+                    StorageHelper::disk()->move($oldFilePath, $newFilePath);
         
                     // Update file path in database
                     $child->update([
@@ -1319,10 +1323,10 @@ class FileManageController extends Controller
                     $newFolderPath = "{$main_folder}/public/{$parent->Folder_unique_id}/{$folder->Folder_unique_id}/";
         
                     // Get all files inside the folder and move them
-                    $files = Storage::disk('s3')->allFiles($oldFolderPath);
+                    $files = StorageHelper::disk()->allFiles($oldFolderPath);
                     foreach ($files as $file) {
                         $newFilePath = str_replace($oldFolderPath, $newFolderPath, $file);
-                        Storage::disk('s3')->move($file, $newFilePath);
+                        StorageHelper::disk()->move($file, $newFilePath);
         
                         // Update file paths in database
                         ChildFileManagement::where("resort_id", $this->resort->resort_id)
@@ -1331,10 +1335,10 @@ class FileManageController extends Controller
                     }
         
                     // Move subfolders
-                    $subfolders = Storage::disk('s3')->allDirectories($oldFolderPath);
+                    $subfolders = StorageHelper::disk()->allDirectories($oldFolderPath);
                     foreach ($subfolders as $subfolder) {
                         $newSubfolderPath = str_replace($oldFolderPath, $newFolderPath, $subfolder);
-                        Storage::disk('s3')->move($subfolder, $newSubfolderPath);
+                        StorageHelper::disk()->move($subfolder, $newSubfolderPath);
                     }
         
                     // Update child folders' `UnderON`
@@ -1381,7 +1385,7 @@ class FileManageController extends Controller
                                     $img='';
                                     $ak->new_id = base64_encode($ak->id);
                                     $ak->File_Name = htmlspecialchars($ak->Folder_Name, ENT_QUOTES, 'UTF-8');
-                                    $ak->ModifiedDate = $ak->updated_at->format('d-m-Y');
+                                    $ak->ModifiedDate = $ak->updated_at->format('d M Y');
                                     $ak->Permission = URL::asset('resorts_assets/images/user-4.svg');
                                     $File_Size = ChildFileManagement::where("Parent_File_ID", $ak->id)
                                                                     ->where("resort_id", $this->resort->resort_id)
@@ -1437,7 +1441,7 @@ class FileManageController extends Controller
                         $img='';
                         $i->new_id = base64_encode($i->id);
                         $i->File_Name =  !empty($i->NewFileName) ?   htmlspecialchars($i->NewFileName, ENT_QUOTES, 'UTF-8') : htmlspecialchars($i->File_Name, ENT_QUOTES, 'UTF-8');
-                        $i->ModifiedDate = $i->updated_at->format('d-m-Y');
+                        $i->ModifiedDate = $i->updated_at->format('d M Y');
                         $i->Permission = URL::asset(path: 'resorts_assets/images/user-4.svg');
                         $i->File_Size = $i->File_Size.' KB';
                         if (in_array($i->File_Extension, $imgExtensions)) {
@@ -1559,7 +1563,7 @@ class FileManageController extends Controller
             ->map(function($i) {
                 $i->ModifiedBy = Common::getResortUserPicture($i->created_by); 
                 $i->Time = $i->created_at->format('H:i:s');
-                $i->LastModified = $i->created_at->format('d-m-Y');
+                $i->LastModified = $i->created_at->format('d M Y');
                 $i->ActionType = $i->TypeofAction;
                 return $i;
             });

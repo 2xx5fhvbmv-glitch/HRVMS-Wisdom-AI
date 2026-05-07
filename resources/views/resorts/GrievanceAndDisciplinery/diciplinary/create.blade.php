@@ -71,7 +71,12 @@
 
                 <!-- Category -->
                 <div class="col-sm-6">
-                    <label class="form-label">Category <span class="text-danger">*</span></label>
+                    <label class="form-label">
+                        Category <span class="text-danger">*</span>
+                        <small id="categoryAutoHint" class="text-muted ms-1">
+                            <i class="fa-solid fa-link"></i> auto-filled from offence
+                        </small>
+                    </label>
                     <select class="form-select" name="Category_id" id="Category_id"
                         required data-parsley-required-message="Please select a category"
                         data-parsley-errors-container="#category-error-list">
@@ -89,14 +94,29 @@
                     <select class="form-select select2t-none" name="Offence_id" id="Offence_id"
                         required data-parsley-required-message="Please select an offence"
                         data-parsley-errors-container="#offence-error-list">
-                        <option></option>
+                        <option value=""></option>
+                        @foreach($Offenses ?? [] as $off)
+                            <option
+                                value="{{ base64_encode($off->id) }}"
+                                data-cat="{{ base64_encode($off->disciplinary_cat_id) }}"
+                                data-severity="{{ $off->default_severity_id ? base64_encode($off->default_severity_id) : '' }}"
+                                data-action="{{ $off->default_action_id ? base64_encode($off->default_action_id) : '' }}"
+                                data-desc="{{ $off->offensesdescription }}">
+                                {{ $off->OffensesName }}
+                            </option>
+                        @endforeach
                     </select>
                     <div id="offence-error-list" class="text-danger small"></div>
                 </div>
 
                 <!-- Action -->
                 <div class="col-sm-6">
-                    <label class="form-label">Action <span class="text-danger">*</span></label>
+                    <label class="form-label">
+                        Action <span class="text-danger">*</span>
+                        <small id="actionAutoHint" class="text-muted ms-1">
+                            <i class="fa-solid fa-link"></i> auto-filled from offence
+                        </small>
+                    </label>
                     <select class="form-select select2t-none" name="Action_id" id="Action_id"
                         required data-parsley-required-message="Please select an action"
                         data-parsley-errors-container="#action-error-list">
@@ -110,7 +130,12 @@
 
                 <!-- Severity -->
                 <div class="col-sm-6">
-                    <label class="form-label">Severity <span class="text-danger">*</span></label>
+                    <label class="form-label">
+                        Severity <span class="text-danger">*</span>
+                        <small id="severityAutoHint" class="text-muted ms-1">
+                            <i class="fa-solid fa-link"></i> auto-filled from offence
+                        </small>
+                    </label>
                     <select class="form-select select2t-none" name="Severity_id" id="Severity_id"
                         required data-parsley-required-message="Please select severity"
                         data-parsley-errors-container="#severity-error-list">
@@ -122,15 +147,18 @@
                     <div id="severity-error-list" class="text-danger small"></div>
                 </div>
 
-                <!-- Expiry Date -->
+                <!-- Action Valid Until -->
                 <div class="col-sm-4">
-                    <label class="form-label">Expiry Date <span class="text-danger">*</span></label>
+                    <label class="form-label">Action Valid Until <span class="text-danger">*</span></label>
                     <input type="text" name="Expiry_date" class="form-control Expiry_date datepicker"
                         required data-parsley-required-message="Please select an expiry date"
                         placeholder="Select Date">
                 </div>
 
-                <!-- Priority -->
+                {{-- Priority — temporarily hidden per request. Default value
+                     'Medium' kept as a hidden input so existing controllers /
+                     storage logic that read `priority_level` still receive a
+                     valid value. Restore the visible block below to re-enable.
                 <div class="col-sm-4">
                     <label class="form-label">Priority <span class="text-danger">*</span></label>
                     <select class="form-select select2t-none" name="priority_level" id="priority_level"
@@ -143,12 +171,13 @@
                     </select>
                     <div id="priority-error-list" class="text-danger small"></div>
                 </div>
+                --}}
+                <input type="hidden" name="priority_level" value="Medium">
 
                 <!-- Assign To -->
                 <div class="col-sm-4">
-                    <label class="form-label">Assign To <span class="text-danger">*</span></label>
+                    <label class="form-label">Assign To</label>
                     <select class="form-select" id="assign_to" name="assign_to"
-                        required data-parsley-required-message="Please select who to assign"
                         data-parsley-errors-container="#assign-error-list">
                         <option value=""></option>
                         @foreach($committiee ?? [] as $c)
@@ -246,6 +275,19 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Readonly select2 — value still submits with the form, but pointer +
+       keyboard interaction is blocked and the field is dimmed. The lock is
+       released as soon as the dependent (Offence) selection is cleared. */
+    .select2.is-readonly,
+    .select2.is-readonly .select2-selection {
+        pointer-events: none;
+        opacity: 0.7;
+        background-color: #f5f5f5 !important;
+        cursor: not-allowed !important;
+    }
+    .select2.is-readonly .select2-selection__arrow { display: none; }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -288,6 +330,93 @@
             autoclose: true,      // Close the picker after selection
             todayHighlight: true  // Highlight today's date
         });
+        // Reverse-direction shortcut: when the user picks an Offence first,
+        // auto-select its parent Category and lock it. The data-cat attribute
+        // is baked into each <option> from the controller payload.
+        // Category, Severity and Action are all fully derived from the
+        // Offence — only Offence is user-editable. Keep the dependents
+        // locked at all times; we only update their values programmatically
+        // when an Offence is picked.
+        function lockSelect(id) {
+            $('#' + id).addClass('is-readonly').next('.select2').addClass('is-readonly');
+        }
+        function lockDerivedFields() {
+            lockSelect('Category_id');
+            lockSelect('Severity_id');
+            lockSelect('Action_id');
+        }
+        // Backwards-compat alias used elsewhere in this file.
+        function lockCategoryWidget() { lockSelect('Category_id'); }
+        lockDerivedFields();
+
+        // Severity and Action stay locked at all times; only the value
+        // changes when a new Offence is picked. We don't toggle the lock
+        // anymore — kept the helper signature so existing call sites work.
+        function lockField(selectId, hintId, locked) {
+            // Always keep the field locked; ignore the `locked` arg.
+            lockSelect(selectId);
+        }
+        function clearAndUnlockHistoryFields() {
+            $('#Severity_id').val('').trigger('change.select2');
+            $('#Action_id').val('').trigger('change.select2');
+            // Stay locked — user must pick a new Offence to populate.
+        }
+        $(document).on('change', '#Offence_id', function () {
+            var $sel = $(this).find('option:selected');
+            var catId       = $sel.data('cat');
+            var sevDefault  = $sel.data('severity');
+            var actDefault  = $sel.data('action');
+            var offenceVal  = $(this).val();
+            if (!offenceVal) {
+                // Offence cleared — clear and unlock all dependents.
+                $('#Category_id').val('').trigger('change.select2');
+                lockCategoryWidget();
+                clearAndUnlockHistoryFields();
+                return;
+            }
+            if (catId && $('#Category_id').val() !== String(catId)) {
+                $('#Category_id').val(String(catId)).trigger('change.select2');
+            }
+            lockCategoryWidget();
+
+            // Apply admin-set defaults synchronously (no waiting for AJAX).
+            if (sevDefault) {
+                $('#Severity_id').val(String(sevDefault)).trigger('change.select2');
+                lockField('Severity_id', 'severityAutoHint', true);
+            }
+            if (actDefault) {
+                $('#Action_id').val(String(actDefault)).trigger('change.select2');
+                lockField('Action_id', 'actionAutoHint', true);
+            }
+
+            // Fetch + apply prior defaults (severity / action) from history,
+            // overriding only the dropdowns the admin hasn't set defaults on.
+            $.ajax({
+                url: "{{ route('GrievanceAndDisciplinery.Disciplinary.GetOffenceDefaults') }}",
+                type: 'POST',
+                data: { _token: "{{ csrf_token() }}", offence_id: offenceVal },
+                success: function (resp) {
+                    if (!resp || !resp.success) return;
+                    var d = resp.data || {};
+                    if (d.Severity_id) {
+                        $('#Severity_id').val(d.Severity_id).trigger('change.select2');
+                        lockField('Severity_id', 'severityAutoHint', true);
+                    } else {
+                        lockField('Severity_id', 'severityAutoHint', false);
+                    }
+                    if (d.Action_id) {
+                        $('#Action_id').val(d.Action_id).trigger('change.select2');
+                        lockField('Action_id', 'actionAutoHint', true);
+                    } else {
+                        lockField('Action_id', 'actionAutoHint', false);
+                    }
+                    if (d.description && !$('#incident-description').val()) {
+                        $('#incident-description').val(d.description);
+                    }
+                }
+            });
+        });
+
         $(document).on('change', '#Category_id', function() {
             var Category_id = $(this).val();
 
@@ -301,7 +430,7 @@
                     {
                         var option = '<option value="">Select Offence</option>';
                         $.each(response.data, function(i, v) {
-                            option += `<option value="${v.newid}">${v.OffensesName}</option>`;
+                            option += `<option value="${v.newid}" data-cat="${v.cat}">${v.OffensesName}</option>`;
                         });
                         $('#Offence_id').html(option);
                     

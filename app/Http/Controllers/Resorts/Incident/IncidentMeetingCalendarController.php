@@ -58,6 +58,8 @@ class IncidentMeetingCalendarController extends Controller
             $query->whereBetween('meeting_date', [$request->start, $request->end]);
         }
     
+        $query->with('participant.employee.resortAdmin');
+
         $meetings = $query->get()->map(function ($meeting) {
             return [
                 'id' => $meeting->id,
@@ -66,11 +68,14 @@ class IncidentMeetingCalendarController extends Controller
                 'time' => $meeting->meeting_time,
                 'location' => $meeting->location ?? '',
                 'participants' => $meeting->participant->map(function ($p) {
+                    $admin = optional(optional($p->employee)->resortAdmin);
+                    $name  = trim(($admin->first_name ?? '') . ' ' . ($admin->last_name ?? '')) ?: 'Unknown';
                     return [
-                        'avatar' => Common::getResortUserPicture($p->employee->Admin_Parent_id)
-                            ?? asset('assets/images/default-user.svg')
+                        'name'   => $name,
+                        'avatar' => Common::getResortUserPicture(optional($p->employee)->Admin_Parent_id)
+                            ?? asset('assets/images/default-user.svg'),
                     ];
-                }),
+                })->values(),
             ];
         });
     

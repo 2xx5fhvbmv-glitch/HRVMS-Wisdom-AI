@@ -17,6 +17,9 @@
                 @if(Common::hasPermission(config('settings.admin_modules.divisions'),config('settings.permissions.delete')))
                   <a href="javascript:void(0)" id="bulk_delete" class="btn btn-danger float-right mr-2"><i class="fas fa-minus"></i> Delete</a>
                 @endif
+                @if(Common::hasPermission(config('settings.admin_modules.divisions'),config('settings.permissions.create')))
+                  @include('admin._partials.bulk-upload', ['module' => 'divisions', 'sampleRoute' => 'admin.divisions.sample', 'importRoute' => 'admin.divisions.import', 'entityLabel' => 'Division'])
+                @endif
               </div>
             </div>
             <div class="card-body">

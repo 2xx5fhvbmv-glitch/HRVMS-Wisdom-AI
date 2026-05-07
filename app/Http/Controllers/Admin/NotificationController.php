@@ -139,6 +139,12 @@ class NotificationController extends Controller
      */
     public function store(Request $request)
     {
+        // The "All Resorts" sentinel from the form's <select> can leak through
+        // to the server when the front-end strip path misses an edge case.
+        // Expand it server-side to all active resort ids and drop non-numeric
+        // entries so validation doesn't fail on it.
+        $request->merge(['resorts' => $this->normalizeResortIds($request->input('resorts', []))]);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'content' => 'required|string|max:1000',
@@ -230,6 +236,8 @@ class NotificationController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $request->merge(['resorts' => $this->normalizeResortIds($request->input('resorts', []))]);
+
         // try {
             // Validate the request
             $validatedData = $request->validate([
@@ -352,6 +360,25 @@ class NotificationController extends Controller
       $response['success'] = true;
       return response()->json($response);
     }
+  }
+
+  /**
+   * Convert the form's resorts[] payload into an array of valid integer ids.
+   * Expands the "all" sentinel to every active resort id and drops any
+   * non-numeric leftovers so the validator's `exists:resorts,id` rule passes.
+   */
+  protected function normalizeResortIds($input): array
+  {
+      $values = array_map('strval', (array) $input);
+      if (in_array('all', $values, true)) {
+          return Resort::where('status', 'active')->pluck('id')->map(fn ($id) => (int) $id)->all();
+      }
+      return collect($values)
+          ->filter(fn ($v) => ctype_digit($v))
+          ->map(fn ($v) => (int) $v)
+          ->unique()
+          ->values()
+          ->all();
   }
 
   public function active($id)

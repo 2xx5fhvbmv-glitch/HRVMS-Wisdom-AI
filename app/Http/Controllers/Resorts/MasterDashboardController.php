@@ -125,8 +125,8 @@ class MasterDashboardController extends Controller
                                 $v->DepartmentCode;
                                 $v->NoOfVacnacy = $v->NoOfVacnacy;
                                 $v->NoOfApplication =  (isset($v->NoOfApplication))  ? $v->NoOfApplication: 0;
-                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d-m-Y');
-                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
+                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
+                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
                                 $v->ApplicationId= $v->application_id;
                             }
             $talentPool  = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
@@ -503,8 +503,8 @@ class MasterDashboardController extends Controller
                                 $v->DepartmentCode;
                                 $v->NoOfVacnacy = $v->NoOfVacnacy;
                                 $v->NoOfApplication =  (isset($v->NoOfApplication))  ? $v->NoOfApplication: 0;
-                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d-m-Y');
-                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
+                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
+                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
                                 $v->ApplicationId= $v->application_id;
                             }
              $TodoData = Common::GmApprovedVacancy($resort_id,$rank);
@@ -1193,9 +1193,9 @@ class MasterDashboardController extends Controller
             ->get()
 
         ->map(function ($item) use($config) {
-            $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+            $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
-            $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d-m-Y') : '-';
+            $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
             $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
 

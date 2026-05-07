@@ -198,7 +198,7 @@ class IncidentMeetingController extends Controller
             'ext_participants.*' => 'nullable|string|max:255',
             'meeting_agenda' => 'nullable|string',
             'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:2048',
+            'attachments.*' => 'file|max:51200', // 50 MB
         ]);
 
         try {
@@ -210,30 +210,34 @@ class IncidentMeetingController extends Controller
             }
 
             $uploadedFiles = [];
-           
-            if ($request->hasFile('attachments')) 
+            $uploadErrors  = [];
+
+            if ($request->hasFile('attachments'))
             {
-                foreach ($request->file('attachments') as $file) 
+                foreach ($request->file('attachments') as $file)
                 {
-                    $status =   Common::AWSEmployeeFileUpload($this->resort->resort_id, $file, $employee->Emp_id,true );
-                  
-                    if ($status['status'] == false) 
+                    $status = Common::AWSEmployeeFileUpload($this->resort->resort_id, $file, $employee->Emp_id, null, true);
+
+                    if (!empty($status['status']) && !empty($status['Chil_file_id']))
                     {
-                        break;
+                        $uploadedFiles[] = [
+                            'Filename' => $file->getClientOriginalName(),
+                            'Child_id' => $status['Chil_file_id'],
+                        ];
                     }
                     else
                     {
-                        if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id']))
-                        {
-
-                            $filename = $file->getClientOriginalName();
-                            $uploadedFiles[] = ['Filename' => $filename, 'Child_id' => $status['Chil_file_id']];
-                        }
-                       
-
+                        $uploadErrors[] = $file->getClientOriginalName() . ': ' . ($status['msg'] ?? 'upload failed');
                     }
                 }
+            }
 
+            if (!empty($uploadErrors)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some attachments failed to upload',
+                    'errors'  => $uploadErrors,
+                ], 422);
             }
       
             $meeting = new IncidentsMeeting();
@@ -303,19 +307,36 @@ class IncidentMeetingController extends Controller
         $page_title ='Meeting Detail';
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
-        $meeting = IncidentsMeeting::with(['participant.employee','incidents'])->where('id',$id)->first();  
-  
-        return view('resorts.incident.meeting.detail',compact('page_title','meeting'));
+        $meeting = IncidentsMeeting::with(['participant.employee','externalParticipant','incidents'])->where('id',$id)->first();
+
+        // Other meetings on the same incident — surfaced under "Previous
+        // Notes / Findings" so the user has context for this one. Excludes
+        // the current meeting itself.
+        $previousMeetings = collect();
+        if ($meeting) {
+            $previousMeetings = IncidentsMeeting::where('incident_id', $meeting->incident_id)
+                ->where('id', '!=', $meeting->id)
+                ->orderByDesc('meeting_date')
+                ->orderByDesc('meeting_time')
+                ->get(['id','meeting_subject','meeting_date','meeting_time','meeting_agenda']);
+        }
+
+        return view('resorts.incident.meeting.detail',compact('page_title','meeting','previousMeetings'));
     }
 
     public function inlineUpdate(Request $request)
     {
+        // Frontend sends the meeting id base64-encoded (matches the rest of the
+        // module — list/details/delete all use base64 ids). Decode before
+        // validating so the integer/exists rule passes.
+        $request->merge(['id' => base64_decode($request->id, true) ?: $request->id]);
+
         $request->validate([
             'id' => 'required|integer|exists:incidents_investigation_meetings,id',
             'meeting_date' => 'nullable|string',
             'meeting_time' => 'nullable|string'
         ]);
-    
+
         $meeting = IncidentsMeeting::with('participant')->find($request->id);
     
         if (!$meeting) {

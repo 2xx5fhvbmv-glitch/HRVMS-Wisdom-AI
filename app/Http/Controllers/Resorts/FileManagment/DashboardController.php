@@ -142,7 +142,7 @@ class DashboardController extends Controller
 
                 $i->new_id = base64_encode($i->id);
                 $i->File_Name = htmlspecialchars($i->File_Name, ENT_QUOTES, 'UTF-8');
-                $i->created_by = \Carbon\Carbon::parse($i->created_by)->format('d-m-Y');
+                $i->created_by = \Carbon\Carbon::parse($i->created_by)->format('d M Y');
                 $i->Permission = URL::asset('resorts_assets/images/user-4.svg');
                 $i->File_Size = $i->File_Size . ' KB';
 
@@ -221,7 +221,7 @@ class DashboardController extends Controller
             ->map(function($i) {
                 $i->ModifiedBy = Common::getResortUserPicture($i->created_by); 
                 $i->Time = $i->created_at->format('H:i:s');
-                $i->LastModified = $i->created_at->format('d-m-Y');
+                $i->LastModified = $i->created_at->format('d M Y');
                 $i->ActionType = $i->TypeofAction;
                 return $i;
             });

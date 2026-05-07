@@ -150,7 +150,7 @@
                 <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
                     <div class="card">
                         <div class="card-title">
-                            <h3>Incident</h3>
+                            <h3>Incident Meeting Schedule</h3>
                         </div>
                         <div class="incident-chart mb-3">
                             <canvas id="myDoughnutChart"></canvas>

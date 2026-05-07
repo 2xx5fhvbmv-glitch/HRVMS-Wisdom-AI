@@ -74,4 +74,9 @@ class IncidentsMeeting extends Model
     {
         return $this->hasMany(IncidentsMeetingParticipants::class, 'meeting_id', 'id');
     }
+
+    public function externalParticipant()
+    {
+        return $this->hasMany(IncidentsMeetingExternalParticipants::class, 'meeting_id', 'id');
+    }
 }

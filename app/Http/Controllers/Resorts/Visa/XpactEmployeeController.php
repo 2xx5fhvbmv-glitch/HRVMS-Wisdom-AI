@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Employee;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use App\Models\VisaRenewal;
 use App\Models\QuotaSlotRenewal;
 use App\Models\EmployeeInsurance;
@@ -718,11 +719,11 @@ class XpactEmployeeController extends Controller
     {
      
         $ChildFiles = ChildFileManagement::where("id",base64_decode($id))->where("resort_id"   ,$this->resort->resort_id)->first();
-        if (isset($ChildFiles) && Storage::disk('s3')->exists($ChildFiles->File_Path)) 
+        if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path)) 
         {   
 
             $key = hash('sha256', env('ENCRYPTION_KEY'), true);
-            $encryptedData = Storage::disk('s3')->get($ChildFiles->File_Path);
+            $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
             if (empty($encryptedData) || strlen($encryptedData) < 16) 
             {
                 throw new \Exception('Invalid or corrupted encrypted data');
@@ -813,7 +814,7 @@ class XpactEmployeeController extends Controller
                 }
                 
                 // Store the decrypted file with proper content type
-                Storage::disk('s3')->put($tempFilePath, $decryptedData, [
+                StorageHelper::disk()->put($tempFilePath, $decryptedData, [
                     'ContentType' => $mimeType
                 ]);
                 
@@ -836,7 +837,7 @@ class XpactEmployeeController extends Controller
                     'zip'  => 'application/zip',
                     default => 'application/octet-stream' // Fallback for unknown types
                 };
-                $newUrl = Storage::disk('s3')->temporaryUrl($tempFilePath, now()->addMinutes(30));
+                $newUrl = StorageHelper::temporaryUrl($tempFilePath, 30);
             } else {
                 $mimeType='';
             $newUrl = "No";

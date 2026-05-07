@@ -50,7 +50,7 @@
                         <thead>
                             <tr>
                                 <th>Survey Name</th>
-                                <th>No of Applicant Form</th>
+                                <th>No of Participant Form</th>
                                 <th>Privacy</th>
                                 <th>Start Date</th>
                                 <th>End Date</th>

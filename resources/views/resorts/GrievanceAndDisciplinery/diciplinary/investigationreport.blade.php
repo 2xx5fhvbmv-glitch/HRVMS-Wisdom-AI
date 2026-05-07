@@ -36,18 +36,22 @@
                         <div class="table-responsive  mb-2">
                             <table class="table-lableSmallLabel">
                                 <tr>
-                                    <th>Grievance ID:</th>
+                                    <th>Disciplinary ID:</th>
                                     <td>{{ $Disciplinary_parent->Disciplinary_id }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Grievance Category:</th>
+                                    <th>Disciplinary Category:</th>
                                     <td>{{ $Disciplinary_parent->CatName }}</td>
                                 </tr>
                                 <tr>
                                     <th>Disciplinary Offence:</th>
                                     <td>{{ $Disciplinary_parent->SubCatName }}</td>
                                 </tr>
-                               
+                                <tr>
+                                    <th>Committee:</th>
+                                    <td>{{ $Disciplinary_parent->CommitteeName ?: 'Unassigned' }}</td>
+                                </tr>
+
                                 <tr>
                                     <th>Priority Level:</th>
                                     <td>
@@ -101,6 +105,10 @@
                         <div class="table-responsive mt-3">
                             <table class="table-lableSmallLabel">
                                 <tr>
+                                    <th>Employee ID:</th>
+                                    <td>{{ $Disciplinary_parent->employee_code ?? '-' }}</td>
+                                </tr>
+                                <tr>
                                     <th>Department:</th>
                                     <td>{{ $Disciplinary_parent->DepartmentName }}</td>
                                 </tr>
@@ -109,10 +117,19 @@
                                     <td>{{ $Disciplinary_parent->PositiontName }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Contact Details:</th>
-                                    <td>{{ $Disciplinary_parent->personal_phone }}</td>
+                                    <th>Email:</th>
+                                    <td>
+                                        @if(!empty($Disciplinary_parent->employee_email))
+                                            <a href="mailto:{{ $Disciplinary_parent->employee_email }}">{{ $Disciplinary_parent->employee_email }}</a>
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
                                 </tr>
-                            
+                                <tr>
+                                    <th>Contact Details:</th>
+                                    <td>{{ $Disciplinary_parent->personal_phone ?: '-' }}</td>
+                                </tr>
                             </table>
                         </div>
                     </div> <!-- /col-lg-6 -->
@@ -227,14 +244,17 @@
                                 <label for="followup_actions" class="form-label">FOLLOW-UP ACTIONS</label>
                                 <select class="form-select select2t-none follow_up_action_id" id="follow_up_action" name="follow_up_action[]" @if($Disciplinary_parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select a follow-up action" data-parsley-errors-container="#follow_up_action_error" @endif aria-label="Default select example">
                                     <option value=""> Select Follow-Up Action</option>
-                                    @if($Disciplinary_parent->Request_For_Statement !="Yes")
-                                        <option value="GatherWitnessStatements">Gather Witness Statements</option>
-                                    @endif
-                                    <option value="InspectSite">Inspect Site</option>
-                                    <option value="ReviewDocuments">Review Documents</option>
-                                    <option value="CCTVFootageReview">CCTV Footage Review</option>
-                                    <option value="CheckAccessLogs">Check Access Logs</option>
-                                    <option value="GatherPhysicalEvidence">Gather Physical Evidence</option>
+                                    @php
+                                        // "Gather Witness Statements" is hidden when a witness statement
+                                        // request is already in progress, matching prior hardcoded behaviour.
+                                        $hideGatherWitness = ($Disciplinary_parent->Request_For_Statement == "Yes");
+                                    @endphp
+                                    @foreach($FollowUpActions ?? [] as $fu)
+                                        @if($hideGatherWitness && stripos($fu->name, 'Gather Witness') !== false)
+                                            @continue
+                                        @endif
+                                        <option value="{{ $fu->name }}">{{ $fu->name }}</option>
+                                    @endforeach
                                 </select>
                                 <div id="follow_up_action_error"></div>
                             </div>
@@ -258,7 +278,7 @@
 
                             <div class="col-12">
                                 <label for="resol_notes" class="form-label">RESOLUTION NOTES</label>
-                                <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Disciplinary_parent->Assigned=="No") readonly @else required data-parsley-required-message="Resolution notes are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of resolution notes" @endif placeholder="Type Here..." rows="4"></textarea>
+                                <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Disciplinary_parent->Assigned=="No") readonly @endif placeholder="Type Here..." rows="4"></textarea>
                             </div>
                         </div>
 
@@ -378,12 +398,12 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#Grivance_offence_id').select2({
-        placeholder: 'Select Grievance Offence',
+        placeholder: 'Select Disciplinary Offence',
         minimumResultsForSearch: -1,
         width: '100%'
     });
     $('#Grivance_Cat_id').select2({
-        placeholder: 'Select Grievance Category',
+        placeholder: 'Select Disciplinary Category',
         minimumResultsForSearch: -1,
         width: '100%'
     });

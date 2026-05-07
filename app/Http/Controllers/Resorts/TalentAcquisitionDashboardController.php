@@ -101,8 +101,8 @@ class TalentAcquisitionDashboardController extends Controller
                                 $v->DepartmentCode;
                                 $v->NoOfVacnacy = $v->NoOfVacnacy;
                                 $v->NoOfApplication =  (isset($v->NoOfApplication))  ? $v->NoOfApplication: 0;
-                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d-m-Y');
-                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
+                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
+                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
                                 $v->ApplicationId= $v->application_id;
                             }
             $talentPool  = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
@@ -260,8 +260,8 @@ class TalentAcquisitionDashboardController extends Controller
                                 $v->DepartmentCode;
                                 $v->NoOfVacnacy = $v->NoOfVacnacy;
                                 $v->NoOfApplication =  (isset($v->NoOfApplication))  ? $v->NoOfApplication: 0;
-                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d-m-Y');
-                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d-m-Y');
+                                $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
+                                $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
                                 $v->ApplicationId= $v->application_id;
                             }
             $talentPoolQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')

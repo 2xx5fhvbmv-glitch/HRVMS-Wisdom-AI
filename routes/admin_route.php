@@ -114,6 +114,8 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::get('/divisions/massremove', 'DivisionController@massremove')->name('admin.divisions.massremove');
         Route::get('/divisions/inactive/{id}', 'DivisionController@block')->name('admin.divisions.block');
         Route::get('/divisions/active/{id}', 'DivisionController@active')->name('admin.divisions.active');
+        Route::get('/divisions/sample-sheet', 'DivisionController@downloadSample')->name('admin.divisions.sample');
+        Route::post('/divisions/import', 'DivisionController@import')->name('admin.divisions.import');
 
         /**Departments Module **/
         Route::get('/department', 'DepartmentController@index')->name('admin.department.index');
@@ -126,6 +128,8 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::get('/department/massremove', 'DepartmentController@massremove')->name('admin.department.massremove');
         Route::get('/department/inactive/{id}', 'DepartmentController@block')->name('admin.department.block');
         Route::get('/department/active/{id}', 'DepartmentController@active')->name('admin.department.active');
+        Route::get('/department/sample-sheet', 'DepartmentController@downloadSample')->name('admin.department.sample');
+        Route::post('/department/import', 'DepartmentController@import')->name('admin.department.import');
 
         /**Sections Module **/
         Route::get('/sections', 'SectionController@index')->name('admin.sections.index');
@@ -138,6 +142,8 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::get('/sections/massremove', 'SectionController@massremove')->name('admin.sections.massremove');
         Route::get('/sections/inactive/{id}', 'SectionController@block')->name('admin.sections.block');
         Route::get('/sections/active/{id}', 'SectionController@active')->name('admin.sections.active');
+        Route::get('/sections/sample-sheet', 'SectionController@downloadSample')->name('admin.sections.sample');
+        Route::post('/sections/import', 'SectionController@import')->name('admin.sections.import');
 
         /**Positions Module **/
         Route::get('/positions', 'PositionController@index')->name('admin.positions.index');
@@ -152,6 +158,8 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
         Route::post('/positions/update-permissions/{id}', 'PositionController@updatePermissions')->name('admin.positions.update_permissions');
         Route::get('/positions/inactive/{id}', 'PositionController@block')->name('admin.positions.block');
         Route::get('/positions/active/{id}', 'PositionController@active')->name('admin.positions.active');
+        Route::get('/positions/sample-sheet', 'PositionController@downloadSample')->name('admin.positions.sample');
+        Route::post('/positions/import', 'PositionController@import')->name('admin.positions.import');
 
         /** Notification Module */
         Route::get('/notifications', 'NotificationController@index')->name('admin.notifications.index');

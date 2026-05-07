@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Mail\SupportReplyEmail;
 use App\Models\Admin;
 use App\Models\Support;
+use App\Models\SupportChatMessage;
 use App\Models\SupportMessages;
 use App\Models\Resort;
 use App\Helpers\Common;
@@ -50,7 +51,18 @@ class SupportController extends Controller
         }
     
         $supports = $query->get();
-    
+
+        // Unread message counts per support_id, scoped to the logged-in
+        // admin. Powers the badge on the Chat button so admins can see
+        // tickets with new replies at a glance.
+        $unreadByTicket = SupportChatMessage::whereIn('support_id', $supports->pluck('id'))
+            ->where('receiver_id', $loginAdmin)
+            ->where('receiver_type', 'admin')
+            ->where('is_read', 0)
+            ->select('support_id', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('support_id')
+            ->pluck('cnt', 'support_id');
+
         // Get unique resort IDs from the support tickets
         $resortIds = $supports->pluck('resort_id')->unique();
     
@@ -105,7 +117,7 @@ class SupportController extends Controller
                 $class = $statusClasses[$support->status] ?? 'badge-secondary';
                 return '<span class="badge ' . $class . '">' . $support->status . '</span>';
             })
-            ->addColumn('action', function ($support) use ($loginAdmin, $type, $resorts, $currentDay, $currentTime) {
+            ->addColumn('action', function ($support) use ($loginAdmin, $type, $resorts, $currentDay, $currentTime, $unreadByTicket) {
                 $resort = $resorts[$support->resort_id] ?? null;
                 if (!$resort) return '-';
             
@@ -163,8 +175,12 @@ class SupportController extends Controller
                     // new tickets have NULL preference. Show Chat + Email Reply
                     // unconditionally — they were previously hidden, which is
                     // why "Reply Ticket" went missing from the Actions column.
-                    $chatButton = '<a href="' . $chat_url . '" title="Open Chat" class="btn btn-secondary btn-sm mx-1">
-                                        <i class="fas fa-comments"></i> Chat
+                    $unreadCount = (int) ($unreadByTicket[$support->id] ?? 0);
+                    $unreadBadge = $unreadCount > 0
+                        ? ' <span class="badge badge-danger" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;margin-left:4px;">' . ($unreadCount > 99 ? '99+' : $unreadCount) . '</span>'
+                        : '';
+                    $chatButton = '<a href="' . $chat_url . '" title="Open Chat" class="btn btn-secondary btn-sm mx-1 position-relative">
+                                        <i class="fas fa-comments"></i> Chat' . $unreadBadge . '
                                     </a>';
 
                     if (!empty($support->createdBy->email)) {
@@ -266,7 +282,7 @@ class SupportController extends Controller
 
         if ($request->hasFile('attachment')) {
             foreach ($request->file('attachment') as $file) {
-                $status =   Common::AWSEmployeeFileUpload($ticket->resort_id, $file, $employee->Emp_id,true );
+                $status =   Common::AWSEmployeeFileUpload($ticket->resort_id, $file, $employee->Emp_id, null, true);
 
                 if ($status['status'] == false) 
                 {

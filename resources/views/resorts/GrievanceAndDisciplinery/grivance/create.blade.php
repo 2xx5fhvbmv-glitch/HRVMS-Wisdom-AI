@@ -106,7 +106,7 @@ Edit
         <div class="col-md-4 col-sm-6">
             <label class="form-label">DATE</label>
             <input type="text" class="form-control datepicker" name="date" id="date"
-                value="{{ date('d-m-Y') }}" placeholder="{{ date('d-m-Y') }}"
+                value="{{ date('d M Y') }}" placeholder="{{ date('d M Y') }}"
                 required data-parsley-required-message="Please select a date">
         </div>
 

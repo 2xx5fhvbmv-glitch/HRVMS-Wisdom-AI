@@ -39,13 +39,16 @@
             $('.skeleton-wrapper').fadeOut('slow');
         }, 1000);
     });
-    const socket = io("http://localhost:3000", {
-        transports: ["websocket"]
-    });
+    // Legacy Node socket.io — silenced when the server isn't running.
+    var socket;
+    try {
+        socket = io("http://localhost:3000", { transports: ["websocket"], reconnection: false, timeout: 2000 });
+    } catch (e) {
+        socket = { emit: function () {}, on: function () {} };
+    }
 
     // Register user ID
     const userId = "{{ Auth::guard('resort-admin')->user()->GetEmployee->id }}";
-    // console.log(userId);
     socket.emit("register-user", userId);
 
     // Listen for new notifications
@@ -533,65 +536,44 @@
             "iDisplayLength": 10,
         });
 
-        // Pusher Notification
-        //  Resort Notification
-        // Pusher.logToConsole = true;
-        // var pusher = new Pusher('55d404203d5a8231840a', {
-        // cluster: 'ap2'
-        // });
+        // === Real-time resort notifications via Laravel Echo / Pusher ===
+        if (typeof window.Echo !== 'undefined') {
+            const ReciverResortId  = '{{ Auth::guard("resort-admin")->user()->resort_id }}';
+            const RankOfResort     = '{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->rank : "" }}';
+            const Dept_id          = parseInt('{{ isset(Auth::guard("resort-admin")->user()->GetEmployee) ? Auth::guard("resort-admin")->user()->GetEmployee->Dept_id : "0" }}', 10);
 
-        //     var channel = pusher.subscribe('Resortevent-channel');
-        //     channel.bind('ResorteNotification-event', function(data) {
+            window.Echo.channel('Resortevent-channel')
+                .listen('.ResorteNotification-event', function (data) {
+                    if (!data || !data.html) return;
+                    const htmlview            = data.html.html;
+                    const type                = data.html.type;
+                    const SenderResortId      = data.html.resortid;
+                    const PendingDepartment_id = data.html.PendingDepartment_id;
 
-        //         let htmlview = data.html.html;
-        //         let ReciverResortId="{{  Auth::guard('resort-admin')->user()->resort_id }}";
-        //       // Check if GetEmployee exists before trying to access its properties
-        //         let RankOfResort = "{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->rank : '' }}";
-        //         let Dept_id = parseInt("{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->Dept_id : '' }}");
-        //         let type = data.html.type;
-        //         let SenderResortId = data.html.resortid;
-        //         let PendingDepartment_id = data.html.PendingDepartment_id;
-        //         console.log(type,PendingDepartment_id,Dept_id);
-        //             if(type == 1)
-        //             {
-        //                 $(".notification-body").html(htmlview);
-        //             }
-        //             else if(type == 2)
-        //             {
-        //                 if(SenderResortId == ReciverResortId &&  RankOfResort == "2")
-        //                 {
-        //                     $(".AppendRequestManningRequest").html(htmlview);
-        //                 }
-        //             }
-        //             else if(type ==3) // Remainder for Department
-        //             {
-        //                 let PendingDepartment_id = data.html.PendingDepartment_id;
-        //                 if (Array.isArray(PendingDepartment_id) && PendingDepartment_id.includes(Dept_id)) {
-
-        //                     if (SenderResortId == ReciverResortId && RankOfResort == "2") {
-        //                         $(".AppendRequestManningRequest").html(htmlview);
-        //                     }
-        //                 }
-        //             }
-        //             else if(type == 4) // HOD will send Mainning request based on maning HR dasbhoard to get a response to pading response Department list
-        //             {
-        //                 if(SenderResortId == ReciverResortId &&  RankOfResort == "3")
-        //                 {
-        //                     $(".HrRequestViewCard").html(htmlview);
-        //                 }
-        //             }
-        //             else if(type  == 5  && SenderResortId == ReciverResortId && RankOfResort == "2")
-        //             {
-        //                 $(".AppendRequestManningRequest").html(htmlview);
-        //             }
-        //             else if(type == 6 && SenderResortId == ReciverResortId && RankOfResort == "2")
-        //             {
-        //                 $(".AppendRequestManningRequest").html(htmlview);
-        //             }
-        //     });
-
-        // End of notfications
-        // End of Pusher Notification
+                    if (type == 1) {
+                        $('.notification-body').html(htmlview);
+                    } else if (type == 2) {
+                        if (SenderResortId == ReciverResortId && RankOfResort == '2') {
+                            $('.AppendRequestManningRequest').html(htmlview);
+                        }
+                    } else if (type == 3) {
+                        if (Array.isArray(PendingDepartment_id) && PendingDepartment_id.includes(Dept_id)) {
+                            if (SenderResortId == ReciverResortId && RankOfResort == '2') {
+                                $('.AppendRequestManningRequest').html(htmlview);
+                            }
+                        }
+                    } else if (type == 4) {
+                        if (SenderResortId == ReciverResortId && RankOfResort == '3') {
+                            $('.HrRequestViewCard').html(htmlview);
+                        }
+                    } else if (type == 5 && SenderResortId == ReciverResortId && RankOfResort == '2') {
+                        $('.AppendRequestManningRequest').html(htmlview);
+                    } else if (type == 6 && SenderResortId == ReciverResortId && RankOfResort == '2') {
+                        $('.AppendRequestManningRequest').html(htmlview);
+                    }
+                });
+        }
+        // End of real-time resort notifications
         $(document).on("keyup", "#occupancytotalRooms", function () {
             let totalRooms = $(this).val();
             let occupiedRooms = $('#occupancyOccupiedRooms').val();

@@ -61,42 +61,20 @@
                                     @endphp
 
                                     @if (!empty($attachments) && is_array($attachments))
-                                        @foreach ($attachments as $file)
-                                            @php
-                                                $file = trim(str_replace(['\\', '"'], '', $file));
-                                            @endphp
-
-                                            @if ($file)
+                                        @foreach ($attachments as $attachment)
+                                            @if (is_array($attachment) && !empty($attachment['Filename']) && !empty($attachment['Child_id']))
                                                 @php
-                                                    $fileUrl = asset($file);
-                                                    $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-
-                                                    switch ($extension) {
-                                                        case 'pdf':
-                                                            $icon = 'fa-file-pdf text-danger';
-                                                            break;
-                                                        case 'doc':
-                                                        case 'docx':
-                                                            $icon = 'fa-file-word text-primary';
-                                                            break;
-                                                        case 'xls':
-                                                        case 'xlsx':
-                                                            $icon = 'fa-file-excel text-success';
-                                                            break;
-                                                        case 'jpg':
-                                                        case 'jpeg':
-                                                        case 'png':
-                                                        case 'gif':
-                                                            $icon = 'fa-file-image text-warning';
-                                                            break;
-                                                        default:
-                                                            $icon = 'fa-file text-secondary';
-                                                            break;
-                                                    }
+                                                    $extension = strtolower(pathinfo($attachment['Filename'], PATHINFO_EXTENSION));
+                                                    $icon = match ($extension) {
+                                                        'pdf'                                  => 'fa-file-pdf text-danger',
+                                                        'doc', 'docx'                          => 'fa-file-word text-primary',
+                                                        'xls', 'xlsx'                          => 'fa-file-excel text-success',
+                                                        'jpg', 'jpeg', 'png', 'gif'            => 'fa-file-image text-warning',
+                                                        default                                => 'fa-file text-secondary',
+                                                    };
                                                 @endphp
-
-                                                <a href="{{ $fileUrl }}" target="_blank" class="me-3" title="{{ basename($file) }}">
-                                                    <i class="fa-solid {{ $icon }} fa-lg"></i> View
+                                                <a href="javascript:void(0)" class="download-link me-3" data-id="{{ base64_encode($attachment['Child_id']) }}" title="{{ $attachment['Filename'] }}">
+                                                    <i class="fa-solid {{ $icon }} fa-lg"></i> {{ $attachment['Filename'] }}
                                                 </a>
                                             @endif
                                         @endforeach
@@ -108,15 +86,76 @@
                             <tr>
                                 <th>Participants:</th>
                                 <td>
-                                    <div class="user-ovImg">
-                                        @if($meeting->participant)
+                                    @if($meeting->participant && count($meeting->participant))
+                                        <div class="d-flex flex-wrap gap-3">
                                             @foreach($meeting->participant as $participant)
-                                                <div class="img-circle">
-                                                    <img title="{{$participant->employee->resortAdmin->full_name}}" src="{{Common::getResortUserPicture($participant->employee->Admin_Parent_id)}}" alt="image">
+                                                @php
+                                                    $admin = optional(optional($participant->employee)->resortAdmin);
+                                                    $first = $admin->first_name ?? '';
+                                                    $last  = $admin->last_name ?? '';
+                                                    $name  = trim($first . ' ' . $last) ?: 'Unknown';
+                                                    $role  = $participant->participant_role ?? null;
+                                                    $img   = Common::getResortUserPicture(optional($participant->employee)->Admin_Parent_id);
+                                                @endphp
+                                                <div class="d-flex align-items-center" style="gap:8px;">
+                                                    <div class="img-circle" style="width:36px;height:36px;overflow:hidden;border-radius:50%;flex-shrink:0;">
+                                                        <img src="{{ $img }}" alt="{{ $name }}" style="width:100%;height:100%;object-fit:cover;">
+                                                    </div>
+                                                    <div>
+                                                        <div style="font-weight:600;font-size:14px;">{{ $name }}</div>
+                                                        @if ($role)
+                                                            <div class="text-muted" style="font-size:12px;">{{ $role }}</div>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                             @endforeach
-                                        @endif
-                                    </div>
+                                        </div>
+                                    @else
+                                        <span class="text-muted">No participants</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>External Participants:</th>
+                                <td>
+                                    @if($meeting->externalParticipant && count($meeting->externalParticipant))
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @foreach($meeting->externalParticipant as $ext)
+                                                @if (!empty($ext->participant_name))
+                                                    <span class="badge bg-light text-dark border" style="padding:6px 10px;font-size:13px;">
+                                                        <i class="fa-solid fa-user me-1 text-secondary"></i>{{ $ext->participant_name }}
+                                                    </span>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-muted">None</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="vertical-align: top;">Previous Notes / Findings:</th>
+                                <td>
+                                    @if(!isset($previousMeetings) || $previousMeetings->isEmpty())
+                                        <span class="text-muted">No previous meetings have been recorded for this incident.</span>
+                                    @else
+                                        <div class="previous-notes-block">
+                                            @foreach($previousMeetings as $pm)
+                                                <div class="previous-note-item mb-3 pb-3 border-bottom">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <strong>{{ $pm->meeting_subject }}</strong>
+                                                        <span class="text-muted small">
+                                                            {{ \Carbon\Carbon::parse($pm->meeting_date)->format('d M Y') }}
+                                                            @if($pm->meeting_time)
+                                                                · {{ \Carbon\Carbon::parse($pm->meeting_time)->format('h:i A') }}
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                    <p class="mb-0 text-body small">{{ $pm->meeting_agenda }}</p>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </td>
                             </tr>
                         </table>
@@ -136,6 +175,27 @@
 <script>
     $(document).ready(function(){
         $('.select2t-none').select2();
+
+        // Resolve a Child_id to a presigned Wasabi URL and open in a new tab.
+        $(document).on('click', '.download-link', function (e) {
+            e.preventDefault();
+            var childId = $(this).data('id');
+            if (!childId) return;
+            $.ajax({
+                url: "{{ route('resort.visa.XpactEmpFileDownload', '') }}/" + childId,
+                type: 'GET',
+                success: function (response) {
+                    if (response && response.NewURLshow) {
+                        window.open(response.NewURLshow, '_blank');
+                    } else {
+                        toastr.error('File not found.', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function () {
+                    toastr.error('Failed to open file.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
 
         $("#incidentForm").submit(function (e) {
             e.preventDefault(); // Prevent default form submission

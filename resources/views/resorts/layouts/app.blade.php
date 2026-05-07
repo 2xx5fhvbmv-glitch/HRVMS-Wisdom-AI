@@ -29,5 +29,7 @@
     @include('resorts.layouts.modal')
 
     @include('resorts.layouts.js')
+
+    @include('partials.global-loader')
 </body>
 </html>

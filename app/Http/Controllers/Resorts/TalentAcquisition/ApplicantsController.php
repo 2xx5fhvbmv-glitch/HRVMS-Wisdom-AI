@@ -170,7 +170,7 @@ class ApplicantsController extends Controller
                         ->map(function ($applicant) use ($config, $resort_Location) {
                             // Map applicant fields
                             $applicant->name = ucfirst($applicant->first_name . ' ' . $applicant->last_name);
-                            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d-m-Y');
+                            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d M Y');
                             $applicant->rank_name = $config[$applicant->As_ApprovedBy] ?? 'Wisdom AI';
                             
 
@@ -459,7 +459,7 @@ class ApplicantsController extends Controller
             }
             $Applicant_form_data->profileImg = $getFileapplicant;
             $Applicant_form_data->rank_name = $config[$Applicant_form_data->As_ApprovedBy] ?? 'Unknown Rank';
-            $Applicant_form_data->InterViewDate =   Carbon::parse($Applicant_form_data->InterViewDate)->format('d-m-Y');
+            $Applicant_form_data->InterViewDate =   Carbon::parse($Applicant_form_data->InterViewDate)->format('d M Y');
 
             $ApplicantWiseStatusFinal = ApplicantWiseStatus::where("Applicant_id", $Applicant_form_data->ApplicantID)
                                                         ->orderBy('status', 'asc') // Sort by "status" in ascending order
@@ -512,7 +512,7 @@ class ApplicantsController extends Controller
                                                             ->Map(function($s) use($config){
                                                                 $config = config('settings.Position_Rank');
                                                                 $s->rank_name = $config[$s->As_ApprovedBy] ?? 'Unknown Rank';
-                                                                $s->InterViewDate = !empty($s->InterViewDate) ? Carbon::parse($s->InterViewDate)->format('d-m-Y') : null;
+                                                                $s->InterViewDate = !empty($s->InterViewDate) ? Carbon::parse($s->InterViewDate)->format('d M Y') : null;
                                                                 return $s;
                                                             });
 
@@ -657,7 +657,7 @@ class ApplicantsController extends Controller
             $config = config('settings.Position_Rank');
             $applicant->rank = $applicant->As_ApprovedBy; // Approved By field
             $applicant->name = ucfirst($applicant->first_name . ' ' . $applicant->last_name);
-            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d-m-Y');
+            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d M Y');
             $applicant->rank_name = $config[$applicant->As_ApprovedBy] ?? 'Wisdom AI'; // Map rank_name from config
             if($applicant->passport_photo)
             {
@@ -778,7 +778,7 @@ class ApplicantsController extends Controller
                        
                         $StatusApplicantStatus->rank_name = $config[$StatusApplicantStatus->As_ApprovedBy] ?? 'Unknown Rank';
                         $StatusApplicantStatus->ApplicantStatus_raw = $StatusApplicantStatus->ApplicantStatus;
-                        $StatusApplicantStatus->AppliedDate = Carbon::parse($StatusApplicantStatus->Application_date)->format('d-m-Y');
+                        $StatusApplicantStatus->AppliedDate = Carbon::parse($StatusApplicantStatus->Application_date)->format('d M Y');
 
                         $StatusApplicantStatus->MalidivanTime = (isset($StatusApplicantStatus->ResortInterviewtime)) ?$StatusApplicantStatus->ResortInterviewtime: '-';
                         $StatusApplicantStatus->ApplicantTime = (isset($StatusApplicantStatus->ApplicantInterviewtime)) ?$StatusApplicantStatus->ApplicantInterviewtime :   '-';
@@ -788,7 +788,7 @@ class ApplicantsController extends Controller
                         if (in_array($StatusApplicantStatus->ApplicantStatus, $postInterviewStatuses)) {
                             $StatusApplicantStatus->InterviewStatus = 'Completed';
                         }
-                        $StatusApplicantStatus->Date = (isset($StatusApplicantStatus->InterViewDate) && $StatusApplicantStatus->InterViewDate !="0000-00-00") ?  Carbon::parse($StatusApplicantStatus->InterViewDate)->format('d-m-Y') : '-';
+                        $StatusApplicantStatus->Date = (isset($StatusApplicantStatus->InterViewDate) && $StatusApplicantStatus->InterViewDate !="0000-00-00") ?  Carbon::parse($StatusApplicantStatus->InterViewDate)->format('d M Y') : '-';
                         // Badge logic
 
                         $badgeThemes = [
@@ -887,7 +887,7 @@ class ApplicantsController extends Controller
                                         ->orderByDesc('id')
                                         ->first();
                                     if ($nextInterview) {
-                                        $nextRound['Date'] = $nextInterview->InterViewDate ? Carbon::parse($nextInterview->InterViewDate)->format('d-m-Y') : '-';
+                                        $nextRound['Date'] = $nextInterview->InterViewDate ? Carbon::parse($nextInterview->InterViewDate)->format('d M Y') : '-';
                                         $nextRound['MalidivanTime'] = $nextInterview->ResortInterviewtime ?? '-';
                                         $nextRound['ApplicantTime'] = $nextInterview->ApplicantInterviewtime ?? '-';
                                         $nextRound['InterviewStatus'] = $nextInterview->Status ?? 'Pending';
@@ -956,7 +956,7 @@ class ApplicantsController extends Controller
                         'rank_name' => $rName,
                         'round' => $roundType,
                         'Interviewer' => $interviewer,
-                        'Date' => $pastInterview && $pastInterview->InterViewDate ? Carbon::parse($pastInterview->InterViewDate)->format('d-m-Y') : '-',
+                        'Date' => $pastInterview && $pastInterview->InterViewDate ? Carbon::parse($pastInterview->InterViewDate)->format('d M Y') : '-',
                         'MalidivanTime' => $pastInterview->ResortInterviewtime ?? '-',
                         'ApplicantTime' => $pastInterview->ApplicantInterviewtime ?? '-',
                         'InterviewStatus' => $pastStatus->status == 'Complete' ? 'Completed' : ($pastInterview->Status ?? '-'),
@@ -1255,7 +1255,7 @@ class ApplicantsController extends Controller
                         t6.name as Department
                     ')
                     ->first();
-                    $InterViewDate = Carbon::parse($Final_response_data->InterViewDate)->format('d-m-Y');
+                    $InterViewDate = Carbon::parse($Final_response_data->InterViewDate)->format('d M Y');
                     $FianlResponse ='';
                     // dd($Final_response_data);
                     if($Final_response_data)
@@ -1340,7 +1340,7 @@ class ApplicantsController extends Controller
             'candidate_name' => $applicant->first_name . ' ' . $applicant->last_name,
             'position_title' => $vacancy->Position ?? '',
             'resort_name' => $resort->resort_name ?? '',
-            'interview_date' => Carbon::parse($interview->InterViewDate)->format('d-m-Y'),
+            'interview_date' => Carbon::parse($interview->InterViewDate)->format('d M Y'),
             'interview_time' => $interview->ApplicantInterviewtime,
             'interview_link' => $invitationLink,
             'meeting_link' => $interview->MeetingLink ?? '',
@@ -1529,14 +1529,14 @@ class ApplicantsController extends Controller
                 // dd($Final_response_data);
                 
                 $InterViewDate = $Final_response_data->InterViewDate
-                    ? Carbon::parse($Final_response_data->InterViewDate)->format('d-m-Y')
+                    ? Carbon::parse($Final_response_data->InterViewDate)->format('d M Y')
                     : '-';
                 $dynamic_data = [
                     'candidate_name' => $Final_response_data->first_name . ' ' . $Final_response_data->last_name,
                     'position_title' => $Final_response_data->Position,
                     'resort_name' => $resort_details->resort_name,
                     'interview_round' =>   $interviewRound,
-                    'completion_date' => Carbon::now()->format('d-m-Y'),
+                    'completion_date' => Carbon::now()->format('d M Y'),
                     'interview_date' => $InterViewDate,
                     'department' => $Final_response_data->Department ?? '',
                     'required_starting_date' => $Final_response_data->required_starting_date ?? '',
@@ -1743,9 +1743,9 @@ class ApplicantsController extends Controller
             ->get()
 
         ->map(function ($item) use($config) {
-            $item->AppliedDate = Carbon::parse($item->Application_date)->format('d-m-Y');
+            $item->AppliedDate = Carbon::parse($item->Application_date)->format('d M Y');
 
-            $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d-m-Y') : '-';
+            $item->InterViewDate = $item->InterViewDate ? Carbon::parse($item->InterViewDate)->format('d M Y') : '-';
 
             $item->MalidivanTime = $item->ResortInterviewtime ?? '-';
 
@@ -1942,7 +1942,7 @@ class ApplicantsController extends Controller
         $Applicant_form_data = $Applicant_form_data1->get()->map(function ($applicant) use ($config, $resort_Location) {
             // Map fields for output
             $applicant->name = ucfirst($applicant->first_name . ' ' . $applicant->last_name);
-            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d-m-Y');
+            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d M Y');
             $applicant->rank_name = $config[$applicant->As_ApprovedBy] ?? 'Wisdom AI';
 
               if($applicant->passport_photo)
@@ -1959,9 +1959,9 @@ class ApplicantsController extends Controller
             $applicant->Notes = base64_encode($applicant->notes);
             $applicant->applicant_id = base64_encode($applicant->applicant_status_id);
             if ($applicant->consent_expiry_date && $applicant->consent_status === 'approved') {
-                $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d-m-Y');
+                $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d M Y');
             } elseif ($applicant->consent_expiry_date && $applicant->consent_status === 'pending') {
-                $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d-m-Y') . ' (Pending)';
+                $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d M Y') . ' (Pending)';
             } else {
                 $applicant->ConsentExpiryDate = $applicant->data_retention_month . 'M/' . $applicant->data_retention_year . 'Y';
             }
@@ -2153,7 +2153,7 @@ class ApplicantsController extends Controller
             $config = config('settings.Position_Rank');
             $applicant->rank = $applicant->As_ApprovedBy; // Approved By field
             $applicant->name = ucfirst($applicant->first_name . ' ' . $applicant->last_name);
-            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d-m-Y');
+            $applicant->Application_date = Carbon::parse($applicant->Application_date)->format('d M Y');
             $applicant->rank_name = $config[$applicant->As_ApprovedBy] ?? 'Wisdom AI'; // Map rank_name from config
                 if($applicant->passport_photo)
                 {
@@ -2379,7 +2379,7 @@ class ApplicantsController extends Controller
 
             $data = $query->get()->map(function ($item) {
                 $item->name = ucfirst($item->first_name . ' ' . $item->last_name);
-                $item->rejection_date = $item->rejection_date ? Carbon::parse($item->rejection_date)->format('d-m-Y') : '-';
+                $item->rejection_date = $item->rejection_date ? Carbon::parse($item->rejection_date)->format('d M Y') : '-';
                 $item->applicant_id = base64_encode($item->applicant_status_id);
                 if ($item->passport_photo) {
                     $getFile = Common::GetApplicantAWSFile($item->passport_photo);
@@ -2435,7 +2435,7 @@ class ApplicantsController extends Controller
                 ->get()
                 ->map(function ($item) {
                     $item->name = ucfirst($item->first_name . ' ' . $item->last_name);
-                    $item->interview_date = Carbon::parse($item->InterViewDate)->format('d-m-Y');
+                    $item->interview_date = Carbon::parse($item->InterViewDate)->format('d M Y');
                     $item->days_until = Carbon::today()->diffInDays(Carbon::parse($item->InterViewDate));
                     if ($item->passport_photo) {
                         $getFile = Common::GetApplicantAWSFile($item->passport_photo);
@@ -2838,7 +2838,7 @@ class ApplicantsController extends Controller
             'department' => $department,
             'interview_round' => 'Availability Check',
             'interview_type' => 'Availability Check',
-            'interview_date' => Carbon::now()->format('d-m-Y'),
+            'interview_date' => Carbon::now()->format('d M Y'),
             'interview_time' => '',
             'interview_link' => $request->meeting_link ?? '',
             'meeting_link' => $request->meeting_link ?? '',
