@@ -4335,7 +4335,22 @@ class Common
             {
                 $url = Common::getResortUserPicture($ak->Parentid);
                 $notifUrl = Common::getNotificationUrl($ak);
-                $timeAgo = Carbon::parse($ak->created_at)->diffForHumans();
+                // ResortNotification::getCreatedAtAttribute already formats
+                // the timestamp into the resort's display format (e.g.
+                // "30/04/2026 20:57"). Carbon::parse can't read d/m/Y, which
+                // crashed the bell dropdown — pull the raw DB value via
+                // getRawOriginal so we always have a parseable timestamp.
+                $rawCreatedAt = method_exists($ak, 'getRawOriginal')
+                    ? $ak->getRawOriginal('created_at')
+                    : $ak->getOriginal('created_at');
+                try {
+                    $timeAgo = $rawCreatedAt
+                        ? Carbon::parse($rawCreatedAt)->diffForHumans()
+                        : '';
+                } catch (\Exception $e) {
+                    \Log::warning('ResortNotification time parse: ' . $e->getMessage());
+                    $timeAgo = '';
+                }
 
                     $stickyClass = !empty($ak->is_sticky) ? ' notification-sticky' : '';
                     $stickyBadge = !empty($ak->is_sticky) ? '<span class="badge badge-warning ms-1">Pinned</span>' : '';
