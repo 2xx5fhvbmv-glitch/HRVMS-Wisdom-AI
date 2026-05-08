@@ -57,7 +57,12 @@ return [
                 'driver'   => 's3',
                 'key'      => env('AWS_ACCESS_KEY_ID'),
                 'secret'   => env('AWS_SECRET_ACCESS_KEY'),
-                'region'   => env('AWS_DEFAULT_REGION'),
+                // Fallback so a missing AWS_DEFAULT_REGION on prod doesn't
+                // crash views that instantiate the S3 client (e.g. the master
+                // HR dashboard rendered Wasabi-stored avatars / files via
+                // Storage::disk('s3')). The proper fix is to set the env var
+                // on the box; this keeps the page from 500-ing in the meantime.
+                'region'   => env('AWS_DEFAULT_REGION', 'ap-south-1'),
                 'bucket'   => env('AWS_BUCKET'),
                 'url'      => env('AWS_URL'),
                 // Tell the AWS SDK exactly which CA root certificates to use:
