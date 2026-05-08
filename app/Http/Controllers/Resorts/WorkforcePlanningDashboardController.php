@@ -59,11 +59,14 @@ class WorkforcePlanningDashboardController extends Controller
             $resort_id = $this->globalUser->resort_id;
             $resort_divisions = ResortDivision::where('status','active')->where('resort_id',$resort_id)->get();
             $resort_departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
-            $resort_positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();
 
-            $resort_divisions_count = count($resort_divisions);
-            $resort_departments_count = count($resort_departments);
-            $resort_positions_count = count($resort_positions);
+            // The view only needs the COUNT of positions (not the full
+            // collection), so issue a COUNT() instead of SELECT * + count.
+            $resort_positions_count = ResortPosition::where('status','active')->where('resort_id',$resort_id)->count();
+            $resort_positions = collect(); // keeps compact() happy without re-fetching.
+
+            $resort_divisions_count = $resort_divisions->count();
+            $resort_departments_count = $resort_departments->count();
 
             $startDate = Carbon::now()->subDays(5)->toDateString(); // Five days before
 
@@ -121,27 +124,65 @@ class WorkforcePlanningDashboardController extends Controller
 
 
 
-        $vacant_positions = DB::table('resort_positions as p')
-        ->leftJoin('employees as e', 'e.Position_id', '=', 'p.id')
-        ->where('p.resort_id', '=', $resort_id);
+        // === Budgeted / Filled / Vacant SEAT counts (current year) ===
+        // Mirrors the fix in hr_dashboard(): the previous logic mixed
+        // employee-row totals with position-title counts so the math never
+        // reconciled. Source of truth is the manning request — sum of
+        // headcount/filledcount/vacantcount across position_monthly_data.
+        $manningYear = (int) date('Y');
+        $totalBudgetedSeats = 0;
+        $totalFilledSeats   = 0;
+        $totalVacantSeats   = 0;
 
-        // // Apply department condition if the user is an employee and has a department
-        // if (isset($this->globalUser->GetEmployee) && isset($this->globalUser->GetEmployee->Dept_id)) {
-        //     $vacant_positions->where('p.dept_id', '=', $this->globalUser->GetEmployee->Dept_id);
-        // }
+        $hasCurrentYearManning = DB::table('manning_responses')
+            ->where('resort_id', $resort_id)
+            ->where('year', $manningYear)
+            ->exists();
 
-        $vacant_positions = $vacant_positions->select(
-            DB::raw('COUNT(DISTINCT p.id) as total_positions_count'), // Total number of unique positions
-            DB::raw('COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN p.id END) as positions_with_employees'), // Positions with at least one employee
-            DB::raw('COUNT(DISTINCT p.id) - COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN p.id END) as vacant_positions'), // Positions with no employees
-        DB::raw('COUNT(e.id) as TotalBudgtedemp')
-            )->first();
+        if ($hasCurrentYearManning) {
+            $seatTotals = DB::table('position_monthly_data as pmd')
+                ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
+                ->where('mr.resort_id', $resort_id)
+                ->where('mr.year', $manningYear)
+                ->select(
+                    'pmd.position_id', 'pmd.manning_response_id',
+                    DB::raw('MAX(pmd.headcount)   as budget'),
+                    DB::raw('MAX(pmd.filledcount) as filled'),
+                    DB::raw('MAX(pmd.vacantcount) as vacant')
+                )
+                ->groupBy('pmd.position_id', 'pmd.manning_response_id')
+                ->get();
+
+            $totalBudgetedSeats = (int) $seatTotals->sum('budget');
+            $totalFilledSeats   = (int) $seatTotals->sum('filled');
+            $totalVacantSeats   = (int) $seatTotals->sum('vacant');
+        }
+
+        $usingManningData = $hasCurrentYearManning && $totalBudgetedSeats > 0;
+        if (!$usingManningData) {
+            // Fallback: position-name level counts when no manning data exists.
+            $totalPositions = DB::table('resort_positions')
+                ->where('resort_id', $resort_id)
+                ->count();
+            $positionsWithEmployees = DB::table('resort_positions as p')
+                ->join('employees as e', 'e.Position_id', '=', 'p.id')
+                ->where('p.resort_id', $resort_id)
+                ->where('e.status', 'Active')
+                ->distinct()
+                ->count('p.id');
+
+            $totalBudgetedSeats = $totalPositions;
+            $totalFilledSeats   = $positionsWithEmployees;
+            $totalVacantSeats   = max(0, $totalPositions - $positionsWithEmployees);
+        }
 
         $manning_response = (object) [
-            "total_budgeted_employees" => $vacant_positions->total_positions_count, // Total unique positions
-            "total_filled_positions_count" => $vacant_positions->positions_with_employees, // Positions where employees exist
-            "total_vacant_count" => $vacant_positions->vacant_positions, // Positions with no employees
-            "TotalBudgtedemp"=>$vacant_positions->TotalBudgtedemp,
+            'total_budgeted_employees'     => $totalBudgetedSeats,
+            'total_filled_positions_count' => $totalFilledSeats,
+            'total_vacant_count'           => $totalVacantSeats,
+            'TotalBudgtedemp'              => $totalBudgetedSeats,
+            'manning_year'                 => $manningYear,
+            'using_manning_data'           => $usingManningData,
         ];
         $employee_under_min_wage_usd = Employee::where('resort_id', $resort_id)
             ->where('basic_salary_currency', 'USD')
@@ -204,11 +245,14 @@ class WorkforcePlanningDashboardController extends Controller
             $resort_id = $this->globalUser->resort_id;
             $resort_divisions = ResortDivision::where('status','active')->where('resort_id',$resort_id)->get();
             $resort_departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
-            $resort_positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();
 
-            $resort_divisions_count = count($resort_divisions);
-            $resort_departments_count = count($resort_departments);
-            $resort_positions_count = count($resort_positions);
+            // The view only needs the COUNT of positions (not the full
+            // collection), so issue a COUNT() instead of SELECT * + count.
+            $resort_positions_count = ResortPosition::where('status','active')->where('resort_id',$resort_id)->count();
+            $resort_positions = collect(); // keeps compact() happy without re-fetching.
+
+            $resort_divisions_count = $resort_divisions->count();
+            $resort_departments_count = $resort_departments->count();
             $ResortData = Resort::find($resort_id);
             $sitesettings = ResortSiteSettings::where('resort_id', $resort_id)->first(['resort_id','header_img','footer_img','Footer']);
 
@@ -268,27 +312,83 @@ class WorkforcePlanningDashboardController extends Controller
 
 
 
-        $vacant_positions = DB::table('resort_positions as p')
-        ->leftJoin('employees as e', 'e.Position_id', '=', 'p.id')
-        ->where('p.resort_id', '=', $resort_id);
+        // === Tile counts: budgeted / filled / vacant SEATS ===
+        // The previous logic mixed three different scales (employee-rows,
+        // position-titles with ≥1 employee, position-titles with 0 employees)
+        // so 137 + 81 ≠ 278 on the dashboard. Source-of-truth for these tiles
+        // is the manning request (position_monthly_data: headcount, filledcount,
+        // vacantcount) which is at the SEAT level — i.e. "Chef × 3 seats" =
+        // 3 budgeted, regardless of how many distinct position-titles exist.
 
-    // // Apply department condition if the user is an employee and has a department
-    // if (isset($this->globalUser->GetEmployee) && isset($this->globalUser->GetEmployee->Dept_id)) {
-    //     $vacant_positions->where('p.dept_id', '=', $this->globalUser->GetEmployee->Dept_id);
-    // }
+        // Always show CURRENT-YEAR manning numbers — when none exist yet
+        // for the current year the tiles will read 0 / 0 / 0 and the view
+        // can surface the empty state via $manning_response->using_manning_data.
+        $manningYear = (int) date('Y');
 
-    $vacant_positions = $vacant_positions->select(
-        DB::raw('COUNT(DISTINCT p.id) as total_positions_count'), // Total number of unique positions
-        DB::raw('COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN p.id END) as positions_with_employees'), // Positions with at least one employee
-        DB::raw('COUNT(DISTINCT p.id) - COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN p.id END) as vacant_positions'), // Positions with no employees
-      DB::raw('COUNT(e.id) as TotalBudgtedemp')
-        )->first();
+        $totalBudgetedSeats = 0;
+        $totalFilledSeats   = 0;
+        $totalVacantSeats   = 0;
+
+        $hasCurrentYearManning = DB::table('manning_responses')
+            ->where('resort_id', $resort_id)
+            ->where('year', $manningYear)
+            ->exists();
+
+        if ($hasCurrentYearManning) {
+            // Per (position, manning_response) take the MAX across months —
+            // the budget is normally constant within a year but if it differs,
+            // MAX gives the planned ceiling. SUM across all positions/depts.
+            $seatTotals = DB::table('position_monthly_data as pmd')
+                ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
+                ->where('mr.resort_id', $resort_id)
+                ->where('mr.year', $manningYear)
+                ->select(
+                    'pmd.position_id', 'pmd.manning_response_id',
+                    DB::raw('MAX(pmd.headcount)   as budget'),
+                    DB::raw('MAX(pmd.filledcount) as filled'),
+                    DB::raw('MAX(pmd.vacantcount) as vacant')
+                )
+                ->groupBy('pmd.position_id', 'pmd.manning_response_id')
+                ->get();
+
+            $totalBudgetedSeats = (int) $seatTotals->sum('budget');
+            $totalFilledSeats   = (int) $seatTotals->sum('filled');
+            $totalVacantSeats   = (int) $seatTotals->sum('vacant');
+        }
+
+        // Fallback when no manning request exists yet for the current year —
+        // show the live employee picture so tiles aren't all zero. Flag the
+        // case so the view can label it ("No manning request submitted for
+        // {year} yet — showing current employee data.").
+        $usingManningData = $hasCurrentYearManning && $totalBudgetedSeats > 0;
+        if (!$usingManningData) {
+            $employeeRows = Employee::where('resort_id', $resort_id)
+                ->where('status', 'Active')
+                ->count();
+            $positionsWithEmployees = DB::table('resort_positions as p')
+                ->join('employees as e', 'e.Position_id', '=', 'p.id')
+                ->where('p.resort_id', $resort_id)
+                ->where('e.status', 'Active')
+                ->distinct()
+                ->count('p.id');
+            $totalPositions = DB::table('resort_positions')
+                ->where('resort_id', $resort_id)
+                ->count();
+
+            $totalBudgetedSeats = $totalPositions;
+            $totalFilledSeats   = $positionsWithEmployees;
+            $totalVacantSeats   = max(0, $totalPositions - $positionsWithEmployees);
+        }
 
         $manning_response = (object) [
-            "total_budgeted_employees" => $vacant_positions->total_positions_count, // Total unique positions
-            "total_filled_positions_count" => $vacant_positions->positions_with_employees, // Positions where employees exist
-            "total_vacant_count" => $vacant_positions->vacant_positions, // Positions with no employees
-            "TotalBudgtedemp"=>$vacant_positions->TotalBudgtedemp,
+            // Mirrors the SEAT-level totals so the existing view bindings keep
+            // working. Now total_filled + total_vacant == total_budgeted.
+            'total_budgeted_employees'     => $totalBudgetedSeats,
+            'total_filled_positions_count' => $totalFilledSeats,
+            'total_vacant_count'           => $totalVacantSeats,
+            'TotalBudgtedemp'              => $totalBudgetedSeats, // legacy alias used in the view
+            'manning_year'                 => $manningYear,
+            'using_manning_data'           => $usingManningData,
         ];
         $employee_under_min_wage_usd = Employee::where('resort_id', $resort_id)
             ->where('basic_salary_currency', 'USD')
@@ -1199,75 +1299,130 @@ class WorkforcePlanningDashboardController extends Controller
 
 
     public function getAiInsights(Request $request)
-{
-    try {
-        $resort_id = $this->globalUser->resort_id;
-        $months = $request->input('months', []);
-
-        $aiInsights = [];
-
-        foreach ($months as $monthYear) {
-            $month_name = strtolower(substr($monthYear, 0, 3));
-            $monthYearParts = explode(' ', $monthYear);
-            $month = date('m', strtotime($monthYearParts[0]));
-            $year = $monthYearParts[1];
-
+    {
+        try {
+            $resort_id = $this->globalUser->resort_id;
+            $months = $request->input('months', []);
             $url = env('AI_URL') . 'predict_staff';
 
-            $occupancy = Occuplany::where('resort_id', $resort_id)
-                ->whereYear('occupancydate', $year)
-                ->whereMonth('occupancydate', $month)
-                ->avg('occupancyinPer');
+            // Cache key per (resort, monthYear) so repeat dashboard loads
+            // don't slam the external AI server. 30-min TTL — short enough
+            // that newly-recorded occupancy changes still surface within
+            // the work-day, long enough to avoid the synchronous-curl pile-up.
+            $cacheTtl = 1800;
+            $aiInsights = [];
+            $missing = []; // months that need a fresh AI call.
 
-            $occupancy = round($occupancy ?? 0, 2);
+            foreach ($months as $monthYear) {
+                $monthYearParts = explode(' ', $monthYear);
+                $month = date('m', strtotime($monthYearParts[0]));
+                $year = $monthYearParts[1] ?? date('Y');
 
-            $curl = curl_init();
-            $postFields = json_encode([
-                "month" => $month_name,
-                "occupancy_percent" => $occupancy
-            ]);
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $url,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $postFields,
-                CURLOPT_HTTPHEADER => [
-                    'Accept: application/json',
-                    'Content-Type: application/json',
-                ],
-            ]);
-            $response = curl_exec($curl);
-            $err = curl_error($curl);
-            curl_close($curl);
+                $occupancy = (float) round(
+                    Occuplany::where('resort_id', $resort_id)
+                        ->whereYear('occupancydate', $year)
+                        ->whereMonth('occupancydate', $month)
+                        ->avg('occupancyinPer') ?? 0,
+                    2
+                );
 
-            if ($err) {
-                return response()->json(['status' => false, 'message' => $err]);
+                $cacheKey = sprintf('ai_insights:%d:%s:%.2f', $resort_id, $monthYear, $occupancy);
+                $cached = \Cache::get($cacheKey);
+                if ($cached !== null) {
+                    $aiInsights[$monthYear] = [
+                        'month'         => $monthYear,
+                        'occupancyRate' => $occupancy,
+                        'hiringData'    => (int) $cached,
+                    ];
+                } else {
+                    $missing[] = [
+                        'monthYear' => $monthYear,
+                        'month_name' => strtolower(substr($monthYear, 0, 3)),
+                        'occupancy' => $occupancy,
+                        'cacheKey'  => $cacheKey,
+                    ];
+                }
             }
 
-            $AI_Data = json_decode($response, true);
+            // Parallelise the missing ones via curl_multi instead of looping
+            // synchronously. Combined with hard timeouts, the worst case for
+            // an unreachable AI server is the timeout window once — not
+            // (timeout × N months) as before.
+            if (!empty($missing)) {
+                $multi = curl_multi_init();
+                $handles = [];
+                foreach ($missing as $i => $m) {
+                    $ch = curl_init();
+                    curl_setopt_array($ch, [
+                        CURLOPT_URL            => $url,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_POST           => true,
+                        CURLOPT_POSTFIELDS     => json_encode([
+                            'month'             => $m['month_name'],
+                            'occupancy_percent' => $m['occupancy'],
+                        ]),
+                        CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
+                        CURLOPT_CONNECTTIMEOUT => 3,   // bail fast if AI host is down
+                        CURLOPT_TIMEOUT        => 8,   // total per-call cap
+                    ]);
+                    curl_multi_add_handle($multi, $ch);
+                    $handles[$i] = $ch;
+                }
 
-            $aiInsights[] = [
-                'month' => $monthYear,
-                'occupancyRate' => $occupancy,
-                'hiringData' => $AI_Data['required_staff'] ?? 0,
-            ];
+                $running = null;
+                do {
+                    curl_multi_exec($multi, $running);
+                    if ($running) curl_multi_select($multi, 0.5);
+                } while ($running > 0);
+
+                foreach ($missing as $i => $m) {
+                    $ch = $handles[$i];
+                    $body = curl_multi_getcontent($ch);
+                    $err  = curl_error($ch);
+                    curl_multi_remove_handle($multi, $ch);
+                    curl_close($ch);
+
+                    $required = 0;
+                    if (!$err && $body) {
+                        $decoded = json_decode($body, true);
+                        $required = (int) ($decoded['required_staff'] ?? 0);
+                        \Cache::put($m['cacheKey'], $required, $cacheTtl);
+                    } else {
+                        \Log::warning('AI insights call failed for ' . $m['monthYear'] . ': ' . $err);
+                    }
+
+                    $aiInsights[$m['monthYear']] = [
+                        'month'         => $m['monthYear'],
+                        'occupancyRate' => $m['occupancy'],
+                        'hiringData'    => $required,
+                    ];
+                }
+                curl_multi_close($multi);
+            }
+
+            // Preserve the requested month ordering when emitting the chart arrays.
+            $occupancyRates = [];
+            $hiringData     = [];
+            foreach ($months as $monthYear) {
+                $row = $aiInsights[$monthYear] ?? ['occupancyRate' => 0, 'hiringData' => 0];
+                $occupancyRates[] = $row['occupancyRate'];
+                $hiringData[]     = $row['hiringData'];
+            }
+
+            return response()->json([
+                'status'         => true,
+                'message'        => 'AI Insights fetched successfully',
+                'occupancyRates' => $occupancyRates,
+                'hiringData'     => $hiringData,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error fetching AI Insights: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json(['status' => false, 'error' => $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'status' => true,
-            'message' => 'AI Insights fetched successfully',
-            'occupancyRates' => array_column($aiInsights, 'occupancyRate'),
-            'hiringData' => array_column($aiInsights, 'hiringData'),
-        ]);
-
-    } catch (\Exception $e) {
-        \Log::error('Error fetching AI Insights: ' . $e->getMessage());
-        \Log::error('File: ' . $e->getFile());
-        \Log::error('Line: ' . $e->getLine());
-        \Log::error('Trace: ' . $e->getTraceAsString());
-
-        return response()->json(['status' => false, 'error' => $e->getMessage()], 500);
     }
-}
 
 }

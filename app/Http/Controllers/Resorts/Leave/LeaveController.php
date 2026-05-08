@@ -23,6 +23,7 @@ use App\Models\ResortBenifitGrid;
 use App\Models\ResortSiteSettings;
 use App\Models\EmployeeTravelPass;
 use App\Models\EmployeeLeaveStatus;
+use App\Models\PublicHoliday;
 use App\Models\ParentAttendace;
 use App\Models\ResortPosition;
 use App\Models\LeaveRecommendation;
@@ -281,7 +282,24 @@ class LeaveController extends Controller
             ->pluck('transportation_option','id')
             ->toArray();
         $leaveFormValidation = config('settings.leave_form_validation', []);
-        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation'));
+        $airports = config('airports', ['national' => [], 'international' => []]);
+        // Public holidays are excluded from the calendar-day count when an
+        // employee picks a leave date range. Friday is the resort weekly off
+        // (same convention as duty-roster + Common::getWeekCountInMonth).
+        // Pass YYYY-MM-DD strings for current + next year to the view; the
+        // JS uses them to subtract from calculateTotalDays().
+        $holidayDates = PublicHoliday::where('status', 'active')
+            ->whereYear('holiday_date', '>=', now()->year)
+            ->whereYear('holiday_date', '<=', now()->year + 1)
+            ->pluck('holiday_date')
+            ->map(function ($d) {
+                try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
+                catch (\Exception $e) { return null; }
+            })
+            ->filter()
+            ->values()
+            ->all();
+        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation', 'airports', 'holidayDates'));
     }
 
     /**
@@ -1244,8 +1262,17 @@ class LeaveController extends Controller
     public function store(Request $request)
     {
         $resort_id = $this->resort->resort_id;
-        $emp_id = $this->resort->GetEmployee->id;
-        $rank = $this->resort->GetEmployee->rank;
+        // Block non-employee admins (master admin, account-only users) from
+        // submitting their own leave — there is no Employee row to attach it to.
+        $applicantEmployeeRecord = $this->resort->GetEmployee ?? $this->resort->getEmployee ?? null;
+        if (!$applicantEmployeeRecord) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Your account is not linked to an employee record. Please contact HR.',
+            ], 422);
+        }
+        $emp_id = $applicantEmployeeRecord->id;
+        $rank = $applicantEmployeeRecord->rank;
 
         // Resolve validation rules from first leave category (Mandatory/Optional/Hidden)
         $categoryIds = $request->input('leave_category_id');
@@ -1299,13 +1326,14 @@ class LeaveController extends Controller
 
         DB::beginTransaction();
         try {
-            // Define leave attachment path
+            // Define leave attachment path. The file is served from /public,
+            // so the dir must live there — Storage::makeDirectory used to
+            // write into storage/app/ instead, which was dead code.
             $leave_attachment = config('settings.leave_attachments');
             $dynamic_path = $leave_attachment . '/' . $emp_id;
-
-            // Create directory if it doesn't exist
-            if (!Storage::exists($dynamic_path)) {
-                Storage::makeDirectory($dynamic_path);
+            $absolutePath = public_path($dynamic_path);
+            if (!is_dir($absolutePath)) {
+                @mkdir($absolutePath, 0755, true);
             }
 
             // Handle file upload
@@ -1313,7 +1341,7 @@ class LeaveController extends Controller
             if ($request->hasFile('attachments')) {
                 $fileName = uniqid('attachment_', true) . '.' . $request->attachments->getClientOriginalExtension();
                 $filePath = $dynamic_path . '/' . $fileName;
-                $request->attachments->move(public_path($dynamic_path), $fileName);
+                $request->attachments->move($absolutePath, $fileName);
             }
 
             foreach ($request->leave_category_id as $key => $categoryId) {
@@ -1343,8 +1371,31 @@ class LeaveController extends Controller
                     ]);
                 }
 
-                // Calculate total days (inclusive)
-                $totalDays = $fromDate->diffInDays($toDate) + 1;
+                // Calculate total days (inclusive), excluding Fridays
+                // (resort weekly off) and public holidays — must match the
+                // JS in resources/views/resorts/leaves/leave/index.blade.php
+                // so the user's "30 Days" preview matches the persisted
+                // total_days and balance debit.
+                $holidayLookup = PublicHoliday::where('status', 'active')
+                    ->whereDate('holiday_date', '>=', $fromDate->format('Y-m-d'))
+                    ->whereDate('holiday_date', '<=', $toDate->format('Y-m-d'))
+                    ->pluck('holiday_date')
+                    ->map(function ($d) {
+                        try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
+                        catch (\Exception $e) { return null; }
+                    })
+                    ->filter()
+                    ->flip();
+                $totalDays = 0;
+                $cursor = $fromDate->copy();
+                while ($cursor->lte($toDate)) {
+                    $isFriday = $cursor->isFriday();
+                    $isHoliday = isset($holidayLookup[$cursor->format('Y-m-d')]);
+                    if (!$isFriday && !$isHoliday) {
+                        $totalDays++;
+                    }
+                    $cursor->addDay();
+                }
 
                 // Check if the leave category ID is valid
                 $checkLeaveOverlap = EmployeeLeave::where('emp_id', $emp_id)
@@ -1590,7 +1641,11 @@ class LeaveController extends Controller
                     $passapprovalFlow->push($SOApprover); // Fourth approver: Security Officer
                 }
 
-                if (isset($request->arr_date, $request->dept_date)) {
+                // Only create a boarding pass when the user actually chose
+                // "Yes" for departure pass AND filled in both dates. The old
+                // `isset(...)` check was true even for empty strings, so a
+                // bogus EmployeeTravelPass row was inserted on every submit.
+                if ($request->input('departure') === 'Yes' && $request->filled('arr_date') && $request->filled('dept_date')) {
                     $boardingPassReason = $request->boarding_pass_reason ?? $request->reason;
                     $boardingPass                       =   EmployeeTravelPass::create([
                         'resort_id'                     =>  $resort_id,
@@ -1633,11 +1688,17 @@ class LeaveController extends Controller
                                                                 ->where('resort_id',$resort_id)
                                                                 ->first();
 
-                $leaveCount                             =   EmployeeLeave::where('emp_id', $emp_id)
-                                                                ->where('leave_category_id', $findSickLeaveCategory->id)
-                                                                ->where('total_days', '1')
-                                                                ->whereYear('from_date', Carbon::now()->year) 
-                                                                ->count();
+                // If the resort has no Sick leave category, this whole block
+                // is irrelevant — leaveCount stays 0 so the > 15 guard below
+                // never trips. Previously this threw "Attempt to read property
+                // 'id' on null" and broke every leave submission.
+                $leaveCount = $findSickLeaveCategory
+                    ? EmployeeLeave::where('emp_id', $emp_id)
+                        ->where('leave_category_id', $findSickLeaveCategory->id)
+                        ->where('total_days', '1')
+                        ->whereYear('from_date', Carbon::now()->year)
+                        ->count()
+                    : 0;
 
                 // Get the clinic staff if the leave type is sick
                 $getClinicStaff                         =   Common::findClinicStaff($resort_id);

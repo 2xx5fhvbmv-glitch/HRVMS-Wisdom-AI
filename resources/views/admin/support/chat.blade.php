@@ -49,6 +49,15 @@
               <div>
                 <div id="chat-messages" class="chat-messages">
                   @foreach($messages as $msg)
+                    @php
+                        // Show full date for older messages, time-only for
+                        // today. Previously only the time was rendered, so
+                        // every chat row looked like it happened "today".
+                        $msgDate = $msg->created_at;
+                        $timeLabel = $msgDate && $msgDate->isToday()
+                            ? $msgDate->format('h:i A')
+                            : ($msgDate ? $msgDate->format('d M Y, h:i A') : '');
+                    @endphp
                     <div class="chat-msg {{ $msg->sender_type === 'admin' ? 'right' : '' }}">
                       <div class="img-circle">
                         @if($msg->sender_type === 'admin')
@@ -58,7 +67,7 @@
                         @endif
                       </div>
                       <div class="msg">
-                        <div class="time">{{ $msg->created_at->format('h:i A') }}</div>
+                        <div class="time">{{ $timeLabel }}</div>
                         <p>{{ $msg->message }}</p>
                         @if($msg->attachment)
                           <div class="attachments">
@@ -404,7 +413,10 @@
         function appendMessage(data, isSender) {
             const position = isSender ? "right" : "";
             const senderName = data.senderName || "Unknown";
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            // Live messages just landed → today by definition, so show
+            // time-only. The blade-rendered history below uses the message's
+            // own created_at and prepends a date when it's older than today.
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
             const senderImage = data.senderImage || null;
             const senderInitials = senderName.split(" ").map(n => n.charAt(0)).join("").toUpperCase();
             const safeMessage = $('<div>').text(data.message || '').html();

@@ -138,10 +138,39 @@
 				@endif
 
 				@if(Common::hasPermission(config('settings.admin_modules.supports'),config('settings.permissions.view')))
+					@php
+						// Aggregate unread count for the Supports nav badge:
+						//   * unread chat msgs the current admin is the receiver of
+						//   * + unread email replies on tickets they own (or all,
+						//     if they're a super admin)
+						$navAdmin = \Auth::guard('admin')->user();
+						$navAdminId = optional($navAdmin)->id;
+						$navIsSuper = optional($navAdmin)->type === 'super';
+						$navUnreadChat = $navAdminId
+							? \App\Models\SupportChatMessage::where('receiver_id', $navAdminId)
+								->where('receiver_type', 'admin')
+								->where('is_read', 0)
+								->count()
+							: 0;
+						$navTicketIds = \App\Models\Support::when(!$navIsSuper, fn($q) => $q->where('assigned_to', $navAdminId))
+							->pluck('id');
+						$navUnreadEmail = $navTicketIds->isNotEmpty()
+							? \App\Models\SupportMessages::whereIn('ticket_id', $navTicketIds)
+								->where('sender', 'employee')
+								->where('is_read', 0)
+								->count()
+							: 0;
+						$navUnreadTotal = $navUnreadChat + $navUnreadEmail;
+					@endphp
 					<li class="nav-item">
 						<a href="{{route('admin.supports.index')}}" class="nav-link @if(in_array(Route::currentRouteName(), array('admin.supports.index', 'admin.supports.edit'))) active @endif">
 							<i class="fa fa-bell nav-icon"></i>
-							<p>Supports</p>
+							<p>
+								Supports
+								@if($navUnreadTotal > 0)
+									<span class="badge badge-danger ms-1" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;">{{ $navUnreadTotal > 99 ? '99+' : $navUnreadTotal }}</span>
+								@endif
+							</p>
 						</a>
 					</li>
 				@endif

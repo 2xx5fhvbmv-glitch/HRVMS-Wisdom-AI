@@ -503,7 +503,25 @@
                                                                 <th>Leave Destination:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->leave_destination}}</span>
-                                                                    <input type="text" name="leave_destination" value="{{ $employee->leave_destination }}" class="form-control edit-mode d-none">
+                                                                    <select name="leave_destination" class="form-select select2-airport-search edit-mode d-none">
+                                                                        <option value="">Select Destination Airport</option>
+                                                                        @if(!empty($airports['national']))
+                                                                            <optgroup label="National (Maldives)">
+                                                                                @foreach($airports['national'] as $ap)
+                                                                                    @php $optVal = $ap['code'].' - '.$ap['name']; @endphp
+                                                                                    <option value="{{ $optVal }}" @selected($employee->leave_destination === $optVal)>{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }})</option>
+                                                                                @endforeach
+                                                                            </optgroup>
+                                                                        @endif
+                                                                        @if(!empty($airports['international']))
+                                                                            <optgroup label="International">
+                                                                                @foreach($airports['international'] as $ap)
+                                                                                    @php $optVal = $ap['code'].' - '.$ap['name']; @endphp
+                                                                                    <option value="{{ $optVal }}" @selected($employee->leave_destination === $optVal)>{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }}{{ !empty($ap['country']) ? ', '.$ap['country'] : '' }})</option>
+                                                                                @endforeach
+                                                                            </optgroup>
+                                                                        @endif
+                                                                    </select>
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -3315,6 +3333,24 @@
                 error: function (xhr) {
                     toastr.error(xhr.responseJSON?.message || 'Failed to update location', 'Error', { positionClass: 'toast-bottom-right' });
                 }
+            });
+        });
+
+        // Searchable airport dropdown for the Leave Destination field. The
+        // global layout init disables search for .select2t-none — this select
+        // uses its own class so search stays visible.
+        $(document).ready(function () {
+            $('.select2-airport-search').each(function () {
+                var $sel = $(this);
+                if ($sel.hasClass('select2-hidden-accessible')) {
+                    try { $sel.select2('destroy'); } catch (e) {}
+                }
+                $sel.select2({
+                    width: '100%',
+                    allowClear: true,
+                    placeholder: 'Search airport (city, IATA code, or country)',
+                    minimumResultsForSearch: 0
+                });
             });
         });
 </script>

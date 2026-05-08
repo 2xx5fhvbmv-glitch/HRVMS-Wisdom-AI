@@ -44,7 +44,10 @@ class DisciplinaryController extends Controller
     public function DisciplinaryIndex(Request $request)
     {
 
-        if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.view')) == false){
+        // Was checking the grievance route name — meant a user who was given
+        // explicit permission for "Disciplinary Index" still got 403 because
+        // the lookup was against the wrong route. Use the disciplinary route.
+        if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized access');
         }
         $assinged_id = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id:0;
@@ -111,10 +114,10 @@ class DisciplinaryController extends Controller
         {
             $edit_class = '';
             $delete_class = '';
-            if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.edit')) == false){
+            if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex',config('settings.resort_permissions.edit')) == false){
                 $edit_class = 'd-none';
             }
-            if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.delete')) == false){
+            if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex',config('settings.resort_permissions.delete')) == false){
                 $delete_class = 'd-none';
             }
 
@@ -154,11 +157,30 @@ class DisciplinaryController extends Controller
                 // return $row->GetEmployee;
                 return $row->GetEmployee->resortAdmin->first_name.' '.$row->GetEmployee->resortAdmin->last_name;
             })
-            ->addColumn('Status', function ($row) 
+            ->addColumn('Status', function ($row)
             {
                 return ucfirst(str_replace('_', ' ', $row->status));
             })
-            ->rawColumns(['Disciplinary_Id','Category_name','Offence','EmployeeName','Status','Action'])
+            ->addColumn('CreatedAt', function ($row)
+            {
+                return $row->created_at ? $row->created_at->format('d M Y') : '—';
+            })
+            ->addColumn('ValidUntil', function ($row)
+            {
+                // Expiry_date is the form's "Action Valid Until" field —
+                // surface it so HR can see at a glance how long an action
+                // remains in force. Stored as Y-m-d / d/m/Y depending on
+                // form path; Carbon::parse handles both.
+                if (empty($row->Expiry_date) || $row->Expiry_date === '0000-00-00') {
+                    return '—';
+                }
+                try {
+                    return \Carbon\Carbon::parse($row->Expiry_date)->format('d M Y');
+                } catch (\Exception $e) {
+                    return $row->Expiry_date;
+                }
+            })
+            ->rawColumns(['Disciplinary_Id','Category_name','Offence','EmployeeName','Status','CreatedAt','ValidUntil','Action'])
             ->make(true);
         }
         
@@ -218,6 +240,22 @@ class DisciplinaryController extends Controller
                 if (!$payload['Severity_id'] && $latest->Severity_id) $payload['Severity_id'] = base64_encode($latest->Severity_id);
                 if (!$payload['Action_id']   && $latest->Action_id)   $payload['Action_id']   = base64_encode($latest->Action_id);
             }
+        }
+
+        // Last-resort fallback so the dropdowns NEVER come back empty —
+        // pick the lowest-id severity / action for the resort. The form
+        // is editable, so the user can adjust if the guess is wrong.
+        // Without this, brand-new offences with no defaults + no history
+        // (e.g. "Chronic Absenteeism") would leave both dropdowns blank.
+        if (!$payload['Severity_id']) {
+            $sev = \App\Models\SeverityStore::where('resort_id', $this->resort->resort_id)
+                ->orderBy('id')->first(['id']);
+            if ($sev) $payload['Severity_id'] = base64_encode($sev->id);
+        }
+        if (!$payload['Action_id']) {
+            $act = \App\Models\ActionStore::where('resort_id', $this->resort->resort_id)
+                ->orderBy('id')->first(['id']);
+            if ($act) $payload['Action_id'] = base64_encode($act->id);
         }
 
         return response()->json(['success' => true, 'data' => $payload]);
@@ -410,9 +448,11 @@ class DisciplinaryController extends Controller
             {
                 return ucfirst($row->Offence->OffensesName);
             })
-            ->addColumn('Date', function ($row) 
+            ->addColumn('Date', function ($row)
             {
-               return $row->Expiry_date;
+                // Was returning Expiry_date which is often unset → "0000-00-00".
+                // Show the case's created_at — when the offence was raised.
+                return $row->created_at ? $row->created_at->format('d M Y') : '—';
             })
            
             ->rawColumns(['Category','Offense','Date','Action'])

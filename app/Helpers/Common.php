@@ -1120,6 +1120,16 @@ class Common
             $getNotifications = Common::GetNotifications($resortid,$type,$Msgid);
 
             $view = view('resorts.renderfiles.resortnotification',compact('getNotifications'))->render();
+
+            // Persistent fan-out: write a per-employee row into
+            // resort_notifications so the admin announcement survives page
+            // reloads, appears on the bell-list page, and ships to mobile.
+            // Only fires when called via the new admin pathway that passes
+            // the notification id as $Msgid; callers using the legacy
+            // signature (no id) keep the broadcast-only behaviour.
+            if (!empty($Msgid)) {
+                self::fanOutAdminNotice($resortid, (int) $Msgid);
+            }
         }
         elseif($type==2)
         {
@@ -2501,6 +2511,12 @@ class Common
         // some use {{candidate name}} (with a space, copy-pasted from a doc),
         // some use {{Candidate Name}} (title case). Replace all common
         // variants for each key so the email body never leaks raw placeholders.
+        //
+        // Word/Google Docs copy-paste also sneaks in non-breaking spaces
+        // (U+00A0). Normalise them to regular spaces *inside the template*
+        // before matching, so the regex below doesn't have to think about it.
+        $template = str_replace("\xC2\xA0", ' ', (string) $template);
+
         foreach ($data as $key => $value) {
             $val          = (string) ($value ?? '');
             $underscore   = $key;                                    // candidate_name
@@ -2509,9 +2525,14 @@ class Common
             $titleSnake   = ucwords($underscore, '_');               // Candidate_Name
 
             foreach (array_unique([$underscore, $spaced, $titleSpaced, $titleSnake]) as $variant) {
-                // Tolerate optional whitespace inside {{ }} too: {{ candidate name }}.
+                // Build a pattern that tolerates: any whitespace inside
+                // {{ }}, multi-space gaps between the words of the
+                // variant, and any case (the `i` flag). Each literal
+                // space in the variant becomes `\s+` in the regex.
+                $core = preg_quote($variant, '/');
+                $core = preg_replace('/\\\\?\s+/', '\\\\s+', $core);
                 $template = preg_replace(
-                    '/\{\{\s*' . preg_quote($variant, '/') . '\s*\}\}/',
+                    '/\{\{\s*' . $core . '\s*\}\}/i',
                     $val,
                     $template
                 );
@@ -3184,6 +3205,197 @@ class Common
      *   - EXCOM (rank 1) / HOD (rank 2) in non-HR dept → entire department (all employees in their Dept_id)
      *   - Manager (4) / Supervisor (5) / Line Workers (6) / others → subordinates + self
      */
+    /**
+     * Apply role-based visibility filtering to an Incidents query, mirroring
+     * the visibility rules used by IncidentController@list. Centralised here
+     * so every dashboard / listing / drill-down endpoint scopes the same
+     * way and other departments can't see each other's incidents:
+     *
+     *  - Super admin / master admin   → unrestricted (resort_id only).
+     *  - HR (rank "HR")               → unrestricted within the resort.
+     *  - GM (rank "GM")               → only approved incidents (approval=1).
+     *  - Everyone else                → only incidents assigned to one of
+     *                                   their committees OR reported by
+     *                                   someone in their own department.
+     *  - No employee record           → no rows (treats as zero visibility
+     *                                   rather than leaking).
+     *
+     * The query is mutated in place AND returned so it can be chained.
+     */
+    public static function scopeIncidentsForViewer($query)
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) {
+            return $query->whereRaw('0=1');
+        }
+        $resortId = $user->resort_id;
+        $query->where('resort_id', $resortId);
+
+        // Super / master admin bypass scoping
+        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+            return $query;
+        }
+
+        $emp = $user->GetEmployee ?? $user->getEmployee ?? null;
+        if (!$emp) {
+            return $query->whereRaw('0=1');
+        }
+
+        $rankMap = config('settings.Position_Rank');
+        $rank = (int) ($emp->rank ?? 0);
+        $availableRank = $rankMap[$emp->rank ?? null] ?? '';
+
+        // Full resort-wide visibility for: GM, HR, HR-department HOD/EXCOM.
+        // Mirrors the L&D module's scope (Common::getPerformanceScopedEmpIds)
+        // so behaviour is consistent across modules — the user reported HR
+        // seeing 0 incidents because their HR account is rank=1 (EXCOM) inside
+        // the HR department, which the strict rank=3 check rejected.
+        if ($rank === 8 || $availableRank === 'GM') {
+            return $query->where('approval', 1);
+        }
+        if ($rank === 3 || $availableRank === 'HR') {
+            return $query;
+        }
+        if (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null)) {
+            return $query;
+        }
+
+        $userCommittees = \App\Models\IncidentCommitteeMember::where('member_id', $emp->id)
+            ->pluck('commitee_id')
+            ->toArray();
+        $departmentId = $emp->Dept_id ?? null;
+
+        return $query->where(function ($q) use ($userCommittees, $departmentId) {
+            if (!empty($userCommittees)) {
+                $q->orWhere(function ($subQ) use ($userCommittees) {
+                    foreach ($userCommittees as $committeeId) {
+                        $subQ->orWhereRaw('JSON_CONTAINS(assigned_to, ?)', [json_encode((string) $committeeId)]);
+                    }
+                });
+            }
+            if ($departmentId) {
+                $q->orWhereHas('reporter', function ($subQ) use ($departmentId) {
+                    $subQ->where('Dept_id', $departmentId);
+                });
+            }
+            // If user has no committee membership AND no department, the
+            // wrapping where(...) leaves the inner closure empty which MySQL
+            // treats as no constraint (returns all rows). Force-reject here.
+            if (empty($userCommittees) && !$departmentId) {
+                $q->whereRaw('0=1');
+            }
+        });
+    }
+
+    /**
+     * Stricter per-record gate for the Incident Investigation page. The
+     * listing scope (scopeIncidentsForViewer) lets a reporter's-dept user
+     * see incidents on the index, but the investigation page contains the
+     * full case file (statements, findings, follow-ups) and should be
+     * restricted to: HR / HR-equivalent / GM / committee members assigned
+     * to THIS specific incident.
+     */
+    public static function canViewIncidentInvestigation($incident): bool
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user || !$incident) return false;
+        if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) return true;
+
+        $emp = $user->GetEmployee ?? $user->getEmployee ?? null;
+        if (!$emp) return false;
+
+        $rank = (int) ($emp->rank ?? 0);
+        $rankMap = config('settings.Position_Rank');
+        $availableRank = $rankMap[$emp->rank ?? null] ?? '';
+
+        // HR (rank 3), GM (rank 8), and HR-dept HOD/EXCOM see everything.
+        if ($rank === 3 || $availableRank === 'HR') return true;
+        if ($rank === 8 || $availableRank === 'GM') return true;
+        if (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null)) return true;
+
+        // Committee members assigned to THIS incident.
+        $assignedCommitteeIds = [];
+        $raw = $incident->assigned_to ?? null;
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) $assignedCommitteeIds = $decoded;
+        } elseif (is_array($raw)) {
+            $assignedCommitteeIds = $raw;
+        }
+        $assignedCommitteeIds = array_map('intval', $assignedCommitteeIds);
+        if (empty($assignedCommitteeIds)) return false;
+
+        return \App\Models\IncidentCommitteeMember::where('member_id', $emp->id)
+            ->whereIn('commitee_id', $assignedCommitteeIds)
+            ->exists();
+    }
+
+    /**
+     * Persist a super-admin notifications row (table: notifications) into
+     * resort_notifications, one row per employee in each targeted resort.
+     *
+     *  - Honours the parent's start_date/end_date window: skips the fan-out
+     *    if today is before start_date or after end_date.
+     *  - Honours the parent's `sticky` flag → is_sticky column on the new
+     *    rows so Common::ResortNotification can pin them to the top.
+     *  - Idempotent: an existing (request_id, user_id, module='Admin Notice')
+     *    row is left in place so editing the parent notification can re-broadcast
+     *    safely without duplicating bell entries.
+     */
+    public static function fanOutAdminNotice($resortIds, int $notificationId): void
+    {
+        $resortIds = is_array($resortIds) ? $resortIds : [$resortIds];
+        $resortIds = array_values(array_filter(array_map('intval', $resortIds)));
+        if (empty($resortIds) || $notificationId <= 0) return;
+
+        $parent = \App\Models\Notification::find($notificationId);
+        if (!$parent) return;
+
+        // Window check: skip if outside [start_date, end_date].
+        try {
+            $today = Carbon::today();
+            $start = $parent->start_date ? Carbon::parse($parent->start_date)->startOfDay() : null;
+            $end   = $parent->end_date   ? Carbon::parse($parent->end_date)->endOfDay()     : null;
+            if ($start && $today->lt($start)) return;
+            if ($end && $today->gt($end))     return;
+        } catch (\Exception $e) {
+            \Log::warning('fanOutAdminNotice date parse: ' . $e->getMessage());
+        }
+
+        $isSticky = in_array(strtolower((string) $parent->sticky), ['yes', '1', 'true'], true) ? 1 : 0;
+        $title    = $parent->name;
+        $message  = $parent->content;
+
+        foreach ($resortIds as $rid) {
+            $employeeIds = \App\Models\Employee::where('resort_id', $rid)
+                ->where('status', 'Active')
+                ->pluck('id');
+
+            foreach ($employeeIds as $empId) {
+                $exists = ResortNotification::where('request_id', $notificationId)
+                    ->where('user_id', $empId)
+                    ->where('module', 'Admin Notice')
+                    ->exists();
+                if ($exists) continue;
+
+                try {
+                    ResortNotification::create([
+                        'resort_id'  => $rid,
+                        'user_id'    => $empId,
+                        'module'     => 'Admin Notice',
+                        'type'       => $title,
+                        'message'    => $message,
+                        'status'     => 'unread',
+                        'request_id' => $notificationId,
+                        'is_sticky'  => $isSticky,
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::warning("fanOutAdminNotice emp {$empId}: " . $e->getMessage());
+                }
+            }
+        }
+    }
+
     public static function getPerformanceScopedEmpIds()
     {
         $user = \Auth::guard('resort-admin')->user();
@@ -4109,7 +4321,12 @@ class Common
         ->where('resort_notifications.status', 'unread')
         ->where("resort_notifications.user_id", $user_id);
 
-        $r = $query->latest()->take(10)->get(['resort_notifications.*','t2.id as Parentid']);
+        // Sticky admin notices pinned to the top of the bell.
+        $r = $query
+            ->orderByDesc('resort_notifications.is_sticky')
+            ->orderByDesc('resort_notifications.created_at')
+            ->take(10)
+            ->get(['resort_notifications.*','t2.id as Parentid']);
         $string='';
 
         if($r->isNotEmpty())
@@ -4120,13 +4337,15 @@ class Common
                 $notifUrl = Common::getNotificationUrl($ak);
                 $timeAgo = Carbon::parse($ak->created_at)->diffForHumans();
 
-                    $string .= ' <div class="notification-box active class_remove_me_'.$ak->id.'">
+                    $stickyClass = !empty($ak->is_sticky) ? ' notification-sticky' : '';
+                    $stickyBadge = !empty($ak->is_sticky) ? '<span class="badge badge-warning ms-1">Pinned</span>' : '';
+                    $string .= ' <div class="notification-box active'.$stickyClass.' class_remove_me_'.$ak->id.'">
                                     <a href="'.$notifUrl.'" class="d-flex  profile-dropdown ">
                                         <div class="flex-shrink-0 img-box " >
                                             <img src="'. $url .'" alt="..." class="img-fluid" />
                                         </div>
                                     <div class="flex-grow-1 ms-3">
-                                        <h5>'.$ak->type.'</h5>
+                                        <h5>'.$ak->type.' '.$stickyBadge.'</h5>
                                         <p>' .$ak->message.' </p>
                                         <br>
                                         <span>'.$timeAgo.'</span>

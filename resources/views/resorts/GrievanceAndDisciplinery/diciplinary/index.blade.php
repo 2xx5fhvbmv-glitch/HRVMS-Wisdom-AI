@@ -49,6 +49,8 @@
                                     <th class="text-nowrap"> Offence </th>
                                     <th> Employee Name </th>
                                     <th> Status </th>
+                                    <th class="text-nowrap"> Created Date </th>
+                                    <th class="text-nowrap"> Action Valid Until </th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
                             </thead>
@@ -79,7 +81,7 @@
             "iDisplayLength": 6,
             processing: true,
             serverSide: true,
-            order:[[6, 'desc']],
+            order:[[5, 'desc']],
             ajax: '{{ route("GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex") }}',
             columns: [
                 { data: 'Disciplinary_Id', name: 'Disciplinary_Id', className: 'text-nowrap' },
@@ -87,8 +89,9 @@
                 { data:'Offence',name:'Offence',className:'text-nowrap'},
                 { data:'EmployeeName',name:'EmployeeName',className:'text-nowrap'},
                 { data:'Status',name:'Status',className:'text-nowrap'},
+                { data:'CreatedAt', name:'created_at', className:'text-nowrap'},
+                { data:'ValidUntil', name:'Expiry_date', className:'text-nowrap'},
                 { data: 'Action', name: 'Action', orderable: false, searchable: false },
-                {data:'created_at',visible:false,searchable:false},
             ]
         });
 

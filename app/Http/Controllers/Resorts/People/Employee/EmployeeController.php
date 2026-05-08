@@ -817,7 +817,8 @@ class EmployeeController extends Controller
                 // )));
             }
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances'));
+        $airports = config('airports', ['national' => [], 'international' => []]);
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports'));
     }
 
     public function assignToTeam(Request $request)

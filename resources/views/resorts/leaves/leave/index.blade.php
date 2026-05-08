@@ -81,8 +81,25 @@
                                         <div id="task_delegation-error"></div>
                                     </div>
                                     <div class="col-md-6" id="field-destination">
-                                        <label for="destination" class="form-label">DESTINATION</label>
-                                        <input type="text" name="destination" id="destination" placeholder="Destination" class="form-control"/>
+                                        <label for="destination" class="form-label">DESTINATION<span class="red-mark destination-required-mark d-none">*</span></label>
+                                        <select class="form-select select2-airport-search" name="destination" id="destination" data-parsley-errors-container="#destination-error">
+                                            <option value="">Select Destination Airport</option>
+                                            @if(!empty($airports['national']))
+                                                <optgroup label="National (Maldives)">
+                                                    @foreach($airports['national'] as $ap)
+                                                        <option value="{{ $ap['code'] }} - {{ $ap['name'] }}">{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }})</option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endif
+                                            @if(!empty($airports['international']))
+                                                <optgroup label="International">
+                                                    @foreach($airports['international'] as $ap)
+                                                        <option value="{{ $ap['code'] }} - {{ $ap['name'] }}">{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }}{{ !empty($ap['country']) ? ', '.$ap['country'] : '' }})</option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endif
+                                        </select>
+                                        <div id="destination-error"></div>
                                     </div>
                                     <div class="col-12" id="field-transportation">
                                         <label class="form-label">TRANSPORTATION  </label>
@@ -136,10 +153,11 @@
                                                         <label for="depDate" class="form-label">DEPARTURE DATE</label>
                                                         <input type="text" class="form-control datepicker" id="depDate" placeholder="DEPARTURE DATE" name="dept_date">
                                                     </div>
-                                                    <div class="mb-md-4 mb-3">
+                                                    {{-- Departure flight time hidden: employees don't know flight times at leave application --}}
+                                                    {{-- <div class="mb-md-4 mb-3">
                                                         <label for="depTime" class="form-label">DEPARTURE TIME</label>
                                                         <input type="time" class="form-control" id="depTime" placeholder="DEPARTURE TIME" name="dept_time">
-                                                    </div>
+                                                    </div> --}}
                                                     <div>
                                                         <label for="" class="form-label">DEPARTURE TRANSPORTATION *</label>
                                                         <div>
@@ -168,10 +186,11 @@
                                                         <label for="arrDate" class="form-label">ARRIVAL DATE</label>
                                                         <input type="text" class="form-control datepicker" id="arrDate" placeholder="ARRIVAL DATE" name="arr_date">
                                                     </div>
-                                                    <div class="mb-md-4 mb-3">
+                                                    {{-- Arrival flight time hidden: employees don't know flight times at leave application --}}
+                                                    {{-- <div class="mb-md-4 mb-3">
                                                         <label for="arrTime" class="form-label">ARRIVAL TIME</label>
                                                         <input type="time" class="form-control" id="arrTime" placeholder="ARRIVAL TIME" name="arr_time">
-                                                    </div>
+                                                    </div> --}}
                                                     <div>
                                                         <label for="" class="form-label">ARRIVAL TRANSPORTATION *</label>
                                                         <div>
@@ -214,10 +233,11 @@
                                         <label for="uploadFile" class="form-label">UPLOAD DOCUMENTS<span class="red-mark attachment-required-mark d-none">*</span></label>
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn">
-                                                <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
-                                                <input type="file" id="uploadFile" name="attachments">
+                                                <button type="button" class="btn btn-themeBlue btn-sm" onclick="document.getElementById('uploadFile').click();">Upload File</button>
+                                                <input type="file" id="uploadFile" name="attachments" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png">
                                             </div>
-                                            <div class="uploadFile-text">PNG, JPEG, PDF, Word</div>
+                                            <div class="uploadFile-text">PNG, JPEG, PDF, Word — max 5 MB</div>
+                                            <span id="uploadFile-name" class="ms-2 text-muted small"></span>
                                         </div>
                                     </div>
                                 </div>
@@ -392,6 +412,37 @@
             $sel.select2({ width: '100%', allowClear: true });
         });
 
+        // File upload UX: surface the chosen filename (input is opacity:0 so
+        // the browser's "No file chosen" hint is invisible) and reject files
+        // > 5 MB before they hit the server.
+        $(document).on('change', '#uploadFile', function () {
+            var f = this.files && this.files[0];
+            if (!f) { $('#uploadFile-name').text(''); return; }
+            if (f.size > 5 * 1024 * 1024) {
+                toastr.error('File is larger than 5 MB. Please choose a smaller file.', 'Error', { positionClass: 'toast-bottom-right' });
+                this.value = '';
+                $('#uploadFile-name').text('');
+                return;
+            }
+            $('#uploadFile-name').text(f.name);
+        });
+
+        // Airport destination dropdown — search ALWAYS visible. The global
+        // layout init disables search for .select2t-none, so this select uses
+        // a separate class. Destroy first in case any earlier code inited it.
+        $(".select2-airport-search").each(function () {
+            var $sel = $(this);
+            if ($sel.hasClass('select2-hidden-accessible')) {
+                try { $sel.select2('destroy'); } catch (e) {}
+            }
+            $sel.select2({
+                width: '100%',
+                allowClear: true,
+                placeholder: 'Search airport (city, IATA code, or country)',
+                minimumResultsForSearch: 0
+            });
+        });
+
         // Apply leave-category-based validation (Mandatory/Optional/Hidden) when first leave category changes
         $(document).on('change', '#leaveCat1', function () {
             applyLeaveCategoryValidation();
@@ -399,7 +450,7 @@
         applyLeaveCategoryValidation();
 
         // Trigger Parsley when any Select2 (leave category or task delegation) changes
-        $(document).on('change', '.select2t-none, .LeaveCate_id', function () {
+        $(document).on('change', '.select2t-none, .select2-airport-search, .LeaveCate_id', function () {
             var parsleyField = $(this).parsley();
             if (parsleyField && parsleyField.validate) {
                 parsleyField.validate();
@@ -522,11 +573,18 @@
                 $(this).datepicker('setEndDate', maxDate);
             });
 
-            // Update departure pass datepickers
-            $('#depDate, #arrDate').each(function() {
-                $(this).datepicker('setStartDate', minDate);
-                $(this).datepicker('setEndDate', maxDate);
-            });
+            // Update departure pass datepickers.
+            // Departure can be ONE DAY BEFORE the leave starts — employees
+            // commonly catch a flight in the evening after their last
+            // working day. Arrival stays inside the leave window.
+            const depMinDate = new Date(minDate);
+            depMinDate.setDate(depMinDate.getDate() - 1);
+
+            $('#depDate').datepicker('setStartDate', depMinDate);
+            $('#depDate').datepicker('setEndDate', maxDate);
+
+            $('#arrDate').datepicker('setStartDate', minDate);
+            $('#arrDate').datepicker('setEndDate', maxDate);
         });
             
 
@@ -739,7 +797,13 @@
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     }
 
-    // Function to calculate total days (basic example)
+    // Set of YYYY-MM-DD public holiday dates from the controller. Used by
+    // calculateTotalDays() to subtract holidays from the leave-day count.
+    window.__publicHolidaySet = new Set(@json($holidayDates ?? []));
+
+    // Function to calculate total days, EXCLUDING Fridays (resort weekly off)
+    // and public holidays — the user shouldn't have those counted against
+    // their leave balance.
     function calculateTotalDays(from, to) {
         const fromParts = from.split('/');
         const toParts = to.split('/');
@@ -754,7 +818,21 @@
             };
         }
 
-        const totalDays = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
+        let totalDays = 0;
+        const cursor = new Date(fromDate);
+        while (cursor <= toDate) {
+            const isFriday = cursor.getDay() === 5;
+            const yyyy = cursor.getFullYear();
+            const mm = String(cursor.getMonth() + 1).padStart(2, '0');
+            const dd = String(cursor.getDate()).padStart(2, '0');
+            const key = `${yyyy}-${mm}-${dd}`;
+            const isHoliday = window.__publicHolidaySet.has(key);
+            if (!isFriday && !isHoliday) {
+                totalDays++;
+            }
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
         const options = { day: '2-digit', month: 'short' };
         const fromFormatted = fromDate.toLocaleDateString('en-GB', options);
         const toFormatted = toDate.toLocaleDateString('en-GB', options);
@@ -994,7 +1072,7 @@
                             }
 
                             // Show error alert
-                            toastr.success(errorMessage, "Error", {
+                            toastr.error(errorMessage, "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
 

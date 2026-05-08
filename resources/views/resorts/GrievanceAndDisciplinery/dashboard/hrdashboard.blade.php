@@ -28,15 +28,26 @@
         </div>
 
         <div class="row g-3 g-xxl-4 card-heigth">
+            @php
+                // Arrow icon was loading from a relative path that broke on
+                // any non-root URL — switch to the absolute asset() helper.
+                $arrowIcon = asset('resorts_assets/images/arrow-right-circle.svg');
+                $grievanceListUrl = route('GrievanceAndDisciplinery.grivance.GrivanceIndex');
+                $disciplinaryListUrl = route('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex');
+            @endphp
             <div class="col-lg-3 col-sm-6">
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Open Cases</p>
-                            <strong>{{ $openCases ?? 0 }}</strong>
+                            <strong class="d-block" style="font-size:14px;font-weight:600;">
+                                <a href="{{ $grievanceListUrl }}" class="text-decoration-none">Grievance: {{ $openGrievance ?? 0 }}</a>
+                                |
+                                <a href="{{ $disciplinaryListUrl }}" class="text-decoration-none">Disciplinary: {{ $openDisciplinary ?? 0 }}</a>
+                            </strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ $grievanceListUrl }}">
+                            <img src="{{ $arrowIcon }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -46,10 +57,14 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Pending Cases</p>
-                            <strong>{{ $pendingCases ?? 0 }}</strong>
+                            <strong class="d-block" style="font-size:14px;font-weight:600;">
+                                <a href="{{ $grievanceListUrl }}" class="text-decoration-none">Grievance: {{ $pendingGrievance ?? 0 }}</a>
+                                |
+                                <a href="{{ $disciplinaryListUrl }}" class="text-decoration-none">Disciplinary: {{ $pendingDisciplinary ?? 0 }}</a>
+                            </strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ $grievanceListUrl }}">
+                            <img src="{{ $arrowIcon }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -59,10 +74,14 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="mb-0  fw-500">Closed Cases</p>
-                            <strong>{{ $closedCases ?? 0 }}</strong>
+                            <strong class="d-block" style="font-size:14px;font-weight:600;">
+                                <a href="{{ $grievanceListUrl }}" class="text-decoration-none">Grievance: {{ $closedGrievance ?? 0 }}</a>
+                                |
+                                <a href="{{ $disciplinaryListUrl }}" class="text-decoration-none">Disciplinary: {{ $closedDisciplinary ?? 0 }}</a>
+                            </strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ $grievanceListUrl }}">
+                            <img src="{{ $arrowIcon }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -74,8 +93,8 @@
                             <p class="mb-0  fw-500">Expired Offense</p>
                             <strong>{{ $expiredOffense ?? 0 }}</strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
+                        <a href="{{ $disciplinaryListUrl }}">
+                            <img src="{{ $arrowIcon }}" alt="" class="img-fluid">
                         </a>
                     </div>
                 </div>
@@ -98,9 +117,9 @@
                             <p>GRIEVANCES RESOLVED</p>
                         </div>
                     </div>
-                    <div class="d-flex">
-                        <!-- <p>Average Resolution Time:</p> -->
-                        <!-- <p>24 HRS</p> -->
+                    <div class="d-flex justify-content-between">
+                        <p class="mb-0">Average Resolution Time:</p>
+                        <p class="mb-0"><strong>{{ $avgResolutionHours ?? 0 }} HRS</strong></p>
                     </div>
                 </div>
             </div>
@@ -145,12 +164,12 @@
                     </div>
                 </div>
             </div>
-            <!-- <div class="col-xl-6">
+            <div class="col-xl-6">
                 <div class="card card-appealsSection">
                     <div class="card-title">
                         <h3>Appeals Section</h3>
                     </div>
-                    <p>Total Appeals Submitted: 26 | Average Resolution Time: 24 Hrs</p>
+                    <p>Total Appeals Submitted: {{ $appealsSubmitted ?? 0 }} | Average Resolution Time: {{ $avgResolutionHours ?? 0 }} Hrs</p>
                     <div class="row g-3 g-xxl-4">
                         <div class="col-md-6  col-sm-7">
                             <div class="bg-themeGrayLight">
@@ -171,13 +190,13 @@
                                         <div class="row g-2 justify-content-center">
                                             <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                                 <div class="doughnut-label">
-                                                    <span class="bg-theme"></span>Pending <br>142
+                                                    <span class="bg-theme"></span>Pending <br>{{ $hearingsPending ?? 0 }}
                                                 </div>
                                             </div>
                                             <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                                 <div class="doughnut-label">
                                                     <span class="bg-themeLightBlue"></span>Resolved
-                                                    <br>35
+                                                    <br>{{ $hearingsResolved ?? 0 }}
                                                 </div>
                                             </div>
                                         </div>
@@ -187,7 +206,7 @@
                         </div>
                     </div>
                 </div>
-            </div> -->
+            </div>
             <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
@@ -209,6 +228,10 @@
             </div>
              <div class="col-xl-3 col-sm-6 order-sm-1 order-xl-0">
                 <div class="row g-3 g-xxl-4">
+                    {{-- Retaliation Reports Filed tile hidden per the latest
+                         design — uncomment to bring it back without re-wiring
+                         the controller (the $retaliationReports variable is
+                         still passed to the view).
                     <div class="col-12">
                         <div class="card dashboard-boxcard timeAttend-boxcard">
                             <div class="d-flex align-items-center justify-content-between">
@@ -217,14 +240,15 @@
                             </div>
                         </div>
                     </div>
-                    <!-- <div class="col-12">
+                    --}}
+                    <div class="col-12">
                         <div class="card card-reportsResolved">
                             <div class="card-title ">
-                                <h3>Reports Marked As Resolved</h3>
+                                <h3>Reports</h3>
                             </div>
                             <div class="progress-block">
-                                <div class="progress-container {{ $progressColor ?? 'blue' }}" data-progress="{{ $totalPercengate ?? 0 }}" data-bs-toggle="tooltip"
-                                    data-bs-placement="bottom" title="{{ $tooltipText ?? 'Grievances Resolved: '.$totalPercengate.'%' }}">
+                                <div class="progress-container blue" data-progress="{{ $totalPercengate ?? 0 }}" data-bs-toggle="tooltip"
+                                    data-bs-placement="bottom" title="Grievances Resolved: {{ $totalPercengate ?? 0 }}%">
                                     <svg class="progress-circle" viewBox="0 0 120 120">
                                         <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                                         <circle class="progress" cx="60" cy="60" r="54"></circle>
@@ -232,15 +256,15 @@
                                 </div>
                                 <div class="text">
                                     <h5>{{ $totalPercengate ?? 0 }}%</h5>
-                                    <p>{{ $progressLabel ?? 'GRIEVANCES RESOLVED' }}</p>
+                                    <p>GRIEVANCES RESOLVED</p>
                                 </div>
                             </div>
-                            <div class="d-flex">
-                                <p>Average Resolution Time:</p>
-                                <p>24 HRS</p>
+                            <div class="d-flex justify-content-between">
+                                <p class="mb-0">Average Resolution Time:</p>
+                                <p class="mb-0"><strong>{{ $avgResolutionHours ?? 0 }} HRS</strong></p>
                             </div>
                         </div>
-                    </div> -->
+                    </div>
                 </div>
             </div>
             <div class="col-xl-6 order-sm-2 order-xl-0">
@@ -557,14 +581,17 @@
     const _appealsByCategoryEl = document.getElementById('appealsByCategory');
     if (_appealsByCategoryEl) {
     const cty = _appealsByCategoryEl.getContext('2d');
+    // Wired to live data from the controller. Falls back to a single
+    // empty bucket so the canvas still renders if there are no appeals.
+    const _appealsLabels = @json($appealsByCategoryLabels ?? []);
+    const _appealsData   = @json($appealsByCategoryData ?? []);
     const appealsByCategory = new Chart(cty, {
         type: 'bar',
         data: {
-            labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4',],
+            labels: _appealsLabels.length ? _appealsLabels : ['No appeals yet'],
             datasets: [
                 {
-                    // label: 'Preplannned OT',
-                    data: [12, 17, 8, 14],
+                    data: _appealsData.length ? _appealsData : [0],
                     backgroundColor: '#014653',
                     borderColor: '#014653',
                     borderWidth: 1,
@@ -660,12 +687,19 @@
         }
     };
 
+    // Live counts from the controller. If both are zero, seed [1,0] so
+    // the doughnut still renders (Chart.js draws nothing for [0,0]).
+    const _hearingsPending  = parseInt(@json($hearingsPending ?? 0), 10) || 0;
+    const _hearingsResolved = parseInt(@json($hearingsResolved ?? 0), 10) || 0;
+    const _hearingsData = (_hearingsPending + _hearingsResolved) === 0
+        ? [1, 0]
+        : [_hearingsPending, _hearingsResolved];
     var myDoughnutChartPeopleRelation = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Pending', 'Resolved'],
             datasets: [{
-                data: [70, 30],
+                data: _hearingsData,
                 backgroundColor: ['#014653', '#2EACB3'], borderWidth: 0 // Removes the border
             }]
         },

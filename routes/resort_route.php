@@ -1098,6 +1098,16 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::delete('notification/notification-destroy/{id}', 'SitesettignsController@NotificationDestory')->name('resort.Mark.NotificationDestory');
 
 
+    // Grievance Appeals — Phase 2 of the appeals workflow.
+    Route::get('grievance-and-disciplinary/appeals',                   'GrievanceAndDisciplinery\GrievanceAppealController@index')->name('GrievanceAndDisciplinery.Appeals.Index');
+    Route::get('grievance-and-disciplinary/appeals/list',              'GrievanceAndDisciplinery\GrievanceAppealController@list')->name('GrievanceAndDisciplinery.Appeals.List');
+    Route::get('grievance-and-disciplinary/appeals/{id}',              'GrievanceAndDisciplinery\GrievanceAppealController@show')->name('GrievanceAndDisciplinery.Appeals.Show');
+    Route::post('grievance-and-disciplinary/appeals/store',            'GrievanceAndDisciplinery\GrievanceAppealController@store')->name('GrievanceAndDisciplinery.Appeals.Store');
+    Route::post('grievance-and-disciplinary/appeals/{id}/hearing',     'GrievanceAndDisciplinery\GrievanceAppealController@storeHearing')->name('GrievanceAndDisciplinery.Appeals.StoreHearing');
+    Route::post('grievance-and-disciplinary/appeals/{id}/hearing-status','GrievanceAndDisciplinery\GrievanceAppealController@updateHearingStatus')->name('GrievanceAndDisciplinery.Appeals.UpdateHearingStatus');
+    Route::post('grievance-and-disciplinary/appeals/{id}/decide',      'GrievanceAndDisciplinery\GrievanceAppealController@decide')->name('GrievanceAndDisciplinery.Appeals.Decide');
+    Route::post('grievance-and-disciplinary/appeals/{id}/withdraw',    'GrievanceAndDisciplinery\GrievanceAppealController@withdraw')->name('GrievanceAndDisciplinery.Appeals.Withdraw');
+
     Route::get('grievance-and-disciplinary/disciplinary-index', 'GrievanceAndDisciplinery\DisciplinaryController@DisciplinaryIndex')->name('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex');
     Route::get('grievance-and-disciplinary/create-disciplinary', 'GrievanceAndDisciplinery\DisciplinaryController@CreateDisciplinary')->name('GrievanceAndDisciplinery.Disciplinary.CreateDisciplinary');
     Route::post('grievance-and-disciplinary/get-category-wise-offence', 'GrievanceAndDisciplinery\DisciplinaryController@GetCategoryWiseOffence')->name('GrievanceAndDisciplinery.Disciplinary.GetCategoryWiseOffence');

@@ -357,6 +357,13 @@ class SupportController extends Controller
         $loggedInEmployee = optional($this->resort->getEmployee)->id ?? 0;
         $page_title = 'Support Email View';
         $support = Support::findOrFail($ticketId);
+        // Resort user opened the email-reply page → mark every admin-sent
+        // message for this ticket as read so the resort-side bell stops
+        // showing the unread count.
+        SupportMessages::where('ticket_id', $ticketId)
+            ->where('sender', 'admin')
+            ->where('is_read', 0)
+            ->update(['is_read' => 1]);
         $supportEmails = SupportMessages::where('ticket_id', $ticketId)->get();
         $settings = Settings::first();
         $supportEmail = optional($settings)->support_email ?? '';
@@ -370,7 +377,10 @@ class SupportController extends Controller
             'to_email'       => 'required|email',
             'subject'        => 'required|string|max:255',
             'message'        => 'required|string',
-            'attachments.*'  => 'nullable|file|mimes:pdf,xlsx|max:2048',
+            // Loosened from `mimes:pdf,xlsx|max:2048` — users routinely
+            // attach screenshots / docs / spreadsheets / videos when
+            // explaining a problem, so allow common file types up to 25 MB.
+            'attachments.*'  => 'nullable|file|max:25600',
         ]);
 
         $ticket = Support::findOrFail($request->ticket_id);
@@ -394,6 +404,9 @@ class SupportController extends Controller
             'attachments' => count($uploadedFiles) > 0 ? json_encode($uploadedFiles) : null,
             'sender'      => 'employee',
             'sender_id'   => optional($employee)->id ?? 0,
+            // Stays unread until an admin opens the ticket — drives the
+            // unread count badge on the admin Supports list & sidebar.
+            'is_read'     => 0,
         ]);
 
         $replyBy = Auth::guard('resort-admin')->user()->first_name . ' ' . Auth::guard('resort-admin')->user()->last_name;

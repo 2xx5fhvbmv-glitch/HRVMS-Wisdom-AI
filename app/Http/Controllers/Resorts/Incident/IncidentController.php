@@ -53,12 +53,11 @@ class IncidentController extends Controller
     public function list(Request $request)
     {
         if ($request->ajax()) {
-            $resort_id = $this->resort->resort_id;
             $loggedInEmployee = $this->resort->getEmployee;
-            $loggedInUserId = $loggedInEmployee->id;
             $rank = config('settings.Position_Rank');
             $current_rank = $loggedInEmployee->rank ?? null;
             $available_rank = $rank[$current_rank] ?? '';
+            // $isHR / $isGM kept — they drive the action-column buttons below.
             $isHR = ($available_rank === "HR");
             $isGM = ($available_rank === "GM");
 
@@ -72,36 +71,13 @@ class IncidentController extends Controller
                 }
             }
 
-            $userCommittees = IncidentCommitteeMember::where('member_id', $loggedInUserId)
-                ->pluck('commitee_id')
-                ->toArray();
-
-            $query = Incidents::where('resort_id', $resort_id)
+            // Apply role-based visibility via the centralised helper. Same
+            // rules used by the dashboards/drill-down so a non-HR/GM user
+            // can never see incidents outside their committees + own dept.
+            $query = Common::scopeIncidentsForViewer(Incidents::query())
                 ->where('status', '!=', 'Resolved')
                 ->with(['categoryName'])
                 ->select('id', 'incident_id', 'incident_name', 'location', 'category', 'incident_date', 'incident_time', 'isWitness', 'involved_employees', 'status', 'priority','created_at');
-
-            if ($isGM) {
-                $query->where('approval', 1);
-            } elseif (!$isHR) {
-                $departmentId = $loggedInEmployee->Dept_id;
-
-                $query->where(function ($q) use ($userCommittees, $departmentId) {
-                    if (!empty($userCommittees)) {
-                        $q->orWhere(function ($subQ) use ($userCommittees) {
-                            foreach ($userCommittees as $committeeId) {
-                                $subQ->orWhereRaw("JSON_CONTAINS(assigned_to, ?)", [json_encode((string)$committeeId)]);
-                            }
-                        });
-                    }
-
-                    if ($departmentId) {
-                        $q->orWhereHas('reporter', function ($subQ) use ($departmentId) {
-                            $subQ->where('Dept_id', $departmentId);
-                        });
-                    }
-                });
-            }
 
             if ($request->searchTerm) {
                 $searchTerm = $request->searchTerm;
@@ -210,7 +186,9 @@ class IncidentController extends Controller
                 }
             }
             // Start Query
-            $query = Incidents::where('resort_id', $resort_id)
+            // Scope by viewer (was previously unscoped — every user could
+            // see every resolved incident in the resort regardless of dept).
+            $query = Common::scopeIncidentsForViewer(Incidents::query())
                 ->where('status', 'Resolved')
                 ->with('categoryName')
                 ->select('id', 'incident_id', 'incident_name', 'location', 'category', 'incident_date', 'incident_time', 'isWitness', 'involved_employees','status','created_at');
@@ -315,9 +293,17 @@ class IncidentController extends Controller
         $page_title ='Incident Detail';
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
-        $incident = Incidents::with(['reporter.resortAdmin','reporter.position','witness.employee'])->where('id',$id)->first();  
-        // dd($incident);
-        $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();  
+        // Re-apply the same role-based scope used by the listing endpoint —
+        // a non-HR user must not be able to load an out-of-scope incident
+        // by guessing/typing the URL.
+        $incident = Common::scopeIncidentsForViewer(Incidents::query())
+            ->with(['reporter.resortAdmin','reporter.position','witness.employee'])
+            ->where('id', $id)
+            ->first();
+        if (!$incident) {
+            abort(404, 'Incident not found or not accessible.');
+        }
+        $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();
         $status = IncidentConfiguration::where('resort_id', $resort_id)
         ->where('setting_key', 'status')
         ->first(); 
@@ -349,10 +335,15 @@ class IncidentController extends Controller
             'status' => $request->status
         ]);
 
-        // Send Notifications to Assigned Committee Members
+        // Send Notifications to Assigned Committee Members. Dedupe by
+        // member_id — a person sitting on multiple assigned committees
+        // would otherwise get one notification per committee.
         if (!empty($request->assigned_commiteee)) {
-            $committeeMembers = IncidentCommitteeMember::whereIn('commitee_id', $request->assigned_commiteee)->get();
-            
+            $committeeMembers = IncidentCommitteeMember::whereIn('commitee_id', $request->assigned_commiteee)
+                ->get()
+                ->unique('member_id')
+                ->values();
+
             foreach ($committeeMembers as $member) {
                 $msg = 'HR has assigned a '.$incident->incident_name.' incident to your committee.';
                 $title = 'Assign Incident';
@@ -392,7 +383,21 @@ class IncidentController extends Controller
         $current_rank = $loggedInEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
         $isHR = ($available_rank === "HR");
-        $incident = Incidents::with(['reporter.resortAdmin','reporter.position','witness.employee'])->where('id',$id)->first();  
+        // The investigation page exposes the full case file (statements,
+        // findings, follow-ups). Apply a STRICTER gate than the listing —
+        // only HR / HR-equivalent, GM, and committee members assigned to
+        // THIS incident may open it. A reporter from the same dept can see
+        // the incident on the list/view page but not the investigation.
+        $incident = Incidents::with(['reporter.resortAdmin','reporter.position','witness.employee'])
+            ->where('resort_id', $resort_id)
+            ->where('id', $id)
+            ->first();
+        if (!$incident) {
+            abort(404, 'Incident not found.');
+        }
+        if (!Common::canViewIncidentInvestigation($incident)) {
+            abort(403, 'Only HR and committee members assigned to this incident can view the investigation.');
+        }
         $investigations = IncidentsInvestigation::with(['addedBy.employee','followupAction'])->where('incident_id',$id)->orderBy('created_at','desc')->get();
         // dd($investigations);
         $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();  
@@ -571,15 +576,20 @@ class IncidentController extends Controller
             $ModuleName = "Incident";
             
             event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, 
-                10, 
-                $title, 
-                $msg, 
-                0, 
-                $user, 
+                $this->resort->resort_id,
+                10,
+                $title,
+                $msg,
+                0,
+                $user,
                 $ModuleName
             )));
 
+            // Common::nofitication(type=10) already inserted the
+            // resort_notifications row above. Pass skipDbInsert=true so
+            // sendMobileNotification only sends the mobile push and does
+            // not duplicate the DB row (which made the bell dropdown
+            // show every notification twice).
             Common::sendMobileNotification(
                 $this->resort->resort_id,
                 '',
@@ -589,6 +599,7 @@ class IncidentController extends Controller
                 $ModuleName,
                 [$user],
                 null,
+                true
             );
         }    
         return response()->json(['message' => 'Statement request sent to involved employees and witnesses.']);

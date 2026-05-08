@@ -281,6 +281,8 @@
                                                 <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.Hrdashboard') }}">Dashboard</a></li>
                                                 <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.config.index') }}">Configuration</a></li>
                                                 <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.grivance.GrivanceIndex') }}">Grievane</a></li>
+                                                <li><a class="dropdown-item {{ Route::currentRouteName() == 'GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex' ? 'active' : '' }}" href="{{ route('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex') }}">Disciplinary</a></li>
+                                                <li><a class="dropdown-item {{ in_array(Route::currentRouteName(), ['GrievanceAndDisciplinery.Appeals.Index','GrievanceAndDisciplinery.Appeals.Show']) ? 'active' : '' }}" href="{{ route('GrievanceAndDisciplinery.Appeals.Index') }}">Appeals</a></li>
                                             </ul>
 
                                         </div>

@@ -50,11 +50,15 @@ class ResortAllNotificationController extends Controller
         // })
         // ->pluck('id') ->toArray();
 
-        // HODs (rank 2) — primary recipients who must respond per department.
-        $employee = Employee::where('resort_id', $resort_id)
+        // HODs (rank 2) — keyed by Dept_id so each department gets a child row
+        // even when no HOD is assigned. Previous logic looped over HODs only,
+        // so departments without a Rank=2 employee were silently dropped from
+        // the pending-response list (cause: 25 depts → only 6 child rows).
+        $hodsByDept = Employee::where('resort_id', $resort_id)
             ->where('Rank', 2)
             ->whereIn('Dept_id', $DepartmentIds)
-            ->get(['Admin_Parent_id','id','Rank','Dept_id','Position_id']);
+            ->get(['Admin_Parent_id','id','Rank','Dept_id','Position_id'])
+            ->groupBy('Dept_id');
 
         // HR users (rank 3) — should also be alerted that a manning request
         // went out, but they don't generate per-department response rows.
@@ -68,30 +72,41 @@ class ResortAllNotificationController extends Controller
                 ->where('user_id', $resort->id)
                 ->update(['status' => 'Inactive']);
 
-            $parentNotification= ResortsParentNotifications::create([
-                'resort_id'=>$resort_id,
-                'user_type'=>($user_type== 0) ? 'super':'sub',
-                'user_id'=>$resort->id,
-                'message_id'=>  $message_id,
-                'message_subject'=>$manningRequest,
+            $parentNotification = ResortsParentNotifications::create([
+                'resort_id'       => $resort_id,
+                'user_type'       => ($user_type == 0) ? 'super' : 'sub',
+                'user_id'         => $resort->id,
+                'message_id'      => $message_id,
+                'message_subject' => $manningRequest,
             ]);
-            $parentmesgid= $parentNotification->message_id;
-            foreach($employee as $key => $value)
-            {
-                $parentNotification = ResortsChildNotifications::create([
-                    'Parent_msg_id'=>$parentmesgid,
-                    'Department_id'=>$value->Dept_id,
-                    'Position_id'=>$value->Position_id,
-                    'response'=>  'No',
+            $parentmesgid = $parentNotification->message_id;
+
+            // ONE child row per department — driven by $DepartmentIds, not the
+            // HOD list. Departments without an HOD still appear as pending so
+            // HR can chase them up. Position_id falls back to 0 because the
+            // column is NOT NULL in the schema (no default).
+            foreach ($DepartmentIds as $deptId) {
+                $deptHods = $hodsByDept->get($deptId, collect());
+                $primaryPositionId = (int) (optional($deptHods->first())->Position_id ?? 0);
+
+                ResortsChildNotifications::create([
+                    'Parent_msg_id' => $parentmesgid,
+                    'Department_id' => $deptId,
+                    'Position_id'   => $primaryPositionId,
+                    'response'      => 'No',
                 ]);
-                // Fire the in-app notification — was commented out, which is
-                // why HODs never received the manning-request alert.
-                try {
-                    event(new ResortNotificationEvent(
-                        Common::nofitication($resort_id, $this->type[1], $parentmesgid, 0, '', $value->id, 'WorkForce Planning')
-                    ));
-                } catch (\Exception $notifErr) {
-                    \Log::warning('Manning notification dispatch failed for HOD ' . $value->id . ': ' . $notifErr->getMessage());
+
+                // Dispatch the in-app event to every HOD in this department.
+                // Departments without an HOD will simply have no recipient
+                // (still tracked as pending until the missing HOD is added).
+                foreach ($deptHods as $hod) {
+                    try {
+                        event(new ResortNotificationEvent(
+                            Common::nofitication($resort_id, $this->type[1], $parentmesgid, 0, '', $hod->id, 'WorkForce Planning')
+                        ));
+                    } catch (\Exception $notifErr) {
+                        \Log::warning('Manning notification dispatch failed for HOD ' . $hod->id . ': ' . $notifErr->getMessage());
+                    }
                 }
             }
 
@@ -141,9 +156,15 @@ class ResortAllNotificationController extends Controller
         }
         catch (\Exception $e){
             DB::rollBack();
-            $response['success'] = false;
-            $response['msg'] = __('Somthing Wrong ', ['name' => 'Wrong']);
-            return response()->json($response);
+            \Log::error('Manning notification handler failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'msg'     => 'Failed to send manning request.',
+                'error'   => config('app.debug') ? $e->getMessage() : null,
+            ]);
         }
     }
 
@@ -190,9 +211,15 @@ class ResortAllNotificationController extends Controller
         }
         catch (\Exception $e){
             DB::rollBack();
-            $response['success'] = false;
-            $response['msg'] = __('Somthing Wrong ', ['name' => 'Wrong']);
-            return response()->json($response);
+            \Log::error('Manning notification handler failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'msg'     => 'Failed to send manning request.',
+                'error'   => config('app.debug') ? $e->getMessage() : null,
+            ]);
         }
     }
 
@@ -249,9 +276,15 @@ class ResortAllNotificationController extends Controller
         }
         catch (\Exception $e){
             DB::rollBack();
-            $response['success'] = false;
-            $response['msg'] = __('Somthing Wrong ', ['name' => 'Wrong']);
-            return response()->json($response);
+            \Log::error('Manning notification handler failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'msg'     => 'Failed to send manning request.',
+                'error'   => config('app.debug') ? $e->getMessage() : null,
+            ]);
         }
 
 
@@ -313,9 +346,15 @@ class ResortAllNotificationController extends Controller
         }
         catch (\Exception $e){
             DB::rollBack();
-            $response['success'] = false;
-            $response['msg'] = __('Somthing Wrong ', ['name' => 'Wrong']);
-            return response()->json($response);
+            \Log::error('Manning notification handler failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'msg'     => 'Failed to send manning request.',
+                'error'   => config('app.debug') ? $e->getMessage() : null,
+            ]);
         }
 
     }

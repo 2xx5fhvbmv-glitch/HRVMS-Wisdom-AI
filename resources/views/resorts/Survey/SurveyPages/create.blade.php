@@ -202,7 +202,7 @@
                         <div class="mb-3">
                             <label for="select_emp" class="form-label">PRIVACY</label>
                             <div>
-                                <div class="form-check form-check-inline" title="Identity stored. Only authorised admins (HR / L&D / GM) can see who responded. Hidden in aggregate reports and exports.">
+                                <div class="form-check form-check-inline" title="Identity stored. Only authorised admins (HR / GM) can see who responded. Hidden in aggregate reports and exports.">
                                     <input class="form-check-input" type="radio" name="survey_privacy_type" id="privacy1"
                                         value="Confidential" data-parsley-required="true"
                                         data-parsley-required-message="Please select a privacy type"
@@ -223,7 +223,7 @@
                             </div>
                             <div id="privacy_error"></div>
                             <small class="text-muted d-block mt-1" id="privacyHint">
-                                <strong>Confidential:</strong> only HR / L&D / GM see respondent identities.
+                                <strong>Confidential:</strong> only HR / GM see respondent identities.
                                 <strong>Neutral:</strong> identities visible to all viewers.
                                 <strong>Anonymous:</strong> identities hidden from everyone.
                             </small>
