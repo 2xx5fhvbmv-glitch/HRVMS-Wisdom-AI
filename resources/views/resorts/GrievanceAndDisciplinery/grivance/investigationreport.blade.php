@@ -406,10 +406,88 @@
                         <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                     </div>
                 </form>
-          
+
+        </div>
+    </div>
+
+    {{-- Appeals panel: shows existing appeals for this grievance + lets the
+         submitter or HR file a new one. Only one *active* appeal can exist
+         at a time per grievance (controller enforces this). --}}
+    @php
+        $existingAppeals = \App\Models\GrievanceAppeal::where('grievance_id', $Grivance_Parent->id)
+            ->orderByDesc('id')->get();
+        $hasActiveAppeal = $existingAppeals->whereIn('status', ['Pending', 'In_Hearing'])->isNotEmpty();
+        // File-appeal is allowed when the parent grievance has been
+        // closed/decided OR when there is no active appeal yet. Block
+        // duplicates so users can't fire two at once.
+        $canFileAppeal = !$hasActiveAppeal;
+    @endphp
+    <div class="container-fluid mt-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Appeals</h5>
+                    @if($canFileAppeal)
+                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#fileAppealModal">
+                            <i class="fa fa-gavel me-1"></i> File Appeal
+                        </button>
+                    @else
+                        <span class="text-muted small">An active appeal already exists for this grievance.</span>
+                    @endif
+                </div>
+
+                @forelse($existingAppeals as $ap)
+                    @php
+                        $cssMap = ['Pending'=>'badge-warning','In_Hearing'=>'badge-info','Resolved'=>'badge-success','Rejected'=>'badge-danger','Withdrawn'=>'badge-secondary'];
+                        $css = $cssMap[$ap->status] ?? 'badge-secondary';
+                    @endphp
+                    <div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center flex-wrap">
+                        <div>
+                            <strong>{{ $ap->appeal_no }}</strong>
+                            <span class="badge {{ $css }} ms-2">{{ str_replace('_',' ', $ap->status) }}</span>
+                            @if($ap->decision)
+                                <span class="ms-2 text-muted small">Decision: {{ $ap->decision }}</span>
+                            @endif
+                            <div class="text-muted small mt-1">{{ \Illuminate\Support\Str::limit($ap->reason, 140) }}</div>
+                        </div>
+                        <a href="{{ route('GrievanceAndDisciplinery.Appeals.Show', base64_encode($ap->id)) }}" class="btn btn-info btn-sm">Open</a>
+                    </div>
+                @empty
+                    <p class="text-muted mb-0">No appeals filed against this grievance.</p>
+                @endforelse
+            </div>
         </div>
     </div>
 </div>
+
+{{-- File Appeal Modal --}}
+@if($canFileAppeal)
+<div class="modal fade" id="fileAppealModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form id="fileAppealForm">
+                @csrf
+                <input type="hidden" name="grievance_id" value="{{ $Grivance_Parent->id }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">File Appeal — Grievance {{ $Grivance_Parent->Grivance_id }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Filing an appeal opens a new case file under the appeals workflow. HR / GM are notified automatically. You can schedule hearings and record a decision from the appeal detail page.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Appeal <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="reason" rows="5" maxlength="2000" required placeholder="Explain why this grievance decision should be reviewed..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Submit Appeal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('import-css')
@@ -418,6 +496,31 @@
 @section('import-scripts')
 <script>
 $(document).ready(function() {
+    // File-appeal modal submit. Posts the reason + grievance_id to the
+    // appeals.store endpoint and redirects to the new appeal's detail page
+    // on success. Idempotent server-side: re-submitting a duplicate gets a
+    // 422 which we surface as a toastr.
+    $('#fileAppealForm').on('submit', function (e) {
+        e.preventDefault();
+        $.ajax({
+            url: '{{ route("GrievanceAndDisciplinery.Appeals.Store") }}',
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+        })
+        .done(function (r) {
+            if (r.success) {
+                toastr.success(r.message, 'Success', { positionClass: 'toast-bottom-right' });
+                if (r.redirect_url) setTimeout(() => window.location.href = r.redirect_url, 600);
+            } else {
+                toastr.error(r.message || 'Failed to file appeal', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        })
+        .fail(function (xhr) {
+            toastr.error(xhr.responseJSON?.message || 'Failed to file appeal', 'Error', { positionClass: 'toast-bottom-right' });
+        });
+    });
+
     $('.datepicker').datepicker({
         format: 'dd/mm/yyyy',
         autoclose: true,      // Close the picker after selection

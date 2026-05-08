@@ -42,8 +42,10 @@ class SurveyController extends Controller
 
     /**
      * Whether the current viewer is allowed to see respondent identities for
-     * Confidential surveys. Mirrors the L&D admin set used elsewhere in the
-     * project: super-admins, HR (rank 3), GM (rank 8), and L&D leadership.
+     * Confidential surveys. Restricted to super-admins, HR (rank 3), and GM
+     * (rank 8). L&D leadership USED to be in this set but was removed at the
+     * client's request — the UI copy on create/results no longer advertises
+     * it, and the backend now matches.
      * Anonymous surveys are NEVER de-masked, even for privileged viewers.
      */
     private function isPrivilegedSurveyViewer(): bool
@@ -57,13 +59,7 @@ class SurveyController extends Controller
 
         $rank = (int) ($emp->rank ?? 0);
         // Rank 3 = HR, Rank 8 = GM (config/settings.php Position_Rank).
-        if (in_array($rank, [3, 8], true)) return true;
-
-        $position = optional($emp->position)->position_title;
-        $ldTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
-        if ($position && in_array($position, $ldTitles, true)) return true;
-
-        return false;
+        return in_array($rank, [3, 8], true);
     }
 
     /**
@@ -591,13 +587,18 @@ class SurveyController extends Controller
                 return  date('d M Y', strtotime($row->End_date));
             })
             ->addColumn('Status', function ($row) {
-                // Derive the user-facing status from start/end dates so "Expired"
-                // and "In Progress" surface automatically without a daily cron.
-                // Dates are stored as d/m/Y strings in the DB.
+                // Derive the user-facing status from start/end dates so
+                // "Expired" surfaces automatically without a daily cron.
+                // Dates are persisted by SaveSurvey/UpdateSurvey as Y-m-d
+                // (lines 222-223 / 358-359), so use Carbon::parse — it
+                // accepts both Y-m-d and legacy d/m/Y rows. The previous
+                // createFromFormat('d/m/Y', ...) silently threw on the
+                // Y-m-d strings and fell through to "Published", which is
+                // why expired surveys still showed Published.
                 $today = \Carbon\Carbon::today();
                 try {
-                    $start = $row->Start_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $row->Start_date)->startOfDay() : null;
-                    $end   = $row->End_date   ? \Carbon\Carbon::createFromFormat('d/m/Y', $row->End_date)->endOfDay()     : null;
+                    $start = $row->Start_date ? \Carbon\Carbon::parse($row->Start_date)->startOfDay() : null;
+                    $end   = $row->End_date   ? \Carbon\Carbon::parse($row->End_date)->endOfDay()     : null;
                 } catch (\Exception $e) {
                     $start = $end = null;
                 }

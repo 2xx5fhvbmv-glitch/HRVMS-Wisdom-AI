@@ -49,6 +49,7 @@
                                     <th> Employee Name </th>
                                     <th> Confidentiality </th>
                                     <th> Status </th>
+                                    <th class="text-nowrap"> Created Date </th>
                                     <th class="text-nowrap">Action</th>
                                 </tr>
                             </thead>
@@ -138,7 +139,7 @@
             "iDisplayLength": 6,
             processing: true,
             serverSide: true,
-            order:[[6, 'desc']],
+            order:[[5, 'desc']],
             ajax: '{{ route("GrievanceAndDisciplinery.grivance.GrivanceIndex") }}',
             columns: [
                 { data: 'Grievance_Id', name: 'Grievance_Id', className: 'text-nowrap' },
@@ -146,8 +147,8 @@
                 { data: 'Grivance_EmployeeName', name: 'Grivance_EmployeeName', className: 'text-nowrap' },
                 { data:'Confidentiality',name:'Confidentiality',className:'text-nowrap'},
                 { data:'status',name:'Status',className:'text-nowrap'},
+                { data:'CreatedAt', name:'created_at', className:'text-nowrap'},
                 { data: 'Action', name: 'Action', orderable: false, searchable: false },
-                {data:'created_at',visible:false,searchable:false},
             ]
         });
 

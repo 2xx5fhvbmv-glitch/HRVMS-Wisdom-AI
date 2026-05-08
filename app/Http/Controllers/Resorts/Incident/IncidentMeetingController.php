@@ -251,14 +251,25 @@ class IncidentMeetingController extends Controller
             $meeting->attachments = $uploadedFiles ? json_encode($uploadedFiles) : null;
             $meeting->save();
 
-            // Save participants
+            // Save participants. Track which participant_ids have already
+            // been notified within this request so a duplicate selection
+            // (same person in the participants[] payload twice) only
+            // triggers ONE notification — the create() can still happen
+            // per-row if intentional (different roles) but the user
+            // shouldn't see the bell ring twice.
             if ($request->participants) {
+                $notifiedParticipantIds = [];
                 foreach ($request->participants as $i => $participant_id) {
                     IncidentsMeetingParticipants::create([
                         'meeting_id' => $meeting->id,
                         'participant_id' => $participant_id,
                         'participant_role' => $request->roles[$i] ?? null,
                     ]);
+
+                    if (in_array($participant_id, $notifiedParticipantIds, true)) {
+                        continue;
+                    }
+                    $notifiedParticipantIds[] = $participant_id;
 
                     $msg = "Meeting Scheduled: {$request->meeting_subject}\n📅 {$request->meeting_date}\n⏰ {$request->meeting_time}\n📍 {$request->location}";
                     event(new ResortNotificationEvent(Common::nofitication(

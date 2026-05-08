@@ -182,7 +182,10 @@ class NotificationController extends Controller
 
             // Save associated resorts
             $notification->resorts()->sync($request->resorts);
-            event(new ResortNotificationEvent(  Common::nofitication($request->input('resorts'),1)));
+            // Pass the just-created admin notification id as $Msgid so
+            // Common::nofitication can fan it out into resort_notifications
+            // (per-user persistent rows) on top of the live broadcast.
+            event(new ResortNotificationEvent(Common::nofitication($request->input('resorts'), 1, $notification->id)));
 
             $response['success'] = true;
             $response['msg'] = __('messages.addSuccess', ['name' => 'Notification']);
@@ -259,7 +262,9 @@ class NotificationController extends Controller
 
                     $notification->resorts()->sync($request->input('resorts'));
 
-            event(new ResortNotificationEvent( Common::nofitication($request->input('resorts'),1)));
+            // Same idea as store(): pass the notification id so the helper
+            // can identify which admin row to fan out.
+            event(new ResortNotificationEvent(Common::nofitication($request->input('resorts'), 1, $notification->id)));
 
             $response['success'] = true;
             $response['msg'] = __('messages.updateSuccess', ['name' => 'Notification']);

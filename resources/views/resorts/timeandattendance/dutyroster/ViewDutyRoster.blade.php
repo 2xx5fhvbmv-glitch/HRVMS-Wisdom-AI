@@ -23,6 +23,28 @@
             <div class="card">
                     <div class="appendData">
                             <div class="monthly-main">
+                                {{-- Week selector: pages the 31-column table by week so it
+                                     fits the screen without horizontal scroll. --}}
+                                @php
+                                    $monthLabel = !empty($startOfMonth) ? \Carbon\Carbon::parse($startOfMonth)->format('F Y') : '';
+                                    $todayDayOfMonth = (int) date('d');
+                                    $isCurrentMonth = !empty($startOfMonth) && \Carbon\Carbon::parse($startOfMonth)->isSameMonth(\Carbon\Carbon::now());
+                                    $defaultWeek = $isCurrentMonth ? (int) ceil($todayDayOfMonth / 7) : 1;
+                                @endphp
+                                <div class="duty-roster-week-toolbar d-flex flex-wrap align-items-center gap-2 mb-3 px-2 pt-2">
+                                    <strong class="me-2">{{ $monthLabel }}</strong>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Week selector">
+                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="1">Week 1<br><small class="text-muted">1–7</small></button>
+                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="2">Week 2<br><small class="text-muted">8–14</small></button>
+                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="3">Week 3<br><small class="text-muted">15–21</small></button>
+                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="4">Week 4<br><small class="text-muted">22–28</small></button>
+                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="5">Week 5<br><small class="text-muted">29–31</small></button>
+                                        <button type="button" class="btn btn-outline-secondary roster-week-btn" data-roster-week="all">Full Month</button>
+                                    </div>
+                                    @if($isCurrentMonth)
+                                        <button type="button" class="btn btn-sm btn-link ms-auto roster-week-btn" data-roster-week="{{ $defaultWeek }}">Jump to current week</button>
+                                    @endif
+                                </div>
                                 {{-- Accordion Structure for Department and Section --}}
                                 <div class="viewBudget-accordion" id="accordionDutyRoster">
                                     @if(!empty($groupedRosterData))
@@ -48,6 +70,10 @@
                                                         {{-- Sections under Department --}}
                                                         @if(!empty($deptData['sections']))
                                                             @foreach($deptData['sections'] as $sectionId => $sectionData)
+                                                                {{-- Skip sections that have no employees so we don't render
+                                                                     a duplicate empty "No Records Found" table next to the
+                                                                     dept-direct employees table. --}}
+                                                                @continue(empty($sectionData['employees']))
                                                                 {{-- Level 2: Section --}}
                                                                 <div class="accordion mb-2 ms-3 section-accordion" id="accordionSec{{ $deptIteration }}_{{ $sectionIteration }}">
                                                                     <div class="accordion-item">
@@ -76,8 +102,9 @@
                                                                                                         @php
                                                                                                             $currentDate = isset($h['date']) ? $h['date'] : date('Y-m-d', strtotime($h['day']));
                                                                                                             $isPublicHoliday = isset($publicHolidays) && in_array($currentDate, $publicHolidays);
+                                                                                                            $weekNum = (int) ceil(((int) date('d', strtotime($currentDate))) / 7);
                                                                                                         @endphp
-                                                                                                        <th class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span></th>
+                                                                                                        <th data-week="{{ $weekNum }}" class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span></th>
                                                                                                     @endforeach
                                                                                                 @endif
                                                                                                 <th>Summary</th>
@@ -160,7 +187,7 @@
                                                                                                             }
                                                                                                         @endphp
 
-                                                                                                            <td class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                                            <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
                                                                                                                 @if($employeeLeave)
                                                                                                                     {{-- Display Leave --}}
                                                                                                                     <div class="createDuty-tableBlock" style="border-color: {{ $employeeLeave->color ?? '#ccc' }}; border-width: 2px;">
@@ -295,8 +322,9 @@
                                                                                     @php
                                                                                         $currentDate = isset($h['date']) ? $h['date'] : date('Y-m-d', strtotime($h['day']));
                                                                                         $isPublicHoliday = isset($publicHolidays) && in_array($currentDate, $publicHolidays);
+                                                                                        $weekNum = (int) ceil(((int) date('d', strtotime($currentDate))) / 7);
                                                                                     @endphp
-                                                                                    <th class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span></th>
+                                                                                    <th data-week="{{ $weekNum }}" class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span></th>
                                                                                 @endforeach
                                                                             @endif
                                                                             <th>Summary</th>
@@ -378,7 +406,7 @@
                                                                                     }
                                                                                 @endphp
 
-                                                                                    <td class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                    <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
                                                                                         @if($employeeLeave)
                                                                                             {{-- Display Leave --}}
                                                                                             <div class="createDuty-tableBlock" style="border-color: {{ $employeeLeave->color ?? '#ccc' }}; border-width: 2px;">
@@ -674,6 +702,18 @@
     .flatpickr-current-month .flatpickr-monthDropdown-months .flatpickr-monthDropdown-month {
         background: white;
     }
+
+    /* Week pager: hide cells not in the active week. The body gets a
+       data-active-week attribute (1-5 or "all"); CSS does the filtering
+       so we don't have to touch every <td>/<th> in JS. */
+    body[data-active-week="1"] [data-week]:not([data-week="1"]) { display: none !important; }
+    body[data-active-week="2"] [data-week]:not([data-week="2"]) { display: none !important; }
+    body[data-active-week="3"] [data-week]:not([data-week="3"]) { display: none !important; }
+    body[data-active-week="4"] [data-week]:not([data-week="4"]) { display: none !important; }
+    body[data-active-week="5"] [data-week]:not([data-week="5"]) { display: none !important; }
+    .roster-week-btn.active { background-color: #0d6efd; color: #fff; }
+    .duty-roster-week-toolbar .btn-group .btn { padding-top: 4px; padding-bottom: 4px; line-height: 1.1; }
+    .duty-roster-week-toolbar .btn-group .btn small { font-size: 10px; }
 </style>
 @endsection
 
@@ -682,6 +722,28 @@
 <script type="text/javascript">
     // new DataTable('#example');
 
+    // Week pager: pages the 31-column duty-roster table by week so it
+    // fits the viewport without horizontal scroll.
+    (function () {
+        function setActiveWeek(week) {
+            document.body.setAttribute('data-active-week', String(week));
+            document.querySelectorAll('.roster-week-btn').forEach(function (btn) {
+                btn.classList.toggle('active', btn.getAttribute('data-roster-week') === String(week));
+            });
+            try { localStorage.setItem('dutyRosterActiveWeek', String(week)); } catch (e) {}
+        }
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.roster-week-btn');
+            if (!btn) return;
+            e.preventDefault();
+            setActiveWeek(btn.getAttribute('data-roster-week'));
+        });
+        // Default: stored selection, else current week of the displayed month, else 1.
+        var stored = null;
+        try { stored = localStorage.getItem('dutyRosterActiveWeek'); } catch (e) {}
+        var defaultWeek = stored || @json((string) $defaultWeek);
+        setActiveWeek(defaultWeek);
+    })();
 
 
     // tooltip

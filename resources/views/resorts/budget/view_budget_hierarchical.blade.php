@@ -129,14 +129,27 @@
                                                         </h2>
                                                     </div>
                                                     <div class="col-md-3 text-end pe-2">
+                                                        @php
+                                                            $isBudgetLocked = isset($approvedBudgetIdsLookup) && isset($approvedBudgetIdsLookup[$manningResponse->id]);
+                                                        @endphp
                                                         @if($available_rank == 'HR')
-                                                        <a href="#revise-budgetmodal"
-                                                           data-dept_id="{{ $department->id }}"
-                                                           data-Budget_id="{{ $manningResponse->id }}"
-                                                           class="btn btn-xs btn-themeBlue ms-2 revisebudgetmodal"
-                                                           data-bs-toggle="modal">
-                                                            Revise Budget
-                                                        </a>
+                                                            @if($isBudgetLocked)
+                                                                {{-- GM has approved this budget — Revise is locked. --}}
+                                                                <button type="button"
+                                                                    class="btn btn-xs btn-secondary ms-2"
+                                                                    disabled
+                                                                    title="GM has approved this budget — revisions are locked.">
+                                                                    Revise Budget
+                                                                </button>
+                                                            @else
+                                                                <a href="#revise-budgetmodal"
+                                                                   data-dept_id="{{ $department->id }}"
+                                                                   data-Budget_id="{{ $manningResponse->id }}"
+                                                                   class="btn btn-xs btn-themeBlue ms-2 revisebudgetmodal"
+                                                                   data-bs-toggle="modal">
+                                                                    Revise Budget
+                                                                </a>
+                                                            @endif
                                                         @endif
                                                     </div>
                                                 </div>
@@ -224,6 +237,15 @@
         $mvrToDollarRate = $resortSettings->MVRtoDoller ?? 0.065;
     @endphp
     window.mvrToDollarRate = {{ $mvrToDollarRate }};
+
+// Format a budget number with thousands separator + 2 decimal places.
+// Used for every Budget badge so 18720.00 → "18,720.00" (matches the
+// payroll module's formatAmount() helper). Tolerates strings/null.
+window.formatBudget = function (n) {
+    var num = parseFloat(n);
+    if (!isFinite(num)) num = 0;
+    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 $(document).ready(function() {
     const resortId = {{ $resortId }};
@@ -407,6 +429,13 @@ $(document).ready(function() {
                             window.budgetTotals.positions[positionId].divisionIndex = divisionIndex;
                             window.budgetTotals.positions[positionId].sectionId = sectionId;
 
+                            // Roll up dept/division badges from stored
+                            // positions data (NOT from DOM) so badges update
+                            // even before the user expands a department.
+                            // updateSectionDepartmentDivisionBadges() walks
+                            // the DOM and would skip unexpanded departments.
+                            try { updateDepartmentDivisionBadgesFromStored(); } catch (e) { /* badges may not be rendered yet */ }
+
                             resolve();
                         });
                     } else {
@@ -546,8 +575,8 @@ $(document).ready(function() {
             const sectionId = positionData.sectionId;
 
             // Update position badges if in DOM
-            $(`.position-accordion[data-position-id="${positionId}"]`).find('.positionGrandTotal').text('Budget: $ ' + total.toFixed(2));
-            $(`.accordion-body[data-position-id="${positionId}"]`).closest('.position-accordion').find('.positionGrandTotal').text('Budget: $ ' + total.toFixed(2));
+            $(`.position-accordion[data-position-id="${positionId}"]`).find('.positionGrandTotal').text('Budget: $ ' + window.formatBudget(total));
+            $(`.accordion-body[data-position-id="${positionId}"]`).closest('.position-accordion').find('.positionGrandTotal').text('Budget: $ ' + window.formatBudget(total));
 
             // Add to section total if position is in a section
             if (sectionId) {
@@ -627,7 +656,7 @@ $(document).ready(function() {
         // Step 4: Update department badges from stored totals
         Object.keys(window.budgetTotals.departments).forEach(deptId => {
             const deptTotal = window.budgetTotals.departments[deptId];
-            $(`[data-department-id="${deptId}"]`).closest('.department-accordion').find('.departmentGrandTotal').text('Budget: $ ' + deptTotal.toFixed(2));
+            $(`[data-department-id="${deptId}"]`).closest('.department-accordion').find('.departmentGrandTotal').text('Budget: $ ' + window.formatBudget(deptTotal));
         });
 
         // Step 5: Calculate and update division totals
@@ -642,13 +671,52 @@ $(document).ready(function() {
                 }
             });
 
-            $division.find('.divisionGrandTotal').text('Budget: $ ' + divisionTotal.toFixed(2));
+            $division.find('.divisionGrandTotal').text('Budget: $ ' + window.formatBudget(divisionTotal));
         });
 
         // Update section, department, and division badges by calculating from DOM (for when they're rendered)
         updateSectionDepartmentDivisionBadges();
 
         console.log('All badges updated.');
+    }
+
+    // Update department + division badges using stored positions data
+    // (window.budgetTotals.positions[*].departmentId / divisionIndex).
+    // Does NOT walk the DOM, so it works for unexpanded departments where
+    // .section-accordion / .position-accordion don't yet exist.
+    function updateDepartmentDivisionBadgesFromStored() {
+        const deptTotals = {};
+        Object.keys(window.budgetTotals.positions).forEach(positionId => {
+            const p = window.budgetTotals.positions[positionId];
+            if (!p || !p.departmentId) return;
+            const t = parseFloat(p.total || 0);
+            deptTotals[p.departmentId] = (deptTotals[p.departmentId] || 0) + t;
+        });
+
+        // Update each department badge
+        Object.keys(deptTotals).forEach(deptId => {
+            const total = deptTotals[deptId];
+            window.budgetTotals.departments[deptId] = total;
+            $(`.accordion-body[data-department-id="${deptId}"]`)
+                .closest('.department-accordion')
+                .find('.departmentGrandTotal')
+                .first()
+                .text('Budget: $ ' + window.formatBudget(total));
+        });
+
+        // Update each division badge by summing its child departments
+        $('.division-accordion').each(function() {
+            const $division = $(this);
+            let divisionTotal = 0;
+            $division.find('[data-department-id]').each(function() {
+                const deptId = $(this).data('department-id');
+                if (deptId && deptTotals[deptId]) {
+                    divisionTotal += deptTotals[deptId];
+                }
+            });
+            $division.find('.divisionGrandTotal').first()
+                .text('Budget: $ ' + window.formatBudget(divisionTotal));
+        });
     }
 
     // Update section, department, and division badges from position totals
@@ -665,7 +733,7 @@ $(document).ready(function() {
                 }
             });
 
-            $section.find('.sectionGrandTotal').text('Budget: $ ' + sectionTotal.toFixed(2));
+            $section.find('.sectionGrandTotal').text('Budget: $ ' + window.formatBudget(sectionTotal));
             window.budgetTotals.sections[$section.attr('id')] = sectionTotal;
         });
 
@@ -692,9 +760,18 @@ $(document).ready(function() {
                 }
             });
 
-            $dept.find('.departmentGrandTotal').text('Budget: $ ' + deptTotal.toFixed(2));
+            // Fallback: if DOM walk yielded 0 (department not yet expanded
+            // → no .section-accordion / .position-accordion in DOM), use the
+            // stored department total computed from positions data so we
+            // don't overwrite a previously-correct badge with $0.00.
+            const deptId = $dept.find('[data-department-id]').first().data('department-id')
+                || $dept.closest('[data-department-id]').data('department-id');
+            if (deptTotal === 0 && deptId && window.budgetTotals.departments[deptId]) {
+                deptTotal = window.budgetTotals.departments[deptId];
+            }
 
-            const deptId = $dept.closest('[data-department-id]').data('department-id');
+            $dept.find('.departmentGrandTotal').first().text('Budget: $ ' + window.formatBudget(deptTotal));
+
             if (deptId) {
                 window.budgetTotals.departments[deptId] = deptTotal;
             }
@@ -707,7 +784,8 @@ $(document).ready(function() {
 
             $division.find('.department-accordion').each(function() {
                 const $dept = $(this);
-                const deptId = $dept.closest('[data-department-id]').data('department-id');
+                const deptId = $dept.find('[data-department-id]').first().data('department-id')
+                    || $dept.closest('[data-department-id]').data('department-id');
                 if (deptId && window.budgetTotals.departments[deptId]) {
                     divisionTotal += window.budgetTotals.departments[deptId];
                 } else {
@@ -723,7 +801,7 @@ $(document).ready(function() {
                 }
             });
 
-            $division.find('.divisionGrandTotal').text('Budget: $ ' + divisionTotal.toFixed(2));
+            $division.find('.divisionGrandTotal').first().text('Budget: $ ' + window.formatBudget(divisionTotal));
         });
     }
 
@@ -738,7 +816,7 @@ $(document).ready(function() {
             if (positionId) {
                 const positionTotal = calculatePositionTotal($position);
                 if (positionTotal > 0 || positionTotal === 0) {
-                    $position.find('.positionGrandTotal').text('Budget: $ ' + positionTotal.toFixed(2));
+                    $position.find('.positionGrandTotal').text('Budget: $ ' + window.formatBudget(positionTotal));
                 }
             }
         });
@@ -746,19 +824,19 @@ $(document).ready(function() {
         // Recalculate section totals
         $('.section-accordion').each(function() {
             const sectionTotal = calculateSectionTotal($(this));
-            $(this).find('.sectionGrandTotal').text('Budget: $ ' + sectionTotal.toFixed(2));
+            $(this).find('.sectionGrandTotal').text('Budget: $ ' + window.formatBudget(sectionTotal));
         });
 
         // Recalculate department totals
         $('.department-accordion').each(function() {
             const deptTotal = calculateDepartmentTotal($(this));
-            $(this).find('.departmentGrandTotal').text('Budget: $ ' + deptTotal.toFixed(2));
+            $(this).find('.departmentGrandTotal').text('Budget: $ ' + window.formatBudget(deptTotal));
         });
 
         // Recalculate division totals
         $('.division-accordion').each(function() {
             const divisionTotal = calculateDivisionTotal($(this));
-            $(this).find('.divisionGrandTotal').text('Budget: $ ' + divisionTotal.toFixed(2));
+            $(this).find('.divisionGrandTotal').text('Budget: $ ' + window.formatBudget(divisionTotal));
         });
 
         console.log('All totals recalculated.');
@@ -922,6 +1000,9 @@ $(document).ready(function() {
                     // Update badges from stored totals if available
                     setTimeout(() => {
                         updateBadgesFromStoredTotals($container);
+                        // Bubble up to department + division badges using
+                        // already-loaded window.budgetTotals.positions data
+                        updateSectionDepartmentDivisionBadges();
                     }, 100);
                 } else {
                     $container.html('<p class="text-danger">' + response.message + '</p>');
@@ -941,7 +1022,7 @@ $(document).ready(function() {
             const positionId = $(this).data('position-id');
             if (positionId && window.budgetTotals && window.budgetTotals.positions && window.budgetTotals.positions[positionId] && window.budgetTotals.positions[positionId].total) {
                 const total = window.budgetTotals.positions[positionId].total;
-                $(this).find('.positionGrandTotal').text('Budget: $ ' + parseFloat(total).toFixed(2));
+                $(this).find('.positionGrandTotal').text('Budget: $ ' + window.formatBudget(total));
             }
         });
 
@@ -955,10 +1036,34 @@ $(document).ready(function() {
                     sectionTotal += parseFloat(window.budgetTotals.positions[positionId].total);
                 }
             });
-            if (sectionTotal > 0) {
-                $section.find('.sectionGrandTotal').text('Budget: $ ' + sectionTotal.toFixed(2));
-            }
+            $section.find('.sectionGrandTotal').text('Budget: $ ' + window.formatBudget(sectionTotal));
+            window.budgetTotals.sections[$section.attr('id')] = sectionTotal;
         });
+
+        // Update the parent department badge for this container
+        const $dept = $container.closest('.department-accordion');
+        if ($dept.length) {
+            let deptTotal = 0;
+            $dept.find('.section-accordion').each(function() {
+                const sectionId = $(this).attr('id');
+                if (window.budgetTotals.sections[sectionId]) {
+                    deptTotal += window.budgetTotals.sections[sectionId];
+                }
+            });
+            $dept.find('.position-accordion').each(function() {
+                if ($(this).closest('.section-accordion').length === 0) {
+                    const positionId = $(this).data('position-id');
+                    if (positionId && window.budgetTotals.positions[positionId]) {
+                        deptTotal += parseFloat(window.budgetTotals.positions[positionId].total || 0);
+                    }
+                }
+            });
+            $dept.find('.departmentGrandTotal').first().text('Budget: $ ' + window.formatBudget(deptTotal));
+            const deptId = $dept.closest('[data-department-id]').data('department-id') || $container.data('department-id');
+            if (deptId) {
+                window.budgetTotals.departments[deptId] = deptTotal;
+            }
+        }
     }
 
     function createPositionHtml(position, divisionIteration, deptIteration, sectionIteration, positionIteration) {
@@ -966,7 +1071,7 @@ $(document).ready(function() {
         // Check if we have stored total for this position
         let badgeText = 'Budget: {{ Common::GetResortCurrencySymbol() }} 0.00';
         if (window.budgetTotals && window.budgetTotals.positions && window.budgetTotals.positions[position.id] && window.budgetTotals.positions[position.id].total) {
-            badgeText = 'Budget: $ ' + parseFloat(window.budgetTotals.positions[position.id].total).toFixed(2);
+            badgeText = 'Budget: $ ' + window.formatBudget(window.budgetTotals.positions[position.id].total);
         }
         return `
             <div class="accordion mb-2 ms-3 position-accordion" id="accordion${accordionId}" data-position-id="${position.id}">
@@ -2228,7 +2333,7 @@ $(document).ready(function() {
             // Update position badge
             const $positionBadge = $positionAccordion.find('.positionGrandTotal');
             if ($positionBadge.length) {
-                $positionBadge.text('Budget: $ ' + positionTotal.toFixed(2));
+                $positionBadge.text('Budget: $ ' + window.formatBudget(positionTotal));
                 console.log('Updated position badge to:', positionTotal);
             }
 
@@ -2241,7 +2346,7 @@ $(document).ready(function() {
 
                 const $sectionBadge = $sectionAccordion.find('.sectionGrandTotal');
                 if ($sectionBadge.length) {
-                    $sectionBadge.text('Budget: $ ' + sectionTotal.toFixed(2));
+                    $sectionBadge.text('Budget: $ ' + window.formatBudget(sectionTotal));
                     console.log('Updated section badge to:', sectionTotal);
                 }
             }
@@ -2255,7 +2360,7 @@ $(document).ready(function() {
 
                 const $deptBadge = $deptAccordion.find('.departmentGrandTotal');
                 if ($deptBadge.length) {
-                    $deptBadge.text('Budget: $ ' + deptTotal.toFixed(2));
+                    $deptBadge.text('Budget: $ ' + window.formatBudget(deptTotal));
                     console.log('Updated department badge to:', deptTotal);
                 }
             }
@@ -2269,7 +2374,7 @@ $(document).ready(function() {
 
                 const $divisionBadge = $divisionAccordion.find('.divisionGrandTotal');
                 if ($divisionBadge.length) {
-                    $divisionBadge.text('Budget: $ ' + divisionTotal.toFixed(2));
+                    $divisionBadge.text('Budget: $ ' + window.formatBudget(divisionTotal));
                     console.log('Updated division badge to:', divisionTotal);
                 }
             }

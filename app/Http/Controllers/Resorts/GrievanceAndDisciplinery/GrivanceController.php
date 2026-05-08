@@ -202,14 +202,17 @@ class GrivanceController extends Controller
                 else if($row->Anonymous =="No")
                 {
                     $Grivance_Submission_Type =  "No";
-                } 
+                }
                 else
                 {
                     $Grivance_Submission_Type =  "NotApplicable";
                 }
                 return $Grivance_Submission_Type;
             })
-            ->rawColumns(['Grivance_id','Category_Name','Employee_Name','Confidentiality','Status','Action'])
+            ->addColumn('CreatedAt', function ($row) {
+                return $row->created_at ? $row->created_at->format('d M Y') : '—';
+            })
+            ->rawColumns(['Grivance_id','Category_Name','Employee_Name','Confidentiality','Status','CreatedAt','Action'])
             ->make(true);
         }
         return view('resorts.GrievanceAndDisciplinery.grivance.index',compact('page_title'));

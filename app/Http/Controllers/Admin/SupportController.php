@@ -52,7 +52,7 @@ class SupportController extends Controller
     
         $supports = $query->get();
 
-        // Unread message counts per support_id, scoped to the logged-in
+        // Unread chat message counts per support_id, scoped to the logged-in
         // admin. Powers the badge on the Chat button so admins can see
         // tickets with new replies at a glance.
         $unreadByTicket = SupportChatMessage::whereIn('support_id', $supports->pluck('id'))
@@ -62,6 +62,16 @@ class SupportController extends Controller
             ->select('support_id', DB::raw('COUNT(*) as cnt'))
             ->groupBy('support_id')
             ->pluck('cnt', 'support_id');
+
+        // Unread EMAIL-REPLY counts per ticket — every resort-side reply
+        // until an admin opens the ticket. Drives the badge on the
+        // Email Reply button + the aggregate count on the sidebar nav.
+        $unreadEmailByTicket = SupportMessages::whereIn('ticket_id', $supports->pluck('id'))
+            ->where('sender', 'employee')
+            ->where('is_read', 0)
+            ->select('ticket_id', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('ticket_id')
+            ->pluck('cnt', 'ticket_id');
 
         // Get unique resort IDs from the support tickets
         $resortIds = $supports->pluck('resort_id')->unique();
@@ -117,7 +127,7 @@ class SupportController extends Controller
                 $class = $statusClasses[$support->status] ?? 'badge-secondary';
                 return '<span class="badge ' . $class . '">' . $support->status . '</span>';
             })
-            ->addColumn('action', function ($support) use ($loginAdmin, $type, $resorts, $currentDay, $currentTime, $unreadByTicket) {
+            ->addColumn('action', function ($support) use ($loginAdmin, $type, $resorts, $currentDay, $currentTime, $unreadByTicket, $unreadEmailByTicket) {
                 $resort = $resorts[$support->resort_id] ?? null;
                 if (!$resort) return '-';
             
@@ -184,12 +194,16 @@ class SupportController extends Controller
                                     </a>';
 
                     if (!empty($support->createdBy->email)) {
+                        $unreadEmailCount = (int) ($unreadEmailByTicket[$support->id] ?? 0);
+                        $unreadEmailBadge = $unreadEmailCount > 0
+                            ? ' <span class="badge badge-danger" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;margin-left:4px;">' . ($unreadEmailCount > 99 ? '99+' : $unreadEmailCount) . '</span>'
+                            : '';
                         $emailReplyButton = '<button title="Reply via Email" class="btn btn-warning btn-sm mx-1 reply-email"
                             data-toggle="modal" data-target="#replyModal"
                             data-subject="' . htmlspecialchars($support->subject, ENT_QUOTES) . '"
                             data-reply-to="' . htmlspecialchars($support->createdBy->email, ENT_QUOTES) . '"
                             data-id="' . $support->id . '">
-                            <i class="fas fa-envelope"></i> Email Reply
+                            <i class="fas fa-envelope"></i> Email Reply' . $unreadEmailBadge . '
                         </button>';
                     }
 
@@ -251,9 +265,16 @@ class SupportController extends Controller
 
     public function view($id)
     {
-        $support = Support::with(['support_category', 'createdBy','assignedAdmin'])->findOrFail(base64_decode($id));
-        $supportEmails = SupportMessages::where('ticket_id',base64_decode($id))->get();
-        
+        $ticketId = base64_decode($id);
+        $support = Support::with(['support_category', 'createdBy','assignedAdmin'])->findOrFail($ticketId);
+        // Admin opened the ticket → mark every employee-sent reply as read
+        // so the unread badge on the action button (and sidebar nav) clears.
+        SupportMessages::where('ticket_id', $ticketId)
+            ->where('sender', 'employee')
+            ->where('is_read', 0)
+            ->update(['is_read' => 1]);
+        $supportEmails = SupportMessages::where('ticket_id', $ticketId)->get();
+
         return view('admin.support.view', compact('support','supportEmails'));
     }
 
@@ -307,6 +328,8 @@ class SupportController extends Controller
             'attachments' => count($uploadedFiles) > 0 ? json_encode($uploadedFiles) : null,
             'sender' => 'admin',
             'sender_id' => Auth::guard('admin')->user()->id,
+            // Stays unread until the resort user opens the email-reply page.
+            'is_read' => 0,
         ]);
 
         // Determine recipient (To field)

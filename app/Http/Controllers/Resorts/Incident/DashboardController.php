@@ -29,54 +29,15 @@ class DashboardController extends Controller
     }
 
     /**
-     * Apply the same role-based visibility filter that IncidentController@list
-     * uses, so dashboard tile counts match what the user can actually open.
-     *
-     *  - HR (rank "HR")  → no extra filter (sees all).
-     *  - GM (rank "GM")  → only approved incidents (approval = 1).
-     *  - Everyone else   → only incidents assigned to one of their committees
-     *                      or reported by someone in their own department.
+     * Thin wrapper around the centralised Common::scopeIncidentsForViewer
+     * helper so existing call sites in this controller keep working. The
+     * helper applies the same role-based visibility rules used by every
+     * other incident endpoint (committee membership + reporter dept), so
+     * department data can no longer leak across dashboards.
      */
     private function scopeForCurrentViewer($query)
     {
-        $resort_id = $this->resort->resort_id;
-        $loggedInEmployee = $this->resort->getEmployee ?? $this->resort->GetEmployee ?? null;
-        $query->where('resort_id', $resort_id);
-
-        if (!$loggedInEmployee) {
-            // No employee record — treat as "no visibility" rather than leaking.
-            return $query->whereRaw('0=1');
-        }
-
-        $rankMap = config('settings.Position_Rank');
-        $current_rank = $loggedInEmployee->rank ?? null;
-        $available_rank = $rankMap[$current_rank] ?? '';
-        $isHR = ($available_rank === 'HR');
-        $isGM = ($available_rank === 'GM');
-
-        if ($isHR) return $query;
-
-        if ($isGM) return $query->where('approval', 1);
-
-        $userCommittees = \App\Models\IncidentCommitteeMember::where('member_id', $loggedInEmployee->id)
-            ->pluck('commitee_id')
-            ->toArray();
-        $departmentId = $loggedInEmployee->Dept_id ?? null;
-
-        return $query->where(function ($q) use ($userCommittees, $departmentId) {
-            if (!empty($userCommittees)) {
-                $q->orWhere(function ($subQ) use ($userCommittees) {
-                    foreach ($userCommittees as $committeeId) {
-                        $subQ->orWhereRaw("JSON_CONTAINS(assigned_to, ?)", [json_encode((string)$committeeId)]);
-                    }
-                });
-            }
-            if ($departmentId) {
-                $q->orWhereHas('reporter', function ($subQ) use ($departmentId) {
-                    $subQ->where('Dept_id', $departmentId);
-                });
-            }
-        });
+        return Common::scopeIncidentsForViewer($query);
     }
 
     public function HR_Dashobard()
@@ -105,15 +66,19 @@ class DashboardController extends Controller
                 ->value('avg_days')
             : 0;
         // dd($averageResolutionDays);
+        // Committee summary: limit each committee's incident roll-up to the
+        // viewer's visibility set (`$visibleIncidentIds`) so cross-department
+        // incidents don't leak through committee assignments.
         $committees = IncidentCommittee::where('resort_id', $resort_id)->get();
 
         $committeeSummary = [];
-    
+
         foreach ($committees as $committee) {
             $incidents = Incidents::whereJsonContains('assigned_to', (string) $committee->id)
                 ->where('resort_id', $resort_id)
+                ->whereIn('id', $visibleIncidentIds ?: [0])
                 ->get();
-    
+
             $statusCounts = $incidents->groupBy('status')->map->count();
             $totalOpen = $incidents->whereNotIn('status', ['Resolved', 'Reported'])->count();
     
@@ -168,17 +133,26 @@ class DashboardController extends Controller
 
     public function getDepartmentWiseParticipation()
     {
+        // Restrict the chart's incident set to what the viewer is allowed
+        // to see — without this a HOD could see participation from incidents
+        // reported by other departments.
+        $visibleIncidentIds = Common::scopeIncidentsForViewer(Incidents::query())->pluck('id')->all();
+        if (empty($visibleIncidentIds)) {
+            return response()->json(['labels' => [], 'datasets' => []]);
+        }
+
         $data = DB::table('incidents_investigation_meetings as meetings')
             ->join('incidents as i','i.id','=','meetings.incident_id')
             ->join('incidents_investigation_meetings_participants as participants', 'meetings.id', '=', 'participants.meeting_id')
             ->join('employees', 'participants.participant_id', '=', 'employees.id')
-            ->join('resort_departments', 'employees.Dept_id', '=', 'resort_departments.id') // adjust if your schema is different
+            ->join('resort_departments', 'employees.Dept_id', '=', 'resort_departments.id')
             ->select(
                 DB::raw("DATE_FORMAT(meetings.meeting_date, '%b %Y') as month"),
                 'resort_departments.name as department',
                 DB::raw('COUNT(participants.id) as participation_count')
             )
             ->where('i.resort_id',$this->resort->resort_id)
+            ->whereIn('i.id', $visibleIncidentIds)
             ->groupBy('month', 'department')
             ->orderBy(DB::raw("STR_TO_DATE(month, '%b %Y')"))
             ->get();
@@ -234,12 +208,18 @@ class DashboardController extends Controller
             $months[Carbon::createFromDate($year, $i, 1)->format('M Y')] = 0;
         }
     
-        $incidentCounts = DB::table('incidents')
-            ->select(DB::raw("DATE_FORMAT(incident_date, '%b %Y') as month"), DB::raw('COUNT(*) as total'))
-            ->whereBetween('incident_date', [$start, $end])
-            ->where('incidents.resort_id', $this->resort->resort_id)
-            ->groupBy('month')
-            ->get();
+        // Same viewer scope as the dashboard tiles so the trend chart
+        // matches the counts and doesn't expose other-dept incidents.
+        $visibleIncidentIds = Common::scopeIncidentsForViewer(Incidents::query())->pluck('id')->all();
+        $incidentCounts = empty($visibleIncidentIds)
+            ? collect()
+            : DB::table('incidents')
+                ->select(DB::raw("DATE_FORMAT(incident_date, '%b %Y') as month"), DB::raw('COUNT(*) as total'))
+                ->whereBetween('incident_date', [$start, $end])
+                ->where('incidents.resort_id', $this->resort->resort_id)
+                ->whereIn('incidents.id', $visibleIncidentIds)
+                ->groupBy('month')
+                ->get();
     
         foreach ($incidentCounts as $row) {
             $months[$row->month] = $row->total;

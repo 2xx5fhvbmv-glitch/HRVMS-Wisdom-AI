@@ -107,8 +107,27 @@ class BudgetController extends Controller
         // which made the page sit on a "loading…" spinner for 30–60 s+).
         $departmentIds = $departments->pluck('id')->all();
 
+        // Restrict pmd join to ONLY this year's manning_responses. Without
+        // this, MAX(pmd.vacantcount/headcount) below aggregates across pmd
+        // rows for every year the position has ever existed in — so a
+        // position with vacantcount=10 in 2025 and 2 in 2027 returns 10
+        // when viewing year=2027.
+        $manningResponseIdsForYear = ManningResponse::where('year', $year)
+            ->where('resort_id', $resortId)
+            ->whereIn('dept_id', $departmentIds)
+            ->pluck('id')
+            ->all();
+
         $allPositionsRaw = DB::table('resort_positions as p')
-            ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
+            ->leftJoin('position_monthly_data as pmd', function ($join) use ($manningResponseIdsForYear) {
+                $join->on('p.id', '=', 'pmd.position_id');
+                if (!empty($manningResponseIdsForYear)) {
+                    $join->whereIn('pmd.manning_response_id', $manningResponseIdsForYear);
+                } else {
+                    // No manning_responses for this year → pmd contributes nothing
+                    $join->whereRaw('1 = 0');
+                }
+            })
             ->leftJoin('manning_responses as mr', function ($join) use ($year, $resortId) {
                 $join->on('pmd.manning_response_id', '=', 'mr.id')
                     ->where('mr.year', '=', $year)
@@ -370,11 +389,6 @@ class BudgetController extends Controller
                 'employeeRankPosition',
                 'isBudgetCompleted'
             ));
-
-       try {  } catch (\Exception $e) {
-            \Log::emergency("File: " . $e->getFile(). " | Line: " . $e->getLine() . " | Message: " . $e->getMessage());
-            return back()->with('error', 'An error occurred while fetching budget data.');
-        }
     }
 
     public function CompareBudget($deptID, $budgetId)
@@ -461,11 +475,6 @@ class BudgetController extends Controller
                 }
             }
             return view('resorts.budget.compare',compact('page_title','vacant_positions','available_rank'));
-        try {} catch( \Exception $e ) {
-            \Log::emergency("File: ".$e->getFile());
-            \Log::emergency("Line: ".$e->getLine());
-            \Log::emergency("Message: ".$e->getMessage());
-        }
     }
 
     public function ViewBudget(Request $request)
@@ -585,7 +594,6 @@ class BudgetController extends Controller
                     DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
                 )
                 ->groupBy('p.id', 'p.position_title', 'mr.id')
-                ->havingRaw('COUNT(e.id) > 0')
                 ->get();
 
             if ($department->departmentPositions->isNotEmpty()) {
@@ -764,6 +772,29 @@ class BudgetController extends Controller
 
         $available_rank = $employeeRankPosition['position'];
 
+        // Build a Budget_id → is-locked map. Once GM has approved the budget
+        // (status='Approved' OR budget_process_status='Approved'/'Completed')
+        // the Revise Budget button must disable for that department, so HR
+        // can't reopen something the GM already signed off on.
+        $budgetIdsForYear = $departments->pluck('Budget_id')->filter()->unique()->all();
+        $approvedBudgetIds = empty($budgetIdsForYear)
+            ? collect()
+            : DB::table('budget_statuses')
+                ->whereIn('Budget_id', $budgetIdsForYear)
+                ->where('resort_id', $resortId)
+                ->whereIn('status', ['Approved', 'Completed'])
+                ->pluck('Budget_id')
+                ->unique();
+        // Also treat manning_responses.budget_process_status as authoritative
+        // (when Finance/GM marks it Approved, that flips this flag too).
+        $approvedByProcess = empty($budgetIdsForYear)
+            ? collect()
+            : ManningResponse::whereIn('id', $budgetIdsForYear)
+                ->whereIn('budget_process_status', ['Approved', 'Completed', 'GM_Approved'])
+                ->pluck('id');
+        $approvedBudgetIds = $approvedBudgetIds->merge($approvedByProcess)->unique()->values();
+        $approvedBudgetIdsLookup = $approvedBudgetIds->flip(); // O(1) `isset` checks
+
         // Get resort budget costs for the modal
         $resortCosts = ResortBudgetCost::where('resort_id', $resortId)
             ->where('status', 'active')
@@ -779,14 +810,9 @@ class BudgetController extends Controller
             'available_rank',
             'manningResponses',
             'departments',
-            'resortCosts'
+            'resortCosts',
+            'approvedBudgetIdsLookup'
         ));
-
-        try { } catch (\Exception $e) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
-            \Log::emergency("Message: " . $e->getMessage());
-        }
     }
 
     public function ConsolidateBudget()

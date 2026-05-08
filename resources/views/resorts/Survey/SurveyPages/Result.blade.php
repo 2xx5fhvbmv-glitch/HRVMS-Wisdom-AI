@@ -34,8 +34,8 @@
                                     if (($privacy ?? null) === 'Confidential') {
                                         $badgeClass = 'badge-info';
                                         $privacyNote = $showRespondentIdentity
-                                            ? 'Confidential — identities are visible to you because you are an authorised admin (HR / L&D / GM).'
-                                            : 'Confidential — respondent identities are hidden. Only authorised admins (HR / L&D / GM) can see who responded.';
+                                            ? 'Confidential — identities are visible to you because you are an authorised admin (HR / GM).'
+                                            : 'Confidential — respondent identities are hidden. Only authorised admins (HR / GM) can see who responded.';
                                     } elseif (($privacy ?? null) === 'Anonymous') {
                                         $badgeClass = 'badge-secondary';
                                         $privacyNote = 'Anonymous — respondent identities are hidden for everyone, including admins.';
