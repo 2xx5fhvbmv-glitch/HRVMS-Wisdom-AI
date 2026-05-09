@@ -43,7 +43,7 @@
                         </div>
                         <div class="col-auto">
                             <span class="date"><i class="fa-regular fa-calendar me-2"></i>
-                                {{ \Carbon\Carbon::parse($promotion->created_at)->format('d M Y - g:i a') }}
+                                {{ \Carbon\Carbon::flexible($promotion->created_at)->format('d M Y - g:i a') }}
                             </span>
                         </div>
                     </div>

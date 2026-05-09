@@ -41,7 +41,7 @@
                                             <span class="badge badge-themeSuccess">Read</span>
                                         @endif
                                     </td>
-                                    <td>{{ \Carbon\Carbon::parse($notif->created_at)->diffForHumans() }}</td>
+                                    <td>{{ \Carbon\Carbon::flexible($notif->created_at)->diffForHumans() }}</td>
                                 </tr>
                             @empty
                                 <tr>

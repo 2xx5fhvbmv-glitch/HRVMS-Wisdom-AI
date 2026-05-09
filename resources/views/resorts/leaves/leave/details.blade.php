@@ -103,7 +103,7 @@
                         {{-- Leave overview --}}
                         <div class="leave-overview-card rounded-3 p-4 mb-4">
                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-                                <span class="text-muted small">Applied on {{ \Carbon\Carbon::parse($leaveDetail->created_at)->format('d M, Y') }}</span>
+                                <span class="text-muted small">Applied on {{ \Carbon\Carbon::flexible($leaveDetail->created_at)->format('d M, Y') }}</span>
                             </div>
                             <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 py-2">
                                 <div class="leave-date-box text-center rounded-2 px-3 py-2">

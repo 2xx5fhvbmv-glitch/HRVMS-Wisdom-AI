@@ -92,4 +92,62 @@
 		});
 	}
 </script>
+
+@if( Auth::guard('admin')->check() )
+{{-- Live unread-counts poll: refreshes the Supports sidebar nav badge AND
+     the Chat / Email Reply badges per ticket every 10s without a reload.
+     Lightweight (just two indexed COUNTs); piggybacks on the already-loaded
+     jQuery from the admin layout. --}}
+<script>
+(function () {
+    if (typeof jQuery === 'undefined') return;
+    var endpoint = "{{ route('admin.supports.counts') }}";
+
+    function setBadge($el, count) {
+        if (!$el || !$el.length) return;
+        if (count > 0) {
+            $el.removeClass('d-none').text(count > 99 ? '99+' : count);
+        } else {
+            $el.addClass('d-none').text('0');
+        }
+    }
+
+    function poll() {
+        $.getJSON(endpoint).done(function (data) {
+            if (!data) return;
+            // Sidebar Supports nav badge
+            setBadge($('#js-supports-nav-badge'), parseInt(data.nav_total || 0, 10));
+
+            // Per-ticket badges in the Supports DataTable. The DataTable
+            // re-renders rows on each draw, so the elements may not exist
+            // on every page; that's fine — selectors return empty jQuery
+            // and we no-op.
+            var byTicket = data.by_ticket || {};
+            $('.js-chat-unread-badge').each(function () {
+                var $b = $(this);
+                var t = byTicket[$b.data('ticket-id')];
+                setBadge($b, t ? parseInt(t.chat || 0, 10) : 0);
+            });
+            $('.js-email-unread-badge').each(function () {
+                var $b = $(this);
+                var t = byTicket[$b.data('ticket-id')];
+                setBadge($b, t ? parseInt(t.email || 0, 10) : 0);
+            });
+        });
+    }
+
+    // Kick off after page load + every 10s thereafter.
+    $(function () {
+        poll();
+        setInterval(poll, 10000);
+
+        // After a DataTables redraw the per-ticket badges are fresh DOM
+        // nodes — make sure they show the latest counts immediately
+        // instead of waiting up to 10s for the next poll.
+        $(document).on('draw.dt', function () { poll(); });
+    });
+})();
+</script>
+@endif
+
 @yield('import-scripts')

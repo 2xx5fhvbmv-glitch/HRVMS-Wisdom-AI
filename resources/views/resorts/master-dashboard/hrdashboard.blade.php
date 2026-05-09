@@ -2135,7 +2135,7 @@
                                                                 class="badge badge-white">{{ $checkin->employee->Emp_id }}</span>
                                                         </div>
                                                         <span class="badge badge-themeNew1"><i
-                                                                class="fa-regular fa-calendar me-2"></i>{{ Carbon\Carbon::parse($checkin->created_at)->format('d M Y') }}</span>
+                                                                class="fa-regular fa-calendar me-2"></i>{{ Carbon\Carbon::flexible($checkin->created_at)->format('d M Y') }}</span>
                                                     </div>
                                                     <p>{{ $checkin->comment }}</p>
                                                     <a href="{{ route('Performance.GetMonthlyCheckInDetails', base64_encode($checkin->id)) }}"

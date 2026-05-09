@@ -142,7 +142,7 @@
                                                 <td>{{ $draft->Getdepartment->name ?? 'N/A' }}</td>
                                                 <td>{{ $draft->employee_type ?? 'N/A' }}</td>
                                                 <td>{{ $draft->Total_position_required }}</td>
-                                                <td>{{ $draft->created_at ? \Carbon\Carbon::parse($draft->created_at)->format('d M Y') : 'N/A' }}</td>
+                                                <td>{{ $draft->created_at ? \Carbon\Carbon::flexible($draft->created_at)->format('d M Y') : 'N/A' }}</td>
                                                 <td>
                                                     <a href="{{ route('resort.vacancies.edit', $draft->id) }}" class="btn btn-sm btn-themeBlue">Edit</a>
                                                 </td>

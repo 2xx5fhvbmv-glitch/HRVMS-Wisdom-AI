@@ -2584,20 +2584,23 @@ class Common
         }
         if($flag =="Monthwise")
         {
-            // $startOfMonth = Carbon::now()->startOfMonth()->format('Y-m-d'); // First day of the month
-            // $endOfMonth = Carbon::now()->endOfMonth()->format('Y-m-d'); // Last day of the month
-            // $startOfMonth = Carbon::now()->subMonth()->startOfMonth()->format('Y-m-d');
-
-            // // End of the previous month
-
-            // $endOfMonth = Carbon::now()->subMonth()->endOfMonth()->format('Y-m-d');
                 $LeaveCategory = LeaveCategory::where('resort_id', $resort_id)->get(['leave_type']);
-                $DutyRoster = DutyRoster::join('duty_roster_entries as t2', 't2.Emp_id', '=', 'duty_rosters.Emp_id')
+                // Use the EMPLOYEE id to scope the entries — the previous
+                // filter `where('duty_rosters.id', '=', $duty_roster_id)`
+                // broke when the calling controller's groupBy('employees.id')
+                // happened to pick an old/different duty_rosters row for the
+                // same employee. The date range already restricts to the
+                // viewed month, so widening on Emp_id is safe.
+                // Join duty_rosters via the entry's roster_id (proper FK)
+                // instead of the employee id — the latter cross-multiplies
+                // when an employee has multiple duty_rosters rows
+                // (different periods).
+                $DutyRoster = \App\Models\DutyRosterEntry::from('duty_roster_entries as t2')
+                    ->leftJoin('duty_rosters', 'duty_rosters.id', '=', 't2.roster_id')
                     ->join('shift_settings as t1', 't1.id', '=', 't2.Shift_id')
                     ->whereBetween('t2.date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
-                    // ->where('duty_rosters.Year', '=', $startOfMonth->format('Y'))
                     ->where('t1.resort_id', '=', $resort_id)
-                    ->where('duty_rosters.id', '=', $duty_roster_id)
+                    ->when(!empty($Employee), fn($q) => $q->where('t2.Emp_id', '=', $Employee))
                     ->orderBy('t2.date', 'asc')
                     ->get([
                         't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date', 't2.Shift_id', 't2.roster_id', 'duty_rosters.DayOfDate',
@@ -3245,13 +3248,12 @@ class Common
         $rank = (int) ($emp->rank ?? 0);
         $availableRank = $rankMap[$emp->rank ?? null] ?? '';
 
-        // Full resort-wide visibility for: GM, HR, HR-department HOD/EXCOM.
-        // Mirrors the L&D module's scope (Common::getPerformanceScopedEmpIds)
-        // so behaviour is consistent across modules — the user reported HR
-        // seeing 0 incidents because their HR account is rank=1 (EXCOM) inside
-        // the HR department, which the strict rank=3 check rejected.
+        // Per the access-control spec: GM, HR, and HR-department HOD/EXCOM
+        // get full resort-wide visibility. (Earlier the GM branch limited
+        // to approval=1 — that contradicted the spec which says
+        // "Full access across system" for GM.)
         if ($rank === 8 || $availableRank === 'GM') {
-            return $query->where('approval', 1);
+            return $query;
         }
         if ($rank === 3 || $availableRank === 'HR') {
             return $query;

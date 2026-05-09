@@ -113,7 +113,7 @@
                                             : ($statusLabel === 'In Progress' ? 'badge-themeWarning' : 'badge-themeDanger');
                                     @endphp
                                     <tr>
-                                        <td>{{ $row->Manager_review_date ? \Carbon\Carbon::parse($row->Manager_review_date)->format('d M Y') : ($row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d M Y') : '-') }}</td>
+                                        <td>{{ $row->Manager_review_date ? \Carbon\Carbon::parse($row->Manager_review_date)->format('d M Y') : ($row->created_at ? \Carbon\Carbon::flexible($row->created_at)->format('d M Y') : '-') }}</td>
                                         <td>
                                             @if($feedback)
                                                 {{ \Illuminate\Support\Str::limit($feedback, 180) }}

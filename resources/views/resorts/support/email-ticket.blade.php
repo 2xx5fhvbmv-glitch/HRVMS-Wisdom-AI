@@ -46,7 +46,7 @@
                                         <img src="{{ $userImage }}" alt="user">
                                     </div> -->
                                     <div class="msg">
-                                        <div class="time">{{ \Carbon\Carbon::parse($message->created_at)->format('d-M-Y h:i A') }}</div>
+                                        <div class="time">{{ \Carbon\Carbon::flexible($message->created_at)->format('d-M-Y h:i A') }}</div>
                                         <div class="content">
                                             <p>{!! html_entity_decode($message->message) !!}</p>
                                             

@@ -67,7 +67,7 @@
                             </strong>
                         </div>
                         <div class="text-end">
-                            <span>{{ $lastPayroll ? \Carbon\Carbon::parse($lastPayroll->updated_at)->format('d M Y') : '-' }}</span><br>
+                            <span>{{ $lastPayroll ? \Carbon\Carbon::flexible($lastPayroll->updated_at)->format('d M Y') : '-' }}</span><br>
                             <span class="badge badge-themeSuccess">
                                 {{ ucfirst($lastPayroll->status ?? 'N/A') }}
                             </span>
@@ -313,7 +313,7 @@
                                         <td>{{ \Carbon\Carbon::parse($draft->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($draft->end_date)->format('d M Y') }}</td>
                                         <td>{{ $draft->employee_count }}</td>
                                         <td>{!! Common::formatCurrency($draft->total_payroll ?? 0, 'USD') !!}</td>
-                                        <td>{{ \Carbon\Carbon::parse($draft->created_at)->format('d M Y') }}</td>
+                                        <td>{{ \Carbon\Carbon::flexible($draft->created_at)->format('d M Y') }}</td>
                                         <td><span class="badge badge-themeWarning">{{ ucfirst($draft->status) }}</span></td>
                                         <td>
                                             <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm btn-themeBlue" onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
@@ -432,7 +432,7 @@
                                         <td>{{ \Carbon\Carbon::parse($lp->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($lp->end_date)->format('d M Y') }}</td>
                                         <td>{{ $lp->total_employees }}</td>
                                         <td>{!! Common::formatCurrency($lp->total_payroll ?? 0, 'USD') !!}</td>
-                                        <td>{{ \Carbon\Carbon::parse($lp->updated_at)->format('d M Y, h:i A') }}</td>
+                                        <td>{{ \Carbon\Carbon::flexible($lp->updated_at)->format('d M Y, h:i A') }}</td>
                                         <td>
                                             <a href="{{ route('payroll.view', ['payroll_id' => base64_encode($lp->id)]) }}" class="btn btn-sm btn-themeBlue">
                                                 <i class="fa-solid fa-eye"></i> View

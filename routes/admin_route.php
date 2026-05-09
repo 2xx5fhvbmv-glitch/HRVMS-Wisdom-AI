@@ -248,6 +248,11 @@ Route::prefix('admin')->namespace('Admin')->group(function () {
       Route::get('supports/chat/messages/{support_id}', 'SupportChatController@fetchMessages')->name('support.chat.fetchMessage');
 
       Route::post('supports/support-email-reply', 'SupportController@replyStore')->name('support.email.reply');
+      // JSON list of email replies for a ticket — drives the live polling
+      // on the support detail page.
+      Route::get('supports/{id}/messages-json', 'SupportController@fetchMessagesJson')->name('admin.supports.fetchMessagesJson');
+      // Live unread counts for the sidebar nav badge + per-ticket badges.
+      Route::get('supports/counts/json', 'SupportController@counts')->name('admin.supports.counts');
 
     });
     });

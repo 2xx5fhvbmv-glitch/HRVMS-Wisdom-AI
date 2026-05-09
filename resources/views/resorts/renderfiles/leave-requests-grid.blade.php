@@ -30,7 +30,7 @@
                     <p>{{ $request->position ?? 'N/A' }}</p>
                     <span class="position">{{ $request->department ?? 'N/A' }}</span>
                     <div class="bg">
-                        <i>Applied On: {{ \Carbon\Carbon::parse($request->created_at)->format('d M, Y') }}</i>
+                        <i>Applied On: {{ \Carbon\Carbon::flexible($request->created_at)->format('d M, Y') }}</i>
                         <div>
                             <div class="bg-white date-block">
                                 {{ \Carbon\Carbon::parse($request->from_date)->format('M') }}
@@ -88,7 +88,7 @@
                     <p>{{ $request->position ?? 'N/A' }}</p>
                     <span class="position">{{ $request->department ?? 'N/A' }}</span>
                     <div class="bg">
-                        <i>Applied On: {{ \Carbon\Carbon::parse($request->created_at)->format('d M, Y') }}</i>
+                        <i>Applied On: {{ \Carbon\Carbon::flexible($request->created_at)->format('d M, Y') }}</i>
                         <div>
                             <div class="bg-white date-block">
                                 {{ \Carbon\Carbon::parse($request->from_date)->format('M') }}

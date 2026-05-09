@@ -39,7 +39,7 @@
                                 <td>{{ \Carbon\Carbon::parse($draft->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($draft->end_date)->format('d M Y') }}</td>
                                 <td>{{ $draft->employee_count }}</td>
                                 <td>{!! Common::formatCurrency($draft->total_payroll ?? 0, 'USD') !!}</td>
-                                <td>{{ \Carbon\Carbon::parse($draft->created_at)->format('d M Y, h:i A') }}</td>
+                                <td>{{ \Carbon\Carbon::flexible($draft->created_at)->format('d M Y, h:i A') }}</td>
                                 <td><span class="badge badge-themeWarning">{{ ucfirst($draft->status) }}</span></td>
                                 <td>
                                     <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm btn-themeBlue"

@@ -167,9 +167,11 @@
 							<i class="fa fa-bell nav-icon"></i>
 							<p>
 								Supports
-								@if($navUnreadTotal > 0)
-									<span class="badge badge-danger ms-1" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;">{{ $navUnreadTotal > 99 ? '99+' : $navUnreadTotal }}</span>
-								@endif
+								{{-- Always rendered (hidden when 0) so the live polling
+								     loop can flip its visibility + text in place. --}}
+								<span id="js-supports-nav-badge"
+									class="badge badge-danger ms-1 {{ $navUnreadTotal > 0 ? '' : 'd-none' }}"
+									style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;">{{ $navUnreadTotal > 99 ? '99+' : $navUnreadTotal }}</span>
 							</p>
 						</a>
 					</li>

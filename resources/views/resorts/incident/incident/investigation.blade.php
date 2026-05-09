@@ -311,7 +311,7 @@
                                                     <div class="card-body">
                                                         <h6 class="card-title">{{ $statement->employee->resortAdmin->full_name ?? 'Unknown Employee' }}</h6>
                                                         <p class="card-text text-muted mb-1">
-                                                            Date : {{ \Carbon\Carbon::parse($statement->created_at)->format('d M Y, h:i A') }}
+                                                            Date : {{ \Carbon\Carbon::flexible($statement->created_at)->format('d M Y, h:i A') }}
                                                         </p>
                                                         <p class="card-text">{{ $statement->statement ?? 'No statement provided.' }}</p>
 
@@ -379,7 +379,7 @@
                                                     <div class="card-body">
                                                         <h6 class="card-title">{{ $witness->employee->resortAdmin->full_name ?? 'Unknown Witness' }}</h6>
                                                         <p class="card-text text-muted mb-1">
-                                                            Date : {{ \Carbon\Carbon::parse($witness->created_at)->format('d M Y, h:i A') }}
+                                                            Date : {{ \Carbon\Carbon::flexible($witness->created_at)->format('d M Y, h:i A') }}
                                                         </p>
                                                         <p class="card-text">{{ $witness->witness_statements ?? 'No statement provided.' }}</p>
                                                         @php
