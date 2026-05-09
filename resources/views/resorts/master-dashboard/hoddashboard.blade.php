@@ -940,7 +940,7 @@
                                                             <span class="userApplicants-btn">{{$announcement->employee->resortAdmin->full_name}}</span>   
                                                         </div>
                                                     </td>
-                                                    <td>{{ Carbon\Carbon::parse($announcement->created_at)->format('d M Y') }}</td>
+                                                    <td>{{ Carbon\Carbon::flexible($announcement->created_at)->format('d M Y') }}</td>
                                                     <td>
                                                         @if($announcement->status === 'Published')
                                                             <span class="badge badge-themeSuccess">{{$announcement->status}}</span>
@@ -1282,7 +1282,7 @@
                                                                             class="badge badge-white">{{ $checkin->employee->Emp_id }}</span>
                                                                     </div>
                                                                     <span class="badge badge-themeNew1"><i
-                                                                            class="fa-regular fa-calendar me-2"></i>{{ Carbon\Carbon::parse($checkin->created_at)->format('d M Y') }}</span>
+                                                                            class="fa-regular fa-calendar me-2"></i>{{ Carbon\Carbon::flexible($checkin->created_at)->format('d M Y') }}</span>
                                                                 </div>
                                                                 <p>{{ $checkin->comment }}</p>
                                                                 <a href="{{ route('Performance.GetMonthlyCheckInDetails', base64_encode($checkin->id)) }}"
@@ -1343,7 +1343,7 @@
                                                             <div>
                                                                 <div class="d-flex">
                                                                     <h6>{{ $incident->incident_name }}</h6>
-                                                                    <span class="badge badge-white">{{ \Carbon\Carbon::parse($incident->created_at)->diffForHumans() }}</span>
+                                                                    <span class="badge badge-white">{{ \Carbon\Carbon::flexible($incident->created_at)->diffForHumans() }}</span>
                                                                 </div>
                                                                 <p>{{ $incident->description }}</p>
                                                                 <div>

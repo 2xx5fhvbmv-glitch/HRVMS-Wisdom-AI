@@ -23,28 +23,17 @@
             <div class="card">
                     <div class="appendData">
                             <div class="monthly-main">
-                                {{-- Week selector: pages the 31-column table by week so it
-                                     fits the screen without horizontal scroll. --}}
                                 @php
+                                    // Display label only — the week selector
+                                    // toolbar was removed in favour of a
+                                    // single full-month calendar layout.
                                     $monthLabel = !empty($startOfMonth) ? \Carbon\Carbon::parse($startOfMonth)->format('F Y') : '';
-                                    $todayDayOfMonth = (int) date('d');
-                                    $isCurrentMonth = !empty($startOfMonth) && \Carbon\Carbon::parse($startOfMonth)->isSameMonth(\Carbon\Carbon::now());
-                                    $defaultWeek = $isCurrentMonth ? (int) ceil($todayDayOfMonth / 7) : 1;
                                 @endphp
-                                <div class="duty-roster-week-toolbar d-flex flex-wrap align-items-center gap-2 mb-3 px-2 pt-2">
-                                    <strong class="me-2">{{ $monthLabel }}</strong>
-                                    <div class="btn-group btn-group-sm" role="group" aria-label="Week selector">
-                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="1">Week 1<br><small class="text-muted">1–7</small></button>
-                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="2">Week 2<br><small class="text-muted">8–14</small></button>
-                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="3">Week 3<br><small class="text-muted">15–21</small></button>
-                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="4">Week 4<br><small class="text-muted">22–28</small></button>
-                                        <button type="button" class="btn btn-outline-primary roster-week-btn" data-roster-week="5">Week 5<br><small class="text-muted">29–31</small></button>
-                                        <button type="button" class="btn btn-outline-secondary roster-week-btn" data-roster-week="all">Full Month</button>
+                                @if($monthLabel)
+                                    <div class="d-flex align-items-center gap-2 mb-3 px-2 pt-2">
+                                        <strong class="me-2">{{ $monthLabel }}</strong>
                                     </div>
-                                    @if($isCurrentMonth)
-                                        <button type="button" class="btn btn-sm btn-link ms-auto roster-week-btn" data-roster-week="{{ $defaultWeek }}">Jump to current week</button>
-                                    @endif
-                                </div>
+                                @endif
                                 {{-- Accordion Structure for Department and Section --}}
                                 <div class="viewBudget-accordion" id="accordionDutyRoster">
                                     @if(!empty($groupedRosterData))
@@ -187,7 +176,11 @@
                                                                                                             }
                                                                                                         @endphp
 
-                                                                                                            <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                                            <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="day-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                                                <div class="day-cell-date">
+                                                                                                                    <span class="day-num">{{ (int) date('d', strtotime($formattedDate)) }}</span>
+                                                                                                                    <span class="day-name">{{ date('D', strtotime($formattedDate)) }}</span>
+                                                                                                                </div>
                                                                                                                 @if($employeeLeave)
                                                                                                                     {{-- Display Leave --}}
                                                                                                                     <div class="createDuty-tableBlock" style="border-color: {{ $employeeLeave->color ?? '#ccc' }}; border-width: 2px;">
@@ -406,7 +399,11 @@
                                                                                     }
                                                                                 @endphp
 
-                                                                                    <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="{{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                    <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="day-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                        <div class="day-cell-date">
+                                                                                            <span class="day-num">{{ (int) date('d', strtotime($formattedDate)) }}</span>
+                                                                                            <span class="day-name">{{ date('D', strtotime($formattedDate)) }}</span>
+                                                                                        </div>
                                                                                         @if($employeeLeave)
                                                                                             {{-- Display Leave --}}
                                                                                             <div class="createDuty-tableBlock" style="border-color: {{ $employeeLeave->color ?? '#ccc' }}; border-width: 2px;">
@@ -703,17 +700,111 @@
         background: white;
     }
 
-    /* Week pager: hide cells not in the active week. The body gets a
-       data-active-week attribute (1-5 or "all"); CSS does the filtering
-       so we don't have to touch every <td>/<th> in JS. */
-    body[data-active-week="1"] [data-week]:not([data-week="1"]) { display: none !important; }
-    body[data-active-week="2"] [data-week]:not([data-week="2"]) { display: none !important; }
-    body[data-active-week="3"] [data-week]:not([data-week="3"]) { display: none !important; }
-    body[data-active-week="4"] [data-week]:not([data-week="4"]) { display: none !important; }
-    body[data-active-week="5"] [data-week]:not([data-week="5"]) { display: none !important; }
-    .roster-week-btn.active { background-color: #0d6efd; color: #fff; }
-    .duty-roster-week-toolbar .btn-group .btn { padding-top: 4px; padding-bottom: 4px; line-height: 1.1; }
-    .duty-roster-week-toolbar .btn-group .btn small { font-size: 10px; }
+    /* Calendar layout — fits the entire month at once without horizontal
+       scroll. The roster table is rendered as a 7-column wrapping grid
+       (one row per week) instead of a 31-column matrix. The Employee
+       Name + Summary cells stay full-width above each employee block. */
+    .table-createDutymonthly { table-layout: fixed; width: 100%; }
+
+    /* Re-flow each employee row from a single 33-cell <tr> into a
+       2-column header (name + summary) followed by a 7-column day grid.
+       We do this purely with CSS so the existing PHP loop doesn't need
+       to be rewritten. */
+    .table-createDutymonthly thead { display: none; }
+    .table-createDutymonthly,
+    .table-createDutymonthly tbody,
+    .table-createDutymonthly tr { display: block; width: 100%; }
+
+    .table-createDutymonthly tbody tr {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 6px;
+        margin-bottom: 18px;
+        padding: 8px;
+        border: 1px solid #e6e6e6;
+        border-radius: 8px;
+        background: #fff;
+    }
+    .table-createDutymonthly tbody tr > td {
+        display: block;
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        padding: 6px;
+        min-height: 56px;
+        font-size: 11px;
+        background: #fafbfc;
+        overflow: hidden;
+    }
+    /* First TD = employee header — span all 7 cols. */
+    .table-createDutymonthly tbody tr > td:first-child {
+        grid-column: 1 / -1;
+        background: #f5f8fb;
+        min-height: auto;
+        padding: 8px 10px;
+    }
+    /* Last TD = summary — also full width. */
+    .table-createDutymonthly tbody tr > td:last-child {
+        grid-column: 1 / -1;
+        background: #fff7e6;
+        min-height: auto;
+        padding: 8px 10px;
+        font-weight: 600;
+        text-align: right;
+    }
+    .table-createDutymonthly .createDuty-tableBlock {
+        font-size: 10px;
+        line-height: 1.25;
+    }
+    .table-createDutymonthly .createDuty-tableBlock p { margin: 0; font-size: 10px; }
+    .table-createDutymonthly .createDuty-tableBlock .badge { font-size: 9px; padding: 2px 4px; }
+    .table-createDutymonthly .ot-details { display: none; }
+    .table-createDutymonthly .editIcon-btn { padding: 0; font-size: 11px; }
+
+    /* Date label inside each calendar day cell. Day number is the
+       prominent figure; weekday abbreviation sits next to it. Without
+       this the cell only showed "No Shift Assigned" with no way to
+       tell which day it was. */
+    .table-createDutymonthly .day-cell-date {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 4px;
+        padding-bottom: 3px;
+        border-bottom: 1px dashed #d8dde3;
+    }
+    .table-createDutymonthly .day-cell-date .day-num {
+        font-weight: 700;
+        font-size: 13px;
+        color: #014653;
+    }
+    .table-createDutymonthly .day-cell-date .day-name {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+    }
+    .table-createDutymonthly .public-holiday-cell .day-cell-date {
+        border-bottom-color: #f1aeb5;
+    }
+    .table-createDutymonthly .public-holiday-cell .day-cell-date .day-num {
+        color: #c92a2a;
+    }
+    /* Quieter "No Shift Assigned" text — the empty-state shouldn't
+       shout in every cell of an unscheduled employee. */
+    .table-createDutymonthly .createDuty-empty {
+        font-size: 9px;
+        color: #adb5bd;
+        font-style: italic;
+        text-align: center;
+        padding: 4px 0;
+    }
+    .table-createDutymonthly .createDuty-tableBlock {
+        margin-top: 2px;
+    }
+
+    /* "No Records Found" cell that spanned 33 cols originally — let it
+       span full grid so it doesn't squish into one column. */
+    .table-createDutymonthly tbody tr > td[colspan] { grid-column: 1 / -1; min-height: auto; text-align: center; }
 </style>
 @endsection
 
@@ -722,29 +813,9 @@
 <script type="text/javascript">
     // new DataTable('#example');
 
-    // Week pager: pages the 31-column duty-roster table by week so it
-    // fits the viewport without horizontal scroll.
-    (function () {
-        function setActiveWeek(week) {
-            document.body.setAttribute('data-active-week', String(week));
-            document.querySelectorAll('.roster-week-btn').forEach(function (btn) {
-                btn.classList.toggle('active', btn.getAttribute('data-roster-week') === String(week));
-            });
-            try { localStorage.setItem('dutyRosterActiveWeek', String(week)); } catch (e) {}
-        }
-        document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.roster-week-btn');
-            if (!btn) return;
-            e.preventDefault();
-            setActiveWeek(btn.getAttribute('data-roster-week'));
-        });
-        // Default: stored selection, else current week of the displayed month, else 1.
-        var stored = null;
-        try { stored = localStorage.getItem('dutyRosterActiveWeek'); } catch (e) {}
-        var defaultWeek = stored || @json((string) $defaultWeek);
-        setActiveWeek(defaultWeek);
-    })();
-
+    // (Removed: the week-1..5 / Full Month pager. The roster now renders
+    // as a single full-month calendar grid via CSS, so no JS is needed
+    // to toggle which days are visible.)
 
     // tooltip
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))

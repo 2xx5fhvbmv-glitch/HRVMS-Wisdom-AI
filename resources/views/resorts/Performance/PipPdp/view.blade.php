@@ -27,7 +27,7 @@
                     <div class="col-md-4"><strong>Position:</strong> {{ optional($plan->position)->position_title ?? optional(optional($plan->employee)->position)->position_title ?? '-' }}</div>
                     <div class="col-md-4"><strong>Duration:</strong> {{ $plan->duration }}</div>
                     <div class="col-md-4"><strong>Template:</strong> {{ optional($plan->template)->FormName ?? '—' }}</div>
-                    <div class="col-md-4"><strong>Assigned On:</strong> {{ \Carbon\Carbon::parse($plan->created_at)->format('d M Y') }}</div>
+                    <div class="col-md-4"><strong>Assigned On:</strong> {{ \Carbon\Carbon::flexible($plan->created_at)->format('d M Y') }}</div>
                     <div class="col-md-4">
                         <strong>Status:</strong>
                         @if($plan->submitted_at)

@@ -919,7 +919,7 @@
                                                             <span class="userApplicants-btn">{{$announcement->employee->resortAdmin->full_name}}</span>   
                                                         </div>
                                                     </td>
-                                                    <td>{{ Carbon\Carbon::parse($announcement->created_at)->format('d M Y') }}</td>
+                                                    <td>{{ Carbon\Carbon::flexible($announcement->created_at)->format('d M Y') }}</td>
                                                     <td>
                                                         @if($announcement->status === 'Published')
                                                             <span class="badge badge-themeSuccess">{{$announcement->status}}</span>

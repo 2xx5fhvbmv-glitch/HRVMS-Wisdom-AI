@@ -75,7 +75,7 @@
                                 <td>{{ $plan->duration }}</td>
                                 <td><small>{{ \Illuminate\Support\Str::limit($plan->factors, 60) }}</small></td>
                                 @php
-                                    $startDate = \Carbon\Carbon::parse($plan->created_at);
+                                    $startDate = \Carbon\Carbon::flexible($plan->created_at);
                                     $endDate   = null;
                                     if ($plan->duration && preg_match('/(\d+)\s*(day|week|month|year)s?/i', $plan->duration, $m)) {
                                         $qty  = (int) $m[1];

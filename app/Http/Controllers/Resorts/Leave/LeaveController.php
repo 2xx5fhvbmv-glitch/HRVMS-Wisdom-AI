@@ -288,15 +288,30 @@ class LeaveController extends Controller
         // (same convention as duty-roster + Common::getWeekCountInMonth).
         // Pass YYYY-MM-DD strings for current + next year to the view; the
         // JS uses them to subtract from calculateTotalDays().
+        // public_holidays.holiday_date is a STRING column stored as d-m-Y
+        // (e.g. "01-05-2026"), so whereYear() can't be used on it (the
+        // earlier version returned zero rows because of that, which is
+        // why only Fridays were excluded). Pull every active row and
+        // normalise in PHP using createFromFormat with explicit fallbacks.
         $holidayDates = PublicHoliday::where('status', 'active')
-            ->whereYear('holiday_date', '>=', now()->year)
-            ->whereYear('holiday_date', '<=', now()->year + 1)
             ->pluck('holiday_date')
             ->map(function ($d) {
+                $d = trim((string) $d);
+                if ($d === '') return null;
+                foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
+                    try {
+                        $c = \Carbon\Carbon::createFromFormat($fmt, $d);
+                        if ($c) return $c->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        // try next
+                    }
+                }
+                // Last resort — Carbon::parse for ISO-ish strings.
                 try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
                 catch (\Exception $e) { return null; }
             })
             ->filter()
+            ->unique()
             ->values()
             ->all();
         return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation', 'airports', 'holidayDates'));
@@ -1376,15 +1391,28 @@ class LeaveController extends Controller
                 // JS in resources/views/resorts/leaves/leave/index.blade.php
                 // so the user's "30 Days" preview matches the persisted
                 // total_days and balance debit.
+                // public_holidays.holiday_date is a string column stored as
+                // d-m-Y, so whereDate()/whereYear() return zero rows. Pull
+                // every active row, normalise to Y-m-d in PHP, then filter
+                // to the leave window.
+                $rangeStart = $fromDate->format('Y-m-d');
+                $rangeEnd   = $toDate->format('Y-m-d');
                 $holidayLookup = PublicHoliday::where('status', 'active')
-                    ->whereDate('holiday_date', '>=', $fromDate->format('Y-m-d'))
-                    ->whereDate('holiday_date', '<=', $toDate->format('Y-m-d'))
                     ->pluck('holiday_date')
                     ->map(function ($d) {
+                        $d = trim((string) $d);
+                        if ($d === '') return null;
+                        foreach (['d-m-Y', 'd/m/Y', 'Y-m-d', 'Y/m/d', 'd-m-y', 'd/m/y'] as $fmt) {
+                            try {
+                                $c = \Carbon\Carbon::createFromFormat($fmt, $d);
+                                if ($c) return $c->format('Y-m-d');
+                            } catch (\Exception $e) { /* try next */ }
+                        }
                         try { return \Carbon\Carbon::parse($d)->format('Y-m-d'); }
                         catch (\Exception $e) { return null; }
                     })
                     ->filter()
+                    ->filter(fn($d) => $d >= $rangeStart && $d <= $rangeEnd)
                     ->flip();
                 $totalDays = 0;
                 $cursor = $fromDate->copy();

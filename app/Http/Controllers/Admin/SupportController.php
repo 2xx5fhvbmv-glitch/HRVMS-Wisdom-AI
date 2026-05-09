@@ -186,18 +186,20 @@ class SupportController extends Controller
                     // unconditionally — they were previously hidden, which is
                     // why "Reply Ticket" went missing from the Actions column.
                     $unreadCount = (int) ($unreadByTicket[$support->id] ?? 0);
-                    $unreadBadge = $unreadCount > 0
-                        ? ' <span class="badge badge-danger" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;margin-left:4px;">' . ($unreadCount > 99 ? '99+' : $unreadCount) . '</span>'
-                        : '';
+                    // Always render the badge with a stable selector
+                    // (hidden when 0) so the polling JS can flip it live.
+                    $hiddenCls   = $unreadCount > 0 ? '' : ' d-none';
+                    $unreadBadge = ' <span class="badge badge-danger js-chat-unread-badge' . $hiddenCls . '" data-ticket-id="' . $support->id . '" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;margin-left:4px;">' . ($unreadCount > 99 ? '99+' : $unreadCount) . '</span>';
                     $chatButton = '<a href="' . $chat_url . '" title="Open Chat" class="btn btn-secondary btn-sm mx-1 position-relative">
                                         <i class="fas fa-comments"></i> Chat' . $unreadBadge . '
                                     </a>';
 
                     if (!empty($support->createdBy->email)) {
                         $unreadEmailCount = (int) ($unreadEmailByTicket[$support->id] ?? 0);
-                        $unreadEmailBadge = $unreadEmailCount > 0
-                            ? ' <span class="badge badge-danger" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;margin-left:4px;">' . ($unreadEmailCount > 99 ? '99+' : $unreadEmailCount) . '</span>'
-                            : '';
+                        // Same idea as the Chat badge — always rendered,
+                        // toggled via .d-none, picked up by the live poller.
+                        $emailHiddenCls   = $unreadEmailCount > 0 ? '' : ' d-none';
+                        $unreadEmailBadge = ' <span class="badge badge-danger js-email-unread-badge' . $emailHiddenCls . '" data-ticket-id="' . $support->id . '" style="background:#dc3545;color:#fff;border-radius:10px;padding:2px 7px;font-size:11px;margin-left:4px;">' . ($unreadEmailCount > 99 ? '99+' : $unreadEmailCount) . '</span>';
                         $emailReplyButton = '<button title="Reply via Email" class="btn btn-warning btn-sm mx-1 reply-email"
                             data-toggle="modal" data-target="#replyModal"
                             data-subject="' . htmlspecialchars($support->subject, ENT_QUOTES) . '"
@@ -261,6 +263,97 @@ class SupportController extends Controller
         $ticket->save();
 
         return response()->json(['success' => true, 'message' => 'Status updated successfully!']);
+    }
+
+    /**
+     * JSON list of email replies for a ticket. Powers the support-detail
+     * page's polling loop — frontend calls this every few seconds to pull
+     * any new admin/employee replies that arrived since the last poll.
+     * Returns ids + raw timestamps so the client can dedupe.
+     */
+    public function fetchMessagesJson($id)
+    {
+        $ticketId = (int) base64_decode($id, true);
+        if (!$ticketId) return response()->json(['success' => false], 400);
+
+        $rows = SupportMessages::where('ticket_id', $ticketId)
+            ->orderBy('id')
+            ->get(['id', 'ticket_id', 'sender', 'sender_id', 'message', 'attachments', 'created_at']);
+
+        $messages = $rows->map(function ($r) {
+            // getRawOriginal because the model may have a formatting accessor.
+            $raw = method_exists($r, 'getRawOriginal') ? $r->getRawOriginal('created_at') : $r->getOriginal('created_at');
+            $when = $raw ? \Carbon\Carbon::parse($raw) : null;
+            return [
+                'id'           => $r->id,
+                'sender'       => $r->sender,
+                'message'      => $r->message,
+                'attachments'  => $r->attachments ? json_decode($r->attachments, true) : [],
+                'created_at'   => $when ? $when->toIso8601String() : null,
+                'time_label'   => $when ? ($when->isToday() ? $when->format('h:i A') : $when->format('d M Y, h:i A')) : '',
+            ];
+        });
+
+        // Also mark inbound (employee → admin) as read on every fetch so
+        // the unread badge clears as the admin keeps the page open.
+        SupportMessages::where('ticket_id', $ticketId)
+            ->where('sender', 'employee')
+            ->where('is_read', 0)
+            ->update(['is_read' => 1]);
+
+        return response()->json(['success' => true, 'messages' => $messages]);
+    }
+
+    /**
+     * Aggregate unread counts for the admin Supports module — drives the
+     * sidebar nav badge AND each ticket's Chat / Email Reply badges live.
+     * The frontend polls this every ~10 seconds; cheap because both
+     * underlying tables are indexed on (ticket/support_id, is_read).
+     */
+    public function counts()
+    {
+        $admin = Auth::guard('admin')->user();
+        if (!$admin) return response()->json(['nav_total' => 0, 'by_ticket' => (object) []]);
+
+        $isSuper = ($admin->type ?? null) === 'super';
+        $adminId = $admin->id;
+
+        $ticketIds = Support::when(!$isSuper, fn($q) => $q->where('assigned_to', $adminId))
+            ->pluck('id');
+
+        $chatByTicket = $ticketIds->isEmpty()
+            ? collect()
+            : SupportChatMessage::whereIn('support_id', $ticketIds)
+                ->where('receiver_id', $adminId)
+                ->where('receiver_type', 'admin')
+                ->where('is_read', 0)
+                ->select('support_id', DB::raw('COUNT(*) as cnt'))
+                ->groupBy('support_id')
+                ->pluck('cnt', 'support_id');
+
+        $emailByTicket = $ticketIds->isEmpty()
+            ? collect()
+            : SupportMessages::whereIn('ticket_id', $ticketIds)
+                ->where('sender', 'employee')
+                ->where('is_read', 0)
+                ->select('ticket_id', DB::raw('COUNT(*) as cnt'))
+                ->groupBy('ticket_id')
+                ->pluck('cnt', 'ticket_id');
+
+        $byTicket = [];
+        foreach ($ticketIds as $tid) {
+            $byTicket[(string) $tid] = [
+                'chat'  => (int) ($chatByTicket[$tid] ?? 0),
+                'email' => (int) ($emailByTicket[$tid] ?? 0),
+            ];
+        }
+
+        $navTotal = (int) $chatByTicket->sum() + (int) $emailByTicket->sum();
+
+        return response()->json([
+            'nav_total' => $navTotal,
+            'by_ticket' => $byTicket,
+        ]);
     }
 
     public function view($id)

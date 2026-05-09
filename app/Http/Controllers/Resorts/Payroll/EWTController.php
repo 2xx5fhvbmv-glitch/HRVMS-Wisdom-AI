@@ -44,10 +44,20 @@ class EWTController extends Controller
     {
         $page_title ='Employee Withholding Tax (EWT)';
         $resort_id = $this->resort->resort_id;
-        $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)->where('status', 'Active')->get();
-          $deductions = Deduction::where('resort_id',$resort_id)->get();
+        // Dept-scope per the access-control spec: HR/GM/HR-dept HOD-XCOM
+        // see all; everyone else is restricted to their own department.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $employees = Employee::with('resortAdmin')
+            ->where('resort_id',$resort_id)
+            ->where('status', 'Active')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->get();
+        $deductions = Deduction::where('resort_id',$resort_id)->get();
         $positions = ResortPosition::where('status','active')->where('resort_id',$resort_id)->get();
-        $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
+        $departments = ResortDepartment::where('status','active')
+            ->where('resort_id',$resort_id)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+            ->get();
         return view('resorts.payroll.EWT.index',compact('page_title','positions','departments','deductions','employees'));
     }
 

@@ -604,7 +604,11 @@
             }
         });
 
-        function loadAllResortEmployees() {
+        // Promote to window so callbacks defined OUTSIDE this closure (e.g.
+        // in loadPositionOptions below the file) can call them. Without
+        // this, "loadSelectiveEmployees is not defined" fires whenever the
+        // department/position cascade tries to refresh the participant list.
+        window.loadAllResortEmployees = function () {
             $.ajax({
                 url: "{{ route('Survey.getAllEmployees') }}",
                 type: "GET",
@@ -630,10 +634,11 @@
                     toastr.error("Failed to load employees.", "Error", { positionClass: "toast-bottom-right" });
                 }
             });
-        }
+        };
 
         /** Selective: load all employees with checkboxes enabled (no filters applied); user can use Filters to narrow down. */
-        function loadSelectiveEmployees() {
+        // Same scope-promotion as loadAllResortEmployees above.
+        window.loadSelectiveEmployees = function () {
             // Preserve current ticks across re-loads (e.g., toggling Selective).
             var previouslyChecked = $("#employeeList input[name='Emp_id[]']:checked").map(function () {
                 return $(this).val();
@@ -664,10 +669,8 @@
                     toastr.error("Failed to load employees.", "Error", { positionClass: "toast-bottom-right" });
                 }
             });
-        }
+        };
 
-        
-           
         window.Parsley.addValidator('endgreaterthanstart', {
         requirementType: 'string',
         validateString: function (endDateValue, startDateSelector) {

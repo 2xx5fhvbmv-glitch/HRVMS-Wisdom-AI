@@ -42,7 +42,7 @@
                             @endif
 
                         </ul>
-                        <span>{{ \Carbon\Carbon::parse($employeeStatus->updated_at)->diffForHumans() }}</span>
+                        <span>{{ \Carbon\Carbon::flexible($employeeStatus->updated_at)->diffForHumans() }}</span>
                     </div>
                 </div>
             @endif

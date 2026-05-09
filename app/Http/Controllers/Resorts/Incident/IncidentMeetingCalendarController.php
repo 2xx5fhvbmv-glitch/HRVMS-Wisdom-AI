@@ -50,14 +50,33 @@ class IncidentMeetingCalendarController extends Controller
     // IncidentController.php
     public function getIncidentMeetings(Request $request)
     {
+        // Department-based visibility per the access-control spec:
+        //   GM / HR / HR-dept HOD/EXCOM  → all meetings in the resort
+        //   Everyone else                → only meetings whose parent
+        //                                  incident is in the viewer's
+        //                                  scope (own committee + own dept).
+        // Plus a hard resort_id filter — the previous query had no resort
+        // scope at all, so any logged-in user could see every meeting in
+        // the entire database.
+        $resortId = optional($this->resort)->resort_id;
+        $visibleIncidentIds = \App\Helpers\Common::scopeIncidentsForViewer(\App\Models\Incidents::query())
+            ->pluck('id')
+            ->all();
+
+        // No accessible incidents → no meetings.
+        if (empty($visibleIncidentIds)) {
+            return response()->json([]);
+        }
+
         $query = IncidentsMeeting::with('participant.employee')
-            ->select('id', 'meeting_subject', 'meeting_date', 'meeting_time', 'location');
-    
+            ->whereIn('incident_id', $visibleIncidentIds)
+            ->select('id', 'incident_id', 'meeting_subject', 'meeting_date', 'meeting_time', 'location');
+
         // Optional filtering by date range (e.g., when changing calendar month)
         if ($request->has('start') && $request->has('end')) {
             $query->whereBetween('meeting_date', [$request->start, $request->end]);
         }
-    
+
         $query->with('participant.employee.resortAdmin');
 
         $meetings = $query->get()->map(function ($meeting) {
