@@ -288,7 +288,23 @@ class DisciplinaryController extends Controller
         $Offence_id =  base64_decode($request->Offence_id);
         $Action_id =  base64_decode($request->Action_id);
         $Severity_id =  base64_decode($request->Severity_id);
-        $Expiry_date = $request->Expiry_date;
+        // Form datepicker emits d/m/Y but the column is a DATE — passing
+        // "10/05/2026" straight in made MySQL store 0000-00-00. Parse to
+        // Y-m-d here. Tolerate already-Y-m-d values (e.g. API callers).
+        $Expiry_date = null;
+        if ($request->filled('Expiry_date')) {
+            $raw = trim((string) $request->Expiry_date);
+            foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'Y/m/d'] as $fmt) {
+                try {
+                    $c = \Carbon\Carbon::createFromFormat($fmt, $raw);
+                    if ($c) { $Expiry_date = $c->format('Y-m-d'); break; }
+                } catch (\Exception $e) { /* try next */ }
+            }
+            if (!$Expiry_date) {
+                try { $Expiry_date = \Carbon\Carbon::parse($raw)->format('Y-m-d'); }
+                catch (\Exception $e) { $Expiry_date = null; }
+            }
+        }
         $priority_level = $request->priority_level;
         $Incident_description = $request->incident_description;
         $committiee_id = $request->filled('assign_to') ? $request->assign_to : null;
@@ -364,12 +380,17 @@ class DisciplinaryController extends Controller
         
         $members_ids  = DisciplineryCommitteeMembers::where("Parent_committee_id",$committiee_id)->get();
 
-        foreach($members_ids as $g)
-        {
-            $msg = 'HR has assigned a grievance case to your committee.';
-            $title = ' Disciplinary Case';
-            $ModuleName = "Grievance And Disciplinery ";
-            event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10,$title,$msg,0,$g->MemberId,$ModuleName)));
+        // Notify each committee member assigned to this DISCIPLINARY case.
+        // Was using grievance copy ("a grievance case to your committee")
+        // which confused users on the receiving end.
+        $caseId = $disciplinarySubmit->Disciplinary_id ?? '';
+        $msg = 'HR has assigned a disciplinary case' . ($caseId ? ' (' . $caseId . ')' : '') . ' to your committee.';
+        $title = 'Disciplinary Case';
+        $ModuleName = 'Disciplinary';
+        foreach ($members_ids as $g) {
+            event(new ResortNotificationEvent(Common::nofitication(
+                $this->resort->resort_id, 10, $title, $msg, 0, $g->MemberId, $ModuleName
+            )));
         }
         if($witnessisapplicable =="Yes")
         {
@@ -401,17 +422,49 @@ class DisciplinaryController extends Controller
             'Case_Description' => $Incident_description,
         ];
 
-        // Send email only when a template is configured for this action.
+        // Send email only when a template is configured for this action AND
+        // the employee actually has an email on record. Capture the result
+        // (the helper returns true on success, an error string on failure)
+        // so we can surface the reason to the user instead of silently
+        // dropping the mail.
         $emailWarning = null;
-        if ($disciplinary_email) {
-            Common::sendTemplateEmail("Disciplinary", $disciplinary_email->id, $emp->email, $dynamic_data);
-        } else {
+        if (!$disciplinary_email) {
             $emailWarning = 'Saved, but no email template is configured for this action. The employee was not notified by email.';
             \Log::warning('Disciplinary saved without email notification', [
                 'resort_id' => $this->resort->resort_id,
                 'action_id' => $Action_id,
                 'case_id'   => $disciplinarySubmit->Disciplinary_id ?? null,
             ]);
+        } elseif (empty($emp->email)) {
+            $emailWarning = 'Saved, but the employee has no email on record. The notification was not sent.';
+            \Log::warning('Disciplinary saved without recipient email', [
+                'resort_id' => $this->resort->resort_id,
+                'employee_id' => $Employee_id,
+                'case_id' => $disciplinarySubmit->Disciplinary_id ?? null,
+            ]);
+        } else {
+            try {
+                $sendResult = Common::sendTemplateEmail('Disciplinary', $disciplinary_email->id, $emp->email, $dynamic_data);
+                // sendTemplateEmail returns true on success, a string on failure.
+                if ($sendResult !== true) {
+                    $emailWarning = 'Saved, but email delivery failed: ' . (is_string($sendResult) ? $sendResult : 'unknown error');
+                    \Log::warning('Disciplinary email helper returned non-true', [
+                        'case_id' => $disciplinarySubmit->Disciplinary_id ?? null,
+                        'result'  => $sendResult,
+                    ]);
+                } else {
+                    \Log::info('Disciplinary email dispatched', [
+                        'case_id' => $disciplinarySubmit->Disciplinary_id ?? null,
+                        'to'      => $emp->email,
+                    ]);
+                }
+            } catch (\Throwable $mailEx) {
+                $emailWarning = 'Saved, but email delivery threw: ' . $mailEx->getMessage();
+                \Log::error('Disciplinary email threw exception', [
+                    'case_id' => $disciplinarySubmit->Disciplinary_id ?? null,
+                    'error'   => $mailEx->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
@@ -450,9 +503,17 @@ class DisciplinaryController extends Controller
             })
             ->addColumn('Date', function ($row)
             {
-                // Was returning Expiry_date which is often unset → "0000-00-00".
-                // Show the case's created_at — when the offence was raised.
-                return $row->created_at ? $row->created_at->format('d M Y') : '—';
+                // "Active Offences" panel shows ACTION VALID UNTIL — the
+                // expiry of the disciplinary action against the employee.
+                // Falls back to "—" if Expiry_date is empty / 0000-00-00.
+                if (empty($row->Expiry_date) || $row->Expiry_date === '0000-00-00') {
+                    return '—';
+                }
+                try {
+                    return \Carbon\Carbon::parse($row->Expiry_date)->format('d M Y');
+                } catch (\Exception $e) {
+                    return $row->Expiry_date;
+                }
             })
            
             ->rawColumns(['Category','Offense','Date','Action'])
@@ -602,6 +663,41 @@ class DisciplinaryController extends Controller
                 }
             }
                            
+
+            // Fan out a bell notification to every OTHER member of the
+            // committee assigned to this case, so they know an update was
+            // posted. Skip the member who just submitted (themselves).
+            try {
+                $caseRow = disciplinarySubmit::where('resort_id', $this->resort->resort_id)
+                    ->where('Disciplinary_id', $id)
+                    ->first(['Committee_id', 'Disciplinary_id']);
+                if ($caseRow && $caseRow->Committee_id) {
+                    $otherMemberIds = DisciplineryCommitteeMembers::where('Parent_committee_id', $caseRow->Committee_id)
+                        ->where('MemberId', '!=', (int) $committee_member_id)
+                        ->pluck('MemberId')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+                    if (!empty($otherMemberIds)) {
+                        $title = 'Disciplinary Investigation Update';
+                        $msg = 'A committee member has updated the investigation for ' . $caseRow->Disciplinary_id . '.';
+                        foreach ($otherMemberIds as $mid) {
+                            event(new ResortNotificationEvent(Common::nofitication(
+                                $this->resort->resort_id,
+                                10,
+                                $title,
+                                $msg,
+                                0,
+                                $mid,
+                                'Disciplinary'
+                            )));
+                        }
+                    }
+                }
+            } catch (\Exception $notifyEx) {
+                \Log::warning('Disciplinary investigation notify failed: ' . $notifyEx->getMessage());
+            }
 
              DB::beginTransaction();
         try {DB::commit();

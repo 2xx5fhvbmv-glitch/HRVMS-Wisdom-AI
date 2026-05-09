@@ -111,28 +111,65 @@ class DashboardController extends Controller
                     = $cases->where('Grivance_Cat_id', $category->id)->count();
             });
 
-        // Latest 3 active cases for the "Case Timelines" panel.
-        // Deadline = Grivance_date_time + 28 days as a placeholder SLA.
-        $caseTimelines = GrivanceSubmissionModel::with('category')
+        // Latest 3 active cases for the "Case Timelines" panel — union of
+        // grievance + disciplinary so the panel doesn't sit empty when a
+        // resort only has disciplinary cases (and vice versa).
+        // Deadline = filed_at + 28 days as a placeholder SLA.
+        $grievanceTimelines = GrivanceSubmissionModel::with('category')
             ->where('resort_id', $resort_id)
             ->whereNotIn('status', ['resolved', 'rejected'])
             ->orderByDesc('Grivance_date_time')
-            ->limit(3)
+            ->limit(5)
             ->get()
             ->map(function ($c) {
-                $filed    = $c->Grivance_date_time ? Carbon::parse($c->Grivance_date_time) : Carbon::parse($c->created_at);
+                $filed = $c->Grivance_date_time ? Carbon::parse($c->Grivance_date_time) : ($c->created_at ?? null);
+                if (!$filed) return null;
+                $filed = $filed instanceof Carbon ? $filed : Carbon::parse($filed);
                 $deadline = (clone $filed)->addDays(28);
-                $totalDays  = $filed->diffInDays($deadline) ?: 1;
-                $usedDays   = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
+                $totalDays   = max(1, $filed->diffInDays($deadline));
+                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
                 $progressPct = (int) round(($usedDays / $totalDays) * 100);
                 return [
-                    'name'        => optional($c->category)->Category_Name ?? 'Untitled Case',
-                    'filed_date'  => $filed->format('d/m/Y'),
-                    'deadline'    => $deadline->format('d/m/Y'),
+                    'name'         => 'Grievance — ' . (optional($c->category)->Category_Name ?? 'Untitled'),
+                    'filed_date'   => $filed->format('d/m/Y'),
+                    'deadline'     => $deadline->format('d/m/Y'),
                     'progress_pct' => max(5, min(100, $progressPct)),
-                    'priority'    => $c->Priority ?? 'Medium',
+                    'priority'     => $c->Priority ?? 'Medium',
+                    '_filed_at'    => $filed,
                 ];
-            });
+            })->filter();
+
+        $disciplinaryTimelines = \App\Models\disciplinarySubmit::with(['category', 'offence'])
+            ->where('resort_id', $resort_id)
+            ->whereNotIn('status', ['resolved', 'rejected'])
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(function ($d) {
+                $filed = $d->created_at instanceof Carbon ? $d->created_at : ($d->created_at ? Carbon::parse($d->created_at) : null);
+                if (!$filed) return null;
+                $deadline = (clone $filed)->addDays(28);
+                $totalDays   = max(1, $filed->diffInDays($deadline));
+                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
+                $progressPct = (int) round(($usedDays / $totalDays) * 100);
+                $catName     = optional($d->category)->DisciplinaryCategoryName ?? 'Untitled';
+                $offence     = optional($d->offence)->OffensesName;
+                $label       = 'Disciplinary — ' . $catName . ($offence ? ' (' . $offence . ')' : '');
+                return [
+                    'name'         => $label,
+                    'filed_date'   => $filed->format('d/m/Y'),
+                    'deadline'     => $deadline->format('d/m/Y'),
+                    'progress_pct' => max(5, min(100, $progressPct)),
+                    'priority'     => $d->Priority ?? 'Medium',
+                    '_filed_at'    => $filed,
+                ];
+            })->filter();
+
+        $caseTimelines = $grievanceTimelines->concat($disciplinaryTimelines)
+            ->sortByDesc(fn ($r) => $r['_filed_at']->getTimestamp())
+            ->take(3)
+            ->map(function ($r) { unset($r['_filed_at']); return $r; })
+            ->values();
 
         $totalPercengate = $totalcase > 0 ? round(($resolvedCase / $totalcase) * 100, 2) : 0;
 
@@ -295,25 +332,61 @@ class DashboardController extends Controller
                 $grivanceCategoryWiseCount[$category->Category_Name] = $cases->where('Grivance_Cat_id', $category->id)->count();
             });
 
-        $caseTimelines = $grievanceQuery->with('category')
+        // HOD/EXCOM Case Timelines — union of grievance + disciplinary
+        // restricted to the dept's own employees so the panel matches
+        // the rest of this dashboard's scope.
+        $grievanceTimelines = $grievanceQuery->with('category')
             ->whereNotIn('status', ['resolved', 'rejected'])
             ->orderByDesc('Grivance_date_time')
-            ->limit(3)
+            ->limit(5)
             ->get()
             ->map(function ($c) {
-                $filed    = $c->Grivance_date_time ? Carbon::parse($c->Grivance_date_time) : Carbon::parse($c->created_at);
+                $filed = $c->Grivance_date_time ? Carbon::parse($c->Grivance_date_time) : ($c->created_at ?? null);
+                if (!$filed) return null;
+                $filed = $filed instanceof Carbon ? $filed : Carbon::parse($filed);
                 $deadline = (clone $filed)->addDays(28);
-                $totalDays  = $filed->diffInDays($deadline) ?: 1;
-                $usedDays   = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
+                $totalDays   = max(1, $filed->diffInDays($deadline));
+                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
                 $progressPct = (int) round(($usedDays / $totalDays) * 100);
                 return [
-                    'name'        => optional($c->category)->Category_Name ?? 'Untitled Case',
-                    'filed_date'  => $filed->format('d/m/Y'),
-                    'deadline'    => $deadline->format('d/m/Y'),
+                    'name'         => 'Grievance — ' . (optional($c->category)->Category_Name ?? 'Untitled'),
+                    'filed_date'   => $filed->format('d/m/Y'),
+                    'deadline'     => $deadline->format('d/m/Y'),
                     'progress_pct' => max(5, min(100, $progressPct)),
-                    'priority'    => $c->Priority ?? 'Medium',
+                    'priority'     => $c->Priority ?? 'Medium',
+                    '_filed_at'    => $filed,
                 ];
-            });
+            })->filter();
+
+        $disciplinaryTimelines = $disciplinaryQuery->with(['category', 'offence'])
+            ->whereNotIn('status', ['resolved', 'rejected'])
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get()
+            ->map(function ($d) {
+                $filed = $d->created_at instanceof Carbon ? $d->created_at : ($d->created_at ? Carbon::parse($d->created_at) : null);
+                if (!$filed) return null;
+                $deadline = (clone $filed)->addDays(28);
+                $totalDays   = max(1, $filed->diffInDays($deadline));
+                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
+                $progressPct = (int) round(($usedDays / $totalDays) * 100);
+                $catName     = optional($d->category)->DisciplinaryCategoryName ?? 'Untitled';
+                $offence     = optional($d->offence)->OffensesName;
+                return [
+                    'name'         => 'Disciplinary — ' . $catName . ($offence ? ' (' . $offence . ')' : ''),
+                    'filed_date'   => $filed->format('d/m/Y'),
+                    'deadline'     => $deadline->format('d/m/Y'),
+                    'progress_pct' => max(5, min(100, $progressPct)),
+                    'priority'     => $d->Priority ?? 'Medium',
+                    '_filed_at'    => $filed,
+                ];
+            })->filter();
+
+        $caseTimelines = $grievanceTimelines->concat($disciplinaryTimelines)
+            ->sortByDesc(fn ($r) => $r['_filed_at']->getTimestamp())
+            ->take(3)
+            ->map(function ($r) { unset($r['_filed_at']); return $r; })
+            ->values();
 
         $totalPercengate = $totalcase > 0 ? round(($resolvedCase / $totalcase) * 100, 2) : 0;
 

@@ -249,7 +249,7 @@
                             <tr>
                                 <th>Category</th>
                                 <th>Offence</th>
-                                <th>Date</th>
+                                <th>Action Valid Until</th>
                                 <th>Action</th>
                             </tr>
                         </thead>

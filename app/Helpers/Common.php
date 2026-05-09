@@ -4335,7 +4335,6 @@ class Common
         {
             foreach($r as $ak)
             {
-                $url = Common::getResortUserPicture($ak->Parentid);
                 $notifUrl = Common::getNotificationUrl($ak);
                 // ResortNotification::getCreatedAtAttribute already formats
                 // the timestamp into the resort's display format (e.g.
@@ -4356,21 +4355,20 @@ class Common
 
                     $stickyClass = !empty($ak->is_sticky) ? ' notification-sticky' : '';
                     $stickyBadge = !empty($ak->is_sticky) ? '<span class="badge badge-warning ms-1">Pinned</span>' : '';
+                    // Profile image intentionally removed per UX request —
+                    // bell items now show only the message body + meta.
                     $string .= ' <div class="notification-box active'.$stickyClass.' class_remove_me_'.$ak->id.'">
-                                    <a href="'.$notifUrl.'" class="d-flex  profile-dropdown ">
-                                        <div class="flex-shrink-0 img-box " >
-                                            <img src="'. $url .'" alt="..." class="img-fluid" />
+                                    <a href="'.$notifUrl.'" class="d-flex profile-dropdown">
+                                        <div class="flex-grow-1">
+                                            <h5>'.$ak->type.' '.$stickyBadge.'</h5>
+                                            <p>' .$ak->message.' </p>
+                                            <br>
+                                            <span>'.$timeAgo.'</span>
                                         </div>
-                                    <div class="flex-grow-1 ms-3">
-                                        <h5>'.$ak->type.' '.$stickyBadge.'</h5>
-                                        <p>' .$ak->message.' </p>
-                                        <br>
-                                        <span>'.$timeAgo.'</span>
-                                    </div>
-                                </a>
+                                    </a>
                                     <a href="javascript:void(0);" class="btn-lg-icon btn-light-grey MarkNotification" data-id="'.$ak->id .'">
-                                    <i class="fas fa-envelope-open" aria-hidden="true"></i>
-                                </a>
+                                        <i class="fas fa-envelope-open" aria-hidden="true"></i>
+                                    </a>
                             </div>';
             }
             return $string;

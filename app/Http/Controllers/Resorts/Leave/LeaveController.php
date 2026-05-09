@@ -1949,9 +1949,16 @@ class LeaveController extends Controller
 
     public function getCombineInfo(Request $request)
     {
-        // Get the category_id from the request
-        $categoryId = $request->input('category_id'); // Assuming the key is 'category_ids' based on the AJAX data
-        if (count($categoryId) == 1) {
+        // Drop empty / null entries up front — adding a fresh "Add another"
+        // card sends an empty dropdown value, which previously made this
+        // endpoint flag a relation error against the placeholder card.
+        $categoryId = array_values(array_filter(
+            (array) $request->input('category_id'),
+            fn ($v) => $v !== null && $v !== '' && $v !== '0'
+        ));
+        $categoryId = array_values(array_unique(array_map('intval', $categoryId)));
+
+        if (count($categoryId) < 2) {
             return response()->json([
                 'status' => 'success',
                 'message' => 'Valid selection.',
@@ -1962,7 +1969,6 @@ class LeaveController extends Controller
         $leaveCategories = LeaveCategory::whereIn('id', $categoryId)->get();
 
         // Check for any relation: leave_category can be comma-separated IDs (e.g. "1,3,5"); at least one selected category must list another selected ID in its leave_category
-        $categoryId = array_map('intval', (array) $categoryId);
         $hasRelation = $leaveCategories->contains(function ($category) use ($categoryId) {
             $allowed = array_filter(array_map('trim', explode(',', $category->leave_category ?? '')));
             $allowed = array_map('intval', $allowed);

@@ -124,22 +124,28 @@ class WorkforcePlanningDashboardController extends Controller
 
 
 
-        // === Budgeted / Filled / Vacant SEAT counts (current year) ===
-        // Mirrors the fix in hr_dashboard(): the previous logic mixed
-        // employee-row totals with position-title counts so the math never
-        // reconciled. Source of truth is the manning request — sum of
+        // === Budgeted / Filled / Vacant SEAT counts ===
+        // Source of truth is the manning request — sum of
         // headcount/filledcount/vacantcount across position_monthly_data.
-        $manningYear = (int) date('Y');
+        // Prefer the current year's manning; if the resort hasn't filed
+        // current-year manning yet, fall back to the most recent year that
+        // does have data (resorts often plan next-year manning ahead of
+        // time, so we surface those numbers rather than zeros / fake
+        // position-name math). The view receives `manning_year` so the UI
+        // can label which year is being shown.
+        $currentYear = (int) date('Y');
         $totalBudgetedSeats = 0;
         $totalFilledSeats   = 0;
         $totalVacantSeats   = 0;
 
-        $hasCurrentYearManning = DB::table('manning_responses')
+        $manningYear = (int) (DB::table('manning_responses')
             ->where('resort_id', $resort_id)
-            ->where('year', $manningYear)
-            ->exists();
+            ->where('year', $currentYear)
+            ->exists()
+            ? $currentYear
+            : DB::table('manning_responses')->where('resort_id', $resort_id)->max('year'));
 
-        if ($hasCurrentYearManning) {
+        if ($manningYear) {
             $seatTotals = DB::table('position_monthly_data as pmd')
                 ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
                 ->where('mr.resort_id', $resort_id)
@@ -158,22 +164,21 @@ class WorkforcePlanningDashboardController extends Controller
             $totalVacantSeats   = (int) $seatTotals->sum('vacant');
         }
 
-        $usingManningData = $hasCurrentYearManning && $totalBudgetedSeats > 0;
+        $usingManningData = $manningYear !== 0 && $totalBudgetedSeats > 0;
         if (!$usingManningData) {
-            // Fallback: position-name level counts when no manning data exists.
-            $totalPositions = DB::table('resort_positions')
-                ->where('resort_id', $resort_id)
+            // No manning request anywhere for this resort — surface live
+            // employee numbers rather than fabricated vacant counts. We
+            // can't know the planned headcount without manning, so vacant
+            // is reported as 0 (the view labels the empty state via
+            // `using_manning_data`).
+            $activeEmployees = Employee::where('resort_id', $resort_id)
+                ->where('status', 'Active')
                 ->count();
-            $positionsWithEmployees = DB::table('resort_positions as p')
-                ->join('employees as e', 'e.Position_id', '=', 'p.id')
-                ->where('p.resort_id', $resort_id)
-                ->where('e.status', 'Active')
-                ->distinct()
-                ->count('p.id');
 
-            $totalBudgetedSeats = $totalPositions;
-            $totalFilledSeats   = $positionsWithEmployees;
-            $totalVacantSeats   = max(0, $totalPositions - $positionsWithEmployees);
+            $totalBudgetedSeats = $activeEmployees;
+            $totalFilledSeats   = $activeEmployees;
+            $totalVacantSeats   = 0;
+            $manningYear        = $currentYear;
         }
 
         $manning_response = (object) [
@@ -313,28 +318,26 @@ class WorkforcePlanningDashboardController extends Controller
 
 
         // === Tile counts: budgeted / filled / vacant SEATS ===
-        // The previous logic mixed three different scales (employee-rows,
-        // position-titles with ≥1 employee, position-titles with 0 employees)
-        // so 137 + 81 ≠ 278 on the dashboard. Source-of-truth for these tiles
-        // is the manning request (position_monthly_data: headcount, filledcount,
-        // vacantcount) which is at the SEAT level — i.e. "Chef × 3 seats" =
-        // 3 budgeted, regardless of how many distinct position-titles exist.
-
-        // Always show CURRENT-YEAR manning numbers — when none exist yet
-        // for the current year the tiles will read 0 / 0 / 0 and the view
-        // can surface the empty state via $manning_response->using_manning_data.
-        $manningYear = (int) date('Y');
-
+        // Source-of-truth is the manning request (position_monthly_data:
+        // headcount, filledcount, vacantcount) which is at the SEAT level —
+        // i.e. "Chef × 3 seats" = 3 budgeted regardless of how many distinct
+        // position-titles exist. Prefer current-year manning; if the resort
+        // hasn't filed it yet, fall back to the most recent year that has
+        // data (next-year planning is common, so we'd rather show those
+        // real numbers than fabricated position-title counts).
+        $currentYear = (int) date('Y');
         $totalBudgetedSeats = 0;
         $totalFilledSeats   = 0;
         $totalVacantSeats   = 0;
 
-        $hasCurrentYearManning = DB::table('manning_responses')
+        $manningYear = (int) (DB::table('manning_responses')
             ->where('resort_id', $resort_id)
-            ->where('year', $manningYear)
-            ->exists();
+            ->where('year', $currentYear)
+            ->exists()
+            ? $currentYear
+            : DB::table('manning_responses')->where('resort_id', $resort_id)->max('year'));
 
-        if ($hasCurrentYearManning) {
+        if ($manningYear) {
             // Per (position, manning_response) take the MAX across months —
             // the budget is normally constant within a year but if it differs,
             // MAX gives the planned ceiling. SUM across all positions/depts.
@@ -356,28 +359,20 @@ class WorkforcePlanningDashboardController extends Controller
             $totalVacantSeats   = (int) $seatTotals->sum('vacant');
         }
 
-        // Fallback when no manning request exists yet for the current year —
-        // show the live employee picture so tiles aren't all zero. Flag the
-        // case so the view can label it ("No manning request submitted for
-        // {year} yet — showing current employee data.").
-        $usingManningData = $hasCurrentYearManning && $totalBudgetedSeats > 0;
+        // No manning at all for this resort (any year): surface live
+        // employee numbers and label the empty state via
+        // `using_manning_data` instead of inventing vacant counts from
+        // position titles.
+        $usingManningData = $manningYear !== 0 && $totalBudgetedSeats > 0;
         if (!$usingManningData) {
-            $employeeRows = Employee::where('resort_id', $resort_id)
+            $activeEmployees = Employee::where('resort_id', $resort_id)
                 ->where('status', 'Active')
                 ->count();
-            $positionsWithEmployees = DB::table('resort_positions as p')
-                ->join('employees as e', 'e.Position_id', '=', 'p.id')
-                ->where('p.resort_id', $resort_id)
-                ->where('e.status', 'Active')
-                ->distinct()
-                ->count('p.id');
-            $totalPositions = DB::table('resort_positions')
-                ->where('resort_id', $resort_id)
-                ->count();
 
-            $totalBudgetedSeats = $totalPositions;
-            $totalFilledSeats   = $positionsWithEmployees;
-            $totalVacantSeats   = max(0, $totalPositions - $positionsWithEmployees);
+            $totalBudgetedSeats = $activeEmployees;
+            $totalFilledSeats   = $activeEmployees;
+            $totalVacantSeats   = 0;
+            $manningYear        = $currentYear;
         }
 
         $manning_response = (object) [
@@ -460,15 +455,18 @@ class WorkforcePlanningDashboardController extends Controller
     public function get_filledpositions(Request $request)
     {
         $resort_id = (int) $this->globalUser->resort_id;
+        // Dept-scope per the access-control spec: GM / HR / HR-dept HOD-XCOM
+        // see all departments; everyone else is restricted to their own
+        // department only. Was previously returning every position in the
+        // resort to non-HR HOD/EXCOM users.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
 
         if ($request->ajax())
         {
-            // Compute employee count per position with a correlated subquery
-            // INSIDE the base query — avoids the N+1 that fired one COUNT()
-            // per row in the previous addColumn callback.
             $resort_positions = DB::table('resort_positions as p')
                 ->leftJoin('resort_departments as rd', 'p.dept_id', '=', 'rd.id')
                 ->where('p.resort_id', '=', $resort_id)
+                ->when(is_array($scopedDeptIds), fn ($q) => $q->whereIn('p.dept_id', $scopedDeptIds))
                 ->select(
                     'p.id',
                     'p.position_title',
@@ -489,10 +487,18 @@ class WorkforcePlanningDashboardController extends Controller
     public function getEmployeeNames(Request $request)
     {
         $positionId = $request->get('position_id');
+        $resortId   = $this->globalUser->resort_id;
+        // Same dept-scope rule. The position itself already implies a
+        // department, but we still defend with whereIn(Dept_id) so a
+        // non-HR/HOD user can't surface employees for a position that
+        // belongs to another dept by passing a different position_id.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+
         $employees = Employee::where('Position_id', $positionId)
             ->with('resortAdmin:id,first_name,last_name')
-            ->where('resort_id', $this->globalUser->resort_id)
+            ->where('resort_id', $resortId)
             ->where('status', 'Active')
+            ->when(is_array($scopedDeptIds), fn ($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get('Admin_Parent_id');
 
         // Map employees to include the image URL

@@ -589,6 +589,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/transportation-options/submit', 'Leave\ConfigController@submitTransportationOptions')->name('submit.transportation');
 
     Route::get('/leave/apply','Leave\LeaveController@index')->name('leave.apply');
+    // Airport search (Select2 remote-data) — used by Apply Leave's
+    // DESTINATION dropdown and the Employee Detail "Leave Destination" field.
+    Route::get('/airports/search', 'AirportController@search')->name('resort.airports.search');
     Route::get('/leave/request','Leave\LeaveController@request')->name('leave.request');
     Route::get('/leave/filter/grid', 'Leave\LeaveController@filterLeaveGridRequests')->name('leave.filter.grid');
 
