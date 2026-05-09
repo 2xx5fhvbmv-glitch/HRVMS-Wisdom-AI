@@ -209,13 +209,62 @@
         </form>
     </div>
 </div>
+
+{{-- Cropper modal — opened when the user picks a profile picture. The
+     cropped result replaces the file in the original input via DataTransfer
+     so the existing form submit logic doesn't need to change. --}}
+<div class="modal fade" id="cropperModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adjust Profile Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="cropperCancelBtn"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Drag the box to position, scroll/pinch to zoom, then save. The image is cropped to a square (recommended for avatars).</p>
+                <div id="cropperContainer">
+                    <img id="cropperImage" alt="To crop">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" id="cropperCancelBtn2">Cancel</button>
+                <button type="button" class="btn btn-themeBlue btn-sm" id="cropperApplyBtn">Save crop</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endSection
 
 @section('import-css')
+{{-- Cropper.js — lets the user trim a tall/wide image to a square avatar
+     before upload. Without this, large portraits broke the page layout. --}}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha512-VBdo0a3pj/m7m6zMMjRPCsVjGVxKKW6vy+4O+vBQ/dpqkLQyl0cqzIE5ucJOd62GkXfh5L8kDLPkFKwgV9JLEw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+    /* Hard-cap the avatar preview height so an oversized portrait can't
+       push the form rows out of alignment. The cropper itself enforces a
+       1:1 ratio for new uploads, but legacy server-stored portraits still
+       need this guard. */
+    #profileimg, #signature_show_img {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 6px;
+        background: #f5f5f5;
+    }
+    #cropperImage { max-width: 100%; display: block; }
+    #cropperContainer {
+        max-height: 60vh;
+        background: #f8f9fa;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
 
+{{-- Cropper.js library — used by the profile-image change handler below. --}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" integrity="sha512-A7DoyT7ULYOqCkJZtMBd0kkBI06p0Qlcqs2aiJ3xPEPS8Pm9kqDS39A4j3T4ZV4bUSUgnPnkJyBPijQjzqzw0g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 $(document).ready(function(){
 
@@ -460,16 +509,102 @@ $(document).ready(function(){
         togglePasswordVisibility('confirmpassword', 'toggleConfirmPassword');
     });
 
-    $("#profile_picture").on("change", function(event) {
+    // Profile-image crop flow.
+    //
+    // When the user picks a file, open a Cropper.js modal instead of
+    // dumping the raw file into the form. After they confirm the crop,
+    // the cropped Blob is wrapped in a File and stuffed back into
+    // #profile_picture via DataTransfer — the existing FormData submit
+    // path then sends the trimmed image without any further changes.
+    var __cropper = null;
+    var __cropperTargetInput = document.getElementById('profile_picture');
+    var __cropperPreviewImg  = document.getElementById('profileimg');
 
+    $("#profile_picture").on("change", function (event) {
         var file = event.target.files[0];
-        if (file) {
-            var output = document.getElementById("profileimg");
-            output.src = URL.createObjectURL(file);
-            output.onload = function() {
-                URL.revokeObjectURL(output.src);
-            };
+        if (!file) return;
+        if (!file.type || file.type.indexOf('image/') !== 0) {
+            // Non-image (shouldn't normally happen — input has no
+            // accept=, but defend just in case). Fall back to the old
+            // direct-preview behaviour.
+            __cropperPreviewImg.src = URL.createObjectURL(file);
+            return;
         }
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var img = document.getElementById('cropperImage');
+            img.src = e.target.result;
+
+            // Tear down any previous cropper instance.
+            if (__cropper) { try { __cropper.destroy(); } catch (e) {} }
+
+            // Show the modal first, then init Cropper after the image
+            // has a non-zero width — Cropper needs measurable dimensions.
+            var modalEl = document.getElementById('cropperModal');
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+            modalEl.addEventListener('shown.bs.modal', function _init() {
+                modalEl.removeEventListener('shown.bs.modal', _init);
+                __cropper = new Cropper(img, {
+                    aspectRatio: 1,             // square avatar
+                    viewMode: 1,                 // crop box stays inside the canvas
+                    autoCropArea: 0.9,
+                    movable: true,
+                    zoomable: true,
+                    rotatable: false,
+                    scalable: false,
+                    background: false,
+                    minContainerHeight: 320,
+                });
+            }, { once: true });
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // "Save crop" — turn the crop selection into a JPEG Blob, wrap as
+    // File, and replace the file input's FileList. Bumping the size cap
+    // to 600px keeps the avatar small (~50KB) so we're not shipping
+    // megapixel portraits to Wasabi.
+    $('#cropperApplyBtn').on('click', function () {
+        if (!__cropper) return;
+        var canvas = __cropper.getCroppedCanvas({
+            width: 600,
+            height: 600,
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: 'high',
+        });
+        if (!canvas) return;
+        canvas.toBlob(function (blob) {
+            if (!blob) return;
+            var croppedFile = new File([blob], 'profile.jpg', { type: 'image/jpeg' });
+            // Replace the file input's FileList. DataTransfer is the
+            // standard way to programmatically set <input type=file> .files.
+            try {
+                var dt = new DataTransfer();
+                dt.items.add(croppedFile);
+                __cropperTargetInput.files = dt.files;
+            } catch (err) {
+                console.warn('DataTransfer not supported, falling back to direct assignment', err);
+            }
+            // Update the inline preview to the cropped image.
+            var url = URL.createObjectURL(blob);
+            __cropperPreviewImg.src = url;
+            __cropperPreviewImg.onload = function () { URL.revokeObjectURL(url); };
+
+            // Tear down + close.
+            try { __cropper.destroy(); } catch (e) {}
+            __cropper = null;
+            var modal = bootstrap.Modal.getInstance(document.getElementById('cropperModal'));
+            if (modal) modal.hide();
+        }, 'image/jpeg', 0.9);
+    });
+
+    // Cancelling the crop — clear the file input so a partially-picked
+    // file doesn't sit in the form half-loaded.
+    $('#cropperCancelBtn, #cropperCancelBtn2').on('click', function () {
+        if (__cropper) { try { __cropper.destroy(); } catch (e) {} __cropper = null; }
+        if (__cropperTargetInput) __cropperTargetInput.value = '';
     });
 
     $("#signature_img").on("change", function(event) {

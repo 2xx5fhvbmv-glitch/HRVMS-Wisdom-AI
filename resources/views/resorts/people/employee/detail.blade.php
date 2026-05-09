@@ -503,23 +503,15 @@
                                                                 <th>Leave Destination:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->leave_destination}}</span>
-                                                                    <select name="leave_destination" class="form-select select2-airport-search edit-mode d-none">
+                                                                    {{-- Select2 AJAX dropdown — full IATA list lives in the
+                                                                         airports table, queried via /resort/airports/search.
+                                                                         The single <option> below pre-loads the existing
+                                                                         saved value so the field renders correctly without
+                                                                         needing to ship every airport in the markup. --}}
+                                                                    <select name="leave_destination" class="form-select select2-airport-search edit-mode d-none" data-current-value="{{ $employee->leave_destination }}">
                                                                         <option value="">Select Destination Airport</option>
-                                                                        @if(!empty($airports['national']))
-                                                                            <optgroup label="National (Maldives)">
-                                                                                @foreach($airports['national'] as $ap)
-                                                                                    @php $optVal = $ap['code'].' - '.$ap['name']; @endphp
-                                                                                    <option value="{{ $optVal }}" @selected($employee->leave_destination === $optVal)>{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }})</option>
-                                                                                @endforeach
-                                                                            </optgroup>
-                                                                        @endif
-                                                                        @if(!empty($airports['international']))
-                                                                            <optgroup label="International">
-                                                                                @foreach($airports['international'] as $ap)
-                                                                                    @php $optVal = $ap['code'].' - '.$ap['name']; @endphp
-                                                                                    <option value="{{ $optVal }}" @selected($employee->leave_destination === $optVal)>{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }}{{ !empty($ap['country']) ? ', '.$ap['country'] : '' }})</option>
-                                                                                @endforeach
-                                                                            </optgroup>
+                                                                        @if(!empty($employee->leave_destination))
+                                                                            <option value="{{ $employee->leave_destination }}" selected>{{ $employee->leave_destination }}</option>
                                                                         @endif
                                                                     </select>
                                                                 </td>
@@ -3349,7 +3341,15 @@
                     width: '100%',
                     allowClear: true,
                     placeholder: 'Search airport (city, IATA code, or country)',
-                    minimumResultsForSearch: 0
+                    minimumInputLength: 1,
+                    ajax: {
+                        url: '{{ route("resort.airports.search") }}',
+                        dataType: 'json',
+                        delay: 200,
+                        data: function (params) { return { q: params.term }; },
+                        processResults: function (data) { return data; },
+                        cache: true
+                    }
                 });
             });
         });

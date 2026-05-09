@@ -82,22 +82,12 @@
                                     </div>
                                     <div class="col-md-6" id="field-destination">
                                         <label for="destination" class="form-label">DESTINATION<span class="red-mark destination-required-mark d-none">*</span></label>
+                                        {{-- Select2 AJAX-mode airport picker. The full IATA dataset
+                                             (~9k rows) lives in the `airports` table; the dropdown
+                                             queries /resort/airports/search?q=... as the user types
+                                             so the page stays light. --}}
                                         <select class="form-select select2-airport-search" name="destination" id="destination" data-parsley-errors-container="#destination-error">
                                             <option value="">Select Destination Airport</option>
-                                            @if(!empty($airports['national']))
-                                                <optgroup label="National (Maldives)">
-                                                    @foreach($airports['national'] as $ap)
-                                                        <option value="{{ $ap['code'] }} - {{ $ap['name'] }}">{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }})</option>
-                                                    @endforeach
-                                                </optgroup>
-                                            @endif
-                                            @if(!empty($airports['international']))
-                                                <optgroup label="International">
-                                                    @foreach($airports['international'] as $ap)
-                                                        <option value="{{ $ap['code'] }} - {{ $ap['name'] }}">{{ $ap['code'] }} — {{ $ap['name'] }} ({{ $ap['city'] }}{{ !empty($ap['country']) ? ', '.$ap['country'] : '' }})</option>
-                                                    @endforeach
-                                                </optgroup>
-                                            @endif
                                         </select>
                                         <div id="destination-error"></div>
                                     </div>
@@ -274,6 +264,80 @@
         display: block!important;
         margin-top: 5px!important;
     }
+
+    /* ── Leave Breakdown Summary card ─────────────────────────────── */
+    .leave-breakdown-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 18px 18px 6px;
+        margin: 12px 0 16px;
+        border: 1px solid #ececec;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .leave-breakdown-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        color: #1f2937;
+        margin: 0 0 14px;
+    }
+    .leave-breakdown-quadrants {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .leave-breakdown-tile {
+        background: #f3eddc;
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 90px;
+    }
+    .leave-breakdown-tile .tile-label {
+        font-size: 13px;
+        color: #4b5563;
+    }
+    .leave-breakdown-tile .tile-value {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+        color: #b45309; /* amber-700 */
+    }
+    .leave-breakdown-tile .tile-value.tile-amber  { color: #b45309; }
+    .leave-breakdown-tile .tile-value.tile-green  { color: #166534; } /* green-800 */
+
+    .leave-breakdown-rows {
+        border-top: 1px solid #ececec;
+        padding-top: 8px;
+    }
+    .leave-breakdown-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f1f1;
+        font-size: 14px;
+        color: #1f2937;
+    }
+    .leave-breakdown-row:last-child { border-bottom: none; }
+
+    .leave-breakdown-row .row-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .pill-purple     { background: #ede7ff; color: #5b21b6; }
+    .pill-blue       { background: #e0f2fe; color: #075985; }
+    .pill-amber      { background: #fef3c7; color: #92400e; }
+    .pill-green      { background: #dcfce7; color: #166534; }
+    .pill-green-soft { background: #ecfdf5; color: #065f46; }
+    .pill-red        { background: #fee2e2; color: #991b1b; }
 </style>
 @endsection
 
@@ -427,9 +491,9 @@
             $('#uploadFile-name').text(f.name);
         });
 
-        // Airport destination dropdown — search ALWAYS visible. The global
-        // layout init disables search for .select2t-none, so this select uses
-        // a separate class. Destroy first in case any earlier code inited it.
+        // Airport destination dropdown — Select2 AJAX mode. The full IATA
+        // dataset is in the `airports` table; we hit /resort/airports/search
+        // as the user types so the page doesn't ship 9k <option>s.
         $(".select2-airport-search").each(function () {
             var $sel = $(this);
             if ($sel.hasClass('select2-hidden-accessible')) {
@@ -439,9 +503,27 @@
                 width: '100%',
                 allowClear: true,
                 placeholder: 'Search airport (city, IATA code, or country)',
-                minimumResultsForSearch: 0
+                minimumInputLength: 1,
+                ajax: {
+                    url: '{{ route("resort.airports.search") }}',
+                    dataType: 'json',
+                    delay: 200,
+                    data: function (params) { return { q: params.term }; },
+                    processResults: function (data) { return data; },
+                    cache: true
+                }
             });
         });
+
+        // Pre-fill the previously-saved destination if any (e.g. when the
+        // page reloads after a server-side validation error and we still
+        // have an "old('destination')" value).
+        var preselectedDestination = @json(old('destination'));
+        if (preselectedDestination) {
+            var parts = String(preselectedDestination).split(' - ');
+            var $opt = new Option(parts.length === 2 ? (parts[0] + ' — ' + parts[1]) : preselectedDestination, preselectedDestination, true, true);
+            $('#destination').append($opt).trigger('change');
+        }
 
         // Apply leave-category-based validation (Mandatory/Optional/Hidden) when first leave category changes
         $(document).on('change', '#leaveCat1', function () {
@@ -516,36 +598,56 @@
                         <div class="row mb-3" id="${datepickerId}">
                             <div class="col-md-6">
                                 <label class="form-label">Departure Date for ${transportName}</label>
-                                <input type="text" class="form-control transport-departure-date" 
-                                    name="departure_date[${transportId}]" 
+                                <input type="text" class="form-control transport-departure-date"
+                                    name="departure_date[${transportId}]"
                                     placeholder="Select Departure Date">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Arrival Date for ${transportName}</label>
-                                <input type="text" class="form-control transport-arrival-date" 
-                                    name="arrival_date[${transportId}]" 
+                                <input type="text" class="form-control transport-arrival-date"
+                                    name="arrival_date[${transportId}]"
                                     placeholder="Select Arrival Date">
                             </div>
                         </div>
+                        <!--
+                            Departure / Arrival TIME fields hidden — employees
+                            don't know exact flight times when filing leave.
+                            Kept the markup commented so it can be re-enabled
+                            without rebuilding the template if HR changes its
+                            mind. Backend already nulls dept_time / arr_time
+                            when missing, so leaving them out is safe.
                         <div class="row mb-3" id="timepicker-${transportId}">
                             <div class="col-md-6">
-                                <label class="form-label">Departure Time for ${transportName}</label>
-                                <input type="time" class="form-control departure-time" name="departure_time[${transportId}]" placeholder="Select Departure Time">
+                                <label class="form-label">Departure Time for \${transportName}</label>
+                                <input type="time" class="form-control departure-time" name="departure_time[\${transportId}]" placeholder="Select Departure Time">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Arrival Time for ${transportName}</label>
-                                <input type="time" class="form-control arrival-time" name="arrival_time[${transportId}]" placeholder="Select Arrival Time">
+                                <label class="form-label">Arrival Time for \${transportName}</label>
+                                <input type="time" class="form-control arrival-time" name="arrival_time[\${transportId}]" placeholder="Select Arrival Time">
                             </div>
                         </div>
+                        -->
                     </div>
                 `);
 
-                    $(`#${datepickerId} .transport-arrival-date, #${datepickerId} .transport-departure-date`).datepicker({
-                    format: 'dd/mm/yyyy',
-                    autoclose: true,
-                    startDate: minDate,  // Cannot select before leave starts
-                    endDate: maxDate,    // Cannot select after leave ends
-                });
+                    // Departure can be ONE day before leave starts (employees
+                    // commonly fly out the night before). Arrival is bounded
+                    // to the leave window itself.
+                    const transportDepMinDate = new Date(minDate);
+                    transportDepMinDate.setDate(transportDepMinDate.getDate() - 1);
+
+                    $(`#${datepickerId} .transport-departure-date`).datepicker({
+                        format: 'dd/mm/yyyy',
+                        autoclose: true,
+                        startDate: transportDepMinDate,
+                        endDate: maxDate,
+                    });
+                    $(`#${datepickerId} .transport-arrival-date`).datepicker({
+                        format: 'dd/mm/yyyy',
+                        autoclose: true,
+                        startDate: minDate,
+                        endDate: maxDate,
+                    });
             } else {
                 $(`#main-${transportId}`).remove(); // Remove if unchecked
             }
@@ -567,19 +669,23 @@
             const minDate = parseDate(fromDateStr);
             const maxDate = parseDate(toDateStr);
 
-            // Update transportation datepickers
-            $('.transport-arrival-date, .transport-departure-date').each(function() {
-                $(this).datepicker('setStartDate', minDate);
-                $(this).datepicker('setEndDate', maxDate);
-            });
-
-            // Update departure pass datepickers.
             // Departure can be ONE DAY BEFORE the leave starts — employees
             // commonly catch a flight in the evening after their last
             // working day. Arrival stays inside the leave window.
             const depMinDate = new Date(minDate);
             depMinDate.setDate(depMinDate.getDate() - 1);
 
+            // Update per-transportation datepickers (departure: -1 day; arrival: leave window).
+            $('.transport-departure-date').each(function () {
+                $(this).datepicker('setStartDate', depMinDate);
+                $(this).datepicker('setEndDate', maxDate);
+            });
+            $('.transport-arrival-date').each(function () {
+                $(this).datepicker('setStartDate', minDate);
+                $(this).datepicker('setEndDate', maxDate);
+            });
+
+            // Update departure pass datepickers (same rule).
             $('#depDate').datepicker('setStartDate', depMinDate);
             $('#depDate').datepicker('setEndDate', maxDate);
 
@@ -628,14 +734,35 @@
 
     });
 
+    // Combine-info validator. Runs whenever the user picks a leave
+    // category, but skips while we're already showing an error (so the
+    // .val(null).trigger('change') below doesn't recurse and re-fire the
+    // toast for the remaining selections), and dedupes in-flight calls
+    // so Select2's double-fire doesn't produce two toasts.
+    window.__combineInfoSuppressed = false;
+    window.__combineInfoInflight = null;
     $(document).on('change', '.LeaveCate_id', function () {
+        if (window.__combineInfoSuppressed) return;
         var $select = $(this);
-        // Run after Select2 has finished updating so the selected value is stable
         var runAjax = function () {
+            // Only consider DROPDOWNS WITH AN ACTUAL VALUE — clicking
+            // "Add another" creates an empty dropdown; including its
+            // blank value previously triggered a spurious "No relation"
+            // toast.
             var selectedValues = $("select[name^='leave_category_id']").map(function () {
-                return $(this).val();
-            }).get();
-            $.ajax({
+                var v = $(this).val();
+                return (v === null || v === '' || (Array.isArray(v) && !v.length)) ? null : v;
+            }).get().filter(function (v) { return v !== null; });
+
+            if (selectedValues.length < 2) return;
+
+            // Cancel any in-flight request — the latest selection is the
+            // only one that matters.
+            if (window.__combineInfoInflight && window.__combineInfoInflight.readyState !== 4) {
+                try { window.__combineInfoInflight.abort(); } catch (e) {}
+            }
+
+            window.__combineInfoInflight = $.ajax({
                 url: "{{ route('leaves.combineInfo.get') }}",
                 method: 'GET',
                 data: { category_id: selectedValues },
@@ -646,10 +773,21 @@
                         toastr.error(response.message || 'Invalid selection', "Error", {
                             positionClass: 'toast-bottom-right'
                         });
-                        $(this).val(null).trigger('change');
+                        // Clear the just-picked value WITHOUT re-firing
+                        // the validator — otherwise the remaining picks
+                        // get re-checked and surface a duplicate toast.
+                        window.__combineInfoSuppressed = true;
+                        try {
+                            $(this).val(null).trigger('change.select2');
+                        } finally {
+                            // Release the suppression on the next tick so
+                            // future user selections still validate.
+                            setTimeout(function () { window.__combineInfoSuppressed = false; }, 0);
+                        }
                     }
                 },
                 error: function (xhr, status, error) {
+                    if (status === 'abort') return; // ignore deliberate cancels
                     toastr.error(xhr.responseJSON?.message || error || "Request failed", "Error", {
                         positionClass: 'toast-bottom-right'
                     });
@@ -742,10 +880,12 @@
             const remainingLeaves = (!isNaN(availableDays) && availableDays >= 0) ? availableDays : (allowedLeaves - usedLeaves);
 
             if (leaveCategoryText && fromDate && toDate) {
-                const { totalDays, formattedRange } = calculateTotalDays(fromDate, toDate);
+                const breakdown = calculateTotalDays(fromDate, toDate);
+                const { totalDays, formattedRange, calendarDays, fridaysExcluded, holidaysExcluded } = breakdown;
 
                 totalLeaveDays += totalDays; // Add total days
                 const leaveExceedsBalance = totalDays > remainingLeaves; // Check balance
+                const balanceRemaining = remainingLeaves - totalDays;
 
                 if (leaveExceedsBalance) {
                     isFormValid = false; // Mark form as invalid
@@ -765,6 +905,57 @@
                             <h6>${formattedRange}</h6><span>${totalDays} Days</span>
                         </div>
                         <p>Available Leave Balance: ${remainingLeaves} ${warningText}</p>
+                    </div>
+
+                    <!-- Leave Breakdown Summary card -->
+                    <div class="leave-breakdown-card">
+                        <h6 class="leave-breakdown-title">LEAVE BREAKDOWN SUMMARY</h6>
+
+                        <div class="leave-breakdown-quadrants">
+                            <div class="leave-breakdown-tile tile-soft-grey">
+                                <span class="tile-label">Calendar days selected</span>
+                                <span class="tile-value">${calendarDays}</span>
+                            </div>
+                            <div class="leave-breakdown-tile tile-soft-grey">
+                                <span class="tile-label">Fridays (excluded)</span>
+                                <span class="tile-value tile-amber">${fridaysExcluded}</span>
+                            </div>
+                            <div class="leave-breakdown-tile tile-soft-grey">
+                                <span class="tile-label">Public holidays (excl.)</span>
+                                <span class="tile-value tile-amber">${holidaysExcluded}</span>
+                            </div>
+                            <div class="leave-breakdown-tile tile-soft-grey">
+                                <span class="tile-label">Actual working days</span>
+                                <span class="tile-value tile-green">${totalDays}</span>
+                            </div>
+                        </div>
+
+                        <div class="leave-breakdown-rows">
+                            <div class="leave-breakdown-row">
+                                <span class="row-label"><strong>Calendar days (${formattedRange})</strong></span>
+                                <span class="row-pill pill-purple">${calendarDays} days</span>
+                            </div>
+                            <div class="leave-breakdown-row">
+                                <span class="row-label"><strong>Fridays (not counted)</strong></span>
+                                <span class="row-pill pill-blue">${fridaysExcluded > 0 ? '– ' : ''}${fridaysExcluded} days</span>
+                            </div>
+                            <div class="leave-breakdown-row">
+                                <span class="row-label"><strong>Public holidays (not counted)</strong></span>
+                                <span class="row-pill pill-amber">${holidaysExcluded > 0 ? '– ' : ''}${holidaysExcluded} days</span>
+                            </div>
+                            <div class="leave-breakdown-row">
+                                <span class="row-label"><strong>Working days consumed</strong></span>
+                                <span class="row-pill pill-green">${totalDays} days</span>
+                            </div>
+                            <div class="leave-breakdown-row">
+                                <span class="row-label"><strong>Leave entitlement (${leaveCategoryText.trim()})</strong></span>
+                                <span class="row-pill pill-purple">${remainingLeaves} days</span>
+                            </div>
+                            <div class="leave-breakdown-row">
+                                <span class="row-label"><strong>Balance remaining</strong></span>
+                                <span class="row-pill ${balanceRemaining < 0 ? 'pill-red' : 'pill-green-soft'}">${balanceRemaining} days</span>
+                            </div>
+                        </div>
                     </div>
                     <hr class="mt-1 mb-3">
                 `;
@@ -803,7 +994,8 @@
 
     // Function to calculate total days, EXCLUDING Fridays (resort weekly off)
     // and public holidays — the user shouldn't have those counted against
-    // their leave balance.
+    // their leave balance. Returns the breakdown so the summary card can
+    // render the four-quadrant view (calendar / fridays / holidays / working).
     function calculateTotalDays(from, to) {
         const fromParts = from.split('/');
         const toParts = to.split('/');
@@ -815,24 +1007,38 @@
             return {
                 totalDays: 0,
                 formattedRange: '',
+                calendarDays: 0,
+                fridaysExcluded: 0,
+                holidaysExcluded: 0,
+                holidayDetails: [],
             };
         }
 
-        let totalDays = 0;
+        let calendarDays = 0;
+        let fridaysExcluded = 0;
+        let holidaysExcluded = 0;
+        const holidayDetails = [];
         const cursor = new Date(fromDate);
         while (cursor <= toDate) {
+            calendarDays++;
             const isFriday = cursor.getDay() === 5;
             const yyyy = cursor.getFullYear();
             const mm = String(cursor.getMonth() + 1).padStart(2, '0');
             const dd = String(cursor.getDate()).padStart(2, '0');
             const key = `${yyyy}-${mm}-${dd}`;
             const isHoliday = window.__publicHolidaySet.has(key);
-            if (!isFriday && !isHoliday) {
-                totalDays++;
+            // Friday takes precedence — a public holiday that lands on a
+            // Friday already wasn't being counted, so no double-deduction.
+            if (isFriday) {
+                fridaysExcluded++;
+            } else if (isHoliday) {
+                holidaysExcluded++;
+                holidayDetails.push(key);
             }
             cursor.setDate(cursor.getDate() + 1);
         }
 
+        const totalDays = calendarDays - fridaysExcluded - holidaysExcluded;
         const options = { day: '2-digit', month: 'short' };
         const fromFormatted = fromDate.toLocaleDateString('en-GB', options);
         const toFormatted = toDate.toLocaleDateString('en-GB', options);
@@ -840,6 +1046,10 @@
         return {
             totalDays: totalDays,
             formattedRange: `${fromFormatted} - ${toFormatted}`,
+            calendarDays: calendarDays,
+            fridaysExcluded: fridaysExcluded,
+            holidaysExcluded: holidaysExcluded,
+            holidayDetails: holidayDetails,
         };
     }
 

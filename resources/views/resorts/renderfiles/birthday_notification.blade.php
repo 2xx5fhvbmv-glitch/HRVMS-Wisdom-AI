@@ -1,14 +1,14 @@
+{{-- Live (Pusher) notification card. Profile avatar removed per UX
+     request — keep the layout consistent with the on-load bell render
+     in Common::ResortNotification(). --}}
 @if($message1 && $name )
     <div class="notification-box active class_remove_me_{{ $message1->id }}">
-        <a href="#" class="d-flex profile-dropdown  ">
-            <div class="flex-shrink-0 img-box">
-                <img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="..." class="img-fluid" />
-            </div>
-            <div class="flex-grow-1 ms-3">
+        <a href="#" class="d-flex profile-dropdown">
+            <div class="flex-grow-1">
                 <h5>{!!$message1->Type !!}</h5>
                 <p>{!!$message1->message !!}</p>
                 <br>
-                <span>Current Date andc Time: {{ \Carbon\Carbon::now()->format('Y-m-d H:i:s') }}</span>
+                <span>{{ \Carbon\Carbon::now()->diffForHumans() }}</span>
             </div>
         </a>
         <a href="javascript:void(0);" class="btn-lg-icon btn-light-grey MarkNotification" data-id="{{ $message1->id }}">

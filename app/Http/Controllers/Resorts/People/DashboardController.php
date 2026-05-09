@@ -393,16 +393,32 @@ class DashboardController extends Controller
 
     public function getDepartmentCounts($divisionId = null)
     {
+        // Two earlier bugs in this query:
+        //   1. Joined `employees` only on Dept_id, with no employee.resort_id
+        //      filter — so any employee from another resort that happened to
+        //      share a Dept_id (FK collision in a multi-resort install)
+        //      counted toward the chart.
+        //   2. Counted every status (Active / Inactive / Resigned / Terminated),
+        //      so the "Distribution by department" inflated past current
+        //      headcount.
+        // Pin both join sides to the same resort and restrict to Active.
+        // LEFT JOIN so departments with zero employees still appear with 0.
+        $resortId = $this->resort->resort_id;
         $query = DB::table('resort_departments')
-            ->join('employees', 'resort_departments.id', '=', 'employees.Dept_id')
-            ->where('resort_departments.resort_id',$this->resort->resort_id)
+            ->leftJoin('employees', function ($join) use ($resortId) {
+                $join->on('resort_departments.id', '=', 'employees.Dept_id')
+                     ->where('employees.resort_id', '=', $resortId)
+                     ->where('employees.status', '=', 'Active');
+            })
+            ->where('resort_departments.resort_id', $resortId)
+            ->where('resort_departments.status', 'active')
             ->select('resort_departments.name as department', DB::raw('count(employees.id) as count'));
 
         if ($divisionId) {
             $query->where('resort_departments.division_id', $divisionId);
         }
 
-        $data = $query->groupBy('resort_departments.id')->get();
+        $data = $query->groupBy('resort_departments.id', 'resort_departments.name')->get();
 
         return response()->json($data);
     }

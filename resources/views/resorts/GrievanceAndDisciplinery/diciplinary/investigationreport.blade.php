@@ -45,11 +45,31 @@
                                 </tr>
                                 <tr>
                                     <th>Disciplinary Offence:</th>
-                                    <td>{{ $Disciplinary_parent->SubCatName }}</td>
+                                    {{-- Was reading $Disciplinary_parent->SubCatName which the
+                                         controller never populated — the SELECT only aliases
+                                         t6.OffensesName, so the field always rendered blank. --}}
+                                    <td>{{ $Disciplinary_parent->OffensesName ?? '—' }}</td>
                                 </tr>
                                 <tr>
                                     <th>Committee:</th>
                                     <td>{{ $Disciplinary_parent->CommitteeName ?: 'Unassigned' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created Date:</th>
+                                    <td>{{ $Disciplinary_parent->created_at ? \Carbon\Carbon::flexible($Disciplinary_parent->created_at)->format('d M Y, h:i A') : '—' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Action Valid Until:</th>
+                                    <td>
+                                        @php
+                                            $exp = $Disciplinary_parent->Expiry_date ?? null;
+                                        @endphp
+                                        @if(empty($exp) || $exp === '0000-00-00')
+                                            —
+                                        @else
+                                            {{ \Carbon\Carbon::parse($exp)->format('d M Y') }}
+                                        @endif
+                                    </td>
                                 </tr>
 
                                 <tr>
