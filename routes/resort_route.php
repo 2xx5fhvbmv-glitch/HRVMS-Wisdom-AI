@@ -179,6 +179,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post( '/workforce-planning/manning/budget-monthwise', 'WorkforcePlanningDashboardController@ManningBudgetMonthWise')->name('resort.ManningBudget.MonthWise');
 
     Route::get( '/user/profile', ['App\Http\Controllers\Resorts\ResortLoginController','ResortProfile'] )->name('resort.user.profile');
+    Route::post('/admin-notifications/{id}/dismiss', 'AdminBroadcastNotificationController@dismiss')->name('resort.adminBroadcast.dismiss');
     Route::post( '/update/user/profile', ['App\Http\Controllers\Resorts\ResortLoginController','UpdateResortProfile'] )->name('resort.Updateuser.profile');
     Route::post( '/change/password', ['App\Http\Controllers\Resorts\ResortLoginController','changePassword'] )->name('resort.profile.changePassword');
     /***Manning page  */

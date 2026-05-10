@@ -20,6 +20,8 @@
         
     @include('resorts.layouts.header')
 
+    @include('resorts.layouts.admin_broadcast_banner')
+
     @yield('content')
 
     {{-- @include('resorts.layouts.sidebar') --}}

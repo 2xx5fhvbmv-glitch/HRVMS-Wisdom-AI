@@ -3583,6 +3583,45 @@ class Common
     }
 
     /**
+     * Active admin-broadcast notifications the current resort-admin user
+     * should see in the header banner. Filters by:
+     *   - notification.status = 'active'
+     *   - today between start_date and end_date (inclusive)
+     *   - notification is targeted at the user's resort (notification_resort pivot)
+     *   - the user has NOT dismissed it in the current session
+     *
+     * Dismissals are SESSION-scoped (not DB-backed): the user crosses the
+     * banner and it's gone for the rest of that login, but on the next
+     * login the banner returns. It only stops appearing when the
+     * notification's end_date passes (or admin marks it inactive).
+     */
+    public static function getActiveAdminNotifications()
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) return collect();
+
+        $today = \Carbon\Carbon::today()->toDateString();
+        $dismissedIds = (array) session('dismissed_admin_notifications', []);
+
+        // notifications.start_date / end_date are varchar in 'd M Y'
+        // format (e.g. "07 May 2026"), not DATE columns. Parse with
+        // STR_TO_DATE so date comparison actually works.
+        $query = \DB::table('notifications as n')
+            ->join('notification_resort as nr', 'nr.notification_id', '=', 'n.id')
+            ->where('nr.resort_id', $user->resort_id)
+            ->where('n.status', 'active')
+            ->whereRaw("STR_TO_DATE(n.start_date, '%d %M %Y') <= ?", [$today])
+            ->whereRaw("STR_TO_DATE(n.end_date,   '%d %M %Y') >= ?", [$today]);
+
+        if (!empty($dismissedIds)) {
+            $query->whereNotIn('n.id', $dismissedIds);
+        }
+
+        return $query->orderByDesc('n.id')
+            ->get(['n.id', 'n.name', 'n.content', 'n.notice_color', 'n.font_color']);
+    }
+
+    /**
      * Returns true when the given department id refers to the HR / Human Resources department.
      * Used to grant HR HOD and HR EXCOM the same full-system visibility as GM.
      */
