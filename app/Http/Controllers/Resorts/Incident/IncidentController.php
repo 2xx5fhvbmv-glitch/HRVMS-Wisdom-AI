@@ -44,14 +44,28 @@ class IncidentController extends Controller
     
     public function index()
     {
+        // Incident List page is restricted to the full-data-access set
+        // (HR / GM / HR-dept HOD-EXCOM / super admin). Other-dept HOD/EXCOM
+        // were previously able to open the page; per spec the list is
+        // HR/GM only — they get a 403 here. Per-record drill-down (view /
+        // investigation) is still available to committee members via
+        // Common::canViewIncidentInvestigation().
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Unauthorized access');
+        }
+
         $page_title ='Incident List';
         $resort_id = $this->resort->resort_id;
-        $categories = IncidentCategory::where('resort_id',$resort_id)->get();        
+        $categories = IncidentCategory::where('resort_id',$resort_id)->get();
         return view('resorts.incident.incident.index',compact('page_title','categories'));
     }
 
     public function list(Request $request)
     {
+        // Mirror the index() gate so the AJAX feed can't be hit directly.
+        if (!Common::hasFullDataAccess()) {
+            return abort(403, 'Unauthorized access');
+        }
         if ($request->ajax()) {
             $loggedInEmployee = $this->resort->getEmployee;
             $rank = config('settings.Position_Rank');

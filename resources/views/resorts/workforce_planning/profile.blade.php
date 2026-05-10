@@ -238,7 +238,7 @@
 @section('import-css')
 {{-- Cropper.js — lets the user trim a tall/wide image to a square avatar
      before upload. Without this, large portraits broke the page layout. --}}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha512-VBdo0a3pj/m7m6zMMjRPCsVjGVxKKW6vy+4O+vBQ/dpqkLQyl0cqzIE5ucJOd62GkXfh5L8kDLPkFKwgV9JLEw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha512-UtLOu9C7NuThQhuXXrGwx9Jb/z9zPQJctuAgNUBK3Z6kkSYT9wJ+2+dh6klS+TDBCV9kNPBbAxbVD+vCcfGPaA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 <style>
     /* Hard-cap the avatar preview height so an oversized portrait can't
        push the form rows out of alignment. The cropper itself enforces a
@@ -264,7 +264,7 @@
 @section('import-scripts')
 
 {{-- Cropper.js library — used by the profile-image change handler below. --}}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" integrity="sha512-A7DoyT7ULYOqCkJZtMBd0kkBI06p0Qlcqs2aiJ3xPEPS8Pm9kqDS39A4j3T4ZV4bUSUgnPnkJyBPijQjzqzw0g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" integrity="sha512-JyCZjCOZoyeQZSd5+YEAcFgz2fowJ1F1hyJOXgtKu4llIa0KneLcidn5bwfutiehUTiOuK87A986BZJMko0eWQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 $(document).ready(function(){
 
