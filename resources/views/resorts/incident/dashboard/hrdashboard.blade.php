@@ -81,6 +81,28 @@
                         </div>
                     </div>
                 </div>
+                {{-- Incident List widget — visible to HR / GM / HR-dept HOD-EXCOM
+                     (the same set the HOD dashboard uses). Mirrors the
+                     `card-todoIncidentHOD` widget from the HOD dashboard so HR
+                     and GM can see the live incident feed too. --}}
+                <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
+                    <div class="card card-todoIncidentHOD" id="card-todoIncidentHOD">
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">Incident List</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{route('incident.index')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main" id="incidentTodoList">
+                            <!-- Dynamic content will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class=" card">
                         <div class=" card-title">
@@ -440,8 +462,43 @@
         let myStackedBarChartInstance = null;
         let incidentChart;
         const meetingDetailBaseUrl = "{{ route('incident.meeting.detail', ['id' => 'MEETING_ID']) }}";
-                          
+        const incidentDetailBaseUrl = "{{ route('incident.view', ['id' => 'INCIDENT_ID']) }}";
+
+        function loadIncidentTodoList() {
+            $.ajax({
+                url: '{{ route("incident.todoList") }}',
+                method: 'GET',
+                success: function (data) {
+                    let html = '';
+                    if (!data || data.length === 0) {
+                        html = `<div class="text-center py-3">No incidents found.</div>`;
+                    } else {
+                        data.forEach(incident => {
+                            html += `
+                            <div class="leaveUser-block">
+                                <div>
+                                    <div class="d-flex justify-content-between">
+                                        <h6>${incident.title}</h6>
+                                        <span class="badge badge-themeNew1 border-0">${incident.time_ago}</span>
+                                    </div>
+                                    <p>${incident.description}</p>
+                                    <div>
+                                        <a href="${incidentDetailBaseUrl.replace('INCIDENT_ID', btoa(incident.id))}" class="a-linkTheme">View Details</a>
+                                    </div>
+                                </div>
+                            </div>`;
+                        });
+                    }
+                    $('#incidentTodoList').html(html);
+                },
+                error: function () {
+                    $('#incidentTodoList').html(`<div class="text-danger py-3 text-center">Error loading data.</div>`);
+                }
+            });
+        }
+
         $(document).ready(function () {
+            loadIncidentTodoList();
             loadParticipationChart();
             loadResolutionTimelineStats();
             loadUpcomingMeetings();

@@ -399,11 +399,16 @@ $(document).ready(function(){
                         if (response.success) {
                             $('#sendReminder-modal').modal('hide');
 
-                            // Check if a new profile picture file is selected
+                            // Update only the avatar in the navbar dropdown TOGGLE, not
+                            // the dropdown menu items (Profile / Settings / Currency etc.
+                            // each have their own .img-box icon and would otherwise all
+                            // get replaced with the user's avatar). The toggle's avatar
+                            // sits inside `.profile-dropdown > .nav-link.dropdown-toggle`
+                            // — scope the selector to that anchor only.
                             var profilePictureInput = $('#profile_picture')[0];
                             if (profilePictureInput.files && profilePictureInput.files[0]) {
                                 var newProfilePictureUrl = URL.createObjectURL(profilePictureInput.files[0]);
-                                $('.profile-dropdown .img-box img').attr('src', newProfilePictureUrl);
+                                $('.profile-dropdown > .dropdown-toggle .img-box img').first().attr('src', newProfilePictureUrl);
                             }
 
 

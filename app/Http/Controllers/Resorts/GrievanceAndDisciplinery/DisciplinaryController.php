@@ -607,9 +607,17 @@ class DisciplinaryController extends Controller
             $file = $request->investigation_file;
             $Files = array();
             if(isset($file)) {
+                // Use the Disciplinary upload path + the case's Disciplinary_id
+                // subfolder so the URL the view builds in DisciplineryInvestigation()
+                // — uploads/DisciplinaryAttachments/{resort_id}/{Disciplinary_id}/file —
+                // actually resolves to a real file on disk. Was writing to
+                // public/uploads/GrievanceSubmission (wrong module) without the
+                // case subdir, so every attachment 404'd from the view page.
+                $FilePath = config('settings.DisciplinaryAttachments')
+                    .'/'.$this->resort->resort->resort_id
+                    .'/'.$request->Disciplinary_form_id;
                 foreach($file as $f) {
-                    $FilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
-                    $f->move($FilePath, $f->getClientOriginalName());
+                    $f->move(public_path($FilePath), $f->getClientOriginalName());
                     $Files[] = $f->getClientOriginalName();
                 }
             }

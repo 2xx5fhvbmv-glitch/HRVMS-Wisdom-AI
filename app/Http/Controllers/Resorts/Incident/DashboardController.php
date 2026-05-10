@@ -698,12 +698,13 @@ class DashboardController extends Controller
 
     public function getIncidentTodoList()
     {
-        $resort_id = $this->resort->resort_id;
-        $department_id = $this->resort->GetEmployee->Dept_id;
-        $incidents =  Incidents::where('resort_id', $resort_id)
-            ->whereHas('reporter', function ($query) use ($department_id) {
-                $query->where('Dept_id', $department_id);
-            })
+        // Was hard-scoped to the logged-in user's own department, so HR /
+        // GM saw zero results (HR-dept employees rarely report operational
+        // incidents) and master admins crashed on a null GetEmployee.
+        // Now uses the same viewer scope as every other dashboard endpoint:
+        // full-access users see all incidents, other-dept HOD/EXCOM see
+        // their own dept's reported incidents.
+        $incidents = $this->scopeForCurrentViewer(Incidents::query())
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
