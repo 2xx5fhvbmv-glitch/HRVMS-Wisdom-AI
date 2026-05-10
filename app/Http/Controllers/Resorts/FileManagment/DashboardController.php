@@ -210,22 +210,31 @@ class DashboardController extends Controller
     }
     public function AuditLogsDashboardList(Request $request)
     {
-        
+        // Mirror of FileManageController@AuditLogsList — was setting
+        // ModifiedBy to just the avatar URL with no resort_admins join, so
+        // the user's name never appeared in the column.
         $ChildFiles = AuditLogs::join('child_file_management as t1', 't1.id', '=', 'audit_logs.file_id')
+        ->leftJoin('resort_admins as ra', 'ra.id', '=', 'audit_logs.created_by')
         ->where('audit_logs.resort_id', $this->resort->resort_id)
         ->whereDate('audit_logs.created_at', Carbon::today())
         ->orderBy('audit_logs.id', 'DESC')
         ->limit(20)
         ->groupBy('audit_logs.id')
-            ->get(['t1.File_Name as FileName', 'audit_logs.*'])
+            ->get([
+                't1.File_Name as FileName',
+                'ra.first_name as ModifierFirstName',
+                'ra.last_name  as ModifierLastName',
+                'audit_logs.*'
+            ])
             ->map(function($i) {
-                $i->ModifiedBy = Common::getResortUserPicture($i->created_by); 
-                $i->Time = $i->created_at->format('H:i:s');
-                $i->LastModified = $i->created_at->format('d M Y');
-                $i->ActionType = $i->TypeofAction;
+                $i->ModifierName  = trim(($i->ModifierFirstName ?? '') . ' ' . ($i->ModifierLastName ?? '')) ?: 'Unknown user';
+                $i->ModifierPic   = Common::getResortUserPicture($i->created_by);
+                $i->Time          = $i->created_at->format('H:i:s');
+                $i->LastModified  = $i->created_at->format('d M Y');
+                $i->ActionType    = $i->TypeofAction;
                 return $i;
             });
-            if ($request->ajax()) 
+            if ($request->ajax())
             {
                 return datatables()->of($ChildFiles)
                     ->editColumn('ActionType', function ($row) {
@@ -234,13 +243,17 @@ class DashboardController extends Controller
                     ->editColumn('FileName', function ($row) {
                         return $row->FileName;
                     })
-                    ->editColumn('ModifiedBy', function ($row) 
+                    ->editColumn('ModifiedBy', function ($row)
                     {
-                        $imgUrl = $row->ModifiedBy ?? asset('resorts_assets/images/user-2.svg');
-                        
-                        return '<div class="user-ovImg user-ovImgTable"><div class="img-circle">
-                                    <img src="'.$imgUrl.'" alt="user">
-                                </div></div>';
+                        $imgUrl = $row->ModifierPic ?: asset('resorts_assets/images/user-2.svg');
+                        $name   = e($row->ModifierName);
+
+                        return '<div class="d-flex align-items-center gap-2">
+                                    <div class="user-ovImg user-ovImgTable"><div class="img-circle">
+                                        <img src="'.$imgUrl.'" alt="'.$name.'">
+                                    </div></div>
+                                    <span>'.$name.'</span>
+                                </div>';
                     })
                     ->editColumn('LastModified', function ($row) {
                         return $row->LastModified;

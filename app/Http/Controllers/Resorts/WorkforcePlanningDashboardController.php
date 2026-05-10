@@ -637,6 +637,11 @@ class WorkforcePlanningDashboardController extends Controller
             ->groupBy('message_id')
             ->get()
             ->toArray();
+            // Show a Revise prompt only when the LATEST budget_status for
+            // the message is "Rejected". Was missing both the status filter
+            // and the latest-row constraint, so once GM later approved the
+            // budget (a newer Approved row), the older Rejected row still
+            // came back and the Revise button stayed enabled.
             $BudgetRejactedStatus  =  ResortsParentNotifications::join('resort_admins as t1', 't1.id', '=', 'resorts_parent_notifications.user_id')
             ->join('employees as t2', 't2.Admin_Parent_id', '=', 't1.id')
             ->leftJoin('resort_departments as t3', 't3.id', '=', 't2.Dept_id')
@@ -645,6 +650,8 @@ class WorkforcePlanningDashboardController extends Controller
             ->join('manning_responses as t6', 't6.id', '=', 't5.Budget_id')
             ->where('t5.resort_id', $resort_id)
             ->where('t5.Department_id', $Dept_id)
+            ->where('t5.status', 'Rejected')
+            ->whereRaw('t5.id = (SELECT MAX(bs2.id) FROM budget_statuses bs2 WHERE bs2.message_id = t5.message_id AND bs2.resort_id = ? AND bs2.Department_id = ?)', [$resort_id, $Dept_id])
             ->where('t4.response', "Yes")
             ->orderBy('t5.id',  'desc')
             ->first([

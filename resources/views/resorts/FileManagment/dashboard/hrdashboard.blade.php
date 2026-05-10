@@ -26,7 +26,7 @@
             <div class="col-lg-3">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Filles</h3>
+                        <h3>Files</h3>
                     </div>
                     <div class="row g-3 align-items-center">
                         <div class="col-lg-12 col-sm-6">

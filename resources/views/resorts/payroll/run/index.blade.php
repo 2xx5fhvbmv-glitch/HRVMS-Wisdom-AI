@@ -771,10 +771,13 @@
             console.warn('Parsley.js is not loaded — form validation may not work');
         }
 
-        // View-only mode: disable all editable elements
+        // View-only mode: disable all editable elements WITHIN the payroll
+        // form. Was scoped to `$('input, select, textarea')` (whole
+        // document) which also disabled the top navbar's search input
+        // and any other unrelated inputs on the page.
         if (isViewOnly) {
             setTimeout(function() {
-                $('input, select, textarea').not('#searchField, #review-search').prop('disabled', true);
+                $('#msform').find('input, select, textarea').not('#searchField, #review-search').prop('disabled', true);
                 $('.editable').off('dblclick click');
                 $('.add-deduction-btn, #distribute-service-charge, #upload-city-ledger-button, #OverTimeform, #download-city-ledger-template, #upload-city-ledger, #saveAsDraft').hide();
                 // Hide Action column in deductions table

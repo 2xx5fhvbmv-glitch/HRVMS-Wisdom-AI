@@ -1273,6 +1273,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
       Route::post('file-manage/get/folder-files', 'FileManagment\FileManageController@GetFolderFiles')->name('FileManage.GetFolderFiles');
       Route::post('file-manage/rename-file', 'FileManagment\FileManageController@RenameFile')->name('FileManage.RenameFile');
+      Route::post('file-manage/delete-file', 'FileManagment\FileManageController@DeleteFile')->name('FileManage.DeleteFile');
+      Route::post('file-manage/share-file',  'FileManagment\FileManageController@ShareFile')->name('FileManage.ShareFile');
       Route::post('file-manage/show-the-folder-wise-data', 'FileManagment\FileManageController@ShowthefolderWiseData')->name('FileManage.ShowthefolderWiseData');
       Route::get('file-manage/permission', 'FileManagment\FilePermissionController@index')->name('FileManage.Permission');
       Route::post('file-manage/get/permission-file', 'FileManagment\FilePermissionController@GetPermissionfile')->name('FileManage.GetPermissionfile');
