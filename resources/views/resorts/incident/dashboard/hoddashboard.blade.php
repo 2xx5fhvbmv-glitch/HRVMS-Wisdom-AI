@@ -22,7 +22,7 @@
             </div>
 
             <div class="row g-3 g-xxl-4 card-heigth">
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -35,7 +35,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -48,7 +48,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -61,7 +61,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -125,7 +125,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card card-todoIncidentHOD" id="card-todoIncidentHOD">
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -187,7 +187,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif ">
+                <div class="col-xl-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif ">
                     <div class="card">
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -233,7 +233,7 @@
                     </div>
                 </div>
  
-                <div class="col-lg-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                 <div class="card card-preventiveIncident">
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-1">

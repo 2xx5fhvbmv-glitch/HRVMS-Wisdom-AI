@@ -27,7 +27,7 @@
                 </div>
             </div>
 
-            <div class="row g-3 g-xxl-4 card-heigth card-incidentHr @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="row g-3 g-xxl-4 card-heigth card-incidentHr @if(!Common::hasFullDataAccess()) d-none @endif">
                 <div class="col-lg-3 col-sm-6">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
@@ -41,7 +41,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -54,7 +54,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif" >
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif" >
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -67,7 +67,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-lg-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card dashboard-boxcard timeAttend-boxcard">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
@@ -81,7 +81,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class=" card">
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -125,7 +125,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-xl-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card card-incidentSeverity">
                         <div class="card-title">
                             <h3>Incident Severity</h3>
@@ -147,7 +147,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-xl-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card">
                         <div class="card-title">
                             <h3>Incident Meeting Schedule</h3>
@@ -170,7 +170,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card">
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -255,7 +255,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="col-xl-3 col-sm-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card">
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -301,16 +301,22 @@
                     </div>
                 </div>
 
-                <div class="col-xl-6 col-md-6 @if(Common::checkRouteWisePermission('incident.meeting',config('settings.resort_permissions.view')) == false) d-none @endif">
+                {{-- Upcoming Meetings is visible to every logged-in user.
+                     The "View All" link only renders for users who have
+                     access to the meeting list page so non-HR/GM users
+                     don't get a 403 from clicking through. --}}
+                <div class="col-xl-6 col-md-6">
                     <div class="card card-upMeetIncident" id="card-upMeetIncident">
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-1">
                                 <div class="col">
                                     <h3 class="text-nowrap">Upcoming Meetings</h3>
                                 </div>
+                                @if(Common::hasFullDataAccess())
                                 <div class="col-auto">
                                     <a href="{{route('incident.meeting')}}" class="a-link">View All</a>
                                 </div>
+                                @endif
                             </div>
                         </div>
                         <div class="leaveUser-main" id="upcoming-meetings"></div>
