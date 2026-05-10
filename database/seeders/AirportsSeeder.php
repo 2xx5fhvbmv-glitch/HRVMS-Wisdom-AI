@@ -42,13 +42,20 @@ class AirportsSeeder extends Seeder
             return;
         }
 
+        // Auto-detect comma vs tab — the IATA paste format is TSV but
+        // some sources are CSV. Whichever has more occurrences in the
+        // first line wins.
+        $sniff = fgets($handle) ?: '';
+        rewind($handle);
+        $delim = substr_count($sniff, "\t") > substr_count($sniff, ',') ? "\t" : ',';
+
         // Maldivian airports — anything matching this list (or country=Maldives)
         // is tagged 'national'; everything else 'international'.
         $maldivesIata = ['MLE','GAN','HAQ','VAM','FVM','KDM','KDO','DRV','TMF','IFU','VRG','GKK','NMF'];
 
         // Sniff for a header row by checking if the first cell looks
         // like an IATA code (3 letters).
-        $first = fgetcsv($handle);
+        $first = fgetcsv($handle, 0, $delim);
         $hasHeader = !preg_match('/^[A-Z]{3}$/', strtoupper($first[0] ?? ''));
         if (!$hasHeader && $first) {
             // First row is data, not a header — push it back into the loop.
@@ -57,7 +64,7 @@ class AirportsSeeder extends Seeder
 
         $batch = [];
         $now   = now();
-        while (($row = fgetcsv($handle)) !== false) {
+        while (($row = fgetcsv($handle, 0, $delim)) !== false) {
             if (empty($row[0])) continue;
             $iata = strtoupper(trim((string) $row[0]));
             if (!preg_match('/^[A-Z]{3}$/', $iata)) continue;
