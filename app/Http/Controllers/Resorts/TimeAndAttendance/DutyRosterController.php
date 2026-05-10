@@ -620,16 +620,36 @@ class DutyRosterController extends Controller
                         }
                     }
 
-                    $DutyRosterEntry = DutyRosterEntry::updateOrCreate(['id'=>$Attd_id],[
-                        "Shift_id"=>$Shift,
-                        "DayWiseTotalHours"=>$DayWiseTotalHours,
-                        "OverTime"=>$overtimeValue,
-                    ]);
+                    // For cells that have NO existing DutyRosterEntry (the
+                    // "No Shift Assigned" / fresh Day Off path), Attd_id
+                    // arrives empty. The view passes emp_id + roster_id in
+                    // those cases so we can create a properly-keyed row;
+                    // without them the insert would land with NULL Emp_id
+                    // and the downstream EmployeeOvertime insert crashes.
+                    $editEmpId    = $request->emp_id ?: null;
+                    $editRosterId = $request->roster_id ?: null;
+                    $createPayload = [
+                        "Shift_id"          => $Shift,
+                        "DayWiseTotalHours" => $DayWiseTotalHours,
+                        "OverTime"          => $overtimeValue,
+                    ];
+                    if (empty($Attd_id)) {
+                        $createPayload["Emp_id"]    = $editEmpId;
+                        $createPayload["roster_id"] = $editRosterId;
+                        $createPayload["resort_id"] = $this->resort->resort_id;
+                        $createPayload["date"]      = $shift_Date->format('Y-m-d');
+                        // Status is NOT NULL on duty_roster_entries — default
+                        // a freshly-created entry to Present so the row is
+                        // valid; HR can flip to DayOff later if needed.
+                        $createPayload["Status"]    = 'Present';
+                    }
+
+                    $DutyRosterEntry = DutyRosterEntry::updateOrCreate(['id'=>$Attd_id], $createPayload);
 
                     // Handle overtime from employee_overtimes table (for reporting/payroll)
                     if ($DutyRosterEntry && $Overtime) {
                         $resort_id = $this->resort->resort_id;
-                        $Emp_id = $DutyRosterEntry->Emp_id;
+                        $Emp_id = $DutyRosterEntry->Emp_id ?: $editEmpId;
                         $dateFormatted = $shift_Date->format('Y-m-d');
 
                         // Parse overtime (format: HH:MM or H:MM)

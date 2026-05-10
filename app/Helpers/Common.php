@@ -4651,7 +4651,17 @@ class Common
         elseif($resort->type == "sub")
         {
 
-            if(in_array($resort->GetEmployee->rank ,[1,3,8,4,9])) // EXCOM HR MGR GM MD
+            // Privileged set: GM (8), HR (3), MGR (4), MD (9) anywhere; plus
+            // HR-department HOD (2) and EXCOM (1). Other-dept rank-1/2 fall
+            // through to the per-employee folder check below — the previous
+            // list let any EXCOM (rank 1) view every file regardless of dept,
+            // which contradicted the standing access-control spec, and
+            // dropped HR-dept HOD entirely (rank 2 was missing).
+            $rank = (int) $resort->GetEmployee->rank;
+            $isHrDept = self::isHRDepartment($resort->GetEmployee->Dept_id ?? null);
+            $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
+                || (in_array($rank, [1, 2], true) && $isHrDept);
+            if ($isPrivileged)
             {
 
                 $Department_id = $resort->GetEmployee->Dept_id;

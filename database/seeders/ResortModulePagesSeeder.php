@@ -610,14 +610,18 @@ class ResortModulePagesSeeder extends Seeder
               "type"            => "normal",
               "place_order"     => "4"
             ],
-           [
-              "page_name"       => "Permission",
-              "Module_Id"       => "16",
-              "internal_route"  => "FileManage.Permission",
-              "TypeOfPage"      => "InsideOfMenu",
-              "type"            => "normal",
-              "place_order"     => "3"
-            ],
+           // "Permission" submenu hidden — feature not in current scope.
+           // The route + controller still exist; re-enable by uncommenting
+           // and running the matching down() in
+           // 2026_05_10_225514_hide_file_manage_permission_submenu.
+           // [
+           //   "page_name"       => "Permission",
+           //   "Module_Id"       => "16",
+           //   "internal_route"  => "FileManage.Permission",
+           //   "TypeOfPage"      => "InsideOfMenu",
+           //   "type"            => "normal",
+           //   "place_order"     => "3"
+           // ],
            [
               "page_name"       => "Employees Documents",
               "Module_Id"       => "16",

@@ -33,14 +33,16 @@
                               <option value="Main">Folder</option>
                               @if($AllFolderList->isNotEmpty())
                               @foreach($AllFolderList as $folder)
-                              <option value="{{ base64_encode($folder->id) }}">{{ $folder->Folder_Name }}</option>
+                              <option value="{{ base64_encode($folder->id) }}">{{ $folder->Display_Name ?? $folder->Folder_Name }}</option>
                               @endforeach
                               @endif
                            </select>
                         </div>
-                        <div class="col-auto"><a href="javascript:void(0)" id="NewfolderCreate" class=" btn btn-themeBlue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('Employees.Documents',config('settings.resort_permissions.create')) == false) d-none @endif">Create
-                           Folder</a>
-                        </div>
+                        {{-- Create Folder button hidden — employee folders are
+                             auto-created from the EmployeeController save flow
+                             (and backfilled), so HR doesn't need to create
+                             them by hand from this page. --}}
+                        {{-- <div class="col-auto"><a href="javascript:void(0)" id="NewfolderCreate" class=" btn btn-themeBlue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('Employees.Documents',config('settings.resort_permissions.create')) == false) d-none @endif">Create Folder</a></div> --}}
                      </div>
                   </div>
                   <div class="search-document mb-3">
@@ -62,7 +64,7 @@
                                     <img src="{{ URL::asset('resorts_assets/images/folder.svg') }}" alt="image">
                                     </div>
                                     <div>
-                                    <h6>{{ $folder->Folder_Name }}</h6>
+                                    <h6>{{ $folder->Display_Name ?? $folder->Folder_Name }}</h6>
                                     </div>
                                 </div>
                                 <div class="form-check no-label">
@@ -121,8 +123,33 @@
 <nav id="context-menu" class="context-menu">
    <ul>
       <li><a href="#renameDocument-modal" class="passContext-menu" data-bs-toggle="modal">Rename</a></li>
+      <li><a href="#shareFile-modal" class="passContext-menu" data-bs-toggle="modal" id="contextShareFile">Share</a></li>
+      <li><a href="javascript:void(0)" class="passContext-menu text-danger" id="contextDeleteFile">Delete</a></li>
    </ul>
 </nav>
+
+{{-- Share modal — generates a temporary signed URL the user can copy. --}}
+<div class="modal fade" id="shareFile-modal" tabindex="-1" aria-labelledby="shareFileLabel" aria-hidden="true">
+   <div class="modal-dialog modal-dialog-centered modal-small">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h5 class="modal-title">Share File</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+         <div class="modal-body">
+            <label class="form-label">SHAREABLE LINK <small class="text-muted">(valid 30 minutes)</small></label>
+            <div class="input-group">
+               <input type="text" id="shareLinkInput" class="form-control" readonly placeholder="Generating link...">
+               <button type="button" class="btn btn-themeBlue" id="copyShareLinkBtn">Copy</button>
+            </div>
+            <small id="shareLinkStatus" class="text-muted d-block mt-2"></small>
+         </div>
+         <div class="modal-footer">
+            <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+         </div>
+      </div>
+   </div>
+</div>
 <!-- modal -->
 <div class="modal fade" id="renameDocument-modal" tabindex="-1" aria-labelledby="renameDocumentLabel"
    aria-hidden="true">
@@ -563,13 +590,76 @@
 //            });
 //        }
 //    });
-   $(document).on( "click","#NewfolderCreate", function() 
+   $(document).on( "click","#NewfolderCreate", function()
    {
-   
+
        $("#AddFolder-modal").modal('show');
        var Folderselect = $('#Folderselect').val();
        $('#FolderType').val(Folderselect);
-       
+
+   });
+
+   // ── Action menu: Delete ─────────────────────────────────────────
+   // Uses the file_id (== ChildFileManagement.unique_id) the
+   // contextmenu/click handler stored when the user opened the menu.
+   $(document).on('click', '#contextDeleteFile', function () {
+       var fileId = $('#file_id').val();
+       var fileName = $('#renameFile').val();
+       if (!fileId) { return; }
+       if (!confirm('Delete "' + fileName + '"? This cannot be undone.')) return;
+       $.ajax({
+           url: "{{ route('FileManage.DeleteFile') }}",
+           type: 'POST',
+           data: { _token: "{{ csrf_token() }}", file_id: fileId },
+           success: function (r) {
+               if (r.success) {
+                   toastr.success(r.message || 'File deleted', 'Success', { positionClass: 'toast-bottom-right' });
+                   GetTheUpdatedFolder();
+               } else {
+                   toastr.error(r.message || 'Delete failed', 'Error', { positionClass: 'toast-bottom-right' });
+               }
+           },
+           error: function (xhr) {
+               var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Delete failed';
+               toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+           }
+       });
+   });
+
+   // ── Action menu: Share ──────────────────────────────────────────
+   // Generates a short-lived signed URL on the fly and pre-fills the
+   // shareable-link input so HR can copy it.
+   $(document).on('click', '#contextShareFile', function () {
+       var fileId = $('#file_id').val();
+       $('#shareLinkInput').val('').attr('placeholder', 'Generating link…');
+       $('#shareLinkStatus').text('');
+       if (!fileId) { return; }
+       $.ajax({
+           url: "{{ route('FileManage.ShareFile') }}",
+           type: 'POST',
+           data: { _token: "{{ csrf_token() }}", file_id: fileId },
+           success: function (r) {
+               if (r.success && r.url) {
+                   $('#shareLinkInput').val(r.url);
+                   $('#shareLinkStatus').text('Link valid until ' + (r.expires_at || '30 minutes from now'));
+               } else {
+                   $('#shareLinkInput').val('');
+                   $('#shareLinkStatus').addClass('text-danger').text(r.message || 'Could not generate link');
+               }
+           },
+           error: function (xhr) {
+               var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Could not generate link';
+               $('#shareLinkInput').val('');
+               $('#shareLinkStatus').addClass('text-danger').text(msg);
+           }
+       });
+   });
+   $(document).on('click', '#copyShareLinkBtn', function () {
+       var input = document.getElementById('shareLinkInput');
+       if (!input || !input.value) return;
+       input.select();
+       document.execCommand('copy');
+       toastr.success('Link copied to clipboard', '', { positionClass: 'toast-bottom-right', timeOut: 1500 });
    });
    $(document).on( "keyup","#Search", function() 
    {
@@ -1009,19 +1099,40 @@
    
    /**
     * Listens for click events.
+    *
+    * The 3-dot action button in each file row (.context-btn) is meant to
+    * open the same menu as the right-click contextmenu event. Originally
+    * only the contextmenu listener was wired, so left-clicking the
+    * ellipsis did nothing — handle that explicitly here.
     */
    function clickListener() {
        document.addEventListener("click", function (e) {
            var clickeElIsLink = clickInsideElement(e, contextMenuLinkClassName);
-   
+
            if (clickeElIsLink) {
                e.preventDefault();
                menuItemListener(clickeElIsLink);
-           } else {
-               var button = e.which || e.button;
-               if (button === 1) {
-                   toggleMenuOff();
-               }
+               return;
+           }
+
+           // Left-click on the ellipsis action button → open menu at the
+           // button position with the same data attributes the contextmenu
+           // path uses (file_id, renameFile).
+           var actionTarget = clickInsideElement(e, taskItemClassName);
+           if (actionTarget) {
+               e.preventDefault();
+               e.stopPropagation();
+               taskItemInContext = actionTarget;
+               $("#file_id").val(actionTarget.getAttribute("data-id") || " ");
+               $("#renameFile").val(actionTarget.getAttribute("data-name") || "");
+               toggleMenuOn();
+               positionMenu(e);
+               return;
+           }
+
+           var button = e.which || e.button;
+           if (button === 1) {
+               toggleMenuOff();
            }
        });
    }

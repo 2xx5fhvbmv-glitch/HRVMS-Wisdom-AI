@@ -104,16 +104,17 @@
                                                                                                 @foreach ($sectionData['employees'] as $r)
                                                                                                     <tr>
                                                                                                         <td>
-                                                                                                            <div class="createDuty-user">
-                                                                                                                <div class="img-circle">
-                                                                                                                    <img src="{{ Common::getResortUserPicture($r->Parentid) }}" alt="user">
-                                                                                                                </div>
-                                                                                                                <div>
-                                                                                                                    <p>
-                                                                                                                        <span class="fw-600">{{ ucfirst($r->first_name .' '. $r->last_name) }}</span>
-                                                                                                                        <span class="badge badge-white">{{ $r->Emp_id }}</span>
-                                                                                                                    </p>
-                                                                                                                    <span>{{ ucfirst($r->position_title) }}</span>
+                                                                                                            <div class="createDuty-user d-flex justify-content-between align-items-center">
+                                                                                                                <div class="d-flex align-items-center">
+                                                                                                                    <div class="img-circle">
+                                                                                                                        <img src="{{ Common::getResortUserPicture($r->Parentid) }}" alt="user">
+                                                                                                                    </div>
+                                                                                                                    <div class="ms-2">
+                                                                                                                        <p>
+                                                                                                                            <span class="fw-600">{{ ucfirst($r->first_name .' '. $r->last_name) }}</span>
+                                                                                                                            <span class="badge badge-white">{{ $r->Emp_id }}</span>
+                                                                                                                        </p>
+                                                                                                                        <span>{{ ucfirst($r->position_title) }}</span>
                                                                                                                     @if(!empty($r->geofence_zone_id))
                                                                                                                         @php
                                                                                                                             $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
@@ -128,6 +129,14 @@
                                                                                                                         </div>
                                                                                                                     @endif
                                                                                                                 </div>
+                                                                                                                </div>
+                                                                                                                {{-- Per-employee collapse — same idea as the dept/section
+                                                                                                                     accordion above. CSS hides every <td> except the
+                                                                                                                     header when this <tr> has class .emp-collapsed. --}}
+                                                                                                                <button type="button" class="btn btn-sm btn-link emp-collapse-toggle p-1 text-decoration-none" aria-label="Toggle employee">
+                                                                                                                    <i class="fa-solid fa-chevron-up"></i>
+                                                                                                                    <i class="fa-solid fa-chevron-down"></i>
+                                                                                                                </button>
                                                                                                             </div>
                                                                                                         </td>
 
@@ -195,9 +204,22 @@
                                                                                                                     </div>
                                                                                                                 @elseif($shiftData)
                                                                                                                     @if($shiftData->Status == 'DayOff')
-                                                                                                                        {{-- Day Off: show on whole column, no shift --}}
+                                                                                                                        {{-- Day Off: show on whole column, no shift, but
+                                                                                                                             expose edit so HR can change it back to a
+                                                                                                                             working shift. --}}
                                                                                                                         <div class="createDuty-tableBlock dayoff-cell">
                                                                                                                             <div class="createDuty-dayoff">Day Off</div>
+                                                                                                                            <p class="text-end mb-0 mt-1">
+                                                                                                                                <button class="editIcon-btn editdutyRoster"
+                                                                                                                                        data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
+                                                                                                                                        data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
+                                                                                                                                        data-OverTime="00:00"
+                                                                                                                                        data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
+                                                                                                                                        data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
+                                                                                                                                        data-DayWiseTotalHours="">
+                                                                                                                                    <i class="fa fa-edit"></i>
+                                                                                                                                </button>
+                                                                                                                            </p>
                                                                                                                         </div>
                                                                                                                     @else
                                                                                                                     {{-- Display Roster Entry --}}
@@ -277,9 +299,25 @@
                                                                                                                     </div>
                                                                                                                     @endif
                                                                                                                 @else
-                                                                                                                    {{-- No Leave and No Roster Entry --}}
+                                                                                                                    {{-- No Leave and No Roster Entry — edit pencil
+                                                                                                                         carries emp_id + roster_id so the create-on-edit
+                                                                                                                         flow knows which employee this empty cell
+                                                                                                                         belongs to. --}}
                                                                                                                     <div class="createDuty-tableBlock">
                                                                                                                         <div class="createDuty-empty">No Shift Assigned</div>
+                                                                                                                        <p class="text-end mb-0 mt-1">
+                                                                                                                            <button class="editIcon-btn editdutyRoster"
+                                                                                                                                    data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
+                                                                                                                                    data-Shift_id=""
+                                                                                                                                    data-OverTime="00:00"
+                                                                                                                                    data-DayOfDate="{{ $h['date'] ?? '' }}"
+                                                                                                                                    data-Attd_id=""
+                                                                                                                                    data-emp_id="{{ $r->emp_id ?? '' }}"
+                                                                                                                                    data-roster_id="{{ $r->duty_roster_id ?? '' }}"
+                                                                                                                                    data-DayWiseTotalHours="">
+                                                                                                                                <i class="fa fa-edit"></i>
+                                                                                                                            </button>
+                                                                                                                        </p>
                                                                                                                     </div>
                                                                                                                 @endif
                                                                                                             </td>
@@ -327,30 +365,36 @@
                                                                         @foreach ($deptData['employees'] as $r)
                                                                             <tr>
                                                                                 <td>
-                                                                                    <div class="createDuty-user">
-                                                                                        <div class="img-circle">
-                                                                                            <img src="{{ Common::getResortUserPicture($r->Parentid) }}" alt="user">
+                                                                                    <div class="createDuty-user d-flex justify-content-between align-items-center">
+                                                                                        <div class="d-flex align-items-center">
+                                                                                            <div class="img-circle">
+                                                                                                <img src="{{ Common::getResortUserPicture($r->Parentid) }}" alt="user">
+                                                                                            </div>
+                                                                                            <div class="ms-2">
+                                                                                                <p>
+                                                                                                    <span class="fw-600">{{ ucfirst($r->first_name .' '. $r->last_name) }}</span>
+                                                                                                    <span class="badge badge-white">{{ $r->Emp_id }}</span>
+                                                                                                </p>
+                                                                                                <span>{{ ucfirst($r->position_title) }}</span>
+                                                                                                @if(!empty($r->geofence_zone_id))
+                                                                                                    @php
+                                                                                                        $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
+                                                                                                        $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
+                                                                                                    @endphp
+                                                                                                    <div class="mt-1">
+                                                                                                    @foreach($zones as $zone)
+                                                                                                        <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:9px;">
+                                                                                                            <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
+                                                                                                        </span>
+                                                                                                    @endforeach
+                                                                                                    </div>
+                                                                                                @endif
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div>
-                                                                                            <p>
-                                                                                                <span class="fw-600">{{ ucfirst($r->first_name .' '. $r->last_name) }}</span>
-                                                                                                <span class="badge badge-white">{{ $r->Emp_id }}</span>
-                                                                                            </p>
-                                                                                            <span>{{ ucfirst($r->position_title) }}</span>
-                                                                                            @if(!empty($r->geofence_zone_id))
-                                                                                                @php
-                                                                                                    $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
-                                                                                                    $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
-                                                                                                @endphp
-                                                                                                <div class="mt-1">
-                                                                                                @foreach($zones as $zone)
-                                                                                                    <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:9px;">
-                                                                                                        <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
-                                                                                                    </span>
-                                                                                                @endforeach
-                                                                                                </div>
-                                                                                            @endif
-                                                                                        </div>
+                                                                                        <button type="button" class="btn btn-sm btn-link emp-collapse-toggle p-1 text-decoration-none" aria-label="Toggle employee">
+                                                                                            <i class="fa-solid fa-chevron-up"></i>
+                                                                                            <i class="fa-solid fa-chevron-down"></i>
+                                                                                        </button>
                                                                                     </div>
                                                                                 </td>
 
@@ -496,9 +540,24 @@
                                                                                             </div>
                                                                                             @endif
                                                                                         @else
-                                                                                            {{-- No Leave and No Roster Entry --}}
+                                                                                            {{-- No Leave and No Roster Entry — edit pencil carries
+                                                                                                 emp_id + roster_id so create-on-edit knows which
+                                                                                                 employee this empty cell belongs to. --}}
                                                                                             <div class="createDuty-tableBlock">
                                                                                                 <div class="createDuty-empty">No Shift Assigned</div>
+                                                                                                <p class="text-end mb-0 mt-1">
+                                                                                                    <button class="editIcon-btn editdutyRoster"
+                                                                                                            data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
+                                                                                                            data-Shift_id=""
+                                                                                                            data-OverTime="00:00"
+                                                                                                            data-DayOfDate="{{ $h['date'] ?? '' }}"
+                                                                                                            data-Attd_id=""
+                                                                                                            data-emp_id="{{ $r->emp_id ?? '' }}"
+                                                                                                            data-roster_id="{{ $r->duty_roster_id ?? '' }}"
+                                                                                                            data-DayWiseTotalHours="">
+                                                                                                        <i class="fa fa-edit"></i>
+                                                                                                    </button>
+                                                                                                </p>
                                                                                             </div>
                                                                                         @endif
                                                                                     </td>
@@ -576,6 +635,12 @@
                                 </div>
                             </div>
                             <input type="hidden" id="Attd_id" name="Attd_id">
+                            {{-- Carry the employee + roster context for cells that
+                                 don't yet have a DutyRosterEntry — without these,
+                                 create-on-edit inserts a row with NULL Emp_id and
+                                 the downstream EmployeeOvertime insert crashes. --}}
+                            <input type="hidden" id="EditEmpId" name="emp_id">
+                            <input type="hidden" id="EditRosterId" name="roster_id">
                         </div>
 
                     </div>
@@ -757,8 +822,44 @@
     }
     .table-createDutymonthly .createDuty-tableBlock p { margin: 0; font-size: 10px; }
     .table-createDutymonthly .createDuty-tableBlock .badge { font-size: 9px; padding: 2px 4px; }
-    .table-createDutymonthly .ot-details { display: none; }
-    .table-createDutymonthly .editIcon-btn { padding: 0; font-size: 11px; }
+    /* The edit pencil was disappearing from every shift cell because its
+       wrapper (.ot-details) was display:none in the compact monthly grid.
+       Three-pronged fix:
+       1. Force .ot-details visible (overrides any leftover display:none).
+       2. Hide just the OT text <p> inside it, keep the button <p>.
+       3. Pin the button absolute-top-right of each cell so even if some
+          parent flex/overflow rule clipped it, it still renders. */
+    .table-createDutymonthly .day-cell { position: relative !important; }
+    .table-createDutymonthly .ot-details {
+        display: flex !important;
+        justify-content: flex-end;
+        align-items: center;
+        margin: 0;
+        padding: 0;
+    }
+    .table-createDutymonthly .ot-details > p:not(:last-child) { display: none !important; }
+    .table-createDutymonthly .ot-details > p:last-child { margin: 0; }
+    .table-createDutymonthly .editIcon-btn {
+        position: absolute !important;
+        top: 4px !important;
+        right: 4px !important;
+        padding: 2px !important;
+        font-size: 12px !important;
+        line-height: 1 !important;
+        background: rgba(255,255,255,0.85) !important;
+        border-radius: 3px !important;
+        z-index: 5 !important;
+    }
+    .table-createDutymonthly .editIcon-btn:hover { background: #fff !important; }
+
+    /* Per-employee collapse — when the toggle is clicked, the <tr> gets
+       .emp-collapsed and we hide every <td> except the header (first
+       child) so only the employee name strip stays visible, like a
+       collapsed accordion item. */
+    .table-createDutymonthly tbody tr.emp-collapsed > td:not(:first-child) { display: none !important; }
+    .table-createDutymonthly .emp-collapse-toggle { color: #014653; font-size: 14px; }
+    .table-createDutymonthly tbody tr.emp-collapsed .emp-collapse-toggle .fa-chevron-up { display: none; }
+    .table-createDutymonthly tbody tr:not(.emp-collapsed) .emp-collapse-toggle .fa-chevron-down { display: none; }
 
     /* Date label inside each calendar day cell. Day number is the
        prominent figure; weekday abbreviation sits next to it. Without
@@ -910,6 +1011,15 @@
             }
         });
 
+        // Per-employee collapse: clicking the chevron flips .emp-collapsed
+        // on the surrounding <tr>; CSS hides the day cells. Identical UX
+        // to the dept/section accordion above, just adapted for the
+        // grid-row layout we use for the monthly view.
+        $(document).on("click", ".emp-collapse-toggle", function (e) {
+            e.preventDefault();
+            $(this).closest('tr').toggleClass('emp-collapsed');
+        });
+
         $(document).on("click", ".editdutyRoster", function() {
 
             let date = $(this).attr('data-date');
@@ -932,6 +1042,13 @@
                 }
             }
             $("#Attd_id").val(Attd_id);
+            // Empty cells (No Shift Assigned / Day Off) carry emp_id +
+            // roster_id so the controller can create the DutyRosterEntry
+            // properly. For cells that already have a roster entry, these
+            // are blank — the controller falls back to the existing
+            // DutyRosterEntry's own Emp_id/roster_id via Attd_id.
+            $("#EditEmpId").val($(this).attr('data-emp_id') || '');
+            $("#EditRosterId").val($(this).attr('data-roster_id') || '');
 
             if (!$("#ShiftOverTime").data("flatpickr")) {
                 flatpickr("#ShiftOverTime", {

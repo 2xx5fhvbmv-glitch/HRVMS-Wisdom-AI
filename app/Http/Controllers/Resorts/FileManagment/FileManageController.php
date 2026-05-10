@@ -653,6 +653,88 @@ class FileManageController extends Controller
             return response()->json(['success' => false, 'message' => 'Failed to rename file.'], 500);
 
         }
+
+        /**
+         * Delete a file from the user's resort. Removes the encrypted blob
+         * from storage AND the ChildFileManagement row, with an audit-log
+         * entry pointing at the deleted path.
+         */
+        public function DeleteFile(Request $request)
+        {
+            $file_id = $request->file_id;
+            $File = ChildFileManagement::where('resort_id', $this->resort->resort_id)
+                ->where('unique_id', $file_id)
+                ->first();
+            if (!$File) {
+                return response()->json(['success' => false, 'message' => 'File not found.'], 404);
+            }
+            try {
+                if ($File->File_Path && StorageHelper::disk()->exists($File->File_Path)) {
+                    StorageHelper::disk()->delete($File->File_Path);
+                }
+                AuditLogs::create([
+                    'resort_id'    => $this->resort->resort_id,
+                    'file_id'      => $File->id,
+                    'TypeofAction' => 'Delete',
+                    'file_path'    => $File->File_Path,
+                ]);
+                $File->delete();
+                return response()->json(['success' => true, 'message' => 'File deleted successfully.'], 200);
+            } catch (\Throwable $e) {
+                \Log::error('DeleteFile failed: ' . $e->getMessage());
+                return response()->json(['success' => false, 'message' => 'Could not delete the file: ' . $e->getMessage()], 500);
+            }
+        }
+
+        /**
+         * Build a short-lived shareable link for a file. We decrypt to a
+         * temp object on the same disk and hand back a presigned URL (or a
+         * regular URL on local disk). Same temp-decrypt pattern as the
+         * inline-view path in ShowthefolderWiseData() — but no iframe
+         * rendering, just the URL.
+         */
+        public function ShareFile(Request $request)
+        {
+            $file_id = $request->file_id;
+            $File = ChildFileManagement::where('resort_id', $this->resort->resort_id)
+                ->where('unique_id', $file_id)
+                ->first();
+            if (!$File) {
+                return response()->json(['success' => false, 'message' => 'File not found.'], 404);
+            }
+            if (!$File->File_Path || !StorageHelper::disk()->exists($File->File_Path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This file is no longer available in storage.'
+                ], 404);
+            }
+            try {
+                $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+                $encryptedData = StorageHelper::disk()->get($File->File_Path);
+                if (empty($encryptedData) || strlen($encryptedData) < 16) {
+                    throw new \Exception('Invalid or corrupted encrypted data');
+                }
+                $iv = substr($encryptedData, 0, 16);
+                $cipherText = substr($encryptedData, 16);
+                $decryptedData = openssl_decrypt($cipherText, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+                if ($decryptedData === false) {
+                    throw new \Exception('Decryption failed: ' . openssl_error_string());
+                }
+                $decryptedFileName = str_replace('.enc', '', basename($File->File_Path));
+                $tempFilePath = 'temp/share_' . time() . '_' . $decryptedFileName;
+                StorageHelper::disk()->put($tempFilePath, $decryptedData);
+                $url = StorageHelper::temporaryUrl($tempFilePath, 30);
+                return response()->json([
+                    'success'    => true,
+                    'url'        => $url,
+                    'expires_at' => now()->addMinutes(30)->format('d M Y, h:i A'),
+                ], 200);
+            } catch (\Throwable $e) {
+                \Log::error('ShareFile failed: ' . $e->getMessage());
+                return response()->json(['success' => false, 'message' => 'Could not generate share link: ' . $e->getMessage()], 500);
+            }
+        }
+
         public function ShowthefolderWiseData(Request $request)
         {
 
@@ -977,12 +1059,21 @@ class FileManageController extends Controller
                             default => 'application/octet-stream' // Fallback for unknown types
                         };
                         $newUrl = StorageHelper::temporaryUrl($tempFilePath, 30);
-                    } 
-                    else 
+                    }
+                    else
                     {
-                        $mimeType='';
-                    $newUrl = "No";
-                }
+                        // File row exists in DB but the encrypted file is
+                        // missing from storage (s3/wasabi/local). Was setting
+                        // $newUrl = "No" — JS would then put "No" into the
+                        // iframe src and the browser resolved it as a
+                        // relative path → /resort/file-manage/No → 404.
+                        // Return an explicit failure so the JS can toast a
+                        // proper "File not found" message.
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This file is no longer available in storage. It may have been deleted or never finished uploading.'
+                        ], 404);
+                    }
                 return response()->json(['success' => true, 'data' => $tr, 'NewURLshow' => $newUrl,    'mimeType' => $mimeType], 200);
             }
         }
@@ -1005,6 +1096,39 @@ class FileManageController extends Controller
                                                                             ->where("Folder_Type", "categorized")
                                                                             ->orderByDesc('id')
                                                                             ->get();
+
+            // Folders for employees are auto-created with Folder_Name =
+            // Employee Emp_id (e.g. "DR-19") — see EmployeeController:403.
+            // The DB key stays the Emp_id (other lookups depend on that),
+            // but the UI should show the name too. Build a one-shot
+            // Emp_id → "Name (Emp_id)" map and decorate each folder's
+            // Display_Name. Folders that don't match an Emp_id keep their
+            // raw Folder_Name (manually-created folders / non-employee
+            // categories).
+            $empIds = $FolderList->pluck('Folder_Name')->merge($AllFolderList->pluck('Folder_Name'))->unique()->filter()->values();
+            $empNameByEmpId = [];
+            if ($empIds->isNotEmpty()) {
+                // Use a real SELECT (not pluck-with-DB::raw — that misreads
+                // the SQL alias as a property name and throws "Undefined
+                // property" on rows where the join nullified the value).
+                $empRows = DB::table('employees as e')
+                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                    ->where('e.resort_id', $this->resort->resort_id)
+                    ->whereIn('e.Emp_id', $empIds)
+                    ->get(['e.Emp_id', 'ra.first_name', 'ra.last_name']);
+                foreach ($empRows as $row) {
+                    $empNameByEmpId[$row->Emp_id] = trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                }
+            }
+            $decorate = function ($folder) use ($empNameByEmpId) {
+                $name = $empNameByEmpId[$folder->Folder_Name] ?? null;
+                $folder->Display_Name = $name
+                    ? trim($name) . ' (' . $folder->Folder_Name . ')'
+                    : $folder->Folder_Name;
+                return $folder;
+            };
+            $FolderList    = $FolderList->map($decorate);
+            $AllFolderList = $AllFolderList->map($decorate);
 
             $department = ResortDepartment::where('resort_id', $this->resort->resort_id)->get();
 
@@ -1554,21 +1678,31 @@ class FileManageController extends Controller
 
         public function AuditLogsList(Request $request)
         {
+            // Was setting ModifiedBy to the avatar URL only, with no join to
+            // resort_admins, so the column rendered just an avatar img and
+            // the name never showed up. Join resort_admins to pull the name
+            // and render avatar + name together.
             $ChildFiles = AuditLogs::join('child_file_management as t1', 't1.id', '=', 'audit_logs.file_id')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'audit_logs.created_by')
             ->where('audit_logs.resort_id', $this->resort->resort_id)
-            // ->whereDate('audit_logs.created_at', Carbon::today()) // Filter for today's date
             ->orderByDesc('audit_logs.id')
             ->groupBy('audit_logs.id')
-            ->get(['t1.File_Name as FileName', 'audit_logs.*'])
+            ->get([
+                't1.File_Name as FileName',
+                'ra.first_name as ModifierFirstName',
+                'ra.last_name  as ModifierLastName',
+                'audit_logs.*'
+            ])
             ->map(function($i) {
-                $i->ModifiedBy = Common::getResortUserPicture($i->created_by); 
-                $i->Time = $i->created_at->format('H:i:s');
-                $i->LastModified = $i->created_at->format('d M Y');
-                $i->ActionType = $i->TypeofAction;
+                $i->ModifierName  = trim(($i->ModifierFirstName ?? '') . ' ' . ($i->ModifierLastName ?? '')) ?: 'Unknown user';
+                $i->ModifierPic   = Common::getResortUserPicture($i->created_by);
+                $i->Time          = $i->created_at->format('H:i:s');
+                $i->LastModified  = $i->created_at->format('d M Y');
+                $i->ActionType    = $i->TypeofAction;
                 return $i;
             });
-    
-                                    if ($request->ajax()) 
+
+                                    if ($request->ajax())
                                     {
                                         return datatables()->of($ChildFiles)
                                             ->editColumn('ActionType', function ($row) {
@@ -1577,13 +1711,17 @@ class FileManageController extends Controller
                                             ->editColumn('FileName', function ($row) {
                                                 return $row->FileName;
                                             })
-                                            ->editColumn('ModifiedBy', function ($row) 
+                                            ->editColumn('ModifiedBy', function ($row)
                                             {
-                                                $imgUrl = $row->ModifiedBy ?? asset('resorts_assets/images/user-2.svg');
-                                                
-                                                return '<div class="user-ovImg user-ovImgTable"><div class="img-circle">
-                                                            <img src="'.$imgUrl.'" alt="user">
-                                                        </div></div>';
+                                                $imgUrl = $row->ModifierPic ?: asset('resorts_assets/images/user-2.svg');
+                                                $name   = e($row->ModifierName);
+
+                                                return '<div class="d-flex align-items-center gap-2">
+                                                            <div class="user-ovImg user-ovImgTable"><div class="img-circle">
+                                                                <img src="'.$imgUrl.'" alt="'.$name.'">
+                                                            </div></div>
+                                                            <span>'.$name.'</span>
+                                                        </div>';
                                             })
                                             ->editColumn('LastModified', function ($row) {
                                                 return $row->LastModified;
