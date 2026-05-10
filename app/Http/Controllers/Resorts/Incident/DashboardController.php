@@ -295,6 +295,9 @@ class DashboardController extends Controller
     public function getUpcomingMeetings()
     {
         $now = Carbon::now(); // Full current datetime
+        // Was scoped only by resort_id — non-HR HOD/EXCOM saw upcoming
+        // meetings for incidents from other depts.
+        $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
 
         $meetings = DB::table('incidents_investigation_meetings as m')
             ->join('incidents as i', 'i.id', '=', 'm.incident_id')
@@ -306,7 +309,7 @@ class DashboardController extends Controller
                 'm.meeting_time',
                 'm.id'
             )
-            ->where('i.resort_id', $this->resort->resort_id)
+            ->whereIn('i.id', $visibleIncidentIds ?: [0])
             ->whereRaw("STR_TO_DATE(CONCAT(m.meeting_date, ' ', m.meeting_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now])
             ->orderByRaw("STR_TO_DATE(CONCAT(m.meeting_date, ' ', m.meeting_time), '%Y-%m-%d %H:%i:%s')")
             ->limit(5)
@@ -377,9 +380,11 @@ class DashboardController extends Controller
         }
         $page_title = 'Preventive Measures List';
         if ($request->ajax()) {
+            // Bound to viewer-visible incidents — was previously resort-only.
+            $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
             $query = DB::table('incidents_investigation as ii')
                 ->join('incidents as i', 'i.id', '=', 'ii.incident_id')
-                ->where('i.resort_id', $this->resort->resort_id)
+                ->whereIn('i.id', $visibleIncidentIds ?: [0])
                 ->select('ii.id', 'i.incident_name', 'i.preventive_measures', 'ii.updated_at','ii.created_at');
     
             // Optional: Apply search filter
@@ -407,6 +412,9 @@ class DashboardController extends Controller
         }
         $page_title = 'Pending Approvals List';
         if ($request->ajax()) {
+            // Was missing both resort_id AND viewer scope — leaked across
+            // every resort in the system.
+            $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
             $query = DB::table('incidents_investigation as ii')
                 ->join('incidents as i', 'i.id', '=', 'ii.incident_id')
                 ->leftJoin('incident_outcome_types as iot', 'iot.id', '=', 'ii.outcome_type')
@@ -421,6 +429,7 @@ class DashboardController extends Controller
                     'ii.updated_at',
                     'ii.created_at'
                 )
+                ->whereIn('i.id', $visibleIncidentIds ?: [0])
                 ->where('ii.approval', 1)
                 ->whereNull('ii.approved_by')
                 ->orderBy('ii.created_at', 'desc');

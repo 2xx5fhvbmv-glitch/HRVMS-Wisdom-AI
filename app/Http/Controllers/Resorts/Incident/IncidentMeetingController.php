@@ -41,14 +41,9 @@ class IncidentMeetingController extends Controller
     
     public function index()
     {
-        // Same gate as the Incident List page — meetings panel is restricted
-        // to the full-data-access set (HR / GM / HR-dept HOD-EXCOM / super).
-        // Other-dept HOD/EXCOM previously could see all incident meetings
-        // even though they shouldn't have list-level visibility at all.
-        if (!Common::hasFullDataAccess()) {
-            return abort(403, 'Unauthorized access');
-        }
-
+        // Page is open to every logged-in user. Data is scoped via
+        // Common::scopeIncidentsForViewer() so non-HR/GM HOD/EXCOM only
+        // see meetings tied to their own dept's incidents.
         $page_title ='Investigation Meeting';
         $incidents = Common::scopeIncidentsForViewer(Incidents::query())
             ->where('status', '!=', 'Resolved')
@@ -60,10 +55,6 @@ class IncidentMeetingController extends Controller
 
     public function list(Request $request)
     {
-        // Mirror the index() gate so the AJAX feed can't be hit directly.
-        if (!Common::hasFullDataAccess()) {
-            return abort(403, 'Unauthorized access');
-        }
         if ($request->ajax()) {
             // Restrict the meeting list to meetings whose parent incident
             // the viewer has access to. This was previously unscoped so any
