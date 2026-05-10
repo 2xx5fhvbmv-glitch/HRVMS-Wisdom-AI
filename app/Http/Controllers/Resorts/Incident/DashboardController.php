@@ -45,8 +45,12 @@ class DashboardController extends Controller
         $page_title ='Incident';
         $resort_id= $this->resort->resort_id;
         $total_incidents = $this->scopeForCurrentViewer(Incidents::query())->count();
+        // "Open" = anything not yet resolved. Excluding 'Reported' here was
+        // dropping freshly-filed incidents into a gap where they showed up
+        // in Total but not in Open / Under Investigation, so the tile read
+        // 0 with 4 incidents on the list.
         $open_incidents = $this->scopeForCurrentViewer(Incidents::query())
-            ->whereNotIn('status', ['Reported', 'Resolved'])
+            ->where('status', '!=', 'Resolved')
             ->count();
         $under_investigation_incidents = $this->scopeForCurrentViewer(Incidents::query())
             ->where('status', 'Investigation In Progress')
@@ -80,7 +84,9 @@ class DashboardController extends Controller
                 ->get();
 
             $statusCounts = $incidents->groupBy('status')->map->count();
-            $totalOpen = $incidents->whereNotIn('status', ['Resolved', 'Reported'])->count();
+            // "Open" = not yet Resolved. Excluding 'Reported' here was the
+            // same gap-bucket bug the Open Incidents tile had.
+            $totalOpen = $incidents->where('status', '!=', 'Resolved')->count();
     
             // Choose a dominant status (you can change this logic)
             $dominantStatus = $statusCounts->sortDesc()->keys()->first() ?? 'No Incidents';
@@ -235,9 +241,16 @@ class DashboardController extends Controller
     {
         $today = Carbon::today();
         $resort_id = $this->resort->resort_id;
+        // Restrict every count to the same incident set the viewer can see —
+        // raw DB::table() queries without the viewer scope were leaking
+        // cross-dept (and cross-resort, on the global $total) numbers into
+        // the tile.
+        $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
+        $visibleIds = $visibleIncidentIds ?: [0];
+
         $nearingDeadline = DB::table('incidents as i')
             ->join('incidents_investigation as ii','ii.incident_id','=','i.id')
-            ->where('i.resort_id', $resort_id)
+            ->whereIn('i.id', $visibleIds)
             ->whereDate('ii.expected_resolution_date', '>=', $today)
             ->whereDate('ii.expected_resolution_date', '<=', $today->copy()->addDays(3))
             ->where('i.status', '!=', 'Resolved')
@@ -245,22 +258,30 @@ class DashboardController extends Controller
 
         $breachedTimelines = DB::table('incidents as i')
             ->join('incidents_investigation as ii','ii.incident_id','=','i.id')
-            ->where('i.resort_id', $resort_id)
+            ->whereIn('i.id', $visibleIds)
             ->whereDate('ii.expected_resolution_date', '<', $today)
             ->where('i.status', '!=', 'Resolved')
             ->count();
 
         $resolved = DB::table('incidents')
-            ->where('resort_id', $resort_id)
+            ->whereIn('id', $visibleIds)
             ->where('status', 'Resolved')
             ->count();
 
-        $total = DB::table('incidents')->count();
+        // Was DB::table('incidents')->count() — counted ALL incidents in
+        // every resort across the system, so resolvedPercentage was wildly
+        // wrong on small resorts.
+        $total = count($visibleIncidentIds);
 
         $resolvedPercentage = $total > 0 ? round(($resolved / $total) * 100) : 0;
 
+        // Was: ->whereNotIn('status', ['Reported', 'Resolved']) with no
+        // resort or viewer scope — same gap-bucket bug as the Open tile,
+        // plus a cross-resort leak. Open = anything not yet Resolved,
+        // bounded to the viewer's visible set.
         $openInvestigations = DB::table('incidents')
-            ->whereNotIn('status', ['Reported', 'Resolved'])
+            ->whereIn('id', $visibleIds)
+            ->where('status', '!=', 'Resolved')
             ->count();
 
         return response()->json([
@@ -307,16 +328,21 @@ class DashboardController extends Controller
 
     public function getPreventiveActions()
     {
+        // Was scoped only by resort_id — non-HR HOD/EXCOM saw preventive
+        // measures from other depts. Use the same viewer scope as the rest
+        // of the dashboard so the panel matches the surrounding tiles.
+        $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
+
         $actions = DB::table('incidents_investigation as ii')
             ->join('incidents as i','i.id','=','ii.incident_id')
-            ->where('i.resort_id', $this->resort->resort_id)
+            ->whereIn('i.id', $visibleIncidentIds ?: [0])
             ->orderBy('i.incident_date', 'desc')
             ->limit(5)
             ->get()
             ->map(function ($item) {
                 return [
                     'title' => $item->incident_name,
-                    'description' => $item->preventive_measures ?? "No Preventive Measures Added.", // Optional: shorten long text
+                    'description' => $item->preventive_measures ?? "No Preventive Measures Added.",
                 ];
             });
 
@@ -325,11 +351,17 @@ class DashboardController extends Controller
 
     public function getPendingResolutionApprovals()
     {
+        // Was missing both resort_id AND viewer scope — returned approval
+        // rows from EVERY resort in the system. Bound to the viewer's
+        // visible incidents so the panel can never leak cross-resort data.
+        $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
+
         $pendingResolutions = DB::table('incidents_investigation as ii')
             ->join('incidents as i', 'i.id', '=', 'ii.incident_id')
             ->leftJoin('incident_outcome_types as iot','iot.id','=','ii.outcome_type')
             ->leftJoin('incident_actions_taken as iat','iat.id','=','ii.action_taken')
             ->select('ii.id', 'i.incident_name', 'ii.investigation_findings', 'ii.follow_up_actions','iat.action_taken','iot.outcome_type')
+            ->whereIn('i.id', $visibleIncidentIds ?: [0])
             ->where('ii.approval', 1)
             ->whereNull('ii.approved_by')
             ->orderBy('ii.created_at', 'desc')
@@ -417,8 +449,10 @@ class DashboardController extends Controller
         $page_title ='Incident';
         $resort_id= $this->resort->resort_id;
         $total_incidents = Incidents::where('resort_id',$resort_id)->count();
+        // "Open" = anything not yet resolved (matches HR_Dashobard fix —
+        // freshly-Reported incidents must count or they vanish from tiles).
         $open_incidents = Incidents::where('resort_id', $resort_id)
-        ->whereNotIn('status', ['Reported', 'Resolved'])
+        ->where('status', '!=', 'Resolved')
         ->count();
         $under_investigation_incidents = Incidents::where('resort_id', $resort_id)
         ->where('status', 'Investigation In Progress')
@@ -441,7 +475,9 @@ class DashboardController extends Controller
                 ->get();
     
             $statusCounts = $incidents->groupBy('status')->map->count();
-            $totalOpen = $incidents->whereNotIn('status', ['Resolved', 'Reported'])->count();
+            // "Open" = not yet Resolved. Excluding 'Reported' here was the
+            // same gap-bucket bug the Open Incidents tile had.
+            $totalOpen = $incidents->where('status', '!=', 'Resolved')->count();
     
             // Choose a dominant status (you can change this logic)
             $dominantStatus = $statusCounts->sortDesc()->keys()->first() ?? 'No Incidents';
@@ -505,12 +541,15 @@ class DashboardController extends Controller
         ->count();        
         // dd($total_incidents);
        
+        // Was: ->where('status', ['Reported']) — passing an array as the
+        // value silently casts to "Array" and matches nothing, so the
+        // tile read 0 even when there were Reported incidents.
         $pending_incidents = Incidents::whereHas('reporter', function($query) use ($department_id) {
             $query->where('Dept_id', $department_id);
         })
         ->where('resort_id', $resort_id)
-        ->where('status', ['Reported'])
-        ->count(); 
+        ->where('status', 'Reported')
+        ->count();
 
         $under_investigation_incidents = Incidents::whereHas('reporter', function($query) use ($department_id) {
             $query->where('Dept_id', $department_id);
@@ -537,7 +576,9 @@ class DashboardController extends Controller
                 ->get();
     
             $statusCounts = $incidents->groupBy('status')->map->count();
-            $totalOpen = $incidents->whereNotIn('status', ['Resolved', 'Reported'])->count();
+            // "Open" = not yet Resolved. Excluding 'Reported' here was the
+            // same gap-bucket bug the Open Incidents tile had.
+            $totalOpen = $incidents->where('status', '!=', 'Resolved')->count();
     
             // Choose a dominant status (you can change this logic)
             $dominantStatus = $statusCounts->sortDesc()->keys()->first() ?? 'No Incidents';

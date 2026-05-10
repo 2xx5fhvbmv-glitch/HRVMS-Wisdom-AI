@@ -35,6 +35,7 @@ use App\Models\ResortNotification;
 use App\Events\ResortNotificationEvent;
 use App\Notifications\AlternativeDateSuggestedNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Mail;
 
 class LeaveController extends Controller
 {
@@ -1920,6 +1921,27 @@ class LeaveController extends Controller
                             'Leave'
                         )));
                     }
+                }
+
+                // ── Confirmation email to the applicant ──
+                // Was previously delivered via the external NOTIFICATION_URL
+                // service; this gives a self-contained SMTP path so the
+                // applicant always gets a record of their submission.
+                if ($applicantAdmin && filter_var($applicantAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
+                    $leaveCategoryName = LeaveCategory::where('id', $leave->leave_category_id ?? 0)->value('leave_type') ?? 'Leave';
+                    $totalDays = $leave->total_days ?? Carbon::parse($fromDate)->diffInDays(Carbon::parse($toDate)) + 1;
+
+                    Mail::send('emails.leave-applied', [
+                        'applicantName'   => $applicantName,
+                        'leaveCategory'   => $leaveCategoryName,
+                        'fromDate'        => $leaveFromFormatted,
+                        'toDate'          => $leaveToFormatted,
+                        'totalDays'       => $totalDays,
+                        'reason'          => $request->reason ?? '',
+                    ], function ($m) use ($applicantAdmin, $leaveFromFormatted, $leaveToFormatted) {
+                        $m->to($applicantAdmin->email, $applicantAdmin->first_name . ' ' . $applicantAdmin->last_name)
+                          ->subject('Leave Application Submitted (' . $leaveFromFormatted . ' – ' . $leaveToFormatted . ')');
+                    });
                 }
             } catch (\Exception $notifEx) {
                 \Log::warning('Leave notification error: ' . $notifEx->getMessage());

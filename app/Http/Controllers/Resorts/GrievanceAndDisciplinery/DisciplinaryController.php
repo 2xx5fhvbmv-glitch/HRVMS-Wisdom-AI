@@ -75,6 +75,9 @@ class DisciplinaryController extends Controller
             // cases they created themselves so a creator never loses
             // visibility of their own submission, even when it's
             // unassigned (Committee_id IS NULL).
+            // Cases delivered to HR (SendtoHr=Yes) stay visible — the
+            // committee member who handled the case still needs a record
+            // of it on their dashboard.
             $loginAdminId = $this->resort->id;
 
             $committeeCaseIds = disciplinarySubmit::query()
@@ -84,7 +87,6 @@ class DisciplinaryController extends Controller
                 ->where('t3.MemberId', $assinged_id)
                 ->whereNotIn('disciplinary_submits.status', ['resolved', 'rejected'])
                 ->where('disciplinary_submits.Assigned', 'Yes')
-                ->when($rankKey === 'HOD', fn ($q) => $q->where('disciplinary_submits.SendtoHr', 'No'))
                 ->pluck('disciplinary_submits.id');
 
             $DisciplinarySubmissionModel = disciplinarySubmit::with(['category', 'offence', 'GetEmployee'])

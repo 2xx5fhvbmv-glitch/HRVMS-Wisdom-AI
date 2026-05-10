@@ -265,43 +265,87 @@
         margin-top: 5px!important;
     }
 
+    /* ── "Your Request Includes" card — sticky + internal scroll so the
+       right column never overgrows the form on the left. The card body
+       scrolls; the title stays pinned. ───────────────────────────────── */
+    .card.regInclude-card {
+        position: sticky;
+        top: 90px;
+        max-height: calc(100vh - 110px);
+        display: flex;
+        flex-direction: column;
+    }
+    .card.regInclude-card > .card-title { flex: 0 0 auto; }
+    .card.regInclude-card > .card-title h3 { font-size: 14px; }
+    .card.regInclude-card > #dynamic-summary {
+        overflow-y: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        padding-right: 6px;
+    }
+    /* Subtle scrollbar so it doesn't fight the card border. */
+    .card.regInclude-card > #dynamic-summary::-webkit-scrollbar { width: 6px; }
+    .card.regInclude-card > #dynamic-summary::-webkit-scrollbar-thumb {
+        background: #d1d5db; border-radius: 3px;
+    }
+
+    /* Tighten the leave-category header block (Emergency Leave / dates /
+       Available balance) to match the form's compact scale. The defaults
+       in default.css are 14px h5/h6 + 12px p — a notch larger than the
+       form labels next to them, which is what looked off. */
+    .card.regInclude-card .regInclude-block h5 { font-size: 12px; font-weight: 600; }
+    .card.regInclude-card .regInclude-block h6 { font-size: 11px; font-weight: 600; }
+    .card.regInclude-card .regInclude-block span { font-size: 11px; }
+    .card.regInclude-card .regInclude-block p { font-size: 11px; margin-bottom: 0; }
+
+    /* "Total:" footer pill — was inheriting bold + larger default text. */
+    .card.regInclude-card .bg-themeGrayLight { padding: 10px 14px; font-size: 12px; }
+    .card.regInclude-card .bg-themeGrayLight p { font-size: 12px; }
+    .card.regInclude-card .bg-themeGrayLight span { font-size: 13px; font-weight: 700; }
+
     /* ── Leave Breakdown Summary card ─────────────────────────────── */
+    /* Font sizes deliberately match the rest of the form:
+       - .regInclude-block p uses 12px (tile labels mirror it)
+       - .regInclude-block h6 uses 14px (row labels stay close to it)
+       Previous 28px tile values + 14px rows looked oversized vs the
+       form's 12-14px scale; now everything sits in the same band. */
     .leave-breakdown-card {
         background: #fff;
         border-radius: 14px;
-        padding: 18px 18px 6px;
-        margin: 12px 0 16px;
+        padding: 14px 14px 4px;
+        margin: 10px 0 12px;
         border: 1px solid #ececec;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
     .leave-breakdown-title {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
-        letter-spacing: 1.5px;
+        letter-spacing: 1.3px;
         color: #1f2937;
-        margin: 0 0 14px;
+        margin: 0 0 12px;
     }
     .leave-breakdown-quadrants {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-bottom: 16px;
+        gap: 8px;
+        margin-bottom: 12px;
     }
     .leave-breakdown-tile {
         background: #f3eddc;
-        border-radius: 12px;
-        padding: 14px 16px;
+        border-radius: 10px;
+        padding: 10px 12px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        min-height: 90px;
+        gap: 4px;
+        min-height: 68px;
     }
     .leave-breakdown-tile .tile-label {
-        font-size: 13px;
+        font-size: 11px;
         color: #4b5563;
+        line-height: 1.3;
     }
     .leave-breakdown-tile .tile-value {
-        font-size: 28px;
+        font-size: 13px;
         font-weight: 700;
         line-height: 1;
         color: #b45309; /* amber-700 */
@@ -311,24 +355,26 @@
 
     .leave-breakdown-rows {
         border-top: 1px solid #ececec;
-        padding-top: 8px;
+        padding-top: 4px;
     }
     .leave-breakdown-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 0;
+        gap: 8px;
+        padding: 7px 0;
         border-bottom: 1px solid #f1f1f1;
-        font-size: 14px;
+        font-size: 12px;
         color: #1f2937;
     }
     .leave-breakdown-row:last-child { border-bottom: none; }
+    .leave-breakdown-row .row-label { line-height: 1.35; }
 
     .leave-breakdown-row .row-pill {
         display: inline-block;
-        padding: 4px 12px;
+        padding: 3px 10px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         white-space: nowrap;
     }
@@ -630,23 +676,16 @@
                     </div>
                 `);
 
-                    // Departure can be ONE day before leave starts (employees
-                    // commonly fly out the night before). Arrival is bounded
-                    // to the leave window itself.
-                    const transportDepMinDate = new Date(minDate);
-                    transportDepMinDate.setDate(transportDepMinDate.getDate() - 1);
-
+                    // No window constraint — employees can pick any date for
+                    // their flight. Sequence (arrival ≥ departure) is still
+                    // enforced below in the on-change handler.
                     $(`#${datepickerId} .transport-departure-date`).datepicker({
                         format: 'dd/mm/yyyy',
                         autoclose: true,
-                        startDate: transportDepMinDate,
-                        endDate: maxDate,
                     });
                     $(`#${datepickerId} .transport-arrival-date`).datepicker({
                         format: 'dd/mm/yyyy',
                         autoclose: true,
-                        startDate: minDate,
-                        endDate: maxDate,
                     });
             } else {
                 $(`#main-${transportId}`).remove(); // Remove if unchecked
@@ -669,28 +708,8 @@
             const minDate = parseDate(fromDateStr);
             const maxDate = parseDate(toDateStr);
 
-            // Departure can be ONE DAY BEFORE the leave starts — employees
-            // commonly catch a flight in the evening after their last
-            // working day. Arrival stays inside the leave window.
-            const depMinDate = new Date(minDate);
-            depMinDate.setDate(depMinDate.getDate() - 1);
-
-            // Update per-transportation datepickers (departure: -1 day; arrival: leave window).
-            $('.transport-departure-date').each(function () {
-                $(this).datepicker('setStartDate', depMinDate);
-                $(this).datepicker('setEndDate', maxDate);
-            });
-            $('.transport-arrival-date').each(function () {
-                $(this).datepicker('setStartDate', minDate);
-                $(this).datepicker('setEndDate', maxDate);
-            });
-
-            // Update departure pass datepickers (same rule).
-            $('#depDate').datepicker('setStartDate', depMinDate);
-            $('#depDate').datepicker('setEndDate', maxDate);
-
-            $('#arrDate').datepicker('setStartDate', minDate);
-            $('#arrDate').datepicker('setEndDate', maxDate);
+            // Per-transport and departure-pass datepickers are
+            // intentionally unconstrained — employees can pick any date.
         });
             
 
@@ -826,12 +845,10 @@
         const minDate = parseDate(fromDateStr);
         const maxDate = parseDate(toDateStr);
 
-        // Initialize datepickers with restricted range
+        // No window constraint — employees can pick any flight date.
         $('#depDate, #arrDate').datepicker({
             format: 'dd/mm/yyyy',
             autoclose: true,
-            startDate: minDate,
-            endDate: maxDate,
         });
     } else {
         $options.addClass('d-none');

@@ -3262,30 +3262,21 @@ class Common
             return $query;
         }
 
-        $userCommittees = \App\Models\IncidentCommitteeMember::where('member_id', $emp->id)
-            ->pluck('commitee_id')
-            ->toArray();
+        // Per the standing dept-scope spec: other-dept HOD/EXCOM see ONLY
+        // their own department's incidents on the listing. Committee
+        // membership does NOT widen the listing — that bypass was letting
+        // a Security HOD assigned to a resort-wide committee see FNB /
+        // Accounts incidents on the index and meetings list. Per-record
+        // access (canViewIncidentInvestigation) still honours committee
+        // membership so a committee member can open a case file outside
+        // their own dept; only the LIST scope is tightened here.
         $departmentId = $emp->Dept_id ?? null;
+        if (!$departmentId) {
+            return $query->whereRaw('0=1');
+        }
 
-        return $query->where(function ($q) use ($userCommittees, $departmentId) {
-            if (!empty($userCommittees)) {
-                $q->orWhere(function ($subQ) use ($userCommittees) {
-                    foreach ($userCommittees as $committeeId) {
-                        $subQ->orWhereRaw('JSON_CONTAINS(assigned_to, ?)', [json_encode((string) $committeeId)]);
-                    }
-                });
-            }
-            if ($departmentId) {
-                $q->orWhereHas('reporter', function ($subQ) use ($departmentId) {
-                    $subQ->where('Dept_id', $departmentId);
-                });
-            }
-            // If user has no committee membership AND no department, the
-            // wrapping where(...) leaves the inner closure empty which MySQL
-            // treats as no constraint (returns all rows). Force-reject here.
-            if (empty($userCommittees) && !$departmentId) {
-                $q->whereRaw('0=1');
-            }
+        return $query->whereHas('reporter', function ($subQ) use ($departmentId) {
+            $subQ->where('Dept_id', $departmentId);
         });
     }
 

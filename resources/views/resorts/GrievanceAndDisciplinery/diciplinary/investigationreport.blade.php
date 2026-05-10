@@ -177,7 +177,7 @@
                                             @foreach($parent as $key => $value)
                                                 <tr>
                                                     <td class="text-center">{{ $loop->iteration }}</td>
-                                                    <td>{{ $value->invesigation_date }} - {{ $value->resolution_date }}</td>
+                                                    <td>{{ $value->invesigation_date ? \Carbon\Carbon::flexible($value->invesigation_date)->format('d M Y') : '—' }} - {{ $value->resolution_date ? \Carbon\Carbon::flexible($value->resolution_date)->format('d M Y') : '—' }}</td>
                                                     <td>{{ $value->first_name }} {{ $value->last_name }}  ({{$value->rank}})</td>
                                                     <td>{{ $value->outcome_type }}</td>
                                                     <td>

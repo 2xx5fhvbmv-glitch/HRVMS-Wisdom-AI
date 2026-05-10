@@ -114,26 +114,28 @@ class DashboardController extends Controller
         // Latest 3 active cases for the "Case Timelines" panel — union of
         // grievance + disciplinary so the panel doesn't sit empty when a
         // resort only has disciplinary cases (and vice versa).
-        // Deadline = filed_at + 28 days as a placeholder SLA.
+        // Deadline = filed_at + N days, where N comes from the resort's
+        // grivance_resoultion_time_line_models row (per-priority SLA).
+        // For disciplinary, the row's own Expiry_date wins when it's a
+        // real date; otherwise we fall back to the same priority SLA.
+        $slaMap = $this->resolveSlaMap($resort_id);
+
         $grievanceTimelines = GrivanceSubmissionModel::with('category')
             ->where('resort_id', $resort_id)
             ->whereNotIn('status', ['resolved', 'rejected'])
             ->orderByDesc('Grivance_date_time')
             ->limit(5)
             ->get()
-            ->map(function ($c) {
+            ->map(function ($c) use ($slaMap) {
                 $filed = $c->Grivance_date_time ? Carbon::parse($c->Grivance_date_time) : ($c->created_at ?? null);
                 if (!$filed) return null;
                 $filed = $filed instanceof Carbon ? $filed : Carbon::parse($filed);
-                $deadline = (clone $filed)->addDays(28);
-                $totalDays   = max(1, $filed->diffInDays($deadline));
-                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
-                $progressPct = (int) round(($usedDays / $totalDays) * 100);
+                $deadline = $this->slaDeadline($filed, $c->Priority, $slaMap);
                 return [
                     'name'         => 'Grievance — ' . (optional($c->category)->Category_Name ?? 'Untitled'),
-                    'filed_date'   => $filed->format('d/m/Y'),
-                    'deadline'     => $deadline->format('d/m/Y'),
-                    'progress_pct' => max(5, min(100, $progressPct)),
+                    'filed_date'   => $filed->format('d M Y'),
+                    'deadline'     => $deadline->format('d M Y'),
+                    'progress_pct' => $this->progressPct($filed, $deadline),
                     'priority'     => $c->Priority ?? 'Medium',
                     '_filed_at'    => $filed,
                 ];
@@ -145,21 +147,18 @@ class DashboardController extends Controller
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
-            ->map(function ($d) {
+            ->map(function ($d) use ($slaMap) {
                 $filed = $d->created_at instanceof Carbon ? $d->created_at : ($d->created_at ? Carbon::parse($d->created_at) : null);
                 if (!$filed) return null;
-                $deadline = (clone $filed)->addDays(28);
-                $totalDays   = max(1, $filed->diffInDays($deadline));
-                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
-                $progressPct = (int) round(($usedDays / $totalDays) * 100);
-                $catName     = optional($d->category)->DisciplinaryCategoryName ?? 'Untitled';
-                $offence     = optional($d->offence)->OffensesName;
-                $label       = 'Disciplinary — ' . $catName . ($offence ? ' (' . $offence . ')' : '');
+                $deadline = $this->disciplinaryDeadline($filed, $d->Priority, $d->Expiry_date, $slaMap);
+                $catName  = optional($d->category)->DisciplinaryCategoryName ?? 'Untitled';
+                $offence  = optional($d->offence)->OffensesName;
+                $label    = 'Disciplinary — ' . $catName . ($offence ? ' (' . $offence . ')' : '');
                 return [
                     'name'         => $label,
-                    'filed_date'   => $filed->format('d/m/Y'),
-                    'deadline'     => $deadline->format('d/m/Y'),
-                    'progress_pct' => max(5, min(100, $progressPct)),
+                    'filed_date'   => $filed->format('d M Y'),
+                    'deadline'     => $deadline->format('d M Y'),
+                    'progress_pct' => $this->progressPct($filed, $deadline),
                     'priority'     => $d->Priority ?? 'Medium',
                     '_filed_at'    => $filed,
                 ];
@@ -334,25 +333,24 @@ class DashboardController extends Controller
 
         // HOD/EXCOM Case Timelines — union of grievance + disciplinary
         // restricted to the dept's own employees so the panel matches
-        // the rest of this dashboard's scope.
+        // the rest of this dashboard's scope. Same SLA source as HR.
+        $slaMap = $this->resolveSlaMap($resort_id);
+
         $grievanceTimelines = $grievanceQuery->with('category')
             ->whereNotIn('status', ['resolved', 'rejected'])
             ->orderByDesc('Grivance_date_time')
             ->limit(5)
             ->get()
-            ->map(function ($c) {
+            ->map(function ($c) use ($slaMap) {
                 $filed = $c->Grivance_date_time ? Carbon::parse($c->Grivance_date_time) : ($c->created_at ?? null);
                 if (!$filed) return null;
                 $filed = $filed instanceof Carbon ? $filed : Carbon::parse($filed);
-                $deadline = (clone $filed)->addDays(28);
-                $totalDays   = max(1, $filed->diffInDays($deadline));
-                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
-                $progressPct = (int) round(($usedDays / $totalDays) * 100);
+                $deadline = $this->slaDeadline($filed, $c->Priority, $slaMap);
                 return [
                     'name'         => 'Grievance — ' . (optional($c->category)->Category_Name ?? 'Untitled'),
-                    'filed_date'   => $filed->format('d/m/Y'),
-                    'deadline'     => $deadline->format('d/m/Y'),
-                    'progress_pct' => max(5, min(100, $progressPct)),
+                    'filed_date'   => $filed->format('d M Y'),
+                    'deadline'     => $deadline->format('d M Y'),
+                    'progress_pct' => $this->progressPct($filed, $deadline),
                     'priority'     => $c->Priority ?? 'Medium',
                     '_filed_at'    => $filed,
                 ];
@@ -363,20 +361,17 @@ class DashboardController extends Controller
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
-            ->map(function ($d) {
+            ->map(function ($d) use ($slaMap) {
                 $filed = $d->created_at instanceof Carbon ? $d->created_at : ($d->created_at ? Carbon::parse($d->created_at) : null);
                 if (!$filed) return null;
-                $deadline = (clone $filed)->addDays(28);
-                $totalDays   = max(1, $filed->diffInDays($deadline));
-                $usedDays    = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
-                $progressPct = (int) round(($usedDays / $totalDays) * 100);
-                $catName     = optional($d->category)->DisciplinaryCategoryName ?? 'Untitled';
-                $offence     = optional($d->offence)->OffensesName;
+                $deadline = $this->disciplinaryDeadline($filed, $d->Priority, $d->Expiry_date, $slaMap);
+                $catName  = optional($d->category)->DisciplinaryCategoryName ?? 'Untitled';
+                $offence  = optional($d->offence)->OffensesName;
                 return [
                     'name'         => 'Disciplinary — ' . $catName . ($offence ? ' (' . $offence . ')' : ''),
-                    'filed_date'   => $filed->format('d/m/Y'),
-                    'deadline'     => $deadline->format('d/m/Y'),
-                    'progress_pct' => max(5, min(100, $progressPct)),
+                    'filed_date'   => $filed->format('d M Y'),
+                    'deadline'     => $deadline->format('d M Y'),
+                    'progress_pct' => $this->progressPct($filed, $deadline),
                     'priority'     => $d->Priority ?? 'Medium',
                     '_filed_at'    => $filed,
                 ];
@@ -474,4 +469,52 @@ class DashboardController extends Controller
         return $this->Hod_dashboard(request());
     }
 
+    /**
+     * Per-resort SLA in days, keyed by Priority. Source of truth is
+     * grivance_resoultion_time_line_models (one row per resort). Returns
+     * sane defaults (High 7 / Medium 14 / Low 28) when the resort hasn't
+     * configured one yet, so the timeline panel always shows something.
+     */
+    private function resolveSlaMap(int $resort_id): array
+    {
+        $row = DB::table('grivance_resoultion_time_line_models')
+            ->where('resort_id', $resort_id)
+            ->first();
+
+        return [
+            'High'   => (int) ($row->HighPriority   ?? 7),
+            'Medium' => (int) ($row->MediumPriority ?? 14),
+            'Low'    => (int) ($row->LowPriority    ?? 28),
+        ];
+    }
+
+    private function slaDeadline(Carbon $filed, ?string $priority, array $slaMap): Carbon
+    {
+        $days = $slaMap[$priority ?? 'Medium'] ?? $slaMap['Medium'];
+        return (clone $filed)->addDays(max(1, $days));
+    }
+
+    /**
+     * Disciplinary deadline. Prefers the row's own Expiry_date when it's a
+     * real date; falls back to the priority-based SLA otherwise (older
+     * rows without Expiry_date set, or '0000-00-00').
+     */
+    private function disciplinaryDeadline(Carbon $filed, ?string $priority, $expiry, array $slaMap): Carbon
+    {
+        if ($expiry && $expiry !== '0000-00-00' && $expiry !== '0000-00-00 00:00:00') {
+            try {
+                $dt = $expiry instanceof Carbon ? $expiry : Carbon::parse($expiry);
+                if ($dt->year > 1) return $dt;
+            } catch (\Exception $e) { /* fall through to SLA */ }
+        }
+        return $this->slaDeadline($filed, $priority, $slaMap);
+    }
+
+    private function progressPct(Carbon $filed, Carbon $deadline): int
+    {
+        $totalDays = max(1, $filed->diffInDays($deadline));
+        $usedDays  = max(0, min($totalDays, $filed->diffInDays(Carbon::now())));
+        $pct       = (int) round(($usedDays / $totalDays) * 100);
+        return max(5, min(100, $pct));
+    }
 }
