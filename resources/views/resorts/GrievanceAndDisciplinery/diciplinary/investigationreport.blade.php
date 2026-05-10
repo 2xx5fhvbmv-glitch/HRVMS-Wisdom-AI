@@ -200,7 +200,7 @@
                                                                 <thead>
                                                                     <tr>
                                                                         <th>Sr No.</th>
-                                                                        <th>Investigation Find Recommendations</th>
+                                                                        <th>INVESTIGATION FINDINGS AND RECOMMENDATIONS</th>
                                                                         <th>Follow Up Action</th>
                                                                         <th>Follow Up Description</th>
                                                                         <th>Investigation Stage</th>
