@@ -232,7 +232,14 @@
                                     </div>
                                 </div>
                                 <div class="card-footer">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm float-end">Submit</button>
+                                    {{-- Inline reason rendered next to Submit when the JS validator
+                                         disables the button, so the user always knows WHY they can't
+                                         submit (was previously only flagged with a tiny
+                                         "(Exceeds balance!)" in the right-side summary card). --}}
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                        <small id="submit-disabled-reason" class="text-danger d-none me-2"></small>
+                                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                    </div>
                                 </div>
                             </div>
                        </form>
@@ -882,6 +889,7 @@
         let leaveSummary = '';
         let totalLeaveDays = 0; // Initialize total days
         let isFormValid = true; // Flag to check if form is valid
+        let disableReasons = []; // Human-readable reasons the submit is blocked
 
         $('.append-block').each(function (index) {
             const leaveCategory = $(this).find('select[name^="leave_category_id"] option:selected');
@@ -906,6 +914,10 @@
 
                 if (leaveExceedsBalance) {
                     isFormValid = false; // Mark form as invalid
+                    const exceedBy = totalDays - remainingLeaves;
+                    disableReasons.push(
+                        `${leaveCategoryText.trim()} exceeds available balance by ${exceedBy} day${exceedBy === 1 ? '' : 's'}`
+                    );
                 }
 
                 const warningText = leaveExceedsBalance
@@ -987,11 +999,20 @@
 
         $('#dynamic-summary').html(leaveSummary || '<p>No leave requests yet.</p>');
 
-        // Enable or disable the submit button based on form validity
+        // Enable or disable the submit button based on form validity, and
+        // surface the reason inline next to the button so the user knows
+        // exactly what's blocking submission.
+        const $submit = $('button[type="submit"]');
+        const $reason = $('#submit-disabled-reason');
         if (isFormValid) {
-            $('button[type="submit"]').prop('disabled', false);
+            $submit.prop('disabled', false);
+            $reason.addClass('d-none').text('');
         } else {
-            $('button[type="submit"]').prop('disabled', true);
+            $submit.prop('disabled', true);
+            const msg = disableReasons.length
+                ? 'Cannot submit: ' + disableReasons.join('; ')
+                : 'Cannot submit: please review the form.';
+            $reason.removeClass('d-none').text(msg);
         }
     }
 
