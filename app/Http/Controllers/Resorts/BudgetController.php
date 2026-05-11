@@ -1485,17 +1485,36 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Budget not found.'], 404);
             }
 
-            // Update the budget status to 'Approved'
-            $manningResponse->budget_process_status = 'Approved';
-            $manningResponse->save();
+            // Was: budget_process_status save fired BEFORE the BudgetStatus
+            // insert, and the insert crashed on five NOT NULL columns
+            // (resort_id / Department_id / message_id / OtherComments /
+            // created_by) that this method wasn't providing. End result was
+            // a half-approved budget: manning_responses said Approved but no
+            // BudgetStatus row existed. Wrap both writes in a transaction
+            // and supply every required column so the approval is atomic
+            // and the Revise-Budget lockout downstream actually triggers.
+            DB::beginTransaction();
+            try {
+                $manningResponse->budget_process_status = 'Approved';
+                $manningResponse->save();
 
-            // You might also want to log this action or create a BudgetStatus entry
-            BudgetStatus::create([
-                'Budget_id' => $budgetId,
-                'status' => 'Approved',
-                'message' => 'Budget approved by GM.',
-                'user_id' => Auth::guard('resort-admin')->user()->id, // Assuming authenticated resort admin
-            ]);
+                $userId = Auth::guard('resort-admin')->user()->id ?? null;
+                BudgetStatus::create([
+                    'resort_id'      => $manningResponse->resort_id,
+                    'Department_id'  => $departmentId,
+                    'message_id'     => $manningResponse->message_id ?? ('BUDGET_'.$budgetId),
+                    'Budget_id'      => $budgetId,
+                    'status'         => 'Approved',
+                    'comments'       => 'Budget approved by GM.',
+                    'OtherComments'  => 'Budget approved by GM.',
+                    'created_by'     => $userId,
+                    'modified_by'    => $userId,
+                ]);
+                DB::commit();
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                throw $e;
+            }
 
             return response()->json(['success' => true, 'message' => 'Budget approved successfully!']);
 

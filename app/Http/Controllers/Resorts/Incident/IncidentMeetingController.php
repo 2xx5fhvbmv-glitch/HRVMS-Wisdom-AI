@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Resorts\Incident;
 
 use App\Http\Controllers\Controller;
 use App\Events\ResortNotificationEvent;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
@@ -296,6 +297,33 @@ class IncidentMeetingController extends Controller
                         $participant_id,
                         'Incident'
                     )));
+
+                    // Email — same content as the bell notification.
+                    try {
+                        $partEmp   = \App\Models\Employee::find($participant_id);
+                        $partAdmin = $partEmp ? \App\Models\ResortAdmin::find($partEmp->Admin_Parent_id) : null;
+                        if ($partAdmin && filter_var($partAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
+                            $name = trim(($partAdmin->first_name ?? '') . ' ' . ($partAdmin->last_name ?? '')) ?: 'there';
+                            $bodyHtml = "You have been invited to a meeting in the Incident module.";
+                            Mail::send('emails.incident-notification', [
+                                'recipientName' => $name,
+                                'body'          => $bodyHtml,
+                                'details'       => [
+                                    'Meeting'  => $request->meeting_subject,
+                                    'Date'     => $request->meeting_date,
+                                    'Time'     => $request->meeting_time,
+                                    'Location' => $request->location ?? '—',
+                                ],
+                                'ctaUrl'   => route('incident.meeting'),
+                                'ctaLabel' => 'View meetings',
+                            ], function ($m) use ($partAdmin, $name, $request) {
+                                $m->to($partAdmin->email, $name)
+                                  ->subject('Meeting scheduled: ' . $request->meeting_subject);
+                            });
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('Incident meeting email failed for participant ' . $participant_id . ': ' . $e->getMessage());
+                    }
                 }
             }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Resorts\Incident;
 
 use App\Http\Controllers\Controller;
 use App\Events\ResortNotificationEvent;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
@@ -351,17 +352,30 @@ class IncidentController extends Controller
                 $msg = 'HR has assigned a '.$incident->incident_name.' incident to your committee.';
                 $title = 'Assign Incident';
                 $ModuleName = "Incident";
-                
-                
+
+
                 event(new ResortNotificationEvent(Common::nofitication(
-                    $this->resort->resort_id, 
-                    10, 
-                    $title, 
-                    $msg, 
-                    0, 
-                    $member->member_id, 
+                    $this->resort->resort_id,
+                    10,
+                    $title,
+                    $msg,
+                    0,
+                    $member->member_id,
                     $ModuleName
                 )));
+
+                $this->notifyByEmail(
+                    $member->member_id,
+                    'New incident assigned: ' . $incident->incident_name,
+                    $msg,
+                    [
+                        'Incident' => $incident->incident_name,
+                        'Priority' => $incident->priority,
+                        'Status'   => $incident->status,
+                    ],
+                    route('incident.investigation', base64_encode($incident->id)),
+                    'Open Investigation'
+                );
             }
         }
 
@@ -577,7 +591,7 @@ class IncidentController extends Controller
             $msg = 'You are requested to provide a statement regarding an incident.';
             $title = 'Employee Statement Required';
             $ModuleName = "Incident";
-            
+
             event(new ResortNotificationEvent(Common::nofitication(
                 $this->resort->resort_id,
                 10,
@@ -587,6 +601,15 @@ class IncidentController extends Controller
                 $user,
                 $ModuleName
             )));
+
+            $this->notifyByEmail(
+                $user,
+                'Statement requested for an incident',
+                $msg,
+                [],
+                route('incident.index'),
+                'Open Incidents'
+            );
 
             // Common::nofitication(type=10) already inserted the
             // resort_notifications row above. Pass skipDbInsert=true so
@@ -637,6 +660,18 @@ class IncidentController extends Controller
                 $ModuleName
             )));
 
+            $this->notifyByEmail(
+                $gm->id,
+                'Incident approval required: ' . $incident->incident_name,
+                $msg,
+                [
+                    'Incident' => $incident->incident_name,
+                    'Status'   => $incident->status,
+                ],
+                route('incident.investigation', base64_encode($incident->id)),
+                'Review for approval'
+            );
+
             // Also notify GM's delegate if GM is on leave
             $gmDelegateIds = Common::getDelegatedEmployeeIds($gm->id, $this->resort->resort_id);
             // getDelegatedEmployeeIds returns IDs of employees on leave, we need the reverse — delegates FOR the GM
@@ -653,6 +688,19 @@ class IncidentController extends Controller
                     $msg . ' (Delegated from GM)',
                     0, $delegateId, $ModuleName
                 )));
+
+                $this->notifyByEmail(
+                    $delegateId,
+                    'Delegated incident approval: ' . $incident->incident_name,
+                    $msg . ' (Delegated from GM)',
+                    [
+                        'Incident'   => $incident->incident_name,
+                        'Status'     => $incident->status,
+                        'Delegated by' => 'GM (on leave)',
+                    ],
+                    route('incident.investigation', base64_encode($incident->id)),
+                    'Review for approval'
+                );
             }
         }
 
@@ -725,5 +773,42 @@ class IncidentController extends Controller
         }
     }
 
+    /**
+     * Send an incident-related email to a recipient employee. Pairs with
+     * each ResortNotificationEvent dispatch so the bell-notification and
+     * the email arrive at the same time. Designed to be non-fatal: SMTP
+     * failure is logged and the request continues — same pattern used
+     * by the leave-applied email earlier in this codebase.
+     *
+     * @param int    $employeeId  employees.id of recipient
+     * @param string $subject     email subject line
+     * @param string $body        HTML body (single paragraph; the layout
+     *                            already adds greeting + footer)
+     * @param array  $details     optional label => value map rendered as
+     *                            a key/value table in the email body
+     * @param string|null $ctaUrl optional CTA button target URL
+     * @param string|null $ctaLabel optional CTA button label
+     */
+    protected function notifyByEmail($employeeId, string $subject, string $body, array $details = [], $ctaUrl = null, $ctaLabel = null): void
+    {
+        try {
+            $emp = Employee::find($employeeId);
+            if (!$emp) return;
+            $admin = ResortAdmin::find($emp->Admin_Parent_id ?? 0);
+            if (!$admin || !filter_var($admin->email ?? '', FILTER_VALIDATE_EMAIL)) return;
+            $recipientName = trim(($admin->first_name ?? '') . ' ' . ($admin->last_name ?? '')) ?: 'there';
 
+            Mail::send('emails.incident-notification', [
+                'recipientName' => $recipientName,
+                'body'          => $body,
+                'details'       => $details,
+                'ctaUrl'        => $ctaUrl,
+                'ctaLabel'      => $ctaLabel ?: 'View in HRVMS',
+            ], function ($m) use ($admin, $recipientName, $subject) {
+                $m->to($admin->email, $recipientName)->subject($subject);
+            });
+        } catch (\Throwable $e) {
+            \Log::warning('Incident email failed for employee ' . $employeeId . ': ' . $e->getMessage());
+        }
+    }
 }
