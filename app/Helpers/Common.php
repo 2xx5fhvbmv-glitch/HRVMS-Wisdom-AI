@@ -3603,15 +3603,28 @@ class Common
         $today = \Carbon\Carbon::today()->toDateString();
         $dismissedIds = (array) session('dismissed_admin_notifications', []);
 
-        // notifications.start_date / end_date are varchar in 'd M Y'
-        // format (e.g. "07 May 2026"), not DATE columns. Parse with
-        // STR_TO_DATE so date comparison actually works.
+        // notifications.start_date / end_date are varchar — different
+        // environments save them in different formats:
+        //   - local DB had "07 May 2026" (d M Y, month name)
+        //   - prod DB has  "10/05/2026" (d/m/Y, slash + numeric)
+        // COALESCE tries each known format so the comparison works
+        // regardless of which datepicker locale was active when the
+        // admin saved the notification. NULL means STR_TO_DATE rejected
+        // the format; the next one is tried.
+        $startExpr = "COALESCE("
+            . "STR_TO_DATE(n.start_date, '%d %M %Y'),"   // 07 May 2026
+            . "STR_TO_DATE(n.start_date, '%d/%m/%Y'),"   // 10/05/2026
+            . "STR_TO_DATE(n.start_date, '%Y-%m-%d'),"   // 2026-05-10
+            . "STR_TO_DATE(n.start_date, '%d-%m-%Y')"    // 10-05-2026
+            . ")";
+        $endExpr   = str_replace('start_date', 'end_date', $startExpr);
+
         $query = \DB::table('notifications as n')
             ->join('notification_resort as nr', 'nr.notification_id', '=', 'n.id')
             ->where('nr.resort_id', $user->resort_id)
             ->where('n.status', 'active')
-            ->whereRaw("STR_TO_DATE(n.start_date, '%d %M %Y') <= ?", [$today])
-            ->whereRaw("STR_TO_DATE(n.end_date,   '%d %M %Y') >= ?", [$today]);
+            ->whereRaw("{$startExpr} <= ?", [$today])
+            ->whereRaw("{$endExpr}   >= ?", [$today]);
 
         if (!empty($dismissedIds)) {
             $query->whereNotIn('n.id', $dismissedIds);
