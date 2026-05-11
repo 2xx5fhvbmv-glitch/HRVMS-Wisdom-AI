@@ -1276,6 +1276,14 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('file-manage/rename-file', 'FileManagment\FileManageController@RenameFile')->name('FileManage.RenameFile');
       Route::post('file-manage/delete-file', 'FileManagment\FileManageController@DeleteFile')->name('FileManage.DeleteFile');
       Route::post('file-manage/share-file',  'FileManagment\FileManageController@ShareFile')->name('FileManage.ShareFile');
+
+      // File / Folder share feature (phase 1: internal only)
+      Route::post(  'file-manage/shares',                'FileManagment\FileShareController@store')->name('FileShare.store');
+      Route::delete('file-manage/shares/{id}',           'FileManagment\FileShareController@destroy')->name('FileShare.destroy');
+      Route::get(   'file-manage/shares',                'FileManagment\FileShareController@index')->name('FileShare.index');
+      Route::get(   'file-manage/shares/received',       'FileManagment\FileShareController@received')->name('FileShare.received');
+      Route::get(   'file-manage/shares/employees',      'FileManagment\FileShareController@employeesSearch')->name('FileShare.employees');
+      Route::get(   'file-manage/shares/departments',    'FileManagment\FileShareController@departments')->name('FileShare.departments');
       Route::post('file-manage/show-the-folder-wise-data', 'FileManagment\FileManageController@ShowthefolderWiseData')->name('FileManage.ShowthefolderWiseData');
       Route::get('file-manage/permission', 'FileManagment\FilePermissionController@index')->name('FileManage.Permission');
       Route::post('file-manage/get/permission-file', 'FileManagment\FilePermissionController@GetPermissionfile')->name('FileManage.GetPermissionfile');

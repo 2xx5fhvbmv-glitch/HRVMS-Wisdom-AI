@@ -223,11 +223,19 @@ class FileManageController extends Controller
             $Search = $request->Search;
     
             $flag= $request->flag;
+            // Sidebar search/refresh uses the same per-user filter the
+            // initial page load uses — otherwise typing in Search would
+            // re-surface all the folders a non-privileged user shouldn't
+            // see.
+            $allowedFolderIds = $this->visibleFolderIdsForCurrentUser();
             $FolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)
                     ->where('UnderON', 0);
                 if($Search != '')
                 {
                     $FolderList->where('Folder_Name', 'like', '%' . $Search . '%');
+                }
+                if (is_array($allowedFolderIds)) {
+                    $FolderList->whereIn('id', $allowedFolderIds ?: [0]);
                 }
                 $FolderList= $FolderList->where("Folder_Type", $flag)
                     ->orderByDesc('id')
@@ -490,6 +498,15 @@ class FileManageController extends Controller
                                 ]);
                             });
                                 
+                // Folder-level share short-circuit: when the user reached
+                // this folder via a share (folder id is in their allowed
+                // set), grant access to every file in the folder without
+                // running the per-file FilePermissions check — otherwise
+                // recipients see an empty "shared" folder.
+                $allowedFolderIds = $this->visibleFolderIdsForCurrentUser();
+                $folderGrantedByShare = is_array($allowedFolderIds)
+                    && in_array($File_structure->id, $allowedFolderIds, true);
+
                 // FiL Structure FilePermissions
                 $ChildFiles = ChildFileManagement::where("Parent_File_ID"   , $File_structure->id)
                                 ->where("resort_id"   , $this->resort->resort_id)
@@ -541,10 +558,12 @@ class FileManageController extends Controller
                                     $i->File_img = $img;
                                     return $i;    
                                 })
-                                ->each(function ($file) use ($mergedFiles,$parent_unique_id,$flag ) 
+                                ->each(function ($file) use ($mergedFiles,$parent_unique_id,$flag,$folderGrantedByShare )
                                 {
                                         $resort =  $this->resort;
-                                        $filePermission = Common::FilePermissions($file->unique_id, $resort, $flag);
+                                        $filePermission = $folderGrantedByShare
+                                            ? ['type' => true, 'emp' => []]
+                                            : Common::FilePermissions($file->unique_id, $resort, $flag);
                                         if(isset($filePermission['type']) && $filePermission['type'] == true)
                                         {
                                             $emp='<div class="user-ovImg user-ovImgTable">';
@@ -733,6 +752,108 @@ class FileManageController extends Controller
                 \Log::error('ShareFile failed: ' . $e->getMessage());
                 return response()->json(['success' => false, 'message' => 'Could not generate share link: ' . $e->getMessage()], 500);
             }
+        }
+
+        /**
+         * Folder ids the current resort-admin can see in the sidebar.
+         * Returns NULL for "unrestricted" (the privileged set: GM / HR /
+         * MGR / MD / HR-dept HOD-EXCOM / master admin) and an array of
+         * filemangement_systems.id otherwise. Non-privileged users see
+         * only their own categorized folder (named after their Emp_id)
+         * plus any folders explicitly shared with them.
+         */
+        protected function visibleFolderIdsForCurrentUser(): ?array
+        {
+            $user = $this->resort;
+            if (!$user) return [];
+
+            // Super / master always sees everything.
+            if (($user->type ?? null) === 'super' || ($user->is_master_admin ?? 0)) {
+                return null;
+            }
+
+            $emp = $user->GetEmployee ?? null;
+            if (!$emp) return [];
+
+            $rank     = (int) ($emp->rank ?? 0);
+            $isHrDept = \App\Helpers\Common::isHRDepartment($emp->Dept_id ?? null);
+
+            // Privileged set mirrors Common::FilePermissions:
+            //   - rank 3 (HR), 4 (MGR), 8 (GM), 9 (MD) anywhere
+            //   - rank 1 (EXCOM), 2 (HOD) only if they're in the HR dept
+            $isPrivileged = in_array($rank, [3, 4, 8, 9], true)
+                || (in_array($rank, [1, 2], true) && $isHrDept);
+            if ($isPrivileged) return null;
+
+            // Non-privileged: own folder (Emp_id) + shared folders.
+            $allowed = [];
+
+            if (!empty($emp->Emp_id)) {
+                $ownFolderId = (int) FilemangementSystem::where('resort_id', $user->resort_id)
+                    ->where('Folder_Type', 'categorized')
+                    ->where('Folder_Name', $emp->Emp_id)
+                    ->value('id');
+                if ($ownFolderId) $allowed[] = $ownFolderId;
+            }
+
+            $sharedIds = \App\Http\Controllers\Resorts\FileManagment\FileShareController::visibleSharedFolderIdsFor($emp);
+            $allowed = array_values(array_unique(array_merge($allowed, $sharedIds)));
+            return $allowed;
+        }
+
+        /**
+         * Does the current resort-admin user have an active FileShare
+         * granting them access to this specific file id?
+         * Resolves the three internal scope types:
+         *   - explicit employees (file_share_employees)
+         *   - employee's current Dept_id matches a department share
+         *   - organization-wide share in the user's resort
+         */
+        protected function userHasReceivedShareForFile(int $fileId): bool
+        {
+            $emp = $this->resort->GetEmployee ?? null;
+            if (!$emp) return false;
+
+            // All share records pointing at this file
+            $shareIds = \DB::table('file_shares')
+                ->where('shareable_type', 'file')
+                ->where('shareable_id', $fileId)
+                ->where('share_mode', 'internal')
+                ->pluck('id', 'scope_type');
+            if ($shareIds->isEmpty()) return false;
+
+            // Org-wide → recipient just needs to be in the same resort
+            // as one of these shares.
+            $orgShareIds = \DB::table('file_shares')
+                ->where('shareable_type', 'file')
+                ->where('shareable_id', $fileId)
+                ->where('share_mode', 'internal')
+                ->where('scope_type', 'organization')
+                ->where('resort_id', $emp->resort_id)
+                ->exists();
+            if ($orgShareIds) return true;
+
+            // Specific-employee shares
+            $directHit = \DB::table('file_shares as fs')
+                ->join('file_share_employees as fse', 'fse.share_id', '=', 'fs.id')
+                ->where('fs.shareable_type', 'file')
+                ->where('fs.shareable_id', $fileId)
+                ->where('fse.employee_id', $emp->id)
+                ->exists();
+            if ($directHit) return true;
+
+            // Department shares — recipient's current Dept_id wins
+            if ($emp->Dept_id) {
+                $deptHit = \DB::table('file_shares as fs')
+                    ->join('file_share_departments as fsd', 'fsd.share_id', '=', 'fs.id')
+                    ->where('fs.shareable_type', 'file')
+                    ->where('fs.shareable_id', $fileId)
+                    ->where('fsd.department_id', $emp->Dept_id)
+                    ->exists();
+                if ($deptHit) return true;
+            }
+
+            return false;
         }
 
         public function ShowthefolderWiseData(Request $request)
@@ -928,7 +1049,42 @@ class FileManageController extends Controller
                 $ChildFiles = ChildFileManagement::where("unique_id"   , $unique_id)
                 ->where("resort_id"   , $this->resort->resort_id)->first();
                 $tr="";
-                if (isset($ChildFiles) && StorageHelper::disk()->exists($ChildFiles->File_Path)) {
+
+                // Per-user access gate. Without this, any logged-in user at
+                // the resort could open any file (including other employees'
+                // personal folders) just by passing the file's unique_id —
+                // which is rendered in the file list HTML, so it leaks.
+                // FilePermissions() returns ['type' => true|false] depending
+                // on the viewer's rank + dept + whether they own the
+                // categorized folder. Non-HR HOD/EXCOM/Line-Worker viewing
+                // someone else's folder file fails this check.
+                if (!isset($ChildFiles)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File not found.'
+                    ], 404);
+                }
+                // Look up the parent folder to derive the folder type
+                // (categorized vs uncategorized) — FilePermissions branches
+                // on it.
+                $parentFolder = FilemangementSystem::where('id', $ChildFiles->Parent_File_ID)
+                    ->where('resort_id', $this->resort->resort_id)
+                    ->first(['Folder_Type']);
+                $accessFlag = $parentFolder->Folder_Type ?? 'categorized';
+                $accessCheck = Common::FilePermissions($ChildFiles->unique_id, $this->resort, $accessFlag);
+                if (!is_array($accessCheck) || empty($accessCheck['type']) || $accessCheck['type'] !== true) {
+                    // Also accept access if this file/folder has been
+                    // explicitly shared with the current user via the new
+                    // FileShare feature (phase 1). Otherwise hard-deny.
+                    if (!$this->userHasReceivedShareForFile($ChildFiles->id)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'You do not have permission to view this file.'
+                        ], 403);
+                    }
+                }
+
+                if (StorageHelper::disk()->exists($ChildFiles->File_Path)) {
                    
                         // Generate encryption key from environment variable
                         $key = hash('sha256', env('ENCRYPTION_KEY'), true);
@@ -1086,16 +1242,30 @@ class FileManageController extends Controller
             $page_title = 'Employees File Management';
 
 
-            $AllFolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)
-                                            // ->where('UnderON', 0)
+            // Sidebar folder list scoping. Privileged users (HR / GM /
+            // MGR / MD / HR-dept HOD-EXCOM / master) see every folder at
+            // the resort. Everyone else sees ONLY their own categorized
+            // folder (matched by Folder_Name == their Emp_id) PLUS any
+            // folders explicitly shared with them (via FileShare).
+            // Without this filter, a Chief Engineer (rank 1 / 2 in a
+            // non-HR dept) saw every other employee's folder name in the
+            // sidebar even though they couldn't open the files inside.
+            $allowedFolderIds = $this->visibleFolderIdsForCurrentUser();
+
+            $allBuilder = FilemangementSystem::where('resort_id', $this->resort->resort_id)
                                             ->where("Folder_Type", "categorized")
-                                            ->orderByDesc('id')
-                                            ->get();
-            $FolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)
-                                                                            ->where('UnderON', 0)
-                                                                            ->where("Folder_Type", "categorized")
-                                                                            ->orderByDesc('id')
-                                                                            ->get();
+                                            ->orderByDesc('id');
+            $rootBuilder = FilemangementSystem::where('resort_id', $this->resort->resort_id)
+                                            ->where('UnderON', 0)
+                                            ->where("Folder_Type", "categorized")
+                                            ->orderByDesc('id');
+            if (is_array($allowedFolderIds)) {
+                // empty array → user has no folders → show nothing
+                $allBuilder->whereIn('id', $allowedFolderIds ?: [0]);
+                $rootBuilder->whereIn('id', $allowedFolderIds ?: [0]);
+            }
+            $AllFolderList = $allBuilder->get();
+            $FolderList    = $rootBuilder->get();
 
             // Folders for employees are auto-created with Folder_Name =
             // Employee Emp_id (e.g. "DR-19") — see EmployeeController:403.
@@ -1120,7 +1290,19 @@ class FileManageController extends Controller
                     $empNameByEmpId[$row->Emp_id] = trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
                 }
             }
-            $decorate = function ($folder) use ($empNameByEmpId) {
+            // Identify which of the visible folders the current user got
+            // through a share (vs. their own) so the view can mark them
+            // with a SHARED badge. Privileged users get an empty set
+            // (everything they see is "theirs to govern", not shared TO
+            // them).
+            $sharedFolderIdSet = [];
+            $currentEmp = optional($this->resort)->GetEmployee;
+            if ($currentEmp && is_array($allowedFolderIds)) {
+                $sharedFolderIdSet = array_flip(\App\Http\Controllers\Resorts\FileManagment\FileShareController::visibleSharedFolderIdsFor($currentEmp));
+            }
+
+            $decorate = function ($folder) use ($empNameByEmpId, $sharedFolderIdSet) {
+                $folder->Is_Shared = isset($sharedFolderIdSet[$folder->id]);
                 $name = $empNameByEmpId[$folder->Folder_Name] ?? null;
                 $folder->Display_Name = $name
                     ? trim($name) . ' (' . $folder->Folder_Name . ')'

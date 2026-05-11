@@ -295,10 +295,11 @@ class DashboardController extends Controller
     public function getUpcomingMeetings()
     {
         $now = Carbon::now(); // Full current datetime
-        // Was scoped only by resort_id — non-HR HOD/EXCOM saw upcoming
-        // meetings for incidents from other depts.
-        $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
-
+        // Upcoming Meetings is a "shared awareness" widget — every logged-in
+        // user at the resort can see it, including non-HR HOD/EXCOM. Only
+        // the resort_id scopes the result (cross-resort still blocked);
+        // dept-level scope is intentionally NOT applied here so a F&B HOD
+        // can see if HR/GM is running a meeting today.
         $meetings = DB::table('incidents_investigation_meetings as m')
             ->join('incidents as i', 'i.id', '=', 'm.incident_id')
             ->select(
@@ -309,7 +310,7 @@ class DashboardController extends Controller
                 'm.meeting_time',
                 'm.id'
             )
-            ->whereIn('i.id', $visibleIncidentIds ?: [0])
+            ->where('i.resort_id', $this->resort->resort_id)
             ->whereRaw("STR_TO_DATE(CONCAT(m.meeting_date, ' ', m.meeting_time), '%Y-%m-%d %H:%i:%s') >= ?", [$now])
             ->orderByRaw("STR_TO_DATE(CONCAT(m.meeting_date, ' ', m.meeting_time), '%Y-%m-%d %H:%i:%s')")
             ->limit(5)

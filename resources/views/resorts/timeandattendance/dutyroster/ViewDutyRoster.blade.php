@@ -841,7 +841,7 @@
     .table-createDutymonthly .ot-details > p:last-child { margin: 0; }
     .table-createDutymonthly .editIcon-btn {
         position: absolute !important;
-        top: 4px !important;
+        bottom: 4px !important;
         right: 4px !important;
         padding: 2px !important;
         font-size: 12px !important;
