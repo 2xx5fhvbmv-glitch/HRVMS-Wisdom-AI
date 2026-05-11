@@ -265,6 +265,11 @@
 
 {{-- Cropper.js library — used by the profile-image change handler below. --}}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" integrity="sha512-JyCZjCOZoyeQZSd5+YEAcFgz2fowJ1F1hyJOXgtKu4llIa0KneLcidn5bwfutiehUTiOuK87A986BZJMko0eWQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+{{-- heic2any: iPhone photos default to HEIC, which Chrome/Firefox/Edge
+     can't render. Before passing the file to Cropper, we detect HEIC
+     and silently transcode to JPEG in the browser so the rest of the
+     flow stays unchanged. --}}
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script>
 $(document).ready(function(){
 
@@ -525,9 +530,58 @@ $(document).ready(function(){
     var __cropperTargetInput = document.getElementById('profile_picture');
     var __cropperPreviewImg  = document.getElementById('profileimg');
 
+    // Helper: a file is HEIC/HEIF if either the MIME type says so or the
+    // file extension does. Some iPhones (esp. older iOS) report HEIC
+    // files with MIME "" or "application/octet-stream" rather than
+    // image/heic, so we also sniff the extension.
+    function __isHeicFile(file) {
+        if (!file) return false;
+        var t = (file.type || '').toLowerCase();
+        if (t === 'image/heic' || t === 'image/heif') return true;
+        var n = (file.name || '').toLowerCase();
+        return n.endsWith('.heic') || n.endsWith('.heif');
+    }
+
+    // Convert HEIC → JPEG Blob in the browser using heic2any. Returns
+    // a Promise<File>. Resolves with a normal JPEG File the rest of
+    // the pipeline can handle.
+    function __heicToJpegFile(originalFile) {
+        if (typeof heic2any !== 'function') {
+            return Promise.reject(new Error('heic2any not loaded'));
+        }
+        return heic2any({ blob: originalFile, toType: 'image/jpeg', quality: 0.9 })
+            .then(function (jpegBlob) {
+                var baseName = (originalFile.name || 'profile').replace(/\.(heic|heif)$/i, '');
+                return new File([jpegBlob], baseName + '.jpg', { type: 'image/jpeg' });
+            });
+    }
+
     $("#profile_picture").on("change", function (event) {
+        var inputEl = this;
         var file = event.target.files[0];
         if (!file) return;
+
+        // HEIC path: transcode first, then re-enter the normal flow.
+        // We swap the input's FileList to the converted JPEG so the
+        // form-submit handler picks up the right file even if the
+        // user skips the crop step.
+        if (__isHeicFile(file)) {
+            toastr.info('Converting iPhone photo...', '', { positionClass: 'toast-bottom-right', timeOut: 2000 });
+            __heicToJpegFile(file).then(function (jpegFile) {
+                try {
+                    var dt = new DataTransfer();
+                    dt.items.add(jpegFile);
+                    inputEl.files = dt.files;
+                } catch (e) { /* older browsers — fall through */ }
+                __openCropperForFile(jpegFile);
+            }).catch(function (err) {
+                console.error('HEIC conversion failed:', err);
+                toastr.error('Could not read this HEIC photo. Please convert it to JPEG and try again.', 'Error', { positionClass: 'toast-bottom-right' });
+                inputEl.value = '';
+            });
+            return;
+        }
+
         if (!file.type || file.type.indexOf('image/') !== 0) {
             // Non-image (shouldn't normally happen — input has no
             // accept=, but defend just in case). Fall back to the old
@@ -535,7 +589,12 @@ $(document).ready(function(){
             __cropperPreviewImg.src = URL.createObjectURL(file);
             return;
         }
+        __openCropperForFile(file);
+    });
 
+    // Extracted from the original change handler so HEIC and non-HEIC
+    // paths share the same Cropper bootstrap code.
+    function __openCropperForFile(file) {
         var reader = new FileReader();
         reader.onload = function (e) {
             var img = document.getElementById('cropperImage');
@@ -565,7 +624,7 @@ $(document).ready(function(){
             }, { once: true });
         };
         reader.readAsDataURL(file);
-    });
+    }
 
     // "Save crop" — turn the crop selection into a JPEG Blob, wrap as
     // File, and replace the file input's FileList. Bumping the size cap
