@@ -60,7 +60,13 @@ class EmployeeController extends Controller
                 $userprofile = Common::getResortUserPicture($row->Admin_Parent_id);
                 $ra = $row->resortAdmin;
                 $name = trim(($ra->first_name ?? '').' '.($ra->middle_name ?? '').' '.($ra->last_name ?? ''));
-                return '<img style="width:50px;height:50px" src="' . e($userprofile) . '" alt="user" class="profile-image">' . e($name);
+                return '
+                <div class="tableUser-block">
+                    <div class="img-circle">
+                        <img src="'.e($userprofile).'" alt="user">
+                    </div>
+                    <span class="userApplicants-btn">'.e($name).'</span>
+                </div>';
             })
             ->addColumn('Department', fn($row) => $row->department ? e($row->department->name) : 'No Department Selected')
             ->addColumn('Position', fn($row) => $row->position ? e($row->position->position_title) : 'No Position Selected')

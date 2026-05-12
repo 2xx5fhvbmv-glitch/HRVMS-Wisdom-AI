@@ -101,15 +101,18 @@ class ComplianceController extends Controller
                          return $compliance->employee ? $compliance->employee->Emp_id : '-';
                     })
                     ->addColumn('employee_name', function ($compliance) {
-                         $name = $compliance->employee ? $compliance->employee->resortAdmin->full_name : 'N/A';
                          if (!$compliance->employee) {
                               return '<span class="text-danger">-</span>';
                          }
-                         $img = '';
-                              $profileImage = Common::getResortUserPicture($compliance->employee->Admin_Parent_id);
-                              $img = '<img src="' . $profileImage . '" class="rounded-circle mr-2" width="30" height="30" alt="Profile">';
-
-                         return $img . ' ' . $name;
+                         $name = $compliance->employee->resortAdmin->full_name ?? 'N/A';
+                         $profileImage = Common::getResortUserPicture($compliance->employee->Admin_Parent_id);
+                         return '
+                         <div class="tableUser-block">
+                              <div class="img-circle">
+                                   <img src="'.e($profileImage).'" alt="user">
+                              </div>
+                              <span class="userApplicants-btn">'.e($name).'</span>
+                         </div>';
                     })
                     ->addColumn('reported_on', function ($compliance) {
                          return $compliance->reported_on ? Carbon::parse($compliance->reported_on)->format('Y-m-d H:i:s') : 'N/A';

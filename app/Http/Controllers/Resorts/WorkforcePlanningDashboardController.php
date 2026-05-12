@@ -674,11 +674,14 @@ class WorkforcePlanningDashboardController extends Controller
                 ->where('resort_id', $resort->resort_id)
                 ->count();
 
+            // The avatar strip next to Total Employees was filtering by
+            // position_id = $position_id (the HOD's OWN position), so only
+            // employees with the same job title as the HOD rendered —
+            // which is usually just the HOD themselves. Scope by DEPT
+            // instead so the strip mirrors the count above it.
             $employees = Employee::where('resort_id', $resort->resort_id)
                 ->with('resortAdmin')
-                ->where('position_id', $position_id)
                 ->where('dept_id', $Dept_id)
-                ->where('resort_id', $resort->resort_id)
                 ->limit(6)
                 ->get();
 
@@ -689,14 +692,10 @@ class WorkforcePlanningDashboardController extends Controller
                 $leftemp[] = $emp->id;
             }
 
+            // Overflow count: dept members beyond the 6 shown as avatars.
             $LeftemployeesCount = Employee::where('resort_id', $resort->resort_id)
-                ->with('resortAdmin')
-                ->where('position_id', $position_id)
                 ->where('dept_id', $Dept_id)
-                ->where('resort_id', $resort->resort_id)
-                ->where('rank', '=', 'others')
                 ->whereNotIn('id', $leftemp)
-
                 ->count();
 
             // Batch fetch the first employee for every position in ONE query —

@@ -3225,6 +3225,34 @@ class Common
      *
      * The query is mutated in place AND returned so it can be chained.
      */
+    /**
+     * Apply strict participant-only visibility to an incident-meeting
+     * query. A meeting is visible to:
+     *   - HR / GM / HR-dept HOD-EXCOM / master (privileged set)
+     *   - Listed participants of the meeting (ONLY)
+     * The original incident reporter does NOT get implicit access — if
+     * they need to see this specific meeting they must be added as a
+     * participant. This matches the project decision (2026-05-12) that
+     * meetings are private to invitees.
+     */
+    public static function scopeMeetingsForViewer($query, string $alias = 'incidents_investigation_meetings')
+    {
+        $user = \Auth::guard('resort-admin')->user();
+        if (!$user) return $query->whereRaw('0=1');
+        if (self::hasFullDataAccess()) return $query;
+
+        $emp = $user->GetEmployee ?? null;
+        if (!$emp) return $query->whereRaw('0=1');
+        $empId = (int) $emp->id;
+
+        return $query->whereExists(function ($sub) use ($empId, $alias) {
+            $sub->select(\DB::raw(1))
+                ->from('incidents_investigation_meetings_participants as p')
+                ->whereColumn('p.meeting_id', $alias . '.id')
+                ->where('p.participant_id', $empId);
+        });
+    }
+
     public static function scopeIncidentsForViewer($query)
     {
         $user = \Auth::guard('resort-admin')->user();

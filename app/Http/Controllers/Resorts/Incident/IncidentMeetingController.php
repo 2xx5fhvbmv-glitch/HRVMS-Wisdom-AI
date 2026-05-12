@@ -57,15 +57,16 @@ class IncidentMeetingController extends Controller
     public function list(Request $request)
     {
         if ($request->ajax()) {
-            // Restrict the meeting list to meetings whose parent incident
-            // the viewer has access to. This was previously unscoped so any
-            // dept HOD could see every meeting in the resort.
-            $visibleIncidentIds = Common::scopeIncidentsForViewer(Incidents::query())->pluck('id')->all();
-            if (empty($visibleIncidentIds)) {
-                return datatables()->of(collect())->make(true);
-            }
+            // Participant-only meeting visibility — see Common::scopeMeetingsForViewer.
+            // Previously listed meetings whose parent incident the user
+            // had dept-level access to; now restricted to meetings where
+            // the user is a participant or the incident reporter.
+            $resortId = $this->resort->resort_id;
             $incident_meetings = IncidentsMeeting::with(['participant.employee','incidents'])
-                ->whereIn('incident_id', $visibleIncidentIds);
+                ->whereHas('incidents', function ($q) use ($resortId) {
+                    $q->where('resort_id', $resortId);
+                });
+            $incident_meetings = Common::scopeMeetingsForViewer($incident_meetings);
 
             // Apply filters
             if ($request->has('searchTerm') && $request->searchTerm) {
@@ -361,13 +362,11 @@ class IncidentMeetingController extends Controller
         $page_title ='Meeting Detail';
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
-        // Restrict to meetings whose parent incident the viewer can see —
-        // direct-URL access to a meeting on someone else's dept incident
-        // would otherwise leak full details.
-        $visibleIncidentIds = Common::scopeIncidentsForViewer(Incidents::query())->pluck('id')->all();
-        $meeting = IncidentsMeeting::with(['participant.employee','externalParticipant','incidents'])
-            ->where('id', $id)
-            ->whereIn('incident_id', $visibleIncidentIds ?: [0])
+        // Participant-only meeting visibility — direct-URL access to a
+        // meeting the user isn't invited to (and didn't report the parent
+        // incident) is blocked.
+        $meeting = Common::scopeMeetingsForViewer(IncidentsMeeting::with(['participant.employee','externalParticipant','incidents']))
+            ->where('incidents_investigation_meetings.id', $id)
             ->first();
         if (!$meeting) {
             abort(404, 'Meeting not found or not accessible.');
@@ -406,10 +405,11 @@ class IncidentMeetingController extends Controller
         if (!$meeting) {
             return response()->json(['message' => 'Meeting not found.'], 404);
         }
-        // Same dept-scope gate as details/create — block inline updates
-        // for meetings on incidents the viewer can't see.
-        $canSee = Common::scopeIncidentsForViewer(Incidents::query())
-            ->where('id', $meeting->incident_id)
+        // Participant-only gate — block inline updates for meetings the
+        // viewer isn't a participant of (or didn't report the parent
+        // incident, or isn't privileged).
+        $canSee = Common::scopeMeetingsForViewer(IncidentsMeeting::query())
+            ->where('id', $meeting->id)
             ->exists();
         if (!$canSee) {
             return response()->json(['message' => 'Not authorised.'], 403);
@@ -465,10 +465,10 @@ class IncidentMeetingController extends Controller
                 'message' => 'Meeting not found.'
             ], 404);
         }
-        // Same dept-scope gate — block deletes from users who can't see
-        // the parent incident.
-        $canSee = Common::scopeIncidentsForViewer(Incidents::query())
-            ->where('id', $meeting->incident_id)
+        // Participant-only gate — only privileged users, participants,
+        // or the incident reporter can delete the meeting.
+        $canSee = Common::scopeMeetingsForViewer(IncidentsMeeting::query())
+            ->where('id', $meeting->id)
             ->exists();
         if (!$canSee) {
             return response()->json([
