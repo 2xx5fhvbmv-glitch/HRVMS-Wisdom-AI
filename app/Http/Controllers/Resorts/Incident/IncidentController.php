@@ -616,8 +616,16 @@ class IncidentController extends Controller
             // sendMobileNotification only sends the mobile push and does
             // not duplicate the DB row (which made the bell dropdown
             // show every notification twice).
+            // Signature: ($resortId, $type, $feedbackFormId, $trainingId,
+            //            $title, $message, $module, $sendto, $request_id,
+            //            $skipDbInsert)
+            // Earlier call omitted $trainingId, which shifted every later
+            // arg one position left: $sendto received `null` and the
+            // foreach crashed; skipDbInsert never landed at its real slot
+            // so the DB row would have double-inserted too.
             Common::sendMobileNotification(
                 $this->resort->resort_id,
+                '',
                 '',
                 '',
                 $title,

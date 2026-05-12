@@ -547,6 +547,12 @@
             }
         });
 
+        // Investigation start / expected resolution dates must be today
+        // or later. Other datepickers on this page (mndf_date, fire_date,
+        // Ministry_notified_date) record past events, so the past-date
+        // lock is applied per-field rather than globally on `.datepicker`.
+        $('#start_date, #expResoDate').datepicker('setStartDate', new Date());
+
         const originalPriority = $('#original_priority').val();
 
         $('#priority_level').on('change', function () {
@@ -653,7 +659,11 @@
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
-                        $('#incidentInvestigation')[0].reset(); 
+                        // After saving, return to the incident list so the
+                        // user can see the updated status in context.
+                        setTimeout(function () {
+                            window.location.href = '{{ route("incident.index") }}';
+                        }, 800);
                     }
                 },
                 error: function(response) {

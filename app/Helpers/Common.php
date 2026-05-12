@@ -3334,6 +3334,19 @@ class Common
         if ($rank === 8 || $availableRank === 'GM') return true;
         if (in_array($rank, [1, 2], true) && self::isHRDepartment($emp->Dept_id ?? null)) return true;
 
+        // HOD/EXCOM of the same department that REPORTED this incident.
+        // If the incident already shows up on their listing (per
+        // scopeIncidentsForViewer's reporter-dept rule), they should also
+        // be able to open the case file — otherwise the "View" button
+        // throws 403 on rows the user can plainly see, which is confusing.
+        if (in_array($rank, [1, 2], true) && !empty($emp->Dept_id)) {
+            $reporterDeptId = optional($incident->reporter)->Dept_id
+                ?? \App\Models\Employee::where('id', $incident->reporter_id)->value('Dept_id');
+            if ($reporterDeptId && (int) $reporterDeptId === (int) $emp->Dept_id) {
+                return true;
+            }
+        }
+
         // Committee members assigned to THIS incident.
         $assignedCommitteeIds = [];
         $raw = $incident->assigned_to ?? null;
