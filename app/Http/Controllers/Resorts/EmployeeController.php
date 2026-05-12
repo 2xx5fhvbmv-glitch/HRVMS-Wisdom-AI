@@ -42,15 +42,20 @@ class EmployeeController extends Controller
             $user = Auth::guard('resort-admin')->user();
             $employee = $user->GetEmployee;
             $Dept_id = $employee->Dept_id ?? null;
-            $rank = $employee->rank ?? null;
 
             // Eager-load the relations the DataTable renders so we don't N+1 per row.
             $query = Employee::where('employees.resort_id', $user->resort_id)
                 ->where('employees.status', 'Active')
                 ->with(['resortAdmin:id,first_name,middle_name,last_name,profile_picture', 'department:id,name', 'position:id,position_title']);
 
-            // HR (rank 3), EXCOM (rank 1), or master admin see all employees
-            if (!$user->is_master_admin && !in_array($rank, [1, 3])) {
+            // Standing department-based access rule:
+            //   - Master / super / GM / HR / HR-dept HOD-EXCOM see all
+            //   - Every other rank (incl. non-HR EXCOM rank 1) is scoped
+            //     to their own department.
+            // Earlier check `in_array($rank, [1,3])` let any rank-1 EXCOM
+            // see every department, which violated the spec — e.g. an
+            // Engineering EXCOM was seeing Accounting, F&B and HR rows.
+            if (!Common::hasFullDataAccess()) {
                 $query->where('employees.Dept_id', $Dept_id);
             }
 
