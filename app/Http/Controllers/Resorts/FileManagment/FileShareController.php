@@ -294,10 +294,14 @@ class FileShareController extends Controller
         $q = trim((string) $request->query('q', ''));
         if (strlen($q) < 2) return response()->json(['success' => true, 'results' => []]);
 
+        // Recipient picker must stay inside the sharer's own resort.
+        // Without this scope, HR at resort A could type a name and pull
+        // back employees from resort B, then share files cross-resort.
         $like = '%' . $q . '%';
         $rows = DB::table('employees as e')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->where('e.resort_id', $this->resort->resort_id)
             ->where('e.status', 'Active')
             ->where(function ($q2) use ($like) {
                 $q2->where('ra.first_name', 'like', $like)
@@ -331,8 +335,11 @@ class FileShareController extends Controller
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(function ($d) {
+                // Dept_id is shared across resorts in some seeds, so the
+                // employee count must also scope by the sharer's resort.
                 $count = DB::table('employees')
                     ->where('Dept_id', $d->id)
+                    ->where('resort_id', $this->resort->resort_id)
                     ->where('status', 'Active')
                     ->count();
                 return ['id' => $d->id, 'name' => $d->name, 'count' => $count];
