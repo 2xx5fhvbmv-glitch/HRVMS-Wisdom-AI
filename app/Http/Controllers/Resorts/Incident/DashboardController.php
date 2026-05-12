@@ -295,11 +295,8 @@ class DashboardController extends Controller
     public function getUpcomingMeetings()
     {
         $now = Carbon::now(); // Full current datetime
-        // Upcoming Meetings is a "shared awareness" widget — every logged-in
-        // user at the resort can see it, including non-HR HOD/EXCOM. Only
-        // the resort_id scopes the result (cross-resort still blocked);
-        // dept-level scope is intentionally NOT applied here so a F&B HOD
-        // can see if HR/GM is running a meeting today.
+        // Widget is visible to every resort user: any meeting under the
+        // current resort shows up regardless of participation.
         $meetings = DB::table('incidents_investigation_meetings as m')
             ->join('incidents as i', 'i.id', '=', 'm.incident_id')
             ->select(

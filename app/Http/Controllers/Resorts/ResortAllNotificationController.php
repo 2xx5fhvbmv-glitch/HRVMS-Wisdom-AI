@@ -8,6 +8,7 @@ use Auth;
 use App\Models\Employee;
 use App\Models\ResortsParentNotifications;
 use App\Models\ResortsChildNotifications;
+use App\Models\ResortNotification;
 use App\Models\ResortDepartment;
 use Str;
 use DB;
@@ -104,6 +105,21 @@ class ResortAllNotificationController extends Controller
                         event(new ResortNotificationEvent(
                             Common::nofitication($resort_id, $this->type[1], $parentmesgid, 0, '', $hod->id, 'WorkForce Planning')
                         ));
+                        // Also write a persistent bell-tray row — Common::nofitication
+                        // with type=2 only broadcasts via Pusher; it does NOT write
+                        // resort_notifications, which is what the bell dropdown
+                        // reads from. So HODs saw the Request widget on their
+                        // dashboard but no bell entry. Mirror what the Disciplinary
+                        // / Incident modules do.
+                        ResortNotification::create([
+                            'resort_id'  => $resort_id,
+                            'user_id'    => $hod->id,
+                            'module'     => 'WorkForce Planning',
+                            'type'       => 'Manning Request',
+                            'message'    => 'A new manning request requires your response.',
+                            'status'     => 'unread',
+                            'request_id' => $parentmesgid,
+                        ]);
                     } catch (\Exception $notifErr) {
                         \Log::warning('Manning notification dispatch failed for HOD ' . $hod->id . ': ' . $notifErr->getMessage());
                     }
@@ -117,6 +133,15 @@ class ResortAllNotificationController extends Controller
                     event(new ResortNotificationEvent(
                         Common::nofitication($resort_id, $this->type[1], $parentmesgid, 0, '', $hr->id, 'WorkForce Planning')
                     ));
+                    ResortNotification::create([
+                        'resort_id'  => $resort_id,
+                        'user_id'    => $hr->id,
+                        'module'     => 'WorkForce Planning',
+                        'type'       => 'Manning Request',
+                        'message'    => 'Manning request dispatched to department HODs.',
+                        'status'     => 'unread',
+                        'request_id' => $parentmesgid,
+                    ]);
                 } catch (\Exception $notifErr) {
                     \Log::warning('Manning notification dispatch failed for HR ' . $hr->id . ': ' . $notifErr->getMessage());
                 }

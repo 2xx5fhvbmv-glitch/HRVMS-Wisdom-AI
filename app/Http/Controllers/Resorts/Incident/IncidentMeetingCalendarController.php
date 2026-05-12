@@ -50,27 +50,21 @@ class IncidentMeetingCalendarController extends Controller
     // IncidentController.php
     public function getIncidentMeetings(Request $request)
     {
-        // Department-based visibility per the access-control spec:
-        //   GM / HR / HR-dept HOD/EXCOM  → all meetings in the resort
-        //   Everyone else                → only meetings whose parent
-        //                                  incident is in the viewer's
-        //                                  scope (own committee + own dept).
-        // Plus a hard resort_id filter — the previous query had no resort
-        // scope at all, so any logged-in user could see every meeting in
-        // the entire database.
+        // Per project decision (2026-05-12): meeting visibility is now
+        // PARTICIPANT-BASED, not incident-dept-based. A meeting is
+        // visible only to:
+        //   - HR / GM / HR-dept HOD-EXCOM / master  (privileged)
+        //   - Listed participants of the meeting
+        //   - The reporter of the parent incident
+        // Previous rule was "any HOD of the incident's reporting dept" —
+        // that surfaced meetings to dept HODs who weren't invited.
         $resortId = optional($this->resort)->resort_id;
-        $visibleIncidentIds = \App\Helpers\Common::scopeIncidentsForViewer(\App\Models\Incidents::query())
-            ->pluck('id')
-            ->all();
-
-        // No accessible incidents → no meetings.
-        if (empty($visibleIncidentIds)) {
-            return response()->json([]);
-        }
-
         $query = IncidentsMeeting::with('participant.employee')
-            ->whereIn('incident_id', $visibleIncidentIds)
+            ->whereHas('incidents', function ($q) use ($resortId) {
+                $q->where('resort_id', $resortId);
+            })
             ->select('id', 'incident_id', 'meeting_subject', 'meeting_date', 'meeting_time', 'location');
+        $query = \App\Helpers\Common::scopeMeetingsForViewer($query);
 
         // Optional filtering by date range (e.g., when changing calendar month)
         if ($request->has('start') && $request->has('end')) {

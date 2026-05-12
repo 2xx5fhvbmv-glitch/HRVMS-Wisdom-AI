@@ -233,6 +233,25 @@
                     </div>
                 </div>
  
+                {{-- Upcoming Meetings is visible to every logged-in user.
+                     The backend (DashboardController@getUpcomingMeetings)
+                     returns all resort meetings, not just participant ones. --}}
+                <div class="col-lg-6">
+                    <div class="card card-upMeetIncident" id="card-upMeetIncident">
+                        <div class=" card-title">
+                            <div class="row justify-content-between align-items-center g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">Upcoming Meetings</h3>
+                                </div>
+                                <div class="col-auto">
+                                    <a href="{{route('incident.meeting')}}" class="a-link">View All</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main" id="upcoming-meetings"></div>
+                    </div>
+                </div>
+
                 <div class="col-lg-6 @if(!Common::hasFullDataAccess()) d-none @endif">
                 <div class="card card-preventiveIncident">
                         <div class=" card-title">
@@ -330,6 +349,7 @@
 @section('import-scripts')
     <script type="text/javascript">
         const incidentDetailBaseUrl = "{{ route('incident.view', ['id' => 'INCIDENT_ID']) }}";
+        const meetingDetailBaseUrl  = "{{ route('incident.meeting.detail', ['id' => 'MEETING_ID']) }}";
         let incidentChart;
 
         $(document).ready(function () {
@@ -338,7 +358,41 @@
            fetchIncidentTrends();
            loadResolutionTimelineStats();
            loadPreventiveActions();
+           loadUpcomingMeetings();
         });
+
+        function loadUpcomingMeetings() {
+            $.ajax({
+                url: '{{ route("incident.getUpcomingMeetings") }}',
+                method: 'GET',
+                success: function (meetings) {
+                    let container = $('#upcoming-meetings');
+                    container.empty();
+
+                    if (meetings.length === 0) {
+                        container.append('<div class="text-muted px-3 py-2">No upcoming meetings.</div>');
+                        return;
+                    }
+
+                    meetings.forEach(meeting => {
+                        container.append(`
+                            <div class="leaveUser-block">
+                                <div>
+                                    <div class="d-flex justify-content-between">
+                                        <h6>${meeting.title}</h6>
+                                        <span class="badge badge-themeNew1 border-0">${meeting.day_label}, ${meeting.scheduled_time}</span>
+                                    </div>
+                                    <p>${meeting.description}</p>
+                                    <div>
+                                        <a href="${meetingDetailBaseUrl.replace('MEETING_ID', meeting.id)}" class="a-linkTheme">View Details</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                    });
+                }
+            });
+        }
 
         function getIncidentChart() {
             $.ajax({
