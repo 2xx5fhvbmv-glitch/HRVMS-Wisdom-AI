@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Auth;
 use Carbon\Carbon;
 use App\Helpers\Common;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class Employee extends Model
 {
@@ -109,6 +111,38 @@ class Employee extends Model
             if(Auth::guard('resort-admin')->check()) {
                 $model->modified_by = Auth::guard('resort-admin')->user()->id;
             }
+        });
+
+        // Every active employee needs a categorized folder in the file-
+        // management system. Historically it was created lazily on the
+        // first leave-attachment upload — which meant employees who never
+        // uploaded anything were invisible to HR on the File Management
+        // page. Create it eagerly on row insert so the folder always
+        // exists for every new hire. Backfill migration handles legacy.
+        self::created(function ($model) {
+            if (empty($model->Emp_id) || empty($model->resort_id)) {
+                return;
+            }
+            $exists = DB::table('filemangement_systems')
+                ->where('resort_id', $model->resort_id)
+                ->where('Folder_Name', $model->Emp_id)
+                ->where('Folder_Type', 'categorized')
+                ->where('UnderON', 0)
+                ->exists();
+            if ($exists) {
+                return;
+            }
+            DB::table('filemangement_systems')->insert([
+                'resort_id'        => $model->resort_id,
+                'Folder_unique_id' => Str::random(10),
+                'UnderON'          => 0,
+                'Folder_Name'      => $model->Emp_id,
+                'Folder_Type'      => 'categorized',
+                'created_by'       => null,
+                'modified_by'      => null,
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]);
         });
     }
 
