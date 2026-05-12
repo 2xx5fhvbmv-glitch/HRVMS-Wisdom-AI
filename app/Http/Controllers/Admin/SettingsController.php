@@ -41,7 +41,12 @@ class SettingsController extends Controller
   {
     try {
       $settings = Settings::first();
-      // dd($request);
+      if (!$settings) {
+        return response()->json([
+          'success' => false,
+          'msg'     => 'Settings row is missing — seed `settings` table before editing.',
+        ]);
+      }
 
       $input = $request->except(['_token','external_path', 'stripe_secret']);
 
