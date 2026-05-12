@@ -177,7 +177,7 @@
             				<div class="form-group">
             					<label>Time Format</label>
             					<select class="form-control" id="time_format" name="time_format">
-									<option selected disabled>Select date format</option>
+									<option selected disabled>Select time format</option>
 									@foreach($timeFormats as $key => $value)
 										<option value="{{$value}}" @if($value == $data->time_format) Selected @endif>{{$value}}</option>
 									@endforeach
@@ -212,7 +212,7 @@
             	</div>
             	<div class="card-footer">
             		<button type="submit" class="btn btn-info">Submit</button>
-            		<button type="button" onclick="document.getElementById('formStore').reset();" class="btn btn-default resetForm">Reset</a>
+            		<button type="button" onclick="document.getElementById('formStore').reset();" class="btn btn-default resetForm">Reset</button>
             	</div>
             </form>
           </div>
@@ -279,39 +279,22 @@
 					required: true,
 					maxlength: 50,
 				},
+				// Site-settings emails are just contact addresses — they don't
+				// need to be unique against the admins table. The remote rule
+				// here used to call admin.checkEmailExists with the wrong
+				// :input selectors (name="email" / name="id" don't exist on
+				// this form), which made the validator return false whenever
+				// a real admin email was typed and silently blocked the
+				// submit — so logo / favicon uploads never fired.
 				'email_address': {
 					required: true,
 					customEmailValidation: true,
 					email: true,
-					remote: {
-						url: '{{ route("admin.checkEmailExists") }}',
-						type: "post",
-						data: {
-							email: function() {
-								return $('#formStore :input[name="email"]').val();
-							},
-							id: function() {
-								return $('#formStore :input[name="id"]').val();
-							}
-						}
-					}
 				},
 				'admin_email': {
 					required: true,
 					customEmailValidation: true,
 					email: true,
-					remote: {
-						url: '{{ route("admin.checkEmailExists") }}',
-						type: "post",
-						data: {
-							email: function() {
-								return $('#formStore :input[name="email"]').val();
-							},
-							id: function() {
-								return $('#formStore :input[name="id"]').val();
-							}
-						}
-					}
 				},
 			},
 			messages: {
