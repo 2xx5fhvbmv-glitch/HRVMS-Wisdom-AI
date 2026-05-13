@@ -36,13 +36,13 @@ class VisaNationalityImport implements ToModel, WithHeadingRow
         $excelRowNumber = $this->rowNumber + $this->startRow() - 1;
         static $errors = [];
         
-        if (!empty($row['nationality']) && !empty($row['amount'])) 
+        if (!empty($row['nationality']) && !empty($row['amount']))
         {
-            $nationality = config('settings.nationalities');
+            $nationality = array_values(config('settings.countries'));
 
             // Validate nationality
-            if (!in_array($row['nationality'], $nationality)) 
-            { 
+            if (!in_array($row['nationality'], $nationality))
+            {
                 $errors[] = [
                     'row' => $excelRowNumber,
                     'name' => trim($row['nationality']),

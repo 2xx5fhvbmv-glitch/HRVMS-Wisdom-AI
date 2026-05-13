@@ -41,14 +41,17 @@ class ConfigurationController extends Controller
     }
     public function index()
     {
-        $page_title="Configuration Index";
+        $page_title="Configuration";
         $nationality = config('settings.nationalities');
         $ResortSiteSettings =  ResortSiteSettings::where('resort_id',$this->resort->resort_id)->first(['MVRtoDoller','DollertoMVR']);
-        $ResortBudgetCost = ResortBudgetCost::whereIn("details",["Xpat Only"])->where('status','active')->where('resort_id',$this->resort->resort_id)->orderBy('updated_at', 'DESC')->get()
-        ->map(function($i)use($ResortSiteSettings)
+        $hiddenFeeParticulars = ['recruitment fee', 'relocation / luggage allowance', 'ticket annual leave'];
+        $ResortBudgetCost = ResortBudgetCost::whereIn("details",["Xpat Only"])->where('status','active')->where('resort_id',$this->resort->resort_id)
+            ->whereRaw('LOWER(TRIM(particulars)) NOT IN (?, ?, ?)', $hiddenFeeParticulars)
+            ->orderBy('updated_at', 'DESC')->get()
+        ->map(function($i)
         {
-
-            $i->New_Amount  =  Common::RateConversion("DollerToMVR",$i->amount,$this->resort->resort_id);
+            $sourceCurrency = in_array($i->amount_unit, ['$', 'USD']) ? 'USD' : 'MVR';
+            $i->New_Amount  = Common::convertToDisplayCurrency($i->amount, $sourceCurrency);
             return  $i;
         });
     
@@ -300,22 +303,29 @@ class ConfigurationController extends Controller
         $AmountbeforExp = $request->AmountbeforExp;
         $AmountafterExp = $request->AmountafterExp;
 
+        $displayCurrency = Common::getDisplayCurrency();
+
         foreach($ids as $k=>$id)
         {
-        
+
             $amount1 = array_key_exists($k,$amount) ?  $amount[$k]:null;
 
             if(isset($amount1))
             {
-                ResortBudgetCost::where('id',$id)->update(['amount'=>$amount1,'amount_unit'=>'ރ']);
+                $usdAmount = $displayCurrency === 'MVR'
+                    ? Common::RateConversion('MVRToDoller', $amount1, $this->resort->resort_id)
+                    : $amount1;
+                ResortBudgetCost::where('id',$id)->update(['amount'=>$usdAmount,'amount_unit'=>'USD']);
             }
         }
         DB::beginTransaction();
-        try 
+        try
         {
-            $data = ["resort_id"=>$this->resort->resort_id,'nationality'=>$request->nationality,'AmountbeforExp'=>$request->AmountbeforExp,'AmountafterExp'=>$request->AmountafterExp];
-            VisaFeeAmount::updateOrCreate(["resort_id"=>$this->resort->resort_id,'nationality'=>$request->nationality],$data);
-                DB::commit();
+            if (!empty($request->nationality)) {
+                $data = ["resort_id"=>$this->resort->resort_id,'nationality'=>$request->nationality,'AmountbeforExp'=>$request->AmountbeforExp,'AmountafterExp'=>$request->AmountafterExp];
+                VisaFeeAmount::updateOrCreate(["resort_id"=>$this->resort->resort_id,'nationality'=>$request->nationality],$data);
+            }
+            DB::commit();
             return response()->json([
                 'success' => true,
                 'msg' => 'Visa Fees  Create or updated  successfully.',
@@ -598,6 +608,9 @@ class ConfigurationController extends Controller
             return response()->json(['error' => 'Failed to Delete Wallet Type'], 500);
         }
     }
+    // Document Segmentation feature retired — UI and route disabled.
+    // Kept for reference in case the segmentation flow is wired up later.
+    /*
     public function DocumentSegmentationStore(Request $request)
     {
         $resortId = $this->resort->resort_id;
@@ -618,10 +631,9 @@ class ConfigurationController extends Controller
             'document_id.*.required' => 'Please select a nationality.',
             'DocumentName.*.required' => 'Please enter an amount.',
         ];
-        
-        // Validate the request
+
         $validator = Validator::make($request->all(), $rules, $messages);
-        
+
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -629,13 +641,12 @@ class ConfigurationController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-        
+
         DB::beginTransaction();
         try {
-            // Process and save the data
             $VisaDocumentType = $request->document_id;
             $DocumentName = $request->DocumentName;
-            
+
             foreach ($VisaDocumentType as $key => $type) {
                 VisaDocumentSegmentation::create([
                     'resort_id' => $resortId,
@@ -643,7 +654,7 @@ class ConfigurationController extends Controller
                     'document_id' => $type,
                 ]);
             }
-            
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -661,6 +672,7 @@ class ConfigurationController extends Controller
             ], 500);
         }
     }
+    */
     public function VisaWalletsStore(Request $request) 
     {
 

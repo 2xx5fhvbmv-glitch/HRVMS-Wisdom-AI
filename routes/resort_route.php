@@ -1330,7 +1330,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::delete('visa/wallet/destroy/{id}', 'Visa\ConfigurationController@WalletDestroy')->name('resort.visa.WalletDestroy');
 
 
-      Route::post('visa/document-segmentation', 'Visa\ConfigurationController@DocumentSegmentationStore')->name('resort.visa.DocumentSegmentationStore');
+      // Route::post('visa/document-segmentation', 'Visa\ConfigurationController@DocumentSegmentationStore')->name('resort.visa.DocumentSegmentationStore');
 
       Route::get('visa/document-management', 'Visa\DocumentController@index')->name('resort.visa.DocumentManage');
       Route::get('visa/xpatsync', 'Visa\DocumentController@Xpatsync')->name('resort.visa.Xpatsync');

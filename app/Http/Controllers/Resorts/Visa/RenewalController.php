@@ -42,7 +42,7 @@ class RenewalController extends Controller
 
     public function index()
     {
-        $page_title = 'Visa Renewal';
+        $page_title = 'Renewals';
         $Employee= Employee::with(['resortAdmin','position'])->where("nationality","!=","Maldivian")
             ->where('resort_id',$this->resort->resort_id)
             ->get()->map(function($i){

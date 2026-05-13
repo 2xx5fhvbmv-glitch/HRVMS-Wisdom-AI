@@ -31,13 +31,13 @@
                             <i class="fa-solid fa-search"></i>
                         </div>
                     </div>
-                    <div class="col-xl-2 col-md-4 col-sm-4 col-6">
+                    {{-- <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <div class="input-group">
                             <input type="text" id="datepickerXpact" class="form-control datepickerXpact"
                                 placeholder="01/08/2024">
 
                         </div>
-                    </div>
+                    </div> --}}
                     <!-- <div class="col-xl-auto col-md-4 col-sm-4 col-6">
                         <select class="form-select">
                             <option selected>By Joining date</option>
@@ -48,7 +48,7 @@
                     </div> -->
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <select class="form-select" name="departmentFilter" id="departmentFilter">
-                            <option value=""></option>
+                            <option value="">All Department</option>
                             @if($departments->isNotEmpty())
                                 @foreach($departments as $department)
                                     <option value="{{ $department->id }}">{{ $department->name }}</option>

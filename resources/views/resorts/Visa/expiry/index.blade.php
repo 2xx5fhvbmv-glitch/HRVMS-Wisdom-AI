@@ -46,7 +46,7 @@
                             <!-- <span>(10)</span> -->
                         </a>
                         <a href="#" class="d-flex align-items-center justify-content-between Categories" data-flag="medical_report">
-                            <p class="mb-0">Medical Report Test Fees</p>
+                            <p class="mb-0">Medical Report</p>
                             <!-- <span>(10)</span> -->
                         </a>                        
                     </div>

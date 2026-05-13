@@ -267,7 +267,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3>Work Permit Medical Test Fee Renewal</h3>
+                                                    <h3>Work Permit Medical</h3>
                                                     <span>Last Test Date: ${WorkPermitMedicalRenewal.medical_end_date}</span>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span
@@ -310,7 +310,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                     <h3>Work Permit Medical Test Fee Renewal</h3>
+                                                     <h3>Work Permit Medical</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
                                                 

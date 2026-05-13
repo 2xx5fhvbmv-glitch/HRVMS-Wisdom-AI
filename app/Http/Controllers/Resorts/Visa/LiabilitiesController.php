@@ -318,7 +318,7 @@ class LiabilitiesController extends Controller
             
 
 
-            $page_title =  'Liabilities List';
+            $page_title =  'Liabilities';
             return view('resorts.Visa.liabilities.index',compact('page_title'));
     }
     public function getFormattedExpiryStatus($endDate)

@@ -36,10 +36,10 @@
 
                         <div class="col-auto">
                             <div class="d-flex align-items-center">
-                                <ul class="employee-details-nav">
+                                {{-- <ul class="employee-details-nav">
                                     <li>Slot Reference: #SR12345</li>
                                     <li>Payment Type: {{$QuotaSlotRenewal->PaymentType ?? '-'}}</li>
-                                </ul>
+                                </ul> --}}
                                     <!-- @php
                                         if ($Employee->status == 'Active') 
                                         {
@@ -344,7 +344,7 @@
                         <div class="col-xl-3 col-lg-4 col-sm-6">
                             <div class="empDetail-block expenses-joining-box d-block">
                                 <div>
-                                    <h6>Total Medical  Insurance - Internationl Payment</h6>
+                                    <h6>Total Medical Insurance</h6>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalInsurancePayment'], 'MVR') !!}</strong>
                                     </div>
@@ -354,14 +354,14 @@
                         <div class="col-xl-3 col-lg-4 col-sm-6">
                             <div class="empDetail-block expenses-joining-box d-block">
                                 <div>
-                                    <h6>Total Work Permit Medical Test Fees Payment</h6>
+                                    <h6>Total Work Permit Medical Test Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'MVR') !!}</strong>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-3 col-lg-4 col-sm-6">
+                        {{-- <div class="col-xl-3 col-lg-4 col-sm-6">
                             <div class="empDetail-block expenses-joining-box d-block">
                                 <div>
                                     <h6>Visa Payment</h6>
@@ -370,7 +370,7 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> --}}
                     </div>
                 </div>
             </div>
