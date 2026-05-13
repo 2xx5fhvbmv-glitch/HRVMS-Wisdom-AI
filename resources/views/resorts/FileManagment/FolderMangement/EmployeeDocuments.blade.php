@@ -1071,34 +1071,40 @@
        GetTheUpdatedFolder();
    });
    
-   $(document).on( "click",".showStructure", function() 
+   $(document).on( "click",".showStructure", function()
    {
-    
+        // The virtual "Shared With Me" folder is handled by its own
+        // dedicated click handler (registered above), which renders
+        // received files locally. Bail here so we don't fire the
+        // generic GetFileStructureList AJAX whose empty response would
+        // immediately wipe the rendered list.
+        if ($(this).attr('data-shared-virtual') === '1') {
+            return;
+        }
 
-      
         let activeElement =  $(this).addClass('active')
             .parent('.d-flex')
             .addClass('active')
-            .siblings('.d-flex') 
+            .siblings('.d-flex')
             .removeClass('active')
-            .find('.showStructure') 
-            .removeClass('active'); 
- 
+            .find('.showStructure')
+            .removeClass('active');
+
 
             let activeElement1 = $('.d-flex.active').find('.showStructure.active');
 
         if (activeElement1.length > 0)
-        {  
+        {
             let id = activeElement1.data("unique_id");
             GetFileStructureList(id);
         }
 
     $("#Search").val("");
-    if (!$(".internacheck").hasClass("d-none")) 
-    {  
-        $(".internacheck").addClass("d-none");  
-    } 
-      
+    if (!$(".internacheck").hasClass("d-none"))
+    {
+        $(".internacheck").addClass("d-none");
+    }
+
    });
    $(document).on( "click",".OpenFileorFolder", function() 
     {
