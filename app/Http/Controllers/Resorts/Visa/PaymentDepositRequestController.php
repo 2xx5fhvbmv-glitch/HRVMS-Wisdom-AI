@@ -45,17 +45,16 @@ class PaymentDepositRequestController extends Controller
 
     public function DepositeRefundStore(Request $request)
     {
-        
+
         $wallet_option = $request->input('wallet_option', []);
-       
-        
+
+
         $validator = Validator::make($request->all(), [
             'wallet_option' => 'required|array',
-            'wallet_option.*' => 'required|array',
-            'wallet_option.*.*' => 'required|numeric|min:0',
+            'wallet_option.*' => 'required|integer|min:1',
         ]);
 
-            if ($validator->fails()) 
+            if ($validator->fails())
             {
 
                 return response()->json([
@@ -68,11 +67,11 @@ class PaymentDepositRequestController extends Controller
             DB::beginTransaction();
             try
             {
-           
+
                 $insufficientWallets = [];
                 $updates = [];
 
-                foreach ($wallet_option as $walletId => $option) 
+                foreach ($wallet_option as $EmployeeId => $walletId)
                 {
                     $from_wallet_Amt = VisaWallets::where('resort_id', $this->resort->resort_id)
                         ->where('id', $walletId)
@@ -83,9 +82,6 @@ class PaymentDepositRequestController extends Controller
                         $insufficientWallets[] = "Wallet ID {$walletId} not found.";
                         continue;
                     }
-
-                    $EmployeeId = key($option);
-                    $walletAmt = $option[$EmployeeId];
 
                     $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)
                         ->where('employees_id', $EmployeeId)
@@ -258,27 +254,22 @@ class PaymentDepositRequestController extends Controller
                                     $query->where('position_id', base64_decode($position));
                                 }
                             })
-                            ->where('Deposit_withdraw', '!=', 'Yes')
-                            ->when($Date, function ($query, $Date) 
+                            ->where(function ($q) {
+                                $q->whereNull('Deposit_withdraw')
+                                  ->orWhere('Deposit_withdraw', '!=', 'Yes');
+                            })
+                            ->when($Date, function ($query, $Date)
                             {
                                 $query->whereDate('resignation_date', Carbon::parse($Date)->format('Y-m-d'));
                             })
                             ->get()
-                           
-                            ->map(function($resignation) 
+
+                            ->map(function($resignation)
                             {
-                               
-                                if($resignation->hod_status =="Pending" && $resignation->hr_status == "Pending")
-                                {
-                                    $resignation->RequestStatus = '<span class="badge badge-themeSkyblue">Not Requested</span>';
-                                }
-                                else
-                                {
-                                   $resignation->RequestStatus = '<span class="badge badge-themeBlue">Requested</span> ';
-                                }
-                              
+                                $resignation->RequestStatus = '<span class="badge badge-themeBlue">Requested</span>';
+
                                     $DepositeAmount                = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $resignation->employee_id)->first('Deposit_Amt');
-                                    $resignation->DepositeAmount   = $DepositeAmount->Deposit_Amt ?? 'Please  Check Employee Nationality';
+                                    $resignation->DepositeAmount   = isset($DepositeAmount->Deposit_Amt) ? $DepositeAmount->Deposit_Amt : '-';
                                     $resignation->Hod_status       = $resignation->hod_status;
                                     $resignation->hr_status        = $resignation->hr_status;
                                     $resignation->id               = $resignation->id;

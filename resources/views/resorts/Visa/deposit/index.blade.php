@@ -87,12 +87,12 @@
                                                                 <span>Current Balance: MVR {{ $wallet->Amt }}</span>
                                                             </div>
                                                             <div class="form-check form-check-inline p-0 me-0">
-                                                                <input 
-                                                                    class="form-check-input" 
-                                                                    type="radio" 
-                                                                    name="wallet_option[{{ $wallet->id}}][{{$resignation['employee_id'] }}]" {{-- Grouping only by employee --}}
-                                                                    id="wallet-radio-{{ $resignation['employee_id'] }}-{{ $loop->index }}" 
-                                                                    value="{{ $wallet->Amt }}"
+                                                                <input
+                                                                    class="form-check-input wallet-radio-{{ $resignation['employee_id'] }}"
+                                                                    type="radio"
+                                                                    name="wallet_option[{{ $resignation['employee_id'] }}]"
+                                                                    id="wallet-radio-{{ $resignation['employee_id'] }}-{{ $loop->index }}"
+                                                                    value="{{ $wallet->id }}"
                                                                 >
                                                                 <label class="form-check-label" for="wallet-radio-{{ $resignation['employee_id'] }}-{{ $loop->index }}"></label>
                                                             </div>
@@ -131,20 +131,20 @@
 @section('import-scripts')
 <script>
  $(document).ready(function () {
-    $(document).on("click", ".Paymentcheck", function () 
+    $(document).on("click", ".Paymentcheck", function ()
     {
-        let empId = $(this).data("id"); 
+        let empId = $(this).data("id");
+        $(this).prop("checked", true);
         $("#no-check-"+empId).prop("checked", false);
-
-        $("#Toggle-"+empId).toggleClass("d-none");
+        $("#Toggle-"+empId).removeClass("d-none");
     });
-    $(document).on("click", ".PaymentcheckCancle", function () 
+    $(document).on("click", ".PaymentcheckCancle", function ()
     {
-        let empId = $(this).data("id"); 
+        let empId = $(this).data("id");
+        $(this).prop("checked", true);
         $("#Toggle-"+empId).find('input[type="radio"]').prop("checked", false);
         $("#Paymentcheck_"+empId+"-yes-check").prop("checked", false);
-        
-        $("#Toggle-"+empId).toggleClass("d-none");
+        $("#Toggle-"+empId).addClass("d-none");
     });
 
     $("#DepositRefundForm").parsley();

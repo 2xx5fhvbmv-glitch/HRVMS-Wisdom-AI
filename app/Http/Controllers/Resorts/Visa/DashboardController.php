@@ -49,15 +49,23 @@ class DashboardController extends Controller
     }
     public function HR_Dashobard(Request $request)
     {
-       
-        $page_title ="Visa";
+
+        $page_title ="Visa Management";
         $VisaWallets  = VisaWallets::orderBy("id","DESC")->where('resort_id', $this->resort->resort_id)->get();
         $VisaXpactAmounts = VisaXpactAmounts::orderBy("id","DESC")->where('resort_id', $this->resort->resort_id)->get();
         $reconiliation = $this->ReconiliationCheck();
         $DetermineSeverity = $this->DetermineSeverity();
         $Position = ResortPosition::where('resort_id', $this->resort->resort_id)->get();
 
-        return view('resorts.Visa.dashboard.hrdashboard',compact('page_title','Position','VisaWallets','VisaXpactAmounts','reconiliation','DetermineSeverity'));
+        $XpatEmployeeCount = Employee::where('resort_id', $this->resort->resort_id)
+            ->where('nationality', '!=', 'Maldivian')
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhereIn('status', ['Active', 'Probationary']);
+            })
+            ->count();
+
+        return view('resorts.Visa.dashboard.hrdashboard',compact('page_title','Position','VisaWallets','VisaXpactAmounts','reconiliation','DetermineSeverity','XpatEmployeeCount'));
     }
 
 
@@ -169,15 +177,12 @@ class DashboardController extends Controller
     public function DetermineSeverity()
     {
         $PaymentRequest = PaymentRequest::where('resort_id', $this->resort->resort_id)->get();
-                       
 
-
-            return  $finalCounts = [
-                    'Pending' =>  $PaymentRequest->where('Status','Pending')->count(),
-                    'Complete' =>$PaymentRequest->where('Status','Approved')->count()
-                  
-                ];
-
+        return [
+            'Pending'   => $PaymentRequest->where('Status', 'Pending')->count(),
+            'Requested' => $PaymentRequest->where('Status', 'SendtoFinance')->count(),
+            'Complete'  => $PaymentRequest->where('Status', 'Approved')->count(),
+        ];
     }
 
     public function NatioanlityWiseEmployeeDepositAndCount(Request $request)
@@ -337,53 +342,60 @@ class DashboardController extends Controller
         if ($request->ajax()) {
             $resort_id = $this->resort->resort_id;
             $Year = $request->input('NatioanlityWiseBreakDownRang');
-            
-                $start = Carbon::create($Year, 1, 1)->startOfDay();
+            if (!$Year || !is_numeric($Year)) {
+                $Year = (int) date('Y');
+            }
 
-                // End = 31st Dec of the year
+                $start = Carbon::create($Year, 1, 1)->startOfDay();
                 $end = Carbon::create($Year, 12, 31)->endOfDay();
 
                 $months = [];
                 $period = $start->copy()->startOfMonth();
 
                 while ($period->lte($end)) {
-                    $months[$period->format('Y-m')] = $period->format('M Y'); 
+                    $months[$period->format('Y-m')] = $period->format('M');
                     $period->addMonth();
                 }
 
-           
+
             $chartData = [
                 'labels' => array_values($months),
                 'workpermit' => [],
                 'slot_fee' => [],
                 'insurance' => [],
                 'medical' => [],
-                'photo' => []
+                'Visa' => [],
             ];
 
-            foreach ($months as $monthKey => $monthLabel) 
+            // Liability Breakdown semantic:
+            // Every line is bucketed by the date the liability becomes due / the cost is
+            // incurred — Workpermit & Slot by Due_Date, Insurance & Medical by their
+            // start_date (since those tables don't carry a separate due/paid date).
+            // Status filter intentionally absent on all four so the chart shows total
+            // owed (paid + unpaid) per month, matching the "Liability" framing.
+            foreach ($months as $monthKey => $monthLabel)
             {
-                $chartData['workpermit'][] = (float)WorkPermit::where('resort_id', $resort_id)
-                    ->where('Status', 'Paid')
+                $chartData['workpermit'][] = (float) WorkPermit::where('resort_id', $resort_id)
                     ->whereRaw("DATE_FORMAT(Due_Date, '%Y-%m') = ?", [$monthKey])
                     ->sum('Amt');
 
-                $chartData['slot_fee'][] = (float)QuotaSlotRenewal::where('resort_id', $resort_id)
-                    ->where('Status', 'Paid')
+                $chartData['slot_fee'][] = (float) QuotaSlotRenewal::where('resort_id', $resort_id)
                     ->whereRaw("DATE_FORMAT(Due_Date, '%Y-%m') = ?", [$monthKey])
                     ->sum('Amt');
 
-                $chartData['insurance'][] = (float)EmployeeInsurance::where('resort_id', $resort_id)
+                $chartData['insurance'][] = (float) EmployeeInsurance::where('resort_id', $resort_id)
                     ->whereRaw("DATE_FORMAT(insurance_start_date, '%Y-%m') = ?", [$monthKey])
                     ->sum('Premium');
 
-                $chartData['medical'][] =(float) WorkPermitMedicalRenewal::where('resort_id', $resort_id)
+                $chartData['medical'][] = (float) WorkPermitMedicalRenewal::where('resort_id', $resort_id)
                     ->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$monthKey])
                     ->sum('Amt');
 
-                $chartData['Visa'][] =(float) VisaRenewal::where('resort_id', $resort_id)
-                    ->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$monthKey])
-                    ->sum('Amt');
+                // Visa stack temporarily disabled per UI request.
+                // $chartData['Visa'][] = (float) VisaRenewal::where('resort_id', $resort_id)
+                //     ->whereRaw("DATE_FORMAT(start_date, '%Y-%m') = ?", [$monthKey])
+                //     ->sum('Amt');
+                $chartData['Visa'][] = 0.0;
             }
 
             return response()->json([
@@ -396,53 +408,50 @@ class DashboardController extends Controller
     public function NatioanlityWiseEmployeeBreakDownChart(Request $request)
     {
         $resort_id = $this->resort->resort_id;
-            $natioanlity = array();
-            $totalEmployees = 0;
+        $natioanlity = array();
 
-            $totalActiveEmployees = Employee::where('resort_id', $resort_id)
-                ->where('status', 'Active')
-                ->where('nationality', '!=', 'maldivian')
-                ->count();
+        $totalActiveEmployees = Employee::where('resort_id', $resort_id)
+            ->where('status', 'Active')
+            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
+            ->count();
 
-             
+        VisaNationality::where('resort_id', $resort_id)
+            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
+            ->get()
+            ->map(function ($ak) use (&$natioanlity, $resort_id, $totalActiveEmployees) {
+                $empCount = Employee::where('resort_id', $resort_id)
+                    ->where('status', 'Active')
+                    ->where('nationality', $ak->nationality)
+                    ->count();
 
-            // First collect and compute totals
-            VisaNationality::where('resort_id', $resort_id)
-                ->get()
-                ->map(function($ak) use (&$natioanlity, &$totalEmployees, $resort_id,&$totalActiveEmployees) {
-                    $empCount = Employee::where('resort_id', $resort_id)
-                        ->where('status', 'Active')
-                        ->where('nationality', $ak->nationality)
-                        ->count();
-               
-                    $natioanlity[$ak->nationality] = [
-                        'id' => $ak->id,
-                        'DepositAmt' => $ak->amt,
-                        'natioanlity' => $ak->nationality,
-                        'deposit_percent'  =>$empCount > 0 ? round( ( $empCount/ $totalActiveEmployees) * 100):0,
-                        'Count' => $empCount , 
-                    ];
+                $natioanlity[$ak->nationality] = [
+                    'id' => $ak->id,
+                    'DepositAmt' => $ak->amt,
+                    'natioanlity' => $ak->nationality,
+                    'deposit_percent' => ($empCount > 0 && $totalActiveEmployees > 0)
+                        ? round(($empCount / $totalActiveEmployees) * 100)
+                        : 0,
+                    'Count' => $empCount,
+                ];
+            });
 
-                });
+        // Top 3 by employee count, drop zero-count entries.
+        $top3 = collect($natioanlity)
+            ->filter(fn ($v) => ($v['Count'] ?? 0) > 0)
+            ->sortByDesc('Count')
+            ->take(3)
+            ->values();
 
-            $chartData = [
-                'labels' => [],
-                'data' => [],
-                'deposit_percent' => [],
-            ];
-            foreach ($natioanlity as $value) {
-                $chartData['labels'][] = $value['natioanlity'];
-                $chartData['data'][] = $value['Count'];
-                $chartData['deposit_percent'][] = $value['Count'];
-              
-            }
-            return response()->json([
-                'success' => true,
-                'chartData' => $chartData
+        $chartData = [
+            'labels' => $top3->pluck('natioanlity')->all(),
+            'data' => $top3->pluck('Count')->all(),
+            'deposit_percent' => $top3->pluck('deposit_percent')->all(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'chartData' => $chartData,
         ]);
-       
-
-
     }
 
     public function DasbhoardFlagWiseGetData(Request $request)

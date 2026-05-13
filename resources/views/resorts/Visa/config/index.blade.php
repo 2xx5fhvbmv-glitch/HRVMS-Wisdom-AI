@@ -272,12 +272,12 @@
                                                 <div class="col-sm-6">
                                                     <label for="txt" class="form-label">{{strtoupper($c->particulars)}}</label>
                                                     <div class="position-relative flotting-text">
-                                                    <input type="hidden" id="txt" class="form-control" name="id[]" value="{{$c->id}}" placeholder="1000">
+                                                    <input type="hidden" class="form-control" name="id[]" value="{{$c->id}}" placeholder="1000">
 
-                                                        <input type="number" readonly id="txt" class="form-control" value="{{$c->New_Amount}}" name="amount[]"  data-parsley-required-message="Amount is required" data-parsley-type="number" data-parsley-type-message="Please enter a valid number" placeholder="0.00">
-                                                        <span>MVR </span>
+                                                        <input type="number" step="0.01" min="0" class="form-control" value="{{$c->New_Amount}}" name="amount[]" required data-parsley-required-message="Amount is required" data-parsley-type="number" data-parsley-type-message="Please enter a valid number" placeholder="0.00">
+                                                        <span>{{ Common::GetResortCurrencySymbol() }}</span>
                                                     </div>
-                                              
+
                                                 </div>
                                             @endforeach
                                         @endif
@@ -325,7 +325,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <!-- <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button> -->
+                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                             </div>
                         </form>
 
@@ -407,13 +407,16 @@
 
                                             </tbody>
                                         </table>
+                                        <div class="text-end mt-2">
+                                            <a href="javascript:void(0)" id="DocumentTypeViewAll" class="a-link">View All</a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                        
                     </div>
-                    <div class="card mb-30">
+                    {{-- <div class="card mb-30">
                         <div class="card-title">
                             <h3>Document Segmentation</h3>
                         </div>
@@ -421,7 +424,7 @@
                             <div class="incidentCategories-main">
                                 <div class="incidentCategories-block">
                                     <div class="row gx-2 gy-3 mb-md-4 mb-3 ">
-                                        <div class="col-sm-6"> 
+                                        <div class="col-sm-6">
                                             <label for="txt" class="form-label">DOCUMENT TYPE <span class="red-mark">*</span></label>
                                             <select class="form-select select2t-none" data-parsley-required-message="Please enter document type"  name="document_id[]" id="VisaDocumentType"
                                                 aria-label="Default select example">
@@ -433,20 +436,20 @@
                                                     @endforeach
                                                 @endif
                                             </select>
-                                            
+
                                         </div>
                                         <div class="col-sm-6">
                                             <label for="txt" class="form-label">DOCUMENT NAME <span class="red-mark">*</span></label>
                                             <input type="text" name="DocumentName[]" required data-parsley-required-message="Please select a Document Type"  id="txt" class="form-control" placeholder="1000">
                                         </div>
 
-                                        
+
                                     </div>
                                     <div class="AppendDocumenttype">
                                     </div>
-                                                                
 
-                                    
+
+
                                 </div>
 
                             </div>
@@ -456,7 +459,7 @@
                                         <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                             </div>
                         </form>
-                    </div>
+                    </div> --}}
 
                 </div>
             </div>
@@ -504,9 +507,9 @@ $(document).ready(function(){
     
     $('#NationalityForm').parsley(); 
     $('#NationalityExportForm').parsley(); 
-    $('#DocumentTypeForm').parsley(); 
-    $('#DocumentSegmentationForm').parsley(); 
-    $('#WalletType').parsley(); 
+    $('#DocumentTypeForm').parsley();
+    // $('#DocumentSegmentationForm').parsley();
+    $('#WalletType').parsley();
 
     
     DocumentTypeIndex();
@@ -677,12 +680,14 @@ $("#WalletType").on("submit", function(e) {
             type: "POST",
             data: formData,
             success: function(response) {
-                if (response.success) 
+                if (response.success)
                 {
                     toastr.success(response.msg, "Success", {
                         positionClass: 'toast-bottom-right'
                     });
-                    WalletTypetable();  
+                    WalletTypetable();
+                    form[0].reset();
+                    form.parsley().reset();
                 }
                 else
                 {
@@ -823,7 +828,7 @@ $("#DepositRefundForm").on("submit", function(e) {
         let formData = form.serialize();
 
         $.ajax({
-            url: "{{ url('Visa/DepositRefund') }}",
+            url: "{{ route('resort.visa.DepositRefundStore') }}",
             type: "POST",
             data: formData,
             success: function(response) {
@@ -960,9 +965,10 @@ $("#DocumentTypeForm").on("submit", function(e)
     }
 });
 
-$("#DocumentSegmentationForm").on("submit", function(e) 
+/*
+$("#DocumentSegmentationForm").on("submit", function(e)
 {
-    e.preventDefault(); // Prevent normal form submission
+    e.preventDefault();
 
     var form = $(this);
     if (form.parsley().isValid()) {
@@ -973,47 +979,31 @@ $("#DocumentSegmentationForm").on("submit", function(e)
             type: "POST",
             data: formData,
             success: function(response) {
-                if (response.success) 
-                {
+                if (response.success) {
                     DocumentTypeIndex();
-                    toastr.success(response.msg, "Success", 
-                    {
-                        positionClass: 'toast-bottom-right'
-                    });
-                    $("#WalletName").val();
-                    $("#Amt").val();
+                    toastr.success(response.msg, "Success", { positionClass: 'toast-bottom-right' });
                     form[0].reset();
                     form.parsley().reset();
-                } 
-                else
-                {
-                    toastr.error(response.msg, "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                } else {
+                    toastr.error(response.msg, "Error", { positionClass: 'toast-bottom-right' });
                 }
             },
             error: function(response) {
                 var errors = response.responseJSON;
                 var errs = '';
                 if (errors && errors.errors) {
-                    $.each(errors.errors, function(key, error) {
-                        errs += error + '<br>';
-                    });
-                    toastr.error(errs, "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                    $.each(errors.errors, function(key, error) { errs += error + '<br>'; });
+                    toastr.error(errs, "Error", { positionClass: 'toast-bottom-right' });
                 } else {
-                    toastr.error("An unexpected error occurred", "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                    toastr.error("An unexpected error occurred", "Error", { positionClass: 'toast-bottom-right' });
                 }
             }
         });
     } else {
-        // Optionally: scroll to the first invalid field
         form.parsley().validate();
     }
 });
+*/
 
 
 
@@ -1139,34 +1129,46 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                 }
             });
         });
-        function DocumentTypeIndex()
+        function DocumentTypeIndex(pageLength)
         {
+            var displayLength = pageLength || 5;
             if ($.fn.DataTable.isDataTable('#DocumentType')) {
-                $('#DocumentType').DataTable().clear().destroy(); // Destroy existing instance
+                $('#DocumentType').DataTable().clear().destroy();
             }
 
-            $('#DocumentType tbody').empty(); // Clear the tbody content if needed
-            var hiringsource = $('#DocumentType').DataTable({
-            searching: false,
-            bLengthChange: false,
-            bFilter: true,
-            bInfo: true,
-            bAutoWidth: false,
-            scrollX: true,
-            iDisplayLength: 6,
-            processing: true,
-            serverSide: true,
-            ajax: {
-                url: '{{ route("resort.visa.DocumentTypeIndex") }}',
-                type: 'GET',
-            },
-            columns: [
-                { data: 'DocumentName', name: 'DocumentName', className: 'text-nowrap' },
-                { data: 'Action', name: 'Action', orderable: false, searchable: false }
-            ]
+            $('#DocumentType tbody').empty();
+            $('#DocumentType').DataTable({
+                searching: false,
+                bLengthChange: false,
+                bFilter: true,
+                bInfo: true,
+                bAutoWidth: false,
+                scrollX: true,
+                iDisplayLength: displayLength,
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '{{ route("resort.visa.DocumentTypeIndex") }}',
+                    type: 'GET',
+                },
+                columns: [
+                    { data: 'DocumentName', name: 'DocumentName', className: 'text-nowrap' },
+                    { data: 'Action', name: 'Action', orderable: false, searchable: false }
+                ]
             });
-
         }
+
+        $(document).on('click', '#DocumentTypeViewAll', function () {
+            var $btn = $(this);
+            var showingAll = $btn.data('all') === true;
+            if (showingAll) {
+                DocumentTypeIndex(5);
+                $btn.text('View All').data('all', false);
+            } else {
+                DocumentTypeIndex(99999);
+                $btn.text('Show Less').data('all', true);
+            }
+        });
     function WalletTypetable() 
     {
         if ($.fn.DataTable.isDataTable('#WalletTypetable')) {
@@ -1309,8 +1311,8 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                     }
             });
         });
+        /*
         $(document).on("click",".AddmoreDocumentType",function(){
-
             var count = $("#documentCount").val();
             count= parseInt(count) +1;
             $(".AppendDocumenttype").append(`<div class="row gx-2 gy-3 mb-md-4 mb-3 RemovedoumentCount_${count}">
@@ -1319,12 +1321,6 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                                                     <select class="form-select select2t-none" name="document_id[]"  required data-parsley-required-message="Please select a Document Type" id="VisaDocumentType_${count}"
                                                         aria-label="Default select example">
                                                         <option > </option>
-                                                        @if($VisaDocumentType->isnotEmpty())
-                                                            @foreach($VisaDocumentType as $t)
-                                                            <option value="{{$t->id}}">{{$t->documentname}} </option>
-
-                                                            @endforeach
-                                                        @endif
                                                     </select>
                                                 </div>
                                                 <div class="col-sm-6">
@@ -1334,7 +1330,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                                                 <div class="col-sm-2">
                                                     <input type="button" style="margin-top: 33px;" value="Remove" class="btn btn-danger btn-sm RemovedocumentType" data-id="${count}" fdprocessedid="qi65s">
                                                 </div>
-                                            </div>`); 
+                                            </div>`);
                 $("#documentCount").val(count);
 
                 $("#VisaDocumentType_"+count).select2({
@@ -1348,5 +1344,6 @@ $("#DocumentSegmentationForm").on("submit", function(e)
             let count = parseInt(id)-1;
             $("#documentCount").val(count);
         });
+        */
 </script>
 @endsection

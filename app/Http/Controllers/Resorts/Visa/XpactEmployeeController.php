@@ -227,7 +227,7 @@ class XpactEmployeeController extends Controller
             return abort(403, 'Unauthorized action.');
         }
         $id = base64_decode($id);
-        $page_title = "Xpact Employee Details";
+        $page_title = "Xpat Employee Details";
         $Employee = Employee::with(['resortAdmin', 'position', 'department'])->where("id",$id)->where("nationality",'!=',"Maldivian")->where('resort_id', $this->resort->resort_id)->first();
         // $Employee->passport_number = $Employee->passport_number; //uncomment if you want to show passport number
         

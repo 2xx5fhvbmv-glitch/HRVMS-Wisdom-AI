@@ -14,19 +14,19 @@
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
-                            <span>Total Incidents</span>
-                            <h1>Dashboard</h1>
+                            <span>Visa Management</span>
+                            <h1>Visa Management</h1>
                         </div>
                     </div>
-                        <div class="col-lg-2 col-md-3 col-auto ms-auto">
+                        {{-- <div class="col-lg-2 col-md-3 col-auto ms-auto">
                             <select class="form-select select2t-none" id="checkYearStatus"aria-label="Default select example">
                                 <option value="Weekly">Weekly</option>
                                 <option selected value="Monthly">Monthly</option>
                                 <option value="Quarterly">Quarterly</option>
-                                <option value="Semiannual">Semiannual</option> <!-- 6 month -->
+                                <option value="Semiannual">Semiannual</option>
                                 <option value="Yearly">Yearly</option>
                             </select>
-                        </div>
+                        </div> --}}
                 </div>
             </div>
 
@@ -71,11 +71,11 @@
                                         type="button" role="tab" aria-controls="tabPane4" aria-selected="false">Work
                                         Permit Medical Fee</button>
                                 </li>
-                                <li class="nav-item VisaModuleLink"  data-id="WorkVisa" role="presentation">
+                                {{-- <li class="nav-item VisaModuleLink"  data-id="WorkVisa" role="presentation">
                                     <button class="nav-link" id="#tab4" data-bs-toggle="tab" data-bs-target="#tabPane4"
                                         type="button" role="tab" aria-controls="tabPane4" aria-selected="false">Work Visa
                                     </button>
-                                </li>
+                                </li> --}}
                             </ul>
                         </div>
                         <div class="tab-content" id="myTabContent">
@@ -88,13 +88,17 @@
                             <h3>Payment Request Tracker</h3>
                         </div>
                         <div class="leaveUser-main">
-                            
+
                             <div class="leaveUser-bgBlock">
                                 <h6>Pending</h6>
                                 <strong>{{$DetermineSeverity['Pending']}}</strong>
                             </div>
                             <div class="leaveUser-bgBlock">
-                                <h6>Complete</h6>
+                                <h6>Requested</h6>
+                                <strong>{{$DetermineSeverity['Requested']}}</strong>
+                            </div>
+                            <div class="leaveUser-bgBlock">
+                                <h6>Completed</h6>
                                 <strong>{{$DetermineSeverity['Complete']}}</strong>
                             </div>
                         </div>
@@ -103,7 +107,7 @@
                 <div class="col-xl-3 col-sm-6">
                     <div class="card">
                         <div class="card-title">
-                            <h3>Nationality-wise breakdown</h3>
+                            <h3>Top 3 Nationality</h3>
                         </div>
                         <div class="incident-chart mb-3">
                             <canvas id="myDoughnutChart"></canvas>
@@ -122,11 +126,11 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="row align-items-center">
-                                        <div class="col">
+                                        {{-- <div class="col">
                                             <div class="form-group">
                                             <input type="text" class="form-control datepicker" id="expiryDate" placeholder="Select date">
                                             </div>
-                                        </div>
+                                        </div> --}}
                                         <div class="col-auto">
                                             <a href="{{route('resort.visa.Expiry')}}" class="a-link">View All</a>
                                         </div>
@@ -157,21 +161,21 @@
                                 <div class="col">
                                     <h3 class="text-nowrap">Liability Breakdown</h3>
                                 </div>
-                                <div class="col-auto">
+                                {{-- <div class="col-auto">
 
                                     <select name="liabilityYear" id="liabilityYear" class="form-select">
-                                      
+
                                         <?php
                                             $currentYear = date('Y');
-                                            $startingYear = $currentYear - 4; // Adjusted to show 5 years including current
+                                            $startingYear = $currentYear - 4;
                                         ?>
                                         @for($i = $startingYear; $i < $currentYear; $i++)
                                             <option value="{{ $i }}">{{ $i }}</option>
                                         @endfor
                                         <option selected value="{{ $currentYear }}">{{ $currentYear }} </option>
                                     </select>
-                                  
-                                </div>
+
+                                </div> --}}
                             </div>
                         </div>
                         <div class="row g-md-4 g-2 align-items-center">
@@ -202,11 +206,11 @@
                                             25,000
                                         </div>
                                     </div>
-                                    <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
+                                    {{-- <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                         <div class="doughnut-label">
                                             <span class=" bg-themeGray"></span>Photo - MVR 25,000
                                         </div>
-                                    </div>
+                                    </div> --}}
                                     <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                         <div class="doughnut-label fw-bold">
                                             Total: MVR 1,10,000
@@ -224,7 +228,7 @@
                                 <div class="col">
                                     <h3 class="text-nowrap">Deposit Refund Requests</h3>
                                 </div>
-                                <div class="col-6">
+                                {{-- <div class="col-6">
                                     <div class="row justify-content-end g-md-3 g-2 align-items-center">
                                         <div class="col-xl-4 col-md-4 col-sm-4 col-6">
                                             <select class="form-select" name="position" id="position">
@@ -232,9 +236,9 @@
                                                 @if($Position->isNotEmpty())
                                                     @foreach($Position as $pos)
                                                         <option value="{{ base64_encode($pos->id) }}">{{ $pos->position_title }}</option>
-                                                    @endforeach 
+                                                    @endforeach
                                                 @endif
-                                      
+
                                             </select>
                                         </div>
                                         <div class="col-xl-4 col-md-4 col-sm-4 col-6">
@@ -243,7 +247,7 @@
 
                                         </div>
                                     </div>
-                                </div>
+                                </div> --}}
                             </div>
                         </div>
                         <table  class="table  w-100 depositWallet-table" id="depositWallet-table">
@@ -323,7 +327,7 @@
                         <div class="col-lg-12">
                             <div class="card">
                                 <div class="card-title">
-                                    <h3>Transfer Betweem Wallet</h3>
+                                    <h3>Transfer Between Wallet</h3>
                                 </div>
                            <form id="TransferAmountform"  data-parsley-validate enctype="multipart/form-data">
                                 @csrf
@@ -414,7 +418,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h4>Total: Xpats</h4>
+                                        <h4>Xpat Portal <small class="text-muted">({{ $XpatEmployeeCount ?? 0 }} employees)</small></h4>
                                         <div class="row g-2"  id="VisaXpactAmounts">
                                             @if($VisaXpactAmounts->isNotEmpty())
                                                 @foreach($VisaXpactAmounts as $VisaWallet)
@@ -527,7 +531,7 @@
     <div class="modal-dialog modal-dialog-centered modal-md">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Xpact Amount</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Xpat Amount</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="VisaXpactEditAmtForm" data-parsley-validate>
@@ -537,7 +541,7 @@
                         <input type="hidden" class="form-control" id="Xpact_id" name="id">
 
                         <div class="mt-3 mb-3">
-                            <label class="form-label">Xpact Wallet Name <span class="red-mark">*</span></label>
+                            <label class="form-label">Xpat Wallet Name <span class="red-mark">*</span></label>
                             <input type="text" readonly class="form-control" id="Xpact_WalletName" name="Xpact_WalletName"
                                 placeholder="Wallet Name"
                                 required
@@ -545,7 +549,7 @@
                         </div>
 
                         <div class="mt-3 mb-3">
-                            <label class="form-label">Xpact Wallet Amount <span class="red-mark">*</span></label>
+                            <label class="form-label">Xpat Wallet Amount <span class="red-mark">*</span></label>
                             <input type="number" min="1" class="form-control" id="Xpact_WalletAmt" name="Xpact_WalletAmt"
                                 placeholder="Wallet Amount"
                                 required
@@ -798,7 +802,9 @@ $(document).ready(function ()
                         toastr.success(response.msg, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
-                        TransectionHistory();
+                        // Refresh the page so wallet balances + transaction history
+                        // pick up the transfer everywhere on the dashboard.
+                        setTimeout(function () { window.location.reload(); }, 800);
                     } else {
                         toastr.error(response.msg, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -823,7 +829,7 @@ $(document).ready(function ()
                     }
                 }
             });
-        } 
+        }
         else
         {
             form.parsley().validate();
@@ -1233,14 +1239,14 @@ $(document).ready(function ()
                             let slot_fee = 0;
                             let insurance = 0;
                             let medical = 0;
-                            let Visa = 0;
+                            // let Visa = 0;
                             for (let i = 0; i < data.labels.length; i++) {
-                                total += (data.workpermit[i] || 0) +(data.slot_fee[i] || 0) +(data.insurance[i] || 0) + (data.medical[i] || 0) +(data.Visa[i] || 0);
+                                total += (data.workpermit[i] || 0) +(data.slot_fee[i] || 0) +(data.insurance[i] || 0) + (data.medical[i] || 0);
                                 workpermit += (data.workpermit[i] || 0);
                                 slot_fee += (data.slot_fee[i] || 0);
                                 insurance += (data.insurance[i] || 0);
                                 medical += (data.medical[i] || 0);
-                                Visa += (data.Visa[i] || 0);
+                                // Visa += (data.Visa[i] || 0);
                             }
 
                             // Update chart
@@ -1249,7 +1255,7 @@ $(document).ready(function ()
                             myStackedBarChart.data.datasets[1].data = data.slot_fee;
                             myStackedBarChart.data.datasets[2].data = data.insurance;
                             myStackedBarChart.data.datasets[3].data = data.medical;
-                            myStackedBarChart.data.datasets[4].data = data.Visa;
+                            // myStackedBarChart.data.datasets[4].data = data.Visa;
                             myStackedBarChart.update();
 
                             
@@ -1273,11 +1279,6 @@ $(document).ready(function ()
                                     <div class="doughnut-label">
                                         <span class="bg-themeSkyblue"></span>Work Permit Medical - MVR
                                         ${medical.toLocaleString('en-IN')}
-                                    </div>
-                                </div>
-                                <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                    <div class="doughnut-label">
-                                        <span class=" bg-themeGray"></span>Visa - MVR ${Visa.toLocaleString('en-IN')}
                                     </div>
                                 </div>
                                 <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
@@ -1476,15 +1477,16 @@ $(document).ready(function ()
                             borderColor: '#fff',
                             borderWidth: 2,
                             borderRadius: 10,
-                        },
-                        {
-                            label: 'Visa',
-                            data: [],
-                            backgroundColor: '#333333',
-                            borderColor: '#fff',
-                            borderWidth: 2,
-                            borderRadius: 10,
                         }
+                        // Visa stack disabled
+                        // ,{
+                        //     label: 'Visa',
+                        //     data: [],
+                        //     backgroundColor: '#333333',
+                        //     borderColor: '#fff',
+                        //     borderWidth: 2,
+                        //     borderRadius: 10,
+                        // }
                     ]
                 },
                 options: {

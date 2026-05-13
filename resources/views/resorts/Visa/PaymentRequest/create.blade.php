@@ -118,15 +118,15 @@
                                 <th>Employee Name</th>
                                 <th>Position</th>
                                 <th>Department</th>
-                                <th> Visa Expiry</th>
+                                <th class="d-none">Visa Expiry</th>
                                 <th>Work Permit</th>
+                                <th>Slot Fee</th>
                                 <th>Insurance</th>
                                 <th>Medical (work permit)</th>
-                                <th>Slot Fee</th>
                             </tr>
                         </thead>
                         <tbody>
-                            
+
                         </tbody>
                         <tfoot>
                             <tr>
@@ -135,11 +135,11 @@
                                 <th></th>
                                 <th></th>
                                 <th></th>
+                                <th class="d-none">MVR 0.00</th>
                                 <th>MVR 0.00</th>
                                 <th>MVR 0.00</th>
                                 <th>MVR 0.00</th>
                                 <th>MVR 0.00</th>
-                                  <th>MVR 0.00</th>
                             </tr>
                         </tfoot>
                     </table>
@@ -329,22 +329,23 @@ function PaymentRequestTable() {
                 { data: 'EmployeeName', name: 'EmployeeName' },
                 { data: 'Position', name: 'Position' },
                 { data: 'Department', name: 'Department' },
-                { data: 'VisaExpiry', name: 'VisaExpiry' },
+                { data: 'VisaExpiry', name: 'VisaExpiry', visible: false },
                 { data: 'WorkPermit', name: 'WorkPermit' },
+                { data: 'SlotFees', name: 'SlotFees' },
                 { data: 'Insurance', name: 'Insurance' },
                 { data: 'Medical', name: 'Medical' },
-                { data: 'SlotFees', name: 'SlotFees' },
                 {data:'created_at', visible:false,searchable:false},
             ],
             footerCallback: function (row, data, start, end, display) {
                 var api = this.api();
                 if (api.ajax.json().totals) {
                     const totals = api.ajax.json().totals;
+                    // column(5) = VisaExpiry (hidden), column(6) = WorkPermit, column(7) = SlotFees, column(8) = Insurance, column(9) = Medical
                     $(api.column(5).footer()).html('<b>' + totals.visa + '</b>');
                     $(api.column(6).footer()).html('<b>' + totals.work_permit + '</b>');
-                    $(api.column(7).footer()).html('<b>' + totals.insurance + '</b>');
-                    $(api.column(8).footer()).html('<b>' + totals.medical + '</b>');
-                    $(api.column(9).footer()).html('<b>' + totals.slot_payment + '</b>');
+                    $(api.column(7).footer()).html('<b>' + totals.slot_payment + '</b>');
+                    $(api.column(8).footer()).html('<b>' + totals.insurance + '</b>');
+                    $(api.column(9).footer()).html('<b>' + totals.medical + '</b>');
                 $('.Overall-tot-amount').html('<b>MVR ' + totals.overall + '</b>');   
                 $("#selectedCount").html(totals.totalChecked + ' Employees Selected');
                 } else {

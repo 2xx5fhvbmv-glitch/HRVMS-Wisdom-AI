@@ -11,9 +11,9 @@ class NationalitiesHiddenSheet implements FromArray, WithTitle, WithEvents
 {
     public function array(): array
     {
-        $list = config('settings.nationalities');
-        return array_map(function ($nationality) {
-            return [$nationality];
+        $list = array_values(config('settings.countries'));
+        return array_map(function ($country) {
+            return [$country];
         }, $list);
     }
 
@@ -34,7 +34,7 @@ class NationalitiesHiddenSheet implements FromArray, WithTitle, WithEvents
                     new \PhpOffice\PhpSpreadsheet\NamedRange(
                         'DropdownList',
                         $sheet,
-                        'A1:A' . count(config('settings.nationalities'))
+                        'A1:A' . count(config('settings.countries'))
                     )
                 );
             },

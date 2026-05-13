@@ -35,12 +35,12 @@
                                     <span>Current Balance: MVR {{ $wallet->Amt }}</span>
                                 </div>
                                 <div class="form-check form-check-inline p-0 me-0">
-                                    <input 
-                                        class="form-check-input" 
-                                        type="radio" 
-                                        name="wallet_option[{{ $wallet->id}}][{{$resignation['employee_id'] }}]" {{-- Grouping only by employee --}}
-                                        id="wallet-radio-{{ $resignation['employee_id'] }}-{{ $loop->index }}" 
-                                        value="{{ $wallet->Amt }}"
+                                    <input
+                                        class="form-check-input wallet-radio-{{ $resignation['employee_id'] }}"
+                                        type="radio"
+                                        name="wallet_option[{{ $resignation['employee_id'] }}]"
+                                        id="wallet-radio-{{ $resignation['employee_id'] }}-{{ $loop->index }}"
+                                        value="{{ $wallet->id }}"
                                     >
                                     <label class="form-check-label" for="wallet-radio-{{ $resignation['employee_id'] }}-{{ $loop->index }}"></label>
                                 </div>

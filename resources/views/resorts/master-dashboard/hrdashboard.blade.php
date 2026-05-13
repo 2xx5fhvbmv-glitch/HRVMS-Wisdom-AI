@@ -1466,7 +1466,7 @@
                                                         <div class="col">
                                                             <h3 class="text-nowrap">Deposit Refund Requests</h3>
                                                         </div>
-                                                        <div class="col-auto"><select class="form-select"
+                                                        {{-- <div class="col-auto"><select class="form-select"
                                                                 aria-label="Default select example">
                                                                 <option selected="">Select Position</option>
                                                                 <option value="1">AAA</option>
@@ -1477,7 +1477,7 @@
                                                                 <option selected="">Select Dates</option>
                                                                 <option value="1">AAA</option>
                                                                 <option value="2">AAA</option>
-                                                            </select></div>
+                                                            </select></div> --}}
                                                     </div>
                                                 </div>
                                                 <div class="table-responsive">
@@ -1488,7 +1488,7 @@
                                                                 <th>Employee Name</th>
                                                                 <th>Nationality</th>
                                                                 <th>Deposit Amount</th>
-                                                                <th>Current Wallet</th>
+                                                                {{-- <th>Current Wallet</th> --}}
 
                                                                 <th>Status</th>
                                                             </tr>
@@ -1507,7 +1507,7 @@
                                                                 </td>
                                                                 <td>Indian</td>
                                                                 <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
 
                                                                 <td><span class="badge badge-themeBlue">Requested</span>
                                                                 </td>
@@ -1526,7 +1526,7 @@
                                                                 </td>
                                                                 <td>Filipino</td>
                                                                 <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
 
                                                                 <td><span class="badge badge-themeSkyblue">Not
                                                                         Requested</span></td>
@@ -1545,7 +1545,7 @@
                                                                 </td>
                                                                 <td>Indian</td>
                                                                 <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
 
                                                                 <td><span class="badge badge-themeBlue">Requested</span>
                                                                 </td>
@@ -1565,7 +1565,7 @@
                                                                 </td>
                                                                 <td>Indian</td>
                                                                 <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
 
                                                                 <td><span class="badge badge-themeSkyblue">Not
                                                                         Requested</span></td>
@@ -1584,7 +1584,7 @@
                                                                 </td>
                                                                 <td>Filipino</td>
                                                                 <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
+                                                                {{-- <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td> --}}
 
                                                                 <td><span class="badge badge-themeBlue">Requested</span>
                                                                 </td>

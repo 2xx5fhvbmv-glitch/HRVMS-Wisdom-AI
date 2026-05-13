@@ -77,11 +77,11 @@
 
             </div>
         </div>
-        <div class="d-lg-flex align-items-center">
+        {{-- <div class="d-lg-flex align-items-center">
             <div>
                 <h5 class ="findEmploees" data-flag="Visa" >Visa</h5>
                 <p>{{$TotalVisaEmployee}} Employees
-                   
+
                 </p>
             </div>
             <div>
@@ -92,7 +92,7 @@
                 </ul>
 
             </div>
-        </div>
+        </div> --}}
         <div class="d-lg-flex align-items-center">
             <div>
                 <h5 class ="findEmploees" data-flag="Insurance" >Insurance</h5>
