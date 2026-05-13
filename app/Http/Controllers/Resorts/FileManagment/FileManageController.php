@@ -221,7 +221,7 @@ class FileManageController extends Controller
         public function GetFolder(Request $request)
         {
             $Search = $request->Search;
-    
+
             $flag= $request->flag;
             // Sidebar search/refresh uses the same per-user filter the
             // initial page load uses — otherwise typing in Search would
@@ -232,7 +232,26 @@ class FileManageController extends Controller
                     ->where('UnderON', 0);
                 if($Search != '')
                 {
-                    $FolderList->where('Folder_Name', 'like', '%' . $Search . '%');
+                    // Match either the raw Folder_Name (Emp_id like "DR-31") or the
+                    // employee's full name — sidebar shows the latter, so users
+                    // searching by name expect it to work.
+                    $matchingEmpIds = DB::table('employees as e')
+                        ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                        ->where('e.resort_id', $this->resort->resort_id)
+                        ->where(function ($q) use ($Search) {
+                            $q->where('ra.first_name', 'like', '%' . $Search . '%')
+                              ->orWhere('ra.last_name', 'like', '%' . $Search . '%')
+                              ->orWhereRaw("CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,'')) like ?", ['%' . $Search . '%']);
+                        })
+                        ->pluck('e.Emp_id')
+                        ->filter()
+                        ->all();
+                    $FolderList->where(function ($q) use ($Search, $matchingEmpIds) {
+                        $q->where('Folder_Name', 'like', '%' . $Search . '%');
+                        if (!empty($matchingEmpIds)) {
+                            $q->orWhereIn('Folder_Name', $matchingEmpIds);
+                        }
+                    });
                 }
                 if (is_array($allowedFolderIds)) {
                     $FolderList->whereIn('id', $allowedFolderIds ?: [0]);
@@ -241,44 +260,64 @@ class FileManageController extends Controller
                     ->orderByDesc('id')
                     ->get();
 
+            // Match the EmployeesFolderMangement initial render: resolve
+            // each folder's Folder_Name (= Emp_id) to "Full Name (Emp_id)"
+            // so the sidebar text stays the same after search/clear.
+            $empIds = $FolderList->pluck('Folder_Name')->unique()->filter()->values();
+            $empNameByEmpId = [];
+            if ($empIds->isNotEmpty()) {
+                $empRows = DB::table('employees as e')
+                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                    ->where('e.resort_id', $this->resort->resort_id)
+                    ->whereIn('e.Emp_id', $empIds)
+                    ->get(['e.Emp_id', 'ra.first_name', 'ra.last_name']);
+                foreach ($empRows as $row) {
+                    $empNameByEmpId[$row->Emp_id] = trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? ''));
+                }
+            }
+
             $string = '';
             if($FolderList->isNotEmpty())
             {
-                foreach ($FolderList as $f) 
+                foreach ($FolderList as $f)
                 {
+                    $displayName = isset($empNameByEmpId[$f->Folder_Name]) && $empNameByEmpId[$f->Folder_Name] !== ''
+                        ? $empNameByEmpId[$f->Folder_Name] . ' (' . $f->Folder_Name . ')'
+                        : $f->Folder_Name;
+
                     $string .= '<div class="d-flex">
                                 <div class="showStructure" data-unique_id="'. htmlspecialchars($f->Folder_unique_id, ENT_QUOTES, 'UTF-8') .'">
                                     <div class="img-circle userImg-block">
                                         <img src="' . URL::asset('resorts_assets/images/folder.svg') . '" alt="image">
                                     </div>
                                     <div>
-                                        <h6>' . htmlspecialchars($f->Folder_Name, ENT_QUOTES, 'UTF-8') . '</h6>
+                                        <h6>' . htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') . '</h6>
                                     </div>
                                 </div>
                                 <div class="form-check no-label">
-                                    <input class="form-check-input FolderName internacheck checkCheck d-none" 
-                                        type="checkbox" 
-                                        name="FolderName[]"  
-                                        data-id="'. htmlspecialchars($f->Folder_unique_id, ENT_QUOTES, 'UTF-8') .'" 
+                                    <input class="form-check-input FolderName internacheck checkCheck d-none"
+                                        type="checkbox"
+                                        name="FolderName[]"
+                                        data-id="'. htmlspecialchars($f->Folder_unique_id, ENT_QUOTES, 'UTF-8') .'"
                                         value="'. htmlspecialchars($f->Folder_unique_id, ENT_QUOTES, 'UTF-8') .'">
                                 </div>
                             </div>';
-    
+
                 }
-        
+
             }
             else
             {
                 $string = '<div class="d-flex">
                                 <div class="showStructure">
-                                   
+
                                    <h6>No record found ..<h6>
                                 </div>
-                             
+
                             </div>
                            ';
             }
-            
+
             return response()->json(['success' => true,'data'=>$string], 200);
         }
         
@@ -455,11 +494,33 @@ class FileManageController extends Controller
         {
             $id =  $request->id;
             $flag=$request->flag;
+
+            // The "Shared With Me" sidebar entry is a virtual folder injected
+            // client-side (data-unique_id="__shared_with_me__") and its contents
+            // are rendered by JS without a server call. The generic
+            // .showStructure click handler still fires this endpoint, though,
+            // so short-circuit cleanly instead of crashing on the null lookup.
+            if ($id === '__shared_with_me__') {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'breadcrumb' => '',
+                    'virtual' => 'shared_with_me',
+                ], 200);
+            }
+
             $File_structure = FilemangementSystem::where('resort_id', $this->resort->resort_id)
                                 ->where('Folder_unique_id', $id)
                                 ->where('Folder_Type',$flag)
                                 ->first();
-                            
+
+            if (!$File_structure) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Folder not found or no longer accessible.',
+                ], 404);
+            }
+
             $parent_unique_id = $File_structure->Folder_unique_id;
             $mergedFiles = collect();
             // withSum aggregates child file sizes per folder in ONE query —
