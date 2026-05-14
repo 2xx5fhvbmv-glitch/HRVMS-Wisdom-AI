@@ -975,7 +975,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
         let formData = form.serialize();
 
         $.ajax({
-            url: "{{ route('resort.visa.DocumentSegmentationStore') }}",
+            url: "#", // route resort.visa.DocumentSegmentationStore removed — handler retired
             type: "POST",
             data: formData,
             success: function(response) {
