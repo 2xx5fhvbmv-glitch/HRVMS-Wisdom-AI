@@ -67,8 +67,13 @@
                         <div class="empDetail-block XpatDetail-box">
                             <div>
                                 <h6>Passport Expiry</h6>
-                                <strong>15 Mar 2026</strong>
-                                <span class="text-danger">Expires in 395 days</span>
+                                @if(!empty($passportExpiryDate))
+                                    <strong>{{ $passportExpiryDate }}</strong>
+                                    <span class="text-danger">{{ $passportExpiryStatus }}</span>
+                                @else
+                                    <strong>N/A</strong>
+                                    <span class="text-danger">N/A</span>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -306,7 +311,7 @@
                 </div>
                 <div class="XpatDetail-documents-box XpatDet-paySchedule mb-4">
                     <div class="card-title">
-                        <h3>Total Expenses Since Joining</h3>
+                        <h3>Total Expenses Since Wisdom AI</h3>
                     </div>
                     <div class="row g-lg-4 g-3 mb-4">
                         <div class="col-xl-3 col-lg-4 col-sm-6">
@@ -354,7 +359,7 @@
                         <div class="col-xl-3 col-lg-4 col-sm-6">
                             <div class="empDetail-block expenses-joining-box d-block">
                                 <div>
-                                    <h6>Total Work Permit Medical Test Payment</h6>
+                                    <h6>Total Work Permit Medical Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'MVR') !!}</strong>
                                     </div>
@@ -774,7 +779,11 @@ function QuotaSlotFeeTable()
    
         productTable.on('xhr', function(e, settings, json){
             if(json && json.footerData){
-                $('.listing-box ul').html(`
+                // Scope to the active tab's listing-box — `$('.listing-box ul')`
+                // matched BOTH tab panes, so the Quota Slot totals overwrote the
+                // Work Permit totals and vice versa.
+                var paneSelector = (flag == "Quota_Slot_Fee") ? '#Quota_Slot_Fee' : '#Work_Permit_Fee';
+                $(paneSelector + ' .listing-box ul').html(`
                     <li>Total Amount (Payable): ${json.footerData.PayableAmount}</li>
                     <li>Amount Paid: ${json.footerData.AmountPaid}</li>
                     <li>Balance Amount: ${json.footerData.BalanceAmount}</li>

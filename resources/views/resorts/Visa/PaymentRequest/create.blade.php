@@ -56,13 +56,13 @@
                                             Permit</label>
                                     </div>
                                 </div>
-                                <div class="col-auto ">
+                                {{-- <div class="col-auto ">
                                     <div class="form-check">
                                         <input class="form-check-input PaymentType" data-flag="visa" type="checkbox" id="work-permit-check"
                                             value="Status1" >
                                         <label class="form-check-label text-nowrap" for="work-permit-check">Visa</label>
                                     </div>
-                                </div>
+                                </div> --}}
                                 <div class="col-auto ">
                                     <div class="form-check">
                                         <input class="form-check-input PaymentType" data-flag="insurance" type="checkbox" id="insurance-check"
@@ -95,7 +95,7 @@
                             </div>
                         </div>
                         <div class="col text-end order-md-2 order-1 order-xxl-last">
-                            <span class=" Overall-tot-amount text-nowrap">Total amount: MVR 0.00</span>
+                            <span class=" Overall-tot-amount text-nowrap">Total amount: {{ Common::GetResortCurrencySymbol() }} 0.00</span>
                         </div>
 
                     </div>
@@ -136,10 +136,10 @@
                                 <th></th>
                                 <th></th>
                                 <th class="d-none">MVR 0.00</th>
-                                <th>MVR 0.00</th>
-                                <th>MVR 0.00</th>
-                                <th>MVR 0.00</th>
-                                <th>MVR 0.00</th>
+                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
                             </tr>
                         </tfoot>
                     </table>
@@ -346,7 +346,7 @@ function PaymentRequestTable() {
                     $(api.column(7).footer()).html('<b>' + totals.slot_payment + '</b>');
                     $(api.column(8).footer()).html('<b>' + totals.insurance + '</b>');
                     $(api.column(9).footer()).html('<b>' + totals.medical + '</b>');
-                $('.Overall-tot-amount').html('<b>MVR ' + totals.overall + '</b>');   
+                $('.Overall-tot-amount').html('<b>{{ Common::GetResortCurrencySymbol() }} ' + totals.overall + '</b>');
                 $("#selectedCount").html(totals.totalChecked + ' Employees Selected');
                 } else {
                     $(api.column(5).footer()).html('<b>0</b>');
@@ -354,7 +354,7 @@ function PaymentRequestTable() {
                     $(api.column(7).footer()).html('<b>0</b>');
                     $(api.column(8).footer()).html('<b>0</b>');
                     $(api.column(9).footer()).html('<b>0</b>');
-                    $('.Overall-tot-amount').html('<b>Total Amount: MVR 0</b>');
+                    $('.Overall-tot-amount').html('<b>Total Amount: {{ Common::GetResortCurrencySymbol() }} 0</b>');
                 }
             }
         }); 

@@ -13,15 +13,15 @@ class EmployeeInsurance extends Model
         'resort_id',
         'employee_id',
         'Currency',
-        
         'Premium',
         'insurance_company',
         'insurance_policy_number',
         'insurance_coverage',
         'insurance_start_date',
         'insurance_end_date',
-        'insurance_file' 
-        
+        'insurance_file',
+        'Status',
+        'paid_date',
     ];
 
     public function InsuranceChild()

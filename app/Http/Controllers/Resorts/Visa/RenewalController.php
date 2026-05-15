@@ -142,7 +142,7 @@ class RenewalController extends Controller
                 {
                     $WorkPermitMedicalRenewal->MedicalRenewalTime = "$medical_months_diff month(s) remaining";
                 } 
-                $WorkPermitMedicalRenewal->workpermitcost =  $WorkPermitMedicalRenewal->Amt.' MVR' ?? $work_permit_amt['amount'].' '.$work_permit_amt['unit'];
+                $WorkPermitMedicalRenewal->workpermitcost =  Common::formatCurrency($WorkPermitMedicalRenewal->Amt, 'MVR');
                 $WorkPermitMedicalRenewal->employee_id =base64_encode($WorkPermitMedicalRenewal->employee_id);
                 $WorkPermitMedicalRenewal->medical_end_date = Carbon::parse($WorkPermitMedicalRenewal->medical_end_date)->format('d M Y');
             }
@@ -590,9 +590,9 @@ class RenewalController extends Controller
                                         'Due_Date'=> $next_year_due_date->format('Y-m-d'),
                                         'employee_id'=> $emp_id,
                                         'Month'=> 12,
-                                        "Currency"=>"MVR",
+                                        "Currency"=> $WorkPermit_amt['unit'] ?? 'MVR',
                                         "Amt"=> $WorkPermit_amt['amount'],
-                                    ]); 
+                                    ]);
  
                 return response()->json(['success'=>true,'message'=>'WorkPermit Renewal  Successfully Using the Lumpsum Payment Type','status'=>200]);
             }
@@ -609,9 +609,9 @@ class RenewalController extends Controller
                                                 'Due_Date'=> $new_date->format('Y-m-d'),
                                                 'employee_id'=> $emp_id,
                                                 'Month'=> $new_date->format('m'),
-                                                "Currency"=>"MVR",
+                                                "Currency"=> $WorkPermit_amt['unit'] ?? 'MVR',
                                                 "Amt"=> $WorkPermit_amt['amount']/12,
-                                            ]);              
+                                            ]);
                 }
             return  response()->json(['success'=>true,'message'=>' WorkPermit Renewal  successfully using the Installment Payment Type.','status'=>200]);
             }
@@ -637,9 +637,9 @@ class RenewalController extends Controller
                                             'Due_Date'=> $next_year_due_date->format('Y-m-d'),
                                             'employee_id'=> $emp_id,
                                             'Month'=> 12,
-                                            "Currency"=>"MVR",
+                                            "Currency"=> $qotaslotAMt['unit'] ?? 'MVR',
                                             "Amt"=> $qotaslotAMt['amount'],
-                                            ]);     
+                                            ]);
 
              
                 return response()->json(['success'=>true,'message'=>'Quota Slot Renewal  Successfully Using the Lumpsum Payment Type','status'=>200]);
@@ -660,9 +660,9 @@ class RenewalController extends Controller
                                           'Due_Date'=> $new_date->format('Y-m-d'),
                                           'employee_id'=> $emp_id,
                                           'Month'=> $new_date->format('m'),
-                                          "Currency"=>"MVR",
+                                          "Currency"=> $qotaslotAMt['unit'] ?? 'MVR',
                                           "Amt"=> $amt,
-                                        ]);              
+                                        ]);
                 }
                
                  $TotalExpensessSinceJoing->Total_slot_Payment += $qotaslotAMt['amount'] ?? 0.00;  
@@ -803,20 +803,20 @@ class RenewalController extends Controller
                             $expiryBoxes = '';
                       
                                 $expiryBoxes .= '<div>
-                                    <label>Work Permit: MVR  '.($row->WorkPermitAmt).'</label>
+                                    <label>Work Permit: '.Common::formatCurrency($row->WorkPermitAmt, 'MVR').'</label>
                                     <p>Expires: ' . ($row->WorkPermitExpiryDate ?? '-') . '</p>
                                 </div>';
                            
                                 $expiryBoxes .= '<div>
-                                    <label>Slot Payment: MVR '.($row->QuotaSlotAmtForThisMonthAmt).'</label>
+                                    <label>Slot Payment: '.Common::formatCurrency($row->QuotaSlotAmtForThisMonthAmt, 'MVR').'</label>
                                     <p>Expires: ' . ($row->QuotaSlotAmtForThisMonth ?? '-') . '</p>
                                 </div>';
                                $expiryBoxes .= '<div>
-                                    <label>Visa: MVR ' . ($row->VisaExpiryExpiryAmt ?? '-') . '</label>
+                                    <label>Visa: ' . ($row->VisaExpiryExpiryAmt !== null ? Common::formatCurrency($row->VisaExpiryExpiryAmt, 'MVR') : '-') . '</label>
                                     <p>Expires: ' . ($row->VisaExpiryDate ?? '-') . '</p>
                                 </div>';
                                $expiryBoxes .= '<div>
-                                    <label>Insurance: MVR ' . ($row->Premium ?? '-') . '</label>
+                                    <label>Insurance: ' . ($row->Premium !== null ? Common::formatCurrency($row->Premium, 'MVR') : '-') . '</label>
                                     <p>Expires: ' . ($row->InsuranceExpiryDate ?? '-') . '</p>
                                 </div>';
                            
@@ -909,7 +909,7 @@ class RenewalController extends Controller
                 'EmployeeInsurance',
                 'QuotaSlotRenewal'
             ])
-            ->where("nationality", '!=', "Maldivian")
+            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
             ->where('resort_id', $this->resort->resort_id)
             ->get();
 
@@ -936,8 +936,9 @@ class RenewalController extends Controller
                 ];
             }
 
-            // Insurance
-            $insurance = $employee->EmployeeInsurance()->where('resort_id', $this->resort->resort_id)->latest()->first();
+            // Insurance — reuse the eager-loaded hasOne relation rather than firing
+            // a fresh query per employee.
+            $insurance = $employee->EmployeeInsurance;
             if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
                 $groupedData['Insurance'][] = [
                     'ExpiryDate' => $this->getFormattedExpiryStatus($insurance->insurance_end_date),
@@ -980,10 +981,11 @@ class RenewalController extends Controller
                 ];
             }
 
-            // Quota Slot
+            // Quota Slot — filter and display by Due_Date so the filter window
+            // matches the value shown in the row (was filtering by Expiry_Date).
             $currentQuota = $employee->QuotaSlotRenewal
-                ->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))
                 ->where('Status', 'Unpaid')
+                ->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))
                 ->first();
             if ($currentQuota) {
                 $groupedData['QuotaSlot'][] = [
@@ -1019,7 +1021,7 @@ class RenewalController extends Controller
                                     <p>' . $employee['Department_name'] . ' - ' . $employee['Position_name'] . '</p>
                                 </div>
                                 <div class="overdue-text">
-                                    ' . $flag . ': MVR ' . $employee['Amount'] . '<br/>
+                                    ' . $flag . ': ' . Common::formatCurrency($employee['Amount'], 'MVR') . '<br/>
                                     Expires: ' . $employee['ExpiryDate'] . '
                                 </div>
                             </div>

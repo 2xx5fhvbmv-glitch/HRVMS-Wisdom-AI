@@ -179,7 +179,9 @@ class PaymentRequestController extends Controller
             $date = $request->date;
 
             if (in_array('all', $flags)) {
-                $flags = ['visa', 'insurance', 'work_permit', 'MedicalReport', 'slot_payment'];
+                // 'visa' intentionally excluded — the Visa payment-type checkbox
+                // has been removed from the UI. Even "All" must not pull visa.
+                $flags = ['insurance', 'work_permit', 'MedicalReport', 'slot_payment'];
             }
 
             $filterStart = Carbon::now()->startOfMonth();
@@ -223,10 +225,13 @@ class PaymentRequestController extends Controller
                     $employeeData = [];
                     $hasAnyFlagData = false;
 
+                    // Visa payment-type removed from the UI — block disabled.
+                    // Kept for reference in case Visa is re-enabled later.
+                    /*
                     if (in_array('visa', $flags)) {
                         $visa = $employee->VisaRenewal;
 
-               
+
                         if ($visa && Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) {
                             $employee->VisaExpiryExpiryDate = '<b>MVR ' . number_format($visa->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($visa->end_date);
                             $totalVisa += $visa->Amt;
@@ -235,12 +240,13 @@ class PaymentRequestController extends Controller
                             $employeeData[base64_encode($employee->id)]['VisaExpiry'] = $visa->end_date;
 
                             $lastvisaExpiry  = $employee->VisaRenewal->VisaChild()->orderBy("id","desc")->first();
-                            
+
                             $lastvisaExpiry = $lastvisaExpiry->end_date ?? 'N/A';
                             $employeeData[base64_encode($employee->id)]['LastVisaExpiry'] = $lastvisaExpiry;
-                           
+
                         }
                     }
+                    */
 
                     if (in_array('insurance', $flags)) {
                         $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->first();

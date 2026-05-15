@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts\Visa;
 use DB;
 use URL;
+use Validator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -65,74 +66,90 @@ class DashboardController extends Controller
             })
             ->count();
 
-        return view('resorts.Visa.dashboard.hrdashboard',compact('page_title','Position','VisaWallets','VisaXpactAmounts','reconiliation','DetermineSeverity','XpatEmployeeCount'));
+        // Resort name for the Reconciliation card heading (was hardcoded
+        // "Four Season's"). Falls back gracefully if the relation is missing.
+        $resortName = optional(optional($this->resort)->resort)->resort_name ?? 'Resort';
+
+        return view('resorts.Visa.dashboard.hrdashboard',compact('page_title','Position','VisaWallets','VisaXpactAmounts','reconiliation','DetermineSeverity','XpatEmployeeCount','resortName'));
     }
 
 
 
     public function VisaXpactUpdateAmt(Request $request)
     {
+        // Validate the SUBMITTED amount — numeric, allows decimals (0.07 etc.),
+        // must not be negative. The previous code guarded on the EXISTING
+        // amount being > 0, which silently rejected any edit to a wallet that
+        // currently held 0, and also referenced an undefined $html in the
+        // failure branch.
+        $validator = Validator::make($request->all(), [
+            'Xpact_WalletAmt' => ['required', 'numeric', 'min:0'],
+        ], [
+            'Xpact_WalletAmt.required' => 'Amount is required.',
+            'Xpact_WalletAmt.numeric'  => 'Please enter a valid number.',
+            'Xpact_WalletAmt.min'      => 'Amount cannot be negative.',
+        ]);
 
-        $id= base64_decode($request->id);
-        $WalletAmt=$request->Xpact_WalletAmt;
-        $VisaXpactAmounts = VisaXpactAmounts::find($id);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'msg' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        $id = base64_decode($request->id);
+        $WalletAmt = (float) $request->Xpact_WalletAmt;
+        $VisaXpactAmounts = VisaXpactAmounts::where('resort_id', $this->resort->resort_id)->find($id);
+
+        if (!$VisaXpactAmounts) {
+            return response()->json([
+                'success' => false,
+                'msg' => 'Xpat wallet not found.',
+            ], 404);
+        }
+
         DB::beginTransaction();
         try {
-                if($VisaXpactAmounts->Xpact_Amt > 0)
-                {
-                    $VisaXpactAmounts->Xpact_Amt = $WalletAmt;
-                    $VisaXpactAmounts->save();
-                    DB::commit();
+                $VisaXpactAmounts->Xpact_Amt = $WalletAmt;
+                $VisaXpactAmounts->save();
+                DB::commit();
 
-                    $VisaXpactAmounts  = VisaXpactAmounts::where('resort_id', $this->resort->resort_id)->get();
-                    $html ='';
-                    if($VisaXpactAmounts->isNotEmpty())
+                $VisaXpactAmounts  = VisaXpactAmounts::where('resort_id', $this->resort->resort_id)->get();
+                $html ='';
+                if($VisaXpactAmounts->isNotEmpty())
+                {
+                    foreach($VisaXpactAmounts as $VisaWallet)
                     {
-                        foreach($VisaXpactAmounts as $VisaWallet)
-                        {
-                            $html .= '<div class="col-xl-6 col-lg-12 col-6">
-                                        <div class="reconciliation-block">
-                                            <div>
-                                                <div class="d-flex align-items-center">
-                                                    <a href="javascript:void(0)" 
-                                                    class="edit-visa-wallet me-2"
-                                                    data-amt="' . base64_encode($VisaWallet->Xpact_Amt) . '" 
-                                                    data-name="' . base64_encode($VisaWallet->Xpact_WalletName) . '" 
-                                                    data-id="' . base64_encode($VisaWallet->id) . '">
-                                                        <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="icon">
-                                                    </a>
-                                                </div>
-                                                <h6>' . e($VisaWallet->Xpact_WalletName) . '</h6>
-                                                <strong>MVR ' . number_format($VisaWallet->Xpact_Amt, 2) . '</strong>
+                        $html .= '<div class="col-xl-6 col-lg-12 col-6">
+                                    <div class="reconciliation-block">
+                                        <div>
+                                            <div class="d-flex align-items-center">
+                                                <a href="javascript:void(0)"
+                                                class="edit-visa-wallet me-2"
+                                                data-amt="' . base64_encode($VisaWallet->Xpact_Amt) . '"
+                                                data-name="' . base64_encode($VisaWallet->Xpact_WalletName) . '"
+                                                data-id="' . base64_encode($VisaWallet->id) . '">
+                                                    <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="icon">
+                                                </a>
                                             </div>
+                                            <h6>' . e($VisaWallet->Xpact_WalletName) . '</h6>
+                                            <strong>' . Common::formatCurrency($VisaWallet->Xpact_Amt, 'MVR') . '</strong>
                                         </div>
-                                    </div>';
-                        }
+                                    </div>
+                                </div>';
                     }
-                    else   
-                    {   
-                         $html ='<div class="col-12"><p class="text-center">No wallets available.</p> </div>';
-                    }
-
-                 
-                    return response()->json([
-                                    'success' => true,
-                                    'msg' => 'Visa Xpact Amount updated successfully.',
-                                    'html' => $html], 200);
-
-                } 
-                else 
-                {
-
-                     return response()->json([
-                                                'success' => false,
-                                                'msg' => 'Visa Expert amount must be greater than zero',
-                                                'html' => $html
-                                            ], 200);
-                    return redirect()->back()->with('error', 'Visa Expert amount must be greater than zero.');
                 }
+                else
+                {
+                     $html ='<div class="col-12"><p class="text-center">No wallets available.</p> </div>';
+                }
+
+                return response()->json([
+                                'success' => true,
+                                'msg' => 'Visa Xpat Amount updated successfully.',
+                                'html' => $html], 200);
             }
-        catch (\Exception $e) 
+        catch (\Exception $e)
         {
             DB::rollback();
             return redirect()->back()->with('error', 'Something went wrong. Please try again later.');
@@ -161,7 +178,7 @@ class DashboardController extends Controller
                             $results[] = 
                             [
                                 'wallet_name' => $xpact->Xpact_WalletName,
-                                'status' => "Not Reconciled - Difference: MVR ".$difference,
+                                'status' => "Not Reconciled - Difference: " . Common::formatCurrency(abs($walletAmt - $xpactAmt), 'MVR'),
                             ];
                         }
                         break; 
@@ -204,9 +221,16 @@ class DashboardController extends Controller
             });
 
 
-            // Convert array to collection for datatables
+            // Convert array to collection for datatables.
+            // Skip rows where no active employee currently has this nationality
+            // — admin can configure a deposit rate for any country (e.g.
+            // "Afghan") but the breakdown should only surface nationalities
+            // that actually have at least one employee on payroll.
             $nationalityData = collect();
             foreach ($natioanlity as $key => $value) {
+                if (($value['Count'] ?? 0) <= 0) {
+                    continue;
+                }
                 $nationalityData->push((object)[
                     'nationality' => $value['natioanlity'],
                     'deposit_amount' => $value['DepositAmt'],
@@ -221,7 +245,11 @@ class DashboardController extends Controller
                 })
                 ->editColumn('DepositAmount', function ($row)
                 {
-                    return 'MVR ' . number_format($row->deposit_amount, 2);
+                    // Total deposit liability = per-person rate × active headcount.
+                    // Previously rendered the per-person rate which made
+                    // "5 employees × MVR 18,000" look identical to "1 employee".
+                    $total = (float) $row->deposit_amount * (int) $row->employee_count;
+                    return Common::formatCurrency($total, 'MVR');
                 })
                 ->editColumn('Employeee', function ($row) {
                     return $row->employee_count;
@@ -257,6 +285,12 @@ class DashboardController extends Controller
            
             $nationalityData = collect();
              foreach ($natioanlity as $key => $value) {
+                // Same rule as the dashboard widget: drop configured
+                // nationalities with no active employees so the breakdown
+                // only surfaces what's actually staffed.
+                if (($value['Count'] ?? 0) <= 0) {
+                    continue;
+                }
                 $nationalityData->push((object)[
                     'nationality' => $value['natioanlity'],
                     'deposit_amount' => $value['DepositAmt'],
@@ -264,7 +298,7 @@ class DashboardController extends Controller
                     'id' =>$value['id'] ?? 0
                 ]);
             }
-       
+
               return datatables()->of($nationalityData)
                 ->editColumn('Nationality', function ($row) 
                 {
@@ -272,7 +306,11 @@ class DashboardController extends Controller
                 })
                 ->editColumn('DepositAmount', function ($row)
                 {
-                    return 'MVR ' . number_format($row->deposit_amount, 2);
+                    // Total deposit liability = per-person rate × active headcount.
+                    // Previously rendered the per-person rate which made
+                    // "5 employees × MVR 18,000" look identical to "1 employee".
+                    $total = (float) $row->deposit_amount * (int) $row->employee_count;
+                    return Common::formatCurrency($total, 'MVR');
                 })
                 ->editColumn('Employeee', function ($row) {
                     return $row->employee_count;
@@ -408,44 +446,39 @@ class DashboardController extends Controller
     public function NatioanlityWiseEmployeeBreakDownChart(Request $request)
     {
         $resort_id = $this->resort->resort_id;
-        $natioanlity = array();
+
+        // "Top 3 Nationalities" reflects the actual expat employee population
+        // at the resort, not the configured deposit-rate rows in
+        // `visa_nationalities`. The previous implementation iterated the
+        // deposit-rate config and skipped any nationality the admin had not
+        // explicitly added there — which made the chart blank for resorts
+        // that haven't seeded their deposit list.
+        $top3 = Employee::where('resort_id', $resort_id)
+            ->where('status', 'Active')
+            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
+            ->whereNotNull('nationality')
+            ->where('nationality', '!=', '')
+            ->selectRaw('nationality, COUNT(*) as Count')
+            ->groupBy('nationality')
+            ->orderByDesc('Count')
+            ->limit(3)
+            ->get();
 
         $totalActiveEmployees = Employee::where('resort_id', $resort_id)
             ->where('status', 'Active')
             ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
+            ->whereNotNull('nationality')
+            ->where('nationality', '!=', '')
             ->count();
 
-        VisaNationality::where('resort_id', $resort_id)
-            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
-            ->get()
-            ->map(function ($ak) use (&$natioanlity, $resort_id, $totalActiveEmployees) {
-                $empCount = Employee::where('resort_id', $resort_id)
-                    ->where('status', 'Active')
-                    ->where('nationality', $ak->nationality)
-                    ->count();
-
-                $natioanlity[$ak->nationality] = [
-                    'id' => $ak->id,
-                    'DepositAmt' => $ak->amt,
-                    'natioanlity' => $ak->nationality,
-                    'deposit_percent' => ($empCount > 0 && $totalActiveEmployees > 0)
-                        ? round(($empCount / $totalActiveEmployees) * 100)
-                        : 0,
-                    'Count' => $empCount,
-                ];
-            });
-
-        // Top 3 by employee count, drop zero-count entries.
-        $top3 = collect($natioanlity)
-            ->filter(fn ($v) => ($v['Count'] ?? 0) > 0)
-            ->sortByDesc('Count')
-            ->take(3)
-            ->values();
-
         $chartData = [
-            'labels' => $top3->pluck('natioanlity')->all(),
-            'data' => $top3->pluck('Count')->all(),
-            'deposit_percent' => $top3->pluck('deposit_percent')->all(),
+            'labels' => $top3->pluck('nationality')->all(),
+            'data' => $top3->pluck('Count')->map(fn ($c) => (int) $c)->all(),
+            'deposit_percent' => $top3->map(function ($r) use ($totalActiveEmployees) {
+                return $totalActiveEmployees > 0
+                    ? round(((int) $r->Count / $totalActiveEmployees) * 100)
+                    : 0;
+            })->all(),
         ];
 
         return response()->json([
@@ -547,12 +580,12 @@ class DashboardController extends Controller
                     return $w;
             });
             
-            $TotalPaidAmt         =    number_format($WorkPermit->where('Status', 'Paid')->sum('Amt'),2);
-            $TotalUnpaidAmt       =    number_format($WorkPermit->where('Status', 'Unpaid')->sum('Amt'),2);
+            $TotalPaidAmt         =    Common::formatCurrency($WorkPermit->where('Status', 'Paid')->sum('Amt'), 'MVR');
+            $TotalUnpaidAmt       =    Common::formatCurrency($WorkPermit->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
             $Totalemployees       =    $WorkPermit->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment    =    number_format(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'),2);
-            $WeekduePayment       =    number_format(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'),2);
-            $TodayduePayment      =    number_format(WorkPermit::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'),2);
+            $MonthlyduePayment    =    Common::formatCurrency(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $WeekduePayment       =    Common::formatCurrency(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $TodayduePayment      =    Common::formatCurrency(WorkPermit::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
 
 
         
@@ -591,23 +624,25 @@ class DashboardController extends Controller
 
                     return $w;
                 });
-            $TotalPaidAmt         =    number_format($QuotaSlotRenewal->where('Status', 'Paid')->sum('Amt'),2);
+            $TotalPaidAmt         =    Common::formatCurrency($QuotaSlotRenewal->where('Status', 'Paid')->sum('Amt'), 'MVR');
 
-            $TotalUnpaidAmt       =    number_format($QuotaSlotRenewal->where('Status', 'Unpaid')->sum('Amt'),2);
+            $TotalUnpaidAmt       =    Common::formatCurrency($QuotaSlotRenewal->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
             $Totalemployees       =    $QuotaSlotRenewal->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment    =    number_format(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'),2);
-            $WeekduePayment       =    number_format(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'),2);
-            $TodayduePayment      =    number_format(QuotaSlotRenewal::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'),2);
+            $MonthlyduePayment    =    Common::formatCurrency(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $WeekduePayment       =    Common::formatCurrency(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $TodayduePayment      =    Common::formatCurrency(QuotaSlotRenewal::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
 
         }
         elseif($flag == "Insurance")
         {
             $EmployeeInsurance    =   EmployeeInsurance::where('resort_id', $resort_id)->whereBetween("insurance_end_date",[$StartDate,$EndDate])->get();
-            
+
             $EmployeeInsurance->map(function($w) use(&$employee)
             {
                 $today = Carbon::now();
-                $dueDate = Carbon::parse($w->Due_Date);
+                // EmployeeInsurance has no Due_Date column — use insurance_end_date
+                // to compute the overdue label (same column used in the filter above).
+                $dueDate = Carbon::parse($w->insurance_end_date);
                 $overdueDays = $dueDate->diffInDays($today, false);
                 if ($overdueDays > 0) 
                 {
@@ -630,12 +665,18 @@ class DashboardController extends Controller
                
                 return $w;
             });
-            $TotalPaidAmt         =    number_format(EmployeeInsurance::where('resort_id', $resort_id)->whereBetween("insurance_start_date",[$startOfMonth,$endOfMonth])->sum('Premium'),2);
-            $TotalUnpaidAmt       =    number_format($EmployeeInsurance->sum('Premium'),2);
+            // Total Paid = sum of Premium for policies whose start falls in the
+            // selected window AND are marked Status='Paid' (column added in
+            // 2026_05_14 migration). Existing rows backfilled to Paid.
+            $TotalPaidAmt         =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("insurance_start_date",[$StartDate,$EndDate])->sum('Premium'), 'MVR');
+            $TotalUnpaidAmt       =    Common::formatCurrency($EmployeeInsurance->where('Status', 'Pending')->sum('Premium'), 'MVR');
             $Totalemployees       =    $EmployeeInsurance->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment    =    number_format(EmployeeInsurance::where('resort_id', $resort_id)->whereBetween("insurance_end_date",[$startOfMonth,$endOfMonth])->sum('Premium'),2);
-            $WeekduePayment       =    number_format(EmployeeInsurance::where('resort_id', $resort_id)->whereBetween("insurance_end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Premium'),2);
-            $TodayduePayment      =    number_format(EmployeeInsurance::where('resort_id', $resort_id)->whereDate("insurance_end_date",$Today->toDateString())->sum('Premium'),2);
+            // Coming-due totals: only count policies that haven't been paid
+            // yet (Status='Pending'). Mirrors the Status='Unpaid' filter the
+            // Work Permit / Quota Slot branches already use for parity.
+            $MonthlyduePayment    =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("insurance_end_date",[$startOfMonth,$endOfMonth])->sum('Premium'), 'MVR');
+            $WeekduePayment       =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("insurance_end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Premium'), 'MVR');
+            $TodayduePayment      =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("insurance_end_date",$Today->toDateString())->sum('Premium'), 'MVR');
         }
         elseif($flag == "PermitMedicalFee")
         {
@@ -644,7 +685,9 @@ class DashboardController extends Controller
             {
 
                 $today = Carbon::now();
-                $dueDate = Carbon::parse($w->Due_Date);
+                // WorkPermitMedicalRenewal has no Due_Date column — use end_date
+                // to compute overdue (same column used in the filter above).
+                $dueDate = Carbon::parse($w->end_date);
                 $overdueDays = $dueDate->diffInDays($today, false);
                 if ($overdueDays > 0) 
                 {
@@ -665,12 +708,16 @@ class DashboardController extends Controller
                                 'overDue_status' =>  $due,
                             ];
             });
-            $TotalPaidAmt                =    number_format(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->whereBetween("start_date",[$startOfMonth,$endOfMonth])->sum('Amt'),2);
-            $TotalUnpaidAmt              =    number_format($WorkPermitMedicalRenewal->sum('Amt'),2);
+            // Total Paid = sum Amt for renewals whose start falls in the selected
+            // window AND are marked Status='Paid' (column added in 2026_05_14
+            // migration). Was using current month + no Status filter.
+            $TotalPaidAmt                =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("start_date",[$StartDate,$EndDate])->sum('Amt'), 'MVR');
+            $TotalUnpaidAmt              =    Common::formatCurrency($WorkPermitMedicalRenewal->where('Status', 'Pending')->sum('Amt'), 'MVR');
             $Totalemployees              =    $WorkPermitMedicalRenewal->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment           =    number_format(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'),2);
-            $WeekduePayment              =    number_format(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'),2);
-            $TodayduePayment             =    number_format(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->whereDate("end_date",$Today->toDateString())->sum('Amt'),2);
+            // Coming-due totals filtered to Status='Pending' for parity with WorkPermit/QuotaSlot.
+            $MonthlyduePayment           =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'), 'MVR');
+            $WeekduePayment              =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'), 'MVR');
+            $TodayduePayment             =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("end_date",$Today->toDateString())->sum('Amt'), 'MVR');
         }
         elseif($flag == "WorkVisa")
         {
@@ -679,7 +726,9 @@ class DashboardController extends Controller
             {
 
                 $today = Carbon::now();
-                $dueDate = Carbon::parse($w->Due_Date);
+                // VisaRenewal has no Due_Date column — use end_date
+                // to compute overdue (same column used in the filter above).
+                $dueDate = Carbon::parse($w->end_date);
                 $overdueDays = $dueDate->diffInDays($today, false);
                 if ($overdueDays > 0) 
                 {
@@ -702,12 +751,16 @@ class DashboardController extends Controller
 
                 return $w;
             });
-            $TotalPaidAmt                =    number_format(VisaRenewal::where('resort_id', $resort_id)->whereBetween("start_date",[$startOfMonth,$endOfMonth])->sum('Amt'),2);
-            $TotalUnpaidAmt              =    number_format($VisaRenewal->sum('Amt'),2);
+            // Total Paid = sum Amt for visas whose start falls in the selected
+            // window AND are marked Status='Paid' (column added in 2026_05_14
+            // migration).
+            $TotalPaidAmt                =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("start_date",[$StartDate,$EndDate])->sum('Amt'), 'MVR');
+            $TotalUnpaidAmt              =    Common::formatCurrency($VisaRenewal->where('Status', 'Pending')->sum('Amt'), 'MVR');
             $Totalemployees              =    $VisaRenewal->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment           =    number_format(VisaRenewal::where('resort_id', $resort_id)->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'),2);
-            $WeekduePayment              =    number_format(VisaRenewal::where('resort_id', $resort_id)->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'),2);
-            $TodayduePayment             =    number_format(VisaRenewal::where('resort_id', $resort_id)->whereDate("end_date",$Today->toDateString())->sum('Amt'),2);
+            // Coming-due totals filtered to Status='Pending' for parity with WorkPermit/QuotaSlot.
+            $MonthlyduePayment           =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'), 'MVR');
+            $WeekduePayment              =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'), 'MVR');
+            $TodayduePayment             =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("end_date",$Today->toDateString())->sum('Amt'), 'MVR');
         }
 
         $row1='';
@@ -752,12 +805,17 @@ class DashboardController extends Controller
 
 
         $route = route('resort.visa.Expiry');
+        // Calendar date picker + per-tab View All hidden — View All now lives in
+        // the card title (blade) and the date range filter is paused. Hidden
+        // input is still emitted so the post-AJAX daterangepicker init in JS
+        // doesn\'t blow up looking for #hiddenInput.
         $row='<div class="tab-pane fade show active" id="'.$flag.'" role="tabpanel" aria-labelledby="'.$flag.'">
+                                <input type="hidden" id="hiddenInput" value="'.$newDate.'">
+                                <!--
                                 <div class="row align-items-center mb-3">
                                     <div class="col">
                                                <div class="dateRangeAb"  id="datapicker">
                                                     <div>
-                                                        <!-- Hidden input field to attach the calendar to -->
                                                         <input type="text" class="form-control" value="'.$newDate.'" name="hiddenInput" id="hiddenInput">
                                                     </div>
                                                     <p id="startDate" class="d-none">Start Date:</p>
@@ -768,6 +826,7 @@ class DashboardController extends Controller
                                         <a href="'.$route.'" class="a-link">View All</a>
                                     </div>
                                 </div>
+                                -->
                                 <div class="row">
                                     <div class="col-md-5">
                                         <div class="total-incidents-box">
@@ -777,19 +836,19 @@ class DashboardController extends Controller
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label>Total Paid:</label>
-                                                <Span>MVR '.$TotalPaidAmt.'</Span>
+                                                <Span>'.$TotalPaidAmt.'</Span>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label>Today:</label>
-                                                <Span>MVR '.$TodayduePayment.'</Span>
+                                                <Span>'.$TodayduePayment.'</Span>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label>This Week:</label>
-                                                <Span>MVR '.$WeekduePayment.'</Span>
+                                                <Span>'.$WeekduePayment.'</Span>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label>This Month:</label>
-                                                <Span>MVR '.$MonthlyduePayment.'</Span>
+                                                <Span>'.$MonthlyduePayment.'</Span>
                                             </div>
                                         </div>
                                     </div>

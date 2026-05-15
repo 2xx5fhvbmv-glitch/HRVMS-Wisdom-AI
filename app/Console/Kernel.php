@@ -30,6 +30,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('Daily:CheckExtraHours')->daily();
         $schedule->command('Monthly:CheckEveryVisaModule')->monthly();
         $schedule->command('Daily:CheckVisaExpiryReminders')->dailyAt('09:00');
+        $schedule->command('Daily:CheckDepositRefundReminders')->dailyAt('09:15');
         $schedule->command('CheckHourly:IncidentCompliance')->everyMinute();
 
         

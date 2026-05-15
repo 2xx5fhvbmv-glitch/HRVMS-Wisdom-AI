@@ -1366,6 +1366,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
       Route::post('visa/wallet-to-wallet-transfer', 'Visa\FundTransferController@VisaWalletToWalletTransfer')->name('resort.visa.VisaWalletToWalletTransfer');
       Route::get('visa/transection-history', 'Visa\FundTransferController@TransectionHistory')->name('resort.visa.TransectionHistory');
+      Route::get('visa/transaction-history/list', 'Visa\FundTransferController@TransectionHistoryIndex')->name('resort.visa.TransectionHistoryIndex');
       Route::get('visa/nationality-wise-employee-deposit-and-count', 'Visa\DashboardController@NatioanlityWiseEmployeeDepositAndCount')->name('resort.visa.NatioanlityWiseEmployeeDepositAndCount');
 
       Route::get('visa/nationality-wise-employee-list', 'Visa\DashboardController@NatioanlityWiseEmployeeList')->name('resort.visa.NatioanlityWiseEmployeeList');

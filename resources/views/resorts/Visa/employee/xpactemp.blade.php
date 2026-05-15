@@ -70,14 +70,17 @@
             <table id="Table-XpactEmp" class="table data-Table  Table-XpactEmp w-100">
                 <thead>
                     <tr>
+                        <th>Profile</th>
                         <th>Employee ID</th>
                         <th>Employee Name</th>
+                        <th>Nationality</th>
                         <th>Position</th>
                         <th>Department</th>
                         <th>Joining Date</th>
                         <th>Status</th>
                         <th>Insurance</th>
                         <th>Work Permit Due</th>
+                        <th>Medical Expiry</th>
                         <th>Slot Payment Due</th>
                         <th>Active</th>
 
@@ -150,7 +153,7 @@ function FetchIndexDate()
             "iDisplayLength": 15,  // Set the initial number of records per page
             processing: true, // Show processing indicator
             serverSide: true, // Enable server-side processing
-            order: [[10, 'desc']],  // Default order by Joining Date
+            order: [[13, 'desc']],  // Default order by created_at (hidden, last column)
             ajax: {
                 url: "{{ route('resort.visa.xpactEmployee') }}",
                 type: 'GET',
@@ -163,14 +166,17 @@ function FetchIndexDate()
                 }
             },
             columns: [
+                    { data: 'Profile', name: 'Profile', orderable: false, searchable: false },
                     { data: 'EmployeeId', name: 'EmployeeId' },
                     { data: 'EmployeeName', name: 'EmployeeName' },
+                    { data: 'Nationality', name: 'Nationality' },
                     { data: 'position', name: 'Position' },
                     { data: 'department', name: 'Department' },
                     { data: 'JoiningDate', name: 'JoiningDate' },
                     { data: 'status', name: 'status' },
                     { data: 'Insurance', name: 'Insurance' },
                     { data: 'WorkPermitDue', name: 'WorkPermitDue' },
+                    { data: 'MedicalExpiry', name: 'MedicalExpiry' },
                     { data: 'SlotPaymentDue', name: 'SlotPaymentDue' },
                     { data: 'action', name: 'action' },
                     {data:'created_at', visible:false,searchable:false}

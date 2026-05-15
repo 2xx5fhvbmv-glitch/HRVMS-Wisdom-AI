@@ -38,7 +38,7 @@ class VisaNationalityImport implements ToModel, WithHeadingRow
         
         if (!empty($row['nationality']) && !empty($row['amount']))
         {
-            $nationality = array_values(config('settings.countries'));
+            $nationality = array_values(config('settings.visa_countries'));
 
             // Validate nationality
             if (!in_array($row['nationality'], $nationality))

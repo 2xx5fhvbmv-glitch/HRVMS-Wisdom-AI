@@ -56,7 +56,7 @@ class ExpiryController extends Controller
                         ->orWhere('last_name', 'LIKE', "%{$search}%");
                     });
                 })
-                ->where("nationality", '!=', "Maldivian")
+                ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
                 ->where('resort_id', $this->resort->resort_id)
                 ->get()
                 ->map(function ($employee) use ($flag, $filterStart, $filterEnd) {
@@ -118,8 +118,10 @@ class ExpiryController extends Controller
                     
                         
                         
-                            $currentQuota = $employee->QuotaSlotRenewal->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))->where('Status', 'Unpaid')->first();
-                            if ($currentQuota) 
+                            // Filter & display both based on Due_Date so the value shown to
+                            // the user matches the window being filtered.
+                            $currentQuota = $employee->QuotaSlotRenewal->where('Status', 'Unpaid')->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))->first();
+                            if ($currentQuota)
                             {
                                 $employee->QuotaSlotAmtForThisMonth = $this->getFormattedExpiryStatus($currentQuota->Due_Date);
                                 $employee->QuotaSlotAmtForThisMonthAmt =$currentQuota->Amt;
@@ -165,7 +167,7 @@ class ExpiryController extends Controller
                     }
                     if ($flag == 'all' || $flag == 'medical_report') 
                     {
-                        $boxes .= '<div><label>Work Permit Medical Test Fee</label><p>Expires: ' . ($row->WorkPermitMedicalPermitExpiryDate ?? '-') . '</p></div>';
+                        $boxes .= '<div><label>Work Permit Medical</label><p>Expires: ' . ($row->WorkPermitMedicalPermitExpiryDate ?? '-') . '</p></div>';
                     }
 
                     return '<div class="exp-Date-userbox">
