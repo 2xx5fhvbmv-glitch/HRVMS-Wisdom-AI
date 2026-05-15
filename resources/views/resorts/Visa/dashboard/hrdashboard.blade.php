@@ -109,7 +109,7 @@
                 <div class="col-xl-3 col-sm-6">
                     <div class="card">
                         <div class="card-title">
-                            <h3>Top 3 Nationalities</h3>
+                            <h3>Top Nationalities</h3>
                         </div>
                         <div class="incident-chart mb-3">
                             <canvas id="myDoughnutChart"></canvas>
@@ -1333,15 +1333,24 @@ $(document).ready(function ()
             id: 'doughnutLabelsInside',
             afterDraw: function (chart) {
                 var ctx = chart.ctx; // Corrected
+                // Workforce-share percentages supplied by the controller
+                // (count / total active expats). Falls back to the geometric
+                // slice share if not provided.
+                var workforcePct = chart.$workforcePercent || null;
                 chart.data.datasets.forEach(function (dataset, i) {
                     var meta = chart.getDatasetMeta(i);
                     if (!meta.hidden) {
                         meta.data.forEach(function (element, index) {
-                            var dataValue = dataset.data[index];
-                            var total = dataset.data.reduce(function (acc, val) {
-                                return acc + val;
-                            }, 0);
-                            var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
+                            var percentage;
+                            if (workforcePct && typeof workforcePct[index] !== 'undefined') {
+                                percentage = Number(workforcePct[index]).toFixed(0) + '%';
+                            } else {
+                                var dataValue = dataset.data[index];
+                                var total = dataset.data.reduce(function (acc, val) {
+                                    return acc + val;
+                                }, 0);
+                                percentage = total > 0 ? ((dataValue / total) * 100).toFixed(0) + '%' : '0%';
+                            }
 
                             var position = element.tooltipPosition();
 
@@ -1386,12 +1395,11 @@ $(document).ready(function ()
                             return colorPalette[index % colorPalette.length];
                         });
 
-                        // Percentages must use the SAME denominator as the
-                        // doughnut slices (sum of the 3 shown counts), otherwise
-                        // the inside-slice labels and the legend disagree.
-                        // `deposit_percent` from the API divides by the whole
-                        // active workforce, so it is intentionally NOT used here.
-                        let dataTotal = data.reduce((a, b) => a + Number(b || 0), 0);
+                        // Percentages = each nationality's share of the TOTAL
+                        // active expat workforce (count / total). Supplied by
+                        // the controller as deposit_percent; used for BOTH the
+                        // in-slice labels and the legend so they always agree.
+                        let workforcePercent = (depositPercent || []).map(p => Number(p || 0));
 
                         // Robust cleanup: use Chart.getChart() so we always
                         // destroy the Chart instance actually bound to the
@@ -1446,13 +1454,17 @@ $(document).ready(function ()
                             plugins: [doughnutLabelsInside] // Your custom plugin for inside labels
                         });
 
+                        // Hand the workforce-share percentages to the in-slice
+                        // label plugin so the slice labels and the legend below
+                        // both show the same count/total figures.
+                        window.myDoughnutChart.$workforcePercent = workforcePercent;
+                        window.myDoughnutChart.update();
+
                         // 🏷️ Update legend text in DOM — percentage = this
-                        // nationality's share of the 3 shown (matches the slice).
+                        // nationality's share of the TOTAL active expat workforce.
                         let legendHtml = '';
                         labels.forEach((label, i) => {
-                            let pct = dataTotal > 0
-                                ? ((Number(data[i] || 0) / dataTotal) * 100)
-                                : 0;
+                            let pct = Number(workforcePercent[i] || 0);
                             legendHtml += `<div class="doughnut-label">
                                 <span style="background:${colors[i]}; width:12px; height:12px; display:inline-block;"></span>
                                 ${label} - ${pct.toFixed(2)}%
