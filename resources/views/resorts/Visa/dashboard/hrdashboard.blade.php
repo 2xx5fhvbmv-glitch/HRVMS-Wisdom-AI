@@ -69,8 +69,7 @@
                                 </li>
                                 <li class="nav-item VisaModuleLink"  data-id="PermitMedicalFee"  role="presentation">
                                     <button class="nav-link "id="#tab4" data-bs-toggle="tab" data-bs-target="#tabPane4"
-                                        type="button" role="tab" aria-controls="tabPane4" aria-selected="false">Work
-                                        Permit Medical Fee</button>
+                                        type="button" role="tab" aria-controls="tabPane4" aria-selected="false">Medical Fee</button>
                                 </li>
                                 {{-- <li class="nav-item VisaModuleLink"  data-id="WorkVisa" role="presentation">
                                     <button class="nav-link" id="#tab4" data-bs-toggle="tab" data-bs-target="#tabPane4"
@@ -437,7 +436,7 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <div class="d-flex align-items-center">
-                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode($VisaWallet->Xpact_Amt)}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
+                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode(Common::convertToDisplayCurrency($VisaWallet->Xpact_Amt, 'MVR'))}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
                                                                         <img src="{{URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                                                                     </a> </h6>
                                                                 </div>
@@ -458,14 +457,15 @@
 
                                     </div>
                                     <div class="col-12">
-                                        @if(!empty($reconiliation))
-                                            @foreach($reconiliation as $r)
-
-                                            <div class="RecoDiff-block    mb-1 d-flex align-items-center">
-                                               {{$r['status']}} In {{$r['wallet_name']}}
-                                            </div>
-                                            @endforeach
-                                        @endif
+                                        <div id="ReconciliationDiff">
+                                            @if(!empty($reconiliation))
+                                                @foreach($reconiliation as $r)
+                                                <div class="RecoDiff-block    mb-1 d-flex align-items-center">
+                                                   {{$r['status']}} In {{$r['wallet_name']}}
+                                                </div>
+                                                @endforeach
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
 
@@ -559,7 +559,7 @@
                         </div>
 
                         <div class="mt-3 mb-3">
-                            <label class="form-label">Xpat Wallet Amount <span class="red-mark">*</span></label>
+                            <label class="form-label">Xpat Wallet Amount ({{ Common::GetResortCurrencySymbol() }}) <span class="red-mark">*</span></label>
                             <input type="number" min="0" step="0.01" class="form-control" id="Xpact_WalletAmt" name="Xpact_WalletAmt"
                                 placeholder="Wallet Amount"
                                 required
@@ -925,6 +925,12 @@ $(document).ready(function ()
 
                         $("#VisaXpactAmounts").html(response.html);
 
+                        // Refresh the "Not Reconciled - Difference" rows so the
+                        // reconciliation status updates without a page reload.
+                        if (typeof response.reconciliation_html !== 'undefined') {
+                            $("#ReconciliationDiff").html(response.reconciliation_html);
+                        }
+
                     } else {
                         toastr.error(response.msg, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -1223,7 +1229,7 @@ $(document).ready(function ()
                 iDisplayLength: 6,
                 processing: true,
                 serverSide: true,
-                order: [[4, 'desc']],
+                ordering: false,
                 ajax: {
                     url: '{{ route("resort.visa.TransectionHistory") }}',
                     type: 'GET',
@@ -1233,8 +1239,7 @@ $(document).ready(function ()
                     { data: 'FromWallet', name: 'FromWallet', className: 'text-nowrap' },
                     { data: 'ToWallet', name: 'ToWallet', className: 'text-nowrap' },
                     { data: 'Amount', name: 'Amount', className: 'text-nowrap' },
-                    {data:'created_at', visible:false,searchable:false},
-                ]    
+                ]
             });
         }
         function loadLiabilityBreakdown(dateRange) 
@@ -1381,9 +1386,12 @@ $(document).ready(function ()
                             return colorPalette[index % colorPalette.length];
                         });
 
-                       
-                        let totalDeposit = depositPercent.reduce((a, b) => a + b, 0);
-                        $('.doughnut-label.fw-bold').html("Total Deposit %: " + totalDeposit.toFixed(2) + '%');
+                        // Percentages must use the SAME denominator as the
+                        // doughnut slices (sum of the 3 shown counts), otherwise
+                        // the inside-slice labels and the legend disagree.
+                        // `deposit_percent` from the API divides by the whole
+                        // active workforce, so it is intentionally NOT used here.
+                        let dataTotal = data.reduce((a, b) => a + Number(b || 0), 0);
 
                         // Robust cleanup: use Chart.getChart() so we always
                         // destroy the Chart instance actually bound to the
@@ -1426,20 +1434,28 @@ $(document).ready(function ()
                             },
                             options: {
                                 plugins: {
+                                    // Built-in legend disabled — the custom legend
+                                    // rendered below (.myDoughnutChartLabel) already
+                                    // lists each nationality. Having both showed
+                                    // every name twice.
                                     legend: {
-                                        position: 'right'
+                                        display: false
                                     }
                                 }
                             },
                             plugins: [doughnutLabelsInside] // Your custom plugin for inside labels
                         });
 
-                        // 🏷️ Update legend text in DOM (optional)
+                        // 🏷️ Update legend text in DOM — percentage = this
+                        // nationality's share of the 3 shown (matches the slice).
                         let legendHtml = '';
                         labels.forEach((label, i) => {
+                            let pct = dataTotal > 0
+                                ? ((Number(data[i] || 0) / dataTotal) * 100)
+                                : 0;
                             legendHtml += `<div class="doughnut-label">
                                 <span style="background:${colors[i]}; width:12px; height:12px; display:inline-block;"></span>
-                                ${label} - ${depositPercent[i].toFixed(2)}%
+                                ${label} - ${pct.toFixed(2)}%
                             </div>`;
                         });
                         // Replace inside the container (was using .before() which

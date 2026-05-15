@@ -48,7 +48,10 @@
                     </div> -->
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <select class="form-select" name="departmentFilter" id="departmentFilter">
-                            <option value="">All Department</option>
+                            {{-- Non-empty value "all" so Select2 renders it as a real
+                                 selectable row (an empty value is consumed as the
+                                 placeholder slot and never appears in the list). --}}
+                            <option value="all" selected>All Department</option>
                             @if($departments->isNotEmpty())
                                 @foreach($departments as $department)
                                     <option value="{{ $department->id }}">{{ $department->name }}</option>
@@ -114,9 +117,10 @@ $(document).ready(function()
             
         });
         $("#departmentFilter").select2({
-            placeholder: "Select Department",
-            allowClear: true,
-            
+            // "All Department" is now a real option (value="all"), selected by
+            // default — no placeholder needed. A placeholder here would only
+            // re-introduce the empty-slot behaviour.
+            minimumResultsForSearch: 0,
         });
         $(".datepickerXpact").datepicker({
             format: 'dd-mm-yyyy',

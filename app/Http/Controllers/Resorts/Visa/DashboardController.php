@@ -98,7 +98,9 @@ class DashboardController extends Controller
         }
 
         $id = base64_decode($request->id);
-        $WalletAmt = (float) $request->Xpact_WalletAmt;
+        // The modal input is shown/entered in the resort's display currency.
+        // Xpact_Amt is stored in MVR, so convert display → MVR before saving.
+        $WalletAmt = Common::convertToStorageCurrency($request->Xpact_WalletAmt, 'MVR');
         $VisaXpactAmounts = VisaXpactAmounts::where('resort_id', $this->resort->resort_id)->find($id);
 
         if (!$VisaXpactAmounts) {
@@ -126,7 +128,7 @@ class DashboardController extends Controller
                                             <div class="d-flex align-items-center">
                                                 <a href="javascript:void(0)"
                                                 class="edit-visa-wallet me-2"
-                                                data-amt="' . base64_encode($VisaWallet->Xpact_Amt) . '"
+                                                data-amt="' . base64_encode(Common::convertToDisplayCurrency($VisaWallet->Xpact_Amt, 'MVR')) . '"
                                                 data-name="' . base64_encode($VisaWallet->Xpact_WalletName) . '"
                                                 data-id="' . base64_encode($VisaWallet->id) . '">
                                                     <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="icon">
@@ -144,10 +146,22 @@ class DashboardController extends Controller
                      $html ='<div class="col-12"><p class="text-center">No wallets available.</p> </div>';
                 }
 
+                // Re-run the reconciliation so the "Not Reconciled - Difference"
+                // rows under the Xpat Portal refresh in the same AJAX response
+                // — editing a Xpat wallet changes those differences, and they
+                // were previously only rendered server-side on page load.
+                $reconciliationHtml = '';
+                foreach ($this->ReconiliationCheck() as $r) {
+                    $reconciliationHtml .= '<div class="RecoDiff-block mb-1 d-flex align-items-center">'
+                        . e($r['status']) . ' In ' . e($r['wallet_name'])
+                        . '</div>';
+                }
+
                 return response()->json([
                                 'success' => true,
                                 'msg' => 'Visa Xpat Amount updated successfully.',
-                                'html' => $html], 200);
+                                'html' => $html,
+                                'reconciliation_html' => $reconciliationHtml], 200);
             }
         catch (\Exception $e)
         {
@@ -158,36 +172,41 @@ class DashboardController extends Controller
     }
     public function ReconiliationCheck()
     {
-       $results = [];
+        $results = [];
 
-        $VisaWallets  = VisaWallets::orderBy("id","DESC")->where('resort_id', $this->resort->resort_id)->get();
-        $VisaXpactAmounts = VisaXpactAmounts::orderBy("id","DESC")->where('resort_id', $this->resort->resort_id)->get();
-            foreach ($VisaWallets as $wallet) {
-                $matched = false;
+        $VisaWallets      = VisaWallets::where('resort_id', $this->resort->resort_id)->get();
+        $VisaXpactAmounts = VisaXpactAmounts::where('resort_id', $this->resort->resort_id)->get();
 
-                foreach ($VisaXpactAmounts as $xpact) {
-                    if ($wallet->WalletName === $xpact->Xpact_WalletName) 
-                    {
-                        $matched = true;
-                        $walletAmt = floatval($wallet->Amt);
-                        $xpactAmt = floatval($xpact->Xpact_Amt);
+        // Index Xpat amounts by a normalised wallet name so matching is not
+        // broken by stray whitespace / casing, and lookup is O(1).
+        $xpactByName = [];
+        foreach ($VisaXpactAmounts as $xpact) {
+            $key = strtolower(trim((string) $xpact->Xpact_WalletName));
+            $xpactByName[$key] = $xpact;
+        }
 
-                        if ($walletAmt != $xpactAmt) {
-                            $difference = number_format(abs($walletAmt - $xpactAmt), 2);
-                            
-                            $results[] = 
-                            [
-                                'wallet_name' => $xpact->Xpact_WalletName,
-                                'status' => "Not Reconciled - Difference: " . Common::formatCurrency(abs($walletAmt - $xpactAmt), 'MVR'),
-                            ];
-                        }
-                        break; 
-                    }
-                }
-
-               
-               
+        foreach ($VisaWallets as $wallet) {
+            $key = strtolower(trim((string) $wallet->WalletName));
+            if (!isset($xpactByName[$key])) {
+                continue; // no matching Xpat wallet to reconcile against
             }
+            $xpact = $xpactByName[$key];
+
+            // Round BOTH sides to 2 decimals before comparing — the displayed
+            // difference is 2-decimal, so comparing raw floats could flag
+            // "Not Reconciled" while the shown difference rounds to 0.00.
+            $walletAmt = round((float) $wallet->Amt, 2);
+            $xpactAmt  = round((float) $xpact->Xpact_Amt, 2);
+
+            if ($walletAmt !== $xpactAmt) {
+                $results[] = [
+                    'wallet_name' => $xpact->Xpact_WalletName,
+                    'status'      => 'Not Reconciled - Difference: '
+                        . Common::formatCurrency(round(abs($walletAmt - $xpactAmt), 2), 'MVR'),
+                ];
+            }
+        }
+
         return $results;
     }
 

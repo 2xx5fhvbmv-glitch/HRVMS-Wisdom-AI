@@ -623,9 +623,12 @@ class IncidentController extends Controller
             // arg one position left: $sendto received `null` and the
             // foreach crashed; skipDbInsert never landed at its real slot
             // so the DB row would have double-inserted too.
+            // type=2 is the generic "Request / Incident request" notification
+            // (see Common::sendMobileNotification — only types 1-4 build a
+            // payload; passing '' left $payload undefined and 500'd).
             Common::sendMobileNotification(
                 $this->resort->resort_id,
-                '',
+                2,
                 '',
                 '',
                 $title,
