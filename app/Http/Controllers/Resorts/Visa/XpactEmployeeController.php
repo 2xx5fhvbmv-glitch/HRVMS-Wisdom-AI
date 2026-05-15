@@ -98,11 +98,27 @@ class XpactEmployeeController extends Controller
                             {
                                 $i->profile = Common::getResortUserPicture($i->resortAdmin->id);
                                 $WorkPermitMedicalRenewal = WorkPermitMedicalRenewal::where('employee_id', $i->id)->where('resort_id', $this->resort->resort_id)->first(['employee_id','Reference_Number','Cost','Currency','Medical_Center_name','start_date','end_date','medical_file']);
-                                if($WorkPermitMedicalRenewal) 
+                                // NOTE: do NOT use $i->WorkPermit here — that name collides with
+                                // the Employee::WorkPermit() hasMany relation and would resolve to
+                                // an (empty) Collection that renders as "[]" in the table.
+                                $i->MedicalExpiryDate = null;
+                                if($WorkPermitMedicalRenewal)
                                 {
                                     $medicalStatus = $this->getFormattedExpiryStatus($WorkPermitMedicalRenewal->end_date);
-                                    $i->WorkPermit = Carbon::parse($WorkPermitMedicalRenewal->end_date)->format('d M Y') . ' ' . $medicalStatus;
+                                    $i->MedicalExpiryDate = Carbon::parse($WorkPermitMedicalRenewal->end_date)->format('d M Y') . ' ' . $medicalStatus;
                                 }
+
+                                // Work Permit FEE due — next unpaid work permit row for this
+                                // employee, soonest Due_Date first.
+                                $workPermitFee = WorkPermit::where('employee_id', $i->id)
+                                    ->where('resort_id', $this->resort->resort_id)
+                                    ->where('Status', 'Unpaid')
+                                    ->whereNotNull('Due_Date')
+                                    ->orderBy('Due_Date', 'asc')
+                                    ->first(['employee_id', 'Due_Date', 'Status']);
+                                $i->WorkPermitDueDate = $workPermitFee
+                                    ? Carbon::parse($workPermitFee->Due_Date)->format('d M Y') . ' ' . $this->getFormattedExpiryStatus($workPermitFee->Due_Date)
+                                    : null;
    
                                 $QuotaSlotRenewal = QuotaSlotRenewal::where('employee_id', $i->id)
                                         ->where('resort_id', $this->resort->resort_id)
@@ -158,11 +174,18 @@ class XpactEmployeeController extends Controller
                     $edit_class = 'd-none';
                 }
              return datatables()->of($Employee)
+                ->addColumn('Profile', function ($row) {
+                    $pic = $row->profile ?: asset('resorts_assets/images/user-4.svg');
+                    return '<div class="img-circle"><img src="' . e($pic) . '" alt="profile" style="width:36px;height:36px;border-radius:50%;object-fit:cover;"></div>';
+                })
                 ->addColumn('EmployeeId', function ($row) {
                    return $row->Emp_id;
                 })
                 ->editColumn('EmployeeName', function ($row) {
                   return $row->resortAdmin->first_name . ' ' . $row->resortAdmin->last_name;
+                })
+                ->addColumn('Nationality', function ($row) {
+                    return $row->nationality ?: 'N/A';
                 })
                 ->editColumn('position', function ($row) {
                      return $row->position->position_title ;
@@ -198,19 +221,23 @@ class XpactEmployeeController extends Controller
                 {
                     return $row->InsuranceRenewalDate ?? 'N/A';
                 })
-                 ->editColumn('WorkPermitDue', function ($row) 
+                 ->editColumn('WorkPermitDue', function ($row)
                 {
-                    return 'Pending which date we need to show';
+                    return $row->WorkPermitDueDate ?? 'N/A';
                 })
-                ->editColumn('SlotPaymentDue', function ($row) 
+                ->addColumn('MedicalExpiry', function ($row)
+                {
+                    return $row->MedicalExpiryDate ?? 'N/A';
+                })
+                ->editColumn('SlotPaymentDue', function ($row)
                 {
                     return $row->QuotaSlotRenewalDate ?? 'N/A';
                 })
-                ->editColumn('action', function ($row) use ($edit_class) 
+                ->editColumn('action', function ($row) use ($edit_class)
                 {
                     return '<a target="_blank" href="' . route('resort.visa.XpactEmpDetails', base64_encode($row->id)) . '" class="btn btn-themeSkyblue btn-sm ' . $edit_class . '">Edit</a>';
                 })
-                ->rawColumns(['EmployeeId','position','department', 'JoiningDate','Insurance','WorkPermitDue', 'SlotPaymentDue', 'status', 'action'])
+                ->rawColumns(['Profile','EmployeeId','Nationality','position','department', 'JoiningDate','Insurance','WorkPermitDue','MedicalExpiry', 'SlotPaymentDue', 'status', 'action'])
                 ->make(true);
         }
 
@@ -250,11 +277,14 @@ class XpactEmployeeController extends Controller
         if($statisctic_emp_header)
         {
             $Ai_extracted_data = $statisctic_emp_header->Ai_extracted_data;
-            // Visa Expiry Date -> 
-            if(isset($Ai_extracted_data) && $Ai_extracted_data['extracted_fields']['Visa Issued Date'])
+            // Visa Expiry Date -> previously rendered "Visa Issued Date" as the
+            // visa-expiry value, which made the visible date wrong. Use the
+            // dedicated Visa Expiry Date field (same field already feeds the
+            // "remaining days" tag below).
+            if(isset($Ai_extracted_data['extracted_fields']['Visa Expiry Date']) && $Ai_extracted_data['extracted_fields']['Visa Expiry Date'])
             {
                 $statisctic_emp_header->Name ="Visa Expiry";
-                $statisctic_emp_header->VisaExpiryDate = Carbon::parse($Ai_extracted_data['extracted_fields']['Visa Issued Date'])->format('d M Y');
+                $statisctic_emp_header->VisaExpiryDate = Carbon::parse($Ai_extracted_data['extracted_fields']['Visa Expiry Date'])->format('d M Y');
                 $statisctic_emp_header->VisaRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Visa Expiry Date']);
             }
              // Insurance Expiry Date ->
@@ -287,9 +317,33 @@ class XpactEmployeeController extends Controller
             $QuotaSlotRenewal->QuotaslotRemingDays = $this->getFormattedExpiryStatus($QuotaSlotRenewal->Due_Date);
         }
 
+        // Passport Expiry — from the OCR-extracted Passport_Copy document.
+        // The expiry lives in Ai_extracted_data->extracted_fields->"Date of Expiry"
+        // (format like "12Mar2026"). Was hardcoded "15 Mar 2026" in the view.
+        $passportExpiryDate = null;
+        $passportExpiryStatus = null;
+        $passportRow = VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
+            ->where('employee_id', $id)
+            ->where('DocumentName', 'Passport_Copy')
+            ->latest('id')
+            ->first();
+        if ($passportRow) {
+            $extracted = $passportRow->Ai_extracted_data['extracted_fields'] ?? [];
+            $rawPassportExpiry = $extracted['Date of Expiry'] ?? ($extracted['Passport Expiry Date'] ?? null);
+            if (!empty($rawPassportExpiry)) {
+                try {
+                    $parsed = Carbon::parse($rawPassportExpiry);
+                    $passportExpiryDate = $parsed->format('d M Y');
+                    $passportExpiryStatus = $this->getFormattedExpiryStatus($parsed->toDateString());
+                } catch (\Exception $e) {
+                    $passportExpiryDate = null;
+                }
+            }
+        }
+
         $TotalExpensessSinceJoing = $this->TotalExpensessSinceJoing($id);
-        
-        return view('resorts.Visa.employee.XpatEmployeeDetails', compact('page_title','Employee','statisctic_emp_header','QuotaSlotRenewal','VisaEmployeeExpiryData','TotalExpensessSinceJoing'));
+
+        return view('resorts.Visa.employee.XpatEmployeeDetails', compact('page_title','Employee','statisctic_emp_header','QuotaSlotRenewal','VisaEmployeeExpiryData','TotalExpensessSinceJoing','passportExpiryDate','passportExpiryStatus'));
     }
 
     public function XpactEmpBudgetCost(Request $request)

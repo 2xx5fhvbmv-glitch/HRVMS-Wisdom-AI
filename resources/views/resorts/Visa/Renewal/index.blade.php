@@ -201,7 +201,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3>Medical Insurance - International Renewal</h3>
+                                                    <h3>Medical Insurance</h3>
                                                     <span>Current Policy Expires: ${EmployeeInsurance.insurance_end_date}</span>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span class="badge badge-themeWarning">${EmployeeInsurance.InsuranceRenewalTime}</span>
@@ -244,7 +244,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3> Medical  Insurance - Internationl  Renewal</h3>
+                                                    <h3>Medical Insurance</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
                                                 
@@ -490,7 +490,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3>Work Permit Slot Renewal</h3>
+                                                    <h3>Work Permit</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
                                                 

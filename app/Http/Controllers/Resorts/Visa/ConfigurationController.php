@@ -44,14 +44,29 @@ class ConfigurationController extends Controller
         $page_title="Configuration";
         $nationality = config('settings.nationalities');
         $ResortSiteSettings =  ResortSiteSettings::where('resort_id',$this->resort->resort_id)->first(['MVRtoDoller','DollertoMVR']);
-        $hiddenFeeParticulars = ['recruitment fee', 'relocation / luggage allowance', 'ticket annual leave'];
+        // Match the actual DB strings (hyphen variant, plus the existing typo
+        // 'Recrutment Fee' which seed/admin entries use). Comparison happens
+        // on LOWER(TRIM(...)), so each row hides regardless of casing/spacing.
+        $hiddenFeeParticulars = [
+            'recruitment fee',
+            'recrutment fee',
+            'relocation / luggage allowance',
+            'ticket annual leave',
+            'ticket - annual leave',
+        ];
+        $placeholders = implode(',', array_fill(0, count($hiddenFeeParticulars), '?'));
         $ResortBudgetCost = ResortBudgetCost::whereIn("details",["Xpat Only"])->where('status','active')->where('resort_id',$this->resort->resort_id)
-            ->whereRaw('LOWER(TRIM(particulars)) NOT IN (?, ?, ?)', $hiddenFeeParticulars)
+            ->whereRaw("LOWER(TRIM(particulars)) NOT IN ({$placeholders})", $hiddenFeeParticulars)
             ->orderBy('updated_at', 'DESC')->get()
         ->map(function($i)
         {
             $sourceCurrency = in_array($i->amount_unit, ['$', 'USD']) ? 'USD' : 'MVR';
             $i->New_Amount  = Common::convertToDisplayCurrency($i->amount, $sourceCurrency);
+            // Display-only label cleanup: strip the trailing "Test" from "Work
+            // Visa Medical Test" so the UI shows "Work Visa Medical". The DB
+            // row's particulars stays intact so downstream lookups
+            // (Common::VisaRenewalCost etc.) continue to match.
+            $i->DisplayParticulars = preg_replace('/\s+Test\b/i', '', $i->particulars);
             return  $i;
         });
     
@@ -353,8 +368,8 @@ class ConfigurationController extends Controller
             ];
         
         $messages = [
-            'initial_reminder.required' => 'Please Select Initial Reminder.',
-            'followup_reminder.required' => 'Please Select nationality.',
+            'initial_reminder.required' => 'Please enter the initial reminder days.',
+            'followup_reminder.required' => 'Please enter the follow-up reminder days.',
         ];
         
         $validator = Validator::make($request->all(), $rules, $messages);

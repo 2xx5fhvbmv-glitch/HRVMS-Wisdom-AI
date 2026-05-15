@@ -734,12 +734,13 @@
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
                                         <label for="currency_type" class="form-label">Currency Type <span class="req_span">*</span></label>
+                                        @php $__resortCur = Common::GetResortCurrentCurrency() === 'Dollar' ? 'USD' : 'MVR'; @endphp
                                         <select class="form-select select2t-none" id="currency_type" name="basic_salary_currency" required
                                             aria-label="Default select example"
                                              data-parsley-errors-container="#currency_type_error"
                                             data-parsley-error-message="Please Select Status">
-                                            <option value="MVR">MVR</option>
-                                            <option value="USD">USD</option>
+                                            <option value="MVR" {{ $__resortCur === 'MVR' ? 'selected' : '' }}>MVR</option>
+                                            <option value="USD" {{ $__resortCur === 'USD' ? 'selected' : '' }}>USD</option>
                                         </select>
                                         <div id="currency_type_error"></div>
 
@@ -849,9 +850,10 @@
                                                      data-parsley-required-message="Currency is required."
                                                         data-parsley-errors-container="#allowance-currency"
                                                         data-parsley-error-message="Please Select Gender">
+                                                        @php $__resortCur = Common::GetResortCurrentCurrency() === 'Dollar' ? 'USD' : 'MVR'; @endphp
                                                         <option value="">Select Currency</option>
-                                                        <option value="MVR">MVR</option>
-                                                        <option value="USD">USD</option>
+                                                        <option value="MVR" {{ $__resortCur === 'MVR' ? 'selected' : '' }}>MVR</option>
+                                                        <option value="USD" {{ $__resortCur === 'USD' ? 'selected' : '' }}>USD</option>
                                                     </select>
                                                    <div id="allowance-currency"></div>
 
@@ -920,11 +922,12 @@
                                         </div>
                                         <div class="col-lg-4 col-sm-6">
                                             <label class="form-label">Currency <span class="req_span">*</span></label>
+                                            @php $__resortCur = Common::GetResortCurrentCurrency() === 'Dollar' ? 'USD' : 'MVR'; @endphp
                                             <select class="form-select select2t-none currency" name="bank[0][currency]" required
                                                 data-parsley-required-message="Currency is required.">
                                                 <option value="">Select Currency</option>
-                                                <option value="MVR">MVR</option>
-                                                <option value="USD">USD</option>
+                                                <option value="MVR" {{ $__resortCur === 'MVR' ? 'selected' : '' }}>MVR</option>
+                                                <option value="USD" {{ $__resortCur === 'USD' ? 'selected' : '' }}>USD</option>
                                             </select>
                                         </div>
                                         <div class="col-lg-4 col-sm-6">

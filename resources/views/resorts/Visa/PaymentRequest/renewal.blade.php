@@ -74,7 +74,7 @@
                                             <div class="col-sm-6">
                                                     <div class="renewal-innerbox">
                                                         <label>Premium</label>
-                                                        <p>MVR {{$EmployeeInsurance->cost ?? 'N/A'}}</p>
+                                                        <p>{!! Common::formatCurrency($EmployeeInsurance->cost ?? 0, 'MVR') !!}</p>
                                                     </div>
                                                 </div>
 

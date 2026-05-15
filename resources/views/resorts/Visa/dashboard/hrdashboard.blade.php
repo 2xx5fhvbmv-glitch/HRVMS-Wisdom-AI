@@ -38,7 +38,7 @@
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         <p class="mb-0  fw-500">{{$VisaWallet->WalletName}}</p>
-                                        <strong>MVR {{$VisaWallet->Amt}}</strong>
+                                        <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'MVR') !!}</strong>
                                     </div>
                                     <a href="#">
                                         <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -51,9 +51,10 @@
                 <div class="col-xl-6">
                     <div class=" card card-visa-management ">
                         <div class=" card-title pb-0">
-                            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                            <div class="d-flex justify-content-between align-items-center w-100 mb-2">
+                                <ul class="nav nav-tabs mb-0" id="myTab" role="tablist">
                                 <li class="nav-item VisaModuleLink" data-id="QuotaSlot" role="presentation" >
-                                    <button class="nav-link active"  id="tab1" data-bs-toggle="tab" 
+                                    <button class="nav-link active"  id="tab1" data-bs-toggle="tab"
                                     data-bs-target="#QuotaSlot" type="button" role="tab" aria-controls="QuotaSlot" aria-selected="true">
                                     Quota Slot Fee</button>
                                 </li>
@@ -76,7 +77,9 @@
                                         type="button" role="tab" aria-controls="tabPane4" aria-selected="false">Work Visa
                                     </button>
                                 </li> --}}
-                            </ul>
+                                </ul>
+                                <a href="{{ route('resort.visa.Expiry') }}" class="a-link ms-2">View All</a>
+                            </div>
                         </div>
                         <div class="tab-content" id="myTabContent">
                         </div>
@@ -107,7 +110,7 @@
                 <div class="col-xl-3 col-sm-6">
                     <div class="card">
                         <div class="card-title">
-                            <h3>Top 3 Nationality</h3>
+                            <h3>Top 3 Nationalities</h3>
                         </div>
                         <div class="incident-chart mb-3">
                             <canvas id="myDoughnutChart"></canvas>
@@ -327,7 +330,14 @@
                         <div class="col-lg-12">
                             <div class="card">
                                 <div class="card-title">
-                                    <h3>Transfer Between Wallet</h3>
+                                    <div class="row justify-content-between align-items-center g-1 w-100 m-0">
+                                        <div class="col p-0">
+                                            <h3>Transfer Between Wallet</h3>
+                                        </div>
+                                        <div class="col-auto p-0">
+                                            <a href="{{ route('resort.visa.TransectionHistoryIndex') }}" class="a-link">View All</a>
+                                        </div>
+                                    </div>
                                 </div>
                            <form id="TransferAmountform"  data-parsley-validate enctype="multipart/form-data">
                                 @csrf
@@ -359,7 +369,7 @@
                                     </div>
 
                                     <div class="col-12">
-                                        <label for="amount" class="form-label">AMOUNT (MVR)</label>
+                                        <label for="amount" class="form-label">AMOUNT ({{ Common::GetResortCurrencySymbol() }})</label>
                                         <input type="text" class="form-control" name="Amt" id="amount" placeholder="Amount" required data-parsley-type="number" data-parsley-min="1" />
                                     </div>
 
@@ -397,7 +407,7 @@
                                 </div>
                                 <div class="row g-md-4 g-3">
                                     <div class="col-md-6">
-                                        <h4>Total: Four Season's</h4>
+                                        <h4>Total: {{ $resortName ?? 'Resort' }}</h4>
                                         <div class="row g-2">
                                             @if($VisaWallets->isNotEmpty())
                                                 @foreach($VisaWallets as $VisaWallet)
@@ -550,14 +560,14 @@
 
                         <div class="mt-3 mb-3">
                             <label class="form-label">Xpat Wallet Amount <span class="red-mark">*</span></label>
-                            <input type="number" min="1" class="form-control" id="Xpact_WalletAmt" name="Xpact_WalletAmt"
+                            <input type="number" min="0" step="0.01" class="form-control" id="Xpact_WalletAmt" name="Xpact_WalletAmt"
                                 placeholder="Wallet Amount"
                                 required
                                 data-parsley-required-message="Amount is required."
                                 data-parsley-type="number"
                                 data-parsley-type-message="Please enter a valid number."
-                                data-parsley-min="1"
-                                data-parsley-min-message="Amount must be at least 1.">
+                                data-parsley-min="0"
+                                data-parsley-min-message="Amount cannot be negative.">
                         </div>
                     </div>
                 </div>
@@ -629,8 +639,15 @@ $(document).ready(function ()
 
    
     $(document).on("click", ".VisaModuleLink", function () {
-        var triggerPoint = $visaNavLink.filter('.active').closest('.VisaModuleLink').data("id") || $visaNavLink.filter('.active').data("id");
-        DasbhoardFlagWiseGetData(triggerPoint,null);
+        // Read data-id from the clicked tab itself. Reading .filter('.active')
+        // here returned the PREVIOUSLY active tab because Bootstrap's
+        // data-bs-toggle="tab" moves the .active class after our click
+        // handler fires — so the AJAX kept re-fetching the same tab's data.
+        var triggerPoint = $(this).data("id");
+        if (!triggerPoint) {
+            triggerPoint = $(this).find('.nav-link').data("id");
+        }
+        DasbhoardFlagWiseGetData(triggerPoint, null);
     });
   
     
@@ -1260,30 +1277,33 @@ $(document).ready(function ()
 
                             
                             
+                            // Inject the active resort currency symbol so the legend matches the
+                            // nav-bar currency switch. Picked up server-side via Blade.
+                            var __resortCurrency = "{{ Common::GetResortCurrencySymbol() }}";
                             let row=  `<div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label">
-                                        <span class="bg-theme"></span>Workpermit - MVR ${workpermit.toLocaleString('en-IN')}
+                                        <span class="bg-theme"></span>Workpermit - ${__resortCurrency} ${workpermit.toLocaleString('en-IN')}
                                     </div>
                                 </div>
                                 <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label">
-                                        <span class="bg-themeSkyblueLight"></span>Slot Fee - MVR ${slot_fee.toLocaleString('en-IN')}
+                                        <span class="bg-themeSkyblueLight"></span>Slot Fee - ${__resortCurrency} ${slot_fee.toLocaleString('en-IN')}
                                     </div>
                                 </div>
                                 <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label">
-                                        <span class="bg-themeYellow"></span>Insurance - MVR ${insurance.toLocaleString('en-IN')}
+                                        <span class="bg-themeYellow"></span>Insurance - ${__resortCurrency} ${insurance.toLocaleString('en-IN')}
                                     </div>
                                 </div>
                                 <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label">
-                                        <span class="bg-themeSkyblue"></span>Work Permit Medical - MVR
+                                        <span class="bg-themeSkyblue"></span>Work Permit Medical - ${__resortCurrency}
                                         ${medical.toLocaleString('en-IN')}
                                     </div>
                                 </div>
                                 <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label fw-bold">
-                                        Total: MVR ${total.toLocaleString('en-IN')}
+                                        Total: ${__resortCurrency} ${total.toLocaleString('en-IN')}
                                     </div>
                                 </div>`
 
@@ -1296,8 +1316,14 @@ $(document).ready(function ()
                 }
             });
         }
-        var ctx = document.getElementById('myDoughnutChart').getContext('2d');
-        // Custom plugin only registered for this chart
+        // NOTE: the placeholder doughnut chart that was initialised here with
+        // dummy ['Lorem Ipsum',...] data has been removed. It used a script-scope
+        // `var myDoughnutChart`, while DoughtnutChart() below assigns to
+        // `window.myDoughnutChart`. The destroy() guard inside DoughtnutChart()
+        // never matched the placeholder, so Chart.js ended up with two
+        // instances on the same canvas and the real chart vanished a moment
+        // after page load. The AJAX-driven chart below is now the single
+        // source of truth for #myDoughnutChart.
         const doughnutLabelsInside = {
             id: 'doughnutLabelsInside',
             afterDraw: function (chart) {
@@ -1359,9 +1385,27 @@ $(document).ready(function ()
                         let totalDeposit = depositPercent.reduce((a, b) => a + b, 0);
                         $('.doughnut-label.fw-bold').html("Total Deposit %: " + totalDeposit.toFixed(2) + '%');
 
-                        if(window.myDoughnutChart) {
+                        // Robust cleanup: use Chart.getChart() so we always
+                        // destroy the Chart instance actually bound to the
+                        // canvas, regardless of what (if anything) lives on
+                        // window.myDoughnutChart. This survives the previous
+                        // placeholder-leak issue where the cached page set
+                        // window.myDoughnutChart to a non-Chart value and
+                        // .destroy() threw "is not a function".
+                        var __existingDoughnut = (typeof Chart !== 'undefined' && Chart.getChart)
+                            ? Chart.getChart('myDoughnutChart')
+                            : null;
+                        if (__existingDoughnut && typeof __existingDoughnut.destroy === 'function') {
+                            __existingDoughnut.destroy();
+                        } else if (window.myDoughnutChart && typeof window.myDoughnutChart.destroy === 'function') {
                             window.myDoughnutChart.destroy();
                         }
+                        window.myDoughnutChart = null;
+
+                        // Reset the legend rows so re-fetching the chart
+                        // doesn't keep appending duplicates (.before() in
+                        // the old code stacked rows on each call).
+                        $('.myDoughnutChartLabel').empty();
 
                         window.myDoughnutChart = new Chart(document.getElementById('myDoughnutChart').getContext('2d'), {
                             type: 'doughnut',
@@ -1398,43 +1442,16 @@ $(document).ready(function ()
                                 ${label} - ${depositPercent[i].toFixed(2)}%
                             </div>`;
                         });
-                        $('.myDoughnutChartLabel').before(legendHtml); // Insert before total
+                        // Replace inside the container (was using .before() which
+                        // appended siblings each call and stacked legends).
+                        $('.myDoughnutChartLabel').html(legendHtml);
                     }
                 }
             });
         }
       
-        // Custom plugin for center text
-        var myDoughnutChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Lorem Ipsum', 'Lorem Ipsum', 'Lorem Ipsum'],
-                datasets: [{
-                    data: [40, 25, 45],
-                    backgroundColor: ['#8DC9C9', '#50b9bf', '#014653'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    doughnutLabelsInside: true, // Enable the custom plugin
-                    legend: {
-                        display: false
-                    }
-                },
-                layout: {
-                    padding: {
-                        top: 10,
-                        bottom: 10,
-                        left: 0,
-                        right: 0
-                    }
-                },
-                // hoverOffset: 30
-            },
-            plugins: [doughnutLabelsInside] // Attach the plugin to this chart only
-        });
+        // Placeholder doughnut removed — see comment above. Real chart is
+        // created inside DoughtnutChart() and assigned to window.myDoughnutChart.
 
 
 

@@ -10,7 +10,7 @@ class WorkPermitMedicalRenewal extends Model
     use HasFactory;
 
     public $table = 'work_permit_medical_renewals';
-    public $fillable = ['resort_id','employee_id','Reference_Number','Amt','Cost','Currency','Medical_Center_name','start_date','end_date','medical_file'];
+    public $fillable = ['resort_id','employee_id','Reference_Number','Amt','Cost','Currency','Medical_Center_name','start_date','end_date','medical_file','Status','paid_date'];
 
     public function WorkPermitMedicalRenewalChild()
     {

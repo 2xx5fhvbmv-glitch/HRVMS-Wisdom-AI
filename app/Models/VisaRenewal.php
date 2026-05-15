@@ -9,7 +9,7 @@ class VisaRenewal extends Model
 {
     use HasFactory;
        public $table = 'visa_renewals';
-    public $fillable = ['resort_id','employee_id','Visa_Number','WP_No','start_date','end_date','visa_file'];
+    public $fillable = ['resort_id','employee_id','Visa_Number','WP_No','start_date','end_date','visa_file','Status','paid_date','Amt'];
 
 
     public function VisaChild()

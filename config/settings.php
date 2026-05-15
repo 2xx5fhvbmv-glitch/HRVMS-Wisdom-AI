@@ -350,6 +350,37 @@ return [
 	'ZW' => 'Zimbabwe',
 	],
 
+	// Country list used by the Visa module only (deposit-rate Excel template,
+	// import validator, nationality dropdown). Independent of `countries`
+	// above (which is used by applicant/employee/recruitment flows). Keep
+	// the two in sync only if product explicitly asks for it.
+	'visa_countries' => [
+		'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia','Australia','Austria','Azerbaijan',
+		'Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize','Benin','Bhutan','Bolivia','Bosnia-Herzegovina','Botswana','Brazil','Brunei','Bulgaria',
+		'Cambodia','Cameroon','Canada','Cape Verde Islands','Chad','Chile','China','Colombia','Congo','Congo, The DRC','Costa Rica',"Cote D'ivoire",'Croatia','Cuba','Cyprus','Czech Republic',
+		'Denmark','Djibouti','Dominica','Dominican Republic',
+		'Ecuador','Egypt','El Salvador','Estonia','Ethiopia',
+		'Fiji','Finland','France',
+		'Gambia','Georgia','Germany','Ghana','Greece','Guatemala','Guinea','Guyana',
+		'Haiti','Honduras','Hungary',
+		'Iceland','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy',
+		'Jamaica','Japan','Jordan',
+		'Kazakhstan','Kenya','Kiribati','Korea, D.P.R.O.','Korea, Republic of','Kosovo','Kuwait','Kyrgyzstan',
+		'Laos','Latvia','Lebanon','Liberia','Libyan Arab Jamahiriya','Liechtenstein','Lithuania','Luxembourg',
+		'Macau','Macedonia','Madagascar','Malawi','Malaysia','Mali','Malta','Mauritania','Mauritius','Mexico','Moldova','Mongolia','Montenegro','Morocco','Mozambique','Myanmar',
+		'Namibia','Nepal','Netherlands','New Zealand','Nicaragua','Niger','Nigeria','Norway',
+		'Oman',
+		'Pakistan','Palau','Palestine','Panama','Papua New Guinea','Paraguay','Peru','Philippines','Poland','Portugal',
+		'Qatar',
+		'Romania','Russia','Rwanda',
+		'Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','Samoa','San Marino','Saudi Arabia','Senegal','Serbia','Seychelles','Sierra Leone','Singapore','Slovakia','Slovenia','Somalia','South Africa','Spain','Sri Lanka','Sudan','Suriname','Swaziland','Sweden','Switzerland','Syria',
+		'Taiwan','Tajikistan','Tanzania','Thailand','Togo','Trinidad and Tobago','Tunisia','Turkey','Turkmenistan',
+		'Uganda','Ukraine','United Arab Emirates','United Kingdom','United States of America','Uruguay','Uzbekistan',
+		'Vanuatu','Venezuela','Vietnam',
+		'Yemen',
+		'Zambia','Zimbabwe',
+	],
+
 	'resort_modules' => [
 		'workforce_planning' => 1,
 		'budget/payroll' => 2,

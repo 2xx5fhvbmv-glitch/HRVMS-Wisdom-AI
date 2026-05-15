@@ -134,10 +134,15 @@ class LiabilitiesController extends Controller
         
                 $totalVisa = $totalInsurance = $totalPermit = $totalMedical = $totalQuota = $totalChecked = 0;
                 $totalInsuranceEmployee = $totalPermitEmployee = $TotalVisaEmployee=$totalMedicalEmployee = $totalQuotaEmployee = 0;
+                // "Total Xpat Employees" must count every active expat at the
+                // resort — the date range filters the LIABILITY rows below
+                // (Work Permit Due_Date, insurance/medical end_date, Visa
+                // end_date, Quota Slot Due_Date), NOT the employee's joining
+                // date. The previous whereBetween('joining_date', ...) was
+                // the root cause of the wrong count flagged on this page.
                 $employees = Employee::with(['resortAdmin', 'position', 'department', 'VisaRenewal.VisaChild', 'WorkPermitMedicalRenewal.WorkPermitMedicalRenewalChild', 'WorkPermit', 'EmployeeInsurance.InsuranceChild', 'QuotaSlotRenewal'])
-                    ->where("nationality", '!=', "Maldivian")
+                    ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
                     ->where('status','Active')
-                    ->whereBetween('joining_date', [$filterStart, $filterEnd])
                     ->where('resort_id', $this->resort->resort_id)
                     ->get()
                     ->map(function ($employee) use (&$totalPermitEmployee,&$totalMedicalEmployee,&$totalQuotaEmployee,&$totalInsuranceEmployee,&$TotalVisaEmployee,&$totalChecked, $flags, $filterStart, $filterEnd, &$totalVisa, &$totalInsurance, &$totalPermit, &$totalMedical, &$totalQuota) {
@@ -181,31 +186,27 @@ class LiabilitiesController extends Controller
                             }
                         }
 
-                        if (in_array('work_permit', $flags)) 
+                        if (in_array('work_permit', $flags))
                         {
-                            $wpEntries = $employee->WorkPermit->sortByDesc('id')->where('Status','Paid'); // all records sorted by id DESC
+                            // Latest paid work permit in the window (for the expiry-status label).
                             $currentWP = $employee->WorkPermit()
                                 ->where('Status', 'Paid')
                                 ->whereBetween('Due_Date', [$filterStart, $filterEnd])
                                 ->orderByDesc('id')
                                 ->first();
 
+                            // Sum of ALL paid work permit fees in the window.
                             $totalWpAmount = $employee->WorkPermit()
                                 ->where('Status', 'Paid')
                                 ->whereBetween('Due_Date', [$filterStart, $filterEnd])
                                 ->sum('Amt');
 
+                            // Was previously two identical if($currentWP) blocks — the
+                            // total got the window-sum AND the latest row added again,
+                            // double-counting the most recent permit. Now added once.
                             if ($currentWP) {
                                 $employee->WorkPermitExpiryDate = '<b>MVR ' . number_format($totalWpAmount, 2) . '</b>' . $this->getFormattedExpiryStatus($currentWP->Due_Date);
                                 $totalPermit += $totalWpAmount;
-                                $hasAnyFlagData = true;
-                           
-                            }
-                            $encodedId = base64_encode($employee->id);
-                            if ($currentWP)
-                            {
-                                $employee->WorkPermitExpiryDate = '<b>MVR ' . number_format($currentWP->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($currentWP->Due_Date);
-                                $totalPermit += $currentWP->Amt;
                                 $hasAnyFlagData = true;
                                 $totalPermitEmployee++;
                             }
@@ -226,9 +227,11 @@ class LiabilitiesController extends Controller
                         if (in_array('slot_payment', $flags)) 
                         {
                             $quotaEntries = $employee->QuotaSlotRenewal->where('Status', 'Paid'); // All paid entries
-                            // Get total amount for quota entries between filter dates
+                            // Filter by Due_Date — quota_slot_renewals has no Expiry_Date
+                            // column, so the old Carbon::parse($item->Expiry_Date) parsed
+                            // null and the date window never matched correctly.
                             $quotaBetweenDates = $quotaEntries->filter(function($item) use ($filterStart, $filterEnd) {
-                                return Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd);
+                                return $item->Due_Date && Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd);
                             });
                             
                             $quotaTotalAmount = $quotaBetweenDates->sum('Amt');
@@ -260,7 +263,11 @@ class LiabilitiesController extends Controller
                                     ];
                         });
 
-                $TotalExpactEmployee       = Employee::whereBetween('joining_date', [$filterStart, $filterEnd])->where('status','Active')->where("nationality", '!=', "Maldivian")->where('resort_id', $this->resort->resort_id)->get()->count();
+                // Total Xpat Employees = every active expat at this resort.
+                // Date window applies to the liability rows, not the employee
+                // joining date (which made the count regress to "employees
+                // who joined this month" — the bug flagged on this page).
+                $TotalExpactEmployee       = Employee::where('status','Active')->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])->where('resort_id', $this->resort->resort_id)->count();
                 $TotalExpactEmployeecounts = $TotalExpactEmployee;
                 $TotalExpactEmployeecounts = $TotalExpactEmployeecounts > 0 ? $TotalExpactEmployeecounts : 1; // zero can not be used in multiplication, so we set it to 1 if zero
 
@@ -362,10 +369,11 @@ class LiabilitiesController extends Controller
 
         $flags = $request->flag;
         $employeeName=array();
+         // Drill-in / per-category employee list also filters liabilities by
+         // the date window, NOT the employee's joining_date.
          $employees = Employee::with(['resortAdmin', 'position', 'department', 'VisaRenewal.VisaChild', 'WorkPermitMedicalRenewal.WorkPermitMedicalRenewalChild', 'WorkPermit', 'EmployeeInsurance.InsuranceChild', 'QuotaSlotRenewal'])
-                    ->where("nationality", '!=', "Maldivian")
+                    ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
                     ->where('status','Active')
-                    ->whereBetween('joining_date', [$filterStart, $filterEnd])
                     ->where('resort_id', $this->resort->resort_id)
                     ->get()
                     ->map(function ($employee) use ( $filterStart,$filterEnd ,$flags, &$employeeName) {
@@ -374,7 +382,22 @@ class LiabilitiesController extends Controller
                         $employeeData = [];
                         $hasAnyFlagData = false;
 
-                        if ('Visa'== $flags) 
+                        // "Total Xpat Employees" header sends flag=All — list every
+                        // active expat unconditionally (no liability-date filter).
+                        // Previously there was no 'All' branch so the modal showed
+                        // "No Employees Found".
+                        if ('All' == $flags)
+                        {
+                            $employeeName[] = [
+                                trim($employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name),
+                                $employee->Emp_id,
+                                $employee->department->name ?? 'N/A',
+                                $employee->position->position_title ?? 'N/A',
+                                Common::getResortUserPicture($employee->resortAdmin->id),
+                            ];
+                        }
+
+                        if ('Visa'== $flags)
                         {
                             $visa = $employee->VisaRenewal;
                             if ($visa && Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) 
@@ -449,9 +472,11 @@ class LiabilitiesController extends Controller
                         if ('QuotaSlot'== $flags) 
                         {
                             $quotaEntries = $employee->QuotaSlotRenewal->where('Status', 'Paid'); // All paid entries
-                            // Get total amount for quota entries between filter dates
+                            // Filter by Due_Date — quota_slot_renewals has no Expiry_Date
+                            // column, so the old Carbon::parse($item->Expiry_Date) parsed
+                            // null and the date window never matched correctly.
                             $quotaBetweenDates = $quotaEntries->filter(function($item) use ($filterStart, $filterEnd) {
-                                return Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd);
+                                return $item->Due_Date && Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd);
                             });
                             
                             $quotaTotalAmount = $quotaBetweenDates->sum('Amt');
@@ -478,16 +503,19 @@ class LiabilitiesController extends Controller
         {
             foreach($employeeName as $employee)
             {
+                // $employee[4] is ALREADY the resolved picture URL — passing it
+                // back through getResortUserPicture() (which expects an id)
+                // broke the image. Use it directly.
                 $row .= '<tr>
-                            <td>'.$employee[1].'</td>
+                            <td>'.e($employee[1]).'</td>
                                 <td>
                                 <div class=" d-flex align-items-center">
-                                        <div class="img-circle"><img src="'.Common::getResortUserPicture($employee[4]).'" alt="user"></div>
+                                        <div class="img-circle"><img src="'.e($employee[4]).'" alt="user"></div>
                                 </div>
                             </td>
-                            <td>'.$employee[0].'</td>
-                            <td>'.$employee[2].'</td>
-                            <td>'.$employee[3].'</td>
+                            <td>'.e($employee[0]).'</td>
+                            <td>'.e($employee[2]).'</td>
+                            <td>'.e($employee[3]).'</td>
                          </tr>';
             }
         }
