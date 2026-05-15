@@ -466,13 +466,11 @@ class DashboardController extends Controller
     {
         $resort_id = $this->resort->resort_id;
 
-        // "Top 3 Nationalities" reflects the actual expat employee population
-        // at the resort, not the configured deposit-rate rows in
-        // `visa_nationalities`. The previous implementation iterated the
-        // deposit-rate config and skipped any nationality the admin had not
-        // explicitly added there — which made the chart blank for resorts
-        // that haven't seeded their deposit list.
-        $top3 = Employee::where('resort_id', $resort_id)
+        // Top Nationalities reflects the actual expat employee population at
+        // the resort (not the configured deposit-rate rows in
+        // visa_nationalities). All nationalities are fetched ranked by count;
+        // the "top 3" cutoff is tie-inclusive — see below.
+        $allCounts = Employee::where('resort_id', $resort_id)
             ->where('status', 'Active')
             ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
             ->whereNotNull('nationality')
@@ -480,8 +478,18 @@ class DashboardController extends Controller
             ->selectRaw('nationality, COUNT(*) as Count')
             ->groupBy('nationality')
             ->orderByDesc('Count')
-            ->limit(3)
             ->get();
+
+        // Tie-inclusive "top 3": if the 3rd-ranked count is shared by other
+        // nationalities, include all of them (so e.g. three nationalities
+        // tied at 3 employees all appear, instead of MySQL arbitrarily
+        // dropping one). When there are 3 or fewer nationalities, show all.
+        if ($allCounts->count() > 3) {
+            $cutoff = (int) $allCounts[2]->Count;
+            $top = $allCounts->filter(fn ($r) => (int) $r->Count >= $cutoff)->values();
+        } else {
+            $top = $allCounts->values();
+        }
 
         $totalActiveEmployees = Employee::where('resort_id', $resort_id)
             ->where('status', 'Active')
@@ -491,11 +499,14 @@ class DashboardController extends Controller
             ->count();
 
         $chartData = [
-            'labels' => $top3->pluck('nationality')->all(),
-            'data' => $top3->pluck('Count')->map(fn ($c) => (int) $c)->all(),
-            'deposit_percent' => $top3->map(function ($r) use ($totalActiveEmployees) {
+            'labels' => $top->pluck('nationality')->all(),
+            'data'   => $top->pluck('Count')->map(fn ($c) => (int) $c)->all(),
+            // Percentage = share of the TOTAL active expat workforce
+            // (count / total), 2-decimal. Slices may not sum to 100% — the
+            // remainder is nationalities below the cutoff.
+            'deposit_percent' => $top->map(function ($r) use ($totalActiveEmployees) {
                 return $totalActiveEmployees > 0
-                    ? round(((int) $r->Count / $totalActiveEmployees) * 100)
+                    ? round(((int) $r->Count / $totalActiveEmployees) * 100, 2)
                     : 0;
             })->all(),
         ];
