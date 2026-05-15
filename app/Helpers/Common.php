@@ -4257,6 +4257,41 @@ class Common
     }
 
     /**
+     * Inverse of convertToDisplayCurrency(): convert an amount the user typed
+     * in the resort's *display* currency back into the currency it is *stored*
+     * in. Use this when persisting a value from a form whose input was shown
+     * in the live display currency.
+     *
+     * @param float  $displayAmount   Amount as entered in the display currency.
+     * @param string $storageCurrency 'MVR' or 'USD' — the currency the column stores.
+     * @return float Amount in the storage currency.
+     */
+    public static function convertToStorageCurrency($displayAmount, $storageCurrency = 'MVR')
+    {
+        $displayAmount = (float) str_replace(',', '', (string) $displayAmount);
+
+        $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
+        if (!$resortId) return round($displayAmount, 2);
+
+        $settings = \App\Models\ResortSiteSettings::where('resort_id', $resortId)->first();
+        if (!$settings) return round($displayAmount, 2);
+
+        $displayCurrency = $settings->currency; // 'MVR' or 'Dollar'
+
+        // Shown in USD, column stores MVR → USD → MVR.
+        if ($displayCurrency !== 'MVR' && strtoupper($storageCurrency) === 'MVR') {
+            return round($displayAmount * (float) $settings->DollertoMVR, 2);
+        }
+        // Shown in MVR, column stores USD → MVR → USD.
+        if ($displayCurrency === 'MVR' && strtoupper($storageCurrency) === 'USD') {
+            return round($displayAmount * (float) $settings->MVRtoDoller, 2);
+        }
+
+        // Display currency already equals storage currency — no conversion.
+        return round($displayAmount, 2);
+    }
+
+    /**
      * Format amount with currency symbol and conversion.
      * Converts from the stored source currency to the resort's active display
      * currency, then prefixes the current symbol ($ / MVR).
@@ -4909,6 +4944,10 @@ class Common
 
     public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null, $skipDbInsert = false)
     {
+        // Initialised up-front so an unrecognised $type can't leave $payload
+        // undefined and fatal-error at the Http::post() call below.
+        $payload = [];
+
         // Only store in ResortNotification if type is NOT 3, AND the caller didn't
         // already insert via Common::nofitication() (which would double the DB rows).
         if ($type != 3 && !$skipDbInsert) {
@@ -5038,9 +5077,27 @@ class Common
             ];
         }
 
-        $baseURL                        =   env('BASE_URL');
-        $response                       =   Http::post($baseURL . 'mob-send-notification', $payload);
-        return $response->json();
+        // No payload was built for this $type — nothing to push. Bail
+        // cleanly instead of POSTing an empty body to the mobile service.
+        if (empty($payload)) {
+            return null;
+        }
+
+        // BASE_URL is optional (unset on local/dev). Skip the outbound push
+        // rather than calling Http::post() with a null base — Guzzle would
+        // throw an invalid-URI exception and 500 the whole request.
+        $baseURL = env('BASE_URL');
+        if (empty($baseURL)) {
+            return null;
+        }
+
+        try {
+            $response = Http::post(rtrim($baseURL, '/') . '/mob-send-notification', $payload);
+            return $response->json();
+        } catch (\Throwable $e) {
+            \Log::warning('sendMobileNotification push failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public static function getMonthlyCheckIn()

@@ -38,7 +38,10 @@ class FundTransferController extends Controller
     {
         $from_wallet = base64_decode($request->from_wallet);
         $to_wallet = base64_decode($request->to_wallet);
-        $Amt      =  $request->Amt;
+        // The AMOUNT field is entered in the resort's display currency; wallet
+        // balances are stored in MVR — convert display → MVR before any math
+        // (balance check, debit, credit, transaction record).
+        $Amt      =  Common::convertToStorageCurrency($request->Amt, 'MVR');
         $comments = $request->comments;
     
         
@@ -105,12 +108,17 @@ class FundTransferController extends Controller
         $resort_id = $this->resort->resort_id;
         $unified  = collect();
 
+        // Folder that wallet-transfer attachments are stored under — see
+        // VisaWalletToWalletTransfer(): config('settings.FundTransfer')/<resort_id>.
+        $resortFolder = optional($this->resort->resort)->resort_id;
+        $fundTransferBase = config('settings.FundTransfer');
+
         // ── 1. Wallet → Wallet transfers (and wallet → employee refunds) ──
         VisaTransectionHistory::with(['toWallet', 'fromWallet'])
             ->where('resort_id', $resort_id)
             ->orderBy('id', 'desc')
             ->get()
-            ->each(function ($t) use (&$unified) {
+            ->each(function ($t) use (&$unified, $resortFolder, $fundTransferBase) {
                 $fromLabel = !empty($t->fromWallet) ? $t->fromWallet->WalletName : 'Wallet Not Found';
 
                 if (!$t->to_wallet) {
@@ -123,11 +131,19 @@ class FundTransferController extends Controller
                     $toLabel = !empty($t->toWallet) ? $t->toWallet->WalletName : 'Wallet Not Found';
                 }
 
+                $attachment = '—';
+                if (!empty($t->file)) {
+                    $fileUrl = url($fundTransferBase . '/' . $resortFolder . '/' . $t->file);
+                    $attachment = '<a href="' . e($fileUrl) . '" target="_blank" rel="noopener">View</a>';
+                }
+
                 $unified->push((object) [
                     'Date'       => optional($t->Payment_Date)->format('d M Y') ?: '',
                     'FromWallet' => $fromLabel,
                     'ToWallet'   => $toLabel,
                     'Amount'     => (float) $t->Amt,
+                    'Comment'    => !empty($t->comments) ? e($t->comments) : '—',
+                    'Attachment' => $attachment,
                     'sort_ts'    => optional($t->Payment_Date)->timestamp ?? 0,
                 ]);
             });
@@ -153,6 +169,8 @@ class FundTransferController extends Controller
                     'FromWallet' => '—',
                     'ToWallet'   => $feeRecipientLabel($r->employee, 'Work Permit Fee'),
                     'Amount'     => (float) $r->Amt,
+                    'Comment'    => '—',
+                    'Attachment' => '—',
                     'sort_ts'    => $date ? Carbon::parse($date)->timestamp : 0,
                 ]);
             });
@@ -169,6 +187,8 @@ class FundTransferController extends Controller
                     'FromWallet' => '—',
                     'ToWallet'   => $feeRecipientLabel($r->employee, 'Slot Fee'),
                     'Amount'     => (float) $r->Amt,
+                    'Comment'    => '—',
+                    'Attachment' => '—',
                     'sort_ts'    => $date ? Carbon::parse($date)->timestamp : 0,
                 ]);
             });
@@ -185,6 +205,8 @@ class FundTransferController extends Controller
                     'FromWallet' => '—',
                     'ToWallet'   => $feeRecipientLabel($r->employee, 'Insurance Premium'),
                     'Amount'     => (float) $r->Premium,
+                    'Comment'    => '—',
+                    'Attachment' => '—',
                     'sort_ts'    => $date ? Carbon::parse($date)->timestamp : 0,
                 ]);
             });
@@ -201,6 +223,8 @@ class FundTransferController extends Controller
                     'FromWallet' => '—',
                     'ToWallet'   => $feeRecipientLabel($r->employee, 'Work Permit Medical'),
                     'Amount'     => (float) $r->Amt,
+                    'Comment'    => '—',
+                    'Attachment' => '—',
                     'sort_ts'    => $date ? Carbon::parse($date)->timestamp : 0,
                 ]);
             });
@@ -217,6 +241,8 @@ class FundTransferController extends Controller
                     'FromWallet' => '—',
                     'ToWallet'   => $feeRecipientLabel($r->employee, 'Visa Renewal'),
                     'Amount'     => (float) $r->Amt,
+                    'Comment'    => '—',
+                    'Attachment' => '—',
                     'sort_ts'    => $date ? Carbon::parse($date)->timestamp : 0,
                 ]);
             });
@@ -230,7 +256,9 @@ class FundTransferController extends Controller
                 ->editColumn('FromWallet', fn ($row) => $row->FromWallet)
                 ->editColumn('ToWallet', fn ($row) => $row->ToWallet)
                 ->editColumn('Amount', fn ($row) => number_format(Common::convertToDisplayCurrency($row->Amount, 'MVR'), 2))
-                ->rawColumns(['Date', 'FromWallet', 'ToWallet', 'Amount'])
+                ->editColumn('Comment', fn ($row) => $row->Comment)
+                ->editColumn('Attachment', fn ($row) => $row->Attachment)
+                ->rawColumns(['Date', 'FromWallet', 'ToWallet', 'Amount', 'Comment', 'Attachment'])
                 ->make(true);
         }
     }

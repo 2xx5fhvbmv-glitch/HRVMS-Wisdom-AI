@@ -44,6 +44,8 @@
                                     <th class="text-nowrap">From Wallet</th>
                                     <th class="text-nowrap">To Wallet</th>
                                     <th class="text-nowrap">Amount ({{ Common::GetResortCurrencySymbol() }})</th>
+                                    <th class="text-nowrap">Comment</th>
+                                    <th class="text-nowrap">Attachment</th>
                                 </tr>
                             </thead>
                         </table>
@@ -75,7 +77,9 @@ $(document).ready(function () {
         iDisplayLength: 25,
         processing: true,
         serverSide: true,
-        order: [[0, 'desc']],
+        // Controller already returns the unified feed sorted newest-first
+        // (sortByDesc on the transaction timestamp); no client-side ordering.
+        ordering: false,
         ajax: {
             url: '{{ route("resort.visa.TransectionHistory") }}',
             type: 'GET'
@@ -85,7 +89,8 @@ $(document).ready(function () {
             { data: 'FromWallet', name: 'FromWallet', className: 'text-nowrap' },
             { data: 'ToWallet', name: 'ToWallet', className: 'text-nowrap' },
             { data: 'Amount', name: 'Amount', className: 'text-nowrap' },
-            { data: 'created_at', visible: false, searchable: false }
+            { data: 'Comment', name: 'Comment' },
+            { data: 'Attachment', name: 'Attachment', orderable: false, searchable: false, className: 'text-nowrap' },
         ]
     });
 });

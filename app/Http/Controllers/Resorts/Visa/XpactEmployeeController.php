@@ -66,7 +66,7 @@ class XpactEmployeeController extends Controller
                                 {
                                     $query->where('status', $status);
                                 })
-                                ->when(!empty($departmentFilter), function ($query) use ($departmentFilter)
+                                ->when(!empty($departmentFilter) && $departmentFilter != 'all', function ($query) use ($departmentFilter)
                                 {
                                     $query->whereHas('department', function ($q) use ($departmentFilter) {
                                         $q->where('id', $departmentFilter);
