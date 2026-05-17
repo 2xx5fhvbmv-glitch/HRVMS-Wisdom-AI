@@ -11,6 +11,8 @@ use App\Models\Announcement;
 use App\Models\AnnouncementCategory;
 use App\Models\ResortPosition;
 use App\Models\EmployeeResignationWithdrawalConfig;
+use App\Models\LetterheadSetting;
+use App\Helpers\Common;
 
 use Auth;
 use Config;
@@ -198,5 +200,110 @@ class ConfigController extends Controller
             'status' => 'success',
             'message' => 'Configuration updated successfully.',
         ]);
+    }
+
+    /**
+     * Letterhead & E-signature configuration screen.
+     *
+     * Per-resort branded letterhead (header/footer images), stored e-signature
+     * image and signatory block used by document/letter PDFs (Transfer Letter
+     * today; Probation / Promotion can adopt it via Common::getLetterheadData()).
+     */
+    public function letterheadIndex()
+    {
+        $page_title = 'Letterhead & Signature';
+        $letterhead = LetterheadSetting::where('resort_id', $this->resort->resort_id)->first();
+
+        return view('resorts.people.config.letterhead', compact('page_title', 'letterhead'));
+    }
+
+    /**
+     * Store / update the resort's Letterhead & E-signature configuration.
+     * Images accept heic/heif (the app is HEIC-friendly site-wide).
+     */
+    public function letterheadStore(Request $request)
+    {
+        // No `image` rule — it rejects SVG/HEIC; mimes covers the allowed set
+        // and matches the site-wide HEIC-friendly upload convention.
+        $imageRule = 'nullable|file|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120';
+
+        $validator = Validator::make($request->all(), [
+            'header_image'    => $imageRule,
+            'footer_image'    => $imageRule,
+            'signature_image' => $imageRule,
+            'signatory_name'  => 'nullable|string|max:150',
+            'signatory_title' => 'nullable|string|max:150',
+            'address_line1'   => 'nullable|string|max:255',
+            'address_line2'   => 'nullable|string|max:255',
+            'contact_phone'   => 'nullable|string|max:100',
+            'contact_email'   => 'nullable|email|max:150',
+            'website'         => 'nullable|string|max:150',
+        ], [
+            'header_image.mimes'    => 'The header image must be of type: jpeg, jpg, png, gif, svg, webp, heic, heif.',
+            'footer_image.mimes'    => 'The footer image must be of type: jpeg, jpg, png, gif, svg, webp, heic, heif.',
+            'signature_image.mimes' => 'The signature image must be of type: jpeg, jpg, png, gif, svg, webp, heic, heif.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $resortId = $this->resort->resort_id;
+
+        DB::beginTransaction();
+        try {
+            $setting = LetterheadSetting::firstOrNew(['resort_id' => $resortId]);
+
+            // Relative-to-public directory, one per resort.
+            $relativeDir = 'uploads/letterheads/' . $resortId;
+            $absoluteDir = public_path($relativeDir);
+
+            foreach (['header_image', 'footer_image', 'signature_image'] as $field) {
+                if ($request->hasFile($field)) {
+                    $file = $request->file($field);
+                    $fileName = $field . '_' . substr(md5(uniqid('', true)), 0, 10)
+                        . '.' . strtolower($file->getClientOriginalExtension());
+
+                    Common::uploadFile($file, $fileName, $absoluteDir);
+
+                    // Remove the previous image so old files don't pile up.
+                    $old = $setting->{$field};
+                    if (!empty($old) && is_file(public_path($old))) {
+                        @unlink(public_path($old));
+                    }
+
+                    $setting->{$field} = $relativeDir . '/' . $fileName;
+                }
+            }
+
+            $setting->signatory_name  = $request->input('signatory_name');
+            $setting->signatory_title = $request->input('signatory_title');
+            $setting->address_line1   = $request->input('address_line1');
+            $setting->address_line2   = $request->input('address_line2');
+            $setting->contact_phone   = $request->input('contact_phone');
+            $setting->contact_email   = $request->input('contact_email');
+            $setting->website         = $request->input('website');
+            $setting->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Letterhead & signature settings saved successfully.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency('File: ' . $e->getFile());
+            \Log::emergency('Line: ' . $e->getLine());
+            \Log::emergency('Message: ' . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to save letterhead settings.',
+            ], 500);
+        }
     }
 }

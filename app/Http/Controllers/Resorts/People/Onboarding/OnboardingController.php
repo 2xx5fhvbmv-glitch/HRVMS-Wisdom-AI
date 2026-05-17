@@ -57,31 +57,79 @@ class OnboardingController extends Controller
         $resort_id = $this->resort->resort_id;
         $search = $request->search;
 
+        // Step 1 must list the selected candidates from the Talent Acquisition
+        // module — i.e. applicants whose LATEST status is 'Contract Accepted' —
+        // not the employees table. This is what surfaces every accepted hire
+        // regardless of collar type (blue collar / Headhunting / agency etc.),
+        // because the TA pipeline tracks all of them while the employees table
+        // only ever held a subset.
+        //
+        // The downstream onboarding itinerary flow (storeItinerary, getEmployee
+        // Details, sendOnboardingNotifications, EmployeeItineraries.employee_id
+        // FK, joining-date validation) is strictly coupled to an Employee row,
+        // so we only allow SELECTING applicants that already have a matching
+        // Employee record. Applicants without one are still shown but disabled
+        // with a hint (the employee record must be created first).
         $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
-        $query = Employee::with(['resortAdmin', 'department', 'position'])
-            ->where('resort_id', $resort_id)
-            ->whereDate('joining_date', '>', \Carbon\Carbon::today())
-            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('resortAdmin', function ($q2) use ($search) {
-                    $q2->where('first_name', 'like', "%$search%")
-                        ->orWhere('last_name', 'like', "%$search%");
-                })
-                ->orWhere('joining_date', 'like', "%$search%")
-                ->orWhereHas('position', function ($q3) use ($search) {
-                    $q3->where('position_title', 'like', "%$search%");
-                })
-                ->orWhereHas('department', function ($q4) use ($search) {
-                    $q4->where('name', 'like', "%$search%"); // Use correct column
+        $applicants = DB::table('applicant_wise_statuses as t1')
+            ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
+            ->leftJoin('vacancies as v', 'v.id', '=', 't2.Parent_v_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'v.position')
+            ->leftJoin('resort_departments as d', 'd.id', '=', 'v.department')
+            ->where('t2.resort_id', $resort_id)
+            ->where('t1.status', 'Contract Accepted')
+            // Only the latest status row per applicant must be 'Contract Accepted'.
+            ->whereRaw('t1.id = (SELECT MAX(s.id) FROM applicant_wise_statuses s WHERE s.Applicant_id = t1.Applicant_id)')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('v.department', $scopedDeptIds))
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($w) use ($search) {
+                    $w->where('t2.first_name', 'like', "%$search%")
+                        ->orWhere('t2.last_name', 'like', "%$search%")
+                        ->orWhere('p.position_title', 'like', "%$search%")
+                        ->orWhere('d.name', 'like', "%$search%");
                 });
-            });
-        }
+            })
+            ->groupBy('t1.Applicant_id')
+            ->select(
+                't2.id as applicant_id',
+                't2.first_name',
+                't2.last_name',
+                't2.passport_no',
+                't2.email',
+                't2.passport_photo',
+                't2.Joining_availability',
+                'p.position_title',
+                'd.name as department_name'
+            )
+            ->get();
 
-        $upcoming_employees = $query->get();
+        // Match each accepted applicant to an existing Employee record so the
+        // downstream itinerary flow (which needs employees.id) keeps working.
+        $upcoming_candidates = $applicants->map(function ($a) use ($resort_id) {
+            $employee = null;
+            if (!empty($a->passport_no)) {
+                $employee = Employee::with(['resortAdmin', 'department', 'position'])
+                    ->where('resort_id', $resort_id)
+                    ->where('passport_number', $a->passport_no)
+                    ->first();
+            }
+            if (!$employee && !empty($a->email)) {
+                // employees has no `email` column — the email lives on the
+                // linked ResortAdmin record, so match through that relation.
+                $employee = Employee::with(['resortAdmin', 'department', 'position'])
+                    ->where('resort_id', $resort_id)
+                    ->whereHas('resortAdmin', fn($q) => $q->where('email', $a->email))
+                    ->first();
+            }
 
-        $view = view('resorts.renderfiles.upcoming-employees', compact('upcoming_employees'))->render();
+            $a->employee = $employee;
+            $a->employee_id = $employee->id ?? null;
+            $a->full_name = trim(($a->first_name ?? '') . ' ' . ($a->last_name ?? ''));
+            return $a;
+        });
+
+        $view = view('resorts.renderfiles.upcoming-employees', compact('upcoming_candidates'))->render();
 
         return response()->json(['html' => $view]);
     }
@@ -117,7 +165,11 @@ class OnboardingController extends Controller
         $page_title ='Onboarding Configuration';
         $resort_id = $this->resort->resort_id;
         $notificationTimings = config('settings.notificationTiming'); // access the config array
-        return view('resorts.people.onboarding.config',compact('page_title','resort_id','notificationTimings'));
+        // Load the saved Cultural Insights so it pre-fills the editor. The
+        // view reads $termsAndCondition->cultural_insights; without this the
+        // variable was undefined and the saved text "disappeared" on reload.
+        $termsAndCondition = CulturalInsights::where('resort_id', $resort_id)->first();
+        return view('resorts.people.onboarding.config',compact('page_title','resort_id','notificationTimings','termsAndCondition'));
     }
 
     public function create()
@@ -296,24 +348,39 @@ class OnboardingController extends Controller
             'notification_timing.*' => 'nullable|string|max:255'
         ]);
 
-        foreach ($request->events as $key => $eventName) {
-            $checkEvent = OnboardingEvents::where('resort_id', $this->resort->resort_id)
-                ->where('event_name', $eventName)   
-                ->first();
-                
-            if ($checkEvent) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Event "' . $eventName . '" already exists.',
-                ], 400);
-            }
+        // Validate ALL events for duplicates BEFORE creating any — the loop
+        // previously returned on the first duplicate after already having
+        // created the events before it, leaving a partial save.
+        $existing = OnboardingEvents::where('resort_id', $this->resort->resort_id)
+            ->whereIn('event_name', $request->events)
+            ->pluck('event_name')
+            ->all();
 
-            OnboardingEvents::create([
-                'resort_id' => $this->resort->resort_id,
-                'event_name' => $eventName,
-                'notification_time' => $request->notification_timing[$key] ?? null,
-            ]);
+        if (!empty($existing)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Event "' . implode('", "', $existing) . '" already exists.',
+            ], 400);
         }
+
+        // Reject duplicates inside the submitted batch too.
+        $dupeInBatch = array_diff_assoc($request->events, array_unique($request->events));
+        if (!empty($dupeInBatch)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Duplicate event name in the submitted list: "' . implode('", "', array_unique($dupeInBatch)) . '".',
+            ], 400);
+        }
+
+        DB::transaction(function () use ($request) {
+            foreach ($request->events as $key => $eventName) {
+                OnboardingEvents::create([
+                    'resort_id' => $this->resort->resort_id,
+                    'event_name' => $eventName,
+                    'notification_time' => $request->notification_timing[$key] ?? null,
+                ]);
+            }
+        });
 
         return response()->json([
             'success' => true,

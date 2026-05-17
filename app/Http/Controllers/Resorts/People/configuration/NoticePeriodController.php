@@ -65,15 +65,44 @@ class NoticePeriodController extends Controller
     public function store(Request $request){
          $data = $request->notice_periods;
 
+        if (!is_array($data) || empty($data)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No notice period rows submitted.',
+            ], 422);
+        }
+
         foreach ($data as $key => $value) {
+            // Mirror update()'s logic: an "immediate release" notice period
+            // has no period — store() previously kept the posted days value,
+            // leaving a stray period on immediate-release rows.
+            $immediateRelease = @$value['immediate_release'] ?? 0;
+
+            // Server-side guard mirroring the frontend rule: a row needs a
+            // title, and a positive days value unless immediate release is
+            // enabled. Previously this was JS-only and a bypassed request
+            // could persist a meaningless row.
+            if (empty($value['title'])) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Title is required for every notice period row.',
+                ], 422);
+            }
+            if ($immediateRelease != '1' && (!isset($value['days']) || !is_numeric($value['days']) || $value['days'] <= 0)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Notice period days must be a positive number unless Immediate Release is enabled.',
+                ], 422);
+            }
+
             $emp_notice_period = EmployeeNoticePeriod::updateOrCreate(
             [
                 'resort_id' => $this->resort->resort_id,
                 'title' => $value['title'],
             ],
             [
-                'period' => @$value['days'],
-                'immediate_release' => @$value['immediate_release'] ?? 0,
+                'period' => $immediateRelease == '1' ? null : (@$value['days']),
+                'immediate_release' => $immediateRelease,
             ]
         );
         }

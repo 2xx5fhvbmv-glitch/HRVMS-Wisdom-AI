@@ -993,7 +993,7 @@ class EmployeeController extends Controller
     {
         $request->validate([
             'leave_destination' => 'nullable|string|max:255',
-            'biometric_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf',
+            'biometric_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif,pdf',
             'languages.*.language' => 'required|string',
             'languages.*.proficiency_level' => 'required|string',
         ]);
@@ -1313,7 +1313,7 @@ class EmployeeController extends Controller
             'degree' => 'nullable|string|max:255',
             'attendance_period' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
-            'certificate' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+            'certificate' => 'nullable|file|mimes:pdf,jpg,jpeg,png,gif,svg,webp,heic,heif|max:2048',
         ]);
 
         $education = new EmployeeEducation();
@@ -1451,7 +1451,7 @@ class EmployeeController extends Controller
     public function extractDetails(Request $request){
 
         $request->validate([
-            'document' => 'required|mimes:pdf,jpg,jpeg,png|max:20480',
+            'document' => 'required|mimes:pdf,jpg,jpeg,png,gif,svg,webp,heic,heif|max:20480',
         ]);
 
         $file = $request->file('document');

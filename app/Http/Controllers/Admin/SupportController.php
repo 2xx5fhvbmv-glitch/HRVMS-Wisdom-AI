@@ -377,7 +377,7 @@ class SupportController extends Controller
             'ticket_id' => 'required|exists:support,id',
             'body' => 'required|string',
             'subject' => 'nullable|string|max:255',
-            'attachment.*' => 'nullable|file|mimes:jpg,jpeg,png,pdf,doc,docx|max:32768', // Allow multiple files
+            'attachment.*' => 'nullable|file|mimes:jpg,jpeg,png,heic,heif,pdf,doc,docx|max:32768', // Allow multiple files
         ]);
 
         $ticket = Support::with(['createdBy.GetEmployee','assignedAdmin','support_category'])->findOrFail($request->ticket_id);

@@ -1321,7 +1321,7 @@ class LeaveController extends Controller
         if ($rules['destination'] !== 'hidden') {
             $validatorRules['destination'] = 'nullable|string|max:255';
         }
-        $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png|max:5120';
+        $validatorRules['attachments'] = ($rules['attachment'] === 'mandatory') ? 'required|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120' : 'nullable|file|mimes:pdf,doc,docx,jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120';
 
         $validator = Validator::make($request->all(), $validatorRules);
         if ($validator->fails()) {

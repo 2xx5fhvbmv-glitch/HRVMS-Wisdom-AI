@@ -13,6 +13,14 @@ class CreateWebSocketsStatisticsEntriesTable extends Migration
      */
     public function up()
     {
+        // Idempotency guard — the table is created by the production DB
+        // import before this migration gets recorded in the `migrations`
+        // table, so a plain Schema::create() makes `php artisan migrate`
+        // abort with "table already exists". Skip when it already exists.
+        if (Schema::hasTable('websockets_statistics_entries')) {
+            return;
+        }
+
         Schema::create('websockets_statistics_entries', function (Blueprint $table) {
             $table->increments('id');
             $table->string('app_id');

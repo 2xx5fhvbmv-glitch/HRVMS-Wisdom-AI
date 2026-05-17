@@ -111,10 +111,10 @@ class JobAdvertisementController extends Controller
     public function StoreJobAvd(Request $request)
     {
         $validator =  Validator::make($request->all(), [
-            'Jobadvimg' => 'required|file|mimes:jpg,jpeg,png,gif|max:2048',
+            'Jobadvimg' => 'required|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif|max:2048',
         ], [
             'Jobadvimg.max' => 'The file size must not exceed 2MB.',
-            'Jobadvimg.mimes' => 'The file must be an image (jpg, jpeg, png, gif)',
+            'Jobadvimg.mimes' => 'The file must be an image (jpg, jpeg, png, gif, svg, webp, heic, heif)',
             'Jobadvimg.required' => 'Please select an image',
         ]);
         if($validator->fails())

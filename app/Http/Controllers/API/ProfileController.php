@@ -250,10 +250,10 @@ class ProfileController extends Controller
 
       $validator = Validator::make($request->all(),
       [
-        'profile_image' => 'required|file|mimes:jpg,jpeg,png',
+        'profile_image' => 'required|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif',
       ],
       [
-        'profile_image.mimes' => 'The image must be a type of:jpg,jpeg,png',
+        'profile_image.mimes' => 'The image must be a type of:jpg,jpeg,png,gif,svg,webp,heic,heif',
       ]);
 
     if ($validator->fails()) {

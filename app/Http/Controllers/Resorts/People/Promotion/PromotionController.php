@@ -223,7 +223,10 @@ class PromotionController extends Controller
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
         $loggedInEmployee = $this->resort->getEmployee;
-        $loggedInUserId = $loggedInEmployee->id;
+        // Guard against an admin account with no linked employee record —
+        // $loggedInEmployee->id threw "property 'id' on null" and 500'd the
+        // whole Promotion List page for such users.
+        $loggedInUserId = $loggedInEmployee->id ?? null;
         $rank = config('settings.Position_Rank');
         $current_rank = $loggedInEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';

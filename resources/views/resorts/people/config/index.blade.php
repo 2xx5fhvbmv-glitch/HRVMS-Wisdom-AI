@@ -66,6 +66,7 @@
                             </div>
                         </div>
 
+                        {{-- Reminders section hidden for now (per request).
                         <div class="card mb-30">
                             <div class="card-title">
                                 <div class="row g-2">
@@ -103,6 +104,7 @@
                                 </a>
                             </div>
                         </div>
+                        --}}
 
                         <div class="card mb-30 card-resigSettPeopleEmp">
                             <div class="card-title">
@@ -309,7 +311,7 @@
                             </div>
                         </div>
 
-                        <div class="card">
+                        <div class="card mb-30">
                             <div class="card-title">
                                 <div class="row g-2">
                                     <div class="col">
@@ -321,6 +323,22 @@
                             <div class="row g-2 mb-md-4 mb-3">
                                 <div class="col-12">
                                     <a href="{{route('people.exit-clearance.create')}}" class="btn btn-themeSkyblue btn-sm">Create Exit Clearance Form Template</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">
+                                <div class="row g-2">
+                                    <div class="col">
+                                        <h3 class="text-nowrap">Letterhead &amp; Signature</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="mb-3">Configure the branded letterhead, e-signature image and signatory details used on document/letter PDFs (e.g. the Transfer Letter).</p>
+                            <div class="row g-2 mb-md-4 mb-3">
+                                <div class="col-12">
+                                    <a href="{{route('people.config.letterhead')}}" class="btn btn-themeSkyblue btn-sm">Configure Letterhead &amp; Signature</a>
                                 </div>
                             </div>
                         </div>

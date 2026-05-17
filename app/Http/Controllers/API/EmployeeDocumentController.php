@@ -25,11 +25,11 @@ class EmployeeDocumentController extends Controller
 
         $validator = Validator::make($request->all(), [
             'document_title' => 'required',
-            'document_path' => 'required|file|mimes:xls,xlsx,pdf,jpg,jpeg,png',
+            'document_path' => 'required|file|mimes:xls,xlsx,pdf,jpg,jpeg,png,heic,heif',
             'document_category' => 'required',
         ],
             [
-            'document_path.mimes' => 'The Benifit Grid file must be a type of: xls, xlsx ,pdf,jpg,jpeg,png',
+            'document_path.mimes' => 'The Benifit Grid file must be a type of: xls, xlsx ,pdf,jpg,jpeg,png,heic,heif',
         ]);
 
         if ($validator->fails()) {

@@ -1563,6 +1563,10 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
        Route::post('/people/configuration/resignation-withdrawal', 'People\ConfigController@EmployeeResignationWithdrawalConfigStore')->name('people.config.resignation-withdrawal-config');
 
+       // Letterhead & E-signature configuration (used by document/letter PDFs).
+       Route::get('/people/configuration/letterhead', 'People\ConfigController@letterheadIndex')->name('people.config.letterhead');
+       Route::post('/people/configuration/letterhead/store', 'People\ConfigController@letterheadStore')->name('people.config.letterhead.store');
+
       //  Exit Clearance Module configuration
       Route::get('/people/exit-clearance-forms', 'People\configuration\ExitClearanceController@index')->name('people.exit-clearance.index');
       Route::get('/people/exit-clearance/list', 'People\configuration\ExitClearanceController@list')->name('people.exit-clearance.list');
@@ -1717,10 +1721,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
          Route::post('people/employee/transfer-history', 'People\Transfer\TransferController@getEmployeeTransferHistory')->name('employee.transfer.history');
          Route::post('people/employee/transfer-stats', 'People\Transfer\TransferController@getTransferStats')->name('employee.transfer.stats');
          Route::post('people/employee/transfer-type-chart', 'People\Transfer\TransferController@getTransferTypeStats')->name('employee.transfer.type.chart');
-         Route::post('people/transfer/{id}/{action}', 'People\Transfer\TransferController@handleApproval')->name('people.transfer.handle-approval');
          Route::post('people/transfer/check-budget', 'People\Transfer\TransferController@checkBudget')->name('transfer.checkBudget');
          Route::post('people/transfer/get-reporting-managers', 'People\Transfer\TransferController@getReportingManagers')->name('resort.get.reporting_managers');
+         Route::post('people/transfer/get-position-budget', 'People\Transfer\TransferController@getPositionBudgetInfo')->name('transfer.positionBudget');
          Route::get('/people/transfer/history', 'People\Transfer\TransferController@history')->name('people.transfer.history');
+         Route::get('/people/transfer/{id}/download-letter', 'People\Transfer\TransferController@downloadTransferLetter')->name('people.transfer.download-letter');
+         Route::post('people/transfer/{id}/{action}', 'People\Transfer\TransferController@handleApproval')->name('people.transfer.handle-approval')->where('id', '[0-9]+');
 
 
 

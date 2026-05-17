@@ -446,14 +446,14 @@
                            <div class="mt-3 mb-3">
                                 <label for="DocumentFile" class="form-label">File <span class="red-mark">*</span></label>
                                 <input type="file" class="form-control" id="DocumentFile" name="DocumentFile" 
-                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/heic,image/heif"
                                     required 
                                     data-parsley-required-message="Please upload a document." 
                                     data-parsley-errors-container="#div-DocumentFile"
                                     data-parsley-max-file-size="5" 
                                     data-parsley-max-file-size-message="File size must not exceed 5MB."
-                                    data-parsley-fileextension="pdf,jpg,jpeg,png"
-                                    data-parsley-fileextension-message="Only PDF, JPG, JPEG or PNG files are allowed.">
+                                    data-parsley-fileextension="pdf,jpg,jpeg,png,gif,svg,webp,heic,heif"
+                                    data-parsley-fileextension-message="Only PDF, JPG, JPEG, PNG, GIF, SVG, WEBP, HEIC or HEIF files are allowed.">
                                 <div id="div-DocumentFile" class="text-danger"></div>
                                 <small class="form-text text-muted">Accepted formats: PDF, JPG, JPEG, PNG. Maximum size: 5MB</small>
 

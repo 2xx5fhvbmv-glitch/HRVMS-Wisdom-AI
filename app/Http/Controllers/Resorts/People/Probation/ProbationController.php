@@ -43,7 +43,7 @@ class ProbationController extends Controller
         {
             $query = Employee::with(['position', 'department','resortAdmin'])
                     ->where('resort_id', $this->resort->resort_id)
-                    ->where('employment_type', 'Probationary')
+                    ->whereIn('probation_status', ['Active', 'Extended', 'Confirmed', 'Failed'])
                     ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
             if ($request->filled('department_id')) {
@@ -73,7 +73,17 @@ class ProbationController extends Controller
             if(Common::checkRouteWisePermission('people.probation',config('settings.resort_permissions.view')) == false){
                 $edit_class = 'd-none';
             }
-                    
+
+            // --- Onboarding training (L&D) pre-resolution -----------------------------
+            // Resolve the resort's probationary learning programs ONCE here, outside the
+            // per-row DataTables closure. The probationary programs (and the training
+            // schedules backing them) are the same for every row, so doing this once
+            // keeps the per-row work to a single COUNT query.
+            $resortId = $this->resort->resort_id;
+            $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resortId)
+                ->pluck('program_id');
+            $probationaryProgramCount = $probationaryProgramIds->count();
+
             return datatables()->of($query)
                 ->addColumn('employee_id', fn($row) => '#'.$row->Emp_id)
                 ->addColumn('employee_name', fn($row) => '
@@ -90,15 +100,43 @@ class ProbationController extends Controller
                     return $date->format('d M Y') . ' (' . $date->diffForHumans(null, true) . ')';
                 })
                 ->addColumn('probation_end_date', function ($row) {
+                    // Carbon::parse(null) silently returns "now", which made
+                    // every employee with no probation_end_date show today's
+                    // date. Show a clear placeholder instead.
+                    if (empty($row->probation_end_date)) {
+                        return 'Not set';
+                    }
                     $end = \Carbon\Carbon::parse($row->probation_end_date);
                     return $end->format('d M Y') . ' (' . $end->diffForHumans(null, true) . ')';
                 })
-                ->addColumn('onboarding_training', function ($row) {
-                    // Use training_id from MonthlyCheckingModel
-                    $latest = MonthlyCheckingModel::where('emp_id', $row->id)->latest()->first();
-                    return $latest?->tranining_id
-                        ? '<span class="badge badge-themeSuccess">Completed</span>'
-                        : '<span class="badge badge-themeDangerNew">Not Started</span>';
+                ->addColumn('onboarding_training', function ($row) use ($resortId, $probationaryProgramIds, $probationaryProgramCount) {
+                    // Reflects the employee's progress on the resort's probationary
+                    // (onboarding) learning programs. A program counts as completed when
+                    // the employee has a training_attendance record with status='Present'
+                    // on a TrainingSchedule backed by that program — the same definition
+                    // the Learning dashboard uses (DashboardController@computeCompulsoryCompletionPercent).
+                    if ($probationaryProgramCount === 0) {
+                        // No probationary programs configured for this resort.
+                        return '<span class="badge badge-themeDangerNew">Not Started</span>';
+                    }
+
+                    // Distinct probationary programs this employee has completed.
+                    $completedPrograms = \DB::table('training_attendance as ta')
+                        ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                        ->where('ts.resort_id', $resortId)
+                        ->whereIn('ts.training_id', $probationaryProgramIds)
+                        ->where('ta.employee_id', $row->id)
+                        ->where('ta.status', 'Present')
+                        ->distinct()
+                        ->count('ts.training_id');
+
+                    if ($completedPrograms >= $probationaryProgramCount) {
+                        return '<span class="badge badge-themeSuccess">Completed</span>';
+                    }
+                    if ($completedPrograms > 0) {
+                        return '<span class="badge badge-info">In Progress</span>';
+                    }
+                    return '<span class="badge badge-themeDangerNew">Not Started</span>';
                 })
                 ->addColumn('monthly_checkin_status', function ($row) use ($request) {
                     $month = $request->get('month') ?? Carbon::now()->format('Y-m');

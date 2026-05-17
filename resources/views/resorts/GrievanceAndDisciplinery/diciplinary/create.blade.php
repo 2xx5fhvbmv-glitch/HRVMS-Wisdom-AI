@@ -214,9 +214,9 @@
                         <div class="uploadFile-btn">
                             <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
                             <input type="file" name="attachment[]" id="attachment"
-                                accept=".png,.jpg,.jpeg,.pdf" multiple>
+                                accept=".png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif,.pdf" multiple>
                         </div>
-                        <div class="uploadFile-text text-muted">Accepted: PNG, JPEG, PDF</div>
+                        <div class="uploadFile-text text-muted">Accepted: PNG, JPEG, HEIC, PDF</div>
                         <div id="attachment-preview" class="mt-1 text-primary small"></div>
                     </div>
                 </div>
@@ -228,9 +228,9 @@
                         <div class="uploadFile-btn">
                             <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
                             <input type="file" name="upload_signed_document" id="upload-signed-document"
-                                accept=".png,.jpg,.jpeg,.pdf">
+                                accept=".png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif,.pdf">
                         </div>
-                        <div class="uploadFile-text text-muted">Accepted: PNG, JPEG, PDF</div>
+                        <div class="uploadFile-text text-muted">Accepted: PNG, JPEG, HEIC, PDF</div>
                         <div id="signed-preview" class="mt-1 text-primary small"></div>
                     </div>
                 </div>

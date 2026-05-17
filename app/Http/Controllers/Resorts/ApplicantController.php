@@ -194,8 +194,8 @@ class ApplicantController extends Controller
                 'select_years' => 'nullable|required_without:select_months|integer|between:1,5',
                 'curriculum_file' => 'required|file|max:5120',
                 'passport' => 'required|file|max:5120',
-                'profile_picture' => 'required|image|max:5120',
-                'full_length_photo' => 'required|image|max:5120',
+                'profile_picture' => 'required|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120',
+                'full_length_photo' => 'required|mimes:jpeg,jpg,png,gif,svg,webp,heic,heif|max:5120',
                 'resort_id' => 'required|integer',
                 'vacancy_id' => 'required|integer',
             ]);

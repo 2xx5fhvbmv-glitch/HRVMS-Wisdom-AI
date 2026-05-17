@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Resorts\People\Promotion;
 
 use App\Http\Controllers\Controller;
-use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;

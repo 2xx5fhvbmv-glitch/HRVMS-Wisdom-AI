@@ -1712,11 +1712,11 @@ class AccommodationController extends Controller
             $validator = Validator::make(
                 $request->all(),
                 [
-                    'document_path' => 'file|mimes:jpg,jpeg,png|max:2048',
+                    'document_path' => 'file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif|max:2048',
                     'status' => 'required|in:Complete,On-Hold',
                 ],
                 [
-                    'document_path.mimes' => 'The image must be a type of:jpg,jpeg,png',
+                    'document_path.mimes' => 'The image must be a type of:jpg,jpeg,png,gif,svg,webp,heic,heif',
                 ]
             );
 

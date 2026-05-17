@@ -320,17 +320,27 @@
                     toastr.success(data.message, "Success", {
                         positionClass: 'toast-bottom-right',
                     });
-                    // reset form
                     document.getElementById('eventForm').reset();
+                    // Redirect only on success — failure responses (duplicate
+                    // event / validation error) carry no redirect_url, so the
+                    // old unconditional redirect navigated to "/undefined".
+                    if (data.redirect_url) {
+                        window.setTimeout(function() {
+                            window.location.href = data.redirect_url;
+                        }, 2000);
+                    }
                 }else{
-                    toastr.error(data.message, "Error", {
+                    // Keep the user's input on error so they can correct it
+                    // instead of re-typing every row.
+                    toastr.error(data.message || 'Something went wrong.', "Error", {
                         positionClass: 'toast-bottom-right',
                     });
-                    document.getElementById('eventForm').reset();
                 }
-                window.setTimeout(function() {
-                        window.location.href = data.redirect_url;
-                    }, 2000);
+            })
+            .catch(function() {
+                toastr.error('Failed to save events. Please try again.', "Error", {
+                    positionClass: 'toast-bottom-right',
+                });
             });
         });
 
