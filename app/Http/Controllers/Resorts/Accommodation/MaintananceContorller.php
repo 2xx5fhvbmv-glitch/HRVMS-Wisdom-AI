@@ -130,7 +130,7 @@ class MaintananceContorller extends Controller
 
         $validator = Validator::make($request->all(), [
                 'Video' => 'nullable|file|mimes:mp4,mov|max:7168',
-                'Image' => 'nullable|file|mimes:jpg,jpeg,png|max:1024',
+                'Image' => 'nullable|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif|max:1024',
                 'item_id' => 'nullable',
                 'building_id' => 'required',
                 'descriptionIssues' => 'required',
@@ -142,7 +142,7 @@ class MaintananceContorller extends Controller
                 'Video.max' => 'The video size must not exceed 7 MB.',
                 'Video.mimes' => 'The video must be a file of type: mp4, mov.',
                 'Image.max' => 'The image size must not exceed 1 MB.',
-                'Image.mimes' => 'The image must be a file of type: jpg, jpeg, png.',
+                'Image.mimes' => 'The image must be a file of type: jpg, jpeg, png, gif, svg, webp, heic, heif.',
                 'descriptionIssues.required' => 'Please enter a description.',
                 'building_id.required' => 'Please select a building.',
             ]);

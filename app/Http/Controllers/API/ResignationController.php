@@ -108,7 +108,7 @@ class ResignationController extends Controller
         
         $validator = Validator::make($request->all(), [
             'reason_type'                           => 'required',
-            'resignation_letter'                    => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png',
+            'resignation_letter'                    => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif',
             'comments'                              => 'required',
         ]);
 

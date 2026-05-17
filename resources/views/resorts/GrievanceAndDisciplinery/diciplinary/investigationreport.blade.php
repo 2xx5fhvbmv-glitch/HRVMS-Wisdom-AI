@@ -359,7 +359,7 @@
                                                     disabled 
                                                 @else 
                                                     data-parsley-max-file-size="5" 
-                                                    data-parsley-fileextension="pdf,png,jpg,jpeg" 
+                                                    data-parsley-fileextension="pdf,png,jpg,jpeg,gif,svg,webp,heic,heif"
                                                     data-parsley-fileextension-message="Only PDF and image files are allowed" 
                                                 @endif
                                             >

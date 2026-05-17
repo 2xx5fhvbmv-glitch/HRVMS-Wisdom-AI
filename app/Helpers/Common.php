@@ -7965,6 +7965,60 @@ class Common
         return $placeholders;
     }
 
+    /**
+     * Letterhead & E-signature data for a resort's document/letter PDFs.
+     *
+     * Returns a normalised array that letter PDF templates (Transfer today;
+     * Probation / Promotion later) can consume directly. Image values are
+     * ABSOLUTE filesystem paths (DomPDF embeds local files reliably this way)
+     * or null when not configured / missing.
+     *
+     * When no letterhead row exists for the resort, `configured` is false and
+     * the caller should fall back to the legacy logo + typed-signature layout.
+     *
+     * @param  int  $resortId  resorts.id
+     * @return array{
+     *   configured: bool, headerImage: ?string, footerImage: ?string,
+     *   signatureImage: ?string, signatoryName: ?string, signatoryTitle: ?string,
+     *   addressLine1: ?string, addressLine2: ?string, contactPhone: ?string,
+     *   contactEmail: ?string, website: ?string
+     * }
+     */
+    public static function getLetterheadData($resortId)
+    {
+        $setting = \App\Models\LetterheadSetting::where('resort_id', $resortId)->first();
+
+        if (!$setting) {
+            return [
+                'configured'     => false,
+                'headerImage'    => null,
+                'footerImage'    => null,
+                'signatureImage' => null,
+                'signatoryName'  => null,
+                'signatoryTitle' => null,
+                'addressLine1'   => null,
+                'addressLine2'   => null,
+                'contactPhone'   => null,
+                'contactEmail'   => null,
+                'website'        => null,
+            ];
+        }
+
+        return [
+            'configured'     => true,
+            'headerImage'    => $setting->imageAbsolutePath('header_image'),
+            'footerImage'    => $setting->imageAbsolutePath('footer_image'),
+            'signatureImage' => $setting->imageAbsolutePath('signature_image'),
+            'signatoryName'  => $setting->signatory_name,
+            'signatoryTitle' => $setting->signatory_title,
+            'addressLine1'   => $setting->address_line1,
+            'addressLine2'   => $setting->address_line2,
+            'contactPhone'   => $setting->contact_phone,
+            'contactEmail'   => $setting->contact_email,
+            'website'        => $setting->website,
+        ];
+    }
+
 }
 
 ?>

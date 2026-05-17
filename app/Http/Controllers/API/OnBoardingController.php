@@ -399,7 +399,7 @@ class OnBoardingController extends Controller
         }
 
         $validator                                      =   Validator::make($request->all(), [
-            'selfie_image'                              =>  'required|image|mimes:jpeg,png,jpg',
+            'selfie_image'                              =>  'required|mimes:jpeg,png,jpg,gif,svg,webp,heic,heif',
         ]);
 
         

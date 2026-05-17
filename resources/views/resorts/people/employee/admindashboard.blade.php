@@ -18,12 +18,7 @@
                             <h1>Dashboard</h1>
                         </div>
                     </div>
-                    <!-- <div class="col-xl-2 col-auto ms-auto"><select class="form-select select2t-none"
-                            aria-label="Default select example">
-                            <option selected="">Monthly</option>
-
-                        </select></div> -->
-                    <div class="col-auto">
+                    <div class="col-auto ms-auto">
                         <a class="btn btn-theme" href="{{route('people.employees')}}">View Employees</a>
                     </div>
                 </div>
@@ -252,7 +247,7 @@
                         <div class="card-title">
                             <div class="row g-md-2 g-1 align-items-center">
                                 <div class="col">
-                                    <h3>Announcement</h3>
+                                    <h3>Announcements</h3>
                                 </div>
                                 <div class="col-auto">
                                     <a href="{{route('people.announcement.create')}}" class="btn btn-themeBlue btn-sm">
@@ -365,6 +360,7 @@
                                 </div>
                                 <div class="col-auto">
                                         <select class="form-select form-select-large" aria-label="Default select example" id="exitDeptSelect">
+                                        <option value="" selected>All Departments</option>
                                         @foreach($departments as $department)
                                             <option value="{{$department->id}}">{{$department->name}}</option>
                                         @endforeach
@@ -529,7 +525,7 @@
 
                             @foreach($employeeInfoUpdateRequest as $emp_info)
                                 @php
-                                    $profilePicture = App\Helpers\Common::GetAdminResortProfile($emp_info->employee->Admin_Parent_id);
+                                    $profilePicture = App\Helpers\Common::getResortUserPicture($emp_info->employee->Admin_Parent_id ?? null);
                                 @endphp
                                 <div class="leaveUser-block">
                                         <div class="img-circle">
@@ -575,15 +571,15 @@
                                         <div class="row  g-xxl-4 g-md-2 g-2 ">
                                             <div class="col">
                                                 <p class="fw-500">Active</p>
-                                                <h5><b>{{$activeProbationCount ?? 0}}</b></h5>
+                                                <strong>{{$activeProbationCount ?? 0}}</strong>
                                             </div>
                                             <div class="col">
                                                 <p class="fw-500">Failed</p>
-                                                <h5><b>{{$failedProbationCount ?? 0}}</b></h5>
+                                                <strong>{{$failedProbationCount ?? 0}}</strong>
                                             </div>
                                             <div class="col">
                                                 <p class="fw-500">Completed</p>
-                                                <h5><b>{{$completedProbationCount ?? 0}}</b></h5>
+                                                <strong>{{$completedProbationCount ?? 0}}</strong>
                                             </div>
                                         </div>
                                     </div>
@@ -917,23 +913,23 @@
                         </div>
                         <div class="leaveUser-bgBlock">
                             <h6>Total Pending Approvals</h6>
-                            <strong>50</strong>
+                            <strong>{{ $approvalPending ?? 0 }}</strong>
                         </div>
                         <div class="leaveUser-bgBlock">
                             <h6>Approved</h6>
-                            <strong>25</strong>
+                            <strong>{{ $approvalApproved ?? 0 }}</strong>
                         </div>
                         <div class="leaveUser-bgBlock">
                             <h6>Held</h6>
-                            <strong>15</strong>
+                            <strong>{{ $approvalHeld ?? 0 }}</strong>
                         </div>
                         <div class="leaveUser-bgBlock">
                             <h6>Rejected</h6>
-                            <strong>10</strong>
+                            <strong>{{ $approvalRejected ?? 0 }}</strong>
                         </div>
                         <div class="approvalsPeopleEmp-block">
                             <p>Oldest Pending Request</p>
-                            <p><i>2 Days Ago</i></p>
+                            <p><i>{{ $oldestPendingApproval ?? 'N/A' }}</i></p>
                         </div>
                     </div>
                 </div>
@@ -971,8 +967,8 @@
                         <div class="leaveUser-bgBlock mb-md-3 mb-2">
                             <h6>Total Estimated Liability</h6>
                             <div>
-                                <strong>{{ Common::GetResortCurrencySymbol() }} 100,000</strong>
-                                <span>(2026)</span>
+                                <strong>{{ Common::formatCurrency($liabilityEstimated, 'MVR', 2) }}</strong>
+                                <span>({{ $liabilityYear }})</span>
                             </div>
                         </div>
 
@@ -983,14 +979,16 @@
                                     <div class="table-responsive">
                                         <table class="table-lableNew  w-100">
                                             <tbody>
+                                                @forelse($liabilityMonthlyTrend as $row)
                                                 <tr>
-                                                    <td>January</td>
-                                                    <th>{{ Common::GetResortCurrencySymbol() }} 1,000</th>
+                                                    <td>{{ $row['month'] }}</td>
+                                                    <th>{{ Common::formatCurrency($row['paid'], 'MVR', 2) }}</th>
                                                 </tr>
+                                                @empty
                                                 <tr>
-                                                    <td>February</td>
-                                                    <th>{{ Common::GetResortCurrencySymbol() }} 2,000</th>
+                                                    <td colspan="2">No payments recorded</td>
                                                 </tr>
+                                                @endforelse
                                             </tbody>
                                         </table>
                                     </div>
@@ -1000,13 +998,13 @@
                                 <h6 class="fw-600 mb-2">Actual Payments Made</h6>
                                 <div class="d-flex align-items-center  mb-lg-3 mb-2">
                                     <div class="progress progress-custom progress-themeskyblue flex-grow-1 me-2">
-                                        <div class="progress-bar" role="progressbar" style="width: 65%"
-                                            aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"></div>
+                                        <div class="progress-bar" role="progressbar" style="width: {{ $liabilityPaidPercent }}%"
+                                            aria-valuenow="{{ $liabilityPaidPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
                                     </div>
-                                    <span>{{ Common::GetResortCurrencySymbol() }} 20,000</span>
+                                    <span>{{ Common::formatCurrency($liabilityActualPaid, 'MVR', 2) }}</span>
                                 </div>
                                 <h6 class="fw-600 mb-2">Manual Adjustments</h6>
-                                <p>3 Adjustments, Total: $1,500</p>
+                                <p>No manual adjustments recorded</p>
                             </div>
                             <div class="col-12">
                                 <h6 class="fw-600 mb-md-2 mb-1">Estimation vs. Actual Comparison</h6>
@@ -1018,24 +1016,25 @@
                                                 <th>Estimated Cost</th>
                                                 <th>Actual Cost</th>
                                                 <th>Remaining Liability</th>
-                                                <th>Remaining Liability</th>
                                             </tr>
                                         </thead>
                                         <tbody>
+                                            @forelse($liabilityCostComparison as $row)
                                             <tr>
-                                                <td>Overtime</td>
-                                                <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                <td><span class="text-themeSuccess">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
+                                                <td>{{ $row['category'] }}</td>
+                                                <td>{{ Common::formatCurrency($row['estimated'], 'MVR', 2) }}</td>
+                                                <td>{{ Common::formatCurrency($row['actual'], 'MVR', 2) }}</td>
+                                                <td>
+                                                    <span class="{{ $row['remaining'] < 0 ? 'text-themeDanger' : 'text-themeSuccess' }}">
+                                                        {{ Common::formatCurrency($row['remaining'], 'MVR', 2) }}
+                                                    </span>
+                                                </td>
                                             </tr>
+                                            @empty
                                             <tr>
-                                                <td>Loans</td>
-                                                <td>{{ Common::GetResortCurrencySymbol() }} 10,000</td>
-                                                <td>{{ Common::GetResortCurrencySymbol() }} 8,000</td>
-                                                <td>{{ Common::GetResortCurrencySymbol() }} 2,000</td>
-                                                <td><span class="text-themeDanger">-$600</span></td>
+                                                <td colspan="4">No cost data available</td>
                                             </tr>
+                                            @endforelse
                                         </tbody>
                                     </table>
                                 </div>
@@ -1584,6 +1583,23 @@
     var maleCount = parseInt(canvas.getAttribute('data-male')) || 0;
     var femaleCount = parseInt(canvas.getAttribute('data-female')) || 0;
 
+    // Rounds a set of values to integer percentages that always sum to
+    // exactly 100 (largest-remainder method).
+    function percentagesSumTo100(values) {
+        var total = values.reduce(function (a, b) { return a + b; }, 0);
+        if (!total) return values.map(function () { return 0; });
+        var raw = values.map(function (v) { return (v / total) * 100; });
+        var floored = raw.map(Math.floor);
+        var remainder = 100 - floored.reduce(function (a, b) { return a + b; }, 0);
+        var byFrac = raw
+            .map(function (v, idx) { return { idx: idx, frac: v - Math.floor(v) }; })
+            .sort(function (a, b) { return b.frac - a.frac; });
+        for (var r = 0; r < remainder && r < byFrac.length; r++) {
+            floored[byFrac[r].idx]++;
+        }
+        return floored;
+    }
+
     // Custom plugin for inside labels
     const doughnutLabelsInside = {
         id: 'doughnutLabelsInside',
@@ -1592,10 +1608,9 @@
             chart.data.datasets.forEach(function (dataset, i) {
                 var meta = chart.getDatasetMeta(i);
                 if (!meta.hidden) {
+                    var percents = percentagesSumTo100(dataset.data);
                     meta.data.forEach(function (element, index) {
-                        var dataValue = dataset.data[index];
-                        var total = dataset.data.reduce((acc, val) => acc + val, 0);
-                        var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
+                        var percentage = percents[index] + '%';
 
                         var position = element.tooltipPosition();
                         ctx.fillStyle = '#fff';
@@ -1864,6 +1879,26 @@
             });
         });
         
+        $(document).on('click', '#update-info-btn', function () {
+            var url = $(this).data('url');
+            $.ajax({
+                type: "GET",
+                url: url,
+                success: function (response) {
+                    $('#reqApproval-modal').modal('hide');
+                    toastr.success(response.message || "Request updated successfully.", "Success", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                    setTimeout(function () { location.reload(); }, 1200);
+                },
+                error: function () {
+                    toastr.error("Something went wrong", "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+            });
+        });
+
         $(document).on('click', '#confirmRejectBtn', function () {
             var $form = $('#requestRejected');
 
@@ -1889,7 +1924,7 @@
                 success: function (result) {
                 
                     $('#reqReject-modal').modal('hide');
-                loadUpdateRequests();
+                    setTimeout(function () { location.reload(); }, 1200);
                     toastr.success("Request rejected successfully.", "Success", {
                         positionClass: 'toast-bottom-right'
                     });

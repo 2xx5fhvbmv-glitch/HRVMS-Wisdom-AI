@@ -240,13 +240,13 @@ class RenewalController extends Controller
                     [
                         'emp_id' => 'required|string',
                         'flag'   => 'required|in:visa,insurance,work_permit_card_Test_Fee,slot_payment',
-                        'file'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048', // 2MB max
+                        'file'   => 'required|file|mimes:pdf,jpg,jpeg,png,gif,svg,webp,heic,heif|max:2048', // 2MB max
                     ],
                     [
                         'emp_id.required' => 'Employee ID is required.',
                         'flag.required'   => 'Document type is required.',
                         'file.required'   => 'File is required.',
-                        'file.mimes'      => 'File must be a PDF, JPG, JPEG, or PNG.',
+                        'file.mimes'      => 'File must be a PDF, JPG, JPEG, PNG, GIF, SVG, WEBP, HEIC, or HEIF.',
                         'file.max'        => 'File size must not exceed 2MB.',
                     ]);
 

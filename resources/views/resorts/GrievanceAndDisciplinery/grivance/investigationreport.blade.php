@@ -387,7 +387,7 @@
                                             multiple 
                                             name="investigation_file[]" 
                                             accept=".pdf, image/*" 
-                                            @if($Grivance_Parent->Assigned=="No") disabled @else data-parsley-max-file-size="5" data-parsley-fileextension="pdf,png,jpg,jpeg" data-parsley-fileextension-message="Only PDF and image files are allowed" @endif>
+                                            @if($Grivance_Parent->Assigned=="No") disabled @else data-parsley-max-file-size="5" data-parsley-fileextension="pdf,png,jpg,jpeg,gif,svg,webp,heic,heif" data-parsley-fileextension-message="Only PDF and image files are allowed" @endif>
                                         </div>
                                         <div class="uploadFile-text">PNG, JPEG, PDF</div>
                                     </div>

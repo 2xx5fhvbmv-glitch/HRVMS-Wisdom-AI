@@ -1340,7 +1340,11 @@
                                     docTypeValid = false;
                                 }
 
-                                if (selectedType.includes('passport main')) hasPassport = true;
+                                // Match any document type whose name contains
+                                // "passport" — the configured type is just
+                                // "Passport"; checking for "passport main"
+                                // never matched and blocked valid uploads.
+                                if (selectedType.includes('passport')) hasPassport = true;
                                 if (selectedType.includes('photo')) hasPhoto = true;
                             });
 
@@ -1453,6 +1457,13 @@
 
                                 $(".next").removeAttr("disabled");
                                 moveToNextStep(current_fs, next_fs);
+                            })
+                            .catch((err) => {
+                                // A real failure in one of the checks — re-enable
+                                // the button so the user can retry; don't leave it
+                                // disabled or surface an uncaught rejection.
+                                console.error("Document Segregation check failed:", err);
+                                $(".next").removeAttr("disabled");
                             });
                             return false;
                         }
@@ -2301,10 +2312,13 @@
 
         $("fieldset:eq(1) select[name^='docType']").each(function (index) {
             const selectedType = $(this).find('option:selected').text().toLowerCase();
-            if (selectedType.includes('passport main')) 
+            // The configured document type is just "Passport" — checking for
+            // "passport main" never matched, so PassportBlobUrl stayed empty
+            // and PassportExpiry() rejected, silently blocking step 2 → 3.
+            if (selectedType.includes('passport'))
             {
                 const file = selectedFiles[index]; // Assuming selectedFiles exists
-                if (file) 
+                if (file)
                 {
                     PassportBlobUrl = file['pdfUrl'] || URL.createObjectURL(file);
                 }
@@ -2378,14 +2392,11 @@
             }
         });
 
+        // CV is optional — if none was uploaded, skip the check quietly
+        // instead of rejecting (a rejection here aborts the whole
+        // Promise.all and blocks Passport/Photo from advancing).
         if (cvBlobUrls.length === 0) {
-            toster.error("No CV files selected", "Error", {
-                position: "bottom-right",
-                duration: 3000,
-                closeButton: true,
-                progressBar: true
-            });
-            return Promise.reject("No CV files selected");
+            return Promise.resolve({ status: false, skipped: true });
         }
 
         try {
@@ -2800,13 +2811,10 @@
     updateEducationButtons();
     updateEducationFieldNames();
 
+    // Education documents are optional — skip quietly when none were
+    // uploaded rather than rejecting and aborting the Promise.all chain.
     if (educationFiles.length === 0) {
-        toastr.error("No Education files selected", "Error", {
-            position: "bottom-right",
-            duration: 3000,
-            closeButton: true, progressBar: true
-        });
-        return Promise.reject("No Education files selected");
+        return Promise.resolve({ skipped: true });
     }
 
     $(".next").attr("disabled", true);
@@ -2906,13 +2914,10 @@
     updateRemoveAndAddButtons();
     updateExperienceFieldNames();
 
+    // Experience documents are optional — skip quietly when none were
+    // uploaded rather than rejecting and aborting the Promise.all chain.
     if (experienceFiles.length === 0) {
-        toastr.error("No Experience files selected", "Error", {
-            position: "bottom-right",
-            duration: 3000,
-            closeButton: true, progressBar: true
-        });
-        return Promise.reject("No Experience files selected");
+        return Promise.resolve({ skipped: true });
     }
 
     $(".next").attr("disabled", true);

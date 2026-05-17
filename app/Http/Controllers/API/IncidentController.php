@@ -252,7 +252,7 @@ class IncidentController extends Controller
             'involved_emp_ids'              => 'required|array',
             'involved_emp_ids.*'            => 'exists:employees,id',
             'description'                   => 'nullable|string',
-            'attatchements.*'               => 'nullable|file|mimes:jpeg,png,jpg,mp4,mov,doc,docx,pdf'
+            'attatchements.*'               => 'nullable|file|mimes:jpeg,png,jpg,heic,heif,mp4,mov,doc,docx,pdf'
         ]);
             
          if ($validator->fails()) {
@@ -630,7 +630,7 @@ class IncidentController extends Controller
         $validator = Validator::make($request->all(), [
             'incident_id'                  => 'required|exists:incidents,id', 
             'statement'                    => 'required', 
-            'attatchements.*'              => 'file|mimes:jpeg,png,jpg,mp4,mov,doc,docx,pdf'
+            'attatchements.*'              => 'file|mimes:jpeg,png,jpg,heic,heif,mp4,mov,doc,docx,pdf'
         ]);
 
         if ($validator->fails()) {

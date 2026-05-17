@@ -61,11 +61,36 @@ class TransferController extends Controller
             'effective_date' => ['required', 'date_format:d/m/Y'],
             'transfer_status' => 'required|in:Permanent,Temporary',
             'additional_notes' => 'nullable|string|max:255',
-            'reporting_manager' => 'required|exists:employees,id'
+            'reporting_manager' => 'required|exists:employees,id',
+            // Item 2 — proposed salary for the transferred employee.
+            'proposed_salary' => 'nullable|numeric|min:0',
+            // Item 3 — temporary period; only required when type = Temporary.
+            'temporary_from' => 'required_if:transfer_status,Temporary|nullable|date_format:d/m/Y',
+            'temporary_to'   => 'required_if:transfer_status,Temporary|nullable|date_format:d/m/Y|after_or_equal:temporary_from',
         ]);
+
+        // ── Item 1 — Vacant Position Validation ──────────────────────────
+        // Don't allow transferring an employee into a position that is
+        // already actively filled beyond its budgeted headcount.
+        $vacancyCheck = $this->isTargetPositionVacant(
+            (int) $validated['target_pos'],
+            (int) $validated['employee_name']
+        );
+        if (!$vacancyCheck['vacant']) {
+            return response()->json([
+                'success' => false,
+                'message' => $vacancyCheck['message'],
+                'errors'  => ['target_pos' => [$vacancyCheck['message']]],
+            ], 422);
+        }
 
         // Save transfer
         $formattedEffectiveDate = $validated['effective_date'] ? Carbon::createFromFormat('d/m/Y', $validated['effective_date'])->format('Y-m-d') : null;
+
+        $temporaryFrom = ($validated['transfer_status'] === 'Temporary' && !empty($validated['temporary_from']))
+            ? Carbon::createFromFormat('d/m/Y', $validated['temporary_from'])->format('Y-m-d') : null;
+        $temporaryTo = ($validated['transfer_status'] === 'Temporary' && !empty($validated['temporary_to']))
+            ? Carbon::createFromFormat('d/m/Y', $validated['temporary_to'])->format('Y-m-d') : null;
 
         $transfer = EmployeeTransfer::create([
             'resort_id' => $this->resort->resort_id,
@@ -79,40 +104,61 @@ class TransferController extends Controller
             'transfer_status' => $validated['transfer_status'],
             'additional_notes' => $validated['additional_notes'],
             'reporting_manager'=>$validated['reporting_manager'],
+            // Item 2 — budgeted salary snapshot + proposed salary.
+            'budgeted_salary' => $this->getBudgetedSalary((int) $validated['target_dep'], (int) $validated['target_pos']),
+            'proposed_salary' => $validated['proposed_salary'] ?? null,
+            // Item 3 — temporary period.
+            'temporary_from' => $temporaryFrom,
+            'temporary_to'   => $temporaryTo,
             'status' => 'Pending',
         ]);
 
         $transferApprovalFlow = collect();
 
-        // Finance Approver Logic
+        // Finance Approver Logic — match by Finance position titles OR by
+        // Finance rank (7) so resorts that don't use the exact title strings
+        // still resolve a Finance approver. (Item 5 fix.)
         $financeManagerTitles = ['Director of Finance', 'Finance Manager'];
-        $positionIds = ResortPosition::where('resort_id', $this->resort->resort_id)
-            ->whereIn('position_title', $financeManagerTitles)
+        $financeRank = array_search('Finance', config('settings.Position_Rank')); // 7
+        $financePositionIds = ResortPosition::where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) use ($financeManagerTitles, $financeRank) {
+                $q->whereIn('position_title', $financeManagerTitles);
+                if ($financeRank !== false) {
+                    $q->orWhere('Rank', $financeRank);
+                }
+            })
             ->pluck('id');
 
         $financeApprover = Employee::with(['resortAdmin', 'position'])
-            ->whereIn('position_id', $positionIds)
             ->where('resort_id', $this->resort->resort_id)
-            ->select('id')
+            ->where(function ($q) use ($financePositionIds, $financeRank) {
+                $q->whereIn('Position_id', $financePositionIds);
+                if ($financeRank !== false) {
+                    $q->orWhere('rank', $financeRank);
+                }
+            })
             ->first();
 
         if ($financeApprover) {
-            // $promotionApprovalFlow->push($financeApprover);
             $transferApprovalFlow->push([
                 'approver' => $financeApprover,
                 'rank' => 'Finance'
             ]);
         }
 
-        // GM Approver Logic (Rank 8 in position table)
+        // GM Approver Logic — GM rank (8). Match against the employee's own
+        // `rank` column OR the linked position's Rank, so it works whether or
+        // not the position relation is populated. (Item 5 fix.)
+        $gmRank = array_search('GM', config('settings.Position_Rank')); // 8
         $gmApprover = Employee::with('position')
-            ->whereHas('position', fn($query) => $query->where('rank', 8))
             ->where('resort_id', $this->resort->resort_id)
-            ->select('id')
+            ->where(function ($q) use ($gmRank) {
+                $q->where('rank', $gmRank)
+                  ->orWhereHas('position', fn($query) => $query->where('Rank', $gmRank));
+            })
             ->first();
 
         if ($gmApprover) {
-            // $promotionApprovalFlow->push($gmApprover);
             $transferApprovalFlow->push([
                 'approver' => $gmApprover,
                 'rank' => 'GM'
@@ -128,18 +174,18 @@ class TransferController extends Controller
                 'approval_rank'  => $approver['rank'],
             ]);
 
-            $msg = "📢 New Transfer Request Submitted\n👤 Employee: " . $transfer->employee->full_name .
-            "\n🏢 From: " . optional($transfer->currentDepartment)->department_name .
-            "\n➡️ To: " . optional($transfer->targetDepartment)->department_name .
+            $msg = "📢 New Transfer Request Submitted\n👤 Employee: " . optional($transfer->employee->resortAdmin)->full_name .
+            "\n🏢 From: " . optional($transfer->currentDepartment)->name .
+            "\n➡️ To: " . optional($transfer->targetDepartment)->name .
             "\n📅 Effective Date: " . Carbon::parse($transfer->effective_date)->format('d M Y') .
             "\n📝 Status: Pending Approval";
 
             event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, // Make sure `resort_id` exists on the `meetings` table
+                $this->resort->resort_id,
                 10,
                 'Transfer Request Notification',
                 $msg,
-                0,
+                $transfer->id,
                 $approver['approver']->id,
                 'People'
             )));
@@ -149,6 +195,109 @@ class TransferController extends Controller
             'success' => true,
             'message' => 'Transfer request submitted.',
             'redirect_url' => route('people.transfer.list')
+        ]);
+    }
+
+    /**
+     * Item 1 — Determine whether the target position has an open seat.
+     *
+     * A position is considered "vacant" (transfer-allowed) when the number of
+     * employees actively occupying it is below its budgeted headcount.
+     * Budgeted headcount is taken from ResortPosition.no_of_positions and, if
+     * available, cross-checked against the current month's manning data.
+     * The transferred employee themselves is excluded from the filled count
+     * (re-transferring within the same position would otherwise self-block).
+     *
+     * @return array{vacant: bool, message: string}
+     */
+    private function isTargetPositionVacant(int $targetPositionId, int $employeeId): array
+    {
+        $position = ResortPosition::where('resort_id', $this->resort->resort_id)
+            ->find($targetPositionId);
+
+        if (!$position) {
+            return ['vacant' => false, 'message' => 'Target position not found.'];
+        }
+
+        // Budgeted headcount for the position. When it is not configured
+        // (NULL or 0) the position has no enforceable capacity — allow the
+        // transfer instead of wrongly blocking it at an assumed 1 seat.
+        // The check only enforces for positions with a real headcount set
+        // (configure it on the Manning screen to make this binding).
+        $budgetedHeadcount = (int) ($position->no_of_positions ?? 0);
+        if ($budgetedHeadcount <= 0) {
+            return [
+                'vacant'  => true,
+                'message' => 'Target position has no configured headcount; vacancy check skipped.',
+            ];
+        }
+
+        // Employees currently occupying the target position (active only),
+        // excluding the employee being transferred.
+        $filledCount = Employee::where('resort_id', $this->resort->resort_id)
+            ->where('Position_id', $targetPositionId)
+            ->where('status', 'Active')
+            ->where('id', '!=', $employeeId)
+            ->count();
+
+        if ($filledCount >= $budgetedHeadcount) {
+            return [
+                'vacant'  => false,
+                'message' => 'The selected target position is already fully occupied ('
+                    . $filledCount . '/' . $budgetedHeadcount
+                    . ' filled). Transfer into an actively filled position is not allowed.',
+            ];
+        }
+
+        return ['vacant' => true, 'message' => 'Target position has an available seat.'];
+    }
+
+    /**
+     * Item 2 — Resolve the budgeted basic salary for a target position.
+     *
+     * Source: `resort_vacant_budget_costs` (per position / department / year)
+     * which stores `basic_salary` for budgeted vacant positions. Uses the
+     * current year, falling back to the most recent year on record.
+     * Returns null when no budget row exists for the position.
+     */
+    private function getBudgetedSalary(int $departmentId, int $positionId): ?float
+    {
+        $row = DB::table('resort_vacant_budget_costs')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('position_id', $positionId)
+            ->where('department_id', $departmentId)
+            ->orderByRaw('CASE WHEN year = ? THEN 0 ELSE 1 END', [now()->year])
+            ->orderByDesc('year')
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        // Prefer current_salary when set, otherwise basic_salary.
+        $salary = (float) ($row->current_salary ?: $row->basic_salary);
+
+        return $salary > 0 ? $salary : null;
+    }
+
+    /**
+     * Item 2 — AJAX endpoint: returns the budgeted salary for a target
+     * department + position so the initiate form can display it live.
+     */
+    public function getPositionBudgetInfo(Request $request)
+    {
+        $departmentId = (int) $request->input('target_dep');
+        $positionId   = (int) $request->input('target_pos');
+
+        if (!$departmentId || !$positionId) {
+            return response()->json(['success' => false, 'budgeted_salary' => null]);
+        }
+
+        $budgetedSalary = $this->getBudgetedSalary($departmentId, $positionId);
+
+        return response()->json([
+            'success'         => true,
+            'budgeted_salary' => $budgetedSalary,
         ]);
     }
 
@@ -162,7 +311,25 @@ class TransferController extends Controller
                 'employee.position',
                 'employee.department',
                 'employee.resortAdmin','currentDepartment', 'targetDepartment', 'currentPosition', 'targetPosition','approvals'
-            ])->whereIn('status',['Pending','On Hold'])->select('*');
+            ])->where('resort_id', $this->resort->resort_id)
+              ->whereIn('status',['Pending','On Hold'])->select('*');
+
+            // Item 4 — department scoping. HR / GM (full data access) see every
+            // resort transfer. Other HOD/XCOM users see only transfers that
+            // involve their own department (as source OR target), plus any
+            // transfer they are personally an approver on, so Finance/GM
+            // approvers never lose visibility of their approval queue.
+            $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds)) {
+                $loggedInEmployeeId = $this->resort->GetEmployee->id ?? 0;
+                $transfers->where(function ($q) use ($scopedDeptIds, $loggedInEmployeeId) {
+                    $q->whereIn('current_department_id', $scopedDeptIds)
+                      ->orWhereIn('target_department_id', $scopedDeptIds)
+                      ->orWhereHas('approvals', function ($aq) use ($loggedInEmployeeId) {
+                          $aq->where('approved_by', $loggedInEmployeeId);
+                      });
+                });
+            }
 
             if ($request->filled('department_id')) {
                 $transfers->whereHas('employee', function ($q) use ($request) {
@@ -277,7 +444,20 @@ class TransferController extends Controller
                 'employee.position',
                 'employee.department',
                 'employee.resortAdmin','currentDepartment', 'targetDepartment', 'currentPosition', 'targetPosition','approvals'
-            ])->select('*');
+            ])->where('resort_id', $this->resort->resort_id)->select('*');
+
+            // Item 4 — same department scoping as the list screen.
+            $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds)) {
+                $loggedInEmployeeId = $this->resort->GetEmployee->id ?? 0;
+                $transfers->where(function ($q) use ($scopedDeptIds, $loggedInEmployeeId) {
+                    $q->whereIn('current_department_id', $scopedDeptIds)
+                      ->orWhereIn('target_department_id', $scopedDeptIds)
+                      ->orWhereHas('approvals', function ($aq) use ($loggedInEmployeeId) {
+                          $aq->where('approved_by', $loggedInEmployeeId);
+                      });
+                });
+            }
 
             if ($request->filled('department_id')) {
                 $transfers->whereHas('employee', function ($q) use ($request) {
@@ -493,6 +673,10 @@ class TransferController extends Controller
              */
             if ($pending === 0 && $onHold === 0 && $rejected === 0) {
 
+                // Capture the current department BEFORE the profile is mutated,
+                // so post-approval notifications reach the *old* department HOD.
+                $currentDepartmentId = $transfer->current_department_id ?? $transfer->employee->Dept_id;
+
                 $transfer->status = 'Approved';
                 $transfer->save();
 
@@ -505,27 +689,14 @@ class TransferController extends Controller
                 $employee->rank           = $transfer->targetPosition->Rank;
                 $employee->save();
 
-                // 🔔 notifications (unchanged)
-                event(new ResortNotificationEvent(Common::nofitication(
-                    $this->resort->resort_id,
-                    10,
-                    'Transfer Approved',
-                    "🎉 Your transfer request to " . $transfer->targetDepartment->name . " has been approved!",
-                    0,
-                    $employee->id,
-                    'People'
-                )));
+                // 🔔 Item 6 — Post-approval notifications.
+                $this->dispatchPostApprovalNotifications($transfer, $employee, $currentDepartmentId, $hr);
 
-                if ($hr) {
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id,
-                        10,
-                        'Employee Transfer Finalized',
-                        "📢 Transfer for " . $employee->resortAdmin->full_name . " has been approved and profile updated.",
-                        0,
-                        $hr->id,
-                        'People'
-                    )));
+                // 📄 Item 7 — Generate & email the Transfer Letter.
+                try {
+                    $this->generateAndSendTransferLetter($transfer->fresh(['employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition']));
+                } catch (\Throwable $e) {
+                    \Log::error('Transfer letter generation failed for transfer #' . $transfer->id . ': ' . $e->getMessage());
                 }
             }
 
@@ -669,6 +840,292 @@ class TransferController extends Controller
         
         return response()->json(['success' => true, 'data' => $reportingEmployees]);
 
+    }
+
+    /* =================================================================
+     *  Item 6 — Post-approval notification helpers
+     * ================================================================= */
+
+    /**
+     * Returns the employee ids of the HOD (rank 2) and EXCOM/XCOM (rank 1)
+     * of a given department within the current resort. These two ranks are
+     * the department leadership per config('settings.Position_Rank').
+     *
+     * @return int[]
+     */
+    private function getDepartmentLeadEmployeeIds(?int $departmentId): array
+    {
+        if (!$departmentId) {
+            return [];
+        }
+
+        $hodRank   = array_search('HOD', config('settings.Position_Rank'));   // 2
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank')); // 1
+
+        return Employee::where('resort_id', $this->resort->resort_id)
+            ->where('Dept_id', $departmentId)
+            ->where('status', 'Active')
+            ->whereIn('rank', array_filter([$hodRank, $excomRank], fn($r) => $r !== false))
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Sends a single in-app transfer notification to one employee id,
+     * following the app's existing event(new ResortNotificationEvent(...))
+     * convention. Skips silently when $employeeId is empty.
+     */
+    private function notifyEmployee($employeeId, string $title, string $message, $requestId = 0): void
+    {
+        if (empty($employeeId)) {
+            return;
+        }
+
+        event(new ResortNotificationEvent(Common::nofitication(
+            $this->resort->resort_id,
+            10,
+            $title,
+            $message,
+            $requestId,
+            $employeeId,
+            'People'
+        )));
+    }
+
+    /**
+     * Item 6 — On final approval, notify:
+     *   (a) Current Department HOD/EXCOM
+     *   (b) New Department HOD/EXCOM
+     *   (c) HR Department HOD/EXCOM
+     *   (d) the transferred employee
+     * Plus the initiating HR user (existing behaviour, kept).
+     */
+    private function dispatchPostApprovalNotifications(EmployeeTransfer $transfer, $employee, $currentDepartmentId, $hr): void
+    {
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+        $fromDept = optional($transfer->currentDepartment)->name ?? 'previous department';
+        $toDept   = optional($transfer->targetDepartment)->name ?? 'new department';
+
+        // (d) Transferred employee
+        $this->notifyEmployee(
+            $employee->id,
+            'Transfer Approved',
+            "🎉 Your transfer from {$fromDept} to {$toDept} has been fully approved.",
+            $transfer->id
+        );
+
+        // (a) Current Department HOD/EXCOM
+        foreach ($this->getDepartmentLeadEmployeeIds((int) $currentDepartmentId) as $leadId) {
+            if ($leadId === (int) $employee->id) { continue; }
+            $this->notifyEmployee(
+                $leadId,
+                'Employee Transfer Out',
+                "📢 {$employeeName} has been transferred out of {$fromDept} to {$toDept}.",
+                $transfer->id
+            );
+        }
+
+        // (b) New Department HOD/EXCOM
+        foreach ($this->getDepartmentLeadEmployeeIds((int) $transfer->target_department_id) as $leadId) {
+            if ($leadId === (int) $employee->id) { continue; }
+            $this->notifyEmployee(
+                $leadId,
+                'Incoming Employee Transfer',
+                "📢 {$employeeName} has been transferred into {$toDept} from {$fromDept}.",
+                $transfer->id
+            );
+        }
+
+        // (c) HR Department HOD/EXCOM — resolve the HR department, then its leads.
+        $hrDepartment = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->get()
+            ->first(fn($d) => \App\Helpers\Common::isHRDepartment($d->id));
+
+        if ($hrDepartment) {
+            foreach ($this->getDepartmentLeadEmployeeIds((int) $hrDepartment->id) as $leadId) {
+                $this->notifyEmployee(
+                    $leadId,
+                    'Employee Transfer Finalized',
+                    "📢 Transfer for {$employeeName} ({$fromDept} → {$toDept}) has been approved and the profile updated.",
+                    $transfer->id
+                );
+            }
+        }
+
+        // Initiating HR user (existing behaviour retained).
+        if ($hr) {
+            $this->notifyEmployee(
+                $hr->id,
+                'Employee Transfer Finalized',
+                "📢 Transfer for {$employeeName} has been approved and profile updated.",
+                $transfer->id
+            );
+        }
+    }
+
+    /* =================================================================
+     *  Item 7 — Transfer Letter generation
+     * ================================================================= */
+
+    /**
+     * Generates the Transfer Letter PDF, emails it to the transferred
+     * employee, and saves a copy into the File Management module (the
+     * employee's categorized folder) titled "Transfer Letter".
+     *
+     * NOTE: The app has no letterhead-management or e-signature system.
+     * The PDF uses the resort logo + name as an approximated letterhead and
+     * a typed signatory block. See transfer_letter_pdf.blade.php.
+     */
+    private function generateAndSendTransferLetter(EmployeeTransfer $transfer): void
+    {
+        $employee = $transfer->employee;
+        if (!$employee) {
+            return;
+        }
+
+        $resort = Resort::find($transfer->resort_id);
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+
+        // ── 1. Render the PDF ────────────────────────────────────────────
+        // Pull the resort's configured Letterhead & E-signature settings.
+        // When none is configured, $letterhead['configured'] is false and the
+        // template falls back to the resort logo + typed-signature layout.
+        $letterhead = Common::getLetterheadData($transfer->resort_id);
+
+        $pdf = Pdf::loadView('resorts.people.transfer.transfer_letter_pdf', [
+            'transfer'       => $transfer,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($transfer->resort_id),
+            'employeeName'   => $employeeName,
+            'letterhead'     => $letterhead,
+            // Signatory block — prefer configured values, fall back to defaults.
+            'signatureImage' => $letterhead['signatureImage'],
+            'signatoryName'  => $letterhead['signatoryName'] ?: 'Human Resources Department',
+            'signatoryTitle' => $letterhead['signatoryTitle']
+                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+
+        // Allow DomPDF to load local letterhead image files.
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        $pdfBinary = $pdf->output();
+
+        // Local copy for emailing + record-keeping.
+        $localFileName = 'transfer-letter-' . $transfer->id . '.pdf';
+        $localPath = storage_path('app/' . $localFileName);
+        file_put_contents($localPath, $pdfBinary);
+
+        // ── 2. Save into the File Management module ──────────────────────
+        $savedPath = $this->saveTransferLetterToFileManagement($transfer, $employee, $pdfBinary);
+
+        // ── 3. Persist letter status on the transfer record ──────────────
+        $transfer->letter_dispatched    = 'Yes';
+        $transfer->transfer_letter_path = $savedPath;
+        $transfer->save();
+
+        // ── 4. Email the letter to the transferred employee ─────────────
+        $email = optional($employee->resortAdmin)->email;
+        if ($email && file_exists($localPath)) {
+            $bodyHtml = 'Dear ' . e($employeeName) . ',<br><br>'
+                . 'Please find attached your official Transfer Letter. '
+                . 'All details of your transfer have been approved and updated in our records.<br><br>'
+                . 'Regards,<br>Human Resources Department';
+
+            try {
+                \Mail::to($email)->send(new \App\Mail\TransferLetterMail($transfer, $localPath, $bodyHtml, $employeeName));
+            } catch (\Throwable $e) {
+                \Log::error('Transfer letter email failed for transfer #' . $transfer->id . ': ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Item 7 — Stores the Transfer Letter PDF into the File Management
+     * module under the transferred employee's categorized root folder
+     * (named after their Emp_id), mirroring FileManageController's encrypted
+     * upload pattern. Returns the storage path, or null on failure.
+     */
+    private function saveTransferLetterToFileManagement(EmployeeTransfer $transfer, $employee, string $pdfBinary): ?string
+    {
+        try {
+            // The employee's categorized root folder (created by the
+            // Employee model `created` hook — named after Emp_id, UnderON 0).
+            $folder = \App\Models\FilemangementSystem::where('resort_id', $transfer->resort_id)
+                ->where('Folder_Name', $employee->Emp_id)
+                ->where('Folder_Type', 'categorized')
+                ->where('UnderON', 0)
+                ->first();
+
+            if (!$folder) {
+                \Log::warning('Transfer letter: no File Management folder for employee ' . $employee->Emp_id);
+                return null;
+            }
+
+            $resortFolder = optional(optional($this->resort)->resort)->resort_id
+                ?? optional(Resort::find($transfer->resort_id))->resort_id;
+
+            $uniqueString = substr(md5(uniqid('transfer-letter', true)), 0, 10);
+            $newFileName  = $uniqueString . '.pdf.enc';
+            $path = $resortFolder . '/public/categorized/' . $folder->Folder_unique_id . '/' . $newFileName;
+
+            // AES-256-CBC encryption — identical scheme to FileManageController.
+            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+            $iv  = random_bytes(16);
+            $encrypted = $iv . openssl_encrypt($pdfBinary, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+            if ($encrypted === false) {
+                throw new \Exception('Encryption failed: ' . openssl_error_string());
+            }
+
+            \App\Helpers\StorageHelper::disk()->put($path, $encrypted, [
+                'ContentType'        => 'application/octet-stream',
+                'ContentDisposition' => 'attachment; filename="Transfer Letter.pdf"',
+            ]);
+
+            \App\Models\ChildFileManagement::create([
+                'resort_id'      => $transfer->resort_id,
+                'unique_id'      => $uniqueString,
+                'Parent_File_ID' => $folder->id,
+                'File_Name'      => 'Transfer Letter',
+                'NewFileName'    => 'Transfer Letter',
+                'File_Type'      => 'pdf',
+                'File_Size'      => round(strlen($pdfBinary) / 1024, 2),
+                'File_Path'      => $path,
+                'File_Extension' => 'pdf',
+            ]);
+
+            return $path;
+        } catch (\Throwable $e) {
+            \Log::error('Transfer letter File Management save failed for transfer #' . $transfer->id . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Item 7 — Re-download a previously generated Transfer Letter PDF.
+     * Regenerates from the current transfer data so it works even if the
+     * stored encrypted copy is unavailable.
+     */
+    public function downloadTransferLetter($id)
+    {
+        $transfer = EmployeeTransfer::with([
+            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition'
+        ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
+
+        $resort = Resort::find($transfer->resort_id);
+
+        $pdf = Pdf::loadView('resorts.people.transfer.transfer_letter_pdf', [
+            'transfer'       => $transfer,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($transfer->resort_id),
+            'employeeName'   => optional($transfer->employee->resortAdmin)->full_name ?? 'Employee',
+            'signatureImage' => null,
+            'signatoryName'  => 'Human Resources Department',
+            'signatoryTitle' => 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('Transfer_Letter_' . ($transfer->employee->Emp_id ?? $transfer->id) . '.pdf');
     }
 
 }

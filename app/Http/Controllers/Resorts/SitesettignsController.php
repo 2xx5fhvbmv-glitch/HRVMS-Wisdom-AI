@@ -49,13 +49,13 @@ class SitesettignsController extends Controller
         $currency = $request->currency;
 
         $validator = Validator::make($request->all(), [
-            'profile_picture' => 'image|mimes:jpeg,png,jpg,gif',
+            'profile_picture' => 'mimes:jpeg,png,jpg,gif,svg,webp,heic,heif',
             // 'MVRtoDoller' => 'required|numeric|string|min:2|max:7', // Ensures MVRtoDoller is numeric and has 2 to 7 characters
             // 'DollertoMVR' => 'required|numeric|string|min:2|max:7', // Ensures DollertoMVR is numeric and has 2 to 7 characters
-            'footer_img' => 'image|mimes:jpeg,png,jpg,gif',
+            'footer_img' => 'mimes:jpeg,png,jpg,gif,svg,webp,heic,heif',
             'currency' => 'required',
         ], [
-            'profile_picture.mimes' => 'The profile picture must be a file of type: jpeg, png, jpg, gif.',
+            'profile_picture.mimes' => 'The profile picture must be a file of type: jpeg, png, jpg, gif, svg, webp, heic, heif.',
             'MVRtoDoller.numeric' => 'The MVR to Dollar conversion must be a numeric value.',
             // 'MVRtoDoller.min' => 'The MVR to Dollar conversion must be at least :min characters.',
             // 'MVRtoDoller.max' => 'The MVR to Dollar conversion may not be greater than :max characters.',

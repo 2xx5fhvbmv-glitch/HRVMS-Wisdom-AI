@@ -16,7 +16,8 @@
 
      <div class="row g-md-4 g-2 mb-md-3">
 
-          @foreach ($payload as $key => $newValue) 
+          @php $changedCount = 0; @endphp
+          @foreach ($payload as $key => $newValue)
           @php
                if(in_array($key, ['first_name', 'middle_name', 'last_name', 'personal_phone'])){
                     $data = App\Models\ResortAdmin::where('id',$emp_info->employee->Admin_Parent_id)->value($key);
@@ -29,20 +30,26 @@
                }
           @endphp
 
+          {{-- Show only the fields the employee actually changed — the
+               payload often carries the whole profile, not just edits. --}}
+          @continue(trim((string) $data) === trim((string) $newValue))
+          @php $changedCount++; @endphp
+
+          {{-- Only the requested new value is shown — the current value is
+               omitted per request. --}}
           <div class="col-sm-6">
                <div class="bg-themeGrayLight h-100">
-                    <h6>Current {{ucwords(str_replace('_', ' ', $key))}}</h6>
-                    <p>{{$data}}</p>
-               </div>
-          </div>
-          
-          <div class="col-sm-6">
-               <div class="bg-themeGrayLight h-100">
-                    <h6>Requested Changed {{ucwords(str_replace('_', ' ', $key))}}</h6>
+                    <h6>{{ucwords(str_replace('_', ' ', $key))}}</h6>
                     <p>{{$newValue}}</p>
                </div>
           </div>
           @endforeach
+
+          @if ($changedCount === 0)
+               <div class="col-12">
+                    <p class="text-muted mb-0">No changed fields in this request.</p>
+               </div>
+          @endif
      </div>
 </div>
 <div class="modal-footer">

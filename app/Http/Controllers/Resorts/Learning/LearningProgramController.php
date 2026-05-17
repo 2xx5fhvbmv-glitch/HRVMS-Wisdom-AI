@@ -231,7 +231,7 @@ class LearningProgramController extends Controller
             'trainer' => 'nullable|required_without:external_trainer_company|exists:employees,id',
             'external_training' => 'nullable|string|max:255',
             'external_trainer_company' => 'nullable|required_without:trainer|string|max:255',
-            'trainer_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+            'trainer_image' => 'nullable|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif|max:4096',
             'prior_qualification' => 'nullable|string',
             'learning_material.*' => 'nullable|mimes:pdf,ppt,pptx|max:2048',
         ]);

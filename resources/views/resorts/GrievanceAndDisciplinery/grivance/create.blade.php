@@ -163,9 +163,9 @@ Edit
                     <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
                     <input type="file" id="uploadFile" name="Attachments[]" class="uploadFile-input" multiple
                         data-parsley-max-file-size="2"
-                        data-parsley-fileextension="png,jpg,jpeg,pdf">
+                        data-parsley-fileextension="png,jpg,jpeg,gif,svg,webp,heic,heif,pdf">
                 </div>
-                <div class="uploadFile-text">PNG, JPEG, PDF</div>
+                <div class="uploadFile-text">PNG, JPEG, HEIC, PDF</div>
             </div>
         </div>
 

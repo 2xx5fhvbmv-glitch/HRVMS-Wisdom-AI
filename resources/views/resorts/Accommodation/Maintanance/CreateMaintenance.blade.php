@@ -73,7 +73,7 @@
                         <div class="uploadFile-btn">
                             <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
                             <input type="file" name="Image" id="image_check" accept="image/*"
-                                data-parsley-filemimetypes="image/jpeg, image/png"
+                                data-parsley-filemimetypes="image/jpeg, image/png, image/gif, image/svg+xml, image/webp, image/heic, image/heif"
                                 data-parsley-errors-container="#image_error">
                         </div>
                         <div class="uploadFile-text">PNG, JPEG</div>

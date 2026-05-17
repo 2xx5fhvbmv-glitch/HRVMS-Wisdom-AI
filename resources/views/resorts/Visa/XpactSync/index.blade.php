@@ -37,11 +37,11 @@
                                         id="Xpatfile" 
                                         name="Xpatfile" 
                                         class="form-control" 
-                                        accept=".jpg,.jpeg,.png,.pdf" 
-                                        required 
+                                        accept=".jpg,.jpeg,.png,.heic,.heif,image/heic,image/heif,.pdf"
+                                        required
                                         data-parsley-required-message="Please upload a file from Xpat"
-                                        data-parsley-fileextension="jpg,jpeg,png,pdf"
-                                        data-parsley-fileextension-message="Only JPG, JPEG, PNG, or PDF files are allowed."
+                                        data-parsley-fileextension="jpg,jpeg,png,heic,heif,pdf"
+                                        data-parsley-fileextension-message="Only JPG, JPEG, PNG, HEIC, HEIF, or PDF files are allowed."
                                         data-parsley-trigger="change"
                                     >
                                     <p class="mb-0">You can upload Single file.</p>
@@ -60,11 +60,11 @@
                                         id="QuotaSlotFees" 
                                         name="QuotaSlotFees" 
                                         class="form-control" 
-                                        accept=".jpg,.jpeg,.png,.pdf" 
+                                        accept=".jpg,.jpeg,.png,.heic,.heif,image/heic,image/heif,.pdf"
                                         required
                                         data-parsley-required-message="Please upload files from Quota Slot Fees"
-                                        data-parsley-fileextension="jpg,jpeg,png,pdf"
-                                        data-parsley-fileextension-message="Only JPG, JPEG, PNG, or PDF files are allowed."
+                                        data-parsley-fileextension="jpg,jpeg,png,heic,heif,pdf"
+                                        data-parsley-fileextension-message="Only JPG, JPEG, PNG, HEIC, HEIF, or PDF files are allowed."
                                         data-parsley-trigger="change">
                                     <p class="mb-0">You can upload Single files.</p>
                                 </div>

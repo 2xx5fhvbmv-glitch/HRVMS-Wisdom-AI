@@ -232,14 +232,14 @@ class SupportController extends Controller
             'attachments.*' => [
                 'nullable',
                 'file',
-                'mimes:jpg,jpeg,png,pdf',
+                'mimes:jpg,jpeg,png,gif,svg,webp,heic,heif,pdf',
                 'max:51200', // 50MB max size
             ],
         ], [
             'category.required' => 'Please  Select Category.',
             'subject.required' => 'Please Enter subject.',
             'description.max' => 'The description  must not exceed 255 characters.',
-            'attachments.in' => 'Please select file as jpg,jpeg,png,pdf".',
+            'attachments.in' => 'Please select file as jpg,jpeg,png,gif,svg,webp,heic,heif,pdf".',
         ]);
 
         

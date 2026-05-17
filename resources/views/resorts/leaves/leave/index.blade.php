@@ -224,7 +224,7 @@
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn">
                                                 <button type="button" class="btn btn-themeBlue btn-sm" onclick="document.getElementById('uploadFile').click();">Upload File</button>
-                                                <input type="file" id="uploadFile" name="attachments" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png">
+                                                <input type="file" id="uploadFile" name="attachments" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.heic,.heif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/heic,image/heif">
                                             </div>
                                             <div class="uploadFile-text">PNG, JPEG, PDF, Word — max 5 MB</div>
                                             <span id="uploadFile-name" class="ms-2 text-muted small"></span>

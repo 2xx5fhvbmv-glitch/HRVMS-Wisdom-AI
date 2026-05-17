@@ -1964,9 +1964,11 @@
 
                 // Image Validation
                 if (fileType === 'Photo') {
-                    const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-                    if (!validImageTypes.includes(file.type)) {
-                        showErrorMessage('Please upload only JPEG, PNG, or JPG images.', errorMessageContainer);
+                    const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/heic', 'image/heif'];
+                    const photoName = (file.name || '').toLowerCase();
+                    const isHeicByExt = photoName.endsWith('.heic') || photoName.endsWith('.heif');
+                    if (!validImageTypes.includes(file.type) && !isHeicByExt) {
+                        showErrorMessage('Please upload only JPEG, PNG, JPG, or HEIC images.', errorMessageContainer);
                         return false;
                     }
 

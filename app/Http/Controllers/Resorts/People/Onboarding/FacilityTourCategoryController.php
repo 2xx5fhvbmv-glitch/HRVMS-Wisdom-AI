@@ -63,8 +63,8 @@ class FacilityTourCategoryController extends Controller
         
         $validator = Validator::make($request->all(), [
             'facilityTourName' => 'required|string|max:255',
-            'thumbnail_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
-            'facilityTourImgs.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            'thumbnail_image' => 'required|mimes:jpeg,png,jpg,gif,svg,webp,heic,heif|max:10240',
+            'facilityTourImgs.*' => 'nullable|mimes:jpeg,png,jpg,gif,svg,webp,heic,heif|max:10240',
         ], [
             'thumbnail_image.max' => 'The facility tour image must not be larger than 10MB.',
             'facilityTourImgs.*.max' => 'Each tour image must not be larger than 10MB.',
@@ -87,9 +87,9 @@ class FacilityTourCategoryController extends Controller
         }
 
         $fileManagement = FilemangementSystem::where('Folder_Name','facilityTourCategory')->first();
-        if($fileManagement){
-            $folderName = $fileManagement->Folder_Name;
-        }
+        // Default keeps the AWS upload working even if the folder row is
+        // missing — $folderName was previously undefined in that case.
+        $folderName = $fileManagement->Folder_Name ?? 'facilityTourCategory';
         $category_image = $request->file('thumbnail_image');
         $image_url = null;
 
@@ -109,6 +109,11 @@ class FacilityTourCategoryController extends Controller
             return response()->json(['success' => false, 'message' => 'Thumbnail image upload failed.'], 500);
         }
         
+        // Extra tour images are optional (validated as nullable). Only
+        // upload them when present — the previous `else` returned a 500
+        // "Tour images upload failed" even though the category had already
+        // been created successfully, so every category saved without extra
+        // images surfaced an error.
         if ($request->hasFile('facilityTourImgs') && $facilityTourCategory) {
             foreach ($request->file('facilityTourImgs') as $image) {
                 $aws = Common::AWSEmployeeFacilityCategoryImageUpload($this->resort->resort_id, $image,$folderName);
@@ -119,10 +124,8 @@ class FacilityTourCategoryController extends Controller
                     ]);
                 }
             }
-        }else{
-            return response()->json(['success' => false, 'message' => 'Tour images upload failed.'], 500);
         }
-        
+
         return response()->json(['success' => true, 'message' => 'Facility Tour Category created successfully.'], 200);
 
     }
@@ -186,7 +189,7 @@ class FacilityTourCategoryController extends Controller
     public function imageUpdate(Request $request){
 
         $validator = Validator::make($request->all(), [
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:4096',
+            'image' => 'required|mimes:jpeg,png,jpg,gif,svg,webp,heic,heif|max:4096',
         ]);
 
         if ($validator->fails()) {

@@ -728,7 +728,7 @@ $(document).ready(function ()
         const file = this.files[0];
 
         if (file) {
-            const allowedExtensions = ['pdf', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'];
+            const allowedExtensions = ['pdf', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic', 'heif'];
             const fileExtension = file.name.split('.').pop().toLowerCase();
 
             if (!allowedExtensions.includes(fileExtension)) {

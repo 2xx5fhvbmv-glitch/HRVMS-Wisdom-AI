@@ -96,13 +96,36 @@
                         <div class="col-md-6 col-sm-6">
                             <label for="transfer_status" class="form-label">TRANSFER STATUS <span class="red-mark">*</span></label>
                             <select class="form-select select2t-none" id="transfer_status" name="transfer_status"
-                                aria-label="Default select example" required 
+                                aria-label="Default select example" required
                                 data-parsley-required-message="Please select transfer status" data-parsley-errors-container="#status-error">
                                 <option value="">Transfer Status</option>
                                 <option value="Permanent">Permanent</option>
                                 <option value="Temporary">Temporary</option>
                             </select>
                             <div id="status-error"></div>
+                        </div>
+                        {{-- Item 3 — Temporary transfer period (shown only when type = Temporary) --}}
+                        <div class="col-md-3 col-sm-6 temporary-period-field d-none">
+                            <label for="temporary_from" class="form-label">TEMPORARY FROM <span class="red-mark">*</span></label>
+                            <input type="text" id="temporary_from" name="temporary_from" class="form-control datepicker" placeholder="From Date"
+                                data-parsley-errors-container="#temp-from-error">
+                            <div id="temp-from-error"></div>
+                        </div>
+                        <div class="col-md-3 col-sm-6 temporary-period-field d-none">
+                            <label for="temporary_to" class="form-label">TEMPORARY TO <span class="red-mark">*</span></label>
+                            <input type="text" id="temporary_to" name="temporary_to" class="form-control datepicker" placeholder="To Date"
+                                data-parsley-errors-container="#temp-to-error">
+                            <div id="temp-to-error"></div>
+                        </div>
+                        {{-- Item 2 — Budgeted salary (read-only) + proposed salary --}}
+                        <div class="col-md-6 col-sm-6">
+                            <label for="budgeted_salary_display" class="form-label">BUDGETED SALARY (TARGET POSITION)</label>
+                            <input type="text" id="budgeted_salary_display" class="form-control" readonly placeholder="Select target position"/>
+                        </div>
+                        <div class="col-md-6 col-sm-6">
+                            <label for="proposed_salary" class="form-label">PROPOSED SALARY</label>
+                            <input type="number" step="0.01" min="0" id="proposed_salary" name="proposed_salary" class="form-control" placeholder="Proposed Salary"
+                                data-parsley-type="number" data-parsley-min="0">
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="additional_notes" class="form-label">ADDITIONAL NOTES</label>
@@ -267,7 +290,7 @@
             }
         });
 
-        $('#target_pos').on('change', function () { 
+        $('#target_pos').on('change', function () {
             var positionId = $(this).val();
             var departmentId = $('#target_dep').val();
             if (positionId) {
@@ -281,7 +304,6 @@
                     },
                     dataType: 'json',
                     success: function (data) {
-                        console.log(data);
                         let string = '<option value="">Select Reporting Manager</option>'; // ✅ initialize
                         if (data.success === true) {
                             $.each(data.data, function (key, value) {
@@ -291,10 +313,53 @@
                         $("#reporting_manager").html(string); // ✅ update dropdown
                     }
                 });
+
+                // Item 2 — fetch budgeted salary for the chosen target position
+                $.ajax({
+                    url: '{{ route("transfer.positionBudget") }}',
+                    type: "post",
+                    data: {
+                        target_pos: positionId,
+                        target_dep: departmentId,
+                        _token: '{{ csrf_token() }}'
+                    },
+                    dataType: 'json',
+                    success: function (res) {
+                        if (res.success && res.budgeted_salary !== null && res.budgeted_salary !== undefined) {
+                            $('#budgeted_salary_display').val(parseFloat(res.budgeted_salary).toFixed(2));
+                        } else {
+                            $('#budgeted_salary_display').val('No budgeted salary on record');
+                        }
+                    },
+                    error: function () {
+                        $('#budgeted_salary_display').val('');
+                    }
+                });
             } else {
                 $('#target_pos').html('<option value="">Select Position</option>');
+                $('#budgeted_salary_display').val('');
             }
         });
+
+        // Item 3 — show/hide & require the temporary period when type = Temporary
+        function toggleTemporaryFields() {
+            var isTemporary = $('#transfer_status').val() === 'Temporary';
+            if (isTemporary) {
+                $('.temporary-period-field').removeClass('d-none');
+                $('#temporary_from, #temporary_to')
+                    .attr('required', 'required')
+                    .attr('data-parsley-required-message', 'Please select the temporary period');
+            } else {
+                $('.temporary-period-field').addClass('d-none');
+                $('#temporary_from, #temporary_to')
+                    .removeAttr('required')
+                    .val('');
+                form1.reset();
+            }
+        }
+
+        $('#transfer_status').on('change', toggleTemporaryFields);
+        toggleTemporaryFields();
     });
 
     function getEmpDetails(empId) {

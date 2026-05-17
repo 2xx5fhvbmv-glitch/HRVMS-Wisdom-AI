@@ -846,15 +846,15 @@ $(document).ready(function() {
                     Jobadvimg: {
                         required: true,
                         fileSize: 2 * 1024 * 1024 ,
-                        extension: "jfif|jpg|jpeg|png",
-                        accept: "image/jpeg,image/pjpeg,image/png"
+                        extension: "jfif|jpg|jpeg|png|gif|svg|webp|heic|heif",
+                        accept: "image/jpeg,image/pjpeg,image/png,image/gif,image/svg+xml,image/webp,image/heic,image/heif"
                     },
 
                 },
                 messages: {
                     Jobadvimg: {
                         required: "Please Upload Job Advertisment Image.",
-                        extension: "Please upload a valid image format (JFIF, JPG, JPEG, PNG)",
+                        extension: "Please upload a valid image format (JFIF, JPG, JPEG, PNG, GIF, SVG, WEBP, HEIC, HEIF)",
                         accept: "Please upload a valid image file",
                         fileSize: "The file size must not exceed 2MB."
                     },
