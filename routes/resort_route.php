@@ -1764,6 +1764,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       //Itinerary Creation
       Route::get('people/onboarding/itinerary/create', 'People\Onboarding\OnboardingController@createItinerary')->name('onboarding.itinerary.create');
       Route::get('people/onboarding/itinerary/get-upcoming-employees', 'People\Onboarding\OnboardingController@getupcomingEmployees')->name('people.onboarding.upcoming_employees');
+      Route::post('people/onboarding/convert-applicant', 'People\Onboarding\OnboardingController@convertApplicant')->name('people.onboarding.convertApplicant');
       Route::post('/get-templates-for-employees', 'People\Onboarding\OnboardingController@getTemplatesForEmployees')->name('people.onboarding.getTemplatesForEmployees');
 
       Route::post('/people/onboarding/get-employee-details', 'People\Onboarding\OnboardingController@getEmployeeDetails')

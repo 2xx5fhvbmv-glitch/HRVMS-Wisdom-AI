@@ -66,8 +66,13 @@ class ProbationController extends Controller
                 });
             }
 
-            if($request->filled('date')){
-                $query->where('probation_end_date', $request->date);
+            // Date-range filter on probation end date (From / To).
+            if($request->filled('date_from') && $request->filled('date_to')){
+                $query->whereBetween('probation_end_date', [$request->date_from, $request->date_to]);
+            } elseif($request->filled('date_from')){
+                $query->whereDate('probation_end_date', '>=', $request->date_from);
+            } elseif($request->filled('date_to')){
+                $query->whereDate('probation_end_date', '<=', $request->date_to);
             }
             $edit_class = '';
             if(Common::checkRouteWisePermission('people.probation',config('settings.resort_permissions.view')) == false){
@@ -96,18 +101,30 @@ class ProbationController extends Controller
                 ->addColumn('position', fn($row) => optional($row->position)->position_title)
                 ->addColumn('department', fn($row) => optional($row->department)->name)
                 ->addColumn('joining_date', function ($row) {
-                    $date = \Carbon\Carbon::parse($row->joining_date);
-                    return $date->format('d M Y') . ' (' . $date->diffForHumans(null, true) . ')';
-                })
-                ->addColumn('probation_end_date', function ($row) {
-                    // Carbon::parse(null) silently returns "now", which made
-                    // every employee with no probation_end_date show today's
-                    // date. Show a clear placeholder instead.
-                    if (empty($row->probation_end_date)) {
+                    // Carbon::parse(null) silently returns "now" — without this
+                    // guard employees with no joining date wrongly showed
+                    // today's date (and then no derived probation end date).
+                    if (empty($row->joining_date)) {
                         return 'Not set';
                     }
-                    $end = \Carbon\Carbon::parse($row->probation_end_date);
-                    return $end->format('d M Y') . ' (' . $end->diffForHumans(null, true) . ')';
+                    return \Carbon\Carbon::parse($row->joining_date)->format('d M Y');
+                })
+                ->addColumn('probation_end_date', function ($row) {
+                    // Use the explicit probation_end_date; when it isn't set,
+                    // derive it as joining_date + 3 months (the standard
+                    // probation window). Falls back to a placeholder only when
+                    // there is no joining date either — Carbon::parse(null)
+                    // would otherwise silently return "now".
+                    $end = null;
+                    if (!empty($row->probation_end_date)) {
+                        $end = \Carbon\Carbon::parse($row->probation_end_date);
+                    } elseif (!empty($row->joining_date)) {
+                        $end = \Carbon\Carbon::parse($row->joining_date)->addMonths(3);
+                    }
+                    if (!$end) {
+                        return 'Not set';
+                    }
+                    return $end->format('d M Y');
                 })
                 ->addColumn('onboarding_training', function ($row) use ($resortId, $probationaryProgramIds, $probationaryProgramCount) {
                     // Reflects the employee's progress on the resort's probationary
@@ -139,7 +156,10 @@ class ProbationController extends Controller
                     return '<span class="badge badge-themeDangerNew">Not Started</span>';
                 })
                 ->addColumn('monthly_checkin_status', function ($row) use ($request) {
-                    $month = $request->get('month') ?? Carbon::now()->format('Y-m');
+                    // "All Months" sends an empty month — fall back to the
+                    // current month for the per-month check-in status column
+                    // (Carbon::parse('-01') would otherwise error).
+                    $month = $request->filled('month') ? $request->get('month') : Carbon::now()->format('Y-m');
                     $startOfMonth = Carbon::parse($month . '-01')->startOfMonth()->format('Y-m-d');
                     $endOfMonth = Carbon::parse($month . '-01')->endOfMonth()->format('Y-m-d');
 
@@ -176,9 +196,11 @@ class ProbationController extends Controller
                             <a class="btn-lg-icon btnIcon-danger fail-probation '.$edit_class.'" title="Failed Probation" data-id="'.$row->id.'">
                                 <i class="fa-solid fa-xmark"></i> 
                             </a>
+                            <!-- Extend Probation action hidden for now (per request).
                             <a class="btn-lg-icon btnIcon-yellow extend-probation '.$edit_class.'" title="Extend Probation" data-id="'.$row->id.'">
                                 <i class="fa-solid fa-clock-rotate-left"></i>
                             </a>
+                            -->
                             <a href="' . $viewUrl . '" class="btn-lg-icon btnIcon-skyblue" title="View Detail">
                                 <i class="fa-regular fa-eye"></i> 
                             </a>
@@ -206,43 +228,81 @@ class ProbationController extends Controller
         $page_title ='Probation Details';
         $employeeId = base64_decode($id);
         $employee = Employee::with(['resortAdmin','position','department','section','reportingTo.position','reportingTo.department','reportingToAdmin'])->findOrFail($employeeId);
-        $joiningDate = Carbon::parse($employee->joining_date)->startOfMonth();
-        $probationEnd = Carbon::parse($employee->probation_end_date)->endOfMonth();
-        // dd($probationEnd);
-        
-        $monthlyCheckins = [];
+        // Probation is a 3-month window. The end date is probation_end_date
+        // when set, otherwise joining_date + 3 months. Carbon::parse(null)
+        // silently returns "now", so guard against a missing joining date —
+        // without it everything collapsed to today and only one monthly
+        // check-in was generated.
+        $probationMonths = 3;
         $today = Carbon::today();
-        
-        $current = $joiningDate->copy();
-        while ($current->lessThanOrEqualTo($probationEnd)) {
-            $startOfMonth = $current->copy()->startOfMonth()->format('Y-m-d');
-            $endOfMonth = $current->copy()->endOfMonth()->format('Y-m-d');
-            // dd($startOfMonth, $endOfMonth);
-            $checkin = MonthlyCheckingModel::where('emp_id', $employee->id)
-                ->whereRaw("STR_TO_DATE(date_discussion, '%d/%m/%Y') BETWEEN ? AND ?", [$startOfMonth, $endOfMonth])
-                ->first();
-            // dd($checkin)
+        $joiningDate  = $employee->joining_date ? Carbon::parse($employee->joining_date) : null;
+        $probationEnd = $employee->probation_end_date
+            ? Carbon::parse($employee->probation_end_date)
+            : ($joiningDate ? $joiningDate->copy()->addMonths($probationMonths) : null);
+
+        // Probation is "completed" only once its window has fully elapsed —
+        // used to warn HR before sending a Probation Successful letter early.
+        $probationCompleted = $probationEnd ? $probationEnd->isPast() : false;
+
+        // Progress / days-remaining.
+        $totalDays = ($joiningDate && $probationEnd) ? $joiningDate->diffInDays($probationEnd) : 0;
+        $remainingDays = 0;
+        $progress = 0;
+        if ($joiningDate && $probationEnd) {
+            $remainingDays = $today->lte($probationEnd)
+                ? ($today->lt($joiningDate) ? $totalDays : $today->diffInDays($probationEnd))
+                : 0;
+            $daysPassed = $totalDays - $remainingDays;
+            $progress = $totalDays > 0 ? min(100, round(($daysPassed / $totalDays) * 100)) : 0;
+        }
+
+        // Always emit 3 monthly check-ins (3-month probation) so the Progress
+        // Tracking timeline is consistent. When the employee has a joining
+        // date the real due date + status are computed; with no joining date
+        // the check-in still shows as "Not set" / Pending rather than
+        // vanishing from the timeline.
+        $monthlyCheckins = [];
+        for ($i = 0; $i < $probationMonths; $i++) {
+            $label = 'Not set';
             $status = 'Pending';
             $badgeClass = 'badge-themeWarning';
-        
-            if ($current->lt($today)) {
-                $status = $checkin ? 'Completed' : 'Missed';
-                $badgeClass = $checkin ? 'badge-themeSuccess' : 'badge-themeDangerNew';
-            } elseif ($current->isSameMonth($today)) {
-                $status = $checkin ? 'Completed' : 'Pending';
-                $badgeClass = $checkin ? 'badge-themeSuccess' : 'badge-themeWarning';
+
+            if ($joiningDate) {
+                $monthStart = $joiningDate->copy()->addMonths($i);
+                $monthEnd   = $joiningDate->copy()->addMonths($i + 1);
+                $label = $monthEnd->format('d M Y');
+
+                $checkin = MonthlyCheckingModel::where('emp_id', $employee->id)
+                    ->whereRaw("STR_TO_DATE(date_discussion, '%d/%m/%Y') BETWEEN ? AND ?", [
+                        $monthStart->format('Y-m-d'),
+                        $monthEnd->format('Y-m-d'),
+                    ])
+                    ->first();
+
+                if ($monthEnd->lt($today)) {
+                    $status = $checkin ? 'Completed' : 'Missed';
+                    $badgeClass = $checkin ? 'badge-themeSuccess' : 'badge-themeDangerNew';
+                } elseif ($checkin) {
+                    $status = 'Completed';
+                    $badgeClass = 'badge-themeSuccess';
+                }
             }
-        
+
             $monthlyCheckins[] = [
-                'label' => $current->format('F Y'),
+                'label' => $label,
                 'status' => $status,
                 'badge_class' => $badgeClass,
             ];
-        
-            $current->addMonth();
         }
-        
-        return view('resorts.people.probation.detail',compact('page_title','employee','monthlyCheckins'));
+
+        $joiningLabel      = $joiningDate ? $joiningDate->format('d M Y') : 'Not set';
+        $probationEndLabel = $probationEnd ? $probationEnd->format('d M Y') : 'Not set';
+
+        return view('resorts.people.probation.detail', compact(
+            'page_title', 'employee', 'monthlyCheckins',
+            'joiningLabel', 'probationEndLabel', 'remainingDays', 'progress',
+            'probationCompleted'
+        ));
     }
 
     public function confirmProbation(Request $request, $id)
@@ -454,16 +514,30 @@ class ProbationController extends Controller
         if (!$template) {
             return response()->json(['error' => 'Template not found for this resort and type.'], 404);
         }
-        $probationEndDate = \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y');
+        // Probation end: the explicit column, else joining_date + 3 months
+        // (Carbon::parse(null) would otherwise put today's date in the letter).
+        if ($employee->probation_end_date) {
+            $probationEndDate = \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y');
+        } elseif ($employee->joining_date) {
+            $probationEndDate = \Carbon\Carbon::parse($employee->joining_date)->addMonths(3)->format('d M Y');
+        } else {
+            $probationEndDate = 'N/A';
+        }
 
+        // Every placeholder the probation letter templates can use must be
+        // filled — any {{token}} not listed here renders literally in the
+        // sent email. Templates use Department_title and employee_code, which
+        // were previously missing.
         $placeholders = [
             '{{employee_name}}'       => (string) optional($employee->resortAdmin)->full_name,
+            '{{employee_code}}'       => (string) $employee->Emp_id,
             '{{position}}'            => (string) optional($employee->position)->position_title,
+            '{{position_title}}'      => (string) optional($employee->position)->position_title,
+            '{{Department_title}}'    => (string) optional($employee->department)->name,
             '{{resort_name}}'         => (string) $resort->resort_name,
             '{{probation_end_date}}'  => $probationEndDate,
             '{{date}}'                => now()->format('d M Y'),
             '{{employment_type}}'     => (string) $employee->employment_type,
-            '{{position_title}}'      => (string) optional($employee->position)->position_title,
         ];
 
         $letterContent = strtr($template->content, $placeholders);

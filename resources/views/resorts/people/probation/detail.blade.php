@@ -36,7 +36,7 @@
                         </div>
                     </div>
                     <div class="col-auto text-end ms-auto">
-                        <p class="mb-2"><i>Joining Date: {{ \Carbon\Carbon::parse($employee->joining_date)->format('d M Y') }}</i></p>
+                        <p class="mb-2"><i>Joining Date: {{ $joiningLabel }}</i></p>
                         <span class="badge badge-themeSuccess">{{$employee->probation_status}} Probation</span>
                     </div>
                     <div class="col-auto">
@@ -46,26 +46,8 @@
                         <button onclick="printCard()" class="btn btn-themeBlue btn-sm">Print</button>
                     </div>
                 </div>
-                @php
-                    $startDate = \Carbon\Carbon::parse($employee->joining_date);
-                    $endDate = \Carbon\Carbon::parse($employee->probation_end_date);
-                    $today = \Carbon\Carbon::now();
-
-                    $totalDays = $startDate->diffInDays($endDate);
-                    
-                    if ($today->lte($endDate)) {
-                        // If today is before or equal to end date, calculate remaining days directly
-                        $remainingDays = $today->diffInDays($endDate);
-                        $daysPassed = $totalDays - $remainingDays;
-                    } else {
-                        // If probation period is already over
-                        $remainingDays = 0;
-                        $daysPassed = $totalDays;
-                    }
-                    
-                    $progress = $totalDays > 0 ? min(100, round(($daysPassed / $totalDays) * 100)) : 0;
-                @endphp
-
+                {{-- $remainingDays and $progress are computed in the controller
+                     (probation_end_date, or joining_date + 3 months). --}}
                 <div class="bg-themeGrayLight mb-md-4 mb-3">
                     <div class="row g-md-2 g-1 justify-content-between mb-md-3 mb-2">
                         <div class="col-auto">
@@ -83,10 +65,10 @@
                     </div>
                     <div class="row g-md-2 g-1 justify-content-between">
                         <div class="col-auto">
-                            <p>Start Date: {{ \Carbon\Carbon::parse($employee->joining_date)->format('d M Y') }}</p>
+                            <p>Start Date: {{ $joiningLabel }}</p>
                         </div>
                         <div class="col-auto">
-                            <p>End Date: {{ \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y') }}</p>
+                            <p>End Date: {{ $probationEndLabel }}</p>
                         </div>
                     </div>
                 </div>
@@ -139,7 +121,7 @@
                                 <li class="active">
                                     <div>
                                         <h6>Onboarding Training</h6>
-                                        <p>Due: 01 Jan 2025</p>
+                                        <p>Due: {{ $joiningLabel }}</p>
                                     </div>
                                     <span class="badge badge-themeSuccess">Completed</span>
                                 </li>
@@ -155,7 +137,7 @@
                                 <li>
                                     <div>
                                         <h6>Final Probation Review</h6>
-                                        <p>Due: 01 Mar 2025</p>
+                                        <p>Due: {{ $probationEndLabel }}</p>
                                     </div>
                                     <span class="badge badge-themeWarning">Pending</span>
                                 </li>
@@ -166,7 +148,7 @@
                 <div class="card-footer">
                     <div class="row g-2">
                         <div class="col-auto"> 
-                            <a href="#" class="btn btn-themeNeon btn-sm send-letter" data-id="{{ $employee->id }}" data-type="success">
+                            <a href="#" class="btn btn-themeNeon btn-sm send-letter" data-id="{{ $employee->id }}" data-type="success" data-probation-completed="{{ ($probationCompleted ?? false) ? 1 : 0 }}">
                                 Send Probation Successful Letter
                             </a>
                         </div>
@@ -181,6 +163,25 @@
                             </a>
                         </div> -->
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{-- Warning shown before sending a Probation Successful letter while the
+         probation period is not yet complete. --}}
+    <div class="modal fade" id="probationWarningModal" tabindex="-1" aria-labelledby="probationWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="probationWarningModalLabel">Probation Not Complete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">This employee's probation period is <strong>not complete yet</strong>. Are you sure you want to send the <strong>Probation Successful</strong> letter?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-themeBlue btn-sm" id="confirmSendSuccessLetter">Send Anyway</button>
                 </div>
             </div>
         </div>
@@ -213,9 +214,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('.send-letter').on('click', function () {
-            const empId = $(this).data('id');
-            const type = $(this).data('type');
+        // Letter awaiting confirmation from the "probation not complete" modal.
+        var pendingLetter = null;
+
+        function sendProbationLetter(empId, type) {
             $.ajax({
                 url: '{{route("probation.send-letter")}}',
                 method: 'POST',
@@ -225,12 +227,55 @@
                     type: type
                 },
                 success: function (response) {
-                    // alert(response.message);
-                    toastr.success(response.message, "Success", {
+                    if (response && response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    } else {
+                        // e.g. PDF generation failed — controller returns 200
+                        // with success:false.
+                        toastr.error((response && response.message) ? response.message : 'Could not send the letter.', "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function (xhr) {
+                    // e.g. 404 when no letter template is configured for this
+                    // type — previously this failed silently (no error handler).
+                    var msg = 'Could not send the letter.';
+                    if (xhr.responseJSON) {
+                        msg = xhr.responseJSON.error || xhr.responseJSON.message || msg;
+                    }
+                    toastr.error(msg, "Error", {
                         positionClass: 'toast-bottom-right'
                     });
                 }
             });
+        }
+
+        $('.send-letter').on('click', function () {
+            var $btn = $(this);
+            var empId = $btn.data('id');
+            var type = $btn.data('type');
+
+            // Warn (via modal) before sending a "Successful" letter while the
+            // probation period is not yet complete.
+            if (type === 'success' && String($btn.data('probation-completed')) !== '1') {
+                pendingLetter = { empId: empId, type: type };
+                $('#probationWarningModal').modal('show');
+                return;
+            }
+
+            sendProbationLetter(empId, type);
+        });
+
+        // Confirmed from the warning modal — proceed with the send.
+        $('#confirmSendSuccessLetter').on('click', function () {
+            $('#probationWarningModal').modal('hide');
+            if (pendingLetter) {
+                sendProbationLetter(pendingLetter.empId, pendingLetter.type);
+                pendingLetter = null;
+            }
         });
     });
     function printCard() {

@@ -741,6 +741,37 @@
             });
         }
 
+        // Step 1 continuation: given a resolved employees.id, load the employee
+        // details, store them, and advance to Step 2. Shared by both real
+        // employees and applicants that were just auto-converted.
+        function proceedStep1WithEmployee($current, selectedEmployee) {
+            $('#selectedEmployeeId').val(selectedEmployee);
+            localStorage.setItem("employee_id", selectedEmployee);
+
+            fetchEmployeeDetails(selectedEmployee).then(function(employeeData) {
+                localStorage.setItem("employee_name", employeeData.full_name);
+                localStorage.setItem("employee_role", employeeData.position);
+                localStorage.setItem("employee_department", employeeData.department);
+                localStorage.setItem("employee_emp_id", employeeData.emp_id);
+                localStorage.setItem("employee_image", employeeData.profile_image);
+                localStorage.setItem("AdminParentId", employeeData.admin_parent_id);
+
+                // Store joining date and update datepicker validation
+                if (employeeData.joining_date) {
+                    localStorage.setItem("employee_joining_date", employeeData.joining_date);
+                    updateDatepickerValidation();
+                }
+
+                // Move to next step after employee details are loaded
+                moveToNextStep($current, function () {
+                    fetchTemplatesForEmployee(selectedEmployee);
+                });
+            }).catch(function(error) {
+                console.error('Error fetching employee details:', error);
+                toastr.error("Error loading employee details. Please try again.");
+            });
+        }
+
         $(".next").click(function (e) {
             e.preventDefault();
             const $current = $(this).closest("fieldset");
@@ -748,38 +779,44 @@
 
             // Updated Step 1 next button handler
             if (currentStep === 1) {
-                const selectedEmployee = $(".employee-radio:checked").val();
-                if (!selectedEmployee) {
+                const selectedValue = $(".employee-radio:checked").val();
+                if (!selectedValue) {
                     toastr.error("Please select an employee.");
                     return;
                 }
 
-                $('#selectedEmployeeId').val(selectedEmployee);
-                localStorage.setItem("employee_id", selectedEmployee);
-
-                // Fetch and store employee details
-                fetchEmployeeDetails(selectedEmployee).then(function(employeeData) {
-                    localStorage.setItem("employee_name", employeeData.full_name);
-                    localStorage.setItem("employee_role", employeeData.position);
-                    localStorage.setItem("employee_department", employeeData.department);
-                    localStorage.setItem("employee_emp_id", employeeData.emp_id);
-                    localStorage.setItem("employee_image", employeeData.profile_image);
-                    localStorage.setItem("AdminParentId", employeeData.admin_parent_id);
-
-                    // Store joining date and update datepicker validation
-                    if (employeeData.joining_date) {
-                        localStorage.setItem("employee_joining_date", employeeData.joining_date);
-                        updateDatepickerValidation();
-                    }
-
-                    // Move to next step after employee details are loaded
-                    moveToNextStep($current, function () {
-                        fetchTemplatesForEmployee(selectedEmployee);
+                // The selected radio is either a real employees.id, or an
+                // accepted Talent Acquisition applicant carried as
+                // `applicant:<applicant_id>`. In the latter case we first
+                // auto-create (or reuse) the Employee record server-side and
+                // then continue onboarding with the resulting employees.id.
+                if (String(selectedValue).startsWith('applicant:')) {
+                    const applicantId = String(selectedValue).split(':')[1];
+                    const $btn = $(this);
+                    $btn.prop('disabled', true);
+                    $.ajax({
+                        url: '{{ route("people.onboarding.convertApplicant") }}',
+                        method: 'POST',
+                        data: { applicant_id: applicantId, _token: '{{ csrf_token() }}' }
+                    }).done(function (resp) {
+                        $btn.prop('disabled', false);
+                        if (resp && resp.success && resp.employee_id) {
+                            // Refresh the candidate list so the row now renders
+                            // as a real (matched) employee on subsequent visits.
+                            getUpcomingEmployees();
+                            proceedStep1WithEmployee($current, resp.employee_id);
+                        } else {
+                            toastr.error((resp && resp.message) || 'Could not create the employee record.');
+                        }
+                    }).fail(function (xhr) {
+                        $btn.prop('disabled', false);
+                        const msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Could not create the employee record.';
+                        toastr.error(msg);
                     });
-                }).catch(function(error) {
-                    console.error('Error fetching employee details:', error);
-                    toastr.error("Error loading employee details. Please try again.");
-                });            
+                    return;
+                }
+
+                proceedStep1WithEmployee($current, selectedValue);
             } else if (currentStep === 2) {
                 const selectedTemplate = $('#templateContainer input[name="template_id"]:checked').val();
                 if (!selectedTemplate) {

@@ -25,6 +25,7 @@ class Employee extends Model
         'resort_id', //unique resort id which take form the resort
         'Resort_role_id',
         'Emp_id',
+        'applicant_id',
         'device_token',
         'Dept_id',
         'Section_id',

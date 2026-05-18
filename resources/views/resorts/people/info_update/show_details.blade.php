@@ -35,12 +35,19 @@
           @continue(trim((string) $data) === trim((string) $newValue))
           @php $changedCount++; @endphp
 
-          {{-- Only the requested new value is shown — the current value is
-               omitted per request. --}}
+          {{-- Two-column comparison — current value on the left, the value
+               the employee requested on the right. Only fields that actually
+               changed appear (the @continue above skips unchanged entries). --}}
           <div class="col-sm-6">
                <div class="bg-themeGrayLight h-100">
-                    <h6>{{ucwords(str_replace('_', ' ', $key))}}</h6>
-                    <p>{{$newValue}}</p>
+                    <h6>Current {{ucwords(str_replace('_', ' ', $key))}}</h6>
+                    <p>{{ ($data !== null && $data !== '') ? $data : '—' }}</p>
+               </div>
+          </div>
+          <div class="col-sm-6">
+               <div class="bg-themeGrayLight h-100">
+                    <h6>Requested {{ucwords(str_replace('_', ' ', $key))}}</h6>
+                    <p>{{ ($newValue !== null && $newValue !== '') ? $newValue : '—' }}</p>
                </div>
           </div>
           @endforeach
