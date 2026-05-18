@@ -60,8 +60,11 @@
                                 <option value="Failed">Failed</option>
                             </select>
                         </div>
-                        <div class="col-xl-2 col-md-4 col-sm-4 col-6"> 
-                            <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
+                        <div class="col-xl-2 col-md-4 col-sm-4 col-6">
+                            <input type="text" id="dateFromFilter" class="form-control datepicker" placeholder="From Date" autocomplete="off"/>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-sm-4 col-6">
+                            <input type="text" id="dateToFilter" class="form-control datepicker" placeholder="To Date" autocomplete="off"/>
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                             <select class="form-select select2t-none" id="trainingStatusFilter">
@@ -73,6 +76,7 @@
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                             <select id="filter_month" class="form-control">
+                                <option value="">All Months</option>
                                 @for ($i = 0; $i < 12; $i++)
                                     @php
                                         $monthDate = \Carbon\Carbon::now()->subMonthsNoOverflow($i);
@@ -148,7 +152,7 @@
         });
         getProbationaryData();
 
-        $('#searchInput, #dateFilter, #statusFilter, #deptFilter, #positionFilter, #trainingStatusFilter').on('keyup change', function () {
+        $('#searchInput, #dateFromFilter, #dateToFilter, #statusFilter, #deptFilter, #positionFilter, #trainingStatusFilter').on('keyup change', function () {
             getProbationaryData();
         });
 
@@ -314,15 +318,18 @@
                     d.searchTerm = $('#searchInput').val();
                     d.status = $('#statusFilter').val();
                     d.trainingStatus = $('#trainingStatusFilter').val();
-                    d.month = $('#filter_month').val();  // new month filter (YYYY-MM)
+                    d.month = $('#filter_month').val();  // month filter (YYYY-MM); '' = All Months
 
-                    let selectedDate = $('#dateFilter').val();
-                    if (selectedDate) {
-                        let parts = selectedDate.split('/');
-                        d.date = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                    } else {
-                        d.date = '';
-                    }
+                    // Date-range filter on probation end date.
+                    const toYmd = function (v) {
+                        if (!v) return '';
+                        const p = v.split('/');
+                        return p.length === 3
+                            ? `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`
+                            : '';
+                    };
+                    d.date_from = toYmd($('#dateFromFilter').val());
+                    d.date_to = toYmd($('#dateToFilter').val());
                 }
             },
             columns: [

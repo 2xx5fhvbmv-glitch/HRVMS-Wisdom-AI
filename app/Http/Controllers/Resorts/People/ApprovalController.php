@@ -50,14 +50,20 @@ class ApprovalController extends Controller
             // Get employee IDs that current user is delegated for (on-leave employees)
             $delegatedForIds = Common::getDelegatedEmployeeIds($employee->id, $resort->resort_id);
 
-            // Batch fetch ranks for all delegated employees to avoid N+1
-            $delegatedRanks = !empty($delegatedForIds)
-                ? Employee::whereIn('id', $delegatedForIds)->pluck('rank', 'id')->toArray()
-                : [];
-            $isDelegateForHR = in_array(3, $delegatedRanks);
+            // Batch fetch rank + department for all delegated employees (avoid N+1).
+            $delegatedEmployees = !empty($delegatedForIds)
+                ? Employee::whereIn('id', $delegatedForIds)->get(['id', 'rank', 'Dept_id'])
+                : collect();
+            $delegatedRanks = $delegatedEmployees->pluck('rank', 'id')->toArray();
+            // HR is identified by DEPARTMENT, not rank. `rank` stores a seniority
+            // grade (EXCOM/HOD/MGR/SUP/LINE) — no HR position is graded rank 3,
+            // so the old `rank == 3` check matched nobody and hid every
+            // Info-Update approval from HR. Detect HR via the department.
+            $isHR = Common::isHRDepartment($employee->Dept_id ?? null);
+            $isDelegateForHR = $delegatedEmployees->contains(fn($e) => Common::isHRDepartment($e->Dept_id));
             $isDelegateForFinance = in_array(7, $delegatedRanks);
             $isDelegateForGM = in_array(8, $delegatedRanks);
-            if ($rank == 3 || $isDelegateForHR) {
+            if ($isHR || $isDelegateForHR) {
                 $infoUpdateQuery = EmployeeInfoUpdateRequest::where('resort_id', $resort->resort_id)
                     ->where('status', 'Pending')
                     ->with(['employee.resortAdmin', 'employee.department', 'employee.position'])

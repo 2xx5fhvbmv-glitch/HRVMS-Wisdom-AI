@@ -13,6 +13,8 @@ use App\Models\EmployeeItineraries;
 use App\Models\EmployeeItinerariesMeeting;
 use App\Models\Resort;
 use App\Models\Employee;
+use App\Models\ResortAdmin;
+use App\Models\Applicant_form_data;
 use App\Models\CulturalInsights;
 use App\Models\ResortTransportation;
 use Auth;
@@ -108,7 +110,14 @@ class OnboardingController extends Controller
         // downstream itinerary flow (which needs employees.id) keeps working.
         $upcoming_candidates = $applicants->map(function ($a) use ($resort_id) {
             $employee = null;
-            if (!empty($a->passport_no)) {
+            // Prefer the explicit applicant_id link — once a candidate has
+            // been auto-converted (convertApplicant) this is the reliable
+            // match even if passport/email later change.
+            $employee = Employee::with(['resortAdmin', 'department', 'position'])
+                ->where('resort_id', $resort_id)
+                ->where('applicant_id', $a->applicant_id)
+                ->first();
+            if (!$employee && !empty($a->passport_no)) {
                 $employee = Employee::with(['resortAdmin', 'department', 'position'])
                     ->where('resort_id', $resort_id)
                     ->where('passport_number', $a->passport_no)
@@ -132,6 +141,258 @@ class OnboardingController extends Controller
         $view = view('resorts.renderfiles.upcoming-employees', compact('upcoming_candidates'))->render();
 
         return response()->json(['html' => $view]);
+    }
+
+    /**
+     * Auto-create (or reuse) the Employee record for an accepted Talent
+     * Acquisition applicant so that onboarding Step 1 can proceed.
+     *
+     * The whole downstream onboarding itinerary flow (getEmployeeDetails,
+     * storeItinerary, EmployeeItineraries.employee_id FK, joining-date
+     * validation) is coupled to an `employees.id`. Accepted applicants who
+     * were never converted to employees previously blocked onboarding; this
+     * endpoint bridges that gap on demand.
+     *
+     * Idempotent: if an Employee already exists for the applicant (linked via
+     * employees.applicant_id, or matched by passport / ResortAdmin email) it
+     * is returned as-is and nothing new is created.
+     */
+    public function convertApplicant(Request $request)
+    {
+        $request->validate([
+            'applicant_id' => 'required|integer|exists:applicant_form_data,id',
+        ]);
+
+        $resort_id = $this->resort->resort_id;
+
+        $applicant = Applicant_form_data::with('GetVacancies')
+            ->where('id', $request->input('applicant_id'))
+            ->where('resort_id', $resort_id)
+            ->first();
+
+        if (!$applicant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Applicant not found for this resort.',
+            ], 404);
+        }
+
+        // The applicant must actually be an accepted hire — guard against the
+        // endpoint being called for any other applicant id.
+        $latestStatus = DB::table('applicant_wise_statuses')
+            ->where('Applicant_id', $applicant->id)
+            ->orderByDesc('id')
+            ->value('status');
+        if ($latestStatus !== 'Contract Accepted') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This candidate has not accepted their contract.',
+            ], 422);
+        }
+
+        // ---- Idempotency: reuse an existing Employee if we already have one.
+        $employee = $this->findExistingEmployeeForApplicant($applicant, $resort_id);
+        if ($employee) {
+            // Backfill the link if this employee was matched by passport/email
+            // but predates the applicant_id column.
+            if (empty($employee->applicant_id)) {
+                $employee->applicant_id = $applicant->id;
+                $employee->save();
+            }
+            return response()->json([
+                'success'     => true,
+                'employee_id' => $employee->id,
+                'created'     => false,
+                'message'     => 'Employee record already exists.',
+            ]);
+        }
+
+        $vacancy = $applicant->GetVacancies;
+        if (!$vacancy || empty($vacancy->department) || empty($vacancy->position)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot create the employee: the vacancy for this candidate is missing a department or position.',
+            ], 422);
+        }
+
+        // Email-collision guard — resort_admins.email is UNIQUE. A TA applicant
+        // can carry an email that already belongs to another account (shared /
+        // placeholder emails are common in applicant data). Creating the
+        // ResortAdmin would otherwise fail with a raw SQL integrity-constraint
+        // 500. Surface a clear, actionable message instead. (An email that
+        // belongs to an existing *employee* was already reused above by
+        // findExistingEmployeeForApplicant, so any hit here is a non-employee
+        // account — never silently link a new hire to someone else's record.)
+        $applicantEmail = trim((string) $applicant->email);
+        if ($applicantEmail !== '') {
+            $emailOwner = ResortAdmin::where('email', $applicantEmail)->first();
+            if ($emailOwner) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot create an employee record for '
+                        . trim($applicant->first_name . ' ' . $applicant->last_name)
+                        . ' — the email "' . $applicantEmail . '" is already used by another account ('
+                        . trim($emailOwner->first_name . ' ' . $emailOwner->last_name)
+                        . '). Update this candidate\'s email in Talent Acquisition to a unique address, then try again.',
+                ], 422);
+            }
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // ResortAdmin (the person / login record). An empty applicant
+            // email is stored as null — '' would itself collide on the unique
+            // index once a second emailless candidate is converted.
+            $resortAdmin = ResortAdmin::create([
+                'resort_id'      => $resort_id,
+                'first_name'     => $applicant->first_name,
+                'last_name'      => $applicant->last_name,
+                'email'          => $applicantEmail !== '' ? $applicantEmail : null,
+                'personal_phone' => $applicant->mobile_number,
+                'gender'         => $applicant->gender,
+                'address_line_1' => $applicant->address_line_one,
+                'address_line_2' => $applicant->address_line_two,
+                'city'           => $applicant->city,
+                'state'          => $applicant->state,
+                'zip'            => $applicant->pin_code,
+                'country'        => $applicant->country,
+                'is_employee'    => 1,
+                'status'         => 'active',
+            ]);
+
+            // Generate Emp_id the same way EmployeeController@create does:
+            // "<resort_prefix>-<lastEmployeeId + 1>".
+            $resort_prefix = $this->resort->resort->resort_prefix;
+            $last_emp = Employee::withTrashed()
+                ->where('resort_id', $resort_id)
+                ->orderByDesc('id')
+                ->first();
+            $emp_id = $resort_prefix . '-' . ($last_emp ? ($last_emp->id + 1) : 1);
+
+            // Normalise DOB (applicant_form_data.dob is a free-form string).
+            $dob = null;
+            if (!empty($applicant->dob)) {
+                try {
+                    $dob = Carbon::parse($applicant->dob)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    $dob = null;
+                }
+            }
+
+            // Joining date: applicant_form_data has no firm joining date
+            // (Joining_availability is free text), so leave it null here. HR
+            // sets it later; the onboarding arrival-date validation only runs
+            // once joining_date is populated.
+            $joining_date = null;
+
+            // marital_status: applicant enum is married/unmarried, employees
+            // enum is Single/Married/Divorced/Widowed.
+            $maritalStatus = ($applicant->marital_status === 'married') ? 'Married' : 'Single';
+
+            // title: employees enum is Mr/Miss/Mrs.
+            $title = ($applicant->gender === 'female') ? 'Miss' : 'Mr';
+
+            // employment_type: vacancy.employee_type (Permanant / Trainee /
+            // Intern / Replacement) does not map onto the employees enum
+            // (Full-Time, Part-Time, Contract, Casual, Probationary,
+            // Internship, Temporary), so map sensibly with a safe default.
+            $employmentType = 'Full-Time';
+            $vacType = strtolower((string) $vacancy->employee_type);
+            if (str_contains($vacType, 'intern') || str_contains($vacType, 'trainee')) {
+                $employmentType = 'Internship';
+            } elseif (str_contains($vacType, 'replace')) {
+                $employmentType = 'Contract';
+            }
+
+            $employee = Employee::create([
+                'resort_id'             => $resort_id,
+                'Emp_id'                => $emp_id,
+                'applicant_id'          => $applicant->id,
+                'Admin_Parent_id'       => $resortAdmin->id,
+                'title'                 => $title,
+                'Dept_id'               => $vacancy->department,
+                'Section_id'            => $vacancy->section ?: null,
+                'Position_id'           => $vacancy->position,
+                'division_id'           => $vacancy->division ?: 0,
+                'reporting_to'          => $vacancy->reporting_to ?: 0,
+                'rank'                  => $vacancy->rank,
+                'is_employee'           => 1,
+                'status'                => 'Active',
+                'dob'                   => $dob,
+                'marital_status'        => $maritalStatus,
+                'joining_date'          => $joining_date,
+                'employment_type'       => $employmentType,
+                'passport_number'       => $applicant->passport_no,
+                'present_address'       => trim(implode(', ', array_filter([
+                                                $applicant->address_line_one,
+                                                $applicant->address_line_two,
+                                                $applicant->city,
+                                                $applicant->state,
+                                                $applicant->pin_code,
+                                                $applicant->country,
+                                            ]))),
+                'basic_salary'          => $vacancy->salary,
+                'basic_salary_currency' => in_array($vacancy->amount_unit, ['USD', 'MVR']) ? $vacancy->amount_unit : 'USD',
+            ]);
+
+            DB::commit();
+
+            // Note: the Employee::created model hook provisions the
+            // categorized file-management folder, so we do not create it here.
+
+            return response()->json([
+                'success'     => true,
+                'employee_id' => $employee->id,
+                'created'     => true,
+                'message'     => 'Employee record created from candidate.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create the employee record: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Locate an Employee that already represents this applicant. Matches by
+     * the explicit applicant_id link first, then falls back to passport
+     * number and ResortAdmin email (the same heuristics getupcomingEmployees
+     * uses to mark a candidate as "already an employee").
+     */
+    private function findExistingEmployeeForApplicant($applicant, $resort_id)
+    {
+        $employee = Employee::with(['resortAdmin'])
+            ->where('resort_id', $resort_id)
+            ->where('applicant_id', $applicant->id)
+            ->first();
+        if ($employee) {
+            return $employee;
+        }
+
+        if (!empty($applicant->passport_no)) {
+            $employee = Employee::with(['resortAdmin'])
+                ->where('resort_id', $resort_id)
+                ->where('passport_number', $applicant->passport_no)
+                ->first();
+            if ($employee) {
+                return $employee;
+            }
+        }
+
+        if (!empty($applicant->email)) {
+            $employee = Employee::with(['resortAdmin'])
+                ->where('resort_id', $resort_id)
+                ->whereHas('resortAdmin', fn($q) => $q->where('email', $applicant->email))
+                ->first();
+            if ($employee) {
+                return $employee;
+            }
+        }
+
+        return null;
     }
 
     public function getTemplatesForEmployees(Request $request)

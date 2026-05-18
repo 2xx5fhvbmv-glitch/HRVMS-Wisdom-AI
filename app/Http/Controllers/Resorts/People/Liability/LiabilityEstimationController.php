@@ -49,11 +49,14 @@ class LiabilityEstimationController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         
-        $estimated_liability = StoreManningResponseParent::with(['manningbudget' => function($query) use ($currentYear) {
-            $query->where('year', $currentYear);
-        }])
-        ->where('resort_id', $resortId)
-        ->sum('Total_Department_budget');
+        // whereHas (not with) — the year must actually FILTER the summed rows.
+        // `with([...])` only constrains the eager-loaded relation and leaves
+        // the sum spanning every year's manning budget.
+        $estimated_liability = StoreManningResponseParent::where('resort_id', $resortId)
+            ->whereHas('manningbudget', function($query) use ($currentYear) {
+                $query->where('year', $currentYear);
+            })
+            ->sum('Total_Department_budget');
 
         // ✅ Current Liability from Payroll Reviews for the year
         $payrolls = Payroll::with('reviews')
@@ -275,11 +278,17 @@ class LiabilityEstimationController extends Controller
             $reductionData[] = round($liabilityRemaining, 2);
         }
 
-        $allowanceTypes = DB::table('resort_budget_costs')
-            ->where('resort_id', $resortId)
-            ->where('is_payroll_allowance', 1)
+        // The Employees DataTable's allowance columns MUST come from the same
+        // source getLiabilityData() uses to build the row data —
+        // PayrollReviewAllowances.allowance_type for the current year.
+        // Sourcing it from resort_budget_costs instead produced columns (e.g.
+        // "Pension - Employer Contibution") with no matching row-data key,
+        // causing the DataTables "Requested unknown parameter" warning.
+        $allowanceTypes = PayrollReviewAllowances::with('payrollReview')
+            ->whereHas('payrollReview', fn($q) => $q->whereYear('created_at', now()->year))
+            ->select('allowance_type')
             ->distinct()
-            ->pluck('particulars'); // e.g., ['Food Allowance', 'Transport']
+            ->pluck('allowance_type');
 
             // dd($labels, $reductionData);
         return view('resorts.people.liability.index', compact(

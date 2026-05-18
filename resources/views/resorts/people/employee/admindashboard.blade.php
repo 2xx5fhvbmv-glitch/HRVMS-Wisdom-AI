@@ -110,7 +110,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <select class="form-select select2t-none" aria-label="Default select example" id="divisionFilter">
-                                        <option selected="">Select Division</option>
+                                        <option value="" selected>All Divisions</option>
                                         @if($resort_divisions)
                                             @foreach($resort_divisions as $division)
                                                 <option value="{{$division->id}}">{{$division->name}}</option>
@@ -130,7 +130,7 @@
                             <h3>Location-Wise Employee</h3>
                         </div>
                         <div class="locationEmp-chart mb-md-3 mb-2">
-                            <canvas id="locationEmpChart" width="328" height="328"></canvas>
+                            <canvas id="locationEmpChart" width="328" height="328" data-resort="{{ $resortLocationCount ?? 0 }}" data-male="{{ $maleLocationCount ?? 0 }}"></canvas>
                         </div>
                         <div class="row g-2 justify-content-center ">
                             <div class="col-auto">
@@ -140,7 +140,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="doughnut-label">
-                                    <span class="bg-themeSkyblue"></span>Male
+                                    <span class="bg-themeSkyblue"></span>Malé
                                 </div>
                             </div>
                         </div>
@@ -272,7 +272,7 @@
                                     @if ($announcements && count($announcements))
                                         @foreach ($announcements as $announcement)
                                             <tr>
-                                                <td>#{{ $announcement->employee->Emp_id }}</td>
+                                                <td>#{{ $announcement->employee->Emp_id ?? 'N/A' }}</td>
                                                 <td>
                                                     <div class="tableUser-block">
                                                         <div class="img-circle">
@@ -477,16 +477,16 @@
                                     @if(isset($recent_promotions) && count($recent_promotions)>0)
                                         @foreach($recent_promotions as $promotion)
                                             <tr>
-                                                <td>{{$promotion->employee->Emp_id}}</td>
+                                                <td>{{$promotion->employee->Emp_id ?? 'N/A'}}</td>
                                                 <td>
                                                     <div class="tableUser-block">
                                                         <div class="img-circle">
                                                             <img src="{{Common::getResortUserPicture($promotion->employee->Admin_Parent_id ?? null)}}" alt="user">
                                                         </div>
-                                                        <span class="userApplicants-btn">{{$promotion->employee->resortAdmin->full_name}}</span>
+                                                        <span class="userApplicants-btn">{{$promotion->employee->resortAdmin->full_name ?? 'N/A'}}</span>
                                                     </div>
                                                 </td>
-                                                <td>{{$promotion->employee->department->name}}</td>
+                                                <td>{{$promotion->employee->department->name ?? 'N/A'}}</td>
                                                 <td>
                                                     @php
                                                         echo match ($promotion->status) {
@@ -532,7 +532,7 @@
                                             <img src="{{$profilePicture}}" alt="user" class="img-fluid" />
                                         </div>
                                         <div>
-                                            <h6 title="{{$emp_info->employee->resortAdmin->id}}">{{@$emp_info->employee->resortAdmin->full_name}} ({{$emp_info->employee->position->position_title}} - {{$emp_info->employee->department->name}}({{$emp_info->employee->department->code}}))</h6>
+                                            <h6 title="{{$emp_info->employee->resortAdmin->id ?? ''}}">{{@$emp_info->employee->resortAdmin->full_name}} ({{$emp_info->employee->position->position_title ?? 'N/A'}} - {{$emp_info->employee->department->name ?? 'N/A'}}({{$emp_info->employee->department->code ?? ''}}))</h6>
                                             <p>{{$emp_info->title}}</p>
                                         </div>
                                         <div>
@@ -604,12 +604,12 @@
                         <div>
                             <div class="d-flex align-items-center  mb-lg-2 mb-1">
                                 <div class="progress progress-custom progress-themeskyblue flex-grow-1 me-2">
-                                    <div class="progress-bar" role="progressbar" style="width: 65%" aria-valuenow="65"
-                                        aria-valuemin="0" aria-valuemax="100">65%</div>
+                                    <div class="progress-bar" role="progressbar" style="width: {{ $trainingCompletionRate ?? 0 }}%" aria-valuenow="{{ $trainingCompletionRate ?? 0 }}"
+                                        aria-valuemin="0" aria-valuemax="100">{{ $trainingCompletionRate ?? 0 }}%</div>
                                 </div>
-                                <span>65%</span>
+                                <span>{{ $trainingCompletionRate ?? 0 }}%</span>
                             </div>
-                            <span>65% Complete</span>
+                            <span>{{ $trainingCompletionRate ?? 0 }}% Complete</span>
                         </div>
                     </div>
                 </div>
@@ -907,7 +907,7 @@
                                     <h3>Approvals</h3>
                                 </div>
                                 <div class="col-auto">
-                                    <a href="#" class="a-link">View All</a>
+                                    <a href="{{ route('people.approvel.index') }}" class="a-link">View All</a>
                                 </div>
                             </div>
                         </div>
@@ -960,7 +960,7 @@
                                     <h3>Liability Tracker</h3>
                                 </div>
                                 <div class="col-auto">
-                                    <a href="#" class="a-link">View All</a>
+                                    <a href="{{ route('people.liability.index') }}" class="a-link">View All</a>
                                 </div>
                             </div>
                         </div>
@@ -1220,6 +1220,10 @@
                                         tooltip: {
                                             enabled: true,
                                             callbacks: {
+                                                // Hover shows the FULL department name.
+                                                title: function (items) {
+                                                    return items.length ? items[0].label : '';
+                                                },
                                                 label: function (tooltipItem) {
                                                     const value = tooltipItem.raw.toLocaleString();
                                                     return ` ${value}`;
@@ -1231,7 +1235,18 @@
                                         x: {
                                             beginAtZero: true,
                                             grid: { display: false },
-                                            border: { display: true }
+                                            border: { display: true },
+                                            ticks: {
+                                                // Truncate long department names on the axis
+                                                // (e.g. "Human Resources" -> "Human Reso…");
+                                                // the full name appears in the hover tooltip.
+                                                callback: function (value) {
+                                                    var label = this.getLabelForValue(value);
+                                                    return (label && label.length > 10)
+                                                        ? label.slice(0, 10) + '…'
+                                                        : label;
+                                                }
+                                            }
                                         },
                                         y: {
                                             beginAtZero: true,
@@ -1316,7 +1331,11 @@
         $('#divisionFilter').on('change', function() {
             const divisionId = $(this).val();
 
-            if (!divisionId) return; // If no division selected, do nothing
+            // "All Divisions" selected — reload the chart with every department.
+            if (!divisionId) {
+                getBarChartData();
+                return;
+            }
 
             const url = `{{ route('get.division-by-dept', ['id' => '::id::']) }}`.replace('::id::', divisionId);
 
@@ -1653,7 +1672,10 @@
         plugins: [doughnutLabelsInside]
     });
 
-    var cte = document.getElementById('locationEmpChart').getContext('2d');
+    var locCanvas = document.getElementById('locationEmpChart');
+    var cte = locCanvas.getContext('2d');
+    var resortLocationCount = parseInt(locCanvas.getAttribute('data-resort')) || 0;
+    var maleLocationCount = parseInt(locCanvas.getAttribute('data-male')) || 0;
     // Custom plugin to display percentage labels inside the pie chart
     const pieLabelsInside = {
         id: 'pieLabelsInside',
@@ -1662,12 +1684,9 @@
             chart.data.datasets.forEach(function (dataset, i) {
                 var meta = chart.getDatasetMeta(i);
                 if (!meta.hidden) {
+                    var percents = percentagesSumTo100(dataset.data);
                     meta.data.forEach(function (element, index) {
-                        var dataValue = dataset.data[index];
-                        var total = dataset.data.reduce(function (acc, val) {
-                            return acc + val;
-                        }, 0);
-                        var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
+                        var percentage = percents[index] + '%';
 
                         var position = element.tooltipPosition(); // Position for the label
 
@@ -1689,7 +1708,7 @@
         data: {
             // labels: ['January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024'],
             datasets: [{
-                data: [7, 15,],
+                data: [resortLocationCount, maleLocationCount],
                 backgroundColor: ['#014653', '#2EACB3',],
                 borderWidth: 0
             }]

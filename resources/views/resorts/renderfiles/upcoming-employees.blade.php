@@ -46,11 +46,14 @@
                         <label class="form-check-label">Select Employee</label>
                     </div>
                 @else
+                    {{-- Talent Acquisition applicant who accepted their contract but has
+                         no Employee record yet. Selectable: the Employee record is
+                         auto-created from the applicant data when the user proceeds.
+                         The radio value is prefixed `applicant:` so the Step 1 handler
+                         can tell it apart from a real employees.id. --}}
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" disabled>
-                        <label class="form-check-label text-muted">
-                            Employee record not created yet
-                        </label>
+                        <input class="form-check-input employee-radio" required type="radio" name="selected_employee" value="applicant:{{ $candidate->applicant_id }}">
+                        <label class="form-check-label">Select Candidate</label>
                     </div>
                 @endif
             </div>

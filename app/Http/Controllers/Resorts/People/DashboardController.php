@@ -68,13 +68,18 @@ class DashboardController extends Controller
             ->where('aws.status', 'Contract Accepted')
             ->distinct('aws.Applicant_id')
             ->count('aws.Applicant_id');
-        $male_emp = ResortAdmin::with('EmployeeDetails')
-            ->where('resort_id', $resort_id)->where('gender','male')->where('status', 'Active')->where('is_employee', 1)
-            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))
+        // "Employee Type" gender split — count actual Employee records
+        // (gender resolved via the resortAdmin relation), the same population
+        // the local/expat cards use. It previously counted ResortAdmin rows
+        // with is_employee=1, which over-counted the workforce because some
+        // admin accounts are flagged is_employee without an employees row.
+        $male_emp = Employee::where('resort_id', $resort_id)
+            ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'male'))
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->count();
-        $female_emp = ResortAdmin::with('EmployeeDetails')
-            ->where('resort_id', $resort_id)->where('gender','female')->where('status', 'Active')->where('is_employee', 1)
-            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))
+        $female_emp = Employee::where('resort_id', $resort_id)
+            ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'female'))
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->count();
         $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
@@ -84,7 +89,19 @@ class DashboardController extends Controller
             ->count();
         // No limit — the dashboard Announcements table paginates client-side
         // (DataTables, 4 per page), so it needs the full list.
-        $announcements = Announcement::where('resort_id',$this->resort->resort_id)->orderBy('id','desc')->get();
+        // whereHas('employee') — skip announcements whose employee record was
+        // deleted, so the view never hits a null relation.
+        // Location-Wise Employee chart — split the workforce by the
+        // `location` column ('Resorts' vs 'Malé'). Replaces hardcoded [7,15].
+        $resortLocationCount = Employee::where('resort_id', $resort_id)
+            ->where('location', 'LIKE', 'Resort%')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $maleLocationCount = Employee::where('resort_id', $resort_id)
+            ->where('location', 'LIKE', 'Mal%')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $announcements = Announcement::where('resort_id',$this->resort->resort_id)->whereHas('employee')->orderBy('id','desc')->get();
         $totalPublished = Announcement::where('resort_id', $this->resort->resort_id)
 
         ->where('status', 'Published')
@@ -102,39 +119,84 @@ class DashboardController extends Controller
                'position'
           ])->where('status','Pending')->wherehas('employee.resortAdmin')->latest()->limit(5)->get();
 
-        // "Total Employees On Probation" = those currently serving probation.
-        // It previously counted employment_type='Probationary', but employees
-        // carry employment_type='Full-Time' even while on probation — the real
-        // signal is probation_status (Active/Extended), matching the Active
-        // sub-count and the Probation list page.
-        $probationalEmployees = Employee::where('resort_id',$this->resort->resort_id)
+        // "Total Employees On Probation" — only employees whose probation is
+        // still running. probation_status defaults to 'Active' on creation and
+        // is rarely maintained (every employee — even 2010 joiners — shows
+        // 'Active'), so a status-only count wrongly returned the whole
+        // workforce. An employee counts as on probation only when:
+        //   probation_status IN (Active, Extended)
+        //   AND the probation window has not ended — window end is
+        //   probation_end_date, or joining_date + 3 months when it is unset.
+        $probationToday  = Carbon::today();
+        $probationCutoff = $probationToday->copy()->subMonths(3)->toDateString();
+        // Effective probation-end date: the explicit column, or joining_date + 3 months.
+        $probationWindowSql = 'COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH))';
+
+        $probationalEmployees = Employee::where('resort_id', $resort_id)
             ->whereIn('probation_status', ['Active', 'Extended'])
+            ->whereRaw("$probationWindowSql >= ?", [$probationToday->toDateString()])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        $activeProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Active')
+        $activeProbationCount = Employee::where('resort_id', $resort_id)
+            ->where('probation_status', 'Active')
+            ->whereRaw("$probationWindowSql >= ?", [$probationToday->toDateString()])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        $failedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Failed')
+        // Failed / Confirmed are probation outcomes — scoped to employees who
+        // joined within the last 3 months so stale records (status never
+        // cleared) don't inflate the breakdown.
+        $failedProbationCount = Employee::where('resort_id', $resort_id)
+            ->where('probation_status', 'Failed')
+            ->whereDate('joining_date', '>=', $probationCutoff)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        // The probation_status enum is Active / Extended / Confirmed / Failed
-        // — there is no "Completed" value, so this count was always 0.
-        $completedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Confirmed')
+        // The probation_status "passed" value is 'Confirmed' (no 'Completed').
+        $completedProbationCount = Employee::where('resort_id', $resort_id)
+            ->where('probation_status', 'Confirmed')
+            ->whereDate('joining_date', '>=', $probationCutoff)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
 
-        // Probation periods ending within the next 7 / 15 / 30 days. Only
-        // employees still in an open probation (Active/Extended) count; the
-        // dashboard card previously had no $count30/$count15/$count7 passed
-        // to it, so all three always rendered 0.
-        $probationEndingQuery = function ($days) use ($resort_id, $scopedDeptIds) {
-            $today = Carbon::today();
+        // Probation periods ending within the next 7 / 15 / 30 days, using the
+        // same effective window-end expression.
+        $probationEndingQuery = function ($days) use ($resort_id, $scopedDeptIds, $probationToday, $probationWindowSql) {
             return Employee::where('resort_id', $resort_id)
                 ->whereIn('probation_status', ['Active', 'Extended'])
-                ->whereNotNull('probation_end_date')
-                ->whereBetween('probation_end_date', [$today, $today->copy()->addDays($days)])
+                ->whereRaw("$probationWindowSql BETWEEN ? AND ?", [
+                    $probationToday->toDateString(),
+                    $probationToday->copy()->addDays($days)->toDateString(),
+                ])
                 ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
                 ->count();
         };
         $count30 = $probationEndingQuery(30);
         $count15 = $probationEndingQuery(15);
         $count7  = $probationEndingQuery(7);
+
+        // Training Completion Rate — % of the resort's probationary L&D
+        // programs completed by the employees currently on probation. A
+        // program counts as completed for an employee when they have a
+        // training_attendance row with status 'Present' on a training_schedule
+        // backed by that probationary program (same definition the Probation
+        // list's Onboarding Training column uses).
+        $probationEmpIds = Employee::where('resort_id', $resort_id)
+            ->whereIn('probation_status', ['Active', 'Extended'])
+            ->whereRaw("$probationWindowSql >= ?", [$probationToday->toDateString()])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->pluck('id');
+        $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resort_id)
+            ->pluck('program_id');
+        $trainingExpected  = $probationEmpIds->count() * $probationaryProgramIds->count();
+        $trainingCompleted = 0;
+        if ($trainingExpected > 0) {
+            $trainingCompleted = DB::table('training_attendance as ta')
+                ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                ->where('ts.resort_id', $resort_id)
+                ->whereIn('ts.training_id', $probationaryProgramIds)
+                ->whereIn('ta.employee_id', $probationEmpIds)
+                ->where('ta.status', 'Present')
+                ->distinct()
+                ->count(DB::raw("CONCAT(ta.employee_id, '-', ts.training_id)"));
+        }
+        $trainingCompletionRate = $trainingExpected > 0
+            ? (int) round(($trainingCompleted / $trainingExpected) * 100)
+            : 0;
         $total_promotions = EmployeePromotion::where('resort_id',$resortId)->count();
 
         $recent_promotions = EmployeePromotion::with(
@@ -145,7 +207,7 @@ class DashboardController extends Controller
             'newPosition',
             'approvals'
             ]
-        )->where('resort_id',$resortId)->orderBy('id','desc')->limit(5)->get();
+        )->whereHas('employee')->where('resort_id',$resortId)->orderBy('id','desc')->limit(5)->get();
         $average_salary_increase = EmployeePromotion::whereNotNull('current_salary')
                                 ->whereNotNull('new_salary')
                                 ->where('resort_id',$resortId)
@@ -317,7 +379,7 @@ class DashboardController extends Controller
         $liabilityMonthlyTrend      = $liability['monthly_trend'];
         $liabilityCostComparison    = $liability['cost_comparison'];
 
-        return view('resorts.people.employee.hrdashboard',compact('page_title','resort','totalExitInitiated','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison'));
+        return view('resorts.people.employee.hrdashboard',compact('page_title','resort','totalExitInitiated','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison','resortLocationCount','maleLocationCount','trainingCompletionRate'));
     }
 
     public function admin_dashboard()
@@ -344,17 +406,36 @@ class DashboardController extends Controller
             ->where('aws.status', 'Contract Accepted')
             ->distinct('aws.Applicant_id')
             ->count('aws.Applicant_id');
-        $male_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','male')
-            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))->count();
-        $female_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','female')
-            ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('EmployeeDetails', fn($sq) => $sq->whereIn('id', $scopedEmpIds)))->count();
+        // "Employee Type" gender split — count actual Employee records
+        // (gender via the resortAdmin relation), matching the local/expat
+        // cards. Previously counted ResortAdmin rows, which over-counted.
+        $male_emp = Employee::where('resort_id', $resort_id)
+            ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'male'))
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $female_emp = Employee::where('resort_id', $resort_id)
+            ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'female'))
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
         $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         // No limit — the dashboard Announcements table paginates client-side
         // (DataTables, 4 per page), so it needs the full list.
-        $announcements = Announcement::where('resort_id',$this->resort->resort_id)->orderBy('id','desc')->get();
+        // whereHas('employee') — skip announcements whose employee record was
+        // deleted, so the view never hits a null relation.
+        // Location-Wise Employee chart — split the workforce by the
+        // `location` column ('Resorts' vs 'Malé'). Replaces hardcoded [7,15].
+        $resortLocationCount = Employee::where('resort_id', $resort_id)
+            ->where('location', 'LIKE', 'Resort%')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $maleLocationCount = Employee::where('resort_id', $resort_id)
+            ->where('location', 'LIKE', 'Mal%')
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
+        $announcements = Announcement::where('resort_id',$this->resort->resort_id)->whereHas('employee')->orderBy('id','desc')->get();
         $totalPublished = Announcement::where('resort_id', $this->resort->resort_id)
 
         ->where('status', 'Published')
@@ -372,39 +453,84 @@ class DashboardController extends Controller
                'position'
           ])->where('status','Pending')->wherehas('employee.resortAdmin')->latest()->limit(5)->get();
 
-        // "Total Employees On Probation" = those currently serving probation.
-        // It previously counted employment_type='Probationary', but employees
-        // carry employment_type='Full-Time' even while on probation — the real
-        // signal is probation_status (Active/Extended), matching the Active
-        // sub-count and the Probation list page.
-        $probationalEmployees = Employee::where('resort_id',$this->resort->resort_id)
+        // "Total Employees On Probation" — only employees whose probation is
+        // still running. probation_status defaults to 'Active' on creation and
+        // is rarely maintained (every employee — even 2010 joiners — shows
+        // 'Active'), so a status-only count wrongly returned the whole
+        // workforce. An employee counts as on probation only when:
+        //   probation_status IN (Active, Extended)
+        //   AND the probation window has not ended — window end is
+        //   probation_end_date, or joining_date + 3 months when it is unset.
+        $probationToday  = Carbon::today();
+        $probationCutoff = $probationToday->copy()->subMonths(3)->toDateString();
+        // Effective probation-end date: the explicit column, or joining_date + 3 months.
+        $probationWindowSql = 'COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH))';
+
+        $probationalEmployees = Employee::where('resort_id', $resort_id)
             ->whereIn('probation_status', ['Active', 'Extended'])
+            ->whereRaw("$probationWindowSql >= ?", [$probationToday->toDateString()])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        $activeProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Active')
+        $activeProbationCount = Employee::where('resort_id', $resort_id)
+            ->where('probation_status', 'Active')
+            ->whereRaw("$probationWindowSql >= ?", [$probationToday->toDateString()])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        $failedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Failed')
+        // Failed / Confirmed are probation outcomes — scoped to employees who
+        // joined within the last 3 months so stale records (status never
+        // cleared) don't inflate the breakdown.
+        $failedProbationCount = Employee::where('resort_id', $resort_id)
+            ->where('probation_status', 'Failed')
+            ->whereDate('joining_date', '>=', $probationCutoff)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        // The probation_status enum is Active / Extended / Confirmed / Failed
-        // — there is no "Completed" value, so this count was always 0.
-        $completedProbationCount = Employee::where('resort_id',$this->resort->resort_id)->where('probation_status', 'Confirmed')
+        // The probation_status "passed" value is 'Confirmed' (no 'Completed').
+        $completedProbationCount = Employee::where('resort_id', $resort_id)
+            ->where('probation_status', 'Confirmed')
+            ->whereDate('joining_date', '>=', $probationCutoff)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
 
-        // Probation periods ending within the next 7 / 15 / 30 days. Only
-        // employees still in an open probation (Active/Extended) count; the
-        // dashboard card previously had no $count30/$count15/$count7 passed
-        // to it, so all three always rendered 0.
-        $probationEndingQuery = function ($days) use ($resort_id, $scopedDeptIds) {
-            $today = Carbon::today();
+        // Probation periods ending within the next 7 / 15 / 30 days, using the
+        // same effective window-end expression.
+        $probationEndingQuery = function ($days) use ($resort_id, $scopedDeptIds, $probationToday, $probationWindowSql) {
             return Employee::where('resort_id', $resort_id)
                 ->whereIn('probation_status', ['Active', 'Extended'])
-                ->whereNotNull('probation_end_date')
-                ->whereBetween('probation_end_date', [$today, $today->copy()->addDays($days)])
+                ->whereRaw("$probationWindowSql BETWEEN ? AND ?", [
+                    $probationToday->toDateString(),
+                    $probationToday->copy()->addDays($days)->toDateString(),
+                ])
                 ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
                 ->count();
         };
         $count30 = $probationEndingQuery(30);
         $count15 = $probationEndingQuery(15);
         $count7  = $probationEndingQuery(7);
+
+        // Training Completion Rate — % of the resort's probationary L&D
+        // programs completed by the employees currently on probation. A
+        // program counts as completed for an employee when they have a
+        // training_attendance row with status 'Present' on a training_schedule
+        // backed by that probationary program (same definition the Probation
+        // list's Onboarding Training column uses).
+        $probationEmpIds = Employee::where('resort_id', $resort_id)
+            ->whereIn('probation_status', ['Active', 'Extended'])
+            ->whereRaw("$probationWindowSql >= ?", [$probationToday->toDateString()])
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->pluck('id');
+        $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resort_id)
+            ->pluck('program_id');
+        $trainingExpected  = $probationEmpIds->count() * $probationaryProgramIds->count();
+        $trainingCompleted = 0;
+        if ($trainingExpected > 0) {
+            $trainingCompleted = DB::table('training_attendance as ta')
+                ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                ->where('ts.resort_id', $resort_id)
+                ->whereIn('ts.training_id', $probationaryProgramIds)
+                ->whereIn('ta.employee_id', $probationEmpIds)
+                ->where('ta.status', 'Present')
+                ->distinct()
+                ->count(DB::raw("CONCAT(ta.employee_id, '-', ts.training_id)"));
+        }
+        $trainingCompletionRate = $trainingExpected > 0
+            ? (int) round(($trainingCompleted / $trainingExpected) * 100)
+            : 0;
         $total_promotions = EmployeePromotion::where('resort_id',$resortId)->count();
 
         $recent_promotions = EmployeePromotion::with(
@@ -415,7 +541,7 @@ class DashboardController extends Controller
             'newPosition',
             'approvals'
             ]
-        )->where('resort_id',$resortId)->orderBy('id','desc')->limit(5)->get();
+        )->whereHas('employee')->where('resort_id',$resortId)->orderBy('id','desc')->limit(5)->get();
         $average_salary_increase = EmployeePromotion::whereNotNull('current_salary')
                                 ->whereNotNull('new_salary')
                                 ->where('resort_id',$resortId)
@@ -587,7 +713,7 @@ class DashboardController extends Controller
         $liabilityMonthlyTrend      = $liability['monthly_trend'];
         $liabilityCostComparison    = $liability['cost_comparison'];
 
-        return view('resorts.people.employee.admindashboard',compact('page_title','resort','totalExitInitiated','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison'));
+        return view('resorts.people.employee.admindashboard',compact('page_title','resort','totalExitInitiated','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison','resortLocationCount','maleLocationCount','trainingCompletionRate'));
     }
 
     /**
@@ -873,10 +999,14 @@ class DashboardController extends Controller
         $lineLabels = [];
         $lineData = [];
 
-        // Get the last 12 months anchored on the range end (or today when the
-        // filter is cleared and $endDate is null).
-        $periodAnchor = ($endDate ? $endDate->copy() : Carbon::now());
-        $period = CarbonPeriod::create($periodAnchor->copy()->subMonths(11)->startOfMonth(), '1 month', $periodAnchor->copy()->endOfMonth());
+        // Turnover Trends spans the full calendar year — January to December
+        // of the selected range's year (or the current year when no range).
+        $trendYear = ($endDate ? $endDate->year : Carbon::now()->year);
+        $period = CarbonPeriod::create(
+            Carbon::create($trendYear, 1, 1)->startOfMonth(),
+            '1 month',
+            Carbon::create($trendYear, 12, 1)->endOfMonth()
+        );
 
         foreach ($period as $date) {
             $month = $date->format('M Y');
@@ -892,42 +1022,39 @@ class DashboardController extends Controller
         }
 
 
-        // 3. Attrition Rates (by position)
+        // 3. Attrition Rates (by department)
         $attritionLabels = [];
         $attritionCounts = [];
 
-        // Get positions either filtered by department or all
-        $positionQuery = ResortPosition::where('resort_id', $this->resort->resort_id)
+        // Get departments either filtered by the selected one or all.
+        $deptQuery = ResortDepartment::where('resort_id', $this->resort->resort_id)
             ->where('status', 'active');
         if ($departmentId) {
-            $positionQuery->where('dept_id', $departmentId);
+            $deptQuery->where('id', $departmentId);
         }
-        $positions = $positionQuery->get();
+        $attritionDepartments = $deptQuery->get();
 
-        foreach ($positions as $position) {
-            // Count current employees in this position
-            $currentEmployees = Employee::where('Position_id', $position->id)
+        foreach ($attritionDepartments as $department) {
+            // Count current employees in this department.
+            $currentEmployees = Employee::where('Dept_id', $department->id)
                 ->where('resort_id', $this->resort->resort_id)
-                ->when($departmentId, function($query) use ($departmentId) {
-                    return $query->where('Dept_id', $departmentId);
-                })
                 ->count();
-                
-            // Count resignations for this position within date range
-            $resignedCount = $resignations->filter(function($resignation) use ($position) {
-                return $resignation->employee && 
-                    $resignation->employee->Position_id == $position->id;
+
+            // Count resignations belonging to this department within the range.
+            $resignedCount = $resignations->filter(function($resignation) use ($department) {
+                return $resignation->employee &&
+                    $resignation->employee->Dept_id == $department->id;
             })->count();
-            
-            // Calculate attrition rate
+
+            // Attrition rate = leavers / (current + leavers).
             $totalEmployees = $currentEmployees + $resignedCount;
-            $attritionRate = $totalEmployees > 0 
+            $attritionRate = $totalEmployees > 0
                 ? round(($resignedCount / $totalEmployees) * 100, 2)
                 : 0;
 
-            // Only add to chart if there's data to show
+            // Only add to chart if there's data to show.
             if ($resignedCount > 0 || !$departmentId) {
-                $attritionLabels[] = $position->position_title; // Using position_title instead of name
+                $attritionLabels[] = $department->name;
                 $attritionCounts[] = $attritionRate;
             }
         }
