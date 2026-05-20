@@ -55,6 +55,8 @@ class TransferController extends Controller
             'employee_name' => 'required|exists:employees,id',
             'current_dep_id' => 'nullable',
             'target_dep' => 'required|exists:resort_departments,id',
+            'current_section_id' => 'nullable|exists:resort_sections,id',
+            'target_section_id'  => 'nullable|exists:resort_sections,id',
             'current_pos_id' => 'nullable',
             'target_pos' => 'required|exists:resort_positions,id',
             'reason_transfer' => 'nullable|string|max:255',
@@ -97,6 +99,8 @@ class TransferController extends Controller
             'employee_id' => $validated['employee_name'],
             'current_department_id' => $validated['current_dep_id'],
             'target_department_id' => $validated['target_dep'],
+            'current_section_id' => $validated['current_section_id'] ?? null,
+            'target_section_id'  => $validated['target_section_id'] ?? null,
             'current_position_id' => $validated['current_pos_id'],
             'target_position_id' => $validated['target_pos'],
             'reason_for_transfer' => $validated['reason_transfer'],
@@ -212,29 +216,74 @@ class TransferController extends Controller
      */
     private function isTargetPositionVacant(int $targetPositionId, int $employeeId): array
     {
-        $position = ResortPosition::where('resort_id', $this->resort->resort_id)
+        $resortId = $this->resort->resort_id;
+
+        $position = ResortPosition::where('resort_id', $resortId)
             ->find($targetPositionId);
 
         if (!$position) {
             return ['vacant' => false, 'message' => 'Target position not found.'];
         }
 
-        // Budgeted headcount for the position. When it is not configured
-        // (NULL or 0) the position has no enforceable capacity — allow the
-        // transfer instead of wrongly blocking it at an assumed 1 seat.
-        // The check only enforces for positions with a real headcount set
-        // (configure it on the Manning screen to make this binding).
-        $budgetedHeadcount = (int) ($position->no_of_positions ?? 0);
-        if ($budgetedHeadcount <= 0) {
-            return [
-                'vacant'  => true,
-                'message' => 'Target position has no configured headcount; vacancy check skipped.',
-            ];
+        // --- Primary source: Workforce Planning (manning_responses + position_monthly_data).
+        // This is what the Workforce Planning module reports as the authoritative
+        // vacant count. Use the most recent manning year that has a row for this
+        // position; if there is genuine manning data we let it override the
+        // simpler resort_positions.no_of_positions fallback.
+        $manningYear = (int) (DB::table('manning_responses')
+            ->where('resort_id', $resortId)
+            ->where('year', now()->year)
+            ->exists()
+            ? now()->year
+            : DB::table('manning_responses')->where('resort_id', $resortId)->max('year'));
+
+        if ($manningYear) {
+            $seat = DB::table('position_monthly_data as pmd')
+                ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
+                ->where('mr.resort_id', $resortId)
+                ->where('mr.year', $manningYear)
+                ->where('pmd.position_id', $targetPositionId)
+                ->selectRaw('MAX(pmd.headcount) as budgeted, MAX(pmd.filledcount) as filled, MAX(pmd.vacantcount) as vacant')
+                ->first();
+
+            if ($seat && $seat->budgeted !== null) {
+                $budgeted = (int) $seat->budgeted;
+                $filled   = (int) $seat->filled;
+                $vacant   = (int) $seat->vacant;
+
+                // If the employee being moved is *already* in this position,
+                // they shouldn't count against the filled tally.
+                $alreadyHere = Employee::where('resort_id', $resortId)
+                    ->where('Position_id', $targetPositionId)
+                    ->where('id', $employeeId)
+                    ->where('status', 'Active')
+                    ->exists();
+                if ($alreadyHere) {
+                    $filled = max(0, $filled - 1);
+                    $vacant = max(0, $vacant + 1);
+                }
+
+                if ($vacant <= 0 || $filled >= $budgeted) {
+                    return [
+                        'vacant'  => false,
+                        'message' => 'No vacant seat for this position in Workforce Planning ('
+                            . $filled . '/' . $budgeted . ' filled, ' . $vacant . ' vacant for ' . $manningYear . ').',
+                    ];
+                }
+
+                return ['vacant' => true, 'message' => 'Target position has '.$vacant.' vacant seat(s).'];
+            }
         }
 
-        // Employees currently occupying the target position (active only),
-        // excluding the employee being transferred.
-        $filledCount = Employee::where('resort_id', $this->resort->resort_id)
+        // --- Fallback: no manning row for this position — rely on the simple
+        // resort_positions.no_of_positions cap. When unset, default to 1 seat
+        // so the gate is never silently bypassed.
+        $budgetedHeadcount = (int) ($position->no_of_positions ?? 0);
+        if ($budgetedHeadcount <= 0) {
+            $budgetedHeadcount = 1;
+        }
+
+        $filledCount = Employee::where('resort_id', $resortId)
             ->where('Position_id', $targetPositionId)
             ->where('status', 'Active')
             ->where('id', '!=', $employeeId)
@@ -270,14 +319,24 @@ class TransferController extends Controller
             ->orderByDesc('year')
             ->first();
 
-        if (!$row) {
-            return null;
+        if ($row) {
+            $salary = (float) ($row->current_salary ?: $row->basic_salary);
+            if ($salary > 0) {
+                return $salary;
+            }
         }
 
-        // Prefer current_salary when set, otherwise basic_salary.
-        $salary = (float) ($row->current_salary ?: $row->basic_salary);
+        // Fallback — most resorts have very few rows in resort_vacant_budget_costs
+        // so the lookup above misses most positions. Use the average basic
+        // salary of currently-active employees in that position as a sensible
+        // proxy. Better than showing "No budgeted salary on record" for HR.
+        $avg = (float) Employee::where('resort_id', $this->resort->resort_id)
+            ->where('Position_id', $positionId)
+            ->where('status', 'Active')
+            ->whereNotNull('basic_salary')
+            ->avg('basic_salary');
 
-        return $salary > 0 ? $salary : null;
+        return $avg > 0 ? round($avg, 2) : null;
     }
 
     /**
@@ -684,6 +743,10 @@ class TransferController extends Controller
                 $employee                 = $transfer->employee;
                 $employee->Dept_id        = $transfer->target_department_id;
                 $employee->Position_id    = $transfer->target_position_id;
+                // Carry the new section through. When HR didn't pick one (the
+                // target dept may have no sections) we clear it rather than
+                // leave a stale Section_id from the previous department.
+                $employee->Section_id     = $transfer->target_section_id ?: null;
                 $employee->division_id    = $transfer->targetDepartment->division_id;
                 $employee->reporting_to   = $transfer->reporting_manager ?? $employee->reporting_to;
                 $employee->rank           = $transfer->targetPosition->Rank;
