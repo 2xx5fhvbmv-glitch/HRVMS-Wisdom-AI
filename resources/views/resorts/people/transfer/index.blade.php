@@ -71,13 +71,24 @@
                             <div id="dept-error"></div>
                         </div>
                         <div class="col-md-6 col-sm-6">
+                            <label for="current_section" class="form-label">CURRENT SECTION</label>
+                            <input type="text" name="current_section" id="current_section" class="form-control" readonly placeholder="—"/>
+                            <input type="hidden" name="current_section_id" id="current_section_id"/>
+                        </div>
+                        <div class="col-md-6 col-sm-6">
+                            <label for="target_section_id" class="form-label">TARGET SECTION</label>
+                            <select class="form-select select2t-none" name="target_section_id" id="target_section_id">
+                                <option value="">Select Section</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-sm-6">
                             <label for="current_pos" class="form-label">CURRENT POSITION <span class="red-mark">*</span></label>
                             <input type="text" name="current_pos" id="current_pos" class="form-control" readonly/>
                             <input type="hidden" name="current_pos_id" id="current_pos_id" class="form-control" readonly/>
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="target_pos" class="form-label">TARGET POSITION <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="target_pos" id="target_pos" aria-label="Default select example" required 
+                            <select class="form-select select2t-none" name="target_pos" id="target_pos" aria-label="Default select example" required
                             data-parsley-required-message="Please select target position" data-parsley-errors-container="#position-error">
                                 <option value="">Select Position</option>
                             </select>
@@ -203,68 +214,59 @@
                 return;
             }
 
-            // First: Check if target department has budget
+            // Server-side store() runs the authoritative vacancy gate via
+            // isTargetPositionVacant() against resort_positions.no_of_positions
+            // (the same source used everywhere else in the app). The legacy
+            // client-side /check-budget call required a manning_responses row
+            // for the target dept/year/month that most resorts never seed,
+            // and aborted every submission before it could reach store() —
+            // which is also why Finance/GM never received notifications.
+            let formData = new FormData($('#transferInitiate')[0]);
+
             $.ajax({
-                url: '{{ route("transfer.checkBudget") }}',
+                url: '{{ route("people.transfer.store") }}',
                 method: 'POST',
-                data: {
-                    _token: '{{ csrf_token() }}',
-                    target_dep: targetDep,
-                    target_pos: targetPos
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 success: function (response) {
                     if (response.success) {
-                        // Budget available — proceed with submission
-                        let formData = new FormData($('#transferInitiate')[0]);
-
-                        $.ajax({
-                            url: '{{ route("people.transfer.store") }}',
-                            method: 'POST',
-                            data: formData,
-                            processData: false,
-                            contentType: false,
-                            headers: {
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                            },
-                            success: function (response) {
-                                if (response.success) {
-                                    toastr.success(response.message, "Success", {
-                                        positionClass: 'toast-bottom-right'
-                                    });
-                                    setTimeout(() => {
-                                        window.location.href = response.redirect_url;
-                                    }, 2000);
-                                    $('#transferInitiate')[0].reset();
-                                    $('#employee_name').trigger('change');
-                                }
-                            },
-                            error: function (xhr) {
-                                let errors = xhr.responseJSON.errors;
-                                let errorMsg = "Error:\n";
-                                $.each(errors, function (key, value) {
-                                    errorMsg += `${value}\n`;
-                                });
-                                toastr.error(errorMsg, "Error", {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            }
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
                         });
+                        setTimeout(() => {
+                            window.location.href = response.redirect_url;
+                        }, 2000);
+                        $('#transferInitiate')[0].reset();
+                        $('#employee_name').trigger('change');
                     } else {
-                        // Budget check failed
-                        toastr.error(response.message, "Error", {
+                        // store() returned success:false (e.g. vacancy block).
+                        toastr.error(response.message || 'Could not submit the transfer request.', "Error", {
                             positionClass: 'toast-bottom-right'
                         });
                     }
                 },
-                error: function () {
-                    toastr.error("Error checking department budget.","Error", {
+                error: function (xhr) {
+                    // 422 with field errors OR generic server error.
+                    let msg = 'Error submitting the transfer request.';
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.errors) {
+                            msg = Object.values(xhr.responseJSON.errors).flat().join('\n');
+                        } else if (xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                    }
+                    toastr.error(msg, "Error", {
                         positionClass: 'toast-bottom-right'
                     });
                 }
             });
         });
 
-        $('#target_dep').on('change', function () { 
+        $('#target_dep').on('change', function () {
             var departmentId = $(this).val();
             if (departmentId) {
                 $.ajax({
@@ -285,8 +287,25 @@
                         $("#target_pos").html(string); // ✅ update dropdown
                     }
                 });
+
+                // Load sections for the chosen target department.
+                $.ajax({
+                    url: '{{ url("/resort/get-sections-by-department") }}/' + departmentId,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        var html = '<option value="">Select Section</option>';
+                        if (data.success === true && Array.isArray(data.sections)) {
+                            $.each(data.sections, function (i, s) {
+                                html += '<option value="' + s.id + '">' + s.name + '</option>';
+                            });
+                        }
+                        $('#target_section_id').html(html).trigger('change.select2');
+                    }
+                });
             } else {
                 $('#target_pos').html('<option value="">Select Position</option>');
+                $('#target_section_id').html('<option value="">Select Section</option>').trigger('change.select2');
             }
         });
 
@@ -341,24 +360,37 @@
             }
         });
 
-        // Item 3 — show/hide & require the temporary period when type = Temporary
+        // Item 3 — show/hide & require the temporary period when type = Temporary.
+        // The transfer_status select is Select2-wrapped; native change DOES fire
+        // but listening to both events is the safe bet. Also (re-)initialise the
+        // datepicker on the temporary inputs when they become visible, since
+        // bootstrap-datepicker on an initially-hidden .d-none input can end up
+        // with no DOM-anchored popup.
         function toggleTemporaryFields() {
             var isTemporary = $('#transfer_status').val() === 'Temporary';
             if (isTemporary) {
                 $('.temporary-period-field').removeClass('d-none');
                 $('#temporary_from, #temporary_to')
                     .attr('required', 'required')
-                    .attr('data-parsley-required-message', 'Please select the temporary period');
+                    .attr('data-parsley-required-message', 'Please select the temporary period')
+                    .each(function () {
+                        // Re-init in case it was bound while hidden.
+                        $(this).datepicker('destroy').datepicker({
+                            format: 'dd/mm/yyyy',
+                            autoclose: true,
+                            todayHighlight: true,
+                            startDate: new Date(),
+                        });
+                    });
             } else {
                 $('.temporary-period-field').addClass('d-none');
                 $('#temporary_from, #temporary_to')
                     .removeAttr('required')
                     .val('');
-                form1.reset();
             }
         }
 
-        $('#transfer_status').on('change', toggleTemporaryFields);
+        $('#transfer_status').on('change select2:select', toggleTemporaryFields);
         toggleTemporaryFields();
     });
 
@@ -388,6 +420,8 @@
                     $('#current_dep_id').val(response.data.dept_id);
                     $('#current_pos').val(response.data.position);
                     $('#current_pos_id').val(response.data.pos_id);
+                    $('#current_section').val(response.data.section || '');
+                    $('#current_section_id').val(response.data.section_id || '');
 
                     $.ajax({
                         url: '{{ route("employee.transfer.history") }}',

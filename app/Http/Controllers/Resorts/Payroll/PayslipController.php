@@ -391,7 +391,7 @@ class PayslipController extends Controller
     {
         $resort_id = $this->resort->resort_id;
         $employee = Employee::where('id', $request->employee_id)
-            ->with(['resortAdmin', 'position', 'department','resignation','allowance','advancedPaymentRecovey'])
+            ->with(['resortAdmin', 'position', 'department','section','resignation','allowance','advancedPaymentRecovey'])
             ->first();
     
         if (!$employee) {
@@ -421,6 +421,8 @@ class PayslipController extends Controller
                 "last_working_day" => $employee->resignation->last_working_day ?? "N/A",
                 "dept_id" => $employee->department->id ?? 'N/A',
                 "pos_id" => $employee->position->id ?? 'N/A',
+                "section" => $employee->section->name ?? null,
+                "section_id" => $employee->section->id ?? null,
                 "hired_date" => $formattedHireddate ?? "N/A",
                 "basic_salary" => $employee->basic_salary ?? "N/A",
                 'proratedBasic' => $payrollData['proratedBasic'] ?? 0,
