@@ -689,7 +689,7 @@ class PayslipController extends Controller
                 return $settlement->employee->department->name ?? 'N/A';
             })
             ->addColumn('last_working_date', function ($settlement) {
-                return Carbon::parse($settlement->last_working_date)->format('d M, Y');
+                return Carbon::parse($settlement->last_working_date)->format('d M Y');
             })
             ->addColumn('net_pay', function ($settlement) {
                 return number_format($settlement->net_pay, 2) . ' MVR';

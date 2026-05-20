@@ -118,12 +118,12 @@
                                 <h3>Progress Tracking</h3>
                             </div>
                             <ul class="manning-timeline text-start ">
-                                <li class="active">
+                                <li class="{{ $onboardingStatus === 'Completed' ? 'active' : '' }}">
                                     <div>
                                         <h6>Onboarding Training</h6>
                                         <p>Due: {{ $joiningLabel }}</p>
                                     </div>
-                                    <span class="badge badge-themeSuccess">Completed</span>
+                                    <span class="badge {{ $onboardingBadge }}">{{ $onboardingStatus }}</span>
                                 </li>
                                 @foreach ($monthlyCheckins as $index => $checkin)
                                     <li class="{{ $checkin['status'] === 'Completed' ? 'active' : '' }}">
@@ -133,13 +133,13 @@
                                         </div>
                                         <span class="badge {{ $checkin['badge_class'] }}">{{ $checkin['status'] }}</span>
                                     </li>
-                                @endforeach                                
-                                <li>
+                                @endforeach
+                                <li class="{{ $finalReviewStatus === 'Completed' ? 'active' : '' }}">
                                     <div>
                                         <h6>Final Probation Review</h6>
                                         <p>Due: {{ $probationEndLabel }}</p>
                                     </div>
-                                    <span class="badge badge-themeWarning">Pending</span>
+                                    <span class="badge {{ $finalReviewBadge }}">{{ $finalReviewStatus }}</span>
                                 </li>
                             </ul>
                         </div>
@@ -217,15 +217,16 @@
         // Letter awaiting confirmation from the "probation not complete" modal.
         var pendingLetter = null;
 
-        function sendProbationLetter(empId, type) {
+        function sendProbationLetter(empId, type, extras) {
+            extras = extras || {};
             $.ajax({
                 url: '{{route("probation.send-letter")}}',
                 method: 'POST',
-                data: {
+                data: $.extend({
                     _token: '{{ csrf_token() }}',
                     employee_id: empId,
                     type: type
-                },
+                }, extras),
                 success: function (response) {
                     if (response && response.success) {
                         toastr.success(response.message, "Success", {
@@ -253,6 +254,41 @@
             });
         }
 
+        // Confirm Probation flow — same prompt as the list page's
+        // confirm-probation action. Sends the Successful Letter, marks
+        // probation Confirmed and updates employment type in one call.
+        function promptConfirmSuccess(empId) {
+            Swal.fire({
+                title: 'Confirm Probation',
+                html: '<p>Select new Employment Type:</p>' +
+                      '<select id="employmentTypeSelect" class="swal2-input" style="width: 100%; padding: 5px;">' +
+                          '<option value="">-- Select Type --</option>' +
+                          '<option value="Full-Time">Full-Time</option>' +
+                          '<option value="Part-Time">Part-Time</option>' +
+                          '<option value="Contract">Contract</option>' +
+                          '<option value="Casual">Casual</option>' +
+                          '<option value="Probationary">Probationary</option>' +
+                          '<option value="Internship">Internship</option>' +
+                          '<option value="Temporary">Temporary</option>' +
+                      '</select>',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Confirm',
+                preConfirm: function () {
+                    var selected = document.getElementById('employmentTypeSelect').value;
+                    if (!selected) {
+                        Swal.showValidationMessage('Please select an employment type');
+                        return false;
+                    }
+                    return selected;
+                }
+            }).then(function (result) {
+                if (result.isConfirmed && result.value) {
+                    sendProbationLetter(empId, 'success', { employment_type: result.value });
+                }
+            });
+        }
+
         $('.send-letter').on('click', function () {
             var $btn = $(this);
             var empId = $btn.data('id');
@@ -266,14 +302,56 @@
                 return;
             }
 
+            // The Successful Letter is the email side of "Confirm Probation" —
+            // marks the employee Confirmed and updates employment_type. Mirror
+            // the list page's Swal so HR picks the new type.
+            if (type === 'success') {
+                promptConfirmSuccess(empId);
+                return;
+            }
+
+            // The Unsuccessful Letter is the email side of "Fail Probation" —
+            // marks the employee Failed/Terminated and creates the Exit
+            // Clearance record. Confirm with the same SweetAlert prompt as
+            // the list page's Fail Probation action so HR captures a reason.
+            if (type === 'failed') {
+                Swal.fire({
+                    title: 'Fail Probation',
+                    html: '<p>You are about to mark this probation as <strong>Failed</strong>.</p>' +
+                          '<textarea id="fail_remarks" class="swal2-textarea" placeholder="Enter reason for failure..."></textarea>',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Submit',
+                    cancelButtonText: 'Cancel',
+                    preConfirm: function () {
+                        var remarks = (document.getElementById('fail_remarks').value || '').trim();
+                        if (!remarks) {
+                            Swal.showValidationMessage('Remarks are required!');
+                            return false;
+                        }
+                        return remarks;
+                    }
+                }).then(function (result) {
+                    if (result.isConfirmed && result.value) {
+                        sendProbationLetter(empId, type, { remarks: result.value });
+                    }
+                });
+                return;
+            }
+
             sendProbationLetter(empId, type);
         });
 
-        // Confirmed from the warning modal — proceed with the send.
+        // Confirmed from the "probation not complete" warning modal — drop
+        // into the Confirm Probation Swal so HR still picks employment_type.
         $('#confirmSendSuccessLetter').on('click', function () {
             $('#probationWarningModal').modal('hide');
             if (pendingLetter) {
-                sendProbationLetter(pendingLetter.empId, pendingLetter.type);
+                if (pendingLetter.type === 'success') {
+                    promptConfirmSuccess(pendingLetter.empId);
+                } else {
+                    sendProbationLetter(pendingLetter.empId, pendingLetter.type);
+                }
                 pendingLetter = null;
             }
         });

@@ -780,6 +780,42 @@ class DashboardController extends Controller
             ->selectRaw('MONTH(end_date) as m, SUM(Amt) as t')
             ->groupBy(DB::raw('MONTH(end_date)'))->pluck('t', 'm')->toArray();
 
+        // --- Per-category budget estimates (resort_budget_costs particulars).
+        //     Defined here so the headline Total Estimated can be recomputed
+        //     as the SUM of every category estimate — matching the
+        //     Estimation-vs-Actual breakdown shown to the user. Previously
+        //     Total was the manning budget only (= the Payroll category),
+        //     so the other 5 categories' estimates appeared in the breakdown
+        //     but were excluded from the headline figure.
+        $budgetByParticular = DB::table('resort_budget_costs')
+            ->where('resort_id', $resort_id)
+            ->select('particulars', DB::raw('SUM(amount) as total'))
+            ->groupBy('particulars')
+            ->pluck('total', 'particulars')->toArray();
+
+        $budgetMatch = function (array $keywords) use ($budgetByParticular) {
+            $sum = 0.0;
+            foreach ($budgetByParticular as $particular => $amount) {
+                foreach ($keywords as $kw) {
+                    if (stripos($particular, $kw) !== false) {
+                        $sum += (float) $amount;
+                        break;
+                    }
+                }
+            }
+            return $sum;
+        };
+
+        // Preserve the manning-budget figure for the Payroll row; replace
+        // $estimated with the all-categories sum used everywhere else.
+        $manningBudget = $estimated;
+        $estimated = $manningBudget
+            + $budgetMatch(['Work Permit'])
+            + $budgetMatch(['Medical'])
+            + $budgetMatch(['Insurance'])
+            + $budgetMatch(['Quota'])
+            + $budgetMatch(['Visa']);
+
         // --- Build monthly trend (remaining liability after each month) ---
         $remaining   = $estimated;
         $actualPaid  = 0.0;
@@ -818,28 +854,11 @@ class DashboardController extends Controller
         $totalVisa       = array_sum($monthlyVisa);
         $totalPayroll    = array_sum($monthlyPayroll);
 
-        $budgetByParticular = DB::table('resort_budget_costs')
-            ->where('resort_id', $resort_id)
-            ->select('particulars', DB::raw('SUM(amount) as total'))
-            ->groupBy('particulars')
-            ->pluck('total', 'particulars')->toArray();
-
-        // Sum budget rows whose particulars contains a keyword (case-insensitive).
-        $budgetMatch = function (array $keywords) use ($budgetByParticular) {
-            $sum = 0.0;
-            foreach ($budgetByParticular as $particular => $amount) {
-                foreach ($keywords as $kw) {
-                    if (stripos($particular, $kw) !== false) {
-                        $sum += (float) $amount;
-                        break;
-                    }
-                }
-            }
-            return $sum;
-        };
-
+        // $budgetByParticular / $budgetMatch were already defined above so the
+        // headline Total could include every category. Reuse them here for the
+        // Estimation-vs-Actual breakdown.
         $categories = [
-            'Payroll'      => ['estimated' => $estimated,                        'actual' => $totalPayroll],
+            'Payroll'      => ['estimated' => $manningBudget,                     'actual' => $totalPayroll],
             'Work Permit'  => ['estimated' => $budgetMatch(['Work Permit']),      'actual' => $totalWorkPermit],
             'Medical'      => ['estimated' => $budgetMatch(['Medical']),          'actual' => $totalMedical],
             'Insurance'    => ['estimated' => $budgetMatch(['Insurance']),        'actual' => $totalInsurance],

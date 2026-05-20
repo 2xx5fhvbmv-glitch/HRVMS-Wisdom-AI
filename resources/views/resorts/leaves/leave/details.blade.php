@@ -103,7 +103,7 @@
                         {{-- Leave overview --}}
                         <div class="leave-overview-card rounded-3 p-4 mb-4">
                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-                                <span class="text-muted small">Applied on {{ \Carbon\Carbon::flexible($leaveDetail->created_at)->format('d M, Y') }}</span>
+                                <span class="text-muted small">Applied on {{ \Carbon\Carbon::flexible($leaveDetail->created_at)->format('d M Y') }}</span>
                             </div>
                             <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 py-2">
                                 <div class="leave-date-box text-center rounded-2 px-3 py-2">
@@ -190,25 +190,25 @@
                             <div class="col-md-6">
                                 <div class="detail-item rounded-2 p-3 h-100">
                                     <div class="detail-label">Departure date</div>
-                                    <span class="detail-value">{{ $leaveDetail->departure_date ? \Carbon\Carbon::parse($leaveDetail->departure_date)->format('d M, Y') : '—' }}</span>
+                                    <span class="detail-value">{{ $leaveDetail->departure_date ? \Carbon\Carbon::parse($leaveDetail->departure_date)->format('d M Y') : '—' }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-item rounded-2 p-3 h-100">
                                     <div class="detail-label">Arrival date</div>
-                                    <span class="detail-value">{{ $leaveDetail->arrival_date ? \Carbon\Carbon::parse($leaveDetail->arrival_date)->format('d M, Y') : '—' }}</span>
+                                    <span class="detail-value">{{ $leaveDetail->arrival_date ? \Carbon\Carbon::parse($leaveDetail->arrival_date)->format('d M Y') : '—' }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-item rounded-2 p-3 h-100">
                                     <div class="detail-label">From date</div>
-                                    <span class="detail-value">{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('d M, Y') }}</span>
+                                    <span class="detail-value">{{ \Carbon\Carbon::parse($leaveDetail->from_date)->format('d M Y') }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-item rounded-2 p-3 h-100">
                                     <div class="detail-label">To date</div>
-                                    <span class="detail-value">{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('d M, Y') }}</span>
+                                    <span class="detail-value">{{ \Carbon\Carbon::parse($leaveDetail->to_date)->format('d M Y') }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -226,7 +226,7 @@
                                 <div class="col-md-6">
                                     <div class="detail-item rounded-2 p-3 h-100">
                                         <div class="detail-label">Departure date</div>
-                                        <span class="detail-value">{{ $departurePass->departure_date ? \Carbon\Carbon::parse($departurePass->departure_date)->format('d M, Y') : '—' }}</span>
+                                        <span class="detail-value">{{ $departurePass->departure_date ? \Carbon\Carbon::parse($departurePass->departure_date)->format('d M Y') : '—' }}</span>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -238,7 +238,7 @@
                                 <div class="col-md-6">
                                     <div class="detail-item rounded-2 p-3 h-100">
                                         <div class="detail-label">Arrival date</div>
-                                        <span class="detail-value">{{ $departurePass->arrival_date ? \Carbon\Carbon::parse($departurePass->arrival_date)->format('d M, Y') : '—' }}</span>
+                                        <span class="detail-value">{{ $departurePass->arrival_date ? \Carbon\Carbon::parse($departurePass->arrival_date)->format('d M Y') : '—' }}</span>
                                     </div>
                                 </div>
                                 <div class="col-md-6">

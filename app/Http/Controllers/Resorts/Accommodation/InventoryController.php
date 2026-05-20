@@ -371,7 +371,7 @@ class InventoryController extends Controller
                     foreach($AssingAccommodation as $data) 
                     {
                         $effectedDate = Carbon::parse($data->effected_date);
-                        $formattedDate = $effectedDate->format('d M y');
+                        $formattedDate = $effectedDate->format('d M Y');
                         $yearsDifference = $effectedDate->diffInYears(Carbon::now());
                         $dateDifferent = "{$formattedDate} ({$yearsDifference} year" . ($yearsDifference > 1 ? 's' : '') . ")";
                         $assignAccomdationdata[] = [$data->EmployeeName, $data->profileImg, $dateDifferent]; 

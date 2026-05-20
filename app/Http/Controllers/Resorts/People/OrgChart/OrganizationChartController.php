@@ -73,7 +73,7 @@ class OrganizationChartController extends Controller
                 'name' => optional($employee->resortAdmin)->full_name ?? 'N/A',
                 'position' => optional($employee->position)->position_title ?? 'N/A',
                 'joinDate' => $employee->joining_date
-                    ? 'Joining Date: ' . \Carbon\Carbon::parse($employee->joining_date)->format('d F Y')
+                    ? 'Joining Date: ' . \Carbon\Carbon::parse($employee->joining_date)->format('d M Y')
                     : '',
                 'img' => $this->getImageUrlForPDF($employee->Admin_Parent_id ?? null),
                 'department_id' => $employee->Dept_id,

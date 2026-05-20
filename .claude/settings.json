@@ -13,7 +13,9 @@
       "Bash(grep -n 'protected $fillable\\\\|protected $table\\\\|class Employee' /Users/ankittisawer/Desktop/HRVMS-Wisdom-AI/app/Models/Employee.php)",
       "Bash(php -l app/Http/Controllers/Resorts/Payroll/PayrollController.php)",
       "Bash(php -l app/Models/PayrollReview.php)",
-      "Bash(php -l database/seeders/ImportWisdomAiStaffSeeder.php)"
+      "Bash(php -l database/seeders/ImportWisdomAiStaffSeeder.php)",
+      "Bash(php -l /Users/ankittisawer/Desktop/clone/HRVMS-Wisdom-AI/app/Http/Controllers/Resorts/People/Liability/LiabilityEstimationController.php)",
+      "Bash(php -l /Users/ankittisawer/Desktop/clone/HRVMS-Wisdom-AI/app/Http/Controllers/Resorts/People/Onboarding/OnboardingController.php)"
     ]
   }
 }

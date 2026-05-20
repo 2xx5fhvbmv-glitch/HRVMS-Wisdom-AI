@@ -504,7 +504,7 @@ class AccommodationController extends Controller
 
             $employeData->profileImg                        =   Common::getResortUserPicture($employeData->Parentid);
             $employeData->EmployeeName                      =   ucfirst($employeData->first_name . ' ' . $employeData->last_name);
-            $employeData->effected_date                     =   Carbon::parse($employeData->effected_date)->format('d F Y');
+            $employeData->effected_date                     =   Carbon::parse($employeData->effected_date)->format('d M Y');
             $now                                            =   Carbon::now();
             $effectedDate                                   =   Carbon::parse($employeData->effected_date);
             $years                                          =   $effectedDate->diffInYears($now);

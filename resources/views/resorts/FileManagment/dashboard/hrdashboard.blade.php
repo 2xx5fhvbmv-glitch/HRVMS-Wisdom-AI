@@ -286,7 +286,11 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-12">
-                            <select class="form-select select2t-none" name="FolderName" id="FolderName" required data-parsley-required-message="Please select a folder.">
+                            {{-- Removed `select2t-none` class — the global Select2 init binds
+                                 that class with `minimumResultsForSearch: -1`, which hides the
+                                 search box. Without the class, the page-level init below keeps
+                                 the default (search enabled). --}}
+                            <select class="form-select" name="FolderName" id="FolderName" required data-parsley-required-message="Please select a folder.">
                                 @if($FolderList->isNotEmpty())
                                     @foreach ($FolderList as $f)
                                         <option value="{{ base64_encode($f->id) }}">{{$f->Folder_Name}}</option>
@@ -579,9 +583,14 @@ document.getElementById('file').addEventListener('change', function (e) {
     });
 });
     $(document).ready(function () {
+        // dropdownParent attaches the Select2 dropdown INSIDE the modal.
+        // Without it, the dropdown is appended to <body> and Bootstrap's
+        // modal focus-trap blocks input into the Select2 search box —
+        // typing in it does nothing.
         $("#FolderName").select2({
             placeholder: "Select Folder",
-            allowClear: true
+            allowClear: true,
+            dropdownParent: $('#uploadDocument-modal')
         });
         AuditLogsList();
         UncategorizeDoc();

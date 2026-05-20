@@ -270,7 +270,7 @@ class AccommodationMasterController extends Controller
                     $accommodation->EmployeeName = ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
                     $accommodation->profileImg = Common::getResortUserPicture($accommodation->Parentid);
                     $accommodation->AssingAccommodationCount = $AssingAccommodation->where("assing_accommodations.emp_id", 0)->count();
-                    $accommodation->effected_date = Carbon::parse($accommodation->effected_date)->format('d F Y');
+                    $accommodation->effected_date = Carbon::parse($accommodation->effected_date)->format('d M Y');
 
                     return $accommodation;
                 });
@@ -357,7 +357,7 @@ class AccommodationMasterController extends Controller
             $accommodation->EmployeeName = ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
             $accommodation->profileImg = Common::getResortUserPicture($accommodation->Parentid);
             $accommodation->AssingAccommodationCount = $AssingAccommodation->where("assing_accommodations.emp_id", 0)->count();
-            $accommodation->effected_date = Carbon::parse($accommodation->effected_date)->format('d F Y');
+            $accommodation->effected_date = Carbon::parse($accommodation->effected_date)->format('d M Y');
 
             return $accommodation;
         });
@@ -444,8 +444,8 @@ class AccommodationMasterController extends Controller
                 $accommodation->EmployeeName = ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
                 $accommodation->profileImg = Common::getResortUserPicture($accommodation->Parentid);
                 $accommodation->AssingAccommodationCount = $AssingAccommodation->where("assing_accommodations.emp_id", 0)->count();
-                $accommodation->effected_date = Carbon::parse($accommodation->effected_date)->format('d F Y');
-                $accommodation->joining_date = Carbon::parse($accommodation->joining_date)->format('d F Y');
+                $accommodation->effected_date = Carbon::parse($accommodation->effected_date)->format('d M Y');
+                $accommodation->joining_date = Carbon::parse($accommodation->joining_date)->format('d M Y');
                 return $accommodation;
             });
 
@@ -526,7 +526,7 @@ class AccommodationMasterController extends Controller
 
                 $data->profileImg = Common::getResortUserPicture($data->Parentid);
                 $data->EmployeeName = ucfirst($data->first_name.' '.$data->last_name);
-                $data->effected_date =  Carbon::parse($data->effected_date)->format('d F Y');
+                $data->effected_date =  Carbon::parse($data->effected_date)->format('d M Y');
                 $now = Carbon::now();
                 $effectedDate = Carbon::parse($data->effected_date);
                 $years = $effectedDate->diffInYears($now);
@@ -555,7 +555,7 @@ class AccommodationMasterController extends Controller
         //     $accommodation->EmployeeName = ucfirst($accommodation->first_name . ' ' . $accommodation->last_name);
         //     $accommodation->profileImg = Common::getResortUserPicture($accommodation->Parentid);
         //     $accommodation->AssingAccommodationCount = $AssingAccommodation->where("assing_accommodations.emp_id", 0)->count();
-        //     $accommodation->effected_date=Carbon::parse($accommodation->effected_date)->format('d F Y');
+        //     $accommodation->effected_date=Carbon::parse($accommodation->effected_date)->format('d M Y');
         //     return $accommodation;
         // });
 

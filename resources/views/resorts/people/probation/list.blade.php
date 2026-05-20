@@ -56,8 +56,6 @@
                                 <option value="">By Probation Status</option>
                                 <option value="Active">Active</option>
                                 <option value="Extended">Extended</option>
-                                <option value="Confirmed">Confirmed</option>
-                                <option value="Failed">Failed</option>
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">

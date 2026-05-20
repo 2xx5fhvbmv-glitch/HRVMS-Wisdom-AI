@@ -741,6 +741,49 @@
             });
         }
 
+        // Open a SweetAlert input asking HR for a replacement email when the
+        // candidate's TA email collides with an existing account. Calls
+        // onSubmit(newEmail) on confirm or onCancel() on dismiss.
+        function promptForReplacementEmail(body, onSubmit, onCancel) {
+            const intro = body.is_override
+                ? `<p>The email <strong>${body.conflicting_email}</strong> is also in use (by <strong>${body.owner_name}</strong>).</p>
+                   <p>Enter a different unique email for <strong>${body.applicant_name}</strong>.</p>`
+                : `<p>The email <strong>${body.conflicting_email}</strong> on this candidate's Talent Acquisition record is already used by <strong>${body.owner_name}</strong>.</p>
+                   <p>Enter a unique email to use for <strong>${body.applicant_name}</strong>'s new account.</p>`;
+
+            Swal.fire({
+                title: 'Email Already In Use',
+                html: intro + '<input id="replacementEmail" type="email" class="swal2-input" placeholder="name@example.com" />',
+                showCancelButton: true,
+                confirmButtonText: 'Use this email',
+                cancelButtonText: 'Cancel',
+                focusConfirm: false,
+                preConfirm: function () {
+                    const value = (document.getElementById('replacementEmail').value || '').trim();
+                    if (!value) {
+                        Swal.showValidationMessage('Please enter an email address.');
+                        return false;
+                    }
+                    // Lightweight client-side sanity check; the server still validates.
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                        Swal.showValidationMessage('Please enter a valid email address.');
+                        return false;
+                    }
+                    if (value.toLowerCase() === String(body.conflicting_email).toLowerCase()) {
+                        Swal.showValidationMessage('That is the same email — pick a different one.');
+                        return false;
+                    }
+                    return value;
+                }
+            }).then(function (result) {
+                if (result.isConfirmed && result.value) {
+                    onSubmit(result.value);
+                } else {
+                    onCancel();
+                }
+            });
+        }
+
         // Step 1 continuation: given a resolved employees.id, load the employee
         // details, store them, and advance to Step 2. Shared by both real
         // employees and applicants that were just auto-converted.
@@ -794,25 +837,46 @@
                     const applicantId = String(selectedValue).split(':')[1];
                     const $btn = $(this);
                     $btn.prop('disabled', true);
-                    $.ajax({
-                        url: '{{ route("people.onboarding.convertApplicant") }}',
-                        method: 'POST',
-                        data: { applicant_id: applicantId, _token: '{{ csrf_token() }}' }
-                    }).done(function (resp) {
-                        $btn.prop('disabled', false);
-                        if (resp && resp.success && resp.employee_id) {
-                            // Refresh the candidate list so the row now renders
-                            // as a real (matched) employee on subsequent visits.
-                            getUpcomingEmployees();
-                            proceedStep1WithEmployee($current, resp.employee_id);
-                        } else {
-                            toastr.error((resp && resp.message) || 'Could not create the employee record.');
+
+                    // Single attempt. On 'email_collision' the caller re-invokes
+                    // with overrideEmail collected from a SweetAlert prompt;
+                    // any other failure surfaces via toastr.
+                    const attemptConvert = function (overrideEmail) {
+                        const payload = { applicant_id: applicantId, _token: '{{ csrf_token() }}' };
+                        if (overrideEmail) {
+                            payload.override_email = overrideEmail;
                         }
-                    }).fail(function (xhr) {
-                        $btn.prop('disabled', false);
-                        const msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Could not create the employee record.';
-                        toastr.error(msg);
-                    });
+                        $.ajax({
+                            url: '{{ route("people.onboarding.convertApplicant") }}',
+                            method: 'POST',
+                            data: payload
+                        }).done(function (resp) {
+                            $btn.prop('disabled', false);
+                            if (resp && resp.success && resp.employee_id) {
+                                // Refresh the candidate list so the row now
+                                // renders as a real (matched) employee on
+                                // subsequent visits.
+                                getUpcomingEmployees();
+                                proceedStep1WithEmployee($current, resp.employee_id);
+                            } else {
+                                toastr.error((resp && resp.message) || 'Could not create the employee record.');
+                            }
+                        }).fail(function (xhr) {
+                            const body = xhr.responseJSON || {};
+                            if (xhr.status === 422 && body.code === 'email_collision') {
+                                // Keep the button disabled across the prompt so
+                                // HR can't double-fire while the modal is open.
+                                promptForReplacementEmail(body, attemptConvert, function () {
+                                    $btn.prop('disabled', false);
+                                });
+                                return;
+                            }
+                            $btn.prop('disabled', false);
+                            toastr.error(body.message || 'Could not create the employee record.');
+                        });
+                    };
+
+                    attemptConvert(null);
                     return;
                 }
 

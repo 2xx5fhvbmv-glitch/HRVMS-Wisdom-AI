@@ -5044,7 +5044,7 @@ class Common
                                             'status'        => $payload->status,
                                             'module'        => 'Announcement Wish',
                                             'sendto'        => $payload->employee_id,
-                                            'created_at'    => Carbon::parse($payload->created_at)->format('d-m-Y h:i A')
+                                            'created_at'    => Carbon::parse($payload->created_at)->format('d M Y h:i A')
                                         ];
             });
 

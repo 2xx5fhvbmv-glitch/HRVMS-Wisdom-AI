@@ -69,7 +69,7 @@
                             </tr>
                             <tr>
                                 <th>Arrival Date:</th>
-                                <td>{{ \Carbon\Carbon::parse($itinerary->arrival_date)->format('d F Y') }}</td>
+                                <td>{{ \Carbon\Carbon::parse($itinerary->arrival_date)->format('d M Y') }}</td>
                             </tr>
                             <tr>
                                 <th>Arrival Time:</th>
@@ -155,7 +155,7 @@
                             @elseif($itinerary->resort_transportation_id  == 3)
                                 <tr>
                                     <th>Domestic Flight Date</th>
-                                    <td>{{ \Carbon\Carbon::parse($itinerary->domestic_flight_date)->format('d F Y') }}</td>
+                                    <td>{{ \Carbon\Carbon::parse($itinerary->domestic_flight_date)->format('d M Y') }}</td>
                                 </tr>
                                 <tr>
                                     <th>Departure Time</th>
@@ -222,7 +222,7 @@
                                     </tr>
                                     <tr>
                                         <th>Date & Time</th>
-                                        <td>{{ \Carbon\Carbon::parse($meeting->meeting_date)->format('d F Y') }} - {{ \Carbon\Carbon::parse($meeting->meeting_time)->format('h:i a') }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($meeting->meeting_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($meeting->meeting_time)->format('h:i a') }}</td>
                                     </tr>
                                     <tr>
                                         <th>Meeting Link</th>
