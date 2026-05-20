@@ -93,6 +93,7 @@
                                 <option value="">Select Position</option>
                             </select>
                             <div id="position-error"></div>
+                            <small id="vacancy_status" class="d-block mt-1"></small>
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="reason_transfer" class="form-label">REASON FOR TRANSFER <span class="red-mark">*</span></label>
@@ -137,6 +138,13 @@
                             <label for="proposed_salary" class="form-label">PROPOSED SALARY</label>
                             <input type="number" step="0.01" min="0" id="proposed_salary" name="proposed_salary" class="form-control" placeholder="Proposed Salary"
                                 data-parsley-type="number" data-parsley-min="0">
+                        </div>
+                        {{-- Allowances / Benefit Grid for the chosen target position
+                             — mirrors the Add-Vacancy form's pattern (same endpoint,
+                             same response shape). Stays hidden until a position picks. --}}
+                        <div class="col-12" id="target_allowance_container" style="display:none;">
+                            <label class="form-label">ALLOWANCES &amp; BENEFIT GRID (TARGET POSITION)</label>
+                            <div id="target_allowance_list"></div>
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="additional_notes" class="form-label">ADDITIONAL NOTES</label>
@@ -333,13 +341,16 @@
                     }
                 });
 
-                // Item 2 — fetch budgeted salary for the chosen target position
+                // Item 2 + live vacancy preview — fetch budgeted salary AND
+                // the vacancy verdict in one call so HR sees both immediately.
+                $('#vacancy_status').html('<span class="text-muted">Checking vacancy…</span>');
                 $.ajax({
                     url: '{{ route("transfer.positionBudget") }}',
                     type: "post",
                     data: {
                         target_pos: positionId,
                         target_dep: departmentId,
+                        employee_id: $('#employee_name').val(),
                         _token: '{{ csrf_token() }}'
                     },
                     dataType: 'json',
@@ -349,14 +360,63 @@
                         } else {
                             $('#budgeted_salary_display').val('No budgeted salary on record');
                         }
+                        if (res.vacancy) {
+                            var cls = res.vacancy.vacant ? 'text-success' : 'text-danger';
+                            var icon = res.vacancy.vacant
+                                ? '<i class="fa-solid fa-circle-check me-1"></i>'
+                                : '<i class="fa-solid fa-circle-xmark me-1"></i>';
+                            $('#vacancy_status').html('<span class="' + cls + '">' + icon + res.vacancy.message + '</span>');
+                        } else {
+                            $('#vacancy_status').empty();
+                        }
                     },
                     error: function () {
                         $('#budgeted_salary_display').val('');
+                        $('#vacancy_status').empty();
+                    }
+                });
+
+                // Allowances / Benefit Grid for the target position — mirrors
+                // the Add-Vacancy form's pattern by calling the same endpoint
+                // so both surfaces stay in sync when allowance config changes.
+                $.ajax({
+                    url: '{{ route("resort.vacancies.getstatus") }}',
+                    method: 'POST',
+                    data: {
+                        position_id: positionId,
+                        requested_vacancy: 1,
+                        _token: '{{ csrf_token() }}'
+                    },
+                    success: function (response) {
+                        var html = '';
+                        if (response && response.all_allowances && response.all_allowances.length > 0) {
+                            html = '<table class="table table-sm table-bordered mb-0">'
+                                 +    '<thead><tr><th>Particulars</th><th>Amount</th></tr></thead>'
+                                 +    '<tbody>';
+                            response.all_allowances.forEach(function (item) {
+                                var displayAmt = item.unit === '%'
+                                    ? item.raw_amount + '% (' + item.amount + ')'
+                                    : item.amount;
+                                html += '<tr><td>' + item.name + '</td><td>' + displayAmt + '</td></tr>';
+                            });
+                            html += '</tbody></table>';
+                        } else {
+                            html = '<span class="text-muted">No allowances configured for this position.</span>';
+                        }
+                        $('#target_allowance_list').html(html);
+                        $('#target_allowance_container').show();
+                    },
+                    error: function () {
+                        $('#target_allowance_list').empty();
+                        $('#target_allowance_container').hide();
                     }
                 });
             } else {
                 $('#target_pos').html('<option value="">Select Position</option>');
                 $('#budgeted_salary_display').val('');
+                $('#vacancy_status').empty();
+                $('#target_allowance_list').empty();
+                $('#target_allowance_container').hide();
             }
         });
 
