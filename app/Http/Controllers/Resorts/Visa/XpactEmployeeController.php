@@ -405,7 +405,7 @@ class XpactEmployeeController extends Controller
                   return $row->Amt. ' ' . $row->Currency;
                 })
                 ->editColumn('DueDate', function ($row) {
-                     return Carbon::parse($row->Due_Date)->format('d-M-Y');
+                     return Carbon::parse($row->Due_Date)->format('d M Y');
                 })
                 ->editColumn('Status', function ($row) 
                 {

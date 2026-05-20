@@ -77,7 +77,7 @@
                                         use Carbon\Carbon;
 
                                         $joiningDate = Carbon::parse($promotion->employee->joining_date);
-                                        $formattedDate = $joiningDate->format('d F Y');
+                                        $formattedDate = $joiningDate->format('d M Y');
                                         $diff = $joiningDate->diff(Carbon::now());
 
                                         $years = $diff->y;

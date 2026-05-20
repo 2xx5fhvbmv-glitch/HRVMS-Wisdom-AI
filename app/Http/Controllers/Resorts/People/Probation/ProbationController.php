@@ -20,6 +20,8 @@ use App\Models\ProbationLetterTemplate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\ProbationLetterMail;
+use App\Models\EmployeeResignation;
+use App\Models\EmployeeResignationReason;
 use Auth;
 use Config;
 use Common;
@@ -41,28 +43,61 @@ class ProbationController extends Controller
         $scopedDeptIds = Common::getScopedDepartmentIds();
         if($request->ajax())
         {
+            // --- Onboarding training (L&D) pre-resolution -----------------------------
+            // Resolve the resort's probationary learning programs ONCE here, outside the
+            // per-row DataTables closure. Needed up-front because the trainingStatus
+            // filter is computed against these programs and must run against $query
+            // before pagination.
+            $resortId = $this->resort->resort_id;
+            $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resortId)
+                ->pluck('program_id');
+            $probationaryProgramCount = $probationaryProgramIds->count();
+
+            // List shows ONLY in-progress probations (Active / Extended) whose
+            // probation window is still open today. Confirmed/Failed are
+            // terminal states; rows whose probation_end_date has passed (or
+            // whose joining_date + 3 months has passed when end_date is null)
+            // are also excluded — those employees are no longer probationary
+            // even if probation_status was never updated. Rows with neither
+            // probation_end_date nor joining_date are dropped because we have
+            // no way to confirm they are currently on probation.
+            $today = Carbon::today()->toDateString();
             $query = Employee::with(['position', 'department','resortAdmin'])
                     ->where('resort_id', $this->resort->resort_id)
-                    ->whereIn('probation_status', ['Active', 'Extended', 'Confirmed', 'Failed'])
+                    ->whereIn('probation_status', ['Active', 'Extended'])
+                    ->where(function ($q) use ($today) {
+                        $q->whereDate('probation_end_date', '>=', $today)
+                          ->orWhere(function ($qq) use ($today) {
+                              $qq->whereNull('probation_end_date')
+                                 ->whereNotNull('joining_date')
+                                 ->whereRaw('DATE_ADD(joining_date, INTERVAL 3 MONTH) >= ?', [$today]);
+                          });
+                    })
                     ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
             if ($request->filled('department_id')) {
                 $query->where('Dept_id', $request->department_id);
             }
-            
+
             if ($request->filled('position_id')) {
                 $query->where('Position_id', $request->position_id);
             }
-            
+
             if ($request->filled('status')) {
                 $query->where('probation_status', $request->status);
             }
 
             if ($request->filled('searchTerm')) {
-                $query->whereHas('resortAdmin', function ($q) use ($request) {
-                    $q->where('first_name', 'like', '%'.$request->searchTerm.'%')
-                      ->orWhere('last_name', 'like', '%'.$request->searchTerm.'%')
-                      ->orWhere('Emp_id', 'like', '%'.$request->searchTerm.'%');
+                $term = $request->searchTerm;
+                // Emp_id lives on employees, names live on resort_admins —
+                // querying Emp_id inside the whereHas would target a non-existent
+                // resort_admins.Emp_id column.
+                $query->where(function ($q) use ($term) {
+                    $q->where('employees.Emp_id', 'like', '%'.$term.'%')
+                      ->orWhereHas('resortAdmin', function ($qa) use ($term) {
+                          $qa->where('first_name', 'like', '%'.$term.'%')
+                             ->orWhere('last_name', 'like', '%'.$term.'%');
+                      });
                 });
             }
 
@@ -74,20 +109,55 @@ class ProbationController extends Controller
             } elseif($request->filled('date_to')){
                 $query->whereDate('probation_end_date', '<=', $request->date_to);
             }
+
+            // Onboarding-training status filter (Not Started / In Progress /
+            // Completed). The status is derived from training_attendance, so we
+            // resolve matching employee IDs once and constrain the list query.
+            if ($request->filled('trainingStatus')) {
+                $wanted = $request->trainingStatus;
+
+                if ($probationaryProgramCount === 0) {
+                    // No probationary programs configured → every employee
+                    // shows "Not Started". Other selections produce no rows.
+                    if ($wanted !== 'Not Started') {
+                        $query->whereRaw('1=0');
+                    }
+                } else {
+                    // Per-employee distinct completed-program count.
+                    $completed = \DB::table('training_attendance as ta')
+                        ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                        ->where('ts.resort_id', $resortId)
+                        ->whereIn('ts.training_id', $probationaryProgramIds)
+                        ->where('ta.status', 'Present')
+                        ->select('ta.employee_id', \DB::raw('COUNT(DISTINCT ts.training_id) as c'))
+                        ->groupBy('ta.employee_id')
+                        ->pluck('c', 'ta.employee_id');
+
+                    $startedIds   = $completed->keys()->all();
+                    $completedIds = $completed->filter(fn($c) => $c >= $probationaryProgramCount)->keys()->all();
+                    $inProgressIds = $completed->filter(fn($c) => $c > 0 && $c < $probationaryProgramCount)->keys()->all();
+
+                    switch ($wanted) {
+                        case 'Completed':
+                            $query->whereIn('employees.id', $completedIds ?: [0]);
+                            break;
+                        case 'In Progress':
+                            $query->whereIn('employees.id', $inProgressIds ?: [0]);
+                            break;
+                        case 'Not Started':
+                            // Employees with zero matching attendance records.
+                            if (!empty($startedIds)) {
+                                $query->whereNotIn('employees.id', $startedIds);
+                            }
+                            break;
+                    }
+                }
+            }
+
             $edit_class = '';
             if(Common::checkRouteWisePermission('people.probation',config('settings.resort_permissions.view')) == false){
                 $edit_class = 'd-none';
             }
-
-            // --- Onboarding training (L&D) pre-resolution -----------------------------
-            // Resolve the resort's probationary learning programs ONCE here, outside the
-            // per-row DataTables closure. The probationary programs (and the training
-            // schedules backing them) are the same for every row, so doing this once
-            // keeps the per-row work to a single COUNT query.
-            $resortId = $this->resort->resort_id;
-            $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resortId)
-                ->pluck('program_id');
-            $probationaryProgramCount = $probationaryProgramIds->count();
 
             return datatables()->of($query)
                 ->addColumn('employee_id', fn($row) => '#'.$row->Emp_id)
@@ -160,17 +230,32 @@ class ProbationController extends Controller
                     // current month for the per-month check-in status column
                     // (Carbon::parse('-01') would otherwise error).
                     $month = $request->filled('month') ? $request->get('month') : Carbon::now()->format('Y-m');
-                    $startOfMonth = Carbon::parse($month . '-01')->startOfMonth()->format('Y-m-d');
-                    $endOfMonth = Carbon::parse($month . '-01')->endOfMonth()->format('Y-m-d');
+                    $monthStart   = Carbon::parse($month . '-01')->startOfMonth();
+                    $monthEnd     = Carbon::parse($month . '-01')->endOfMonth();
+                    $monthLabel   = $monthStart->format('M Y');
 
                     $checkin = MonthlyCheckingModel::where('emp_id', $row->id)
-                        ->whereRaw("STR_TO_DATE(date_discussion, '%d/%m/%Y') BETWEEN ? AND ?", [$startOfMonth, $endOfMonth])
+                        ->whereRaw("STR_TO_DATE(date_discussion, '%d/%m/%Y') BETWEEN ? AND ?", [
+                            $monthStart->format('Y-m-d'),
+                            $monthEnd->format('Y-m-d'),
+                        ])
                         ->first();
-                
-                    return $checkin
-                        ? '<span class="badge badge-themeSuccess">Up to date ('.Carbon::parse($month . '-01')->startOfMonth()->format('M Y') .')</span>'
-                        : '<span class="badge badge-themeDangerNew">Missed ('.Carbon::parse($month . '-01')->startOfMonth()->format('M Y') .')</span>';
-                    
+
+                    if ($checkin) {
+                        return '<span class="badge badge-themeSuccess">Up to date (' . $monthLabel . ')</span>';
+                    }
+
+                    // The month isn't over yet — no check-in can be "missed"
+                    // until the window closes. Show Due for the current month
+                    // (still in progress) and Upcoming for any future month a
+                    // user might select via the filter.
+                    $today = Carbon::now();
+                    if ($monthEnd->isFuture() || $monthEnd->isSameDay($today->copy()->endOfMonth())) {
+                        $label = $today->between($monthStart, $monthEnd) ? 'Due' : 'Upcoming';
+                        return '<span class="badge badge-themeWarning">' . $label . ' (' . $monthLabel . ')</span>';
+                    }
+
+                    return '<span class="badge badge-themeDangerNew">Missed (' . $monthLabel . ')</span>';
                 })              
                 ->addColumn('review_status', function ($row) {
                     switch($row->probation_status) {
@@ -261,6 +346,11 @@ class ProbationController extends Controller
         // date the real due date + status are computed; with no joining date
         // the check-in still shows as "Not set" / Pending rather than
         // vanishing from the timeline.
+        //
+        // Match window = the CALENDAR MONTH of the due date. If the 1st
+        // check-in is due 01 May, any check-in dated within May counts —
+        // joining-date-anchored windows (rolling 30-day buckets) would
+        // misclassify a 15 May check-in for an Apr-1 joiner as "wrong month".
         $monthlyCheckins = [];
         for ($i = 0; $i < $probationMonths; $i++) {
             $label = 'Not set';
@@ -268,24 +358,32 @@ class ProbationController extends Controller
             $badgeClass = 'badge-themeWarning';
 
             if ($joiningDate) {
-                $monthStart = $joiningDate->copy()->addMonths($i);
-                $monthEnd   = $joiningDate->copy()->addMonths($i + 1);
-                $label = $monthEnd->format('d M Y');
+                $dueDate     = $joiningDate->copy()->addMonths($i + 1);
+                $windowStart = $dueDate->copy()->startOfMonth();
+                $windowEnd   = $dueDate->copy()->endOfMonth();
+                $label       = $dueDate->format('d M Y');
 
                 $checkin = MonthlyCheckingModel::where('emp_id', $employee->id)
                     ->whereRaw("STR_TO_DATE(date_discussion, '%d/%m/%Y') BETWEEN ? AND ?", [
-                        $monthStart->format('Y-m-d'),
-                        $monthEnd->format('Y-m-d'),
+                        $windowStart->format('Y-m-d'),
+                        $windowEnd->format('Y-m-d'),
                     ])
                     ->first();
 
-                if ($monthEnd->lt($today)) {
-                    $status = $checkin ? 'Completed' : 'Missed';
-                    $badgeClass = $checkin ? 'badge-themeSuccess' : 'badge-themeDangerNew';
-                } elseif ($checkin) {
+                if ($checkin) {
                     $status = 'Completed';
                     $badgeClass = 'badge-themeSuccess';
+                } elseif ($windowEnd->lt($today)) {
+                    // Calendar month has fully ended without a check-in.
+                    $status = 'Missed';
+                    $badgeClass = 'badge-themeDangerNew';
+                } elseif ($today->between($windowStart, $windowEnd)) {
+                    // The window is the current calendar month — still time
+                    // to record the check-in.
+                    $status = 'Due';
+                    $badgeClass = 'badge-themeWarning';
                 }
+                // else: future window — keep default Pending/yellow.
             }
 
             $monthlyCheckins[] = [
@@ -298,10 +396,60 @@ class ProbationController extends Controller
         $joiningLabel      = $joiningDate ? $joiningDate->format('d M Y') : 'Not set';
         $probationEndLabel = $probationEnd ? $probationEnd->format('d M Y') : 'Not set';
 
+        // --- Onboarding training status (same definition as list column) ---
+        // A probationary program counts as completed when the employee has a
+        // training_attendance row with status='Present' on a TrainingSchedule
+        // backed by that program. With no probationary programs configured
+        // there is nothing to "complete", so the timeline shows Not Started.
+        $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $employee->resort_id)
+            ->pluck('program_id');
+        $probationaryProgramCount = $probationaryProgramIds->count();
+
+        $onboardingStatus = 'Not Started';
+        $onboardingBadge  = 'badge-themeDangerNew';
+
+        if ($probationaryProgramCount > 0) {
+            $completedPrograms = \DB::table('training_attendance as ta')
+                ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                ->where('ts.resort_id', $employee->resort_id)
+                ->whereIn('ts.training_id', $probationaryProgramIds)
+                ->where('ta.employee_id', $employee->id)
+                ->where('ta.status', 'Present')
+                ->distinct()
+                ->count('ts.training_id');
+
+            if ($completedPrograms >= $probationaryProgramCount) {
+                $onboardingStatus = 'Completed';
+                $onboardingBadge  = 'badge-themeSuccess';
+            } elseif ($completedPrograms > 0) {
+                $onboardingStatus = 'In Progress';
+                $onboardingBadge  = 'badge-info';
+            }
+        }
+
+        // --- Final Probation Review status ---
+        // Reflects probation_status — Confirmed/Failed are terminal,
+        // Active/Extended are still pending the review decision.
+        switch ($employee->probation_status) {
+            case 'Confirmed':
+                $finalReviewStatus = 'Completed';
+                $finalReviewBadge  = 'badge-themeSuccess';
+                break;
+            case 'Failed':
+                $finalReviewStatus = 'Failed';
+                $finalReviewBadge  = 'badge-themeDangerNew';
+                break;
+            default:
+                $finalReviewStatus = 'Pending';
+                $finalReviewBadge  = 'badge-themeWarning';
+        }
+
         return view('resorts.people.probation.detail', compact(
             'page_title', 'employee', 'monthlyCheckins',
             'joiningLabel', 'probationEndLabel', 'remainingDays', 'progress',
-            'probationCompleted'
+            'probationCompleted',
+            'onboardingStatus', 'onboardingBadge',
+            'finalReviewStatus', 'finalReviewBadge'
         ));
     }
 
@@ -317,14 +465,69 @@ class ProbationController extends Controller
         return response()->json(['message' => 'Employee probation confirmed and employment type updated.']);
     }
 
-    public function failProbation($id)
+    public function failProbation(Request $request, $id)
     {
         $employee = Employee::findOrFail($id);
         $employee->probation_status = 'Failed';
         $employee->employment_type = 'Probationary';
         $employee->status = 'Terminated';
         $employee->save();
+
+        $this->ensureExitClearanceRecord($employee, $request->input('remarks'));
+
         return response()->json(['message' => 'Probation failed successfully.']);
+    }
+
+    /**
+     * Failing probation terminates the employee, but the actual offboarding —
+     * department clearance, HOD/HR sign-off, certificates, F&F settlement —
+     * lives on the Exit Clearance page. That page is keyed off
+     * employee_resignation rows, so we create one here with reason
+     * "Probation Failure" (seeded per resort by migration
+     * 2026_05_20_100000_seed_probation_failure_resignation_reason). Idempotent
+     * via firstOrCreate so re-failing the same employee doesn't duplicate.
+     */
+    private function ensureExitClearanceRecord(Employee $employee, $remarks = null)
+    {
+        $reason = EmployeeResignationReason::where('resort_id', $employee->resort_id)
+            ->where('reason', 'Probation Failure')
+            ->where('status', 'Active')
+            ->first();
+
+        if (!$reason) {
+            // Safety net: if the seed migration hasn't run, create the reason
+            // on the fly rather than crashing on the NOT NULL FK.
+            $reason = EmployeeResignationReason::create([
+                'resort_id'   => $employee->resort_id,
+                'reason'      => 'Probation Failure',
+                'status'      => 'Active',
+                'created_by'  => 0,
+                'modified_by' => 0,
+            ]);
+        }
+
+        $today = now()->toDateString();
+
+        EmployeeResignation::firstOrCreate(
+            [
+                'resort_id'   => $employee->resort_id,
+                'employee_id' => $employee->id,
+                'reason'      => $reason->id,
+            ],
+            [
+                'resignation_date'           => $today,
+                'last_working_day'           => $today,
+                'certificate_issue'          => 'no',
+                'full_and_final_settlement'  => 'no',
+                'immediate_release'          => 'Yes',
+                'status'                     => 'Approved',
+                'hod_status'                 => 'Approved',
+                'hod_meeting_status'         => 'Completed',
+                'hr_status'                  => 'Approved',
+                'hr_meeting_status'          => 'Completed',
+                'comments'                   => $remarks,
+            ]
+        );
     }
 
     public function extendProbation(Request $request, $id)
@@ -556,14 +759,23 @@ class ProbationController extends Controller
         $employee->probation_status = $type === 'success' ? 'Confirmed' : 'Failed';
         $employee->probation_letter_path = $pdfPath;
         $employee->employment_type = $request->employment_type ?? 'Full-time'; // default fallback
-        $employee->status = 'Active';
+        // Confirmed → keep Active; Failed → terminate (matches failProbation()).
+        $employee->status = $type === 'success' ? 'Active' : 'Terminated';
         $employee->probation_review_date = now();
         $employee->probation_confirmed_by = $this->resort->GetEmployee->id;
         $employee->save();
 
+        if ($type !== 'success') {
+            // Mirror the failProbation() flow so the employee shows up on the
+            // Exit Clearance page regardless of which UI marked them Failed.
+            // Remarks captured by the Send-Unsuccessful-Letter Swal modal
+            // become the resignation's comments field.
+            $this->ensureExitClearanceRecord($employee, $request->input('remarks'));
+        }
+
         // Send email
         if (file_exists($pdfPath)) {
-            Mail::to($employee->resortAdmin->email)->send(new ProbationLetterMail($employee,$pdfPath, $type, $resort,$fileName));
+            Mail::to($employee->resortAdmin->email)->send(new ProbationLetterMail($employee, $pdfPath, $type, $resort, $fileName, $letterContent));
             return response()->json(['success' => true, 'message' => 'Letter sent successfully.']);
         } else {
             // Log or return error

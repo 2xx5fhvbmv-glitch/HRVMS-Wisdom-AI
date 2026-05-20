@@ -530,7 +530,7 @@
                                                     </div>
                                                     <small class="text-muted">Sent: {{ $oc->created_at }}</small>
                                                     @if($oc->responded_at)
-                                                        <br><small class="text-muted">Responded: {{ $oc->responded_at->format('d-m-Y H:i') }}</small>
+                                                        <br><small class="text-muted">Responded: {{ $oc->responded_at->format('d M Y H:i') }}</small>
                                                     @endif
                                                     @if($oc->status == 'Rejected' && !empty($oc->rejection_reason))
                                                         <div class="mt-2 p-2 bg-white" style="border-radius:4px;">

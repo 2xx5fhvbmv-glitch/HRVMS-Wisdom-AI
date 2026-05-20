@@ -13,7 +13,7 @@
                         <span class="badge badge-themeNew">{{$employee->Emp_id}}</span>
                         <p>{{$employee->position->position_title}}</p>
                         <span class="position">{{$employee->department->name}}</span>
-                        <span class="date">Joining Date: {{Carbon\Carbon::parse($employee->joining_date)->format('d/m/Y')}}</span>
+                        <span class="date">Joining Date: {{Carbon\Carbon::parse($employee->joining_date)->format('d M Y')}}</span>
 
                         <div class="d-flex bg">
                             <p>Current Basic Salary</p>

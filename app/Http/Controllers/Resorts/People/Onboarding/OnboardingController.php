@@ -160,7 +160,10 @@ class OnboardingController extends Controller
     public function convertApplicant(Request $request)
     {
         $request->validate([
-            'applicant_id' => 'required|integer|exists:applicant_form_data,id',
+            'applicant_id'   => 'required|integer|exists:applicant_form_data,id',
+            // Frontend supplies this on retry after an email_collision prompt.
+            // Validated separately below so we can return a structured error.
+            'override_email' => 'nullable|email|max:255',
         ]);
 
         $resort_id = $this->resort->resort_id;
@@ -219,21 +222,36 @@ class OnboardingController extends Controller
         // can carry an email that already belongs to another account (shared /
         // placeholder emails are common in applicant data). Creating the
         // ResortAdmin would otherwise fail with a raw SQL integrity-constraint
-        // 500. Surface a clear, actionable message instead. (An email that
+        // 500. Surface a structured error so the frontend can prompt HR for a
+        // replacement email and retry via `override_email`. (An email that
         // belongs to an existing *employee* was already reused above by
         // findExistingEmployeeForApplicant, so any hit here is a non-employee
         // account — never silently link a new hire to someone else's record.)
-        $applicantEmail = trim((string) $applicant->email);
+        $applicantName = trim($applicant->first_name . ' ' . $applicant->last_name);
+        $overrideEmail = trim((string) $request->input('override_email'));
+        $applicantEmail = $overrideEmail !== '' ? $overrideEmail : trim((string) $applicant->email);
+
         if ($applicantEmail !== '') {
             $emailOwner = ResortAdmin::where('email', $applicantEmail)->first();
             if ($emailOwner) {
+                // Distinguish "the TA email itself collides" from "the HR-typed
+                // replacement also collides" so the prompt copy can adapt.
+                $isOverride = $overrideEmail !== '';
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot create an employee record for '
-                        . trim($applicant->first_name . ' ' . $applicant->last_name)
-                        . ' — the email "' . $applicantEmail . '" is already used by another account ('
-                        . trim($emailOwner->first_name . ' ' . $emailOwner->last_name)
-                        . '). Update this candidate\'s email in Talent Acquisition to a unique address, then try again.',
+                    'success'           => false,
+                    'code'              => 'email_collision',
+                    'applicant_name'    => $applicantName,
+                    'conflicting_email' => $applicantEmail,
+                    'owner_name'        => trim($emailOwner->first_name . ' ' . $emailOwner->last_name),
+                    'is_override'       => $isOverride,
+                    'message'           => $isOverride
+                        ? 'The email "' . $applicantEmail . '" is also taken (used by '
+                            . trim($emailOwner->first_name . ' ' . $emailOwner->last_name)
+                            . '). Try a different one.'
+                        : 'Cannot create an employee record for ' . $applicantName
+                            . ' — the email "' . $applicantEmail . '" is already used by another account ('
+                            . trim($emailOwner->first_name . ' ' . $emailOwner->last_name)
+                            . ').',
                 ], 422);
             }
         }

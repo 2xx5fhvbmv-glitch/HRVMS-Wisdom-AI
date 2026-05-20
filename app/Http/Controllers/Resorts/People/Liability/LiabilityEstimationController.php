@@ -52,11 +52,43 @@ class LiabilityEstimationController extends Controller
         // whereHas (not with) — the year must actually FILTER the summed rows.
         // `with([...])` only constrains the eager-loaded relation and leaves
         // the sum spanning every year's manning budget.
-        $estimated_liability = StoreManningResponseParent::where('resort_id', $resortId)
+        $manning_budget = StoreManningResponseParent::where('resort_id', $resortId)
             ->whereHas('manningbudget', function($query) use ($currentYear) {
                 $query->where('year', $currentYear);
             })
             ->sum('Total_Department_budget');
+
+        // Total Estimated must include every cost category we break out below,
+        // not just the manning (Payroll) budget — otherwise the headline figure
+        // looks smaller than the breakdown total and Liability Reduction is
+        // mathematically misleading. Aggregate by particulars keyword to match
+        // the Estimation-vs-Actual rows (Payroll + Work Permit + Medical +
+        // Insurance + Quota + Visa).
+        $budgetByParticular = DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->select('particulars', DB::raw('SUM(amount) as total'))
+            ->groupBy('particulars')
+            ->pluck('total', 'particulars')->toArray();
+
+        $budgetMatch = function (array $keywords) use ($budgetByParticular) {
+            $sum = 0.0;
+            foreach ($budgetByParticular as $particular => $amount) {
+                foreach ($keywords as $kw) {
+                    if (stripos($particular, $kw) !== false) {
+                        $sum += (float) $amount;
+                        break;
+                    }
+                }
+            }
+            return $sum;
+        };
+
+        $estimated_liability = (float) $manning_budget
+            + $budgetMatch(['Work Permit'])
+            + $budgetMatch(['Medical'])
+            + $budgetMatch(['Insurance'])
+            + $budgetMatch(['Quota'])
+            + $budgetMatch(['Visa']);
 
         // ✅ Current Liability from Payroll Reviews for the year
         $payrolls = Payroll::with('reviews')

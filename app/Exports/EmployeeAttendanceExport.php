@@ -114,7 +114,7 @@ class EmployeeAttendanceExport implements FromCollection, WithHeadings, WithEven
         $ConfigRanks = config('settings.eligibilty', []);
 
         foreach ($dates as $dateYmd) {
-            $dateDisplay = Carbon::parse($dateYmd)->format('d-m-Y');
+            $dateDisplay = Carbon::parse($dateYmd)->format('d M Y');
             foreach ($employees as $employee) {
                 $resortAdmin = $employee->resortAdmin()->first();
                 $empName = $resortAdmin ? trim($resortAdmin->first_name . ' ' . $resortAdmin->last_name) : 'No Name';

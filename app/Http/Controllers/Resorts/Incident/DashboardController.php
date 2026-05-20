@@ -319,7 +319,7 @@ class DashboardController extends Controller
                     'title' => $meeting->meeting_subject,
                     'description' => $meeting->meeting_agenda,
                     'scheduled_time' => $datetime->format('g:i A'), // e.g., "2:00 PM"
-                    'day_label' => $datetime->isToday() ? 'Today' : ($datetime->isTomorrow() ? 'Tomorrow' : $datetime->format('M d, Y')),
+                    'day_label' => $datetime->isToday() ? 'Today' : ($datetime->isTomorrow() ? 'Tomorrow' : $datetime->format('d M Y')),
                     'id' => $meeting->id
                 ];
             });
@@ -396,7 +396,7 @@ class DashboardController extends Controller
                 
             return datatables()->of($query)
                 ->editColumn('updated_at', function ($row) {
-                    return Carbon::parse($row->updated_at)->format('M d, Y');
+                    return Carbon::parse($row->updated_at)->format('d M Y');
                 })
                 ->make(true);
         }
@@ -715,7 +715,7 @@ class DashboardController extends Controller
                     'title' => $item->incident_name,
                     'description' => $item->description,
                     'scheduled_time' => $datetime->format('g:i A'), // e.g., "2:00 PM"
-                    'day_label' => $datetime->isToday() ? 'Today' : ($datetime->isTomorrow() ? 'Tomorrow' : $datetime->format('M d, Y')),
+                    'day_label' => $datetime->isToday() ? 'Today' : ($datetime->isTomorrow() ? 'Tomorrow' : $datetime->format('d M Y')),
                     'time_ago' => $datetime->diffForHumans(), // now accurate
                 ];
             });
@@ -872,7 +872,7 @@ class DashboardController extends Controller
                 
             return datatables()->of($query)
                 ->editColumn('updated_at', function ($row) {
-                    return Carbon::parse($row->updated_at)->format('M d, Y');
+                    return Carbon::parse($row->updated_at)->format('d M Y');
                 })
                 ->make(true);
         }

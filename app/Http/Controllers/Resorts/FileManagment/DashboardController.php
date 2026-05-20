@@ -190,7 +190,7 @@ class DashboardController extends Controller
                         'Permission' => $emp,
                         'File_img' => $file->File_img,
                         'Type' => 'file',
-                        'created_at' => Carbon::parse($file->created_at)->format('d-m-Y H:i:s'),
+                        'created_at' => Carbon::parse($file->created_at)->format('d M Y H:i:s'),
                     ]);
                 }
             });

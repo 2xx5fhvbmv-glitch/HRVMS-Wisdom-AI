@@ -1239,8 +1239,8 @@ class LeaveController extends Controller
                 return response()->json(['success' => false, 'message' => 'Leave not found.'], 404);
             }
 
-            $leave->from_date_formatted = $leave->from_date ? Carbon::parse($leave->from_date)->format('d M, Y') : '—';
-            $leave->to_date_formatted = $leave->to_date ? Carbon::parse($leave->to_date)->format('d M, Y') : '—';
+            $leave->from_date_formatted = $leave->from_date ? Carbon::parse($leave->from_date)->format('d M Y') : '—';
+            $leave->to_date_formatted = $leave->to_date ? Carbon::parse($leave->to_date)->format('d M Y') : '—';
             $leave->status_label = $leave->status ?? 'Pending';
 
             $departurePass = DB::table('employee_travel_passes as etp')
@@ -1259,8 +1259,8 @@ class LeaveController extends Controller
                 ->first();
 
             if ($departurePass) {
-                $departurePass->departure_date_formatted = $departurePass->departure_date ? Carbon::parse($departurePass->departure_date)->format('d M, Y') : '—';
-                $departurePass->arrival_date_formatted = $departurePass->arrival_date ? Carbon::parse($departurePass->arrival_date)->format('d M, Y') : '—';
+                $departurePass->departure_date_formatted = $departurePass->departure_date ? Carbon::parse($departurePass->departure_date)->format('d M Y') : '—';
+                $departurePass->arrival_date_formatted = $departurePass->arrival_date ? Carbon::parse($departurePass->arrival_date)->format('d M Y') : '—';
                 $departurePass->reason_text = $departurePass->departure_reason ?? $departurePass->arrival_reason ?? '—';
             }
 

@@ -24,17 +24,17 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{!! Common::formatCurrency($estimated_liability, 'USD') !!}</strong>
+                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{!! Common::formatCurrency($estimated_liability, 'MVR') !!}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Current Liability</h6><strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
+                            <h6>Current Liability</h6><strong>{!! Common::formatCurrency($current_liability, 'MVR') !!}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Liability Reduction</h6><strong>{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
+                            <h6>Liability Reduction</h6><strong>{!! Common::formatCurrency($liability_reduction, 'MVR') !!}</strong>
                         </div>
                     </div>
                 </div>
