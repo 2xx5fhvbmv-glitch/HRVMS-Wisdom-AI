@@ -71,6 +71,23 @@ class TransferController extends Controller
             'temporary_to'   => 'required_if:transfer_status,Temporary|nullable|date_format:d/m/Y|after_or_equal:temporary_from',
         ]);
 
+        // Block duplicate in-flight transfers — a second submission while a
+        // Pending/On-Hold transfer exists for the same employee would race
+        // both approval flows and risk applying the older transfer's profile
+        // update over the newer one. HR can cancel/withdraw the existing one
+        // first if a re-submission is needed.
+        $hasOpenTransfer = EmployeeTransfer::where('resort_id', $this->resort->resort_id)
+            ->where('employee_id', $validated['employee_name'])
+            ->whereIn('status', ['Pending', 'On Hold'])
+            ->exists();
+        if ($hasOpenTransfer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This employee already has a pending transfer request. Resolve it before submitting another.',
+                'errors'  => ['employee_name' => ['This employee already has a pending transfer request.']],
+            ], 422);
+        }
+
         // ── Item 1 — Vacant Position Validation ──────────────────────────
         // Don't allow transferring an employee into a position that is
         // already actively filled beyond its budgeted headcount.
@@ -194,6 +211,17 @@ class TransferController extends Controller
                 'People'
             )));
         });
+
+        // Awareness notifications — Finance/GM get the *approval* request
+        // above; the affected department leads need a heads-up that a
+        // transfer is in flight (so the receiving HOD/EXCOM aren't blindsided
+        // when the employee shows up later). Errors here are non-fatal —
+        // the transfer is already saved.
+        try {
+            $this->dispatchOnSubmitNotifications($transfer);
+        } catch (\Throwable $e) {
+            \Log::warning('Transfer on-submit dept notifications failed for #' . $transfer->id . ': ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -347,6 +375,7 @@ class TransferController extends Controller
     {
         $departmentId = (int) $request->input('target_dep');
         $positionId   = (int) $request->input('target_pos');
+        $employeeId   = (int) $request->input('employee_id');
 
         if (!$departmentId || !$positionId) {
             return response()->json(['success' => false, 'budgeted_salary' => null]);
@@ -354,9 +383,18 @@ class TransferController extends Controller
 
         $budgetedSalary = $this->getBudgetedSalary($departmentId, $positionId);
 
+        // Live vacancy preview — runs the same gate as store() so HR sees the
+        // verdict the moment they pick the target position rather than at
+        // submit time. Employee id is needed so re-transferring within the
+        // same position isn't reported as "fully filled" by the gate.
+        $vacancy = $employeeId
+            ? $this->isTargetPositionVacant($positionId, $employeeId)
+            : null;
+
         return response()->json([
             'success'         => true,
             'budgeted_salary' => $budgetedSalary,
+            'vacancy'         => $vacancy,
         ]);
     }
 
@@ -662,10 +700,19 @@ class TransferController extends Controller
 
     public function handleApproval(Request $request, $id, $action)
     {
+        // Whitelist the action so a malformed URL can't write a junk value
+        // into the approval enum (and bypass the dispatch branches below).
+        $actionName = $action;
+        if (!in_array($actionName, ['Approved', 'Rejected', 'On Hold'], true)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Invalid action.',
+            ], 422);
+        }
+
         $transfer = EmployeeTransfer::with(['approvals', 'employee', 'targetPosition', 'targetDepartment'])->findOrFail($id);
         $comments = $request->input('reason', null);
         $currentEmployee = $this->resort->GetEmployee;
-        $actionName = $action;
 
         $currentApproval = $transfer->approvals()
             ->where('approved_by', $currentEmployee->id)
@@ -814,7 +861,7 @@ class TransferController extends Controller
                 $transfer->resort_id,
                 10,
                 'Transfer On Hold',
-                "⏸️ Your transfer request to " . $transfer->targetDepartment->department_name . " has been put on hold.",
+                "⏸️ Your transfer request to " . optional($transfer->targetDepartment)->name . " has been put on hold.",
                 0,
                 $transfer->employee_id,
                 'People'
@@ -954,6 +1001,71 @@ class TransferController extends Controller
             $employeeId,
             'People'
         )));
+    }
+
+    /**
+     * On submit, fan out an "awareness" notification to the dept leads of
+     * the source AND target departments (and HR), so the receiving
+     * HOD/EXCOM hear about the transfer the moment it's initiated — not
+     * only after Finance + GM both finalize. Approvers themselves are
+     * notified separately in store().
+     */
+    private function dispatchOnSubmitNotifications(EmployeeTransfer $transfer): void
+    {
+        $employee = $transfer->employee;
+        if (!$employee) {
+            return;
+        }
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+        $fromDept = optional($transfer->currentDepartment)->name ?? 'previous department';
+        $toDept   = optional($transfer->targetDepartment)->name ?? 'new department';
+        $effective = $transfer->effective_date
+            ? Carbon::parse($transfer->effective_date)->format('d M Y')
+            : 'TBD';
+
+        // Skip notifying the employee themselves if they happen to be a
+        // dept lead in either dept.
+        $employeeId = (int) $employee->id;
+
+        // Current dept leads — heads-up that one of their employees is being
+        // transferred OUT.
+        foreach ($this->getDepartmentLeadEmployeeIds((int) $transfer->current_department_id) as $leadId) {
+            if ($leadId === $employeeId) { continue; }
+            $this->notifyEmployee(
+                $leadId,
+                'Employee Transfer Initiated',
+                "📤 Transfer initiated: {$employeeName} ({$fromDept} → {$toDept}, effective {$effective}). Pending Finance + GM approval.",
+                $transfer->id
+            );
+        }
+
+        // Target dept leads — the receiving HOD/EXCOM need to know an
+        // incoming employee is in the pipeline.
+        foreach ($this->getDepartmentLeadEmployeeIds((int) $transfer->target_department_id) as $leadId) {
+            if ($leadId === $employeeId) { continue; }
+            $this->notifyEmployee(
+                $leadId,
+                'Incoming Employee Transfer (Pending)',
+                "📥 Incoming transfer: {$employeeName} (from {$fromDept}, effective {$effective}). Pending Finance + GM approval.",
+                $transfer->id
+            );
+        }
+
+        // HR dept leads — full visibility of every transfer in flight.
+        $hrDepartment = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->get()
+            ->first(fn($d) => \App\Helpers\Common::isHRDepartment($d->id));
+        if ($hrDepartment) {
+            foreach ($this->getDepartmentLeadEmployeeIds((int) $hrDepartment->id) as $leadId) {
+                if ($leadId === $employeeId) { continue; }
+                $this->notifyEmployee(
+                    $leadId,
+                    'Transfer Request Submitted',
+                    "📢 New transfer request: {$employeeName} ({$fromDept} → {$toDept}, effective {$effective}).",
+                    $transfer->id
+                );
+            }
+        }
     }
 
     /**
