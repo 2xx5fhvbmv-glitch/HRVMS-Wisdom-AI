@@ -39,11 +39,19 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
         $page_title = 'Attendance List';
-        // Get schedule_id from query parameters
+        // Schedule the page was opened for (base64 in the query string).
         $scheduleId = base64_decode($request->query('schedule_id'));
 
-        $trainings = TrainingSchedule::with('learningProgram')->where('status','Ongoing')->get();
-        // dd($trainings);
+        // Dropdown of this resort's schedules that can still be marked
+        // (Scheduled or Ongoing) — the old query was status='Ongoing' only and
+        // had no resort filter, so the schedule just clicked (often still
+        // 'Scheduled') never appeared and other resorts' schedules leaked in.
+        $trainings = TrainingSchedule::with('learningProgram')
+            ->where('resort_id', $this->resort->resort_id)
+            ->whereIn('status', ['Scheduled', 'Ongoing', 'Completed'])
+            ->orderByDesc('start_date')
+            ->get();
+
         return view('resorts.learning.attendance.index', compact('scheduleId','trainings','page_title'));
     }
 
@@ -82,9 +90,14 @@ class AttendanceController extends Controller
         }
         
 
-        // Training Filter
-        if ($request->training) {
-            $query->where('training_schedules.training_id', $request->training);
+        // Schedule filter — the page is opened to mark attendance for ONE
+        // schedule, so scope to it. The #trainingFilter dropdown carries
+        // training_schedules.id values; previously the controller filtered
+        // by training_id (the program) and ignored schedule_id entirely, so
+        // every schedule's participants showed up regardless.
+        $scheduleId = $request->input('schedule_id') ?: $request->input('training');
+        if ($scheduleId) {
+            $query->where('training_schedules.id', $scheduleId);
         }
 
         $sessions = $query->get();

@@ -43,15 +43,7 @@ class ProbationController extends Controller
         $scopedDeptIds = Common::getScopedDepartmentIds();
         if($request->ajax())
         {
-            // --- Onboarding training (L&D) pre-resolution -----------------------------
-            // Resolve the resort's probationary learning programs ONCE here, outside the
-            // per-row DataTables closure. Needed up-front because the trainingStatus
-            // filter is computed against these programs and must run against $query
-            // before pagination.
             $resortId = $this->resort->resort_id;
-            $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resortId)
-                ->pluck('program_id');
-            $probationaryProgramCount = $probationaryProgramIds->count();
 
             // List shows ONLY in-progress probations (Active / Extended) whose
             // probation window is still open today. Confirmed/Failed are
@@ -110,47 +102,49 @@ class ProbationController extends Controller
                 $query->whereDate('probation_end_date', '<=', $request->date_to);
             }
 
-            // Onboarding-training status filter (Not Started / In Progress /
-            // Completed). The status is derived from training_attendance, so we
-            // resolve matching employee IDs once and constrain the list query.
+            // Onboarding-training status filter — same buckets as the
+            // onboarding_training column (Not Started / In Progress /
+            // Completed / Absent), derived from training_participants.
             if ($request->filled('trainingStatus')) {
                 $wanted = $request->trainingStatus;
 
-                if ($probationaryProgramCount === 0) {
-                    // No probationary programs configured → every employee
-                    // shows "Not Started". Other selections produce no rows.
-                    if ($wanted !== 'Not Started') {
-                        $query->whereRaw('1=0');
-                    }
-                } else {
-                    // Per-employee distinct completed-program count.
-                    $completed = \DB::table('training_attendance as ta')
-                        ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
-                        ->where('ts.resort_id', $resortId)
-                        ->whereIn('ts.training_id', $probationaryProgramIds)
-                        ->where('ta.status', 'Present')
-                        ->select('ta.employee_id', \DB::raw('COUNT(DISTINCT ts.training_id) as c'))
-                        ->groupBy('ta.employee_id')
-                        ->pluck('c', 'ta.employee_id');
+                // Per-employee tallies: total bookings, attended, still pending.
+                $perEmp = \DB::table('training_participants as tp')
+                    ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+                    ->where('ts.resort_id', $resortId)
+                    ->select(
+                        'tp.employee_id',
+                        \DB::raw('COUNT(*) as total'),
+                        \DB::raw("SUM(CASE WHEN tp.status IN ('Present','Late') THEN 1 ELSE 0 END) as attended"),
+                        \DB::raw("SUM(CASE WHEN tp.status = 'Pending' THEN 1 ELSE 0 END) as pending")
+                    )
+                    ->groupBy('tp.employee_id')
+                    ->get();
 
-                    $startedIds   = $completed->keys()->all();
-                    $completedIds = $completed->filter(fn($c) => $c >= $probationaryProgramCount)->keys()->all();
-                    $inProgressIds = $completed->filter(fn($c) => $c > 0 && $c < $probationaryProgramCount)->keys()->all();
+                $bookedIds     = $perEmp->pluck('employee_id')->all();
+                $inProgressIds = $perEmp->filter(fn($r) => $r->pending > 0)
+                    ->pluck('employee_id')->all();
+                $completedIds  = $perEmp->filter(fn($r) => $r->pending == 0 && $r->attended >= $r->total)
+                    ->pluck('employee_id')->all();
+                $absentIds     = $perEmp->filter(fn($r) => $r->pending == 0 && $r->attended < $r->total)
+                    ->pluck('employee_id')->all();
 
-                    switch ($wanted) {
-                        case 'Completed':
-                            $query->whereIn('employees.id', $completedIds ?: [0]);
-                            break;
-                        case 'In Progress':
-                            $query->whereIn('employees.id', $inProgressIds ?: [0]);
-                            break;
-                        case 'Not Started':
-                            // Employees with zero matching attendance records.
-                            if (!empty($startedIds)) {
-                                $query->whereNotIn('employees.id', $startedIds);
-                            }
-                            break;
-                    }
+                switch ($wanted) {
+                    case 'Completed':
+                        $query->whereIn('employees.id', $completedIds ?: [0]);
+                        break;
+                    case 'In Progress':
+                        $query->whereIn('employees.id', $inProgressIds ?: [0]);
+                        break;
+                    case 'Absent':
+                        $query->whereIn('employees.id', $absentIds ?: [0]);
+                        break;
+                    case 'Not Started':
+                        // Employees with no training bookings at all.
+                        if (!empty($bookedIds)) {
+                            $query->whereNotIn('employees.id', $bookedIds);
+                        }
+                        break;
                 }
             }
 
@@ -196,34 +190,21 @@ class ProbationController extends Controller
                     }
                     return $end->format('d M Y');
                 })
-                ->addColumn('onboarding_training', function ($row) use ($resortId, $probationaryProgramIds, $probationaryProgramCount) {
-                    // Reflects the employee's progress on the resort's probationary
-                    // (onboarding) learning programs. A program counts as completed when
-                    // the employee has a training_attendance record with status='Present'
-                    // on a TrainingSchedule backed by that program — the same definition
-                    // the Learning dashboard uses (DashboardController@computeCompulsoryCompletionPercent).
-                    if ($probationaryProgramCount === 0) {
-                        // No probationary programs configured for this resort.
-                        return '<span class="badge badge-themeDangerNew">Not Started</span>';
-                    }
-
-                    // Distinct probationary programs this employee has completed.
-                    $completedPrograms = \DB::table('training_attendance as ta')
-                        ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                ->addColumn('onboarding_training', function ($row) use ($resortId) {
+                    // Reflects whatever L&D training the employee is booked on,
+                    // from training_participants (the real attendee table).
+                    //   no bookings                          → Not Started
+                    //   a session not held / not marked yet  → In Progress
+                    //   all sessions held & all attended     → Completed
+                    //   all sessions held, some not attended → Absent
+                    $statuses = \DB::table('training_participants as tp')
+                        ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
                         ->where('ts.resort_id', $resortId)
-                        ->whereIn('ts.training_id', $probationaryProgramIds)
-                        ->where('ta.employee_id', $row->id)
-                        ->where('ta.status', 'Present')
-                        ->distinct()
-                        ->count('ts.training_id');
+                        ->where('tp.employee_id', $row->id)
+                        ->pluck('tp.status');
 
-                    if ($completedPrograms >= $probationaryProgramCount) {
-                        return '<span class="badge badge-themeSuccess">Completed</span>';
-                    }
-                    if ($completedPrograms > 0) {
-                        return '<span class="badge badge-info">In Progress</span>';
-                    }
-                    return '<span class="badge badge-themeDangerNew">Not Started</span>';
+                    $t = $this->resolveOnboardingTraining($statuses);
+                    return '<span class="badge '.$t['badge'].'">'.$t['label'].'</span>';
                 })
                 ->addColumn('monthly_checkin_status', function ($row) use ($request) {
                     // "All Months" sends an empty month — fall back to the
@@ -275,22 +256,24 @@ class ProbationController extends Controller
                     $viewUrl = route('people.probation.details', base64_encode($row->id));
                     return '
                         <div class="d-flex align-items-center">
+                            <!-- Confirm / Fail Probation actions hidden here (per request) —
+                                 HR uses the Confirm / Fail / letter actions on the
+                                 probation details page instead.
                             <a class="btn-lg-icon btnIcon-success confirm-probation '.$edit_class.'" title="Confirm Probation Complete" data-id="'.$row->id.'">
                                 <i class="fa-solid fa-check"></i>
                             </a>
                             <a class="btn-lg-icon btnIcon-danger fail-probation '.$edit_class.'" title="Failed Probation" data-id="'.$row->id.'">
-                                <i class="fa-solid fa-xmark"></i> 
+                                <i class="fa-solid fa-xmark"></i>
                             </a>
-                            <!-- Extend Probation action hidden for now (per request).
                             <a class="btn-lg-icon btnIcon-yellow extend-probation '.$edit_class.'" title="Extend Probation" data-id="'.$row->id.'">
                                 <i class="fa-solid fa-clock-rotate-left"></i>
                             </a>
                             -->
                             <a href="' . $viewUrl . '" class="btn-lg-icon btnIcon-skyblue" title="View Detail">
-                                <i class="fa-regular fa-eye"></i> 
+                                <i class="fa-regular fa-eye"></i>
                             </a>
                         </div>';
-                })                            
+                })
                 ->rawColumns(['employee_name', 'onboarding_training', 'monthly_checkin_status','actions','review_status'])
                 ->make(true);
         }
@@ -302,6 +285,35 @@ class ProbationController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         return view('resorts.people.probation.list',compact('page_title','resort_id','employees','departments','positions'));
+    }
+
+    /**
+     * Resolve the "Onboarding Training" status from a collection of the
+     * employee's training_participants.status values. Single source of truth
+     * for the probation list column AND the details-page timeline.
+     *
+     *   no bookings                          → Not Started
+     *   a session not held / not marked yet  → In Progress  (status 'Pending')
+     *   all sessions held & all attended     → Completed     (Present / Late)
+     *   all sessions held, some not attended → Absent        (an 'Absent' row)
+     *
+     * @param  \Illuminate\Support\Collection $statuses
+     * @return array{label:string, badge:string}
+     */
+    private function resolveOnboardingTraining($statuses): array
+    {
+        if ($statuses->isEmpty()) {
+            return ['label' => 'Not Started', 'badge' => 'badge-themeDangerNew'];
+        }
+        // Any session still Pending → attendance not marked yet.
+        if ($statuses->contains('Pending')) {
+            return ['label' => 'In Progress', 'badge' => 'badge-info'];
+        }
+        // Every held session attended → Completed; otherwise Absent.
+        $allAttended = $statuses->every(fn($s) => in_array($s, ['Present', 'Late'], true));
+        return $allAttended
+            ? ['label' => 'Completed', 'badge' => 'badge-themeSuccess']
+            : ['label' => 'Absent', 'badge' => 'badge-themeDangerNew'];
     }
 
     public function details(Request $request,$id)
@@ -396,35 +408,42 @@ class ProbationController extends Controller
         $joiningLabel      = $joiningDate ? $joiningDate->format('d M Y') : 'Not set';
         $probationEndLabel = $probationEnd ? $probationEnd->format('d M Y') : 'Not set';
 
-        // --- Onboarding training status (same definition as list column) ---
-        // A probationary program counts as completed when the employee has a
-        // training_attendance row with status='Present' on a TrainingSchedule
-        // backed by that program. With no probationary programs configured
-        // there is nothing to "complete", so the timeline shows Not Started.
-        $probationaryProgramIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $employee->resort_id)
-            ->pluck('program_id');
-        $probationaryProgramCount = $probationaryProgramIds->count();
+        // --- Onboarding training: one timeline row per probationary program ---
+        // The resort's probationary_learning_programs config defines which
+        // L&D programs a probationer must complete. Each becomes its own
+        // Progress Tracking row with its own status + due date
+        // (joining_date + completion_days).
+        $probationaryPrograms = \DB::table('probationary_learning_programs as plp')
+            ->join('learning_programs as lp', 'lp.id', '=', 'plp.program_id')
+            ->where('plp.resort_id', $employee->resort_id)
+            ->get(['plp.program_id', 'plp.completion_days', 'lp.name']);
 
-        $onboardingStatus = 'Not Started';
-        $onboardingBadge  = 'badge-themeDangerNew';
-
-        if ($probationaryProgramCount > 0) {
-            $completedPrograms = \DB::table('training_attendance as ta')
-                ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+        $onboardingPrograms = [];
+        foreach ($probationaryPrograms as $prog) {
+            // This employee's attendance on this program's scheduled sessions.
+            $statuses = \DB::table('training_participants as tp')
+                ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
                 ->where('ts.resort_id', $employee->resort_id)
-                ->whereIn('ts.training_id', $probationaryProgramIds)
-                ->where('ta.employee_id', $employee->id)
-                ->where('ta.status', 'Present')
-                ->distinct()
-                ->count('ts.training_id');
+                ->where('ts.training_id', $prog->program_id)
+                ->where('tp.employee_id', $employee->id)
+                ->pluck('tp.status');
 
-            if ($completedPrograms >= $probationaryProgramCount) {
-                $onboardingStatus = 'Completed';
-                $onboardingBadge  = 'badge-themeSuccess';
-            } elseif ($completedPrograms > 0) {
-                $onboardingStatus = 'In Progress';
-                $onboardingBadge  = 'badge-info';
+            $resolved = $this->resolveOnboardingTraining($statuses);
+
+            // Due = joining date + the program's allowed completion window.
+            $due = 'Not set';
+            if ($joiningDate) {
+                $due = $prog->completion_days
+                    ? $joiningDate->copy()->addDays((int) $prog->completion_days)->format('d M Y')
+                    : $joiningDate->format('d M Y');
             }
+
+            $onboardingPrograms[] = [
+                'name'  => $prog->name,
+                'due'   => $due,
+                'label' => $resolved['label'],
+                'badge' => $resolved['badge'],
+            ];
         }
 
         // --- Final Probation Review status ---
@@ -448,7 +467,7 @@ class ProbationController extends Controller
             'page_title', 'employee', 'monthlyCheckins',
             'joiningLabel', 'probationEndLabel', 'remainingDays', 'progress',
             'probationCompleted',
-            'onboardingStatus', 'onboardingBadge',
+            'onboardingPrograms',
             'finalReviewStatus', 'finalReviewBadge'
         ));
     }
@@ -745,8 +764,23 @@ class ProbationController extends Controller
 
         $letterContent = strtr($template->content, $placeholders);
 
-        // Optionally, generate PDF
-        $pdf = Pdf::loadHTML($letterContent);
+        // Render the PDF through the letterhead wrapper so the configured
+        // Letterhead & E-signature (People > Configuration > Letterhead)
+        // is applied — header/footer images, address, e-signature block.
+        // Falls back to resort logo + typed signature when none is set.
+        $letterhead = Common::getLetterheadData($employee->resort_id);
+        $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($employee->resort_id),
+            'signatureImage' => $letterhead['signatureImage'],
+            'signatoryName'  => $letterhead['signatoryName'] ?: 'Human Resources Department',
+            'signatoryTitle' => $letterhead['signatoryTitle']
+                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+        // Allow DomPDF to load the local letterhead image files.
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
 
         $fileName = 'probation-' . $type . '_' . $employee->id . '.pdf';
         $pdfPath = storage_path('app/' . $fileName);

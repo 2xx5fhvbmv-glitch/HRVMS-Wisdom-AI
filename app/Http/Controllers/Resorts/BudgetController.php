@@ -2181,6 +2181,32 @@ class BudgetController extends Controller
                 }
             }
 
+            // --- Live fallback from the Budget → Cost definitions -------------
+            // When the employee has no saved per-month override for a cost, the
+            // table used to show 0. Instead, compute the value straight from the
+            // ResortBudgetCost definition (amount + frequency + %/fixed +
+            // Locals/Xpat/Muslim applicability) so the table reflects the
+            // configured costs. HR's explicit overrides (already in
+            // $monthCostLookup) always win — we only fill the gaps.
+            $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
+            $isMuslim = strtolower(trim((string) ($employee->religion ?? '')))   === 'muslim';
+            $basicForPercent = (float) ($currentBasicSalary ?: 0);
+
+            for ($m = 1; $m <= 12; $m++) {
+                foreach ($resortCosts as $cost) {
+                    if (isset($monthCostLookup[$m][$cost->id])) {
+                        continue; // explicit override — leave it untouched
+                    }
+                    $monthCostLookup[$m][$cost->id] = [
+                        'value'    => $this->computeBudgetCostMonthlyValue(
+                                          $cost, $m, (int) $year, $isLocal, $isMuslim, $basicForPercent),
+                        'currency' => $cost->amount_unit,
+                        'hours'    => 0,
+                        'computed' => true, // value derived from the cost config, not a saved override
+                    ];
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'employee' => $employee,
@@ -2201,6 +2227,57 @@ class BudgetController extends Controller
                 'message' => 'An error occurred while fetching employee monthly data: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Compute one ResortBudgetCost's value for a single month column.
+     *
+     * Used as the live fallback in getEmployeeMonthlyData() so the budget
+     * table reflects the configured Budget → Cost definitions instead of 0
+     * when an employee has no saved per-month override.
+     *
+     * Rules:
+     *  - Applicability: a 'Locals Only' / 'Xpat Only' / 'Muslim Only' cost
+     *    contributes 0 for an employee outside that group.
+     *  - Amount unit '%'  → percentage of the employee's basic salary.
+     *  - Frequency → per-month figure:
+     *      Month        → full amount every month
+     *      Year         → amount / 12
+     *      Quarter      → amount / 3
+     *      Daily        → amount × days in that calendar month
+     *      One time …   → full amount in January only
+     *  - The value is returned in the cost's own amount_unit (no FX
+     *    conversion) — same number shown on the Budget → Cost screen.
+     */
+    private function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary): float
+    {
+        $details = trim((string) ($cost->details ?? 'Both'));
+        if ($details === 'Locals Only'  && !$isLocal)  return 0.0;
+        if ($details === 'Xpat Only'    &&  $isLocal)  return 0.0;
+        if ($details === 'Muslim Only'  && !$isMuslim) return 0.0;
+
+        $amount = (float) ($cost->amount ?? 0);
+        $unit   = strtoupper(trim((string) ($cost->amount_unit ?? 'USD')));
+        $freq   = strtolower(trim((string) ($cost->frequency ?? 'Month')));
+
+        // Percentage costs (e.g. Pension 7%) are a % of basic salary.
+        $base = ($unit === '%') ? ($basicSalary * $amount / 100) : $amount;
+
+        if (str_contains($freq, 'year')) {
+            return round($base / 12, 2);
+        }
+        if (str_contains($freq, 'quarter')) {
+            return round($base / 3, 2);
+        }
+        if (str_contains($freq, 'dai')) {
+            $daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+            return round($base * $daysInMonth, 2);
+        }
+        if (str_contains($freq, 'one time')) {
+            return $month === 1 ? round($base, 2) : 0.0;
+        }
+        // Default: a monthly cost.
+        return round($base, 2);
     }
 
     /**

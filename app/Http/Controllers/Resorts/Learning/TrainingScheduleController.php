@@ -91,7 +91,11 @@ class TrainingScheduleController extends Controller
                 'learning_programs.name as learning_name',
                 'learning_programs.delivery_mode as learning_type',
                 DB::raw("CONCAT(trainer_admin.first_name, ' ', trainer_admin.last_name) as trainer"), // Trainer from resort_admins
-                DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) SEPARATOR ', ') as employee_names") // Attendees
+                // Attendees — names AND their Admin_Parent_id (for the avatar),
+                // both ORDERed by employees.id so the two lists index-align.
+                // '|' separator: safe against commas/pipes in names.
+                DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) ORDER BY employees.id SEPARATOR '|') as employee_names"),
+                DB::raw("GROUP_CONCAT(employees.Admin_Parent_id ORDER BY employees.id SEPARATOR '|') as employee_ids")
             )
             ->leftJoin('learning_programs', 'training_schedules.training_id', '=', 'learning_programs.id')
             ->leftJoin('employees as trainer', 'learning_programs.trainer', '=', 'trainer.id') // Join trainer from employees table
@@ -199,27 +203,39 @@ class TrainingScheduleController extends Controller
                 ';
             })
             ->addColumn('attendees', function ($row) {
+                // employee_names / employee_ids are parallel '|'-separated lists
+                // ordered by employees.id, so index i lines up across both.
+                $names = !empty($row->employee_names) ? explode('|', $row->employee_names) : [];
+                $ids   = !empty($row->employee_ids) ? explode('|', $row->employee_ids) : [];
+
+                if (empty($names)) {
+                    return '<span class="text-muted">—</span>';
+                }
+
+                // Overlapping avatar circles — the attendee name shows on hover
+                // (title tooltip) rather than as inline text, so the column
+                // layout stays compact. data-bs-toggle enables the Bootstrap
+                // tooltip if the page initialises them.
+                $displayLimit = 5;
                 $attendeeImages = '';
-                $attendees = explode(', ', $row->employee_names); // Split names
-                $employeeIds = explode(',', $row->employee_ids); // Split IDs
-                $count = count($attendees);
-                $displayLimit = 5; // Show 5 images max, rest as "+ count"
-        
-                foreach ($attendees as $index => $attendee) {
-                    $image = Common::getResortUserPicture($employeeIds[$index] ?? null);
-                    if ($index < $displayLimit) {
-                        $attendeeImages .= '
-                            <div class="img-circle">
-                                <img src="' . $image . '" alt="' . e($attendee) . '">
-                            </div>
-                        ';
+                foreach ($names as $index => $name) {
+                    if ($index >= $displayLimit) {
+                        break;
                     }
+                    $image = Common::getResortUserPicture($ids[$index] ?? null);
+                    $attendeeImages .= '
+                        <div class="img-circle" title="' . e($name) . '"
+                             data-bs-toggle="tooltip" data-bs-placement="top">
+                            <img src="' . $image . '" alt="' . e($name) . '">
+                        </div>';
                 }
-        
-                if ($count > $displayLimit) {
-                    $attendeeImages .= '<div class="num">+' . ($count - $displayLimit) . '</div>';
+
+                if (count($names) > $displayLimit) {
+                    $extra = array_slice($names, $displayLimit);
+                    $attendeeImages .= '<div class="num" title="' . e(implode(', ', $extra)) . '"
+                        data-bs-toggle="tooltip" data-bs-placement="top">+' . count($extra) . '</div>';
                 }
-        
+
                 return '<div class="user-ovImg">' . $attendeeImages . '</div>';
             })
             ->addColumn('action', function ($row) use ($edit_class) {

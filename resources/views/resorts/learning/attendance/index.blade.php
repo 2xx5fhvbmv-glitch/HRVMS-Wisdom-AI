@@ -32,11 +32,12 @@
                         </div>
                         <div class="col-xl-2 col-lg-4 col-md-5  col-sm-6">
                             <select class="form-select select2t-none" id="trainingFilter">
-                                <option value="">Select Training</option>
+                                <option value="">All Schedules</option>
                                 @if($trainings)
                                     @foreach($trainings as $training)
                                         <option value="{{ $training->id }}" {{ $scheduleId == $training->id ? 'selected' : '' }}>
-                                            {{ $training->learningProgram->name }}
+                                            {{ optional($training->learningProgram)->name }}
+                                            ({{ \Carbon\Carbon::parse($training->start_date)->format('d M Y') }})
                                         </option>
                                     @endforeach
                                 @endif
@@ -185,12 +186,18 @@
                             positionClass: 'toast-bottom-right'
                         });
                         return;
-                        $('#attendanceModal').modal('hide');
                     }
                     $('#attendanceModal').modal('hide');
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'
-                    });   
+                    });
+                    // Refresh the table so the Attendance count (e.g. 0/2 → 1/2)
+                    // updates without a manual page reload. Clear the row
+                    // checkboxes too so the next mark starts clean.
+                    if ($.fn.DataTable.isDataTable('#table-attendTrack')) {
+                        $('#table-attendTrack').DataTable().ajax.reload(null, false);
+                    }
+                    $('.attendance-checkbox').prop('checked', false);
                 },
                 error: function(xhr) {
                     let errs = xhr.responseJSON?.message || 'An unexpected error occurred. Please try again.';
@@ -223,7 +230,8 @@
                 type: 'GET',
                 data: function (d) {
                     d.searchTerm = $('#searchInput').val();
-                    d.training = $('#trainingFilter').val();
+                    // #trainingFilter holds training_schedules.id values.
+                    d.schedule_id = $('#trainingFilter').val();
                 }
             },
             columns: [

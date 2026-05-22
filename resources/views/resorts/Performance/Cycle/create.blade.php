@@ -1060,11 +1060,14 @@
                 return true; // Skip validation if any date is invalid or missing
             }
 
-            // Check that the end date is strictly after the start date
-            return endDate.isAfter(startDate, 'day'); // Ensure day-level comparison
+            // End date may equal the start date (a single-day cycle is valid);
+            // only reject when it is genuinely before the start date.
+            // (Uses !isBefore rather than isSameOrAfter — the latter isn't in
+            // this project's older moment.js build.)
+            return !endDate.isBefore(startDate, 'day');
         },
         messages: {
-            en: 'End Date must be greater than Start Date.'
+            en: 'End Date cannot be before the Start Date.'
         }
     });
     function updatePageLength() 

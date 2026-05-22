@@ -145,7 +145,21 @@
                 { data: 'status', name: 'Status' },
                 { data: 'action', name: 'Action' },
                 {data:'created_at',visible:false,searchable:false},
-            ]
+            ],
+            drawCallback: function () {
+                // Attendee avatars carry the name in title + data-bs-toggle.
+                // Initialise Bootstrap tooltips after each (server-side) draw
+                // so hovering an avatar shows the employee name. The native
+                // title attribute is the fallback if Bootstrap isn't present.
+                if (window.bootstrap && bootstrap.Tooltip) {
+                    document.querySelectorAll('#table-training [data-bs-toggle="tooltip"]').forEach(function (el) {
+                        if (!el._ttInit) {
+                            new bootstrap.Tooltip(el);
+                            el._ttInit = true;
+                        }
+                    });
+                }
+            }
         });
     }
 
