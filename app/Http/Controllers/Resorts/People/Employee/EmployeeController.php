@@ -926,6 +926,48 @@ class EmployeeController extends Controller
         return response()->json(['success' => true, 'message' => 'Location updated', 'location' => $employee->location]);
     }
 
+    /**
+     * Activate an employee who is in the pre-joining 'Onboarding' state.
+     *
+     * Called from the "Activate Employee" action on the profile once HR has
+     * completed onboarding. Sets the joining date and flips the status to
+     * 'Active' — only then does the employee surface in Payroll, Attendance
+     * and headcount.
+     */
+    public function activate(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'emp_id'       => 'required|exists:employees,id',
+            'joining_date' => ['required', 'date_format:d/m/Y'],
+        ], [
+            'joining_date.required'    => 'Joining date is required.',
+            'joining_date.date_format' => 'Joining date must be in dd/mm/yyyy format.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $employee = Employee::where('resort_id', $this->resort->resort_id)
+            ->findOrFail($request->emp_id);
+
+        // Only an Onboarding employee can be "activated" via this action.
+        if ($employee->status !== 'Onboarding') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This employee is not in the Onboarding state.',
+            ], 422);
+        }
+
+        $employee->joining_date = \Carbon\Carbon::createFromFormat('d/m/Y', $request->joining_date)->format('Y-m-d');
+        $employee->status = 'Active';
+        $employee->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Employee activated. They will now appear in Payroll and Attendance.',
+        ]);
+    }
+
     public function updatePersonal(Request $request)
     {
         $formattedDOB = \Carbon\Carbon::createFromFormat('d/m/Y', $request->dob)->format('Y-m-d');

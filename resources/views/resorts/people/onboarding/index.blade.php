@@ -149,7 +149,10 @@
                                         <option value="">Select Resort Transporation</option>
                                         @if($transportations)
                                             @foreach($transportations as $key => $value)
-                                                <option value="{{ $key }}">{{ $value }}</option>
+                                                {{-- data-option carries the transportation NAME so the
+                                                     section-switching JS matches by name, not by a
+                                                     hardcoded id (resort_transportations ids vary per resort). --}}
+                                                <option value="{{ $key }}" data-option="{{ $value }}" {{ optional($lastItinerary)->resort_transportation_id == $key ? 'selected' : '' }}>{{ $value }}</option>
                                             @endforeach
                                         @endif
                                     </select>
@@ -205,7 +208,7 @@
                                         <input type="text" class="form-control" id="speedboat_name"
                                             placeholder="Speedboat Name" required name="speedboat_name"
                                             data-parsley-required-message="Please enter speedboat name" data-parsley-script-tag="true"
-                                            data-parsley-html="true">
+                                            data-parsley-html="true" value="{{ optional($lastItinerary)->speedboat_name }}">
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
                                         <label for="captain_number" class="form-label">CAPTAIN NUMBER <span class="red-mark">*</span></label>
@@ -215,9 +218,9 @@
                                     </div>
                                     <div class="col-lg-4 col-sm-6 transportation-field" id="location-field">
                                         <label for="location" class="form-label">LOCATION <span class="red-mark">*</span></label>
-                                        <input type="text" class="form-control" name="location" id="location" 
+                                        <input type="text" class="form-control" name="location" id="location"
                                             placeholder="Location" required data-parsley-script-tag="true"
-                                            data-parsley-html="true" data-parsley-required-message="Please enter location">
+                                            data-parsley-html="true" data-parsley-required-message="Please enter location" value="{{ optional($lastItinerary)->location }}">
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
                                         <label for="speedboat_date" class="form-label">SPEEDBOAT DATE <span class="red-mark">*</span></label>
@@ -271,19 +274,22 @@
                                 <h3>Hotel Details</h3>
                             </div>
                             <div class="row g-md-3 g-2 mb-md-4 mb-3">
-                                <div class="col-lg-4 col-sm-6">
-                                    <label for="hotel_id" class="form-label">Hotel ID <span class="red-mark">*</span></label>
-                                    <input type="text" class="form-control" name="hotel_id" id="hotel_id" placeholder="Hotel ID" required data-parsley-required-message="Please enter hotel id" data-parsley-script-tag="true"
-                                        data-parsley-html="true">
-                                </div>
+                                {{-- Hotel fields default from the resort's most recent
+                                     itinerary ($lastItinerary) — same partner hotel is
+                                     typically reused. Booking Reference is per-booking
+                                     so it is NOT pre-filled. --}}
+                                {{-- Hotel ID field hidden per request. Kept as a hidden
+                                     input so the (still-nullable) backend column keeps
+                                     receiving the pre-filled value without HR re-typing. --}}
+                                <input type="hidden" name="hotel_id" id="hotel_id" value="{{ optional($lastItinerary)->hotel_id }}">
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="hotel_name" class="form-label">Hotel Name <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" name="hotel_name" id="hotel_name" placeholder="Hotel Name" required data-parsley-required-message="Please enter hotel name" data-parsley-script-tag="true"
-                                        data-parsley-html="true">
+                                        data-parsley-html="true" value="{{ optional($lastItinerary)->hotel_name }}">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="hotel_contact_no" class="form-label">Contact No <span class="red-mark">*</span></label>
-                                    <input type="number" class="form-control" name="hotel_contact_no" id="hotel_contact_no" placeholder="Contact No" required data-parsley-required-message="Please enter contact no">
+                                    <input type="number" class="form-control" name="hotel_contact_no" id="hotel_contact_no" placeholder="Contact No" required data-parsley-required-message="Please enter contact no" value="{{ optional($lastItinerary)->hotel_contact_no }}">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="booking_reference" class="form-label">BOOKING REFERENCE <span class="red-mark">*</span></label>
@@ -293,27 +299,31 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="hotel_address" class="form-label">Hotel Address <span class="red-mark">*</span></label>
                                     <textarea class="form-control" id="hotel_address" name="hotel_address" placeholder="Hotel Address" required data-parsley-required-message="Please enter hotel address" data-parsley-script-tag="true"
-                                        data-parsley-html="true"></textarea>
+                                        data-parsley-html="true">{{ optional($lastItinerary)->hotel_address }}</textarea>
                                 </div>
                             </div>
                             <div class="card-title">
                                 <h3>Work Permit Medical Center Details</h3>
                             </div>
                             <div class="row g-md-3 g-2 mb-md-4 mb-3">
+                                {{-- Medical-centre fields default from the last
+                                     itinerary — the resort's work-permit medical
+                                     centre is the same partner each time. Test
+                                     date/time stay blank (per appointment). --}}
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_center_name" class="form-label">Medical center Name <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" id="medical_center_name" placeholder="Medical Center Name" required name="medical_center_name" data-parsley-required-message="Please enter medical center name" data-parsley-script-tag="true"
-                                        data-parsley-html="true">
+                                        data-parsley-html="true" value="{{ optional($lastItinerary)->medical_center_name }}">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_center_contact_no" class="form-label">Contact No <span class="red-mark">*</span></label>
-                                    <input type="number" class="form-control" id="medical_center_contact_no" placeholder="Contact No" name="medical_center_contact_no" required data-parsley-required-message="Please enter contact no">
+                                    <input type="number" class="form-control" id="medical_center_contact_no" placeholder="Contact No" name="medical_center_contact_no" required data-parsley-required-message="Please enter contact no" value="{{ optional($lastItinerary)->medical_center_contact_no }}">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_type" class="form-label">Medical Type <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" id="medical_type" name="medical_type"
                                         placeholder="Medical Type" required data-parsley-required-message="Please enter medical type" data-parsley-script-tag="true"
-                                        data-parsley-html="true">
+                                        data-parsley-html="true" value="{{ optional($lastItinerary)->medical_type }}">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_date" class="form-label">Medical Test Date <span class="red-mark">*</span></label>
@@ -322,12 +332,15 @@
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_time" class="form-label">Medical Test Time <span class="red-mark">*</span></label>
-                                    <input type="time" class="form-control" id="medical_time" name="medical_time"
-                                        placeholder="Medical Test Time" required data-parsley-required-message="Please enter medical type">
+                                    {{-- Plain text time entry (no native picker / no AM-PM).
+                                         HR simply types the time, e.g. 10:09. --}}
+                                    <input type="text" class="form-control" id="medical_time" name="medical_time"
+                                        placeholder="HH:MM (e.g. 10:09)" required data-parsley-required-message="Please enter medical test time">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="approx_time" class="form-label">Approx Time <span class="red-mark">*</span></label>
-                                    <input type="time" class="form-control" id="approx_time" name="approx_time" placeholder="Approx Time" required data-parsley-required-message="Please select approx time"/>
+                                    <input type="text" class="form-control" id="approx_time" name="approx_time"
+                                        placeholder="HH:MM (e.g. 12:30)" required data-parsley-required-message="Please enter approx time"/>
                                 </div>
                             </div>
                             <div class="card-title">
@@ -632,8 +645,23 @@
             </div>`;
 
             $('.itineraryTemplateManage-main').append(newMeetingBlock);
+
+            // Bind the datepicker + select2 directly to the just-added block.
+            // Previously this leaned on updateDatepickerValidation(), but that
+            // function early-returns when the employee has no joining date in
+            // localStorage — leaving the new Meeting Date input with no picker.
+            const $newBlock = $('.itineraryTemplateManage-main .itineraryTemplateManage-block').last();
+            $newBlock.find('.datepicker').datepicker({
+                format: 'dd/mm/yyyy',
+                autoclose: true,
+                todayHighlight: true,
+                startDate: new Date()
+            });
+            $newBlock.find('.select2t-none').select2();
+
+            // Re-apply joining-date bounds across all date inputs when known
+            // (no-op when the employee has no joining date).
             updateDatepickerValidation();
-            $('.select2t-none').select2();
         });
 
         // Remove meeting block
@@ -735,8 +763,14 @@
                         });
                     }
                 },
-                error: function () {
-                    templateContainer.html('<div class="text-danger">Error loading templates.</div>');
+                error: function (xhr) {
+                    // 404 = no template configured for this employee's band;
+                    // surface the controller's specific message.
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                        ? xhr.responseJSON.message
+                        : 'Error loading templates.';
+                    templateContainer.html('<div class="text-danger">' + msg + '</div>');
+                    toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
                 }
             });
         }
@@ -803,6 +837,35 @@
                 if (employeeData.joining_date) {
                     localStorage.setItem("employee_joining_date", employeeData.joining_date);
                     updateDatepickerValidation();
+                }
+
+                // --- Pre-fill Step 3 defaults (HR can still edit) ---------------
+                // Greeting message — (re)generate whenever it is empty OR still
+                // an auto-generated line. Without the re-check, switching the
+                // employee left a stale "Dear <previous name>" greeting. A
+                // greeting HR has actually customised won't match the auto
+                // pattern, so it is left untouched.
+                var currentGreeting = $('#greeting_message').val() || '';
+                var isAutoGreeting = currentGreeting === ''
+                    || /^Dear .*welcome aboard! We are delighted to have you join our team/.test(currentGreeting);
+                if (isAutoGreeting) {
+                    var who = employeeData.full_name || 'Team Member';
+                    $('#greeting_message').val('Dear ' + who + ', welcome aboard! '
+                        + 'We are delighted to have you join our team and look forward '
+                        + 'to a great journey together.');
+                }
+
+                // Arrival date — default to the day before the joining date
+                // (the latest date the arrival datepicker allows), only when
+                // empty so a re-selection doesn't clobber HR's choice.
+                if (employeeData.joining_date && !$('#arrival_date').val()) {
+                    var jd = new Date(employeeData.joining_date);
+                    if (!isNaN(jd.getTime())) {
+                        jd.setDate(jd.getDate() - 1);
+                        var dd = String(jd.getDate()).padStart(2, '0');
+                        var mm = String(jd.getMonth() + 1).padStart(2, '0');
+                        $('#arrival_date').val(dd + '/' + mm + '/' + jd.getFullYear());
+                    }
                 }
 
                 // Move to next step after employee details are loaded
@@ -1223,24 +1286,30 @@
     });
     // Function to show/hide transportation fields based on selection
     function updateTransportationFields() {
-        const transportationType = $('#resort_transportaion_id').val();
-        
-        // Hide all transportation sections first
+        // Match by the transportation NAME (data-option), not the row id —
+        // resort_transportations ids differ per resort (5/6/7, 13/14/15…),
+        // so the old hardcoded '1'/'2'/'3' comparison never matched and no
+        // section was ever revealed.
+        var option = ($('#resort_transportaion_id option:selected').data('option') || '')
+            .toString().toLowerCase();
+
+        // Hide all sections + drop their required flags first.
         $('.transportation-section').hide();
-        
-        // Remove required attribute from all hidden fields
         $('.transportation-section input').prop('required', false);
-        
-        // Show fields based on selected transportation type
-        if (transportationType === '3') {
-            $('#domestic-flight-section').show();
-            $('#domestic-flight-section input').prop('required', true);
-        } else if (transportationType === '2') {
-            $('#speedboat-section').show();
-            $('#speedboat-section input').prop('required', true);
-        } else if (transportationType === '1') {
-            $('#seaplane-section').show();
-            $('#seaplane-section input').prop('required', true);
+
+        var $section = null;
+        if (option.indexOf('seaplane') !== -1) {
+            $section = $('#seaplane-section');
+        } else if (option.indexOf('speed') !== -1 || option.indexOf('boat') !== -1) {
+            $section = $('#speedboat-section');
+        } else if (option.indexOf('domestic') !== -1 || option.indexOf('flight') !== -1) {
+            $section = $('#domestic-flight-section');
+        }
+
+        if ($section && $section.length) {
+            $section.show();
+            // Only the *visible* section's inputs are required.
+            $section.find('input').prop('required', true);
         }
     }
             
@@ -1452,6 +1521,19 @@
             }
         });
     }
+    // Format a dd/mm/yyyy string as "15 May 2026" — the project-wide display
+    // format (matches the Visa module). Returns the input unchanged if it
+    // isn't a parseable dd/mm/yyyy value.
+    function fmtDisplayDate(ddmmyyyy) {
+        if (!ddmmyyyy) return '';
+        var p = String(ddmmyyyy).split('/');
+        if (p.length !== 3) return ddmmyyyy;
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var d = parseInt(p[0], 10), m = parseInt(p[1], 10), y = p[2];
+        if (isNaN(d) || isNaN(m) || m < 1 || m > 12) return ddmmyyyy;
+        return (d < 10 ? '0' + d : d) + ' ' + months[m - 1] + ' ' + y;
+    }
+
     // Updated Step 4 Preview Function
     function updateStep4Preview() {
         console.log("📦 All localStorage Data:");
@@ -1507,40 +1589,41 @@
         const medicalEmployeeImage = localStorage.getItem('medical_employee_image') || '{{ asset('resorts_assets/images/user-2.svg') }}';
         const medicalEmployeeEmpId = localStorage.getItem('medical_employee_emp_id') || '';
 
-        // Get the selected transportation type
-        const transportationType = localStorage.getItem('resort_transportaion_id');
-        // Initialize transportation details
+        // Resort transportation — resolve by NAME (data-option on the still-in-DOM
+        // select), not by row id. The old '1'/'2'/'3' id comparison never matched
+        // real resort_transportations ids (5/6/7…), so the name + detail rows
+        // came through blank on this review page.
+        const transportationName = ($('#resort_transportaion_id option:selected').data('option') || '').toString();
+        const transportationKey  = transportationName.toLowerCase();
         let transportationDetails = '';
-        let transporatationName = "";
-        // Add details based on transportation type
-        if (transportationType === '3') { // Domestic Flight
-            transporatationName = "Domestic Flight";
+        let transporatationName = transportationName || '—';
+
+        if (transportationKey.indexOf('seaplane') !== -1) {
             transportationDetails = `
-                <tr><th>Domestic Flight Date</th><td>${localStorage.getItem('domestic_flight_date') || ''}</td></tr>
-                <tr><th>Departure Time</th><td>${localStorage.getItem('domestic_departure_time') || ''}</td></tr>
-                <tr><th>Arrival Time</th><td>${localStorage.getItem('domestic_arrival_time') || ''}</td></tr>
+                <tr><th>Seaplane Date</th><td>${fmtDisplayDate(localStorage.getItem('seaplane_date'))}</td></tr>
+                <tr><th>Departure Time</th><td>${localStorage.getItem('seaplane_departure_time') || ''}</td></tr>
+                <tr><th>Arrival Time</th><td>${localStorage.getItem('seaplane_arrival_time') || ''}</td></tr>
             `;
-        } else if (transportationType === '2') { // Speedboat
-            transporatationName = "Speedboat";
+        } else if (transportationKey.indexOf('speed') !== -1 || transportationKey.indexOf('boat') !== -1) {
             transportationDetails = `
                 <tr><th>Speedboat Name</th><td>${localStorage.getItem('speedboat_name') || ''}</td></tr>
-                <tr><th>Speedboat Date</th><td>${localStorage.getItem('speedboat_date') || ''}</td></tr>
+                <tr><th>Speedboat Date</th><td>${fmtDisplayDate(localStorage.getItem('speedboat_date'))}</td></tr>
                 <tr><th>Departure Time</th><td>${localStorage.getItem('speedboat_departure_time') || ''}</td></tr>
                 <tr><th>Arrival Time</th><td>${localStorage.getItem('speedboat_arrival_time') || ''}</td></tr>
                 <tr><th>Captain Number</th><td>${localStorage.getItem('captain_number') || ''}</td></tr>
+                <tr><th>Location</th><td>${localStorage.getItem('location') || ''}</td></tr>
             `;
-        } else if (transportationType === '1') { // Seaplane
-            transporatationName = "Seaplane";
+        } else if (transportationKey.indexOf('domestic') !== -1 || transportationKey.indexOf('flight') !== -1) {
             transportationDetails = `
-                <tr><th>Seaplane Date</th><td>${localStorage.getItem('seaplane_date') || ''}</td></tr>
-                <tr><th>Departure Time</th><td>${localStorage.getItem('seaplane_departure_time') || ''}</td></tr>
-                <tr><th>Arrival Time</th><td>${localStorage.getItem('seaplane_arrival_time') || ''}</td></tr>
+                <tr><th>Domestic Flight Date</th><td>${fmtDisplayDate(localStorage.getItem('domestic_flight_date'))}</td></tr>
+                <tr><th>Departure Time</th><td>${localStorage.getItem('domestic_departure_time') || ''}</td></tr>
+                <tr><th>Arrival Time</th><td>${localStorage.getItem('domestic_arrival_time') || ''}</td></tr>
             `;
         }
 
         const onboardingTableRows = `
             <tr><th>Greeting Message:</th><td>${localStorage.getItem('greeting_message') || ''}</td></tr>
-            <tr><th>Arrival Date:</th><td>${localStorage.getItem('arrival_date') || ''}</td></tr>
+            <tr><th>Arrival Date:</th><td>${fmtDisplayDate(localStorage.getItem('arrival_date'))}</td></tr>
             <tr><th>Arrival Time:</th><td>${localStorage.getItem('arrival_time') || ''}</td></tr>
             <tr><th>Pickup From Airport</th><td>
                 <div class="tableUser-block">
@@ -1562,7 +1645,7 @@
             <tr><th>Resort Transportation</th><td>${transporatationName}</td></tr>
             ${transportationDetails}
 
-            <tr><th>Hotel ID</th><td>${localStorage.getItem('hotel_id') || ''}</td></tr>
+            {{-- Hotel ID row hidden — field removed from the form. --}}
             <tr><th>Hotel Name</th><td>${localStorage.getItem('hotel_name') || ''}</td></tr>
             <tr><th>Contact No</th><td>${localStorage.getItem('hotel_contact_no') || ''}</td></tr>
             <tr><th>Booking Reference</th><td>${localStorage.getItem('booking_reference') || ''}</td></tr>
@@ -1570,7 +1653,7 @@
             <tr><th>Medical Center Name</th><td>${localStorage.getItem('medical_center_name') || ''}</td></tr>
             <tr><th>Medical Center Contact</th><td>${localStorage.getItem('medical_center_contact_no') || ''}</td></tr>
             <tr><th>Medical Type</th><td>${localStorage.getItem('medical_type') || ''}</td></tr>
-            <tr><th>Medical Date</th><td>${localStorage.getItem('medical_date') || ''}</td></tr>
+            <tr><th>Medical Date</th><td>${fmtDisplayDate(localStorage.getItem('medical_date'))}</td></tr>
             <tr><th>Medical Time</th><td>${localStorage.getItem('medical_time') || ''}</td></tr>
             <tr><th>Approx Time</th><td>${localStorage.getItem('approx_time') || ''}</td></tr>
         `;
@@ -1587,24 +1670,33 @@
             // Generate participant images HTML
             let participantImagesHtml = '';
             if (meetingParticipantsData && meetingParticipantsData.length > 0) {
-                participantImagesHtml = meetingParticipantsData.slice(0, 4).map(participant => 
-                    `<div class="img-circle">
-                        <img src="{{ $participant->profile_image ?? asset('resorts_assets/images/user-2.svg') }}"
-                        alt="{{ $participant->full_name }}"
-                        title="{{ $participant->full_name }} (#{{ $participant->emp_id }})"
-                        onerror="this.onerror=null;this.src='{{ asset('resorts_assets/images/user-2.svg') }}';">
-                    </div>`
-                ).join('');
-                
-                // Add more indicator if there are more than 4 participants
+                // Render from the REAL participant objects returned by
+                // getParticipantDetails ({id, emp_id, full_name, position,
+                // department, profile_image}). Previously this used Blade
+                // {{ $participant->… }} inside the JS string — a static value
+                // that was the same (broken) markup for every participant.
+                var fallbackImg = '{{ asset('resorts_assets/images/user-2.svg') }}';
+                participantImagesHtml = meetingParticipantsData.slice(0, 4).map(function (participant) {
+                    var img   = participant.profile_image || fallbackImg;
+                    var name  = participant.full_name || 'Unknown';
+                    var empId = participant.emp_id || '';
+                    return `<div class="img-circle">
+                        <img src="${img}" alt="${name}" title="${name} (#${empId})"
+                        onerror="this.onerror=null;this.src='${fallbackImg}';">
+                    </div>`;
+                }).join('');
+
+                // "+N" indicator when more than 4 participants.
                 if (meetingParticipantsData.length > 4) {
                     participantImagesHtml += `<div class="img-circle more-participants">+${meetingParticipantsData.length - 4}</div>`;
                 }
+            } else {
+                participantImagesHtml = '<span class="text-muted">No participants selected</span>';
             }
 
             meetingTableRows += `
                 <tr><th>Meeting Title</th><td>${title}</td></tr>
-                <tr><th>Date & Time</th><td>${meetingDates[index]} - ${meetingTimes[index]}</td></tr>
+                <tr><th>Date & Time</th><td>${fmtDisplayDate(meetingDates[index])} - ${meetingTimes[index] || ''}</td></tr>
                 <tr><th>Meeting Link</th><td><a href="${meetingLinks[index]}" target="_blank">${meetingLinks[index]}</a></td></tr>
                 <tr><th>Participants</th><td>
                     <div class="user-ovImg">

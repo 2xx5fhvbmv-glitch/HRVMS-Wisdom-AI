@@ -50,8 +50,16 @@ class OnboardingController extends Controller
             ->whereNotIn('transportation_option', ['International Flight'])
             ->pluck('transportation_option', 'id')
             ->toArray();
-        // dd($transportations);
-        return view('resorts.people.onboarding.index',compact('page_title','resort_id','employees','participants','transportations'));
+
+        // Pre-fill source — resorts reuse the same partner hotel, medical
+        // centre and transportation across onboardings, so default those
+        // (stable) fields from the most recent itinerary. Per-trip fields
+        // (dates, times, booking reference, files) are NOT pre-filled.
+        $lastItinerary = EmployeeItineraries::where('resort_id', $resort_id)
+            ->latest('id')
+            ->first();
+
+        return view('resorts.people.onboarding.index',compact('page_title','resort_id','employees','participants','transportations','lastItinerary'));
     }
 
     public function getupcomingEmployees(Request $request)
@@ -336,7 +344,12 @@ class OnboardingController extends Controller
                 'reporting_to'          => $vacancy->reporting_to ?: 0,
                 'rank'                  => $vacancy->rank,
                 'is_employee'           => 1,
-                'status'                => 'Active',
+                // Not 'Active' — a converted applicant has not physically
+                // joined yet. They stay 'Onboarding' (excluded from payroll /
+                // attendance / headcount) until HR completes onboarding and
+                // uses "Activate Employee" to set the joining date + flip to
+                // Active.
+                'status'                => 'Onboarding',
                 'dob'                   => $dob,
                 'marital_status'        => $maritalStatus,
                 'joining_date'          => $joining_date,
@@ -421,21 +434,42 @@ class OnboardingController extends Controller
             return response()->json(['templates' => []]);
         }
 
-        $grade = $employee->position->rank ?? null;
+        // Rank source — the resort_positions column is `Rank` (capital R);
+        // `$employee->position->rank` (lowercase) silently returned null, so
+        // EVERY employee fell through to the `else` branch and was handed the
+        // manager_above template. Prefer the position's Rank, fall back to
+        // the employee's own rank column (lowercase, set on the employees
+        // table) so the classification still works if the relation is missing.
+        $grade = $employee->position->Rank ?? $employee->rank ?? null;
 
-        // Example logic — you can modify thresholds
-        if ($grade == 5 || $grade == 6) {
+        // Rank config: 8=GM 1=EXCOM 2=HOD 3=HR 4=MGR 5=SUP 6=LINE WORKERS 7=Finance.
+        // Supervisors (5) and line workers (6) get the supervisor_line form;
+        // everyone manager-and-above gets manager_above.
+        if (in_array((int) $grade, [5, 6], true)) {
             $type = 'supervisor_line';
         } else {
             $type = 'manager_above';
         }
 
-        $template = ItineraryTemplate::where('template_type', $type)->where('resort_id',$this->resort->resort_id)->first();
+        $template = ItineraryTemplate::where('template_type', $type)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+
+        // No template configured for this band — surface a clear message
+        // instead of a 500 on $template->id.
+        if (!$template) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No "' . ($type === 'supervisor_line' ? 'Supervisor / Line' : 'Manager & Above')
+                    . '" itinerary template is configured for this resort.',
+            ], 404);
+        }
 
         return response()->json([
-            'id' => $template->id,
-            'name' => $template->name,
+            'id'          => $template->id,
+            'name'        => $template->name,
             'description' => $template->description,
+            'type'        => $template->template_type,
         ]);
     }
 
@@ -1185,54 +1219,21 @@ class OnboardingController extends Controller
                 'greeting_message' => 'required|string|max:500',
                 'resort_transportaion_id' => 'required|exists:resort_transportations,id', // Fixed spelling
 
-                // Arrival details (always required)
-                'arrival_date' => ['required', 'date_format:d/m/Y', function ($attribute, $value, $fail) use ($employee) {
-                    if (empty($value)) {
-                        $fail('Arrival date is required.');
-                        return;
-                    }
-                    
-                    try {
-                        $arrivalDate = Carbon::createFromFormat('d/m/Y', $value);
-                        if (!$arrivalDate) {
-                            $fail('Invalid arrival date format (dd/mm/yyyy).');
-                            return;
-                        }
-                        
-                        if ($arrivalDate->gte(Carbon::parse($employee->joining_date))) {
-                            $fail('Arrival date must be before the joining date (' . 
-                                Carbon::parse($employee->joining_date)->format('d/m/Y') . ').');
-                        }
-                    } catch (\Exception $e) {
-                        $fail('Invalid arrival date format. Please use dd/mm/yyyy format.');
-                    }
-                }],
+                // Arrival details (always required). The arrival date is no
+                // longer forced to be before the joining date — that constraint
+                // blocked HR whenever the joining date was today/past (and
+                // Carbon::parse(null) made it compare against "now" when the
+                // joining date was unset). It just has to be a valid date.
+                'arrival_date' => ['required', 'date_format:d/m/Y'],
                 'arrival_time' => 'required|date_format:H:i',
 
                 // Domestic flight details (conditionally required)
                 'domestic_flight_date' => [
-                    'nullable', 
-                    'date_format:d/m/Y', 
-                    function ($attribute, $value, $fail) use ($employee, $request) {
+                    'nullable',
+                    'date_format:d/m/Y',
+                    function ($attribute, $value, $fail) use ($request) {
                         if ($request->input('resort_transportaion_id') == config('settings.ReverseTransportations.domestic_flight') && empty($value)) {
                             $fail('Domestic flight date is required for this transportation type.');
-                            return;
-                        }
-                        
-                        if (!empty($value)) {
-                            try {
-                                $date = Carbon::createFromFormat('d/m/Y', $value);
-                                if (!$date) {
-                                    $fail('Invalid domestic flight date format (dd/mm/yyyy).');
-                                    return;
-                                }
-                                
-                                if ($date->gte(Carbon::parse($employee->joining_date))) {
-                                    $fail('Domestic flight date must be before joining date.');
-                                }
-                            } catch (\Exception $e) {
-                                $fail('Invalid domestic flight date format.');
-                            }
                         }
                     }
                 ],
@@ -1241,28 +1242,11 @@ class OnboardingController extends Controller
 
                 // Speedboat details (conditionally required)
                 'speedboat_date' => [
-                    'nullable', 
-                    'date_format:d/m/Y', 
-                    function ($attribute, $value, $fail) use ($employee, $request) {
+                    'nullable',
+                    'date_format:d/m/Y',
+                    function ($attribute, $value, $fail) use ($request) {
                         if ($request->input('resort_transportaion_id') == config('settings.ReverseTransportations.speedboat') && empty($value)) {
                             $fail('Speedboat date is required for this transportation type.');
-                            return;
-                        }
-                        
-                        if (!empty($value)) {
-                            try {
-                                $date = Carbon::createFromFormat('d/m/Y', $value);
-                                if (!$date) {
-                                    $fail('Invalid speedboat date format (dd/mm/yyyy).');
-                                    return;
-                                }
-                                
-                                if ($date->gte(Carbon::parse($employee->joining_date))) {
-                                    $fail('Speedboat date must be before joining date.');
-                                }
-                            } catch (\Exception $e) {
-                                $fail('Invalid speedboat date format.');
-                            }
                         }
                     }
                 ],
@@ -1273,28 +1257,11 @@ class OnboardingController extends Controller
 
                 // Seaplane details (conditionally required)
                 'seaplane_date' => [
-                    'nullable', 
-                    'date_format:d/m/Y', 
-                    function ($attribute, $value, $fail) use ($employee, $request) {
+                    'nullable',
+                    'date_format:d/m/Y',
+                    function ($attribute, $value, $fail) use ($request) {
                         if ($request->input('resort_transportaion_id') == config('settings.ReverseTransportations.seaplane') && empty($value)) {
                             $fail('Seaplane date is required for this transportation type.');
-                            return;
-                        }
-                        
-                        if (!empty($value)) {
-                            try {
-                                $date = Carbon::createFromFormat('d/m/Y', $value);
-                                if (!$date) {
-                                    $fail('Invalid seaplane date format (dd/mm/yyyy).');
-                                    return;
-                                }
-                                
-                                if ($date->gte(Carbon::parse($employee->joining_date))) {
-                                    $fail('Seaplane date must be before joining date.');
-                                }
-                            } catch (\Exception $e) {
-                                $fail('Invalid seaplane date format.');
-                            }
                         }
                     }
                 ],
@@ -1302,40 +1269,24 @@ class OnboardingController extends Controller
                 'seaplane_departure_time' => 'nullable|date_format:H:i|required_if:resort_transportation_id,'.config('settings.ReverseTransportations.seaplane'),
                 'seaplane_arrival_time' => 'nullable|date_format:H:i|required_if:resort_transportation_id,'.config('settings.ReverseTransportations.seaplane'),
 
-                // Hotel details (always required)
-                'hotel_id' => 'required|string|max:255',
+                // Hotel details — hotel_id field is hidden on the form, so it is
+                // no longer a required input; the rest stay required.
+                'hotel_id' => 'nullable|string|max:255',
                 'hotel_name' => 'required|string|max:255',
                 'hotel_contact_no' => 'required|string|max:20',
                 'booking_reference' => 'required|string|max:255',
                 'hotel_address' => 'required|string|max:1000',
 
-                // Medical details (always required)
-                'medical_date' => [
-                    'required', 
-                    'date_format:d/m/Y', 
-                    function ($attribute, $value, $fail) use ($employee, $request) {                        
-                        if (!empty($value)) {
-                            try {
-                                $date = Carbon::createFromFormat('d/m/Y', $value);
-                                if (!$date) {
-                                    $fail('Invalid medical date format (dd/mm/yyyy).');
-                                    return;
-                                }
-                                
-                                if ($date->gte(Carbon::parse($employee->joining_date))) {
-                                    $fail('Medical date must be before joining date.');
-                                }
-                            } catch (\Exception $e) {
-                                $fail('Invalid medical date format.');
-                            }
-                        }
-                    }
-                ],
+                // Medical details (always required). No longer forced before
+                // the joining date — same reasoning as arrival_date above.
+                'medical_date' => ['required', 'date_format:d/m/Y'],
                 'medical_center_name' => 'required|string|max:255',
                 'medical_center_contact_no' => 'required|string|max:20',
                 'medical_type' => 'required|string|max:255',
+                // Medical/approx time are free-typed text fields (no native
+                // picker) — accept any string rather than enforcing H:i.
                 'medical_time' => 'required|string|max:255',
-                'approx_time' => 'required|date_format:H:i',
+                'approx_time' => 'required|string|max:255',
 
                 // Employee assignments (always required)
                 'pickup_employee_id' => 'required|exists:employees,id',
@@ -1393,8 +1344,8 @@ class OnboardingController extends Controller
                 'seaplane_departure_time' => $validatedData['seaplane_departure_time'] ?? null,
                 'seaplane_arrival_time' => $validatedData['seaplane_arrival_time'] ?? null,
                 
-                // Hotel details
-                'hotel_id' => $validatedData['hotel_id'],
+                // Hotel details — hotel_id is now optional (field hidden on form).
+                'hotel_id' => $validatedData['hotel_id'] ?? null,
                 'hotel_name' => $validatedData['hotel_name'],
                 'hotel_contact_no' => $validatedData['hotel_contact_no'],
                 'booking_reference' => $validatedData['booking_reference'],
@@ -1927,8 +1878,9 @@ class OnboardingController extends Controller
                 'seaplane_departure_time' => 'nullable|required_if:resort_transportaion_id,'.config('settings.ReverseTransportations.seaplane'),
                 'seaplane_arrival_time' => 'nullable|required_if:resort_transportaion_id,'.config('settings.ReverseTransportations.seaplane'),
 
-                // Hotel details (always required)
-                'hotel_id' => 'required|string|max:255',
+                // Hotel details — hotel_id field is hidden on the form, so it is
+                // no longer a required input; the rest stay required.
+                'hotel_id' => 'nullable|string|max:255',
                 'hotel_name' => 'required|string|max:255',
                 'hotel_contact_no' => 'required|string|max:20',
                 'booking_reference' => 'required|string|max:255',
