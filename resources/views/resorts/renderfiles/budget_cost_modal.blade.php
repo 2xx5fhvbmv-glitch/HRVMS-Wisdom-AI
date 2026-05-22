@@ -812,13 +812,13 @@ $(document).ready(function() {
             month: currentMonth
         });
 
-        // Auto-calculate pension amounts for non-overtime percentage items
-        // Pension uses CURRENT Basic Salary, not Proposed
-        autoCalculatePensionAmounts(currentBasicSalary);
+        // Effective salary for ALL salary-based calculations: the Proposed
+        // Basic Salary wins whenever it is entered (> 0); otherwise the
+        // Current Basic Salary is used. Pension % and Overtime both follow it.
+        const effectiveSalary = currentProposedSalary > 0 ? currentProposedSalary : currentBasicSalary;
 
-        // Auto-calculate overtime amounts for overtime items with default hours
-        // For overtime holiday, we'll populate hours when checkbox is checked
-        autoCalculateOvertimeAmounts(currentBasicSalary, currentMonth);
+        autoCalculatePensionAmounts(effectiveSalary);
+        autoCalculateOvertimeAmounts(effectiveSalary, currentMonth);
 
         // Auto-populate holiday hours for already checked overtime holiday items
         const currentYear = window.getCurrentYear();
@@ -1031,10 +1031,26 @@ $(document).ready(function() {
     });
 
     // Event listeners for salary input fields to update total
-    $(document).on('input change', '#formCurrentSalary, #formBasicSalary', function() {
+    // Recompute every salary-based cost (Pension %, Overtime) from the modal's
+    // two salary inputs. #formBasicSalary = Current, #formCurrentSalary =
+    // Proposed (the ids are historically swapped). Proposed wins when > 0.
+    window.recalcBudgetModalSalaryBased = function() {
+        const current  = parseFloat($('#formBasicSalary').val() || 0);
+        const proposed = parseFloat($('#formCurrentSalary').val() || 0);
+        const effectiveSalary = proposed > 0 ? proposed : current;
+
+        autoCalculatePensionAmounts(effectiveSalary);
+        autoCalculateOvertimeAmounts(effectiveSalary, currentMonth);
+
         if (typeof window.updateModalTotal === 'function') {
             window.updateModalTotal();
         }
+    };
+
+    // Editing either salary input re-runs all salary-based calculations so
+    // Pension AND Overtime both follow the Proposed salary when it is set.
+    $(document).on('input change', '#formCurrentSalary, #formBasicSalary', function() {
+        window.recalcBudgetModalSalaryBased();
     });
 
     // When amount input changes for daily frequency items, recalculate based on original amount

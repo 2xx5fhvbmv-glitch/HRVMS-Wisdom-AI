@@ -2483,36 +2483,11 @@ $(document).ready(function() {
         }
     });
 
-    // When current basic salary changes, recalculate pension and update total
-    $(document).on('input change', '#formCurrentSalary', function() {
-        const currentSalary = parseFloat($(this).val() || 0);
-
-        // Recalculate pension amounts
-        $('.budget-cost-card[data-is-percentage="1"]').each(function() {
-            const $card = $(this);
-            const isOvertimeItem = $card.data('is-overtime') == '1';
-
-            // Only auto-calculate for non-overtime percentage items (like Pension)
-            if (!isOvertimeItem) {
-                const costId = $card.data('cost-id');
-                const percentage = parseFloat($card.find('.budget-cost-percentage').val() || 0);
-                const year = new Date().getFullYear();
-                const calculatedAmount = currentSalary * (percentage / 100);
-                $card.find('.budget-cost-amount').val(calculatedAmount.toFixed(2));
-            }
-        });
-
-        if (typeof window.updateModalTotal === 'function') {
-            window.updateModalTotal();
-        }
-    });
-
-    // When proposed basic salary changes, update total
-    $(document).on('input change', '#formBasicSalary', function() {
-        if (typeof window.updateModalTotal === 'function') {
-            window.updateModalTotal();
-        }
-    });
+    // Salary-based recalculation (Pension % AND Overtime) is owned by
+    // recalcBudgetModalSalaryBased() in budget_cost_modal.blade.php, which is
+    // bound to both salary inputs and uses the effective salary (Proposed
+    // when entered, else Current). The old handler here recalculated pension
+    // only — and never overtime — so overtime stayed on the current salary.
 });
 </script>
 

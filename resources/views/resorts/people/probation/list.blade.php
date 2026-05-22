@@ -70,6 +70,7 @@
                                 <option value="Not Started">Not Started</option>
                                 <option value="In Progress">In Progress</option>
                                 <option value="Completed">Completed</option>
+                                <option value="Absent">Absent</option>
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">

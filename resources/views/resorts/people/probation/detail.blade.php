@@ -118,13 +118,26 @@
                                 <h3>Progress Tracking</h3>
                             </div>
                             <ul class="manning-timeline text-start ">
-                                <li class="{{ $onboardingStatus === 'Completed' ? 'active' : '' }}">
-                                    <div>
-                                        <h6>Onboarding Training</h6>
-                                        <p>Due: {{ $joiningLabel }}</p>
-                                    </div>
-                                    <span class="badge {{ $onboardingBadge }}">{{ $onboardingStatus }}</span>
-                                </li>
+                                {{-- One row per probationary learning program assigned
+                                     to the resort. Falls back to a single generic row
+                                     when none are configured. --}}
+                                @forelse ($onboardingPrograms as $program)
+                                    <li class="{{ $program['label'] === 'Completed' ? 'active' : '' }}">
+                                        <div>
+                                            <h6>{{ $program['name'] }}</h6>
+                                            <p>Due: {{ $program['due'] }}</p>
+                                        </div>
+                                        <span class="badge {{ $program['badge'] }}">{{ $program['label'] }}</span>
+                                    </li>
+                                @empty
+                                    <li>
+                                        <div>
+                                            <h6>Onboarding Training</h6>
+                                            <p>No probationary programs configured</p>
+                                        </div>
+                                        <span class="badge badge-themeWarning">Not Configured</span>
+                                    </li>
+                                @endforelse
                                 @foreach ($monthlyCheckins as $index => $checkin)
                                     <li class="{{ $checkin['status'] === 'Completed' ? 'active' : '' }}">
                                         <div>
