@@ -14,7 +14,7 @@
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
-                            <span>Peple</span>
+                            <span>People</span>
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>

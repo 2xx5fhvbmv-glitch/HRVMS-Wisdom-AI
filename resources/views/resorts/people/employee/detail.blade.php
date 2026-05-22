@@ -52,12 +52,28 @@
                             <select class="form-select  active mb-2" id="statusFilter" disabled>
                                 <option value="">Status</option>
                                 <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
+                                <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
                                 <option {{$employee->status == "Inactive" ? "Selected" : ""}} value="Inactive">Inactive</option>
                                 <option {{$employee->status == "Terminated" ? "Selected" : ""}} value="Terminated">Terminated</option>
                                 <option {{$employee->status == "Resigned" ? "Selected" : ""}} value="Resigned">Resigned</option>
                                 <option {{$employee->status == "On Leave" ? "Selected" : ""}} value="On Leave">On Leave</option>
                                 <option {{$employee->status == "Suspended" ? "Selected" : ""}} value="Suspended">Suspended</option>
                             </select>
+
+                            {{-- Activate Employee — shown only while the employee is
+                                 still in the pre-joining 'Onboarding' state. HR uses
+                                 this once onboarding is complete to set the joining
+                                 date and flip the employee to Active (which then
+                                 surfaces them in payroll / attendance). --}}
+                            @if($employee->status == 'Onboarding')
+                                <div class="alert alert-warning py-2 px-3 mb-2" style="font-size:13px;">
+                                    This employee is still <strong>onboarding</strong> and has not joined yet.
+                                </div>
+                                <button type="button" class="btn btn-theme btn-sm w-100 mb-2" id="activateEmployeeBtn"
+                                    data-id="{{ $employee->id }}">
+                                    <i class="fa-solid fa-user-check me-1"></i> Activate Employee
+                                </button>
+                            @endif
                             <table class="table table-lable">
                                 <tbody>
                                     <tr id="summary-location-row">
@@ -784,6 +800,7 @@
                                                                     <select name="status" id="employment-status" class="form-select edit-mode d-none">
                                                                         <option value="">Select Status</option>
                                                                         <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
+                                                                        <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
                                                                         <option {{$employee->status == "Inactive" ? "Selected" : ""}} value="Inactive">Inactive</option>
                                                                         <option {{$employee->status == "Terminated" ? "Selected" : ""}} value="Terminated">Terminated</option>
                                                                         <option {{$employee->status == "Resigned" ? "Selected" : ""}} value="Resigned">Resigned</option>
@@ -1697,6 +1714,7 @@
                 <select name="status" id="modal-status" class="form-select select2-modal">
                     <option value="">Status</option>
                     <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
+                    <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
                     <option {{$employee->status == "Inactive" ? "Selected" : ""}} value="Inactive">Inactive</option>
                     <option {{$employee->status == "Terminated" ? "Selected" : ""}} value="Terminated">Terminated</option>
                     <option {{$employee->status == "Resigned" ? "Selected" : ""}} value="Resigned">Resigned</option>
@@ -1708,6 +1726,37 @@
                 <button type="submit" class="btn btn-primary">Update</button>
                 </div>
             </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Activate Employee modal — captures the joining date and flips the
+         employee from 'Onboarding' to 'Active'. --}}
+    <div class="modal fade" id="activateEmployeeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form id="activateEmployeeForm">
+                @csrf
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Activate Employee</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="emp_id" id="activate-emp-id">
+                        <p class="mb-3">Confirm the employee has completed onboarding. This sets their
+                            joining date and marks them <strong>Active</strong> — they will then appear
+                            in Payroll, Attendance and headcount.</p>
+                        <div class="mb-2">
+                            <label for="activate-joining-date" class="form-label">Joining Date <span class="red-mark">*</span></label>
+                            <input type="text" class="form-control datepicker" name="joining_date"
+                                id="activate-joining-date" placeholder="dd/mm/yyyy" autocomplete="off" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-theme">Activate</button>
+                    </div>
+                </div>
             </form>
         </div>
     </div>
@@ -1906,6 +1955,45 @@
                     toastr.error("Failed to update status!", "Error", {
                         positionClass: 'toast-bottom-right'
                     });
+                }
+            });
+        });
+
+        // --- Activate Employee (Onboarding → Active) ----------------------
+        $(document).on('click', '#activateEmployeeBtn', function () {
+            $('#activate-emp-id').val($(this).data('id'));
+            $('#activate-joining-date').val('');
+            $('#activateEmployeeModal').modal('show');
+        });
+
+        $('#activateEmployeeForm').on('submit', function (e) {
+            e.preventDefault();
+            var joiningDate = $('#activate-joining-date').val();
+            if (!joiningDate) {
+                toastr.error('Please select the joining date.', 'Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            var $btn = $(this).find('button[type="submit"]').prop('disabled', true);
+            $.ajax({
+                url: '{{ route("people.employees.activate") }}',
+                method: 'POST',
+                data: $(this).serialize(),
+                success: function (response) {
+                    $btn.prop('disabled', false);
+                    if (response && response.success) {
+                        toastr.success(response.message || 'Employee activated.', 'Success', { positionClass: 'toast-bottom-right' });
+                        $('#activateEmployeeModal').modal('hide');
+                        // Reload so payroll/attendance-dependent sections + the
+                        // status badge reflect the now-Active employee.
+                        setTimeout(function () { location.reload(); }, 1200);
+                    } else {
+                        toastr.error((response && response.message) || 'Could not activate employee.', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (xhr) {
+                    $btn.prop('disabled', false);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Could not activate employee.';
+                    toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
                 }
             });
         });
