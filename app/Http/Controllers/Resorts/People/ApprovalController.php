@@ -16,6 +16,7 @@ use App\Models\Employee;
 use App\Models\EmployeePromotionApproval;
 use App\Models\EmployeeLeave;
 use App\Models\PayrollAdvance;
+use App\Models\EmployeeTransfer;
 use Auth;
 use Config;
 use DB;
@@ -317,12 +318,119 @@ class ApprovalController extends Controller
                 });
 
 
+            // Employee Transfer Requests — surface pending transfer approvals
+            // assigned to this approver, a delegate, OR any team member in the
+            // assigned role's pool (Finance / GM). Without the pool match a
+            // Finance HOD other than the specific one store() picked would
+            // never see the request in their inbox — which is exactly what
+            // happened when only id=171 was the assigned approver and the
+            // logged-in Finance HOD (id=182) saw nothing.
+            $financeRank = array_search('Finance', config('settings.Position_Rank'));
+            $gmRank      = array_search('GM',      config('settings.Position_Rank'));
+            $financeTitles = ['Director of Finance', 'Finance Manager'];
+
+            // Build a list of role-rank pool predicates: an Employee qualifies
+            // for a role when their own rank OR position Rank matches, or (for
+            // Finance) when the position title is in the manager-title list.
+            $employeesForFinanceRole = Employee::where('resort_id', $resort->resort_id)
+                ->where(function ($q) use ($financeRank, $financeTitles) {
+                    if ($financeRank !== false) {
+                        $q->where('rank', $financeRank)
+                          ->orWhereHas('position', function ($pq) use ($financeRank) {
+                              $pq->where('Rank', $financeRank);
+                          });
+                    }
+                    $q->orWhereHas('position', function ($pq) use ($financeTitles) {
+                        $pq->whereIn('position_title', $financeTitles);
+                    });
+                })
+                ->pluck('id')->all();
+            $employeesForGmRole = Employee::where('resort_id', $resort->resort_id)
+                ->where(function ($q) use ($gmRank) {
+                    if ($gmRank !== false) {
+                        $q->where('rank', $gmRank)
+                          ->orWhereHas('position', function ($pq) use ($gmRank) {
+                              $pq->where('Rank', $gmRank);
+                          });
+                    }
+                })
+                ->pluck('id')->all();
+
+            $isFinancePool = in_array($employee->id, $employeesForFinanceRole, true)
+                             || !empty(array_intersect($delegatedForIds, $employeesForFinanceRole));
+            $isGmPool      = in_array($employee->id, $employeesForGmRole, true)
+                             || !empty(array_intersect($delegatedForIds, $employeesForGmRole));
+
+            $transferQuery = EmployeeTransfer::where('resort_id', $resort->resort_id)
+                ->whereIn('status', ['Pending', 'On Hold'])
+                ->where(function ($outer) use ($approverIds, $isFinancePool, $isGmPool) {
+                    // Direct assignment / delegation.
+                    $outer->whereHas('approvals', function ($q) use ($approverIds) {
+                        $q->where('status', 'Pending')->whereIn('approved_by', $approverIds);
+                    });
+                    // OR any pending approval whose role this user qualifies for.
+                    if ($isFinancePool) {
+                        $outer->orWhereHas('approvals', function ($q) {
+                            $q->where('status', 'Pending')->where('approval_rank', 'Finance');
+                        });
+                    }
+                    if ($isGmPool) {
+                        $outer->orWhereHas('approvals', function ($q) {
+                            $q->where('status', 'Pending')->where('approval_rank', 'GM');
+                        });
+                    }
+                })
+                ->with([
+                    'approvals' => function ($q) {
+                        $q->where('status', 'Pending');
+                    },
+                    'employee.resortAdmin',
+                    'employee.department',
+                    'employee.position',
+                ]);
+
+            if (!empty($search)) {
+                $transferQuery->whereHas('employee.resortAdmin', function ($q) use ($search) {
+                    $q->where('first_name', 'LIKE', "%{$search}%")
+                      ->orWhere('last_name', 'LIKE', "%{$search}%")
+                      ->orWhere(DB::raw('CONCAT(first_name, " ", last_name)'), 'LIKE', "%{$search}%");
+                })->orWhereHas('employee', function ($q) use ($search) {
+                    $q->where('Emp_id', 'LIKE', "%{$search}%");
+                });
+            }
+            if (!empty($departmentId)) {
+                $transferQuery->whereHas('employee', function ($q) use ($departmentId) {
+                    $q->where('Dept_id', $departmentId);
+                });
+            }
+            if (!empty($positionId)) {
+                $transferQuery->whereHas('employee', function ($q) use ($positionId) {
+                    $q->where('Position_id', $positionId);
+                });
+            }
+
+            $employeeTransferList = $transferQuery->get()
+                ->map(function ($transfer) {
+                    return [
+                        'id'           => $transfer->id,
+                        'emp_id'       => optional($transfer->employee)->Emp_id,
+                        'name'         => optional(optional($transfer->employee)->resortAdmin)->full_name,
+                        'department'   => optional(optional($transfer->employee)->department)->name,
+                        'position'     => optional(optional($transfer->employee)->position)->position_title,
+                        'status'       => optional($transfer->approvals->first())->status ?? 'Pending',
+                        'request_type' => 'Transfer Request',
+                        'created_at'   => Carbon::parse($transfer->created_at)->format('d M Y h:i A'),
+                        'action'       => 'transfer',
+                    ];
+                });
+
             $collections = [
                 $infoUpdateRequests ?? collect(),
                 $employeePromotionList ?? collect(),
                 $advancePayrolls ?? collect(),
                 $employeeResignations ?? collect(),
                 $employeeLeavesRequests ?? collect(),
+                $employeeTransferList ?? collect(),
             ];
             
             $mergedRequests = collect($collections)->collapse();
@@ -489,6 +597,37 @@ class ApprovalController extends Controller
 
             ];
             $view_route = route('leave.details', ['leave_id' => base64_encode($request['id'])]);
+        } elseif ($request['action'] == 'transfer') {
+
+            // Transfer approvals — same handleApproval endpoint as the Transfer
+            // list page. Approve / On Hold / Reject all hit GET routes that
+            // the action-button JS opens directly.
+            $approve_url = [
+                'route'  => route('people.transfer.handle-approval', ['id' => $request['id'], 'action' => 'Approved']),
+                'method' => 'POST',
+                'action' => 'Approved',
+                'status' => 'Approved',
+                'id'     => $request['id'],
+                'key'    => 'id',
+            ];
+            $hold_url = [
+                'route'  => route('people.transfer.handle-approval', ['id' => $request['id'], 'action' => 'On Hold']),
+                'method' => 'POST',
+                'action' => 'On Hold',
+                'status' => 'On Hold',
+                'id'     => $request['id'],
+                'key'    => 'id',
+            ];
+            $reject_url = [
+                'route'  => route('people.transfer.handle-approval', ['id' => $request['id'], 'action' => 'Rejected']),
+                'method' => 'POST',
+                'action' => 'Rejected',
+                'status' => 'Rejected',
+                'id'     => $request['id'],
+                'key'    => 'id',
+            ];
+            // The Transfer list page is the closest thing to a detail view.
+            $view_route = route('people.transfer.list');
         }
 
 

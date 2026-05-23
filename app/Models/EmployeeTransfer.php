@@ -20,7 +20,13 @@ class EmployeeTransfer extends Model
         'current_section_id','target_section_id',
         'current_position_id','target_position_id','reason_for_transfer','effective_date',
         'transfer_status','additional_notes','status','letter_dispatched','reporting_manager','created_by','modified_by',
-        'budgeted_salary','proposed_salary','temporary_from','temporary_to','transfer_letter_path'
+        'budgeted_salary','proposed_salary','temporary_from','temporary_to','transfer_letter_path',
+        'effective_day_notified_at',
+        'pre_transfer_snapshot','reverted_at',
+    ];
+
+    protected $casts = [
+        'pre_transfer_snapshot' => 'array',
     ];
 
     public static function boot(){

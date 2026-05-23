@@ -32,6 +32,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('Daily:CheckVisaExpiryReminders')->dailyAt('09:00');
         $schedule->command('Daily:CheckDepositRefundReminders')->dailyAt('09:15');
         $schedule->command('CheckHourly:IncidentCompliance')->everyMinute();
+        // Day-of transfer notifications + apply the employee profile move
+        // when an Approved transfer's effective_date arrives.
+        $schedule->command('transfers:notify-effective')->dailyAt('06:00');
 
         
 

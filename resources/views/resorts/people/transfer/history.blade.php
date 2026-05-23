@@ -76,6 +76,7 @@
                                 <th>Transfer date</th>
                                 <th>Reason</th>
                                 <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                     </table>
@@ -164,7 +165,7 @@
             autoWidth: false,
             scrollX: true,
             pageLength: 10,
-            order:[[9, 'desc']],
+            order:[[10, 'desc']],
             ajax: {
                 url: '{{ route("people.transfer.history") }}',
                 data: function (d) {
@@ -192,6 +193,7 @@
                 { data: 'effective_date', name: 'effective_date' },
                 { data: 'reason_for_transfer', name: 'reason_for_transfer' },
                 { data: 'status', name: 'status' },
+                { data: 'actions', name: 'actions', orderable: false, searchable: false },
                 {data:'created_at',visible:false,searchable:false},
             ]
         });
