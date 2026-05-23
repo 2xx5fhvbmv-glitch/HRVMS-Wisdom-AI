@@ -442,13 +442,28 @@
                             startDate: new Date(),
                         });
                     });
+                // For a Temporary transfer the Effective Date IS the day the
+                // temporary period begins — they must match. Lock the
+                // Effective Date input and mirror Temporary From into it.
+                $('#effective_date').prop('readonly', true)
+                    .attr('title', 'For a Temporary transfer this auto-syncs from Temporary From.');
             } else {
                 $('.temporary-period-field').addClass('d-none');
                 $('#temporary_from, #temporary_to')
                     .removeAttr('required')
                     .val('');
+                $('#effective_date').prop('readonly', false).removeAttr('title');
             }
         }
+
+        // Mirror Temporary From → Effective Date whenever the user picks it
+        // (datepicker's `changeDate` event fires before the JS change event).
+        $(document).on('change changeDate', '#temporary_from', function () {
+            if ($('#transfer_status').val() === 'Temporary') {
+                var v = $(this).val();
+                if (v) $('#effective_date').val(v).trigger('change');
+            }
+        });
 
         $('#transfer_status').on('change select2:select', toggleTemporaryFields);
         toggleTemporaryFields();

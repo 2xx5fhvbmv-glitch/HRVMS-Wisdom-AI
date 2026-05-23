@@ -104,12 +104,23 @@ class TransferController extends Controller
         }
 
         // Save transfer
-        $formattedEffectiveDate = $validated['effective_date'] ? Carbon::createFromFormat('d/m/Y', $validated['effective_date'])->format('Y-m-d') : null;
+        $formattedEffectiveDate = $validated['effective_date']
+            ? Carbon::createFromFormat('d/m/Y', $validated['effective_date'])->format('Y-m-d')
+            : null;
 
         $temporaryFrom = ($validated['transfer_status'] === 'Temporary' && !empty($validated['temporary_from']))
             ? Carbon::createFromFormat('d/m/Y', $validated['temporary_from'])->format('Y-m-d') : null;
         $temporaryTo = ($validated['transfer_status'] === 'Temporary' && !empty($validated['temporary_to']))
             ? Carbon::createFromFormat('d/m/Y', $validated['temporary_to'])->format('Y-m-d') : null;
+
+        // For a Temporary transfer the Effective Date IS the day the temp
+        // period starts — enforce server-side too in case the form was
+        // bypassed. Otherwise the apply scheduler and the temp window get
+        // out of sync (apply fires on effective_date, revert fires after
+        // temporary_to).
+        if ($validated['transfer_status'] === 'Temporary' && $temporaryFrom) {
+            $formattedEffectiveDate = $temporaryFrom;
+        }
 
         $transfer = EmployeeTransfer::create([
             'resort_id' => $this->resort->resort_id,
@@ -508,18 +519,38 @@ class TransferController extends Controller
 
                     return $statuses ?: '<span class="badge badge-themeWarning">Pending</span>';
                 })
-               ->addColumn('actions', function ($row) use ($edit_class) {
-                    $loggedInEmployeeId = $this->resort->GetEmployee->id ?? null;
-                    $myApproval = $row->approvals->firstWhere('approved_by', $loggedInEmployeeId);
+               ->addColumn('actions', function ($row) {
+                    // Role-pool aware: any qualifying Finance / GM employee
+                    // (not only the one specifically picked by store()) can act
+                    // on the matching pending approval.
+                    //
+                    // Note: $edit_class is NOT applied here. That class gates
+                    // who can *initiate* a transfer (the Transfer Initiate page
+                    // permission). Acting on an approval the user is authorised
+                    // for is a separate authority — approvalForUser() is the
+                    // only gate. Otherwise an approver had to be given an
+                    // unrelated page permission just to click their own
+                    // pending approval.
+                    $loggedInEmployee = $this->resort->GetEmployee ?? null;
+                    $myApproval = $loggedInEmployee
+                        ? $this->approvalForUser($row, $loggedInEmployee)
+                        : null;
 
-                    if (!$myApproval) return '';
+                    $viewUrl = route('people.transfer.show', base64_encode($row->id));
+                    $viewBtn = '<a href="' . $viewUrl . '" class="btn-tableIcon btnIcon-skyblue" title="View Details"><i class="fa-regular fa-eye"></i></a>';
+
+                    if (!$myApproval) {
+                        // No approval authority — still allow viewing details.
+                        return '<div class="d-flex align-items-center gap-2">' . $viewBtn . '</div>';
+                    }
 
                     return '
                         <div class="d-flex align-items-center gap-2">
-                            <a href="#" class="correct-btn transfer-action ' . $edit_class . '" data-id="' . $row->id . '" data-approvedBy="' . $myApproval->approved_by . '" data-action="Approved" title="Approve"><i class="fa-solid fa-check"></i></a>
-                            <a href="#" class="btn-tableIcon btnIcon-orangeDark transfer-action ' . $edit_class . '" data-id="' . $row->id . '" data-approvedBy="' . $myApproval->approved_by . '" data-action="On Hold" title="Put on Hold"><i class="fa-regular fa-hand"></i></a>
-                            <a href="#" class="close-btn transfer-action ' . $edit_class . '" data-id="' . $row->id . '" data-action="Rejected" data-approvedBy="' . $myApproval->approved_by . '" title="Reject"><i class="fa-solid fa-xmark"></i></a>
-                        </div>';
+                            <a href="#" class="correct-btn transfer-action" data-id="' . $row->id . '" data-approvedBy="' . $myApproval->approved_by . '" data-action="Approved" title="Approve"><i class="fa-solid fa-check"></i></a>
+                            <a href="#" class="btn-tableIcon btnIcon-orangeDark transfer-action" data-id="' . $row->id . '" data-approvedBy="' . $myApproval->approved_by . '" data-action="On Hold" title="Put on Hold"><i class="fa-regular fa-hand"></i></a>
+                            <a href="#" class="close-btn transfer-action" data-id="' . $row->id . '" data-action="Rejected" data-approvedBy="' . $myApproval->approved_by . '" title="Reject"><i class="fa-solid fa-xmark"></i></a>'
+                            . $viewBtn .
+                        '</div>';
                 })
                 ->rawColumns(['employee_name', 'effective_date', 'status', 'actions', 'reason_for_transfer'])
                 ->make(true);
@@ -621,7 +652,14 @@ class TransferController extends Controller
                         default    => '<span class="badge badge-themeWarning">Pending</span>',
                     };
                 })
-                ->rawColumns(['employee_name', 'effective_date', 'status', 'reason_for_transfer'])
+                ->addColumn('actions', function ($row) {
+                    // History is read-only — just View Details (which shows
+                    // rejection reason, approvals timeline, salary,
+                    // allowances/benefit grid, letter download).
+                    $viewUrl = route('people.transfer.show', base64_encode($row->id));
+                    return '<a href="' . $viewUrl . '" class="btn-tableIcon btnIcon-skyblue" title="View Details"><i class="fa-regular fa-eye"></i></a>';
+                })
+                ->rawColumns(['employee_name', 'effective_date', 'status', 'reason_for_transfer', 'actions'])
                 ->make(true);
         }
 
@@ -721,13 +759,39 @@ class TransferController extends Controller
 
         $delegateComment = '';
         if (!$currentApproval) {
-            // Check delegation authority
-            $pendingApprovals = $transfer->approvals()->whereIn('status', ['Pending', 'On Hold'])->get();
+            // Eager-load the user's position once — both delegation and the
+            // role-pool fallback below reference it.
+            $currentEmployee->loadMissing('position');
+
+            // Role-pool fallback FIRST — any Finance / GM team member can act
+            // on an approval assigned to their role, not only the one specific
+            // employee picked by store()->first() at creation time. Iterate in
+            // id order so the earliest open approval wins.
+            $pendingApprovals = $transfer->approvals()
+                ->whereIn('status', ['Pending', 'On Hold'])
+                ->orderBy('id')
+                ->get();
             foreach ($pendingApprovals as $pa) {
-                if (\App\Helpers\Common::hasDelegationAuthority($currentEmployee->id, $pa->approved_by, $this->resort->resort_id)) {
+                if ($pa->approval_rank === 'Finance' && $this->isFinanceApprover($currentEmployee)) {
                     $currentApproval = $pa;
-                    $delegateComment = ' (Acted by delegate)';
+                    $delegateComment = ' (Acted by Finance role: ' . optional($currentEmployee->resortAdmin)->full_name . ')';
                     break;
+                }
+                if ($pa->approval_rank === 'GM' && $this->isGmApprover($currentEmployee)) {
+                    $currentApproval = $pa;
+                    $delegateComment = ' (Acted by GM role: ' . optional($currentEmployee->resortAdmin)->full_name . ')';
+                    break;
+                }
+            }
+
+            // Then fall back to on-leave delegation authority.
+            if (!$currentApproval) {
+                foreach ($pendingApprovals as $pa) {
+                    if (\App\Helpers\Common::hasDelegationAuthority($currentEmployee->id, $pa->approved_by, $this->resort->resort_id)) {
+                        $currentApproval = $pa;
+                        $delegateComment = ' (Acted by delegate)';
+                        break;
+                    }
                 }
             }
         }
@@ -786,18 +850,22 @@ class TransferController extends Controller
                 $transfer->status = 'Approved';
                 $transfer->save();
 
-                // ✍️ propagate changes to Employee profile
-                $employee                 = $transfer->employee;
-                $employee->Dept_id        = $transfer->target_department_id;
-                $employee->Position_id    = $transfer->target_position_id;
-                // Carry the new section through. When HR didn't pick one (the
-                // target dept may have no sections) we clear it rather than
-                // leave a stale Section_id from the previous department.
-                $employee->Section_id     = $transfer->target_section_id ?: null;
-                $employee->division_id    = $transfer->targetDepartment->division_id;
-                $employee->reporting_to   = $transfer->reporting_manager ?? $employee->reporting_to;
-                $employee->rank           = $transfer->targetPosition->Rank;
-                $employee->save();
+                // ✍️ Profile move is now date-gated: only apply now if the
+                // effective date has already arrived (today/past). Otherwise
+                // the daily scheduler (transfers:notify-effective) applies
+                // the move when the effective date rolls around so the
+                // employee doesn't appear in the new department early.
+                $effectiveDate = $transfer->effective_date
+                    ? Carbon::parse($transfer->effective_date)
+                    : null;
+                if ($effectiveDate && !$effectiveDate->isFuture()) {
+                    self::applyTransferToEmployee($transfer);
+                    $transfer->effective_day_notified_at = now();
+                    $transfer->save();
+                }
+                // Reload the employee record so subsequent reads in this
+                // request reflect whatever we did (or didn't) just write.
+                $employee = $transfer->employee()->first() ?: $employee;
 
                 // 🔔 Item 6 — Post-approval notifications.
                 $this->dispatchPostApprovalNotifications($transfer, $employee, $currentDepartmentId, $hr);
@@ -963,6 +1031,72 @@ class TransferController extends Controller
      *
      * @return int[]
      */
+    /**
+     * Pool match — does this employee qualify as a Finance approver for this
+     * resort? Uses the same logic store() uses to *pick* the Finance approver
+     * (rank = Finance, or position title matches "Director of Finance" /
+     * "Finance Manager", or the position's Rank itself is Finance).
+     *
+     * Used by the Transfer list action column and handleApproval so any
+     * Finance team member can act on a Finance approval — not just the one
+     * specific employee picked by store()->first() at creation time.
+     */
+    private function isFinanceApprover($employee): bool
+    {
+        if (!$employee) return false;
+        $financeRank = array_search('Finance', config('settings.Position_Rank'));
+        $financeTitles = ['Director of Finance', 'Finance Manager'];
+
+        if ($financeRank !== false && (int) $employee->rank === (int) $financeRank) {
+            return true;
+        }
+        $pos = $employee->position ?? null;
+        if (!$pos) return false;
+        if (in_array($pos->position_title, $financeTitles, true)) return true;
+        if ($financeRank !== false && (int) $pos->Rank === (int) $financeRank) return true;
+        return false;
+    }
+
+    /**
+     * Pool match for GM — rank or position Rank = GM (8).
+     */
+    private function isGmApprover($employee): bool
+    {
+        if (!$employee) return false;
+        $gmRank = array_search('GM', config('settings.Position_Rank'));
+        if ($gmRank === false) return false;
+
+        if ((int) $employee->rank === (int) $gmRank) return true;
+        $pos = $employee->position ?? null;
+        if ($pos && (int) $pos->Rank === (int) $gmRank) return true;
+        return false;
+    }
+
+    /**
+     * Resolve the approval row the logged-in employee may act on for this
+     * transfer. Direct assignment wins; otherwise a role-pool match
+     * (Finance / GM) so any qualifying team member can step in.
+     *
+     * Returns null when the user has no actionable approval (delegation is
+     * checked separately by handleApproval).
+     */
+    private function approvalForUser(EmployeeTransfer $transfer, $employee)
+    {
+        if (!$employee) return null;
+
+        // 1) Direct assignment — the original picked approver.
+        $direct = $transfer->approvals->firstWhere('approved_by', $employee->id);
+        if ($direct) return $direct;
+
+        // 2) Role-pool match on an open approval row.
+        foreach ($transfer->approvals as $a) {
+            if (!in_array($a->status, ['Pending', 'On Hold'], true)) continue;
+            if ($a->approval_rank === 'Finance' && $this->isFinanceApprover($employee)) return $a;
+            if ($a->approval_rank === 'GM'      && $this->isGmApprover($employee))      return $a;
+        }
+        return null;
+    }
+
     private function getDepartmentLeadEmployeeIds(?int $departmentId): array
     {
         if (!$departmentId) {
@@ -1081,12 +1215,24 @@ class TransferController extends Controller
         $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
         $fromDept = optional($transfer->currentDepartment)->name ?? 'previous department';
         $toDept   = optional($transfer->targetDepartment)->name ?? 'new department';
+        // Transfer effective date — shown to every recipient so the receiving
+        // HOD, current HOD, HR and the employee all know when the move
+        // actually takes effect. Falls back to a placeholder when unset.
+        $effectiveDate = $transfer->effective_date
+            ? Carbon::parse($transfer->effective_date)->format('d M Y')
+            : 'TBD';
+        $temporaryNote = '';
+        if ($transfer->transfer_status === 'Temporary' && $transfer->temporary_from && $transfer->temporary_to) {
+            $temporaryNote = ' (Temporary: '
+                . Carbon::parse($transfer->temporary_from)->format('d M Y')
+                . ' → ' . Carbon::parse($transfer->temporary_to)->format('d M Y') . ')';
+        }
 
         // (d) Transferred employee
         $this->notifyEmployee(
             $employee->id,
             'Transfer Approved',
-            "🎉 Your transfer from {$fromDept} to {$toDept} has been fully approved.",
+            "🎉 Your transfer from {$fromDept} to {$toDept} has been fully approved. Effective date: {$effectiveDate}.{$temporaryNote}",
             $transfer->id
         );
 
@@ -1096,7 +1242,7 @@ class TransferController extends Controller
             $this->notifyEmployee(
                 $leadId,
                 'Employee Transfer Out',
-                "📢 {$employeeName} has been transferred out of {$fromDept} to {$toDept}.",
+                "📢 {$employeeName} has been transferred out of {$fromDept} to {$toDept}. Effective date: {$effectiveDate}.{$temporaryNote}",
                 $transfer->id
             );
         }
@@ -1107,7 +1253,7 @@ class TransferController extends Controller
             $this->notifyEmployee(
                 $leadId,
                 'Incoming Employee Transfer',
-                "📢 {$employeeName} has been transferred into {$toDept} from {$fromDept}.",
+                "📢 {$employeeName} has been transferred into {$toDept} from {$fromDept}. Effective date: {$effectiveDate}.{$temporaryNote}",
                 $transfer->id
             );
         }
@@ -1122,7 +1268,7 @@ class TransferController extends Controller
                 $this->notifyEmployee(
                     $leadId,
                     'Employee Transfer Finalized',
-                    "📢 Transfer for {$employeeName} ({$fromDept} → {$toDept}) has been approved and the profile updated.",
+                    "📢 Transfer for {$employeeName} ({$fromDept} → {$toDept}) has been approved and the profile updated. Effective date: {$effectiveDate}.{$temporaryNote}",
                     $transfer->id
                 );
             }
@@ -1133,10 +1279,384 @@ class TransferController extends Controller
             $this->notifyEmployee(
                 $hr->id,
                 'Employee Transfer Finalized',
-                "📢 Transfer for {$employeeName} has been approved and profile updated.",
+                "📢 Transfer for {$employeeName} has been approved and profile updated. Effective date: {$effectiveDate}.{$temporaryNote}",
                 $transfer->id
             );
         }
+    }
+
+    /**
+     * Apply the transfer to the Employee record — Dept / Section / Position /
+     * Division / Rank / Reporting To. Pulled out of handleApproval() so the
+     * profile move can be deferred to the effective date instead of happening
+     * the moment Finance + GM both approve. Called either by handleApproval()
+     * (when the effective date is already today/past) or by the daily
+     * scheduler when the effective date arrives.
+     */
+    public static function applyTransferToEmployee(EmployeeTransfer $transfer): void
+    {
+        $transfer->loadMissing(['employee', 'targetDepartment', 'targetPosition']);
+
+        $employee = $transfer->employee;
+        if (!$employee) return;
+
+        // Snapshot the employee's pre-move state so a Temporary transfer can
+        // revert exactly (Dept / Section / Position / Division / Rank /
+        // Reporting To). Only written once per transfer — re-applying the
+        // same row (idempotency) must not clobber the original snapshot
+        // with the now-target values.
+        if (empty($transfer->pre_transfer_snapshot)) {
+            $transfer->pre_transfer_snapshot = [
+                'Dept_id'      => $employee->Dept_id,
+                'Section_id'   => $employee->Section_id,
+                'Position_id'  => $employee->Position_id,
+                'division_id'  => $employee->division_id,
+                'reporting_to' => $employee->reporting_to,
+                'rank'         => $employee->rank,
+            ];
+            // Persist the snapshot before the move so a mid-write failure
+            // doesn't leave an unrevertable temp transfer.
+            $transfer->save();
+        }
+
+        // Capture the source dept/position BEFORE overwriting — the manning
+        // sync uses these to decrement the source's filledcount.
+        $sourceDeptId = $employee->Dept_id;
+        $sourcePosId  = $employee->Position_id;
+
+        $employee->Dept_id      = $transfer->target_department_id;
+        $employee->Position_id  = $transfer->target_position_id;
+        // Clear stale Section_id when the target dept has no section picked.
+        $employee->Section_id   = $transfer->target_section_id ?: null;
+        $employee->division_id  = optional($transfer->targetDepartment)->division_id ?? $employee->division_id;
+        $employee->reporting_to = $transfer->reporting_manager ?? $employee->reporting_to;
+        if ($transfer->targetPosition && $transfer->targetPosition->Rank !== null) {
+            $employee->rank = $transfer->targetPosition->Rank;
+        }
+        $employee->save();
+
+        // Workforce Planning / Manning sync — keep filledcount / vacantcount
+        // honest on both ends of the move (per-position-month rows AND the
+        // dept totals on manning_responses).
+        self::adjustManningCount((int) $transfer->resort_id, (int) $sourceDeptId, (int) $sourcePosId, -1);
+        self::adjustManningCount((int) $transfer->resort_id, (int) $transfer->target_department_id, (int) $transfer->target_position_id, +1);
+    }
+
+    /**
+     * Push a +1 / -1 delta through the manning numbers for one dept+position
+     * in the resort's current-year manning (falls back to the latest year
+     * if no current-year row exists).
+     *
+     *   filledcount += $filledDelta   (clamped to [0, headcount])
+     *   vacantcount mirrors so filled + vacant = headcount
+     *
+     * The same delta is applied to manning_responses.total_filled_positions /
+     * total_vacant_positions for the dept so the Workforce Planning cards
+     * stay in sync.
+     */
+    private static function adjustManningCount(int $resortId, int $deptId, int $positionId, int $filledDelta): void
+    {
+        if ($deptId <= 0 || $positionId <= 0 || $filledDelta === 0) return;
+
+        $year = (int) date('Y');
+        $manning = \DB::table('manning_responses')
+            ->where('resort_id', $resortId)
+            ->where('dept_id', $deptId)
+            ->where('year', $year)
+            ->first(['id', 'total_filled_positions', 'total_vacant_positions']);
+
+        if (!$manning) {
+            $manning = \DB::table('manning_responses')
+                ->where('resort_id', $resortId)
+                ->where('dept_id', $deptId)
+                ->orderByDesc('year')
+                ->first(['id', 'total_filled_positions', 'total_vacant_positions']);
+        }
+        if (!$manning) return; // no manning configured for this dept — nothing to update
+
+        // Per-month rows for this position.
+        $rows = \DB::table('position_monthly_data')
+            ->where('manning_response_id', $manning->id)
+            ->where('position_id', $positionId)
+            ->get(['id', 'headcount', 'vacantcount', 'filledcount']);
+
+        foreach ($rows as $row) {
+            $head     = (int) ($row->headcount ?? 0);
+            $newFilled = max(0, (int) $row->filledcount + $filledDelta);
+            if ($head > 0) {
+                $newFilled = min($newFilled, $head);
+            }
+            $newVacant = $head > 0
+                ? max(0, $head - $newFilled)
+                : max(0, (int) $row->vacantcount - $filledDelta);
+
+            \DB::table('position_monthly_data')
+                ->where('id', $row->id)
+                ->update([
+                    'filledcount' => $newFilled,
+                    'vacantcount' => $newVacant,
+                    'updated_at'  => now(),
+                ]);
+        }
+
+        // Dept-level totals on the manning_responses card.
+        \DB::table('manning_responses')->where('id', $manning->id)->update([
+            'total_filled_positions' => max(0, (int) $manning->total_filled_positions + $filledDelta),
+            'total_vacant_positions' => max(0, (int) $manning->total_vacant_positions - $filledDelta),
+            'updated_at'             => now(),
+        ]);
+    }
+
+    /**
+     * Revert a Temporary transfer — restores the employee's Dept / Section /
+     * Position / Division / Rank / Reporting To from the snapshot captured
+     * when applyTransferToEmployee() first ran. Idempotent via reverted_at:
+     * the daily scheduler only picks up rows where it is null.
+     */
+    public static function revertTemporaryTransfer(EmployeeTransfer $transfer): void
+    {
+        $transfer->loadMissing(['employee.resortAdmin', 'currentDepartment', 'targetDepartment']);
+
+        $employee = $transfer->employee;
+        if (!$employee) return;
+
+        $snapshot = is_array($transfer->pre_transfer_snapshot)
+            ? $transfer->pre_transfer_snapshot
+            : [];
+
+        if (empty($snapshot)) {
+            // Without a snapshot we can't revert safely — record that the
+            // window passed and skip silently. (Snapshots are captured for
+            // every apply going forward; this only matters for legacy temp
+            // transfers that pre-date this column.)
+            $transfer->reverted_at = now();
+            $transfer->save();
+            return;
+        }
+
+        // Restore each field that was snapshot. Use array_key_exists so a
+        // legitimately-null original value (e.g. no section) is restored.
+        foreach (['Dept_id','Section_id','Position_id','division_id','reporting_to','rank'] as $col) {
+            if (array_key_exists($col, $snapshot)) {
+                $employee->{$col} = $snapshot[$col];
+            }
+        }
+        $employee->save();
+
+        // Manning sync — mirror image of the apply: take 1 off the temp
+        // dept/position they were in, give it back to the dept/position
+        // from the snapshot.
+        $resortId      = (int) $transfer->resort_id;
+        $snapshotDept  = (int) ($snapshot['Dept_id']     ?? 0);
+        $snapshotPos   = (int) ($snapshot['Position_id'] ?? 0);
+        if ($snapshotDept > 0 && $snapshotPos > 0) {
+            self::adjustManningCount($resortId, (int) $transfer->target_department_id, (int) $transfer->target_position_id, -1);
+            self::adjustManningCount($resortId, $snapshotDept, $snapshotPos, +1);
+        }
+
+        $transfer->reverted_at = now();
+        $transfer->save();
+
+        // Fan-out revert notifications to the same 4 audiences. We message
+        // them in terms of the *current dept* (which is now the original
+        // dept again) and the dept they were temporarily in (the target).
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+        $originalDept = optional($transfer->currentDepartment)->name ?? 'their original department';
+        $tempDept     = optional($transfer->targetDepartment)->name ?? 'the temporary department';
+        $tempToDate   = $transfer->temporary_to
+            ? \Carbon\Carbon::parse($transfer->temporary_to)->format('d M Y')
+            : 'today';
+
+        $resortId = $transfer->resort_id;
+        $push = function ($recipientId, string $title, string $message) use ($resortId, $transfer) {
+            if (empty($recipientId)) return;
+            event(new ResortNotificationEvent(\App\Helpers\Common::nofitication(
+                $resortId, 10, $title, $message, $transfer->id, $recipientId, 'People'
+            )));
+        };
+
+        $hodRank   = array_search('HOD',   config('settings.Position_Rank'));
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank'));
+        $leadRanks = array_filter([$hodRank, $excomRank], fn($r) => $r !== false);
+
+        // (1) Employee
+        $push(
+            $employee->id,
+            'Temporary Transfer Ended',
+            "↩️ Your temporary transfer to {$tempDept} ended on {$tempToDate}. You have returned to {$originalDept}."
+        );
+
+        // (2) The dept they're returning TO — current leads
+        $returnLeads = Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $employee->Dept_id) // post-revert dept
+            ->where('status', 'Active')
+            ->whereIn('rank', $leadRanks)
+            ->pluck('id');
+        foreach ($returnLeads as $leadId) {
+            if ((int) $leadId === (int) $employee->id) continue;
+            $push(
+                $leadId,
+                'Employee Returning From Temporary Transfer',
+                "↩️ {$employeeName} has returned to {$originalDept} after their temporary assignment to {$tempDept} ended ({$tempToDate})."
+            );
+        }
+
+        // (3) The dept they're leaving — target leads
+        $tempDeptLeads = Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $transfer->target_department_id)
+            ->where('status', 'Active')
+            ->whereIn('rank', $leadRanks)
+            ->pluck('id');
+        foreach ($tempDeptLeads as $leadId) {
+            if ((int) $leadId === (int) $employee->id) continue;
+            $push(
+                $leadId,
+                'Temporary Transfer Ended',
+                "↩️ {$employeeName}'s temporary assignment to {$tempDept} ended ({$tempToDate}). They have returned to {$originalDept}."
+            );
+        }
+
+        // (4) HR dept leads
+        $hrDept = ResortDepartment::where('resort_id', $resortId)->get()
+            ->first(fn($d) => \App\Helpers\Common::isHRDepartment($d->id));
+        if ($hrDept) {
+            $hrLeads = Employee::where('resort_id', $resortId)
+                ->where('Dept_id', $hrDept->id)
+                ->where('status', 'Active')
+                ->whereIn('rank', $leadRanks)
+                ->pluck('id');
+            foreach ($hrLeads as $leadId) {
+                $push(
+                    $leadId,
+                    'Temporary Transfer Ended',
+                    "↩️ {$employeeName}'s temporary transfer (to {$tempDept}) ended on {$tempToDate}. Profile restored to {$originalDept}."
+                );
+            }
+        }
+    }
+
+    /**
+     * Day-of notifications — fired by the daily scheduler when a transfer's
+     * effective_date is today. Tells the employee + current/new/HR dept
+     * leads that the move is happening today.
+     *
+     * Idempotent via $transfer->effective_day_notified_at — the command
+     * only picks up transfers where it is still null.
+     *
+     * Static + accepts a resort_id so the scheduler can drive it without
+     * authenticating a resort-admin (it loops every resort and bypasses
+     * $this->resort, which is the request-scoped logged-in user).
+     */
+    public static function dispatchEffectiveDateNotifications(EmployeeTransfer $transfer): void
+    {
+        $transfer->loadMissing([
+            'employee.resortAdmin',
+            'currentDepartment',
+            'targetDepartment',
+            'targetPosition',
+        ]);
+
+        // ★ Apply the profile move FIRST, then notify. handleApproval gates
+        // this by date so on the effective day the scheduler is the surface
+        // that actually moves the employee — they don't appear in the new
+        // department before that date.
+        self::applyTransferToEmployee($transfer);
+
+        $employee = $transfer->employee()->first(); // reload after the move
+        if (!$employee) return;
+
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+        $fromDept = optional($transfer->currentDepartment)->name ?? 'previous department';
+        $toDept   = optional($transfer->targetDepartment)->name ?? 'new department';
+        $effectiveDate = $transfer->effective_date
+            ? Carbon::parse($transfer->effective_date)->format('d M Y')
+            : 'today';
+
+        $temporaryNote = '';
+        if ($transfer->transfer_status === 'Temporary' && $transfer->temporary_from && $transfer->temporary_to) {
+            $temporaryNote = ' (Temporary: '
+                . Carbon::parse($transfer->temporary_from)->format('d M Y')
+                . ' → ' . Carbon::parse($transfer->temporary_to)->format('d M Y') . ')';
+        }
+
+        $resortId = $transfer->resort_id;
+
+        // Helper — same payload shape as notifyEmployee() but static-safe
+        // (no $this binding to the resort-admin guard).
+        $push = function ($recipientId, string $title, string $message) use ($resortId, $transfer) {
+            if (empty($recipientId)) return;
+            event(new ResortNotificationEvent(Common::nofitication(
+                $resortId,
+                10,
+                $title,
+                $message,
+                $transfer->id,
+                $recipientId,
+                'People'
+            )));
+        };
+
+        // (1) The employee
+        $push(
+            $employee->id,
+            'Transfer Effective Today',
+            "📌 Reminder — your transfer to {$toDept} takes effect today ({$effectiveDate}).{$temporaryNote}"
+        );
+
+        // (2) Current dept HOD/EXCOM
+        $hodRank   = array_search('HOD',   config('settings.Position_Rank'));
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank'));
+        $leadRanks = array_filter([$hodRank, $excomRank], fn($r) => $r !== false);
+
+        $currentLeads = Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $transfer->current_department_id)
+            ->where('status', 'Active')
+            ->whereIn('rank', $leadRanks)
+            ->pluck('id');
+        foreach ($currentLeads as $leadId) {
+            if ((int) $leadId === (int) $employee->id) continue;
+            $push(
+                $leadId,
+                'Employee Transfer Effective Today',
+                "📌 {$employeeName} is transferred out of {$fromDept} to {$toDept} today ({$effectiveDate}).{$temporaryNote}"
+            );
+        }
+
+        // (3) Target dept HOD/EXCOM
+        $targetLeads = Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $transfer->target_department_id)
+            ->where('status', 'Active')
+            ->whereIn('rank', $leadRanks)
+            ->pluck('id');
+        foreach ($targetLeads as $leadId) {
+            if ((int) $leadId === (int) $employee->id) continue;
+            $push(
+                $leadId,
+                'Incoming Employee Today',
+                "📌 {$employeeName} joins {$toDept} today ({$effectiveDate}) from {$fromDept}.{$temporaryNote}"
+            );
+        }
+
+        // (4) HR dept HOD/EXCOM
+        $hrDept = ResortDepartment::where('resort_id', $resortId)->get()
+            ->first(fn($d) => \App\Helpers\Common::isHRDepartment($d->id));
+        if ($hrDept) {
+            $hrLeads = Employee::where('resort_id', $resortId)
+                ->where('Dept_id', $hrDept->id)
+                ->where('status', 'Active')
+                ->whereIn('rank', $leadRanks)
+                ->pluck('id');
+            foreach ($hrLeads as $leadId) {
+                $push(
+                    $leadId,
+                    'Transfer Effective Today',
+                    "📌 {$employeeName}'s transfer ({$fromDept} → {$toDept}) takes effect today ({$effectiveDate}).{$temporaryNote}"
+                );
+            }
+        }
+
+        $transfer->effective_day_notified_at = now();
+        $transfer->save();
     }
 
     /* =================================================================
@@ -1282,6 +1802,67 @@ class TransferController extends Controller
      * Regenerates from the current transfer data so it works even if the
      * stored encrypted copy is unavailable.
      */
+    public function show($id)
+    {
+        $page_title = 'Transfer Details';
+        $transferId = base64_decode($id);
+        if (!is_numeric($transferId)) {
+            abort(404);
+        }
+
+        $transfer = EmployeeTransfer::with([
+                'employee.resortAdmin',
+                'employee.position',
+                'employee.department',
+                'currentDepartment',
+                'currentPosition',
+                'targetDepartment',
+                'targetPosition',
+                'reporting.resortAdmin',
+                'reporting.position',
+                'approvals.approver.resortAdmin',
+                'approvals.approver.position',
+            ])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($transferId);
+
+        // Department-scope guard — same rule as the list page so non-HR/GM
+        // HOD/XCOM can only open transfers involving their own department,
+        // or transfers they (or a delegate) are an approver on.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds)) {
+            $myId = $this->resort->GetEmployee->id ?? 0;
+            $deptOk = in_array((int) $transfer->current_department_id, $scopedDeptIds, true)
+                   || in_array((int) $transfer->target_department_id, $scopedDeptIds, true);
+            $approverOk = $transfer->approvals->contains('approved_by', $myId);
+            if (!$deptOk && !$approverOk) {
+                abort(403, 'You do not have access to this transfer.');
+            }
+        }
+
+        // Latest Rejected approval row supplies the rejection reason. handleApproval
+        // stores the reason on the approval row's `remarks` column, so a rejected
+        // transfer surfaces it via the most-recent Rejected approval.
+        $rejectionReason = optional(
+            $transfer->approvals
+                ->where('status', 'Rejected')
+                ->sortByDesc('approved_at')
+                ->first()
+        )->remarks;
+
+        // On-Hold reason — same idea, latest On Hold remarks.
+        $onHoldReason = optional(
+            $transfer->approvals
+                ->where('status', 'On Hold')
+                ->sortByDesc('approved_at')
+                ->first()
+        )->remarks;
+
+        return view('resorts.people.transfer.detail', compact(
+            'page_title', 'transfer', 'rejectionReason', 'onHoldReason'
+        ));
+    }
+
     public function downloadTransferLetter($id)
     {
         $transfer = EmployeeTransfer::with([
