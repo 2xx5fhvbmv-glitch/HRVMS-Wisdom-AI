@@ -586,6 +586,16 @@ function initializeOrUpdateChart(departmentId = null) {
                 },
                 collapse: { level: 2 },
                 nodes: nodes,
+                // Tame the zoom — the default mouse wheel zoomed aggressively
+                // (one wheel tick = huge scale change). Wheel now only
+                // scrolls/pans; zoom is via the on-canvas toolbar (+ / - / fit).
+                // Trackpad pinch still works but with a small per-step delta.
+                mouseScrool: OrgChart.action.scroll,
+                zoom: { speed: 20, smooth: 24 },
+                scaleInitial: 0.9,
+                scaleMin: 0.2,
+                scaleMax: 2,
+                toolbar: { layout: true, zoom: true, fit: true, expandAll: false, fullScreen: true },
                 // Enhanced PDF export configuration
                 pdfExport: {
                     format: "A4",
