@@ -1146,35 +1146,61 @@ class FileManageController extends Controller
                 }
 
                 if (StorageHelper::disk()->exists($ChildFiles->File_Path)) {
-                   
-                        // Generate encryption key from environment variable
-                        $key = hash('sha256', env('ENCRYPTION_KEY'), true);
-                        
-                        // Get encrypted data from S3
-                        $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
-                        
-                        // Validate encrypted data
-                        if (empty($encryptedData) || strlen($encryptedData) < 16) {
-                            throw new \Exception('Invalid or corrupted encrypted data');
+
+                        $rawData = StorageHelper::disk()->get($ChildFiles->File_Path);
+
+                        if (empty($rawData)) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'This file is empty and cannot be opened.'
+                            ], 422);
                         }
-                        
-                        // Extract IV and cipherText - AES block size is 16 bytes
-                        $iv = substr($encryptedData, 0, 16);
-                        $cipherText = substr($encryptedData, 16);
-                        
-                        // Decrypt the data with OPENSSL_RAW_DATA flag to handle binary data correctly
-                        $decryptedData = openssl_decrypt(
-                            $cipherText,
-                            'aes-256-cbc',
-                            $key,
-                            OPENSSL_RAW_DATA,  // Critical for handling binary data properly
-                            $iv
-                        );
-                        
-                        // Check if decryption was successful
-                        if ($decryptedData === false) {
-                            $error = openssl_error_string();
-                            throw new \Exception("Decryption failed: {$error}");
+
+                        // Files saved through the AES-256-CBC pipeline carry a
+                        // `.enc` suffix and a 16-byte IV prepended to the cipher
+                        // text. Earlier uploads (pre-encryption rollout) sit on
+                        // disk as plain bytes — serve them as-is rather than
+                        // trying to decrypt random binary, which 500s with
+                        // "wrong final block length".
+                        $isEncrypted = substr($ChildFiles->File_Path, -4) === '.enc';
+
+                        if ($isEncrypted) {
+                            if (strlen($rawData) < 16) {
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'This file is corrupted and cannot be opened. Please re-upload it.'
+                                ], 422);
+                            }
+
+                            $key = hash('sha256', env('ENCRYPTION_KEY'), true);
+                            $iv  = substr($rawData, 0, 16);
+                            $cipherText = substr($rawData, 16);
+
+                            $decryptedData = openssl_decrypt(
+                                $cipherText,
+                                'aes-256-cbc',
+                                $key,
+                                OPENSSL_RAW_DATA,
+                                $iv
+                            );
+
+                            if ($decryptedData === false) {
+                                // Don't 500 — log + show a clean message. This
+                                // usually means the file was encrypted with a
+                                // different ENCRYPTION_KEY than the current one.
+                                \Log::warning('FileManage: decryption failed', [
+                                    'file_id'       => $ChildFiles->id,
+                                    'path'          => $ChildFiles->File_Path,
+                                    'openssl_error' => openssl_error_string(),
+                                ]);
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'This file cannot be opened. It may have been uploaded with a different encryption key. Please re-upload it.'
+                                ], 422);
+                            }
+                        } else {
+                            // Legacy plain file — no decryption needed.
+                            $decryptedData = $rawData;
                         }
                         
                         // Generate decrypted filename
