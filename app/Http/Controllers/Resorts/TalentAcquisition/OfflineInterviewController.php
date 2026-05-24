@@ -1,569 +1,691 @@
 <?php
-namespace App\Http\Controllers\Resorts\talentacquisition;
 
-use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Http\Request;
+namespace App\Http\Controllers\Resorts\TalentAcquisition;
+
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Foundation\Auth\AuthenticatesUsers;
-use Illuminate\Support\Facades\Session;
-use DB;
-use BrowserDetect;
-use Route;
-use File;
+use App\Helpers\Common;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use App\Models\OfflineInterview;
+use App\Models\OfflineInterviewDocument;
+use App\Models\Applicant_form_data;
+use App\Models\ApplicantWiseStatus;
+use App\Models\Employee;
 use App\Models\ResortAdmin;
 use App\Models\ResortDivision;
 use App\Models\ResortDepartment;
-use App\Models\ResortSection;
 use App\Models\ResortPosition;
-use App\Models\ServiceProvider;
-use App\Models\State;
+use App\Models\ResortSection;
 use App\Models\Country;
-use App\Models\City;
-use App\Models\Vacancies;
-use App\Models\Questionnaire;
-use App\Models\QuestionnaireChild;
-use App\Models\VideoQuestion;
-use App\Models\ResortLanguages;
-use App\Models\Temp_language_video_store;
-use App\Models\Applicant_form_data;
-use App\Models\Work_experience_applicant_form;
-use App\Models\Education_applicant_form;
-use App\Models\Applicant_form_job_assessment;
-use App\Models\ApplicantLanguage;
-use App\Models\ApplicantWiseStatus;
-use App\Helpers\Common;
+use Auth;
+use Carbon\Carbon;
+
 class OfflineInterviewController extends Controller
 {
+    public $resort;
+
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
-        if(!$this->resort) return;
-        $this->rank=  $this->resort->GetEmployee->rank;
+        if (!$this->resort) return;
     }
+
+    /* ============================================================
+     * LIST + CREATE entry points
+     * ============================================================ */
+
     public function index(Request $request)
     {
         $page_title = 'Offline Interview';
-        $resort_id = $this->resort->resort_id;
-        $divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
-        $countries = Country::all();
-        $serviceProviders = ServiceProvider::orderBy('name')->get();        
-        return view('resorts.offline-interview.index',compact('resort_id','divisions','serviceProviders','countries'));
+
+        // DataTable AJAX
+        if ($request->ajax()) {
+            $q = OfflineInterview::with(['applicant', 'department', 'position', 'createdEmployee.resortAdmin'])
+                ->where('resort_id', $this->resort->resort_id)
+                ->orderByDesc('id');
+
+            if ($request->filled('status')) {
+                $q->where('wizard_status', $request->status);
+            }
+            if ($request->filled('search')) {
+                $term = trim($request->search);
+                $q->whereHas('applicant', function ($qa) use ($term) {
+                    $qa->where('first_name', 'like', "%{$term}%")
+                       ->orWhere('last_name', 'like', "%{$term}%")
+                       ->orWhere('email', 'like', "%{$term}%")
+                       ->orWhere('passport_no', 'like', "%{$term}%");
+                })->orWhere('position_title', 'like', "%{$term}%");
+            }
+
+            return datatables()->of($q)
+                ->addColumn('candidate_name', function ($row) {
+                    $a = $row->applicant;
+                    if (!$a) return '—';
+                    return e(trim($a->first_name . ' ' . $a->last_name)) ?: '—';
+                })
+                ->addColumn('passport', fn($row) => optional($row->applicant)->passport_no ?? '—')
+                ->addColumn('email', fn($row) => optional($row->applicant)->email ?? '—')
+                ->addColumn('position', fn($row) => $row->position_title
+                    ?: (optional($row->position)->position_title ?? '—'))
+                ->addColumn('department', fn($row) => optional($row->department)->name ?? '—')
+                ->addColumn('status', function ($row) {
+                    $badge = match ($row->wizard_status) {
+                        'Selected'  => 'badge-themeSuccess',
+                        'Rejected'  => 'badge-themeDanger',
+                        'Withdrawn' => 'badge-themeGray',
+                        'In Progress' => 'badge-themeSkyblue',
+                        default     => 'badge-themeWarning',
+                    };
+                    return '<span class="badge ' . $badge . '">' . e($row->wizard_status) . '</span>';
+                })
+                ->addColumn('step', fn($row) => 'Step ' . (int) $row->current_step . ' / 5')
+                ->addColumn('created_at_fmt', fn($row) => Carbon::parse($row->created_at)->format('d M Y h:i A'))
+                ->addColumn('actions', function ($row) {
+                    $id = base64_encode($row->id);
+                    $continueLabel = in_array($row->wizard_status, ['Draft', 'In Progress'], true) ? 'Continue' : 'View';
+                    return '
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="' . route('offline-interview.create', ['id' => $id]) . '" class="btn-tableIcon btnIcon-skyblue" title="' . $continueLabel . '"><i class="fa-regular fa-eye"></i></a>
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-danger offline-iv-delete" data-id="' . $row->id . '" title="Delete"><i class="fa-solid fa-trash"></i></a>
+                        </div>';
+                })
+                ->rawColumns(['status', 'actions'])
+                ->make(true);
+        }
+
+        return view('resorts.offline-interview.index', compact('page_title'));
     }
+
+    /**
+     * Wizard entry — either a new blank flow or a continued draft.
+     * Pass ?id=base64(offline_interview_id) to resume.
+     */
     public function create(Request $request)
     {
-        $page_title = 'Create Offline Interview';
-        $resort_id = $this->resort->resort_id;
-        $divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
-        $countries = Country::all();
-        $serviceProviders = ServiceProvider::orderBy('name')->get();
-        return view('resorts.offline-interview.create',compact('resort_id','divisions','serviceProviders','countries','page_title'));
+        $page_title = 'Offline Interview';
+        $resort_id  = $this->resort->resort_id;
+
+        $offlineInterview = null;
+        if ($request->filled('id')) {
+            $decoded = base64_decode($request->input('id'));
+            if (is_numeric($decoded)) {
+                $offlineInterview = OfflineInterview::with(['applicant', 'documents'])
+                    ->where('resort_id', $resort_id)
+                    ->find($decoded);
+            }
+        }
+
+        $countries = Country::orderBy('name')->get();
+        $divisions = ResortDivision::where('resort_id', $resort_id)->where('status', 'active')->get();
+        $departments = ResortDepartment::where('resort_id', $resort_id)->where('status', 'active')->get();
+
+        // Pre-populate the cascading dropdowns when continuing a draft so
+        // Section / Position / Reporting render their already-chosen values
+        // without waiting for the JS cascade to fire.
+        $sections = collect();
+        $positions = collect();
+        $reportingCandidates = collect();
+        if ($offlineInterview && $offlineInterview->department_id) {
+            $sections = ResortSection::where('dept_id', $offlineInterview->department_id)
+                ->where('resort_id', $resort_id)->where('status', 'active')->get();
+            $positions = ResortPosition::where('dept_id', $offlineInterview->department_id)
+                ->where('resort_id', $resort_id)->where('status', 'active')->get();
+            $reportingCandidates = Employee::with('resortAdmin')
+                ->where('resort_id', $resort_id)
+                ->whereIn('rank', [1, 2])
+                ->where('Dept_id', $offlineInterview->department_id)
+                ->get()
+                ->map(fn($e) => ['id' => $e->id, 'name' => optional($e->resortAdmin)->full_name]);
+        }
+
+        return view('resorts.offline-interview.create', compact(
+            'page_title', 'resort_id', 'offlineInterview', 'countries', 'divisions',
+            'departments', 'sections', 'positions', 'reportingCandidates'
+        ));
     }
+
+    /* ============================================================
+     * Cascading dropdown helpers (unchanged — already wired in routes)
+     * ============================================================ */
 
     public function getDepartmentsByDivision($division_id)
     {
         try {
-            // Fetch departments that belong to the selected division
             $resort_id = $this->resort->resort_id;
-            $departments = ResortDepartment::where('division_id', $division_id)->where('resort_id',$resort_id)->where('status','active')->get();
-            // dd( $departments);
-
-            return response()->json([
-                'success' => true,
-                'departments' => $departments
-            ]);
+            $departments = ResortDepartment::where('division_id', $division_id)
+                ->where('resort_id', $resort_id)->where('status', 'active')->get();
+            return response()->json(['success' => true, 'departments' => $departments]);
         } catch (\Exception $e) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
-            \Log::emergency("Message: " . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch departments'
-            ]);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch departments']);
         }
     }
 
     public function getSectionsByDept($dept_id)
     {
         try {
-            // Fetch departments that belong to the selected division
             $resort_id = $this->resort->resort_id;
-            $sections = ResortSection::where('dept_id', $dept_id)->where('resort_id',$resort_id)->where('status','active')->get();
-
-            return response()->json([
-                'success' => true,
-                'sections' => $sections
-            ]);
+            $sections = ResortSection::where('dept_id', $dept_id)
+                ->where('resort_id', $resort_id)->where('status', 'active')->get();
+            return response()->json(['success' => true, 'sections' => $sections]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch sections'
-            ]);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch sections']);
         }
     }
 
     public function getPositionByDept($dept_id)
     {
         try {
-            // Fetch departments that belong to the selected division
             $resort_id = $this->resort->resort_id;
-            $positions = ResortPosition::where('dept_id', $dept_id)->where('resort_id',$resort_id)->where('status','active')->get();
-
-            return response()->json([
-                'success' => true,
-                'positions' => $positions
-            ]);
+            $positions = ResortPosition::where('dept_id', $dept_id)
+                ->where('resort_id', $resort_id)->where('status', 'active')->get();
+            return response()->json(['success' => true, 'positions' => $positions]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch positions'
-            ]);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch positions']);
         }
     }
 
-    public function getReportingEmployess($dept_id){
+    public function getReportingEmployess($dept_id)
+    {
         try {
-            // Fetch departments that belong to the selected division
             $resort_id = $this->resort->resort_id;
-            $targetRanks = [
-                array_search('HOD', config('settings.Position_Rank')),
-                array_search('MGR', config('settings.Position_Rank')),
-                array_search('GM', config('settings.Position_Rank'))
-            ];
-            $reportingEmployees = DB::table('employees')
-            ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
-            ->where('employees.resort_id', $resort_id)
-            ->whereIn('employees.rank', $targetRanks)
-            ->where(function ($query) use ($dept_id) {
-                $query->where('employees.rank', array_search('HOD', config('settings.Position_Rank')))
-                      ->where('employees.Dept_id', $dept_id)
-                      ->orWhere('employees.rank', '<>', array_search('HOD', config('settings.Position_Rank')));
-            })
-            ->select(
-                'employees.*',
-                'resort_admins.first_name as first_name',
-                'resort_admins.last_name as last_name',
-                'resort_admins.email as admin_email'
-            )
-            ->get();
-
-            // dd($reportingEmployees);
-
-            return response()->json([
-                'success' => true,
-                'reporting_employees' => $reportingEmployees
-            ]);
+            $employees = Employee::with('resortAdmin')
+                ->where('resort_id', $resort_id)
+                ->where(function ($q) use ($dept_id) {
+                    $q->whereIn('rank', [1, 2])  // EXCOM + HOD
+                      ->where('Dept_id', $dept_id);
+                })
+                ->get()
+                ->map(fn($e) => ['id' => $e->id, 'name' => optional($e->resortAdmin)->full_name]);
+            return response()->json(['success' => true, 'employees' => $employees]);
         } catch (\Exception $e) {
-            \Log::emergency("File: " . $e->getFile());
-            \Log::emergency("Line: " . $e->getLine());
-            \Log::emergency("Message: " . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch reporting employees'
-            ]);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch employees']);
         }
     }
 
-    public function saveDraft(Request $request)
+    /* ============================================================
+     * Wizard — Step persistence + finalize
+     * ============================================================ */
+
+    /**
+     * Step 1 — Hiring Requisition. Creates (or updates) the offline_interviews
+     * shell with position / department / budget context. Must run before Step 2
+     * (Applicant Info) — the candidate is being recruited *for* this position.
+     */
+    public function saveStep1(Request $request)
     {
+        $resort_id = $this->resort->resort_id;
+        $authId    = optional($this->resort)->id;
+
+        $validated = $request->validate([
+            'budgeted_or_out_of_budget' => 'nullable|in:Budgeted,Out of Budget',
+            'division_id'               => 'nullable|exists:resort_divisions,id',
+            'department_id'             => 'nullable|exists:resort_departments,id',
+            'section_id'                => 'nullable|exists:resort_sections,id',
+            'position_id'               => 'nullable|exists:resort_positions,id',
+            'reporting_to'              => 'nullable|exists:employees,id',
+            'position_title'            => 'nullable|string|max:191',
+            'rank'                      => 'nullable|integer',
+            'required_starting_date'    => 'nullable|date',
+            'employee_type'             => 'nullable|in:Permanant,Casual/Agency,Trainee / Intern,Replacement,Temporary / Project',
+            'service_provider_name'     => 'nullable|string|max:191',
+            'salary'                    => 'nullable|string|max:50',
+            'food'                      => 'nullable|string|max:50',
+            'accommodation'             => 'nullable|string|max:50',
+            'transportation'            => 'nullable|string|max:50',
+            'budget_salary'             => 'nullable|numeric',
+            'proposed_salary'           => 'nullable|numeric',
+            'allowances'                => 'nullable|string|max:191',
+            'medical'                   => 'nullable|string|max:50',
+            'insurance'                 => 'nullable|string|max:50',
+            'pension'                   => 'nullable|string|max:50',
+            'service_charge'            => 'nullable|in:Yes,No',
+            'uniform'                   => 'nullable|in:Yes,No',
+            'benefit_accommodation'     => 'nullable|string|max:50',
+            'recruitment_methods'       => 'nullable|array',
+            'recruitment_methods.*'     => 'in:online_posting,recruiter,agency',
+        ]);
+
+        // Reuse existing offline interview (continuing draft) or start new.
+        $oi = null;
+        if ($request->filled('offline_interview_id')) {
+            $oi = OfflineInterview::where('resort_id', $resort_id)
+                ->find($request->input('offline_interview_id'));
+        }
+        if (!$oi) {
+            $oi = new OfflineInterview();
+            $oi->resort_id  = $resort_id;
+            $oi->created_by = $authId;
+        }
+
+        $oi->fill($validated);
+        $oi->wizard_status = $oi->wizard_status === 'Selected' ? $oi->wizard_status : 'In Progress';
+        $oi->current_step  = max((int) $oi->current_step, 1);
+        $oi->modified_by   = $authId;
+        $oi->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Hiring requisition saved.',
+            'offline_interview_id' => $oi->id,
+        ]);
+    }
+
+    /**
+     * Step 2 — Applicant Information. Creates (or updates) the
+     * applicant_form_data row and links it to the existing offline interview.
+     */
+    public function saveStep2(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $authId    = optional($this->resort)->id;
+
+        $rules = [
+            'offline_interview_id' => 'required|exists:offline_interviews,id',
+            'first_name'      => 'required|string|max:100',
+            'last_name'       => 'required|string|max:100',
+            'gender'          => 'required|in:male,female,other',
+            'dob'             => 'nullable|date',
+            'mobile_number'   => 'nullable|string|max:30',
+            'email'           => 'nullable|email|max:191',
+            'marital_status'  => 'nullable|string|max:30',
+            'number_of_children' => 'nullable|integer|min:0',
+            'address_line_one'=> 'nullable|string|max:255',
+            'address_line_two'=> 'nullable|string|max:255',
+            'city'            => 'nullable|string|max:100',
+            'state'           => 'nullable|string|max:100',
+            'country'         => 'nullable',
+            'pin_code'        => 'nullable|string|max:20',
+            'passport_no'     => 'nullable|string|max:50',
+            'passport_expiry_date' => 'nullable|date',
+            'curriculum_file' => 'nullable|file|mimes:pdf|max:10240',
+            'passport_file'   => 'nullable|file|mimes:pdf|max:10240',
+            'profile_picture' => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
+            'full_length_photo' => 'nullable|file|mimes:jpg,jpeg,png|max:5120',
+        ];
+        $request->validate($rules);
+
         try {
-            $step = $request->step;
-            $sessionData = $request->except('step', '_token', 'video');
+            DB::beginTransaction();
 
-            // Handle video file upload
-            if ($request->hasFile('video')) {
-                $video = $request->file('video');
-                $path = $video->store('temp/videos', 'public'); // Save video in a temporary folder
-                $sessionData['video_path'] = $path; // Save file path instead of the file object
+            $oi = OfflineInterview::where('resort_id', $resort_id)
+                ->findOrFail($request->input('offline_interview_id'));
+
+            // Applicant row — update if previously linked, otherwise create new.
+            if ($oi->applicant_form_data_id) {
+                $applicant = Applicant_form_data::find($oi->applicant_form_data_id);
+            }
+            if (empty($applicant)) {
+                $applicant = new Applicant_form_data();
+                $applicant->resort_id = $resort_id;
+                $applicant->Application_date = now();
             }
 
-            // Retrieve existing session data
-            $existingData = Session::get('applicant_form', []);
-            $existingData[$step] = $sessionData;
-
-            Session::put('applicant_form', $existingData);
-
-            return response()->json(['success' => true, 'message' => 'Step data saved successfully.']);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function getDraftStepData(Request $request)
-    {
-        $step = $request->step; // Get the step identifier
-        $sessionData = Session::get('applicant_form', []);
-
-        if (isset($sessionData[$step])) {
-            return response()->json(['success' => true, 'data' => $sessionData[$step]]);
-        }
-
-        return response()->json(['success' => false, 'message' => 'No data found for this step.']);
-    }
-
-    public function applicant_formStore(Request $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            // Validation rules
-            // dd($request);
-            $validatedData = $request->validate([
-                'terms_conditions' => 'required',
-                'select_months' => 'nullable|required_without:select_years|integer|between:1,12',
-                'select_years' => 'nullable|required_without:select_months|integer|between:1,5',
-                // Add other validation rules as needed
-            ]);
-
-            // Fetch country and timezone
-            $country = Country::where('id', $request->country)->first();
-            $timezone = Common::getTimezoneByCountry($country->shortname);
-            $applicant = new Applicant_form_data();
-            $applicant->resort_id = $request->resort_id;
-            $applicant->Parent_v_id = $request->vacancy_id;
-            $applicant->Application_date = now();
-            $applicant->passport_no = $request->passport_no;
-            $applicant->passport_expiry_date = $request->passport_expiry_date;
-            $applicant->first_name = $request->first_name;
-            $applicant->last_name = $request->last_name;
-            $applicant->gender = $request->gender;
-            $applicant->dob = $request->dob;
-            $applicant->mobile_number = $request->mobile_number;
-            $applicant->email = $request->email;
-            $applicant->marital_status = $request->marital_status;
-            $applicant->number_of_children = $request->number_of_children;
-            $applicant->address_line_one = $request->address_line_one;
-            $applicant->address_line_two = $request->address_line_two;
-            $applicant->country = $request->country;
-            $applicant->state = $request->state;
-            $applicant->city = $request->city;
-            $applicant->pin_code = $request->pin_code;
-            $applicant->Joining_availability = $request->Joining_availability;
-            $applicant->reference = $request->reference;
-            $applicant->terms_conditions = $request->terms_conditions;
-            $applicant->data_retention_month = $request->select_months;
-            $applicant->data_retention_year = $request->select_years;
-            $applicant->NotiesPeriod = $request->notice_period;
-            $applicant->SalaryExpectation = $request->expected_salary;
-            $applicant->TimeZone = $timezone[0];
-            $applicant->save(); // Save applicant data first to get ID
-
-            // Define dynamic folder path
-            $passport_path = config('settings.Resort_Applicant'); // Base path
-            $applicant_id = $applicant->id; // Get newly created applicant ID
-            // Encode the applicant ID (e.g., base64 encoding)
-            $encoded_applicant_id = base64_encode($applicant_id);
-
-            // Create the dynamic path
-            $dynamic_path = $passport_path . '/' . $encoded_applicant_id;
-
-            // Create dynamic folder if it doesn't exist
-            if (!file_exists(public_path($dynamic_path))) {
-                mkdir(public_path($dynamic_path), 0755, true);
-            }
-
-            // Handle Passport Upload
-            if ($request->hasFile('passport')) {
-                $fileName = "passport." . $request->passport->getClientOriginalExtension();
-                Common::uploadFile($request->passport, $fileName, $dynamic_path);
-                $applicant->passport_img = $dynamic_path . '/' . $fileName; // Save relative file path
-            }
-
-            // Handle Curriculum Vitae Upload
-            if ($request->hasFile('curriculum_file')) {
-                $fileName = "cv." . $request->curriculum_file->getClientOriginalExtension();
-                Common::uploadFile($request->curriculum_file, $fileName, $dynamic_path);
-                $applicant->curriculum_vitae = $dynamic_path . '/' . $fileName; // Save relative file path
-            }
-
-            // Handle Passport Photo Upload
-            if ($request->hasFile('profile_picture')) {
-                $fileName = "passport_photo." . $request->profile_picture->getClientOriginalExtension();
-                Common::uploadFile($request->profile_picture, $fileName, $dynamic_path);
-                $applicant->passport_photo = $dynamic_path . '/' . $fileName; // Save relative file path
-            }
-
-            // Handle Full-Length Photo Upload
-            if ($request->hasFile('full_length_photo')) {
-                $fileName = "full_length_photo." . $request->full_length_photo->getClientOriginalExtension();
-                Common::uploadFile($request->full_length_photo, $fileName, $dynamic_path);
-                $applicant->full_length_photo = $dynamic_path . '/' . $fileName; // Save relative file path
-            }
-
-            // Save updated file paths
-            $applicant->save();
-            // dd($applicant);
-
-            // Handle work experience data
-            $totalExperience = 0;
-            $employmentStatus = 'Available';  // Default status is "Available"
-
-            foreach ($request->job_title as $key => $job_data) {
-                if (
-                    !isset($request->employer_name[$key], $request->work_country_name[$key],
-                        $request->work_city[$key], $request->total_experience[$key],
-                        $request->work_start_date[$key], $request->job_description_work[$key])
-                ) {
-                    continue; // Skip if any required field is missing
+            foreach ([
+                'first_name','last_name','gender','dob','mobile_number','email',
+                'marital_status','number_of_children','address_line_one','address_line_two',
+                'city','state','country','pin_code','passport_no','passport_expiry_date',
+            ] as $field) {
+                if ($request->filled($field) || $request->exists($field)) {
+                    $applicant->{$field} = $request->input($field);
                 }
-
-                $work_experience = new Work_experience_applicant_form();
-                $work_experience->applicant_form_id = $applicant->id;
-                $work_experience->job_title = $job_data;
-                $work_experience->employer_name = $request->employer_name[$key];
-                $work_experience->work_country_name = $request->work_country_name[$key];
-                $work_experience->work_city = $request->work_city[$key];
-                $work_experience->total_work_exp = $request->total_experience[$key]; // Ensure parsing if needed
-                $work_experience->work_start_date = \Carbon\Carbon::createFromFormat('d/m/Y', $request->work_start_date[$key])->format('Y-m-d');
-                $work_experience->work_end_date = isset($request->work_end_date[$key])
-                    ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->work_end_date[$key])->format('Y-m-d')
-                    : null;
-                $work_experience->job_description_work = $request->job_description_work[$key];
-                $work_experience->currently_working = $request->currently_working[$key] ?? 0;
-
-                // Calculate total experience in months/years if numeric value is not given
-                $totalExperience += (float)$request->total_experience[$key];
-
-                if ($work_experience->currently_working == 1) {
-                    $employmentStatus = 'Working'; // Set status if currently working
-                }
-
-                $work_experience->save();
             }
-            // dd( $totalExperience , $employmentStatus);
-            // Update total experience and employment status
-            $applicant->Total_Experiance = $totalExperience;
-            $applicant->employment_status = $employmentStatus;
+
+            // File uploads → per-applicant folder under the public disk.
+            $storePath = $this->applicantStorageRoot($resort_id);
+            foreach ([
+                'curriculum_file' => 'curriculum_vitae',
+                'passport_file'   => 'passport_file',
+                'profile_picture' => 'profile_picture',
+                'full_length_photo' => 'full_length_photo',
+            ] as $field => $column) {
+                if ($request->hasFile($field)) {
+                    $applicant->{$column} = $this->storeUploadedFile($request->file($field), $storePath);
+                }
+            }
             $applicant->save();
 
-            // Handle education data
-            foreach ($request->institute_name as $key => $education_data) {
-                $education = new Education_applicant_form();
-                $education->applicant_form_id = $applicant->id;
-                $education->institute_name = $request->institute_name[$key];
-                $education->educational_level = $request->educational_level[$key];
-                $education->country_educational = $request->country_educational[$key];
-                $education->city_educational = $request->city_educational[$key];
-                $education->save();
-            }
-
-            // step 4 : Handle job assessment
-            // dd($request->all() );
-            foreach ($request->all() as $key => $value) {
-          
-                if (str_starts_with($key, 'question_')) {
-                    $questionId = str_replace('question_', '', $key);                    
-                    $data = [
-                        'applicant_form_id' => $applicant->id,
-                        'question_id' => $questionId,
-                        'question_type' => $request->get("question_type_$questionId") ?? null,
-                    ];
-            
-                    try {
-                        // Defensive handling of different input types
-                        if (is_array($value)) {
-                            $data['multiple_responses'] = json_encode($value);
-                            $data['response'] = null;
-                        } elseif (is_scalar($value)) {
-                            $data['response'] = (string)$value;
-                            $data['multiple_responses'] = null;
-                        } else {
-                            $data['response'] = null;
-                            $data['multiple_responses'] = null;
-                        }
-                        Applicant_form_job_assessment::create($data);
-                    } catch (\Exception $e) {
-                        \Log::error('Job Assessment Creation Error', [
-                            'data' => $data,
-                            'error' => $e->getMessage()
-                        ]);
-                    }
-                }
-               
-                if (str_starts_with($key, 'tempVideoReference_')) {
-                    $questionId = str_replace('tempVideoReference_', '', $key); 
-                    // $questionId = str_replace($questionId, '', 'video_questionid_');   
-                    $tempVideo = Temp_language_video_store::find($value); // Use video ID from the request
-                    // dd($tempVideo);
-                    if ($tempVideo) {
-                        $videoLanguage = $request->get("language_$key");
-                        $extension = pathinfo($tempVideo->video, PATHINFO_EXTENSION);
-                        $fileName = "{$videoLanguage}_test_video.{$extension}";                       
-                        $sourcePath = public_path($tempVideo->video);
-                        // Ensure dynamic path is properly formatted
-                        $dynamic_path = rtrim($dynamic_path, '/');
-
-                        // File name (from source path)
-                        $fileName = basename($sourcePath); // Extracts "video_67528e1c23bca8.57595350.webm"
-
-                        // Destination file path
-                        $destinationPath = $dynamic_path . '/' . $fileName;
-                        // dd($destinationPath);
-                        try {
-                            // Ensure the destination folder exists
-                            if (!file_exists($dynamic_path)) {
-                                if (!mkdir($dynamic_path, 0755, true) && !is_dir($dynamic_path)) {
-                                    throw new Exception("Failed to create directory: $dynamic_path");
-                                }
-                            }
-
-                            // Move the file
-                            if (copy($sourcePath, $destinationPath)) {
-                                \Log::info("File successfully moved to: $destinationPath");
-                                // Save the record in your database (if necessary)
-                                Applicant_form_job_assessment::create([
-                                    'applicant_form_id' => $applicant->id,
-                                    'question_id' => $request['video_questionid_'.$questionId],
-                                    'question_type' => 'video',
-                                    'video_language_test' => $videoLanguage,
-                                    'video_path' => "{$dynamic_path}/{$fileName}",
-                                ]);
-                                // Delete the temporary video record after moving
-                                $tempVideo->delete();
-                            } else {
-                                throw new Exception("Failed to copy the file from $sourcePath to $destinationPath");
-                            }
-                        } catch (Exception $e) {
-                            \Log::error("Error moving file: " . $e->getMessage());
-                            echo "Error: " . $e->getMessage();
-                        }
-                    }
-                }
-
-                if (str_starts_with($key, 'video_file_')) {
-                    $questionId = str_replace('tempVideoReference_', '', $key); 
-                    $tempVideo = Temp_language_video_store::find($value); // Use video ID from the request
-                    if ($tempVideo) {
-                        $videoLanguage = $request->get("language_$key");
-                        $file = $request->file($key);
-                        $extension = pathinfo($tempVideo->video, PATHINFO_EXTENSION);
-                        $fileName = "{$videoLanguage}_test_video.{$extension}";                       
-                        $sourcePath = public_path(config('settings.Resort_Applicant') . '/' . $tempVideo->video);
-                        Common::uploadFile($sourcePath, $fileName, $dynamic_path);
-                        $res = Applicant_form_job_assessment::create([
-                            'applicant_form_id' => $applicant->id,
-                            'question_id' => $request['video_questionid_'.$questionId],
-                            'question_type' => 'video',
-                            'video_language_test' => $videoLanguage,
-                            'video_path' => "{$dynamic_path}/{$fileName}",
-                        ]);            
-                        // Delete temporary record
-                        $tempVideo->delete();
-                    }    
-                }
-            }
-
-            //step 5 :  Handle language proficiency data
-            if ($request->has('select_level')) {
-
-                foreach ($request->select_level as $key => $language) {
-                    ApplicantLanguage::create([
-                        'applicant_form_id' => $applicant->id,
-                        'language' => array_key_exists($key, $request->preliminary_language) ? $request->preliminary_language[$key]:16,
-                        'level' => $language ,
-                    ]);
-                }
-            }
-
-            // Create applicant status
-            ApplicantWiseStatus::create([
-                'Applicant_id' => $applicant->id,
-                'As_ApprovedBy' => 0,
-                'status' => 'Sortlisted By Wisdom AI',
-            ]);
+            $oi->applicant_form_data_id = $applicant->id;
+            $oi->current_step = max((int) $oi->current_step, 2);
+            $oi->modified_by  = $authId;
+            $oi->save();
 
             DB::commit();
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Application submitted successfully!',
-                'application_id' => $applicant->id,
+                'success' => true,
+                'message' => 'Applicant details saved.',
+                'offline_interview_id' => $oi->id,
+                'applicant_form_data_id' => $applicant->id,
             ]);
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
-            \Log::error('Job Assessment Error', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to submit application. Please try again.',
-                'error' => $e->getMessage(),
-            ]);
+            \Log::error('OfflineInterview Step 2 failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to save: ' . $e->getMessage()], 500);
         }
     }
 
-    public function applicant_tempVideoloadfile(Request $request)
+    /**
+     * Step 3 — Multi-file document uploads (CV + others).
+     */
+    public function saveStep3(Request $request)
     {
-    	$html = view('resorts.applicant_form.modal-content')->with(compact('request'))->render();
-        return $html;
-    }
-
-    public function applicant_tempVideoStore(Request $request)
-    {
-        // dd($request->all());
-        \Log::info('Request received:', $request->all());
-
+        $resort_id = $this->resort->resort_id;
         $request->validate([
-            'video' => 'required|mimes:mp4,webm,ogg,mkv,tmp|max:50000',
+            'offline_interview_id' => 'required|exists:offline_interviews,id',
+            'documents'   => 'nullable|array',
+            'documents.*' => 'file|mimes:pdf,jpg,jpeg,png,xlsx,xls|max:10240',
         ]);
 
-        if (!$request->hasFile('video')) {
-            Log::error('Video file is missing');
-            return response()->json(['message' => 'No video file uploaded'], 400);
+        $oi = OfflineInterview::where('resort_id', $resort_id)->findOrFail($request->input('offline_interview_id'));
+
+        $storePath = $this->applicantStorageRoot($resort_id) . '/oi-' . $oi->id;
+        if ($request->hasFile('documents')) {
+            foreach ($request->file('documents') as $file) {
+                $stored = $this->storeUploadedFile($file, $storePath);
+                OfflineInterviewDocument::create([
+                    'offline_interview_id' => $oi->id,
+                    'category' => 'documents',
+                    'original_name' => $file->getClientOriginalName(),
+                    'file_path' => $stored,
+                    'mime_type' => $file->getClientMimeType(),
+                    'size_bytes' => $file->getSize(),
+                    'uploaded_by' => optional($this->resort)->id,
+                ]);
+            }
         }
-        // Process file upload
+
+        $oi->current_step = max((int) $oi->current_step, 3);
+        $oi->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Documents uploaded.',
+            'offline_interview_id' => $oi->id,
+        ]);
+    }
+
+    /**
+     * Step 4 — Interview rounds (HR / HOD / GM) + comments + scanned docs.
+     */
+    public function saveStep4(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $request->validate([
+            'offline_interview_id' => 'required|exists:offline_interviews,id',
+            'shortlisted_by_ai'    => 'nullable|boolean',
+            'hr_shortlisted'       => 'nullable|boolean',
+            'hr_round_status'      => 'nullable|in:Pending,Passed,Failed,Skipped',
+            'hod_round_status'     => 'nullable|in:Pending,Passed,Failed,Skipped',
+            'gm_round_status'      => 'nullable|in:Pending,Passed,Failed,Skipped',
+            'round_comments'       => 'nullable|string|max:5000',
+            'round_documents'      => 'nullable|array',
+            'round_documents.*'    => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'round_category'       => 'nullable|in:hr_round,hod_round,gm_round',
+        ]);
+
+        $oi = OfflineInterview::where('resort_id', $resort_id)->findOrFail($request->input('offline_interview_id'));
+
+        $oi->fill($request->only([
+            'shortlisted_by_ai','hr_shortlisted','hr_round_status','hod_round_status',
+            'gm_round_status','round_comments',
+        ]));
+
+        if ($request->hasFile('round_documents')) {
+            $category = $request->input('round_category', 'hr_round');
+            $storePath = $this->applicantStorageRoot($resort_id) . '/oi-' . $oi->id;
+            foreach ($request->file('round_documents') as $file) {
+                $stored = $this->storeUploadedFile($file, $storePath);
+                OfflineInterviewDocument::create([
+                    'offline_interview_id' => $oi->id,
+                    'category' => $category,
+                    'original_name' => $file->getClientOriginalName(),
+                    'file_path' => $stored,
+                    'mime_type' => $file->getClientMimeType(),
+                    'size_bytes' => $file->getSize(),
+                    'uploaded_by' => optional($this->resort)->id,
+                ]);
+            }
+        }
+
+        $oi->current_step = max((int) $oi->current_step, 4);
+        $oi->modified_by  = optional($this->resort)->id;
+        $oi->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Interview rounds saved.',
+            'offline_interview_id' => $oi->id,
+        ]);
+    }
+
+    /**
+     * Step 5 — Selection & Offer. When is_selected = Yes, also creates
+     * the Employee + ResortAdmin (mirror of OnboardingController@convertApplicant)
+     * so the candidate flows straight into People as status 'Onboarding'.
+     */
+    public function finalize(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $request->validate([
+            'offline_interview_id' => 'required|exists:offline_interviews,id',
+            'is_selected'          => 'required|in:Yes,No',
+            'offer_letter'         => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'override_email'       => 'nullable|email|max:191',
+        ]);
+
+        $oi = OfflineInterview::with('applicant')
+            ->where('resort_id', $resort_id)
+            ->findOrFail($request->input('offline_interview_id'));
+
         try {
+            DB::beginTransaction();
 
-
-            $ipAddress = $request->ip();
-            $systemInfo = [
-                'os' => php_uname(), // Operating System details
-                'ipAddress' => $ipAddress,
-            ];
-
-            $videoPath = config('settings.Resort_Applicant'); // Base path
-
-            // Ensure directory exists
-            if (!file_exists(public_path($videoPath))) {
-                mkdir(public_path($videoPath), 0755, true);
-            }
-
-            // Store the uploaded file
-            if ($request->hasFile('video')) {
-                $fileName = uniqid('video_', true) . '.' . $request->video->getClientOriginalExtension();
-
-                Common::uploadFile($request->video, $fileName, $videoPath);
-
-                // $fullPath = $request->file('video')->storeAs($videoPath, $fileName, 'public');
-
-                $tempData = Temp_language_video_store::create([
-                    'resort_id' => $request->resort_id,
-                    'video' =>  $videoPath . '/' . $fileName,
-                    'os' => $systemInfo['os'],
-                    'ipAddress' => $systemInfo['ipAddress'],
-                ]);
-
-                return response()->json([
-                    'message' => 'Video uploaded successfully!',
-                    'path' => $videoPath . '/' . $fileName,
-                    'video_id' => $tempData->id,
+            if ($request->hasFile('offer_letter')) {
+                $storePath = $this->applicantStorageRoot($resort_id) . '/oi-' . $oi->id;
+                $stored = $this->storeUploadedFile($request->file('offer_letter'), $storePath);
+                $oi->offer_letter_path = $stored;
+                OfflineInterviewDocument::create([
+                    'offline_interview_id' => $oi->id,
+                    'category' => 'offer_letter',
+                    'original_name' => $request->file('offer_letter')->getClientOriginalName(),
+                    'file_path' => $stored,
+                    'mime_type' => $request->file('offer_letter')->getClientMimeType(),
+                    'size_bytes' => $request->file('offer_letter')->getSize(),
+                    'uploaded_by' => optional($this->resort)->id,
                 ]);
             }
 
-            return response()->json(['message' => 'Failed to upload video'], 400);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('Validation failed:', $e->errors());
-            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+            $oi->is_selected   = $request->input('is_selected');
+            $oi->current_step  = 5;
+            $oi->wizard_status = $oi->is_selected === 'Yes' ? 'Selected' : 'Rejected';
+            $oi->modified_by   = optional($this->resort)->id;
+            $oi->save();
+
+            // Auto-create the Employee on Selected.
+            if ($oi->is_selected === 'Yes' && !$oi->created_employee_id) {
+                $result = $this->convertToEmployee($oi, $request->input('override_email'));
+                if (!$result['success']) {
+                    DB::rollBack();
+                    return response()->json($result, $result['status'] ?? 422);
+                }
+                $oi->created_employee_id = $result['employee_id'];
+                $oi->save();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $oi->is_selected === 'Yes'
+                    ? 'Candidate selected — employee record created. They are now visible in People with status Onboarding.'
+                    : 'Marked as not selected.',
+                'offline_interview_id' => $oi->id,
+                'employee_id' => $oi->created_employee_id,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('OfflineInterview finalize failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to finalize: ' . $e->getMessage()], 500);
         }
     }
 
-    public function applicant_tempVideoremove(Request $request)
+    public function destroy($id)
     {
-    	$remove_data = Temp_language_video_store::find('1')->delete();
+        $oi = OfflineInterview::where('resort_id', $this->resort->resort_id)->findOrFail($id);
+        if ($oi->created_employee_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete — an employee has already been created from this record.',
+            ], 422);
+        }
+        $oi->delete();
+        return response()->json(['success' => true, 'message' => 'Deleted.']);
+    }
+
+    /* ============================================================
+     * Helpers
+     * ============================================================ */
+
+    private function applicantStorageRoot(int $resortId): string
+    {
+        return $resortId . '/public/talent_acquisition/offline';
+    }
+
+    /**
+     * Store an uploaded file under a unique name. Returns the relative path
+     * within the 'public' disk so it can be re-served via Storage::url().
+     */
+    private function storeUploadedFile($file, string $directory): string
+    {
+        $name = 'oi_' . time() . '_' . substr(md5(uniqid('', true)), 0, 8)
+              . '.' . $file->getClientOriginalExtension();
+        return $file->storeAs($directory, $name, 'public');
+    }
+
+    /**
+     * Create Employee + ResortAdmin from a Selected offline_interview row.
+     * Mirrors OnboardingController@convertApplicant — the candidate lands in
+     * People as status 'Onboarding' for HR to activate later.
+     */
+    private function convertToEmployee(OfflineInterview $oi, ?string $overrideEmail = null): array
+    {
+        $resort_id = $oi->resort_id;
+        $applicant = $oi->applicant;
+        if (!$applicant) {
+            return ['success' => false, 'message' => 'Applicant data is missing — complete Step 1 first.', 'status' => 422];
+        }
+        if (!$oi->department_id || !$oi->position_id) {
+            return ['success' => false, 'message' => 'Hiring requisition is incomplete — complete Step 2 first.', 'status' => 422];
+        }
+
+        $applicantName = trim($applicant->first_name . ' ' . $applicant->last_name);
+        $email = $overrideEmail !== null && $overrideEmail !== ''
+            ? $overrideEmail
+            : trim((string) $applicant->email);
+
+        // Email-collision guard — resort_admins.email is UNIQUE.
+        if ($email !== '') {
+            $owner = ResortAdmin::where('email', $email)->first();
+            if ($owner) {
+                return [
+                    'success' => false,
+                    'code' => 'email_collision',
+                    'status' => 422,
+                    'applicant_name' => $applicantName,
+                    'conflicting_email' => $email,
+                    'owner_name' => trim($owner->first_name . ' ' . $owner->last_name),
+                    'message' => 'Cannot create an employee record for ' . $applicantName
+                        . ' — the email "' . $email . '" is already used by another account.',
+                ];
+            }
+        }
+
+        // Create ResortAdmin (login record).
+        $resortAdmin = ResortAdmin::create([
+            'resort_id'      => $resort_id,
+            'first_name'     => $applicant->first_name,
+            'last_name'      => $applicant->last_name,
+            'email'          => $email !== '' ? $email : null,
+            'personal_phone' => $applicant->mobile_number,
+            'gender'         => $applicant->gender,
+            'address_line_1' => $applicant->address_line_one,
+            'address_line_2' => $applicant->address_line_two,
+            'city'           => $applicant->city,
+            'state'          => $applicant->state,
+            'zip'            => $applicant->pin_code,
+            'country'        => $applicant->country,
+            'is_employee'    => 1,
+            'status'         => 'active',
+        ]);
+
+        // Generate Emp_id.
+        $resort_prefix = $this->resort->resort->resort_prefix ?? 'EMP';
+        $last_emp = Employee::withTrashed()->where('resort_id', $resort_id)->orderByDesc('id')->first();
+        $emp_id   = $resort_prefix . '-' . ($last_emp ? ($last_emp->id + 1) : 1);
+
+        $dob = null;
+        if (!empty($applicant->dob)) {
+            try { $dob = Carbon::parse($applicant->dob)->format('Y-m-d'); }
+            catch (\Throwable $e) { $dob = null; }
+        }
+        $marital = strtolower((string) $applicant->marital_status) === 'married' ? 'Married' : 'Single';
+        $title   = strtolower((string) $applicant->gender) === 'female' ? 'Miss' : 'Mr';
+
+        // Map employee_type to the employees enum.
+        $employmentType = 'Full-Time';
+        $vacType = strtolower((string) $oi->employee_type);
+        if (str_contains($vacType, 'intern') || str_contains($vacType, 'trainee')) {
+            $employmentType = 'Internship';
+        } elseif (str_contains($vacType, 'replace')) {
+            $employmentType = 'Contract';
+        } elseif (str_contains($vacType, 'temporary')) {
+            $employmentType = 'Temporary';
+        } elseif (str_contains($vacType, 'casual')) {
+            $employmentType = 'Casual';
+        }
+
+        $employee = Employee::create([
+            'resort_id'             => $resort_id,
+            'Emp_id'                => $emp_id,
+            'applicant_id'          => $applicant->id,
+            'Admin_Parent_id'       => $resortAdmin->id,
+            'title'                 => $title,
+            'Dept_id'               => $oi->department_id,
+            'Section_id'            => $oi->section_id ?: null,
+            'Position_id'           => $oi->position_id,
+            'division_id'           => $oi->division_id ?: 0,
+            'reporting_to'          => $oi->reporting_to ?: 0,
+            'rank'                  => $oi->rank,
+            'is_employee'           => 1,
+            // Same pre-joining gate as convertApplicant — HR activates later.
+            'status'                => 'Onboarding',
+            'dob'                   => $dob,
+            'marital_status'        => $marital,
+            'joining_date'          => null,
+            'employment_type'       => $employmentType,
+            'passport_number'       => $applicant->passport_no,
+            'basic_salary'          => $oi->proposed_salary ?: $oi->budget_salary,
+            'basic_salary_currency' => 'USD',
+            'present_address'       => trim(implode(', ', array_filter([
+                $applicant->address_line_one, $applicant->address_line_two,
+                $applicant->city, $applicant->state, $applicant->pin_code,
+            ]))),
+        ]);
+
+        // Mark the applicant as Contract Accepted so the existing TA history
+        // surfaces consistently.
+        try {
+            ApplicantWiseStatus::create([
+                'Applicant_id' => $applicant->id,
+                'As_ApprovedBy' => 3,
+                'status' => 'Contract Accepted',
+                'Comments' => 'Auto-created via Offline Interview wizard',
+            ]);
+        } catch (\Throwable $e) {
+            // Non-fatal — the employee was created.
+        }
+
+        return ['success' => true, 'employee_id' => $employee->id];
     }
 }
