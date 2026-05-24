@@ -84,48 +84,46 @@
                         let day = sessionDate.getDate();
                         let month = sessionDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
                         let weekday = sessionDate.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
-                        // `session.color` is a hex string like "#28a745".
-                        // Older code interpolated it as a CSS class — which
-                        // produced `class="leaveUser-bgBlock #28a745"`,
-                        // an invalid selector, so the colored title band
-                        // never showed and the card looked unstyled.
-                        let bgColor = session.color || '#28a745';
+                        let bgColorClass = session.color || "success"; // Set color dynamically
 
                         // Generate Attendee Images and collect names
-                        let attendeeHtml = '';
-                        let participantNamesHtml = '';
+                        let attendeeHtml = "";
+                        let participantNamesHtml = "";
                         if (session.participants && session.participants.length > 0) {
                             session.participants.forEach((attendee, index) => {
-                                if (index < 5) {
+                                if (index < 5) { // Show only first 5 images
                                     attendeeHtml += `
                                         <div class="img-circle">
                                             <img src="${attendee.image}" alt="${attendee.name}">
-                                        </div>`;
+                                        </div>
+                                    `;
                                 }
                             });
 
+                            // Add remaining count if more than 5 attendees
                             if (session.participants.length > 5) {
                                 let remainingCount = session.participants.length - 5;
                                 attendeeHtml += `<div class="num">+${remainingCount}</div>`;
                             }
 
+                            // Build comma-separated participant names list
                             let names = session.participants.map(p => p.name).filter(Boolean);
                             if (names.length > 0) {
-                                participantNamesHtml = `<p class="small mb-2"><b>Attendees:</b> ${names.join(', ')}</p>`;
+                                participantNamesHtml = `<p style="font-size: inherit; margin-bottom: 4px;"><b>Attendees:</b> ${names.join(', ')}</p>`;
                             }
                         }
 
                         sidebarContent += `
-                            <div class="d-flex mb-3">
-                                <div class="date-block bg me-2">${month} <h5 class="mb-0">${day}</h5> ${weekday}</div>
-                                <div class="flex-grow-1" style="min-width:0;">
-                                    <div class="leaveUser-bgBlock" style="background-color:${bgColor}; color:#fff; padding:8px 12px; border-radius:6px;">
-                                        <h6 class="mb-0" style="color:#fff;">${session.title}</h6>
+                            <div class="d-flex">
+                                <div class="date-block bg">${month} <h5>${day}</h5> ${weekday}</div>
+                                <div>
+                                    <div class="leaveUser-bgBlock ${bgColorClass}">
+                                        <h6>${session.title}</h6>
                                     </div>
-                                    <div class="leaveUser-block mt-2">
-                                        <p class="small text-muted mb-2">${session.description || 'No description available'}</p>
+                                    <div class="leaveUser-block">
+                                        <p>${session.description || "No description available"}</p>
                                         ${participantNamesHtml}
-                                        <div class="time small mb-2"><i class="fa-regular fa-clock"></i> ${session.start_time} &ndash; ${session.end_time}</div>
+                                        <div class="time"><i class="fa-regular fa-clock"></i> ${session.start_time} to ${session.end_time}</div>
                                         <div class="user-ovImg">${attendeeHtml}</div>
                                     </div>
                                 </div>
