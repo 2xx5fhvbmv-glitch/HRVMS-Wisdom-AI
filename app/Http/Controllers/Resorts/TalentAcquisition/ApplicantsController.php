@@ -1822,22 +1822,35 @@ class ApplicantsController extends Controller
             }
         }
 
-        // ── Onboarding meetings the logged-in user is invited to ─────────
+        // ── Onboarding meetings on the calendar ──────────────────────────
         // Pulls from employee_itineraries_meeting (set up via the People
-        // Onboarding wizard). meeting_participant_ids is a comma-separated
-        // list of employees.id values; we surface a meeting on the master
-        // dashboard calendar whenever the logged-in user appears in it.
+        // Onboarding wizard). Audience rule:
+        //   - EXCOM (rank 1) / HOD (rank 2) / HR-rank (3) / GM (8) → see
+        //     EVERY onboarding meeting in the resort.
+        //   - Anyone whose Dept_id IS the HR department (regardless of
+        //     rank) → also see every meeting.
+        //   - Everyone else → see only meetings where their employee.id is
+        //     in meeting_participant_ids (FIND_IN_SET on the CSV column).
         try {
-            $loggedInEmpId = (int) ($this->resort->GetEmployee->id ?? 0);
-            if ($loggedInEmpId > 0) {
+            $loggedInEmp   = $this->resort->GetEmployee ?? null;
+            $loggedInEmpId = (int) ($loggedInEmp->id ?? 0);
+            $loggedInRank  = (int) ($loggedInEmp->rank ?? 0);
+            $isHrDept      = $loggedInEmp ? \App\Helpers\Common::isHRDepartment($loggedInEmp->Dept_id ?? null) : false;
+            $isSupervisor  = in_array($loggedInRank, [1, 2, 3, 8], true) || $isHrDept;
+
+            if ($loggedInEmpId > 0 || $isSupervisor) {
                 $meetingsQuery = \App\Models\EmployeeItinerariesMeeting::with([
                     'itiernary.employee.resortAdmin',
                     'itiernary.employee.position',
                     'itiernary.employee.department',
                 ])
-                ->whereHas('itiernary', fn($q) => $q->where('resort_id', $resort_id))
-                // FIND_IN_SET handles the CSV format meeting_participant_ids uses.
-                ->whereRaw('FIND_IN_SET(?, meeting_participant_ids)', [$loggedInEmpId]);
+                ->whereHas('itiernary', fn($q) => $q->where('resort_id', $resort_id));
+
+                if (!$isSupervisor) {
+                    // Participant-only view for regular employees.
+                    // FIND_IN_SET handles the CSV meeting_participant_ids.
+                    $meetingsQuery->whereRaw('FIND_IN_SET(?, meeting_participant_ids)', [$loggedInEmpId]);
+                }
 
                 if ($date) {
                     $meetingsQuery->whereDate('meeting_date', $date->format('Y-m-d'));
