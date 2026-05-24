@@ -70,14 +70,65 @@ class OrganizationChartController extends Controller
 
         $employees = $employeeQuery->get();
 
-        $employeeNodes = $employees->map(function ($employee) {
+        // Visible employee IDs and a quick (id → Dept_id) lookup so we can
+        // decide whether to chain to a manager or anchor to a department.
+        $visibleEmployeeIds = $employees->pluck('id')->map(fn($v) => (int) $v)->all();
+        $employeeDeptById = $employees->mapWithKeys(fn($e) => [(int)$e->id => (int)$e->Dept_id])->all();
+
+        // ── Department layer ─────────────────────────────────────────────
+        // Build a department node per visible dept so the org chart reads as
+        //   Organization → Department → Manager → Employee
+        // rather than dumping every manager-less employee directly under
+        // Organization.
+        $deptIdsInPlay = $employees->pluck('Dept_id')->filter()->unique();
+        $deptQuery = ResortDepartment::where('resort_id', $resortId)->where('status', 'active');
+        if ($departmentId) {
+            $deptQuery->where('id', $departmentId);
+        } else {
+            if (is_array($scopedDeptIds)) $deptQuery->whereIn('id', $scopedDeptIds);
+        }
+        $departments = $deptQuery->get();
+
+        $fallbackImg = url('admin_assets/files/user-image.png');
+        $deptNodes = [];
+        foreach ($departments as $d) {
+            // Only emit a dept node when at least one employee or vacant
+            // position will hang off it — otherwise the chart shows empty
+            // dept boxes that confuse the layout.
+            $deptNodes[] = [
+                'id' => 'dept_' . $d->id,
+                // pid stays null — these become root children of the
+                // synthetic "Organization" node added by the frontend.
+                'pid' => null,
+                'name' => $d->name,
+                'position' => 'Department',
+                'joinDate' => '',
+                'img' => $fallbackImg,
+                'department_id' => $d->id,
+                'department_name' => $d->name,
+                'reporting_to' => null,
+                'is_vacant' => false,
+                'is_department' => true,
+                'employee_id' => null,
+            ];
+        }
+
+        $employeeNodes = $employees->map(function ($employee) use ($visibleEmployeeIds, $employeeDeptById) {
+            // Chain to manager ONLY when the manager belongs to the same
+            // department. Cross-department reporting (e.g. Accounting HOD
+            // reports to the GM in Executive Office) shouldn't make
+            // Accounting employees appear under Executive Office on the
+            // chart — they should sit under their own department node.
+            $managerId = (int) ($employee->reporting_to ?? 0);
+            $managerVisible = $managerId > 0 && in_array($managerId, $visibleEmployeeIds, true);
+            $sameDept = $managerVisible
+                && isset($employeeDeptById[$managerId])
+                && (int) $employeeDeptById[$managerId] === (int) $employee->Dept_id;
+            $pid = $sameDept ? 'emp_' . $managerId : 'dept_' . $employee->Dept_id;
+
             return [
                 'id' => 'emp_' . $employee->id,
-                // Treat 0 / null as no parent so legacy rows with reporting_to=0
-                // don't break the tree root detection.
-                'pid' => ($employee->reporting_to && (int)$employee->reporting_to > 0)
-                    ? 'emp_' . $employee->reporting_to
-                    : null,
+                'pid' => $pid,
                 'name' => optional($employee->resortAdmin)->full_name ?? 'N/A',
                 'position' => optional($employee->position)->position_title ?? 'N/A',
                 'joinDate' => $employee->joining_date
@@ -88,6 +139,7 @@ class OrganizationChartController extends Controller
                 'department_name' => optional($employee->department)->name ?? 'N/A',
                 'reporting_to' => $employee->reporting_to,
                 'is_vacant' => false,
+                'is_department' => false,
                 'employee_id' => $employee->id,
             ];
         })->toArray();
@@ -95,8 +147,8 @@ class OrganizationChartController extends Controller
         // ── Vacant positions ─────────────────────────────────────────────
         // Surface every active ResortPosition that has NO active employee in
         // it (respecting the same dept-scope / dept-filter) as a "Vacant"
-        // node. They attach under the position's department head when one is
-        // present; otherwise they sit at the root.
+        // node. Anchored under the dept head when one exists, otherwise
+        // directly under the dept node.
         $occupiedPositionIds = $employees->pluck('Position_id')->filter()->unique()->all();
 
         $positionQuery = \App\Models\ResortPosition::where('resort_id', $resortId)
@@ -111,9 +163,7 @@ class OrganizationChartController extends Controller
             ->with('department')
             ->get();
 
-        // Resolve a per-department "head" employee (rank=2 HOD; fall back to
-        // EXCOM rank=1) — used as pid for vacant nodes so they slot under
-        // their manager rather than floating at the top.
+        // Per-department head — HOD (rank=2) first, then EXCOM (rank=1).
         $deptHeads = [];
         foreach ($vacantPositions->pluck('dept_id')->filter()->unique() as $deptId) {
             $head = $employees->first(function ($emp) use ($deptId) {
@@ -122,11 +172,13 @@ class OrganizationChartController extends Controller
             if ($head) $deptHeads[$deptId] = $head->id;
         }
 
-        $fallbackImg = url('admin_assets/files/user-image.png');
+        $vacantNodes = [];
         foreach ($vacantPositions as $pos) {
             $vacantNodes[] = [
                 'id' => 'vacant_' . $pos->id,
-                'pid' => isset($deptHeads[$pos->dept_id]) ? ('emp_' . $deptHeads[$pos->dept_id]) : null,
+                'pid' => isset($deptHeads[$pos->dept_id])
+                    ? ('emp_' . $deptHeads[$pos->dept_id])
+                    : ('dept_' . $pos->dept_id),
                 'name' => 'Vacant',
                 'position' => $pos->position_title ?? '—',
                 'joinDate' => 'Open Position',
@@ -135,11 +187,21 @@ class OrganizationChartController extends Controller
                 'department_name' => optional($pos->department)->name ?? 'N/A',
                 'reporting_to' => null,
                 'is_vacant' => true,
+                'is_department' => false,
                 'employee_id' => null,
             ];
         }
 
-        return array_merge($employeeNodes, $vacantNodes ?? []);
+        // Department nodes only emit if at least one downstream child
+        // exists — drop the empties.
+        $usedDeptIds = collect($employeeNodes)->pluck('department_id')
+            ->merge(collect($vacantNodes)->pluck('department_id'))
+            ->filter()->unique()->map(fn($v) => (int)$v)->all();
+        $deptNodes = array_values(array_filter($deptNodes, function ($d) use ($usedDeptIds) {
+            return in_array((int)$d['department_id'], $usedDeptIds, true);
+        }));
+
+        return array_merge($deptNodes, $employeeNodes, $vacantNodes);
     }
 
     /**
