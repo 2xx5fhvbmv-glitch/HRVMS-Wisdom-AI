@@ -596,11 +596,30 @@ class DashboardController extends Controller
         // L&D Manager / admin see every probationer (helper returns null).
         $scopedEmpIds = Common::getPerformanceScopedEmpIds();
 
+        // "On probation NOW" means the employee is in their probation window —
+        // either probation_end_date is still in the future, OR they joined
+        // within the last 3 months (the default 3-month window when no
+        // explicit end date is set). This stops long-tenured employees with
+        // stale `probation_status='Active'` from showing up as probationers
+        // (which was inflating the list to 44 rows on prod when only a few
+        // are actually in their first 3 months).
+        $today    = \Carbon\Carbon::today();
+        $cutoff3m = $today->copy()->subMonths(3)->toDateString();
+        $todayStr = $today->toDateString();
+
         $probationers = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resortId)
+            ->where('status', 'Active')
             ->where(function ($q) {
                 $q->where('employment_type', 'Probationary')
                   ->orWhereIn('probation_status', ['Active', 'Extended']);
+            })
+            ->where(function ($q) use ($todayStr, $cutoff3m) {
+                $q->whereDate('probation_end_date', '>=', $todayStr)
+                  ->orWhere(function ($qq) use ($cutoff3m) {
+                      $qq->whereNull('probation_end_date')
+                         ->whereDate('joining_date', '>=', $cutoff3m);
+                  });
             })
             ->when(is_array($scopedEmpIds), fn($q) => $q->whereIn('id', $scopedEmpIds))
             ->get();
