@@ -152,13 +152,13 @@
             navLinks: true,
             eventLimit: true,
             events: function (start, end, timezone, callback) {
-                // Calendar shows two layers:
-                //   1. Real training_schedules (from get.learning.sessions)
-                //   2. The auth user's personal compulsory / probationary windows
-                //      (from learning.my.compulsory.events) — these are window
-                //      ranges, not real schedules, so they only paint dots on the
-                //      calendar. The sidebar's "Upcoming Learning Sessions" still
-                //      uses sessions only, keeping that panel clean.
+                // Calendar shows ONLY real scheduled training sessions from
+                // get.learning.sessions. The compulsory/probationary "due
+                // window" overlay used to draw multi-month bars (joining
+                // date → due date) for each mandatory program; that was
+                // visually noisy because nothing is actually scheduled yet
+                // — those windows are now surfaced on the dashboards and
+                // /compulsory-pending instead, not on the calendar.
                 var toEvent = function (session) {
                     var startStr = session.start_date || session.session_date;
                     var endStr   = session.end_date   || session.session_date || startStr;
@@ -174,7 +174,7 @@
                     };
                 };
 
-                var sessionsXhr = $.ajax({
+                $.ajax({
                     url: "{{route('get.learning.sessions')}}",
                     type: "GET",
                     data: {
@@ -182,23 +182,10 @@
                         end_date: end.format('YYYY-MM-DD')
                     },
                     dataType: "json"
-                });
-                var compulsoryXhr = $.ajax({
-                    url: "{{route('learning.my.compulsory.events')}}",
-                    type: "GET",
-                    dataType: "json"
-                });
-
-                $.when(sessionsXhr).then(function (sessRes) {
+                }).done(function (sessRes) {
                     var sessEvents = ((sessRes && sessRes.data) || []).map(toEvent);
-                    compulsoryXhr.done(function (compRes) {
-                        var compEvents = ((compRes && compRes.data) || []).map(toEvent);
-                        callback(sessEvents.concat(compEvents));
-                    }).fail(function () {
-                        // If compulsory fetch fails, still render real sessions.
-                        callback(sessEvents);
-                    });
-                }, function () {
+                    callback(sessEvents);
+                }).fail(function () {
                     callback([]);
                 });
             },
