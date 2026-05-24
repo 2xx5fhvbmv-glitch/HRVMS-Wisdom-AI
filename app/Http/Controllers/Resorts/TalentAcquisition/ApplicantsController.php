@@ -1829,33 +1829,24 @@ class ApplicantsController extends Controller
 
         // ── Onboarding meetings on the calendar ──────────────────────────
         // Pulls from employee_itineraries_meeting (set up via the People
-        // Onboarding wizard). Audience rule:
-        //   - EXCOM (rank 1) / HOD (rank 2) / HR-rank (3) / GM (8) → see
-        //     EVERY onboarding meeting in the resort.
-        //   - Anyone whose Dept_id IS the HR department (regardless of
-        //     rank) → also see every meeting.
-        //   - Everyone else → see only meetings where their employee.id is
-        //     in meeting_participant_ids (FIND_IN_SET on the CSV column).
+        // Onboarding wizard).
+        //
+        // Audience rule: ONLY meeting participants see the meeting. HR /
+        // GM / EXCOM / HOD do NOT get a wider view — if they weren't
+        // explicitly invited, they don't see it. Keeps the calendar
+        // focused on what the logged-in user actually has to attend.
         try {
             $loggedInEmp   = $this->resort->GetEmployee ?? null;
             $loggedInEmpId = (int) ($loggedInEmp->id ?? 0);
-            $loggedInRank  = (int) ($loggedInEmp->rank ?? 0);
-            $isHrDept      = $loggedInEmp ? \App\Helpers\Common::isHRDepartment($loggedInEmp->Dept_id ?? null) : false;
-            $isSupervisor  = in_array($loggedInRank, [1, 2, 3, 8], true) || $isHrDept;
 
-            if ($loggedInEmpId > 0 || $isSupervisor) {
+            if ($loggedInEmpId > 0) {
                 $meetingsQuery = \App\Models\EmployeeItinerariesMeeting::with([
                     'itiernary.employee.resortAdmin',
                     'itiernary.employee.position',
                     'itiernary.employee.department',
                 ])
-                ->whereHas('itiernary', fn($q) => $q->where('resort_id', $resort_id));
-
-                if (!$isSupervisor) {
-                    // Participant-only view for regular employees.
-                    // FIND_IN_SET handles the CSV meeting_participant_ids.
-                    $meetingsQuery->whereRaw('FIND_IN_SET(?, meeting_participant_ids)', [$loggedInEmpId]);
-                }
+                ->whereHas('itiernary', fn($q) => $q->where('resort_id', $resort_id))
+                ->whereRaw('FIND_IN_SET(?, meeting_participant_ids)', [$loggedInEmpId]);
 
                 if ($date) {
                     $meetingsQuery->whereDate('meeting_date', $date->format('Y-m-d'));
@@ -1886,17 +1877,17 @@ class ApplicantsController extends Controller
                     $titleLabel = e($mt->meeting_title ?? 'Onboarding Meeting');
                     $link       = e($mt->meeting_link ?? '');
 
-                    // Use a different left-border accent to visually
-                    // distinguish onboarding meetings from TA interviews.
+                    // Match the TA interview card markup exactly so the
+                    // existing calendar styling carries over cleanly.
                     $string .= '<a href="' . $link . '" target="_blank" style="text-decoration:none;color:inherit;display:block;">
-                                <div class="upInterviews-block" style="cursor:pointer; border-left: 3px solid #fd7e14;">
+                                <div class="upInterviews-block" style="cursor:pointer;">
                                     <div class="img-circle">
                                         <img src="' . e($photo) . '" alt="image">
                                     </div>
                                     <div>
                                         <h6>' . e($candidateName) . '</h6>
                                         <p>' . $titleLabel . ($posTitle ? ' &middot; ' . e($posTitle) : '') . '</p>
-                                        <span class="badge badge-themeWarning">Onboarding' . ($deptName ? ' &middot; ' . e($deptName) : '') . '</span>
+                                        <span class="badge badge-theme">' . ($deptName ?: 'Onboarding') . '</span>
                                     </div>
                                     <div>
                                         <div class="date">' . $dateLabel . '</div>
