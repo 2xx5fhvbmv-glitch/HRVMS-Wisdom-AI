@@ -668,10 +668,24 @@ class WorkforcePlanningDashboardController extends Controller
             ]);
 
 
+            // All counts/lists on this dashboard should reflect the CURRENT
+            // actually-working population: Active status only, and not past
+            // their last_working_day. Previously every Employee row in the
+            // dept counted — so onboarding-not-joined, terminated, and
+            // transferred-out folks inflated the total + the per-position
+            // strips. e.g. F&B dashboard showed 9 but the real list returned 7.
+            $today = \Carbon\Carbon::today()->toDateString();
+            $activeScope = function ($q) use ($today) {
+                $q->where('status', 'Active')
+                  ->where(function ($qq) use ($today) {
+                      $qq->whereNull('last_working_day')
+                         ->orWhereDate('last_working_day', '>', $today);
+                  });
+            };
+
             $totalemployees = Employee::where('resort_id', $resort->resort_id)
-                ->with('resortAdmin')
                 ->where('dept_id', $Dept_id)
-                ->where('resort_id', $resort->resort_id)
+                ->tap($activeScope)
                 ->count();
 
             // The avatar strip next to Total Employees was filtering by
@@ -679,9 +693,10 @@ class WorkforcePlanningDashboardController extends Controller
             // employees with the same job title as the HOD rendered —
             // which is usually just the HOD themselves. Scope by DEPT
             // instead so the strip mirrors the count above it.
-            $employees = Employee::where('resort_id', $resort->resort_id)
-                ->with('resortAdmin')
+            $employees = Employee::with('resortAdmin')
+                ->where('resort_id', $resort->resort_id)
                 ->where('dept_id', $Dept_id)
+                ->tap($activeScope)
                 ->limit(6)
                 ->get();
 
@@ -696,6 +711,7 @@ class WorkforcePlanningDashboardController extends Controller
             $LeftemployeesCount = Employee::where('resort_id', $resort->resort_id)
                 ->where('dept_id', $Dept_id)
                 ->whereNotIn('id', $leftemp)
+                ->tap($activeScope)
                 ->count();
 
             // Batch fetch the first employee for every position in ONE query —
@@ -708,6 +724,7 @@ class WorkforcePlanningDashboardController extends Controller
                 ->where('resort_id', $resort->resort_id)
                 ->where('rank', '=', 'others')
                 ->whereNotIn('id', $leftemp)
+                ->tap($activeScope)
                 ->get()
                 ->groupBy('position_id');
 
