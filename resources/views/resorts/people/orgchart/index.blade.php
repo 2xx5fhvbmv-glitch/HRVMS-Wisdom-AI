@@ -78,6 +78,19 @@
             ry: 10;
         }
 
+        /* Highlight vacant slots so HR can spot open positions at a glance.
+           Node IDs of the form "vacant_<position_id>_<slot>" are emitted by
+           OrganizationChartController for every open headcount in the
+           current year's manning data. */
+        [data-n-id^="vacant_"] rect {
+            fill: #fff7e6 !important;       /* light orange */
+            stroke: #ffa940 !important;     /* warm border */
+            stroke-width: 1.5px !important;
+        }
+        [data-n-id^="vacant_"] text {
+            fill: #c0570f !important;       /* darker for contrast on the tint */
+        }
+
 
         .boc-edit-form-close {
             display: none;

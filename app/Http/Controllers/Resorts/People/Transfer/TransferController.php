@@ -1477,7 +1477,7 @@ class TransferController extends Controller
      * total_vacant_positions for the dept so the Workforce Planning cards
      * stay in sync.
      */
-    private static function adjustManningCount(int $resortId, int $deptId, int $positionId, int $filledDelta): void
+    public static function adjustManningCount(int $resortId, int $deptId, int $positionId, int $filledDelta): void
     {
         if ($deptId <= 0 || $positionId <= 0 || $filledDelta === 0) return;
 
