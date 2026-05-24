@@ -332,15 +332,15 @@
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_time" class="form-label">Medical Test Time <span class="red-mark">*</span></label>
-                                    {{-- Plain text time entry (no native picker / no AM-PM).
-                                         HR simply types the time, e.g. 10:09. --}}
-                                    <input type="text" class="form-control" id="medical_time" name="medical_time"
-                                        placeholder="HH:MM (e.g. 10:09)" required data-parsley-required-message="Please enter medical test time">
+                                    {{-- Native time picker — matches arrival_time / meeting_time
+                                         elsewhere on this form (was plain text, no picker UI). --}}
+                                    <input type="time" class="form-control" id="medical_time" name="medical_time"
+                                        required data-parsley-required-message="Please enter medical test time">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="approx_time" class="form-label">Approx Time <span class="red-mark">*</span></label>
-                                    <input type="text" class="form-control" id="approx_time" name="approx_time"
-                                        placeholder="HH:MM (e.g. 12:30)" required data-parsley-required-message="Please enter approx time"/>
+                                    <input type="time" class="form-control" id="approx_time" name="approx_time"
+                                        required data-parsley-required-message="Please enter approx time"/>
                                 </div>
                             </div>
                             <div class="card-title">
