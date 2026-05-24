@@ -138,6 +138,11 @@
                             <label for="proposed_salary" class="form-label">PROPOSED SALARY</label>
                             <input type="number" step="0.01" min="0" id="proposed_salary" name="proposed_salary" class="form-control" placeholder="Proposed Salary"
                                 data-parsley-type="number" data-parsley-min="0">
+                            {{-- Shown via JS when Transfer Status = Temporary. The server
+                                 also rejects a non-empty proposed_salary in that case. --}}
+                            <small id="proposed_salary_temp_warning" class="text-danger d-block mt-1" style="display:none !important;">
+                                Proposed Salary is not allowed in a Temporary transfer.
+                            </small>
                         </div>
                         {{-- Allowances / Benefit Grid for the chosen target position
                              — mirrors the Add-Vacancy form's pattern (same endpoint,
@@ -447,12 +452,29 @@
                 // Effective Date input and mirror Temporary From into it.
                 $('#effective_date').prop('readonly', true)
                     .attr('title', 'For a Temporary transfer this auto-syncs from Temporary From.');
+
+                // Proposed Salary is meaningless on a Temporary transfer (the
+                // employee returns to their original role + salary on
+                // temporary_to). Clear, disable, and show the inline warning.
+                $('#proposed_salary')
+                    .val('')
+                    .prop('disabled', true)
+                    .attr('placeholder', 'Not allowed on Temporary transfer')
+                    .attr('title', 'Proposed Salary is not allowed in a Temporary transfer.');
+                $('#proposed_salary_temp_warning').attr('style', 'display:block !important;');
             } else {
                 $('.temporary-period-field').addClass('d-none');
                 $('#temporary_from, #temporary_to')
                     .removeAttr('required')
                     .val('');
                 $('#effective_date').prop('readonly', false).removeAttr('title');
+
+                // Restore the Proposed Salary control for Permanent transfers.
+                $('#proposed_salary')
+                    .prop('disabled', false)
+                    .attr('placeholder', 'Proposed Salary')
+                    .removeAttr('title');
+                $('#proposed_salary_temp_warning').attr('style', 'display:none !important;');
             }
         }
 

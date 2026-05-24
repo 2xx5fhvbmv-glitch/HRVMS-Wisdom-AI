@@ -65,7 +65,19 @@ class TransferController extends Controller
             'additional_notes' => 'nullable|string|max:255',
             'reporting_manager' => 'required|exists:employees,id',
             // Item 2 — proposed salary for the transferred employee.
-            'proposed_salary' => 'nullable|numeric|min:0',
+            // Forbidden on Temporary transfers (the employee returns to the
+            // original role + salary at temporary_to, so changing pay would
+            // be reverted anyway and just confuses Payroll mid-window).
+            'proposed_salary' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($value !== null && $value !== '' && $request->input('transfer_status') === 'Temporary') {
+                        $fail('Proposed Salary is not allowed on a Temporary transfer.');
+                    }
+                },
+            ],
             // Item 3 — temporary period; only required when type = Temporary.
             'temporary_from' => 'required_if:transfer_status,Temporary|nullable|date_format:d/m/Y',
             'temporary_to'   => 'required_if:transfer_status,Temporary|nullable|date_format:d/m/Y|after_or_equal:temporary_from',
@@ -1359,9 +1371,9 @@ class TransferController extends Controller
 
         // Snapshot the employee's pre-move state so a Temporary transfer can
         // revert exactly (Dept / Section / Position / Division / Rank /
-        // Reporting To). Only written once per transfer — re-applying the
-        // same row (idempotency) must not clobber the original snapshot
-        // with the now-target values.
+        // Reporting To / Basic Salary). Only written once per transfer — re-
+        // applying the same row (idempotency) must not clobber the original
+        // snapshot with the now-target values.
         if (empty($transfer->pre_transfer_snapshot)) {
             $transfer->pre_transfer_snapshot = [
                 'Dept_id'      => $employee->Dept_id,
@@ -1370,6 +1382,7 @@ class TransferController extends Controller
                 'division_id'  => $employee->division_id,
                 'reporting_to' => $employee->reporting_to,
                 'rank'         => $employee->rank,
+                'basic_salary' => $employee->basic_salary,
             ];
             // Persist the snapshot before the move so a mid-write failure
             // doesn't leave an unrevertable temp transfer.
@@ -1389,6 +1402,11 @@ class TransferController extends Controller
         $employee->reporting_to = $transfer->reporting_manager ?? $employee->reporting_to;
         if ($transfer->targetPosition && $transfer->targetPosition->Rank !== null) {
             $employee->rank = $transfer->targetPosition->Rank;
+        }
+        // Apply the new salary set during initiation. Skip when the form left
+        // it blank so we never accidentally zero an employee's salary.
+        if ($transfer->proposed_salary !== null && $transfer->proposed_salary !== '') {
+            $employee->basic_salary = $transfer->proposed_salary;
         }
         $employee->save();
 
@@ -1493,7 +1511,9 @@ class TransferController extends Controller
 
         // Restore each field that was snapshot. Use array_key_exists so a
         // legitimately-null original value (e.g. no section) is restored.
-        foreach (['Dept_id','Section_id','Position_id','division_id','reporting_to','rank'] as $col) {
+        // basic_salary is included so temp transfers with a proposed_salary
+        // also revert to the pre-transfer pay on the temporary_to date.
+        foreach (['Dept_id','Section_id','Position_id','division_id','reporting_to','rank','basic_salary'] as $col) {
             if (array_key_exists($col, $snapshot)) {
                 $employee->{$col} = $snapshot[$col];
             }
