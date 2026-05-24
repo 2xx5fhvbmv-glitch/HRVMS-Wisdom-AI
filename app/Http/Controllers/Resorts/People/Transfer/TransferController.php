@@ -341,31 +341,37 @@ class TransferController extends Controller
                 ->where('mr.resort_id', $resortId)
                 ->where('mr.year', $manningYear)
                 ->where('pmd.position_id', $targetPositionId)
-                ->selectRaw('MAX(pmd.headcount) as budgeted, MAX(pmd.filledcount) as filled, MAX(pmd.vacantcount) as vacant')
+                ->selectRaw('MAX(pmd.headcount) as budgeted')
                 ->first();
 
             if ($seat && $seat->budgeted !== null) {
                 $budgeted = (int) $seat->budgeted;
-                $filled   = (int) $seat->filled;
-                $vacant   = (int) $seat->vacant;
 
-                // If the employee being moved is *already* in this position,
-                // they shouldn't count against the filled tally.
-                $alreadyHere = Employee::where('resort_id', $resortId)
+                // Compute filled in real time from actually-working employees
+                // (exclude the employee being moved if they already hold the
+                // seat, since the transfer would just keep them in place).
+                // The old logic trusted pmd.filledcount / pmd.vacantcount which
+                // lag behind reality until the manning scheduler catches up —
+                // that's why the gate said "1 vacant" for Commis even when
+                // the view-manning page showed 2/2 filled.
+                $today = \Carbon\Carbon::today()->toDateString();
+                $filled = Employee::where('resort_id', $resortId)
                     ->where('Position_id', $targetPositionId)
-                    ->where('id', $employeeId)
                     ->where('status', 'Active')
-                    ->exists();
-                if ($alreadyHere) {
-                    $filled = max(0, $filled - 1);
-                    $vacant = max(0, $vacant + 1);
-                }
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('last_working_day')
+                          ->orWhereDate('last_working_day', '>', $today);
+                    })
+                    ->where('id', '!=', $employeeId)
+                    ->count();
 
-                if ($vacant <= 0 || $filled >= $budgeted) {
+                $vacant = max(0, $budgeted - $filled);
+
+                if ($vacant <= 0) {
                     return [
                         'vacant'  => false,
                         'message' => 'No vacant seat for this position in Workforce Planning ('
-                            . $filled . '/' . $budgeted . ' filled, ' . $vacant . ' vacant for ' . $manningYear . ').',
+                            . $filled . '/' . $budgeted . ' filled, 0 vacant for ' . $manningYear . ').',
                     ];
                 }
 

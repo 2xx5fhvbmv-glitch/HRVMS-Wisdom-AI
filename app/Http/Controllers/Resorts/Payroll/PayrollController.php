@@ -663,10 +663,13 @@ class PayrollController extends Controller
             }
         
             DB::commit(); // ✅ Commit transaction
-            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-            if(!$notify_person) 
+            // Pick an HR (rank 3) recipient; fall back to an HOD (rank 2).
+            // Status='Active' guard added so we don't notify a terminated
+            // manager whose account no longer logs in.
+            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->where('status','Active')->first();
+            if(!$notify_person)
             {
-                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->first();
+                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->where('status','Active')->first();
             }
                 $payroll_service_charges = PayrollServiceCharge::where("employee_id",$emp_detail->id)->where('payroll_id',$request->payroll_id)->get();
                 foreach ($payroll_service_charges as $payroll) 
