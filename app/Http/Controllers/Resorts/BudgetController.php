@@ -149,10 +149,22 @@ class BudgetController extends Controller
         $positionIds = $allPositionsRaw->pluck('id')->unique()->all();
 
         // 1) Active employees for every position in a single query.
+        //    Tight filter: same resort + dept + status='Active' AND not past
+        //    their last_working_day. Without these guards stale rows leak in
+        //    (transferred-out, resigned, terminated employees still tagged
+        //    with the old position_id) which inflated filled counts and made
+        //    vacantcount appear to be 0.
+        $today = \Carbon\Carbon::today()->toDateString();
         $employeesByPosition = empty($positionIds) ? collect() : DB::table('employees as e')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->whereIn('e.position_id', $positionIds)
+            ->where('e.resort_id', $resortId)
+            ->whereIn('e.Dept_id', $departmentIds)
             ->where('e.status', 'Active')
+            ->where(function ($q) use ($today) {
+                $q->whereNull('e.last_working_day')
+                  ->orWhereDate('e.last_working_day', '>', $today);
+            })
             ->get([
                 'e.position_id',
                 'e.resort_id',
@@ -209,6 +221,16 @@ class BudgetController extends Controller
 
             foreach ($departmentPositions as $position) {
                 $position->employees = collect($employeesByPosition->get($position->id, collect()))->values();
+
+                // Compute vacantcount in real time = headcount − active filled.
+                // The stored pmd.vacantcount lags behind transfers/resignations
+                // until the manning scheduler catches up — so we recompute from
+                // the actually-active employee count above. This is what makes
+                // a position with 6 budgeted / 3 filled correctly render 3
+                // "Vacant" rows instead of relying on a stored 1.
+                $headcount = (int) ($position->headcount ?? 0);
+                $filled    = $position->employees->count();
+                $position->vacantcount = max(0, $headcount - $filled);
 
                 // Initialise vacant position properties.
                 $position->proper_vacant_count = 0;
