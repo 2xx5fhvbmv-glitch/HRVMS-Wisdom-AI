@@ -311,8 +311,8 @@ class LearningController extends Controller
                 ->addColumn('employees', fn($row) => $row->employee_names ?? 'N/A')
                 ->addColumn('requested_by', fn($row) => trim($row->requested_by ?? '') !== '' ? $row->requested_by : 'N/A')
                 ->addColumn('reason', fn($row) => $row->reason ?? 'N/A')
-                ->addColumn('start_date', fn($row) => $row->start_date ?? 'N/A')
-                ->addColumn('end_date', fn($row) => $row->end_date ?? 'N/A')
+                ->addColumn('start_date', fn($row) => $row->start_date ? \Carbon\Carbon::parse($row->start_date)->format('d M Y') : 'N/A')
+                ->addColumn('end_date',   fn($row) => $row->end_date   ? \Carbon\Carbon::parse($row->end_date)->format('d M Y')   : 'N/A')
 
                 // Status badge — for Denied / On Hold, attach the rejection_reason as a
                 // hover tooltip so reviewers can see WHY without opening the detail page.

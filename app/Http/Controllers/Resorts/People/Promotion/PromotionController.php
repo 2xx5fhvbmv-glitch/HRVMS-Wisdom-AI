@@ -143,53 +143,53 @@ class PromotionController extends Controller
             }
         }
        
+        // ── Approval flow — pool-based ────────────────────────────────────
+        // Finance Approver Logic: anyone whose rank matches "Finance" OR whose
+        // position is ranked Finance OR whose position_title is in the manager
+        // titles list. We pick ONE as the nominal `approved_by` on the approval
+        // row (DB needs a non-null value), but the action handler accepts ANY
+        // member of the pool, and the notification fans out to all of them so
+        // Finance HOD doesn't get silently skipped.
+        $financeRank   = array_search('Finance', config('settings.Position_Rank')) ?: 7;
+        $gmRank        = array_search('GM',      config('settings.Position_Rank')) ?: 8;
+        $financeTitles = ['Director of Finance', 'Finance Manager'];
+
+        $financePool = Employee::with('resortAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) use ($financeRank, $financeTitles) {
+                $q->where('rank', $financeRank)
+                  ->orWhereHas('position', function ($pq) use ($financeRank, $financeTitles) {
+                      $pq->where('Rank', $financeRank)
+                         ->orWhereIn('position_title', $financeTitles);
+                  });
+            })
+            ->get();
+
+        $gmPool = Employee::with('resortAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) use ($gmRank) {
+                $q->where('rank', $gmRank)
+                  ->orWhereHas('position', function ($pq) use ($gmRank) {
+                      $pq->where('Rank', $gmRank);
+                  });
+            })
+            ->get();
+
         $promotionApprovalFlow = collect();
-
-        // Finance Approver Logic
-        $financeManagerTitles = ['Director of Finance', 'Finance Manager'];
-        $positionIds = ResortPosition::where('resort_id', $this->resort->resort_id)
-            ->whereIn('position_title', $financeManagerTitles)
-            ->pluck('id');
-
-        $financeApprover = Employee::with(['resortAdmin', 'position'])
-            ->whereIn('position_id', $positionIds)
-            ->where('resort_id', $this->resort->resort_id)
-            ->select('id')
-            ->first();
-
-        if ($financeApprover) {
-            // $promotionApprovalFlow->push($financeApprover);
-            $promotionApprovalFlow->push([
-                'approver' => $financeApprover,
-                'rank' => 'Finance'
-            ]);
+        if ($financePool->isNotEmpty()) {
+            $promotionApprovalFlow->push(['approver' => $financePool->first(), 'rank' => 'Finance', 'pool' => $financePool]);
+        }
+        if ($gmPool->isNotEmpty()) {
+            $promotionApprovalFlow->push(['approver' => $gmPool->first(), 'rank' => 'GM', 'pool' => $gmPool]);
         }
 
-        // GM Approver Logic (Rank 8 in position table)
-        $gmApprover = Employee::with('position')
-            ->whereHas('position', fn($query) => $query->where('rank', 8))
-            ->where('resort_id', $this->resort->resort_id)
-            ->select('id')
-            ->first();
-
-        if ($gmApprover) 
-        {
-            // $promotionApprovalFlow->push($gmApprover);
-            $promotionApprovalFlow->push([
-                'approver' => $gmApprover,
-                'rank' => 'GM'
-            ]);
-        }
-        // dd($promotionApprovalFlow);
-
-        // Create approval entries
+        // Create approval entries + fan-out notifications.
         $promotionApprovalFlow->each(function ($approver) use ($promotion) {
             EmployeePromotionApproval::create([
-                'promotion_id' => $promotion->id,
+                'promotion_id'   => $promotion->id,
                 'approved_by'    => $approver['approver']->id,
-                'status' => 'Pending',
-                'approval_rank'  => $approver['rank'], // Add this to your DB schema if not already
-
+                'status'         => 'Pending',
+                'approval_rank'  => $approver['rank'],
             ]);
 
             $msg = "📢 New Promotion Request Submitted\n👤 Employee: " . $promotion->employee->resortAdmin->full_name .
@@ -198,15 +198,19 @@ class PromotionController extends Controller
             "\n📅 Effective Date: " . Carbon::parse($promotion->effective_date)->format('d M Y') .
             "\n📝 Status: Pending Approval";
 
-            event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, // Make sure `resort_id` exists on the `meetings` table
-                10,
-                'Promotion Request Notification',
-                $msg,
-                0,
-                $approver['approver']->id,
-                'People'
-            )));
+            // Notify every pool member so e.g. Finance HOD sees the request
+            // even if first()-picked the DOF for the approval row.
+            foreach ($approver['pool'] as $member) {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id,
+                    10,
+                    'Promotion Request Notification',
+                    $msg,
+                    0,
+                    $member->id,
+                    'People'
+                )));
+            }
         });
 
         return response()->json([
@@ -357,6 +361,14 @@ class PromotionController extends Controller
                 'approvals'
             ])->where('resort_id',$this->resort->resort_id)->where('status','Approved')->select('*');
 
+            // Department scope — HOD / MGR / SUP only see their own dept's
+            // promotions; GM / HR / admins get full visibility (returns null).
+            if (is_array($scopedDeptIds)) {
+                $promotions->whereHas('employee', function ($q) use ($scopedDeptIds) {
+                    $q->whereIn('Dept_id', $scopedDeptIds);
+                });
+            }
+
             // Filters
             if ($decodedId) {
                 $promotions->whereHas('employee', function ($q) use ($decodedId) {
@@ -467,6 +479,25 @@ class PromotionController extends Controller
                     $currentApproval = $pa;
                     $delegateComment = ' (Acted by delegate)';
                     break;
+                }
+            }
+        }
+
+        // Pool fallback — if the logged-in user belongs to the Finance or GM
+        // approver pool, let them act on the pending approval slot for that
+        // role even when first()-picked someone else for `approved_by`.
+        // Without this Finance HOD couldn't approve when the row was assigned
+        // to the DOF (or vice-versa).
+        if (!$currentApproval) {
+            $userRole = $this->getUserPromotionRole($currentEmployee->id, $this->resort->resort_id);
+            if ($userRole) {
+                $currentApproval = $promotion->approvals()
+                    ->where('approval_rank', $userRole)
+                    ->whereIn('status', ['Pending', 'On Hold'])
+                    ->first();
+                if ($currentApproval) {
+                    // Re-assign so the audit trail names who actually acted.
+                    $currentApproval->approved_by = $currentEmployee->id;
                 }
             }
         }
@@ -756,6 +787,33 @@ class PromotionController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Return 'Finance', 'GM', or null for the given employee — used by
+     * handlePromotionApproval so a Finance HOD (or any Finance pool member)
+     * can act on a Finance-rank approval slot even when the row was assigned
+     * to a different person at submit time.
+     */
+    private function getUserPromotionRole($empId, $resortId)
+    {
+        $financeRank   = array_search('Finance', config('settings.Position_Rank')) ?: 7;
+        $gmRank        = array_search('GM',      config('settings.Position_Rank')) ?: 8;
+        $financeTitles = ['Director of Finance', 'Finance Manager'];
+
+        $emp = Employee::with('position')->where('resort_id', $resortId)->find($empId);
+        if (!$emp) return null;
+
+        $isFinance = ((int)$emp->rank === (int)$financeRank)
+            || ($emp->position && ((int)$emp->position->Rank === (int)$financeRank
+                || in_array($emp->position->position_title, $financeTitles, true)));
+        if ($isFinance) return 'Finance';
+
+        $isGm = ((int)$emp->rank === (int)$gmRank)
+            || ($emp->position && (int)$emp->position->Rank === (int)$gmRank);
+        if ($isGm) return 'GM';
+
+        return null;
     }
 
     public function GetEmployeeWiseFilterData(Request $request)

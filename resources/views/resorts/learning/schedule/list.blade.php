@@ -163,6 +163,34 @@
         });
     }
 
+    // Convert "YYYY-MM-DD" → "dd/mm/yyyy" for the datepicker input.
+    function isoToDmy(iso) {
+        if (!iso) return '';
+        var p = iso.split('-');
+        return (p.length === 3) ? (p[2] + '/' + p[1] + '/' + p[0]) : '';
+    }
+    // Convert "dd/mm/yyyy" → "DD MMM YYYY" (matches server formatter).
+    function dmyToDisplay(dmy) {
+        if (!dmy) return '';
+        var p = dmy.split('/');
+        if (p.length !== 3) return dmy;
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var mi = parseInt(p[1], 10) - 1;
+        if (mi < 0 || mi > 11) return dmy;
+        return p[0].padStart(2,'0') + ' ' + months[mi] + ' ' + p[2];
+    }
+    // Convert "HH:mm" or "HH:mm:ss" → "hh:MM AM/PM".
+    function timeRawToDisplay(raw) {
+        if (!raw) return '';
+        var parts = raw.split(':');
+        var h = parseInt(parts[0], 10);
+        var m = (parts[1] || '00').padStart(2,'0');
+        if (isNaN(h)) return raw;
+        var period = h >= 12 ? 'PM' : 'AM';
+        var h12 = h % 12; if (h12 === 0) h12 = 12;
+        return String(h12).padStart(2,'0') + ':' + m + ' ' + period;
+    }
+
     $(document).on("click", "#table-training .edit-row-btn", function (event) {
         event.preventDefault();
 
@@ -175,10 +203,17 @@
         var $startTimeCell = $row.find("td:nth-child(6)");
         var $endTimeCell   = $row.find("td:nth-child(7)");
 
-        var currentStartDate = $startDateCell.text().trim();
-        var currentEndDate   = $endDateCell.text().trim();
-        var currentStartTime = $startTimeCell.text().trim();
-        var currentEndTime   = $endTimeCell.text().trim();
+        // Raw ISO / HH:mm:ss live on the wrapper span the server renders,
+        // so the displayed "DD MMM YYYY" / "hh:MM AM/PM" don't need parsing.
+        var isoStart = $startDateCell.find('span').attr('data-iso') || '';
+        var isoEnd   = $endDateCell.find('span').attr('data-iso')   || '';
+        var rawStart = $startTimeCell.find('span').attr('data-raw') || '';
+        var rawEnd   = $endTimeCell.find('span').attr('data-raw')   || '';
+
+        var currentStartDate = isoToDmy(isoStart);
+        var currentEndDate   = isoToDmy(isoEnd);
+        var currentStartTime = rawStart;
+        var currentEndTime   = rawEnd;
 
         // Trim seconds for the time input (HH:mm)
         var startTimeForInput = currentStartTime.slice(0, 5);
@@ -267,10 +302,13 @@
         var originalStartTime = $row.data('original-start-time');
         var originalEndTime   = $row.data('original-end-time');
 
-        $row.find("td:nth-child(4)").text(originalStartDate);
-        $row.find("td:nth-child(5)").text(originalEndDate);
-        $row.find("td:nth-child(6)").text(originalStartTime);
-        $row.find("td:nth-child(7)").text(originalEndTime);
+        // Restore using the same wrapper-span shape the server renders.
+        var isoStart = originalStartDate ? originalStartDate.split('/').reverse().join('-') : '';
+        var isoEnd   = originalEndDate   ? originalEndDate.split('/').reverse().join('-')   : '';
+        $row.find("td:nth-child(4)").html('<span data-iso="' + isoStart + '">' + dmyToDisplay(originalStartDate) + '</span>');
+        $row.find("td:nth-child(5)").html('<span data-iso="' + isoEnd   + '">' + dmyToDisplay(originalEndDate)   + '</span>');
+        $row.find("td:nth-child(6)").html('<span data-raw="' + originalStartTime + '">' + timeRawToDisplay(originalStartTime) + '</span>');
+        $row.find("td:nth-child(7)").html('<span data-raw="' + originalEndTime   + '">' + timeRawToDisplay(originalEndTime)   + '</span>');
 
         // Restore the full action cell (Edit + Mark Attendance) from the stash.
         var originalAction = $row.data('original-action');
@@ -322,10 +360,14 @@
                     var newStartTime = startTimeInput.val() ? (startTimeInput.val().length === 5 ? startTimeInput.val() + ':00' : startTimeInput.val()) : originalStartTime;
                     var newEndTime   = endTimeInput.val()   ? (endTimeInput.val().length   === 5 ? endTimeInput.val()   + ':00' : endTimeInput.val())   : originalEndTime;
 
-                    $row.find("td:nth-child(4)").text(newStartDate);
-                    $row.find("td:nth-child(5)").text(newEndDate);
-                    $row.find("td:nth-child(6)").text(newStartTime);
-                    $row.find("td:nth-child(7)").text(newEndTime);
+                    // Re-render in canonical formats inside the wrapper span the
+                    // edit handler reads from.
+                    var isoStart = newStartDate.split('/').reverse().join('-');
+                    var isoEnd   = newEndDate.split('/').reverse().join('-');
+                    $row.find("td:nth-child(4)").html('<span data-iso="' + isoStart + '">' + dmyToDisplay(newStartDate) + '</span>');
+                    $row.find("td:nth-child(5)").html('<span data-iso="' + isoEnd   + '">' + dmyToDisplay(newEndDate)   + '</span>');
+                    $row.find("td:nth-child(6)").html('<span data-raw="' + newStartTime + '">' + timeRawToDisplay(newStartTime) + '</span>');
+                    $row.find("td:nth-child(7)").html('<span data-raw="' + newEndTime   + '">' + timeRawToDisplay(newEndTime)   + '</span>');
 
                     // Restore the full action cell (Edit + Mark Attendance) from the stash.
                     var originalAction = $row.data('original-action');

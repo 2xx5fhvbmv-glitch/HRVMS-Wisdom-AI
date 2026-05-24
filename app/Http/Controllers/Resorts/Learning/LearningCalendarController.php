@@ -111,7 +111,10 @@ class LearningCalendarController extends Controller
         })
         ->when(is_array($scopedEmpIds), fn($q) => $q->whereHas('participants', fn($sq) => $sq->whereIn('employee_id', $scopedEmpIds)))
         ->with(['learningProgram', 'participants.employee.resortAdmin','participants.employee.position'])
-        ->orderBy('created_at', 'desc')
+        // Chronological (start_date asc) — the calendar event list shows
+        // upcoming sessions in the order they'll happen, not creation order.
+        ->orderBy('start_date', 'asc')
+        ->orderBy('start_time', 'asc')
         ->get();
 
         $events = [];

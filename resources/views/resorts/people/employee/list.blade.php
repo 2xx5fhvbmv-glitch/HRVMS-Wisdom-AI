@@ -55,6 +55,7 @@
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select select2t-none" id="statusFilter">
                                 <option value="">Status</option>
+                                <option value="Onboarding">Onboarding</option>
                                 <option value="Active">Active</option>
                                 <option value="Inactive">Inactive</option>
                                 <option value="Terminated">Terminated</option>

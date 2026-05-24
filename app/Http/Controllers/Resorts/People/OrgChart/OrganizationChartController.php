@@ -56,20 +56,28 @@ class OrganizationChartController extends Controller
 
     private function getEmployeesData($departmentId = null)
     {
+        $resortId = $this->resort->resort_id;
         $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
-        $query = Employee::with(['resortAdmin', 'department', 'position'])
-            ->where('resort_id', $this->resort->resort_id)
-            ->where('status', 'active')
+
+        $employeeQuery = Employee::with(['resortAdmin', 'department', 'position'])
+            ->where('resort_id', $resortId)
+            ->where('status', 'Active')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($departmentId) {
-            $query->where('Dept_id', $departmentId);
+            $employeeQuery->where('Dept_id', $departmentId);
         }
 
-        return $query->get()->map(function ($employee) {
+        $employees = $employeeQuery->get();
+
+        $employeeNodes = $employees->map(function ($employee) {
             return [
-                'id' => $employee->id,
-                'pid' => $employee->reporting_to,
+                'id' => 'emp_' . $employee->id,
+                // Treat 0 / null as no parent so legacy rows with reporting_to=0
+                // don't break the tree root detection.
+                'pid' => ($employee->reporting_to && (int)$employee->reporting_to > 0)
+                    ? 'emp_' . $employee->reporting_to
+                    : null,
                 'name' => optional($employee->resortAdmin)->full_name ?? 'N/A',
                 'position' => optional($employee->position)->position_title ?? 'N/A',
                 'joinDate' => $employee->joining_date
@@ -79,8 +87,59 @@ class OrganizationChartController extends Controller
                 'department_id' => $employee->Dept_id,
                 'department_name' => optional($employee->department)->name ?? 'N/A',
                 'reporting_to' => $employee->reporting_to,
+                'is_vacant' => false,
+                'employee_id' => $employee->id,
             ];
         })->toArray();
+
+        // ── Vacant positions ─────────────────────────────────────────────
+        // Surface every active ResortPosition that has NO active employee in
+        // it (respecting the same dept-scope / dept-filter) as a "Vacant"
+        // node. They attach under the position's department head when one is
+        // present; otherwise they sit at the root.
+        $occupiedPositionIds = $employees->pluck('Position_id')->filter()->unique()->all();
+
+        $positionQuery = \App\Models\ResortPosition::where('resort_id', $resortId)
+            ->where('status', 'active');
+        if ($departmentId) {
+            $positionQuery->where('dept_id', $departmentId);
+        } elseif (is_array($scopedDeptIds)) {
+            $positionQuery->whereIn('dept_id', $scopedDeptIds);
+        }
+        $vacantPositions = $positionQuery
+            ->whereNotIn('id', $occupiedPositionIds)
+            ->with('department')
+            ->get();
+
+        // Resolve a per-department "head" employee (rank=2 HOD; fall back to
+        // EXCOM rank=1) — used as pid for vacant nodes so they slot under
+        // their manager rather than floating at the top.
+        $deptHeads = [];
+        foreach ($vacantPositions->pluck('dept_id')->filter()->unique() as $deptId) {
+            $head = $employees->first(function ($emp) use ($deptId) {
+                return (int)$emp->Dept_id === (int)$deptId && in_array((int)$emp->rank, [2, 1], true);
+            });
+            if ($head) $deptHeads[$deptId] = $head->id;
+        }
+
+        $fallbackImg = url('admin_assets/files/user-image.png');
+        foreach ($vacantPositions as $pos) {
+            $vacantNodes[] = [
+                'id' => 'vacant_' . $pos->id,
+                'pid' => isset($deptHeads[$pos->dept_id]) ? ('emp_' . $deptHeads[$pos->dept_id]) : null,
+                'name' => 'Vacant',
+                'position' => $pos->position_title ?? '—',
+                'joinDate' => 'Open Position',
+                'img' => $fallbackImg,
+                'department_id' => $pos->dept_id,
+                'department_name' => optional($pos->department)->name ?? 'N/A',
+                'reporting_to' => null,
+                'is_vacant' => true,
+                'employee_id' => null,
+            ];
+        }
+
+        return array_merge($employeeNodes, $vacantNodes ?? []);
     }
 
     /**

@@ -1663,20 +1663,34 @@
         const meetingDates = JSON.parse(localStorage.getItem('meeting_dates') || '[]');
         const meetingTimes = JSON.parse(localStorage.getItem('meeting_times') || '[]');
         const meetingLinks = JSON.parse(localStorage.getItem('meeting_links') || '[]');
+        // Flat enriched objects for all unique participants across meetings:
+        //   [{id, emp_id, full_name, profile_image, …}, …]
         const meetingParticipantsData = JSON.parse(localStorage.getItem('meeting_participants_data') || '[]');
+        // Per-meeting IDs from the form, indexed by meeting position:
+        //   [[177], [171]]
+        const meetingParticipantsStructured = JSON.parse(localStorage.getItem('meeting_participants_structured') || '[]');
+
+        // Quick lookup by id for the enriched objects.
+        const participantsById = {};
+        meetingParticipantsData.forEach(function (p) {
+            if (p && p.id !== undefined && p.id !== null) {
+                participantsById[String(p.id)] = p;
+            }
+        });
+
+        const fallbackImg = '{{ asset('resorts_assets/images/user-2.svg') }}';
 
         let meetingTableRows = '';
-        meetingTitles.forEach((title, index) => {
-            // Generate participant images HTML
+        meetingTitles.forEach(function (title, index) {
+            // Pull only THIS meeting's participants (not the merged union).
+            const idsForMeeting = (meetingParticipantsStructured[index] || []).map(String);
+            const thisMeetingParticipants = idsForMeeting
+                .map(function (id) { return participantsById[id]; })
+                .filter(Boolean);
+
             let participantImagesHtml = '';
-            if (meetingParticipantsData && meetingParticipantsData.length > 0) {
-                // Render from the REAL participant objects returned by
-                // getParticipantDetails ({id, emp_id, full_name, position,
-                // department, profile_image}). Previously this used Blade
-                // {{ $participant->… }} inside the JS string — a static value
-                // that was the same (broken) markup for every participant.
-                var fallbackImg = '{{ asset('resorts_assets/images/user-2.svg') }}';
-                participantImagesHtml = meetingParticipantsData.slice(0, 4).map(function (participant) {
+            if (thisMeetingParticipants.length > 0) {
+                participantImagesHtml = thisMeetingParticipants.slice(0, 4).map(function (participant) {
                     var img   = participant.profile_image || fallbackImg;
                     var name  = participant.full_name || 'Unknown';
                     var empId = participant.emp_id || '';
@@ -1686,9 +1700,8 @@
                     </div>`;
                 }).join('');
 
-                // "+N" indicator when more than 4 participants.
-                if (meetingParticipantsData.length > 4) {
-                    participantImagesHtml += `<div class="img-circle more-participants">+${meetingParticipantsData.length - 4}</div>`;
+                if (thisMeetingParticipants.length > 4) {
+                    participantImagesHtml += `<div class="img-circle more-participants">+${thisMeetingParticipants.length - 4}</div>`;
                 }
             } else {
                 participantImagesHtml = '<span class="text-muted">No participants selected</span>';
@@ -1704,9 +1717,6 @@
                     </div>
                 </td></tr>
             `;
-            
-            // Only show first meeting in the preview for now
-            if (index === 0) return false;
         });
 
         // Update the HTML elements
