@@ -114,12 +114,11 @@ class OrganizationChartController extends Controller
                 'position' => 'Department',
                 'joinDate' => '',
                 'img' => $fallbackImg,
-                'department_id' => $d->id,
                 'department_name' => $d->name,
-                'reporting_to' => null,
-                'is_vacant' => false,
-                'is_department' => true,
-                'employee_id' => null,
+                // Internal-only — prefixed underscore so the edit-form's
+                // auto field generator skips it.
+                '_department_id' => $d->id,
+                '_is_department' => true,
             ];
         }
 
@@ -145,12 +144,14 @@ class OrganizationChartController extends Controller
                     ? 'Joining Date: ' . \Carbon\Carbon::parse($employee->joining_date)->format('d M Y')
                     : '',
                 'img' => $this->getImageUrlForPDF($employee->Admin_Parent_id ?? null),
-                'department_id' => $employee->Dept_id,
+                // Display-friendly Employee ID (e.g. DR-18). Shown in the
+                // node detail popup instead of the internal numeric id.
+                'emp_id_display' => $employee->Emp_id ?? '',
                 'department_name' => optional($employee->department)->name ?? 'N/A',
-                'reporting_to' => $employee->reporting_to,
-                'is_vacant' => false,
-                'is_department' => false,
-                'employee_id' => $employee->id,
+                // Internal-use fields used by the PDF export JS to look up
+                // base64 images per employee. Prefixed underscore so the
+                // edit-form auto-generator skips them.
+                '_employee_id' => $employee->id,
             ];
         })->toArray();
 
@@ -214,12 +215,12 @@ class OrganizationChartController extends Controller
                     'position' => $row->position_title ?? '—',
                     'joinDate' => 'Open Position',
                     'img' => $fallbackImg,
-                    'department_id' => $row->dept_id,
                     'department_name' => $deptNameById[$row->dept_id] ?? 'N/A',
-                    'reporting_to' => null,
-                    'is_vacant' => true,
-                    'is_department' => false,
-                    'employee_id' => null,
+                    'emp_id_display' => '',
+                    // Internal-only — prefixed underscore so the edit-form
+                    // auto-generator hides them from the popup.
+                    '_department_id' => $row->dept_id,
+                    '_is_vacant' => true,
                     // OrgChart "tags" trigger the per-node template — used
                     // here to apply a light highlight color via CSS.
                     'tags' => ['vacant'],
@@ -228,12 +229,14 @@ class OrganizationChartController extends Controller
         }
 
         // Department nodes only emit if at least one downstream child
-        // exists — drop the empties.
-        $usedDeptIds = collect($employeeNodes)->pluck('department_id')
-            ->merge(collect($vacantNodes)->pluck('department_id'))
+        // exists — drop the empties. Pids on emp/vacant nodes are
+        // "dept_<id>" or "emp_<id>"; the dept ids in play come from each
+        // node's internal _department_id (employees) or pid prefix.
+        $usedDeptIds = $employees->pluck('Dept_id')
+            ->merge(collect($vacantNodes)->pluck('_department_id'))
             ->filter()->unique()->map(fn($v) => (int)$v)->all();
         $deptNodes = array_values(array_filter($deptNodes, function ($d) use ($usedDeptIds) {
-            return in_array((int)$d['department_id'], $usedDeptIds, true);
+            return in_array((int)$d['_department_id'], $usedDeptIds, true);
         }));
 
         return array_merge($deptNodes, $employeeNodes, $vacantNodes);
