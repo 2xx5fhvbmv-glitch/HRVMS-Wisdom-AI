@@ -190,25 +190,20 @@
                 });
             },
             viewRender: function (view) {
-                // Keep the side panel showing a ROLLING window (recent past →
-                // next 6 months) rather than reloading it for whichever month
-                // the user happens to be looking at. Without this, scheduling
-                // a session for June while the calendar is on May meant the
-                // new event never appeared in the panel until the user
-                // navigated to June. Refresh once whenever the view changes
-                // so newly-created schedules drop in.
-                loadSidebarRolling();
+                // Sidebar mirrors the calendar's TRUE current month — not
+                // the visible grid range. FullCalendar's view.start /
+                // view.end include the trailing days of the previous month
+                // and leading days of the next month that fill the grid
+                // (e.g. May 2026 grid spans Apr 26 → Jun 6), which is why
+                // April events showed up on the May view. intervalStart /
+                // intervalEnd give the actual month boundaries (May 1 →
+                // Jun 1, exclusive end).
+                var startDate = view.intervalStart.format('YYYY-MM-DD');
+                var endDate   = view.intervalEnd.clone().subtract(1, 'day').format('YYYY-MM-DD');
+                loadLearningSessions(startDate, endDate);
                 syncSidebarHeight();
             }
         });
-
-        // ── Sidebar refresh: rolling window so new schedules show up ──
-        function loadSidebarRolling() {
-            var start = moment().subtract(30, 'days').format('YYYY-MM-DD');
-            var end   = moment().add(6, 'months').format('YYYY-MM-DD');
-            loadLearningSessions(start, end);
-        }
-        loadSidebarRolling();
 
         // ── Sidebar height syncs with the rendered calendar height ──
         function syncSidebarHeight() {
