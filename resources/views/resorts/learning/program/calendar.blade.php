@@ -47,8 +47,10 @@
                     <div id="calendar" class="calendar-event"></div>
                 </div>
                 <div class="col-xxl-3 col-lg-4 ">
-                    {{-- Cap the session-list height to match the calendar so a long
-                         list scrolls inside the panel instead of pushing the page. --}}
+                    {{-- The session-list panel scrolls internally. JS below
+                         keeps its max-height in sync with the calendar's
+                         actual rendered height so it never extends past
+                         the calendar or leaves a short stub on a tall view. --}}
                     <div class="leaveUser-main" id="calsidebar"
                          style="max-height: 640px; overflow-y: auto; padding-right: 6px;">
                     </div>
@@ -201,11 +203,36 @@
                 });
             },
             viewRender: function (view) {
-                let startDate = view.start.format('YYYY-MM-DD');
-                let endDate = view.end.format('YYYY-MM-DD');
-                loadLearningSessions(startDate, endDate); // Load sidebar when month changes
+                // Keep the side panel showing a ROLLING window (recent past →
+                // next 6 months) rather than reloading it for whichever month
+                // the user happens to be looking at. Without this, scheduling
+                // a session for June while the calendar is on May meant the
+                // new event never appeared in the panel until the user
+                // navigated to June. Refresh once whenever the view changes
+                // so newly-created schedules drop in.
+                loadSidebarRolling();
+                syncSidebarHeight();
             }
         });
+
+        // ── Sidebar refresh: rolling window so new schedules show up ──
+        function loadSidebarRolling() {
+            var start = moment().subtract(30, 'days').format('YYYY-MM-DD');
+            var end   = moment().add(6, 'months').format('YYYY-MM-DD');
+            loadLearningSessions(start, end);
+        }
+        loadSidebarRolling();
+
+        // ── Sidebar height syncs with the rendered calendar height ──
+        function syncSidebarHeight() {
+            var h = $('#calendar').outerHeight();
+            if (h && h > 200) {
+                $('#calsidebar').css('max-height', h + 'px');
+            }
+        }
+        // Calendar takes a tick to render after FullCalendar init.
+        setTimeout(syncSidebarHeight, 250);
+        $(window).on('resize', syncSidebarHeight);
     });
 
 </script>
