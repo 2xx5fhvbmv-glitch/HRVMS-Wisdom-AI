@@ -1822,6 +1822,77 @@ class ApplicantsController extends Controller
             }
         }
 
+        // ── Onboarding meetings the logged-in user is invited to ─────────
+        // Pulls from employee_itineraries_meeting (set up via the People
+        // Onboarding wizard). meeting_participant_ids is a comma-separated
+        // list of employees.id values; we surface a meeting on the master
+        // dashboard calendar whenever the logged-in user appears in it.
+        try {
+            $loggedInEmpId = (int) ($this->resort->GetEmployee->id ?? 0);
+            if ($loggedInEmpId > 0) {
+                $meetingsQuery = \App\Models\EmployeeItinerariesMeeting::with([
+                    'itiernary.employee.resortAdmin',
+                    'itiernary.employee.position',
+                    'itiernary.employee.department',
+                ])
+                ->whereHas('itiernary', fn($q) => $q->where('resort_id', $resort_id))
+                // FIND_IN_SET handles the CSV format meeting_participant_ids uses.
+                ->whereRaw('FIND_IN_SET(?, meeting_participant_ids)', [$loggedInEmpId]);
+
+                if ($date) {
+                    $meetingsQuery->whereDate('meeting_date', $date->format('Y-m-d'));
+                } else {
+                    $meetingsQuery->whereBetween('meeting_date', [
+                        $currentMonthStart->format('Y-m-d'),
+                        $currentMonthEnd->format('Y-m-d'),
+                    ]);
+                }
+
+                $myMeetings = $meetingsQuery->orderBy('meeting_date')->orderBy('meeting_time')->get();
+
+                foreach ($myMeetings as $mt) {
+                    $iso = \Carbon\Carbon::parse($mt->meeting_date)->format('Y-m-d');
+                    array_push($dates, $iso);
+
+                    // On initial month load (no specific date clicked) hide
+                    // already-passed meetings — same rule as interviews above.
+                    if (!$date && $iso < $today) continue;
+
+                    $candidate = optional($mt->itiernary)->employee;
+                    $candidateName = optional(optional($candidate)->resortAdmin)->full_name ?? 'Onboarding';
+                    $deptName  = optional(optional($candidate)->department)->name ?? '';
+                    $posTitle  = optional(optional($candidate)->position)->position_title ?? '';
+                    $photo     = $candidate ? \App\Helpers\Common::getResortUserPicture($candidate->Admin_Parent_id ?? null) : '';
+                    $dateLabel = \Carbon\Carbon::parse($mt->meeting_date)->format('d M');
+                    $timeLabel = $mt->meeting_time ? \Carbon\Carbon::parse($mt->meeting_time)->format('h:i A') : '';
+                    $titleLabel = e($mt->meeting_title ?? 'Onboarding Meeting');
+                    $link       = e($mt->meeting_link ?? '');
+
+                    // Use a different left-border accent to visually
+                    // distinguish onboarding meetings from TA interviews.
+                    $string .= '<a href="' . $link . '" target="_blank" style="text-decoration:none;color:inherit;display:block;">
+                                <div class="upInterviews-block" style="cursor:pointer; border-left: 3px solid #fd7e14;">
+                                    <div class="img-circle">
+                                        <img src="' . e($photo) . '" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>' . e($candidateName) . '</h6>
+                                        <p>' . $titleLabel . ($posTitle ? ' &middot; ' . e($posTitle) : '') . '</p>
+                                        <span class="badge badge-themeWarning">Onboarding' . ($deptName ? ' &middot; ' . e($deptName) : '') . '</span>
+                                    </div>
+                                    <div>
+                                        <div class="date">' . $dateLabel . '</div>
+                                        <div class="time">' . $timeLabel . '</div>
+                                    </div>
+                                </div>
+                                </a>';
+                }
+            }
+        } catch (\Throwable $e) {
+            // Non-fatal — keep interviews visible even if meeting fetch errors.
+            \Log::warning('Master calendar: onboarding meetings fetch failed: ' . $e->getMessage());
+        }
+
         if(empty($string))
         {
             $string ='<div class="upInterviews-block">
