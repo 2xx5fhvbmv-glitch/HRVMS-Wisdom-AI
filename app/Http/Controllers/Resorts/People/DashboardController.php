@@ -46,6 +46,19 @@ class DashboardController extends Controller
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
         $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $scopedEmpIds  = \App\Helpers\Common::getPerformanceScopedEmpIds();
+        // Shared filter: only count people who are actually still working.
+        // Apply to every workforce composition tile below so a transferred
+        // / resigned / inactive employee isn't counted in Total/Gender/
+        // Nationality/Location splits — the dashboard was over-counting
+        // because these queries had no status guard.
+        $today = \Carbon\Carbon::today()->toDateString();
+        $activeScope = function ($q) use ($today) {
+            $q->where('status', 'Active')
+              ->where(function ($qq) use ($today) {
+                  $qq->whereNull('last_working_day')
+                     ->orWhereDate('last_working_day', '>', $today);
+              });
+        };
         $total_active_employees = Employee::where('resort_id',$resort_id)
             ->whereIn('status',['Active','Resigned'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
@@ -76,16 +89,20 @@ class DashboardController extends Controller
         $male_emp = Employee::where('resort_id', $resort_id)
             ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'male'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $female_emp = Employee::where('resort_id', $resort_id)
             ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'female'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         // No limit — the dashboard Announcements table paginates client-side
         // (DataTables, 4 per page), so it needs the full list.
@@ -96,10 +113,12 @@ class DashboardController extends Controller
         $resortLocationCount = Employee::where('resort_id', $resort_id)
             ->where('location', 'LIKE', 'Resort%')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $maleLocationCount = Employee::where('resort_id', $resort_id)
             ->where('location', 'LIKE', 'Mal%')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $announcements = Announcement::where('resort_id',$this->resort->resort_id)->whereHas('employee')->orderBy('id','desc')->get();
         $totalPublished = Announcement::where('resort_id', $this->resort->resort_id)
@@ -390,6 +409,15 @@ class DashboardController extends Controller
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
         $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
         $scopedEmpIds  = \App\Helpers\Common::getPerformanceScopedEmpIds();
+        // Shared "currently working" filter — same as the HR dashboard above.
+        $today = \Carbon\Carbon::today()->toDateString();
+        $activeScope = function ($q) use ($today) {
+            $q->where('status', 'Active')
+              ->where(function ($qq) use ($today) {
+                  $qq->whereNull('last_working_day')
+                     ->orWhereDate('last_working_day', '>', $today);
+              });
+        };
         $total_active_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Active','Resigned'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $total_inactive_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])
@@ -412,15 +440,17 @@ class DashboardController extends Controller
         $male_emp = Employee::where('resort_id', $resort_id)
             ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'male'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $female_emp = Employee::where('resort_id', $resort_id)
             ->whereHas('resortAdmin', fn($q) => $q->where('gender', 'female'))
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)
-            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->tap($activeScope)->count();
         $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)
-            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->tap($activeScope)->count();
         // No limit — the dashboard Announcements table paginates client-side
         // (DataTables, 4 per page), so it needs the full list.
         // whereHas('employee') — skip announcements whose employee record was
@@ -430,10 +460,12 @@ class DashboardController extends Controller
         $resortLocationCount = Employee::where('resort_id', $resort_id)
             ->where('location', 'LIKE', 'Resort%')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $maleLocationCount = Employee::where('resort_id', $resort_id)
             ->where('location', 'LIKE', 'Mal%')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->tap($activeScope)
             ->count();
         $announcements = Announcement::where('resort_id',$this->resort->resort_id)->whereHas('employee')->orderBy('id','desc')->get();
         $totalPublished = Announcement::where('resort_id', $this->resort->resort_id)
