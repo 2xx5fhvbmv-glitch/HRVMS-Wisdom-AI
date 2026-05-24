@@ -1831,15 +1831,23 @@ class ApplicantsController extends Controller
         // Pulls from employee_itineraries_meeting (set up via the People
         // Onboarding wizard).
         //
+        // Scope: this endpoint is shared with Talent Acquisition module
+        // dashboards (TA admin/HR/HOD) which should show ONLY interviews.
+        // Onboarding meetings only appear when the request originates from
+        // a master/* dashboard — gated by the Referer header.
+        //
         // Audience rule: ONLY meeting participants see the meeting. HR /
         // GM / EXCOM / HOD do NOT get a wider view — if they weren't
         // explicitly invited, they don't see it. Keeps the calendar
         // focused on what the logged-in user actually has to attend.
+        $referer = (string) $request->header('referer', '');
+        $isMasterDashboard = (stripos($referer, '/resort/master/') !== false);
+
         try {
             $loggedInEmp   = $this->resort->GetEmployee ?? null;
             $loggedInEmpId = (int) ($loggedInEmp->id ?? 0);
 
-            if ($loggedInEmpId > 0) {
+            if ($isMasterDashboard && $loggedInEmpId > 0) {
                 $meetingsQuery = \App\Models\EmployeeItinerariesMeeting::with([
                     'itiernary.employee.resortAdmin',
                     'itiernary.employee.position',
