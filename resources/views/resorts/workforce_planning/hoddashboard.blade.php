@@ -1,5 +1,8 @@
 @extends('resorts.layouts.app')
-@section('page_tab_title' , ($page_header ?? 'HOD') . "-Dashboard")
+{{-- $page_header carries inline HTML for the styled <h1> below; the
+     browser tab title would render those tags as literal text. strip_tags
+     gives us a clean plain-text version for the <title>. --}}
+@section('page_tab_title' , strip_tags($page_header ?? 'HOD') . " - Dashboard")
 
 @if ($message = Session::get('success'))
 <div class="alert alert-success">
