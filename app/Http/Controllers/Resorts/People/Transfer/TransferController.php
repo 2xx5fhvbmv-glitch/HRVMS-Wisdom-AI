@@ -894,6 +894,54 @@ class TransferController extends Controller
             $onHold   = $transfer->approvals()->where('status', 'On Hold')->count();
             $rejected = $transfer->approvals()->where('status', 'Rejected')->count();
 
+            // 🔔 Per-stage HR notification.
+            //
+            // Previously HR only heard about a transfer at submit time and
+            // again at FINAL approval (via dispatchPostApprovalNotifications).
+            // That meant when Finance approved first, HR was silent until GM
+            // also approved — so Finance's milestone was invisible to HR.
+            // Fan out an intermediate notification to every HR dept lead so
+            // HR sees each approval as it happens.
+            if ($pending > 0 && $onHold === 0 && $rejected === 0) {
+                try {
+                    $hrDept = ResortDepartment::where('resort_id', $this->resort->resort_id)
+                        ->get()
+                        ->first(fn($d) => \App\Helpers\Common::isHRDepartment($d->id));
+                    if ($hrDept) {
+                        $stageName = $currentApproval->approval_rank ?? 'Approver';
+                        $actorName = optional($currentEmployee->resortAdmin)->full_name
+                            ?: trim((optional($currentEmployee->resortAdmin)->first_name ?? '') . ' ' . (optional($currentEmployee->resortAdmin)->last_name ?? ''));
+                        $empName   = optional(optional($transfer->employee)->resortAdmin)->full_name ?? 'Employee';
+                        $fromDept  = optional($transfer->currentDepartment)->name ?? '—';
+                        $toDept    = optional($transfer->targetDepartment)->name ?? '—';
+
+                        $remainingRanks = $transfer->approvals()
+                            ->where('status', 'Pending')
+                            ->pluck('approval_rank')
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+
+                        $msg = "✅ {$stageName} approval received from {$actorName} for the transfer of {$empName} ({$fromDept} → {$toDept})."
+                             . ($remainingRanks !== '' ? "\n⏳ Still pending: {$remainingRanks}." : '');
+
+                        foreach ($this->getDepartmentLeadEmployeeIds((int) $hrDept->id) as $leadId) {
+                            event(new ResortNotificationEvent(Common::nofitication(
+                                $this->resort->resort_id,
+                                10,
+                                'Transfer Stage Approved',
+                                $msg,
+                                $transfer->id,
+                                $leadId,
+                                'People'
+                            )));
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('HR stage-approval notification failed for transfer #' . $transfer->id . ': ' . $e->getMessage());
+                }
+            }
+
             /**
              * ✅  Main record becomes Approved **only if**:
              *     – nobody is Pending
