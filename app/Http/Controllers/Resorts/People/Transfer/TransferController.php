@@ -161,20 +161,53 @@ class TransferController extends Controller
             })
             ->pluck('id');
 
+        // Resolve Finance dept IDs once so we can also include the dept's
+        // HOD (rank=2) / EXCOM (rank=1) as Finance approver candidates.
+        $financeDeptIds = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->get()
+            ->filter(fn($d) => \App\Helpers\Common::isFinanceDepartment($d->id))
+            ->pluck('id');
+
         $financeApprover = Employee::with(['resortAdmin', 'position'])
             ->where('resort_id', $this->resort->resort_id)
-            ->where(function ($q) use ($financePositionIds, $financeRank) {
+            ->where(function ($q) use ($financePositionIds, $financeRank, $financeDeptIds) {
                 $q->whereIn('Position_id', $financePositionIds);
                 if ($financeRank !== false) {
                     $q->orWhere('rank', $financeRank);
                 }
+                if ($financeDeptIds->isNotEmpty()) {
+                    $q->orWhere(function ($qq) use ($financeDeptIds) {
+                        $qq->whereIn('Dept_id', $financeDeptIds)
+                           ->whereIn('rank', [1, 2]);
+                    });
+                }
             })
             ->first();
+
+        // Build the full Finance pool so we can fan out the on-submit
+        // notification to every eligible Finance HOD/EXCOM, not only the one
+        // picked for `approved_by`.
+        $financePool = Employee::with('resortAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) use ($financePositionIds, $financeRank, $financeDeptIds) {
+                $q->whereIn('Position_id', $financePositionIds);
+                if ($financeRank !== false) {
+                    $q->orWhere('rank', $financeRank);
+                }
+                if ($financeDeptIds->isNotEmpty()) {
+                    $q->orWhere(function ($qq) use ($financeDeptIds) {
+                        $qq->whereIn('Dept_id', $financeDeptIds)
+                           ->whereIn('rank', [1, 2]);
+                    });
+                }
+            })
+            ->get();
 
         if ($financeApprover) {
             $transferApprovalFlow->push([
                 'approver' => $financeApprover,
-                'rank' => 'Finance'
+                'rank' => 'Finance',
+                'pool' => $financePool,
             ]);
         }
 
@@ -190,14 +223,25 @@ class TransferController extends Controller
             })
             ->first();
 
+        $gmPool = Employee::with('resortAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) use ($gmRank) {
+                $q->where('rank', $gmRank)
+                  ->orWhereHas('position', fn($query) => $query->where('Rank', $gmRank));
+            })
+            ->get();
+
         if ($gmApprover) {
             $transferApprovalFlow->push([
                 'approver' => $gmApprover,
-                'rank' => 'GM'
+                'rank' => 'GM',
+                'pool' => $gmPool,
             ]);
         }
 
-        // Create approval entries
+        // Create approval entries + fan out notifications to the WHOLE pool
+        // for each role, so e.g. Finance HOD + DOF both see the request in
+        // their notification feed.
         $transferApprovalFlow->each(function ($approver) use ($transfer) {
             EmployeeTransferApproval::create([
                 'transfer_id' => $transfer->id,
@@ -212,15 +256,18 @@ class TransferController extends Controller
             "\n📅 Effective Date: " . Carbon::parse($transfer->effective_date)->format('d M Y') .
             "\n📝 Status: Pending Approval";
 
-            event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id,
-                10,
-                'Transfer Request Notification',
-                $msg,
-                $transfer->id,
-                $approver['approver']->id,
-                'People'
-            )));
+            $pool = $approver['pool'] ?? collect([$approver['approver']]);
+            foreach ($pool as $member) {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id,
+                    10,
+                    'Transfer Request Notification',
+                    $msg,
+                    $transfer->id,
+                    $member->id,
+                    'People'
+                )));
+            }
         });
 
         // Awareness notifications — Finance/GM get the *approval* request
@@ -1047,13 +1094,23 @@ class TransferController extends Controller
         $financeRank = array_search('Finance', config('settings.Position_Rank'));
         $financeTitles = ['Director of Finance', 'Finance Manager'];
 
+        // Title-based / rank-based match (DOF, Finance Manager, rank=Finance).
         if ($financeRank !== false && (int) $employee->rank === (int) $financeRank) {
             return true;
         }
         $pos = $employee->position ?? null;
-        if (!$pos) return false;
-        if (in_array($pos->position_title, $financeTitles, true)) return true;
-        if ($financeRank !== false && (int) $pos->Rank === (int) $financeRank) return true;
+        if ($pos) {
+            if (in_array($pos->position_title, $financeTitles, true)) return true;
+            if ($financeRank !== false && (int) $pos->Rank === (int) $financeRank) return true;
+        }
+
+        // Department-based match — Finance dept's HOD (rank=2) and EXCOM
+        // (rank=1) are part of the Finance approver pool even if their
+        // position title isn't DOF/Finance Manager.
+        if (in_array((int) $employee->rank, [1, 2], true)
+            && \App\Helpers\Common::isFinanceDepartment($employee->Dept_id ?? null)) {
+            return true;
+        }
         return false;
     }
 
