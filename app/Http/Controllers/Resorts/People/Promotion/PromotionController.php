@@ -154,14 +154,28 @@ class PromotionController extends Controller
         $gmRank        = array_search('GM',      config('settings.Position_Rank')) ?: 8;
         $financeTitles = ['Director of Finance', 'Finance Manager'];
 
+        // Finance dept IDs (Accounting / Finance / etc.) — used to include
+        // the dept's HOD (rank=2) and EXCOM (rank=1) in the Finance pool
+        // even when their position title isn't DOF / Finance Manager.
+        $financeDeptIds = ResortDepartment::where('resort_id', $this->resort->resort_id)
+            ->get()
+            ->filter(fn($d) => Common::isFinanceDepartment($d->id))
+            ->pluck('id');
+
         $financePool = Employee::with('resortAdmin')
             ->where('resort_id', $this->resort->resort_id)
-            ->where(function ($q) use ($financeRank, $financeTitles) {
+            ->where(function ($q) use ($financeRank, $financeTitles, $financeDeptIds) {
                 $q->where('rank', $financeRank)
                   ->orWhereHas('position', function ($pq) use ($financeRank, $financeTitles) {
                       $pq->where('Rank', $financeRank)
                          ->orWhereIn('position_title', $financeTitles);
                   });
+                if ($financeDeptIds->isNotEmpty()) {
+                    $q->orWhere(function ($qq) use ($financeDeptIds) {
+                        $qq->whereIn('Dept_id', $financeDeptIds)
+                           ->whereIn('rank', [1, 2]);
+                    });
+                }
             })
             ->get();
 
@@ -804,9 +818,17 @@ class PromotionController extends Controller
         $emp = Employee::with('position')->where('resort_id', $resortId)->find($empId);
         if (!$emp) return null;
 
+        // Title-based / rank-based match (DOF, Finance Manager, rank=Finance).
         $isFinance = ((int)$emp->rank === (int)$financeRank)
             || ($emp->position && ((int)$emp->position->Rank === (int)$financeRank
                 || in_array($emp->position->position_title, $financeTitles, true)));
+        // Department-based match — Finance dept's HOD (rank=2) and EXCOM
+        // (rank=1) also belong to the Finance approver pool.
+        if (!$isFinance
+            && in_array((int)$emp->rank, [1, 2], true)
+            && Common::isFinanceDepartment($emp->Dept_id ?? null)) {
+            $isFinance = true;
+        }
         if ($isFinance) return 'Finance';
 
         $isGm = ((int)$emp->rank === (int)$gmRank)

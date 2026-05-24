@@ -3697,6 +3697,41 @@ class Common
     }
 
     /**
+     * True when the given department is the Finance department.
+     * Matches common aliases — Finance, Accounting, Accounts, Acc, Fin —
+     * because resorts use different names for the same function (e.g.
+     * resort_id=26 calls it "Accounting" / short "Acc").
+     *
+     * Used to widen Finance approver pools so the Finance dept's HOD
+     * (rank=2) and EXCOM (rank=1) qualify as Finance approvers in
+     * Transfer / Promotion / Approval flows — not only Director of
+     * Finance + Finance Manager + rank=Finance(7).
+     */
+    public static function isFinanceDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['finance', 'accounting', 'accounts', 'account', 'acc', 'fin'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            // Loose contains check for things like "finance & accounting".
+            foreach (['finance', 'accounting', 'accounts'] as $needle) {
+                if (strpos($val, $needle) !== false) return true;
+            }
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
      * True if the logged-in resort user has unrestricted access to all departments
      * (Super admin, master admin, GM, or anyone in the HR department).
      */

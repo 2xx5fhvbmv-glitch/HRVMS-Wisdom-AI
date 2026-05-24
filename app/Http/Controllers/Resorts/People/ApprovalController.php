@@ -332,8 +332,16 @@ class ApprovalController extends Controller
             // Build a list of role-rank pool predicates: an Employee qualifies
             // for a role when their own rank OR position Rank matches, or (for
             // Finance) when the position title is in the manager-title list.
+            // Finance dept (Accounting / Finance / etc.) IDs — used to widen
+            // the pool so Finance HOD (rank=2) and EXCOM (rank=1) also see
+            // pending Finance approvals in their inbox.
+            $financeDeptIdsForInbox = ResortDepartment::where('resort_id', $resort->resort_id)
+                ->get()
+                ->filter(fn($d) => Common::isFinanceDepartment($d->id))
+                ->pluck('id');
+
             $employeesForFinanceRole = Employee::where('resort_id', $resort->resort_id)
-                ->where(function ($q) use ($financeRank, $financeTitles) {
+                ->where(function ($q) use ($financeRank, $financeTitles, $financeDeptIdsForInbox) {
                     if ($financeRank !== false) {
                         $q->where('rank', $financeRank)
                           ->orWhereHas('position', function ($pq) use ($financeRank) {
@@ -343,6 +351,13 @@ class ApprovalController extends Controller
                     $q->orWhereHas('position', function ($pq) use ($financeTitles) {
                         $pq->whereIn('position_title', $financeTitles);
                     });
+                    // Finance dept's HOD / EXCOM also belong to the pool.
+                    if ($financeDeptIdsForInbox->isNotEmpty()) {
+                        $q->orWhere(function ($qq) use ($financeDeptIdsForInbox) {
+                            $qq->whereIn('Dept_id', $financeDeptIdsForInbox)
+                               ->whereIn('rank', [1, 2]);
+                        });
+                    }
                 })
                 ->pluck('id')->all();
             $employeesForGmRole = Employee::where('resort_id', $resort->resort_id)
