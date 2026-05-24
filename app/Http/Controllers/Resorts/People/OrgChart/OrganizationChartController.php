@@ -59,9 +59,19 @@ class OrganizationChartController extends Controller
         $resortId = $this->resort->resort_id;
         $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
 
+        $today = \Carbon\Carbon::today()->toDateString();
         $employeeQuery = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resortId)
             ->where('status', 'Active')
+            // An employee with a last_working_day set is on the way out —
+            // hide them from the chart once that date has arrived (even if
+            // the daily scheduler hasn't flipped their status yet). Their
+            // position then surfaces as Vacant in the headcount-vs-active
+            // calculation below.
+            ->where(function ($q) use ($today) {
+                $q->whereNull('last_working_day')
+                  ->orWhereDate('last_working_day', '>', $today);
+            })
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
         if ($departmentId) {
@@ -144,52 +154,77 @@ class OrganizationChartController extends Controller
             ];
         })->toArray();
 
-        // ── Vacant positions ─────────────────────────────────────────────
-        // Surface every active ResortPosition that has NO active employee in
-        // it (respecting the same dept-scope / dept-filter) as a "Vacant"
-        // node. Anchored under the dept head when one exists, otherwise
-        // directly under the dept node.
-        $occupiedPositionIds = $employees->pluck('Position_id')->filter()->unique()->all();
-
-        $positionQuery = \App\Models\ResortPosition::where('resort_id', $resortId)
-            ->where('status', 'active');
-        if ($departmentId) {
-            $positionQuery->where('dept_id', $departmentId);
-        } elseif (is_array($scopedDeptIds)) {
-            $positionQuery->whereIn('dept_id', $scopedDeptIds);
-        }
-        $vacantPositions = $positionQuery
-            ->whereNotIn('id', $occupiedPositionIds)
-            ->with('department')
+        // ── Vacant positions (real-time, current year) ───────────────────
+        // Vacancy = headcount (from manning) MINUS the count of currently
+        // active employees in that position. Computed live so a resignation
+        // whose last_working_day has just passed instantly shows as vacant —
+        // we don't have to wait for the manning scheduler to catch up. Old
+        // logic trusted stored `vacantcount` which lags.
+        $year = (int) date('Y');
+        $headcountRows = \DB::table('manning_responses as mr')
+            ->join('position_monthly_data as pmd', 'pmd.manning_response_id', '=', 'mr.id')
+            ->join('resort_positions as p', 'p.id', '=', 'pmd.position_id')
+            ->where('mr.resort_id', $resortId)
+            ->where('mr.year', $year)
+            ->where('p.status', 'active')
+            ->when($departmentId, fn($q) => $q->where('mr.dept_id', $departmentId))
+            ->when(!$departmentId && is_array($scopedDeptIds), fn($q) => $q->whereIn('mr.dept_id', $scopedDeptIds))
+            ->groupBy('pmd.position_id', 'p.position_title', 'mr.dept_id')
+            ->selectRaw('pmd.position_id, p.position_title, mr.dept_id, MAX(pmd.headcount) as headcount')
             ->get();
 
+        // Currently active employees per position (after the LWD filter
+        // above, so today's leavers no longer count as filling a seat).
+        $activeByPosition = $employees->groupBy('Position_id')->map(fn($g) => $g->count())->all();
+
+        $vacantRows = $headcountRows->map(function ($row) use ($activeByPosition) {
+            $filled = (int) ($activeByPosition[$row->position_id] ?? 0);
+            $headcount = (int) ($row->headcount ?? 0);
+            $row->vacant_count = max(0, $headcount - $filled);
+            return $row;
+        })->filter(fn($r) => $r->vacant_count > 0)->values();
+
         // Per-department head — HOD (rank=2) first, then EXCOM (rank=1).
+        $vacantDeptIds = $vacantRows->pluck('dept_id')->filter()->unique();
         $deptHeads = [];
-        foreach ($vacantPositions->pluck('dept_id')->filter()->unique() as $deptId) {
+        foreach ($vacantDeptIds as $deptId) {
             $head = $employees->first(function ($emp) use ($deptId) {
                 return (int)$emp->Dept_id === (int)$deptId && in_array((int)$emp->rank, [2, 1], true);
             });
             if ($head) $deptHeads[$deptId] = $head->id;
         }
 
+        // Department name lookup (avoid an extra query per row).
+        $deptNameById = $departments->pluck('name', 'id')->all();
+
         $vacantNodes = [];
-        foreach ($vacantPositions as $pos) {
-            $vacantNodes[] = [
-                'id' => 'vacant_' . $pos->id,
-                'pid' => isset($deptHeads[$pos->dept_id])
-                    ? ('emp_' . $deptHeads[$pos->dept_id])
-                    : ('dept_' . $pos->dept_id),
-                'name' => 'Vacant',
-                'position' => $pos->position_title ?? '—',
-                'joinDate' => 'Open Position',
-                'img' => $fallbackImg,
-                'department_id' => $pos->dept_id,
-                'department_name' => optional($pos->department)->name ?? 'N/A',
-                'reporting_to' => null,
-                'is_vacant' => true,
-                'is_department' => false,
-                'employee_id' => null,
-            ];
+        $vacantSeq = 0;
+        foreach ($vacantRows as $row) {
+            $slots = max(1, (int) $row->vacant_count);
+            for ($i = 0; $i < $slots; $i++) {
+                $vacantSeq++;
+                $vacantNodes[] = [
+                    // Unique ID per slot so multi-vacancy positions render
+                    // as separate boxes (e.g. Waitress x1 + Commis x1).
+                    'id' => 'vacant_' . $row->position_id . '_' . $i,
+                    'pid' => isset($deptHeads[$row->dept_id])
+                        ? ('emp_' . $deptHeads[$row->dept_id])
+                        : ('dept_' . $row->dept_id),
+                    'name' => 'Vacant',
+                    'position' => $row->position_title ?? '—',
+                    'joinDate' => 'Open Position',
+                    'img' => $fallbackImg,
+                    'department_id' => $row->dept_id,
+                    'department_name' => $deptNameById[$row->dept_id] ?? 'N/A',
+                    'reporting_to' => null,
+                    'is_vacant' => true,
+                    'is_department' => false,
+                    'employee_id' => null,
+                    // OrgChart "tags" trigger the per-node template — used
+                    // here to apply a light highlight color via CSS.
+                    'tags' => ['vacant'],
+                ];
+            }
         }
 
         // Department nodes only emit if at least one downstream child

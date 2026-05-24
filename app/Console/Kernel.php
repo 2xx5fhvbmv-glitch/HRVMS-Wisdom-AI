@@ -35,6 +35,10 @@ class Kernel extends ConsoleKernel
         // Day-of transfer notifications + apply the employee profile move
         // when an Approved transfer's effective_date arrives.
         $schedule->command('transfers:notify-effective')->dailyAt('06:00');
+        // Resignation housekeeping — when last_working_day arrives, flip
+        // the employee to Inactive AND free their manning seat (-1 filled
+        // / +1 vacant) so the Workforce Manning numbers stay honest.
+        $schedule->command('employees:apply-last-working-day')->dailyAt('06:15');
 
         
 
