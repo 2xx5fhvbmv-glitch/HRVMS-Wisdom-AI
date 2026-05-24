@@ -38,7 +38,6 @@ class TalentAcquisitionDashboardController extends Controller
     {
 
             $page_title ='Talent Acquisition Dashboard';
-            $page_header = '<span class="arca-font">My</span> Dashboard';
             $currentYear = date('Y');
             $nextYear = $currentYear + 1;
             $resort_id = $this->globalUser->resort_id;
@@ -169,7 +168,6 @@ class TalentAcquisitionDashboardController extends Controller
     {
         // try {
             $page_title ='Talent Acquisition Dashboard';
-            $page_header = '<span class="arca-font">My</span> Dashboard';
             $currentYear = date('Y');
             $nextYear = $currentYear + 1;
             $resort_id = $this->globalUser->resort_id;
