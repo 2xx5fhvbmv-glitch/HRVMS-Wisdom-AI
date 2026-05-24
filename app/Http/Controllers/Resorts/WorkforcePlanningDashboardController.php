@@ -736,7 +736,6 @@ class WorkforcePlanningDashboardController extends Controller
                 ->where('p.resort_id', '=', $resort->resort_id)
                 ->where('p.dept_id', '=', $Dept_id)
                 ->select('p.id', 'p.position_title')
-                ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.vacantcount END), 0) as vacantcount', [$currentYear])
                 ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.headcount END), 0) as headcount', [$currentYear])
                 ->groupBy('p.id', 'p.position_title')
                 ->get();
@@ -744,10 +743,24 @@ class WorkforcePlanningDashboardController extends Controller
 
             // Attach employees to each vacant position — batch into ONE query
             // (was firing one query per position in a hot dashboard path).
+            //
+            // Filter to the CURRENT actually-working population: matching
+            // resort + dept, status Active, and last_working_day either null
+            // or still in the future. Without these guards a transferred /
+            // resigned employee kept appearing under their old position and
+            // the vacant count was always 0.
+            $today = \Carbon\Carbon::today()->toDateString();
             $vacantPositionIds = collect($vacant_positions)->pluck('id')->all();
             $employeesByVacantPosition = DB::table('employees as e')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->whereIn('e.position_id', $vacantPositionIds)
+                ->where('e.resort_id', $resort->resort_id)
+                ->where('e.Dept_id', $Dept_id)
+                ->where('e.status', 'Active')
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('e.last_working_day')
+                      ->orWhereDate('e.last_working_day', '>', $today);
+                })
                 ->get([
                     'e.position_id',
                     'ra.first_name',
@@ -758,8 +771,16 @@ class WorkforcePlanningDashboardController extends Controller
                 ])
                 ->groupBy('position_id');
 
+            // Real-time vacant count = headcount − currently-active filled.
+            // Mirrors the manning math the scheduler eventually catches up to,
+            // but doesn't depend on it — so a transfer applied today (or an
+            // employee whose LWD just passed) reflects in the count instantly.
             foreach ($vacant_positions as $position) {
                 $position->employees = $employeesByVacantPosition->get($position->id, collect())->values();
+                $filled = $position->employees->count();
+                $head   = (int) $position->headcount;
+                $position->filledcount = $filled;
+                $position->vacantcount = max(0, $head - $filled);
             }
             return view('resorts.workforce_planning.hoddashboard',compact('page_header','totalemployees','BudgetRejactedStatus','BudgetStatus','getNotifications','employees','LeftemployeesCount','HODpendingResponse','ManningPendingRequestCount','resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','total_emp','positions','department_details','positionsWithEmployees','nextYear','Dept_id','vacant_positions'));
         }
@@ -800,17 +821,27 @@ class WorkforcePlanningDashboardController extends Controller
                 ->where('p.resort_id', '=', $ResortId)
                 ->where('p.dept_id', '=', $Dept_id)
                 ->select('p.id', 'p.position_title')
-                ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.vacantcount END), 0) as vacantcount', [$year])
                 ->selectRaw('COALESCE(MAX(CASE WHEN mr.year = ? THEN pmd.headcount END), 0) as headcount', [$year])
                 ->groupBy('p.id', 'p.position_title')
                 ->get();
 
-            // Attach employees to each vacant position — batch into ONE query
-            // (was firing one query per position in a hot dashboard path).
+            // Attach employees — current actually-working population only.
+            // Without the resort/dept/status/last_working_day guards, stale
+            // employees (transferred out, resigned past LWD) inflated the
+            // filled count and the vacancy showed 0 even when the seat was
+            // genuinely open.
+            $today = \Carbon\Carbon::today()->toDateString();
             $vacantPositionIds = collect($vacant_positions)->pluck('id')->all();
             $employeesByVacantPosition = DB::table('employees as e')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->whereIn('e.position_id', $vacantPositionIds)
+                ->where('e.resort_id', $ResortId)
+                ->where('e.Dept_id', $Dept_id)
+                ->where('e.status', 'Active')
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('e.last_working_day')
+                      ->orWhereDate('e.last_working_day', '>', $today);
+                })
                 ->get([
                     'e.position_id',
                     'ra.first_name',
@@ -821,8 +852,13 @@ class WorkforcePlanningDashboardController extends Controller
                 ])
                 ->groupBy('position_id');
 
+            // Real-time vacant count from headcount − actually-filled.
             foreach ($vacant_positions as $position) {
                 $position->employees = $employeesByVacantPosition->get($position->id, collect())->values();
+                $filled = $position->employees->count();
+                $head   = (int) $position->headcount;
+                $position->filledcount = $filled;
+                $position->vacantcount = max(0, $head - $filled);
             }
             $html =  view('resorts.renderfiles.DepartmentWisePositions',compact('vacant_positions'))->render();
             $response['success'] = true;
