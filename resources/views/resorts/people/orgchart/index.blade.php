@@ -341,8 +341,8 @@ async function convertImagesToBase64() {
     var empIds = [];
     if (chart && chart.config && Array.isArray(chart.config.nodes)) {
         chart.config.nodes.forEach(function (n) {
-            if (n && typeof n.id === 'string' && n.id.indexOf('emp_') === 0 && n.employee_id) {
-                empIds.push(n.employee_id);
+            if (n && typeof n.id === 'string' && n.id.indexOf('emp_') === 0 && n._employee_id) {
+                empIds.push(n._employee_id);
             }
         });
     }
@@ -371,7 +371,7 @@ async function convertImagesToBase64() {
     var nodeIdToEmpId = {};
     if (chart && chart.config && Array.isArray(chart.config.nodes)) {
         chart.config.nodes.forEach(function (n) {
-            if (n && n.employee_id) nodeIdToEmpId[n.id] = n.employee_id;
+            if (n && n._employee_id) nodeIdToEmpId[n.id] = n._employee_id;
         });
     }
 
@@ -420,6 +420,61 @@ function imageToBase64(url) {
     });
 }
 
+// Capture the full SVG (not just the viewport) onto a high-DPI canvas.
+//
+// Reads the SVG's content extent from getBBox() — that's the true bounding
+// box of every drawn node, even those panned out of view in #tree. We then
+// clone the SVG, set its width/height/viewBox to that full extent, serialise
+// it to a data URL and rasterise via an Image onto a canvas. Returns the
+// canvas ready to embed into jsPDF.
+async function renderSvgToCanvas(svgEl) {
+    // Bounding box of all drawn content. Margin gives the PDF some padding.
+    const margin = 40;
+    let bx = 0, by = 0, bw = svgEl.scrollWidth || 1200, bh = svgEl.scrollHeight || 800;
+    try {
+        const bb = svgEl.getBBox();
+        if (bb && bb.width && bb.height) {
+            bx = bb.x - margin;
+            by = bb.y - margin;
+            bw = bb.width  + margin * 2;
+            bh = bb.height + margin * 2;
+        }
+    } catch (e) { /* getBBox can throw on detached SVGs — keep defaults */ }
+
+    // Clone so we don't mutate the live chart.
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    clone.setAttribute('width',  bw);
+    clone.setAttribute('height', bh);
+    clone.setAttribute('viewBox', bx + ' ' + by + ' ' + bw + ' ' + bh);
+    clone.style.background = '#ffffff';
+
+    // High-DPI bitmap: 2x for crisp text/images in the PDF.
+    const scale = 2;
+    const xml = new XMLSerializer().serializeToString(clone);
+    const svg64 = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(xml)));
+
+    return new Promise(function (resolve, reject) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.ceil(bw * scale);
+            canvas.height = Math.ceil(bh * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas);
+        };
+        img.onerror = function (e) {
+            reject(new Error('SVG-to-image rasterisation failed: ' + (e && e.message ? e.message : 'unknown')));
+        };
+        img.src = svg64;
+    });
+}
+
 // Enhanced canvas-based PDF export with image handling
 async function exportToPDFCanvas() {
     // Show loading indicator
@@ -430,66 +485,60 @@ async function exportToPDFCanvas() {
         // Step 1: Preload all images
         console.log('Step 1: Preloading images...');
         await preloadImages();
-        
+
         // Update loading message
         $('#pdf-loading-canvas .bg-white div:last-child').text('Converting images...');
-        
+
         // Step 2: Convert images to base64
         console.log('Step 2: Converting images to base64...');
         await convertImagesToBase64();
-        
+
         // Update loading message
         $('#pdf-loading-canvas .bg-white div:last-child').text('Generating PDF...');
-        
+
         // Step 3: Wait a bit more for everything to settle
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const element = document.getElementById('tree');
-        
+
+        const wrapperEl = document.getElementById('tree');
+        const svgEl     = wrapperEl.querySelector('svg');
+
         console.log('Step 3: Capturing with html2canvas...');
-        
-        // Use html2canvas to capture the chart with enhanced image handling
-        const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            width: element.scrollWidth,
-            height: element.scrollHeight,
-            logging: false,
-            imageTimeout: 15000,
-            onclone: function(clonedDoc) {
-                // Ensure all images in cloned document are properly set
-                const clonedImages = clonedDoc.querySelectorAll('img, image');
-                clonedImages.forEach(img => {
-                    if (img.tagName.toLowerCase() === 'img') {
-                        img.style.display = 'block';
-                        img.style.maxWidth = 'none';
-                        img.style.maxHeight = 'none';
-                    }
-                });
-                
-                // Ensure SVG elements are properly rendered
-                const svgElements = clonedDoc.querySelectorAll('svg');
-                svgElements.forEach(svg => {
-                    svg.style.overflow = 'visible';
-                });
-            }
-        });
-        
+
+        // Capturing #tree only got the visible viewport because the wrapper
+        // has overflow:auto + viewport-sized dimensions; the SVG content
+        // extends beyond. To capture the FULL chart we serialise the SVG
+        // (which knows its true intrinsic size via getBBox / viewBox), draw
+        // it onto a properly-sized canvas, and use THAT canvas in the PDF.
+        let canvas;
+        if (svgEl) {
+            canvas = await renderSvgToCanvas(svgEl);
+        } else {
+            // Defensive fallback — shouldn't hit this path under BALKAN.
+            canvas = await html2canvas(wrapperEl, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                width: wrapperEl.scrollWidth,
+                height: wrapperEl.scrollHeight,
+                logging: false,
+                imageTimeout: 15000,
+            });
+        }
+
         console.log('Step 4: Creating PDF...');
-        
+
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('l', 'mm', 'a4'); // landscape, millimeters, A4
-        
+
         const imgData = canvas.toDataURL('image/png', 1.0);
         const imgWidth = 297; // A4 landscape width in mm
         const pageHeight = 210; // A4 landscape height in mm
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         let heightLeft = imgHeight;
-        
+
         let position = 0;
-        
+
         // Add title
         pdf.setFontSize(16);
         pdf.text('Organization Chart', 148.5, 15, { align: 'center' });
@@ -596,6 +645,25 @@ function initializeOrUpdateChart(departmentId = null) {
                 scaleMin: 0.2,
                 scaleMax: 2,
                 toolbar: { layout: true, zoom: true, fit: true, expandAll: false, fullScreen: true },
+                // Limit the node-detail popup to a small, curated set of
+                // fields. Without `generateElementsFromFields:false` the
+                // library auto-emits one textbox per node attribute — that's
+                // how the raw "department_id 81 / reporting_to 188 /
+                // is_vacant false" rows + the image URL ended up in the
+                // popup. Name is omitted because it's already in the title.
+                editForm: {
+                    readOnly: true,
+                    titleBinding: 'name',
+                    photoBinding: 'img',
+                    generateElementsFromFields: false,
+                    elements: [
+                        { type: 'textbox', label: 'Employee ID',  binding: 'emp_id_display' },
+                        { type: 'textbox', label: 'Position',     binding: 'position' },
+                        { type: 'textbox', label: 'Department',   binding: 'department_name' },
+                        { type: 'textbox', label: 'Joining Date', binding: 'joinDate' },
+                    ],
+                    buttons: { edit: null, share: null, pdf: null, remove: null },
+                },
                 // Enhanced PDF export configuration
                 pdfExport: {
                     format: "A4",
