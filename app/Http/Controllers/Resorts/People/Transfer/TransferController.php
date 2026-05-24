@@ -323,6 +323,18 @@ class TransferController extends Controller
             return ['vacant' => false, 'message' => 'Target position not found.'];
         }
 
+        // Guard: picking the employee's CURRENT position as the target isn't
+        // a transfer — no seat changes. Previously this code subtracted the
+        // employee from filled "to make room for themselves", which made a
+        // 2/2-occupied position look like 1 vacant seat.
+        $employee = Employee::where('resort_id', $resortId)->find($employeeId);
+        if ($employee && (int) $employee->Position_id === (int) $targetPositionId) {
+            return [
+                'vacant'  => false,
+                'message' => 'Employee is already in this position. Pick a different target position.',
+            ];
+        }
+
         // --- Primary source: Workforce Planning (manning_responses + position_monthly_data).
         // This is what the Workforce Planning module reports as the authoritative
         // vacant count. Use the most recent manning year that has a row for this
