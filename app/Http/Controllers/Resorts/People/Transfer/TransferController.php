@@ -2009,4 +2009,80 @@ class TransferController extends Controller
         return $pdf->download('Transfer_Letter_' . ($transfer->employee->Emp_id ?? $transfer->id) . '.pdf');
     }
 
+    /**
+     * Inline preview of the Transfer Letter — same PDF as the download
+     * endpoint, but streamed so the browser displays it in a new tab
+     * instead of forcing a download. Uses the resort's configured
+     * letterhead + e-signature so HR sees exactly what the employee
+     * received via email.
+     */
+    public function previewTransferLetter($id)
+    {
+        $transfer = EmployeeTransfer::with([
+            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition'
+        ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
+
+        $resort = Resort::find($transfer->resort_id);
+        $letterhead = Common::getLetterheadData($transfer->resort_id);
+
+        $pdf = Pdf::loadView('resorts.people.transfer.transfer_letter_pdf', [
+            'transfer'       => $transfer,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($transfer->resort_id),
+            'employeeName'   => optional($transfer->employee->resortAdmin)->full_name ?? 'Employee',
+            'letterhead'     => $letterhead,
+            'signatureImage' => $letterhead['signatureImage'],
+            'signatoryName'  => $letterhead['signatoryName'] ?: 'Human Resources Department',
+            'signatoryTitle' => $letterhead['signatoryTitle']
+                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        $filename = 'Transfer_Letter_' . ($transfer->employee->Emp_id ?? $transfer->id) . '.pdf';
+        return $pdf->stream($filename);
+    }
+
+    /**
+     * Manually (re-)send the Transfer Letter to the transferred employee.
+     * Reuses the same generator the final-approval flow uses — so the file
+     * lands in File Management, the transfer record is marked dispatched,
+     * and the employee receives the email. Safe to call multiple times.
+     */
+    public function sendTransferLetter($id)
+    {
+        $transfer = EmployeeTransfer::with([
+            'employee.resortAdmin', 'targetDepartment', 'targetPosition', 'currentDepartment', 'currentPosition'
+        ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
+
+        if ($transfer->status !== 'Approved') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Letter can only be sent once the transfer is fully approved.',
+            ], 422);
+        }
+
+        $email = optional(optional($transfer->employee)->resortAdmin)->email;
+        if (empty($email)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot send — the employee doesn't have an email on file.",
+            ], 422);
+        }
+
+        try {
+            $this->generateAndSendTransferLetter($transfer);
+        } catch (\Throwable $e) {
+            \Log::error('Manual transfer letter send failed for #' . $transfer->id . ': ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not send the letter: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer Letter emailed to ' . $email . '.',
+        ]);
+    }
+
 }
