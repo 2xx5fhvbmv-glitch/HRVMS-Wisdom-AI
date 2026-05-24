@@ -503,6 +503,14 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post( '/top-hiring-sources', 'TalentAcquisitionDashboardController@topHiringSources')->name('resort.ta.topHiringSources');
     Route::get( '/talent-acquisition/get-offline-interview', ['App\Http\Controllers\Resorts\TalentAcquisition\OfflineInterviewController','create'])->name('offline-interview.create');
 
+    // Offline Interview wizard — step endpoints + finalize + delete.
+    Route::post('/offline-interview/save-step-1', 'TalentAcquisition\OfflineInterviewController@saveStep1')->name('offline-interview.saveStep1');
+    Route::post('/offline-interview/save-step-2', 'TalentAcquisition\OfflineInterviewController@saveStep2')->name('offline-interview.saveStep2');
+    Route::post('/offline-interview/save-step-3', 'TalentAcquisition\OfflineInterviewController@saveStep3')->name('offline-interview.saveStep3');
+    Route::post('/offline-interview/save-step-4', 'TalentAcquisition\OfflineInterviewController@saveStep4')->name('offline-interview.saveStep4');
+    Route::post('/offline-interview/finalize',    'TalentAcquisition\OfflineInterviewController@finalize')->name('offline-interview.finalize');
+    Route::delete('/offline-interview/{id}',      'TalentAcquisition\OfflineInterviewController@destroy')->name('offline-interview.destroy')->where('id', '[0-9]+');
+
     //End of Talent Acquisition
 
     // Time and Attendance Dashboard
