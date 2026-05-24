@@ -12,7 +12,11 @@ class EmployeeTransferApproval extends Model
 
 
     protected $fillable = [
-        'transfer_id','status','approval_rank','approved_by','remarks',
+        'transfer_id','status','approval_rank','approved_by','remarks','approved_at',
+    ];
+
+    protected $casts = [
+        'approved_at' => 'datetime',
     ];
 
     public function approver()
