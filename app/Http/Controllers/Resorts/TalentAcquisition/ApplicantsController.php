@@ -1657,7 +1657,12 @@ class ApplicantsController extends Controller
     public function GetDateclickWiseUpcomingInterview(Request $request)
     {
         $date = $request->date ? Carbon::parse($request->date) : null;
-        $resort_id = $request->Resort_id;
+        // Some master dashboards (e.g. master/hr-dashboard) don't render the
+        // #Dasboard_resort_id hidden input, so the AJAX POST arrives without
+        // Resort_id. Fall back to the authenticated user's resort_id so the
+        // query isn't silently scoped to nothing — that was the source of
+        // "No Record Found" even when the user clearly had matching items.
+        $resort_id = $request->Resort_id ?: (optional($this->resort)->resort_id ?? null);
         $currentMonthStart = $request->start ? Carbon::parse($request->start) : Carbon::now()->startOfMonth();
         $currentMonthEnd = $request->end ? Carbon::parse($request->end) : Carbon::now()->endOfMonth();
 
