@@ -47,8 +47,10 @@
                     <div id="calendar" class="calendar-event"></div>
                 </div>
                 <div class="col-xxl-3 col-lg-4 ">
-                    <div class="leaveUser-main" id="calsidebar">
-                       
+                    {{-- Cap the session-list height to match the calendar so a long
+                         list scrolls inside the panel instead of pushing the page. --}}
+                    <div class="leaveUser-main" id="calsidebar"
+                         style="max-height: 640px; overflow-y: auto; padding-right: 6px;">
                     </div>
                 </div>
 

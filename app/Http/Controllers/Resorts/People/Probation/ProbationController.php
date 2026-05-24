@@ -463,12 +463,61 @@ class ProbationController extends Controller
                 $finalReviewBadge  = 'badge-themeWarning';
         }
 
+        // --- Performance Cycles the probationer is enrolled in ---
+        // Mirrors the Performance Dashboard lookup: an employee belongs to a
+        // cycle when a performa_child_cycles row exists for them under that
+        // parent cycle. Emp_main_id was stored historically as numeric id,
+        // base64(id), or the Emp_id string — match all three.
+        $empMatchValues = [(string) $employee->id, base64_encode($employee->id)];
+        if (!empty($employee->Emp_id)) $empMatchValues[] = $employee->Emp_id;
+
+        $childRows = \App\Models\PerformaChildCycle::whereIn('Emp_main_id', $empMatchValues)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $performanceCycles = [];
+        if ($childRows->isNotEmpty()) {
+            $parentIds = $childRows->pluck('Parent_cycle_id')->unique()->all();
+            $parents = \App\Models\PerformanceCycle::where('resort_id', $employee->resort_id)
+                ->whereIn('id', $parentIds)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($childRows as $child) {
+                $parent = $parents->get($child->Parent_cycle_id);
+                if (!$parent) continue;
+
+                // Three-state overall label — same rule the Performance grid uses.
+                if ($child->manager_review_status === 'completed'
+                    || ($child->manager_review_status === 'not_applicable' && $child->self_review_status === 'completed')) {
+                    $label = 'Done';
+                    $badge = 'badge-themeSuccess';
+                } else {
+                    $label = 'In Progress';
+                    $badge = 'badge-themeWarning';
+                }
+
+                $performanceCycles[] = [
+                    'name'              => $parent->Cycle_Name,
+                    'summary'           => $parent->CycleSummary,
+                    'start'             => $parent->Start_Date ? Carbon::parse($parent->Start_Date)->format('d M Y') : '—',
+                    'end'               => $parent->End_Date   ? Carbon::parse($parent->End_Date)->format('d M Y')   : '—',
+                    'cycle_status'      => $parent->status,
+                    'self_status'       => $child->self_review_status ?: 'pending',
+                    'manager_status'    => $child->manager_review_status ?: 'pending',
+                    'label'             => $label,
+                    'badge'             => $badge,
+                ];
+            }
+        }
+
         return view('resorts.people.probation.detail', compact(
             'page_title', 'employee', 'monthlyCheckins',
             'joiningLabel', 'probationEndLabel', 'remainingDays', 'progress',
             'probationCompleted',
             'onboardingPrograms',
-            'finalReviewStatus', 'finalReviewBadge'
+            'finalReviewStatus', 'finalReviewBadge',
+            'performanceCycles'
         ));
     }
 

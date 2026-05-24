@@ -81,7 +81,7 @@
                             @if($employee->reportingTo)
                                 <div class="d-flex align-items-center mb-3">
                                     <div class="img-circle userImg-block me-md-3 me-2">
-                                        <img src="{{ Common::getResortUserPicture(optional($employee->reportingToAdmin)->Admin_Parent_id ?? null) }}" alt="image">
+                                        <img src="{{ Common::getResortUserPicture(optional($employee->reportingToAdmin)->id ?? null) }}" alt="image">
                                     </div>
                                     <div>
                                         <h4 class="fw-600">{{ optional($employee->reportingToAdmin)->first_name }} {{ optional($employee->reportingToAdmin)->last_name }}</h4>
@@ -113,6 +113,46 @@
                         </div>
                     </div>
                     <div class="col-xl-9 col-lg-8 col-md-7">
+                        {{-- Performance Cycle(s) this probationer is enrolled in.
+                             Pulled from performa_child_cycles. Empty list ⇒ probationer
+                             isn't assigned to any active or past cycle yet. --}}
+                        @if(!empty($performanceCycles))
+                            <div class="cardBorder-block mb-3">
+                                <div class="card-title">
+                                    <h3>Performance Cycle</h3>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table mb-0 small">
+                                        <thead>
+                                            <tr>
+                                                <th>Cycle</th>
+                                                <th>Period</th>
+                                                <th>Self Review</th>
+                                                <th>Manager Review</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($performanceCycles as $cycle)
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ $cycle['name'] }}</strong>
+                                                        @if(!empty($cycle['cycle_status']))
+                                                            <span class="badge badge-themeGrayLight ms-1">{{ $cycle['cycle_status'] }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ $cycle['start'] }} &rarr; {{ $cycle['end'] }}</td>
+                                                    <td><span class="text-capitalize">{{ str_replace('_', ' ', $cycle['self_status']) }}</span></td>
+                                                    <td><span class="text-capitalize">{{ str_replace('_', ' ', $cycle['manager_status']) }}</span></td>
+                                                    <td><span class="badge {{ $cycle['badge'] }}">{{ $cycle['label'] }}</span></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="cardBorder-block">
                             <div class="card-title">
                                 <h3>Progress Tracking</h3>

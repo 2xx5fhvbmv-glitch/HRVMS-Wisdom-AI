@@ -404,11 +404,17 @@ class PayslipController extends Controller
        
         // dd( $totalAllocatedDays,$totalAvailableDays);
         $formattedHireddate = $employee->joining_date ? Carbon::createFromFormat('Y-m-d', $employee->joining_date)->format('d M Y') : null;
-        $last_promotion = EmployeePromotion::where('employee_id',$request->employee_id)->orderBy('id','desc')->first();
-        if(isset($last_promotion) && !empty($last_promotion))
-            $formattedLastPromotionDate = $last_promotion->effective_date ? Carbon::createFromFormat('Y-m-d', $last_promotion->effective_date)->format('d M Y') : null;
-        else
-            $formattedLastPromotionDate = null;
+        // Last Promotion Date — only counts APPROVED promotions, ordered by
+        // effective_date desc. Pending or Rejected rows shouldn't show up as
+        // "last promotion" on the Initiate Promotion screen.
+        $last_promotion = EmployeePromotion::where('employee_id', $request->employee_id)
+            ->where('status', 'Approved')
+            ->orderByDesc('effective_date')
+            ->orderByDesc('id')
+            ->first();
+        $formattedLastPromotionDate = ($last_promotion && $last_promotion->effective_date)
+            ? Carbon::parse($last_promotion->effective_date)->format('d M Y')
+            : null;
         return response()->json([
             "success" => true,
             "data" => [

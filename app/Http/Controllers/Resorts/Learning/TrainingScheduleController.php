@@ -176,7 +176,27 @@ class TrainingScheduleController extends Controller
             }
 
             // dd($trainings);
+            // Canonical display formats: dates as `d M Y` (e.g. "26 Apr 2026"),
+            // times as `h:i A` (e.g. "02:00 PM"). Raw ISO is kept in data-iso
+            // / data-raw on a wrapper span so the inline edit handler still has
+            // a machine-readable value to parse.
+            $fmtDate = function ($raw) {
+                if (!$raw) return '<span data-iso="">—</span>';
+                $iso = \Carbon\Carbon::parse($raw)->format('Y-m-d');
+                $display = \Carbon\Carbon::parse($raw)->format('d M Y');
+                return '<span data-iso="' . e($iso) . '">' . e($display) . '</span>';
+            };
+            $fmtTime = function ($raw) {
+                if (!$raw) return '<span data-raw="">—</span>';
+                $display = \Carbon\Carbon::parse($raw)->format('h:i A');
+                return '<span data-raw="' . e($raw) . '">' . e($display) . '</span>';
+            };
+
             return datatables()->of($trainings)
+            ->editColumn('start_date', fn($row) => $fmtDate($row->start_date))
+            ->editColumn('end_date',   fn($row) => $fmtDate($row->end_date))
+            ->editColumn('start_time', fn($row) => $fmtTime($row->start_time))
+            ->editColumn('end_time',   fn($row) => $fmtTime($row->end_time))
             ->addColumn('status', function ($row) {
                 // Date-derived status — same rule as the dashboard tile counts and
                 // the training-history page so all three views agree.
@@ -250,7 +270,7 @@ class TrainingScheduleController extends Controller
                             <i class="fas fa-calendar-check" aria-hidden="true"></i>
                         </a>';
             })
-            ->rawColumns(['trainer', 'attendees', 'action', 'status'])
+            ->rawColumns(['trainer', 'attendees', 'action', 'status', 'start_date', 'end_date', 'start_time', 'end_time'])
             ->make(true);
         
         } catch (\Exception $e) {

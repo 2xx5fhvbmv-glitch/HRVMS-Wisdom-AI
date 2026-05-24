@@ -311,40 +311,70 @@ async function preloadImages() {
     }
 }
 
-// Convert images to base64 for better PDF compatibility
+// Convert images to base64 for better PDF compatibility.
+//
+// Earlier this tried to draw each <image> onto a <canvas> client-side, but
+// canvas.toDataURL() throws SecurityError when the source URL doesn't return
+// CORS headers — which is the case for our profile images. The PDF then came
+// out with broken/blank image placeholders. New flow:
+//   1. Collect numeric employee IDs from current chart nodes (`emp_<id>`).
+//   2. POST them to our own /bulk-images-base64 endpoint which reads the
+//      files from disk server-side and returns ready-to-paste data URLs.
+//   3. Substitute the xlink:href on every <image> inside #tree.
 async function convertImagesToBase64() {
-    const images = document.querySelectorAll('#tree img');
-    const svgImages = document.querySelectorAll('#tree image');
-    
-    // Handle regular img elements
-    for (let img of images) {
-        try {
-            if (img.src && !img.src.startsWith('data:')) {
-                const base64 = await imageToBase64(img.src);
-                if (base64) {
-                    img.src = base64;
-                }
+    // Pull employee IDs out of the chart instance — node ids look like
+    // "emp_42" / "vacant_7" / "root_org". Only employee nodes have a server
+    // profile picture worth fetching.
+    var empIds = [];
+    if (chart && chart.config && Array.isArray(chart.config.nodes)) {
+        chart.config.nodes.forEach(function (n) {
+            if (n && typeof n.id === 'string' && n.id.indexOf('emp_') === 0 && n.employee_id) {
+                empIds.push(n.employee_id);
             }
-        } catch (error) {
-            console.warn('Failed to convert image to base64:', img.src, error);
-        }
+        });
     }
-    
-    // Handle SVG image elements
-    for (let svgImg of svgImages) {
-        try {
-            const src = svgImg.getAttribute('xlink:href') || svgImg.getAttribute('href');
-            if (src && !src.startsWith('data:') && src.startsWith('http')) {
-                const base64 = await imageToBase64(src);
-                if (base64) {
-                    svgImg.setAttribute('xlink:href', base64);
-                    svgImg.setAttribute('href', base64);
-                }
+    if (empIds.length === 0) return;
+
+    var base64Map = {};
+    try {
+        var resp = await $.ajax({
+            url: '{{ route("people.org-chart.getBulkImagesBase64") }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                employee_ids: empIds,
             }
-        } catch (error) {
-            console.warn('Failed to convert SVG image to base64:', src, error);
+        });
+        if (resp && resp.success && resp.images) {
+            base64Map = resp.images;
         }
+    } catch (e) {
+        console.warn('Bulk image base64 fetch failed', e);
+        return;
     }
+
+    // Map each chart node back to its employee_id so we can identify which
+    // <image> element belongs to which employee via the chart's data attrs.
+    var nodeIdToEmpId = {};
+    if (chart && chart.config && Array.isArray(chart.config.nodes)) {
+        chart.config.nodes.forEach(function (n) {
+            if (n && n.employee_id) nodeIdToEmpId[n.id] = n.employee_id;
+        });
+    }
+
+    // OrgChart renders nodes inside <g data-n-id="<nodeId>">; find each
+    // node's <image> child and swap xlink:href with our base64 URL.
+    document.querySelectorAll('#tree g[data-n-id]').forEach(function (g) {
+        var nodeId = g.getAttribute('data-n-id');
+        var empId = nodeIdToEmpId[nodeId];
+        if (!empId) return;
+        var b64 = base64Map[empId];
+        if (!b64) return;
+        g.querySelectorAll('image').forEach(function (img) {
+            img.setAttribute('xlink:href', b64);
+            img.setAttribute('href', b64);
+        });
+    });
 }
 
 // Helper function to convert image URL to base64
@@ -502,11 +532,24 @@ function fetchEmployeeData(departmentId = null) {
 // Initialize or update the OrgChart
 function initializeOrUpdateChart(departmentId = null) {
     fetchEmployeeData(departmentId).done(function(nodes) {
-        const rootNodes = nodes.filter(node => !node.pid || !nodes.some(n => n.id === node.pid));
+        // Normalize: every node whose pid points at a non-existent node
+        // (orphan — e.g. parent was inactive / out of scope / never set) is
+        // promoted to a root. Without this, an orphan with a stale pid never
+        // renders because the chart library can't find its parent.
+        const idSet = new Set(nodes.map(n => n.id));
+        nodes.forEach(n => {
+            if (n.pid && !idSet.has(n.pid)) n.pid = null;
+        });
 
-        if (rootNodes.length > 1) {
+        const rootNodes = nodes.filter(node => !node.pid);
+
+        // Always anchor under an "Organization" root when there's any node to
+        // draw. This guarantees a default view even when there's exactly one
+        // root or multiple disconnected branches (e.g. multi-division
+        // resorts, or dept-scoped HOD views).
+        if (rootNodes.length >= 1) {
             nodes.unshift({
-                id: -1,
+                id: 'root_org',
                 name: "Organization",
                 position: "All Employees",
                 joinDate: "",
@@ -514,7 +557,7 @@ function initializeOrUpdateChart(departmentId = null) {
             });
 
             rootNodes.forEach(node => {
-                node.pid = -1;
+                node.pid = 'root_org';
             });
         }
 

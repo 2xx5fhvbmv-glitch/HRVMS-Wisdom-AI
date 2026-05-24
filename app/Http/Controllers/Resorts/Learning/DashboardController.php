@@ -619,13 +619,32 @@ class DashboardController extends Controller
             ->map(fn($rows) => $rows->pluck('training_id')->unique()->all())
             ->toArray();
 
+        // Pre-compute (employee × program) pairs that already have an in-flight
+        // schedule — a session whose end_date hasn't passed yet. The page is
+        // "Action Needed" for L&D, so once a session is booked the row leaves
+        // the list. If the session ends without Present attendance, the row
+        // reappears as Overdue on the next render.
+        $today = \Carbon\Carbon::now()->toDateString();
+        $scheduled = \DB::table('training_participants as tp')
+            ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+            ->where('ts.resort_id', $resortId)
+            ->whereIn('ts.training_id', $programIds)
+            ->where('ts.end_date', '>=', $today)
+            ->select('tp.employee_id', 'ts.training_id')
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn($rows) => $rows->pluck('training_id')->unique()->all())
+            ->toArray();
+
         $rows = [];
         foreach ($probationers as $emp) {
             $deadlineAnchor = $emp->joining_date ? \Carbon\Carbon::parse($emp->joining_date) : null;
             $empCompleted = $completed[$emp->id] ?? [];
+            $empScheduled = $scheduled[$emp->id] ?? [];
 
             foreach ($required as $r) {
                 if (in_array($r->program_id, $empCompleted, true)) continue; // already completed
+                if (in_array($r->program_id, $empScheduled, true)) continue; // session already booked, not yet ended
 
                 $dueOn = ($deadlineAnchor && $r->completion_days)
                     ? (clone $deadlineAnchor)->addDays((int) $r->completion_days)

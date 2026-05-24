@@ -141,8 +141,12 @@
                             </div>
                             <div class="col-sm-6">
                                 <label for="level" class="form-label">LEVEL <span class="red-mark">*</span></label>
-                                <select id="level" class="form-select select2t-none" name="level" @if(isset($isViewMode) && $isViewMode) disabled @endif required 
-                                data-parsley-required-message="Please select level" data-parsley-errors-container="#level-error">
+                                {{-- Level is always read-only on this form — it's derived from
+                                     the selected New Position via getDetails(). The hidden
+                                     input below carries the value to the server since a
+                                     disabled <select> doesn't submit. --}}
+                                <select id="level" class="form-select select2t-none" disabled
+                                    data-parsley-errors-container="#level-error">
                                     <option value="">Select Level</option>
                                     @if(!empty($emp_grade))
                                         @foreach ($emp_grade as $key => $value)
@@ -150,6 +154,9 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <input type="hidden" id="level_value" name="level" required
+                                    data-parsley-required-message="Please select a New Position to auto-fill Level"
+                                    data-parsley-errors-container="#level-error">
                                 <div id="level-error"></div>
                             </div>
                             <div class="col-md-3 col-sm-6">
@@ -199,7 +206,7 @@
                             <div class="col-md-6">
                                 <label for="benefit_grid" class="form-label">BENEFIT GRID UPDATE <span class="red-mark">*</span></label>
                                 <select class="form-select select2t-none" id="benefit_grid" name="benefit_grid"
-                                    aria-label="Default select example" required 
+                                    aria-label="Default select example" required
                                     data-parsley-required-message="Please select benefit grid" data-parsley-errors-container="#benefitgrid-error">
                                     <option value="">BENEFIT GRID UPDATE</option>
                                     @if($benefitGrids)
@@ -209,6 +216,10 @@
                                     @endif
                                 </select>
                                 <div id="benefitgrid-error"></div>
+                                {{-- Mirror the Current Details "View Benefit Grid" link so HR
+                                     can preview the chosen grid before submitting. --}}
+                                <a class="a-link view-benifit-grid mt-1 d-inline-block" id="new-view-benifit-grid"
+                                   style="display:none;" target="_blank">View Benefit Grid</a>
                             </div>
                             <div class="col-md-6">
                                 <label for="comments" class="form-label">COMMENTS</label>
@@ -246,6 +257,25 @@
 
         $('.filter-checkbox').on('change', function () {
             applyFilters();
+        });
+
+        // Keep the hidden `level` value in sync with the (disabled) level
+        // select — needed because a disabled <select> isn't submitted with the
+        // form, but we still want the server to receive the chosen level.
+        $('#level').on('change', function () {
+            $('#level_value').val($(this).val() || '');
+        });
+
+        // New Benefit Grid — when a value is picked, expose a "View Benefit
+        // Grid" link pointing at the benefit-grid page for that level.
+        $('#benefit_grid').on('change', function () {
+            var level = $(this).val();
+            if (level) {
+                var url = "{{ url('resort/people/benefit-grid/view') }}/" + encodeURIComponent(level);
+                $('#new-view-benifit-grid').attr('href', url).show();
+            } else {
+                $('#new-view-benifit-grid').removeAttr('href').hide();
+            }
         });
          // Custom Parsley validator to ensure at least one of the fields is filled
         Parsley.addValidator('oneorother', {
@@ -448,10 +478,12 @@
 
                     console.log(gridLevel);
 
-                    // Set value in Select2 dropdown
+                    // Set value in Select2 dropdown + sync hidden level input
+                    // so the disabled select still submits a value server-side.
                     if (gridLevel) {
                         $('#benefit_grid').val(gridLevel).trigger('change');
                         $('#level').val(gridLevel).trigger('change');
+                        $('#level_value').val(gridLevel);
                     }
                     if (response.data.job_desc_url) {
                         $('#new-job-description-link')
@@ -488,31 +520,48 @@
 
         const $dropdown = $('#select_employee');
 
-        // Restore all options first
+        // Restore all options first.
         $dropdown.html('');
         Object.values(allOptions).forEach(opt => {
             $dropdown.append(opt.clone());
         });
 
-        if (filters.length > 0) {
-            $.ajax({
-                url: '{{ route("resort.promotion.getFilteredEmployees") }}', // define this route
-                method: 'POST',
-                data: {
-                    _token: '{{ csrf_token() }}',
-                    filters: filters
-                },
-                success: function (response) {
-                    // response should be array of employee IDs to exclude
-                    response.exclude_ids.forEach(id => {
-                        $dropdown.find(`option[value="${id}"]`).remove();
-                    });
-                },
-                error: function (err) {
-                    console.error('Error fetching filtered employees', err);
-                }
-            });
+        // Helper — rebuild the Select2 widget after we change the underlying
+        // <option> set so the picker reflects the filtered list. Without this
+        // step Select2 keeps showing the original option set even though
+        // the DOM <select> has changed, which is exactly why the checkboxes
+        // "did nothing" visually.
+        function refreshSelect2() {
+            if ($dropdown.data('select2')) {
+                $dropdown.select2('destroy');
+            }
+            $dropdown.val('').select2();
         }
+
+        if (filters.length === 0) {
+            refreshSelect2();
+            return;
+        }
+
+        $.ajax({
+            url: '{{ route("resort.promotion.getFilteredEmployees") }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                filters: filters
+            },
+            success: function (response) {
+                (response.exclude_ids || []).forEach(id => {
+                    $dropdown.find(`option[value="${id}"]`).remove();
+                });
+                refreshSelect2();
+            },
+            error: function (err) {
+                console.error('Error fetching filtered employees', err);
+                refreshSelect2();
+                toastr.error('Could not apply filter.', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        });
     }
 </script>
 @endsection

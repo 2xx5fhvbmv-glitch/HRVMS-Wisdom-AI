@@ -102,98 +102,108 @@
         $(".select2t-none").select2();
         datatablelist();
 
+        // Cache the originating click's row data so the reject modal's Confirm
+        // button uses THIS row's values, not whichever button jQuery happened to
+        // pick first when querying `.action-btn`.
+        var pendingReject = null;
+
         $(document).on('click', '.action-btn', function (e) {
             e.preventDefault();
-            var reqId = $(this).data('req_id');
-            var approveUrl = $(this).data('approve_url');
-            var method = $(this).data('method');
-            var action = $(this).data('action');
-            var status = $(this).data('status');
-            const key = $('.action-btn').data('key');
+            var $btn       = $(this);
+            var reqId      = $btn.data('req_id');
+            var approveUrl = $btn.data('approve_url') || $btn.data('hold_url') || $btn.data('reject_url') || $btn.attr('href');
+            var method     = ($btn.data('method') || 'POST').toUpperCase();
+            var action     = $btn.data('action');
+            var status     = $btn.data('status');
+            var key        = $btn.data('key');
 
-
-            if (method == 'POST') {
-                if (action === 'Rejected') {
-                    $('#rejectionModal').modal('show');
-                    $('#confirmRejectBtn').on('click', function () {
-                        e.preventDefault();
-
-                        var reqId = $('.action-btn').data('req_id');
-                        var approveUrl = $('.action-btn').data('approve_url');
-                        var method = $('.action-btn').data('method');
-                        var action = $('.action-btn').data('action');
-                        var status ='Rejected';
-
-                        const key = $('.action-btn').data('key');
-                        const reason = $('#rejectionReason').val();
-
-                        var rejectReason = $('#rejectionReason').val();
-
-                        if (!rejectReason.trim()) {
-                            toastr.error('Reject reason is required.', 'Error', {
-                                positionClass: 'toast-bottom-right'
-                            });
-                            return;
-                        }
-
-                        $.ajax({
-                            url: approveUrl,
-                            type: 'POST',
-                            data: {
-                                _token: $('meta[name="csrf-token"]').attr('content'),
-                                [key]: reqId,
-                                status: status,
-                                 action: action,
-                                reject_reason: rejectReason,
-                            },
-                            success: function (response) {
-                                if (response.success) {
-                                    toastr.success(response.message, 'Success', {
-                                        positionClass: 'toast-bottom-right'
-                                    });
-                                    $('#rejectionModal').modal('hide');
-                                    $('#rejectionReason').val(''); 
-                                    datatablelist();
-                                } else {
-                                    toastr.error(response.message, 'Error', {
-                                        positionClass: 'toast-bottom-right'
-                                    });
-                                }
-                            },
-                            error: function (xhr) {
-                                toastr.error(xhr.responseJSON.message, 'Error', {
-                                    positionClass: 'toast-bottom-right'
-                                });
-                            }
-                        });
-                    });
-                
-                } else {
-                
-                    $.ajax({
-                    url: approveUrl,
-                    type: method,
-                    data: {
-                        [key]: reqId,
-                        status: status,
-                        action: action,
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                    },
-                    success: function (response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            datatablelist();
-                        } else {
-                            toastr.error(response.message);
-                        }
-                    },
-                    error: function (xhr) {
-                        toastr.error(xhr.responseJSON.message);
-                    }
-                    });
-                
-                }
+            if (!approveUrl || approveUrl === 'javascript:void(0)') {
+                toastr.error('Action URL missing.', 'Error', { positionClass: 'toast-bottom-right' });
+                return;
             }
+
+            // Reject — always open the reason modal regardless of method, then
+            // submit as POST with reject_reason. (GET-style endpoints like
+            // promotion.review.action still accept the same payload.)
+            if (action === 'Rejected') {
+                pendingReject = { reqId: reqId, approveUrl: approveUrl, method: method, action: action, status: 'Rejected', key: key };
+                $('#rejectionReason').val('');
+                $('#rejectionModal').modal('show');
+                return;
+            }
+
+            // Approve / Hold — fire the request. Use the action's declared
+            // method (GET or POST) so promotion/transfer GET endpoints work
+            // the same way as POST endpoints (info-update, resignation, etc.).
+            $.ajax({
+                url: approveUrl,
+                type: method,
+                data: (function () {
+                    var d = { status: status, action: action, _token: $('meta[name="csrf-token"]').attr('content') };
+                    if (key) d[key] = reqId;
+                    return d;
+                })(),
+                success: function (response) {
+                    if (response && response.success) {
+                        toastr.success(response.message || 'Done.', 'Success', { positionClass: 'toast-bottom-right' });
+                        datatablelist();
+                    } else if (response && response.message) {
+                        toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
+                    } else {
+                        // Endpoints that return a redirect/view rather than JSON
+                        // (some GET-based actions) reach here with response as
+                        // HTML — treat as success since the server didn't 4xx/5xx.
+                        toastr.success('Updated.', 'Success', { positionClass: 'toast-bottom-right' });
+                        datatablelist();
+                    }
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || 'Action failed.';
+                    toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
+        });
+
+        // Reject confirmation — bound ONCE with .off/.on so it doesn't stack
+        // across repeated reject clicks.
+        $(document).off('click', '#confirmRejectBtn').on('click', '#confirmRejectBtn', function () {
+            if (!pendingReject) return;
+            var rejectReason = ($('#rejectionReason').val() || '').trim();
+            if (!rejectReason) {
+                toastr.error('Reject reason is required.', 'Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            var p = pendingReject;
+            $.ajax({
+                url: p.approveUrl,
+                type: p.method,
+                data: (function () {
+                    var d = {
+                        status: p.status,
+                        action: p.action,
+                        reject_reason: rejectReason,
+                        rejection_reason: rejectReason, // some endpoints expect this key
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                    };
+                    if (p.key) d[p.key] = p.reqId;
+                    return d;
+                })(),
+                success: function (response) {
+                    if (!response || response.success !== false) {
+                        toastr.success((response && response.message) || 'Rejected.', 'Success', { positionClass: 'toast-bottom-right' });
+                        $('#rejectionModal').modal('hide');
+                        $('#rejectionReason').val('');
+                        pendingReject = null;
+                        datatablelist();
+                    } else {
+                        toastr.error(response.message || 'Reject failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || 'Reject failed.';
+                    toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            });
         });
 
         $(document).on('change', '.Department', function () {
