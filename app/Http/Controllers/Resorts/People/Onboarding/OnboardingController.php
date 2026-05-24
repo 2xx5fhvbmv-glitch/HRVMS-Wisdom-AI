@@ -146,6 +146,22 @@ class OnboardingController extends Controller
             return $a;
         });
 
+        // Drop candidates who already have an Onboarding Itinerary so HR
+        // doesn't accidentally create a second one. The list page
+        // (/onboarding/itinerary/list) is the place to edit existing
+        // itineraries.
+        $alreadyOnboardedIds = EmployeeItineraries::where('resort_id', $resort_id)
+            ->whereNotNull('employee_id')
+            ->pluck('employee_id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+
+        $upcoming_candidates = $upcoming_candidates
+            ->reject(function ($a) use ($alreadyOnboardedIds) {
+                return $a->employee_id && in_array((int) $a->employee_id, $alreadyOnboardedIds, true);
+            })
+            ->values();
+
         $view = view('resorts.renderfiles.upcoming-employees', compact('upcoming_candidates'))->render();
 
         return response()->json(['html' => $view]);
