@@ -1735,6 +1735,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
          Route::post('people/transfer/get-position-budget', 'People\Transfer\TransferController@getPositionBudgetInfo')->name('transfer.positionBudget');
          Route::get('/people/transfer/history', 'People\Transfer\TransferController@history')->name('people.transfer.history');
          Route::get('/people/transfer/{id}/download-letter', 'People\Transfer\TransferController@downloadTransferLetter')->name('people.transfer.download-letter');
+         Route::get('/people/transfer/{id}/preview-letter',  'People\Transfer\TransferController@previewTransferLetter')->name('people.transfer.preview-letter');
+         Route::post('/people/transfer/{id}/send-letter',    'People\Transfer\TransferController@sendTransferLetter')->name('people.transfer.send-letter');
          Route::get('/people/transfer/{id}/details', 'People\Transfer\TransferController@show')->name('people.transfer.show');
          Route::post('people/transfer/{id}/{action}', 'People\Transfer\TransferController@handleApproval')->name('people.transfer.handle-approval')->where('id', '[0-9]+');
 

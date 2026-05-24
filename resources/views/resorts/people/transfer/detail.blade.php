@@ -266,16 +266,28 @@
                 </div>
             </div>
 
-            {{-- ── Letter download (only when generated) ────────────────── --}}
-            @if($transfer->status === 'Approved' && $transfer->letter_dispatched === 'Yes')
+            {{-- ── Transfer Letter — Preview + Send to employee ──────────── --}}
+            @if($transfer->status === 'Approved')
                 <div class="col-12">
                     <div class="card">
-                        <div class="p-3">
-                            <a href="{{ route('people.transfer.download-letter', $transfer->id) }}"
+                        <div class="p-3 d-flex flex-wrap align-items-center gap-2">
+                            <a href="{{ route('people.transfer.preview-letter', $transfer->id) }}"
+                               target="_blank"
                                class="btn btn-themeSkyblue btn-sm">
-                                <i class="fa-regular fa-file-pdf"></i> Download Transfer Letter
+                                <i class="fa-regular fa-file-pdf"></i> Preview Transfer Letter
                             </a>
-                            <span class="text-muted small ms-2">PDF rendered with the resort letterhead &amp; e-signature.</span>
+                            <button type="button" id="sendTransferLetterBtn"
+                               data-url="{{ route('people.transfer.send-letter', $transfer->id) }}"
+                               class="btn btn-themeBlue btn-sm">
+                                <i class="fa-regular fa-paper-plane"></i> Send to Employee
+                            </button>
+                            <span class="text-muted small ms-2">
+                                @if($transfer->letter_dispatched === 'Yes')
+                                    Last sent to the employee. Re-send anytime.
+                                @else
+                                    Click <strong>Send</strong> to email the letter to the transferred employee.
+                                @endif
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -323,6 +335,52 @@
             },
             error: function () {
                 $('#target_allowance_block').html('<span class="text-danger">Could not load allowances.</span>');
+            }
+        });
+
+        // Send Transfer Letter — confirm, then POST to the send endpoint.
+        // Reuses the existing generateAndSendTransferLetter() flow under the
+        // hood, so the letter is saved into File Management AND emailed.
+        $(document).on('click', '#sendTransferLetterBtn', function () {
+            var $btn = $(this);
+            var url  = $btn.data('url');
+            if (typeof Swal === 'undefined') {
+                if (!confirm('Send the Transfer Letter to the employee now?')) return;
+                doSend();
+                return;
+            }
+            Swal.fire({
+                title: 'Send Transfer Letter?',
+                text: 'The letter will be emailed to the transferred employee.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, send',
+            }).then(function (r) {
+                if (r.isConfirmed) doSend();
+            });
+
+            function doSend() {
+                var orig = $btn.html();
+                $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Sending…');
+                $.ajax({
+                    url: url,
+                    method: 'POST',
+                    data: { _token: '{{ csrf_token() }}' },
+                    success: function (resp) {
+                        if (resp && resp.success) {
+                            toastr.success(resp.message || 'Letter sent.', 'Success', { positionClass: 'toast-bottom-right' });
+                            setTimeout(function () { window.location.reload(); }, 1200);
+                        } else {
+                            toastr.error((resp && resp.message) || 'Could not send the letter.', 'Error', { positionClass: 'toast-bottom-right' });
+                            $btn.prop('disabled', false).html(orig);
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || 'Could not send the letter.';
+                        toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+                        $btn.prop('disabled', false).html(orig);
+                    }
+                });
             }
         });
     });
