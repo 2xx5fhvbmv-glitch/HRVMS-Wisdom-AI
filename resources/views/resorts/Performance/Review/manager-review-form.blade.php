@@ -175,12 +175,23 @@
         formStructure.forEach(function(field, idx) {
             var fieldName = field.name || ('field_' + idx);
             var label = field.label || '';
-            var value = existingData[fieldName] || '';
             // Lock the field when: the whole review is read-only, OR — for
             // the manager tab only — the controller marked it _readonly
             // because the viewer's role isn't in its responder_roles list.
             var roleLocked = !isSelfTab && !!field._readonly;
             var disabled = (isReadOnly || roleLocked) ? 'disabled' : '';
+
+            // Value resolution:
+            //   - Self tab → from selfData (the employee's submission).
+            //   - Manager tab editable fields → from managerData.
+            //   - Manager tab role-locked fields → fall back to selfData
+            //     so a "To be filled by: Self" field still shows what the
+            //     employee actually wrote, as disabled context.
+            var value = existingData[fieldName] || '';
+            if (roleLocked && (value === '' || value === null || (Array.isArray(value) && !value.length))
+                && typeof selfData === 'object' && selfData && selfData[fieldName] !== undefined) {
+                value = selfData[fieldName];
+            }
 
             // Section headers / paragraph blocks have no input — render label only.
             if (field.type === 'header' || field.type === 'paragraph') {
@@ -239,6 +250,13 @@
                         cols.forEach(function(c, ci) {
                             var cellName = fieldName + '_' + ri + '_' + ci;
                             var cellVal = existingData[cellName] || '';
+                            // Role-locked ratingTable cells fall back to
+                            // the employee's selfData so the manager sees
+                            // the employee's grid even though they can't edit.
+                            if (roleLocked && (cellVal === '' || cellVal == null)
+                                && typeof selfData === 'object' && selfData && selfData[cellName] !== undefined) {
+                                cellVal = selfData[cellName];
+                            }
                             html += '<td><input type="text" name="' + cellName + '" value="' + cellVal + '" ' + disabled + '></td>';
                         });
                         html += '</tr>';
