@@ -915,12 +915,21 @@ class PromotionController extends Controller
 
                 if (!empty($requiredProgramIds) && !empty($probationerIds)) {
                     // (employee_id => [program_id, ...]) for programs they
-                    // have at least one Present/Late attendance in.
+                    // have at least one Present/Late attendance in. The L&D
+                    // module writes attendance to training_attendance, not
+                    // training_participants (which stays at 'Pending' on
+                    // enrollment), so we LEFT JOIN and check the COALESCEd
+                    // effective status — otherwise completed attendees would
+                    // still look "not done."
                     $completedByEmp = \DB::table('training_participants as tp')
                         ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+                        ->leftJoin('training_attendance as ta', function ($j) {
+                            $j->on('ta.training_schedule_id', '=', 'tp.training_schedule_id')
+                              ->on('ta.employee_id', '=', 'tp.employee_id');
+                        })
                         ->where('ts.resort_id', $resortId)
                         ->whereIn('ts.training_id', $requiredProgramIds)
-                        ->whereIn('tp.status', ['Present', 'Late'])
+                        ->whereRaw("COALESCE(ta.status, tp.status) IN ('Present','Late')")
                         ->whereIn('tp.employee_id', $probationerIds)
                         ->select('tp.employee_id', 'ts.training_id')
                         ->get()

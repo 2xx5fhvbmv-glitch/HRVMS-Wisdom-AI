@@ -103,20 +103,26 @@ class ProbationController extends Controller
             }
 
             // Onboarding-training status filter — same buckets as the
-            // onboarding_training column (Not Started / In Progress /
-            // Completed / Absent), derived from training_participants.
+            // onboarding_training column. The real attendance lives in
+            // training_attendance (training_participants.status stays at the
+            // enrollment default 'Pending'), so LEFT JOIN it and use
+            // COALESCE(ta.status, tp.status) as the effective status.
             if ($request->filled('trainingStatus')) {
                 $wanted = $request->trainingStatus;
 
                 // Per-employee tallies: total bookings, attended, still pending.
                 $perEmp = \DB::table('training_participants as tp')
                     ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+                    ->leftJoin('training_attendance as ta', function ($j) {
+                        $j->on('ta.training_schedule_id', '=', 'tp.training_schedule_id')
+                          ->on('ta.employee_id', '=', 'tp.employee_id');
+                    })
                     ->where('ts.resort_id', $resortId)
                     ->select(
                         'tp.employee_id',
                         \DB::raw('COUNT(*) as total'),
-                        \DB::raw("SUM(CASE WHEN tp.status IN ('Present','Late') THEN 1 ELSE 0 END) as attended"),
-                        \DB::raw("SUM(CASE WHEN tp.status = 'Pending' THEN 1 ELSE 0 END) as pending")
+                        \DB::raw("SUM(CASE WHEN COALESCE(ta.status, tp.status) IN ('Present','Late') THEN 1 ELSE 0 END) as attended"),
+                        \DB::raw("SUM(CASE WHEN COALESCE(ta.status, tp.status) = 'Pending' THEN 1 ELSE 0 END) as pending")
                     )
                     ->groupBy('tp.employee_id')
                     ->get();
@@ -191,17 +197,24 @@ class ProbationController extends Controller
                     return $end->format('d M Y');
                 })
                 ->addColumn('onboarding_training', function ($row) use ($resortId) {
-                    // Reflects whatever L&D training the employee is booked on,
-                    // from training_participants (the real attendee table).
+                    // Reflects whatever L&D training the employee is booked on.
+                    // training_attendance holds the real attended status; if no
+                    // attendance row exists yet we fall back to the enrollment
+                    // status in training_participants.
                     //   no bookings                          → Not Started
                     //   a session not held / not marked yet  → In Progress
                     //   all sessions held & all attended     → Completed
                     //   all sessions held, some not attended → Absent
                     $statuses = \DB::table('training_participants as tp')
                         ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+                        ->leftJoin('training_attendance as ta', function ($j) {
+                            $j->on('ta.training_schedule_id', '=', 'tp.training_schedule_id')
+                              ->on('ta.employee_id', '=', 'tp.employee_id');
+                        })
                         ->where('ts.resort_id', $resortId)
                         ->where('tp.employee_id', $row->id)
-                        ->pluck('tp.status');
+                        ->selectRaw('COALESCE(ta.status, tp.status) as status')
+                        ->pluck('status');
 
                     $t = $this->resolveOnboardingTraining($statuses);
                     return '<span class="badge '.$t['badge'].'">'.$t['label'].'</span>';
@@ -421,12 +434,22 @@ class ProbationController extends Controller
         $onboardingPrograms = [];
         foreach ($probationaryPrograms as $prog) {
             // This employee's attendance on this program's scheduled sessions.
+            // The L&D AttendanceController writes attendance to training_attendance
+            // (NOT training_participants), so training_participants.status stays
+            // at the enrollment default 'Pending' forever. Pull the real status
+            // by LEFT JOINing training_attendance and COALESCEing — when an
+            // attendance row exists it overrides the stale enrollment status.
             $statuses = \DB::table('training_participants as tp')
                 ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+                ->leftJoin('training_attendance as ta', function ($j) {
+                    $j->on('ta.training_schedule_id', '=', 'tp.training_schedule_id')
+                      ->on('ta.employee_id', '=', 'tp.employee_id');
+                })
                 ->where('ts.resort_id', $employee->resort_id)
                 ->where('ts.training_id', $prog->program_id)
                 ->where('tp.employee_id', $employee->id)
-                ->pluck('tp.status');
+                ->selectRaw('COALESCE(ta.status, tp.status) as status')
+                ->pluck('status');
 
             $resolved = $this->resolveOnboardingTraining($statuses);
 
