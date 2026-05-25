@@ -2157,9 +2157,28 @@ class BudgetController extends Controller
                 ->where('year', $year)
                 ->get();
 
-            // Get salaries from employees table (same for all 12 months)
+            // Shared salary defaults from the employees table — used as the
+            // fallback when a particular month has no override.
             $currentBasicSalary = $employee->basic_salary ?? 0;
             $proposedBasicSalary = $employee->proposed_salary ?? 0;
+
+            // Per-month salary overrides. Build a [month => {current, proposed}]
+            // lookup so the table can render different salaries per month.
+            $monthlySalaryOverrides = DB::table('resort_employee_monthly_salaries')
+                ->where('employee_id', $employeeId)
+                ->where('resort_id', $resortId)
+                ->where('year', $year)
+                ->get(['month', 'current_salary', 'proposed_salary'])
+                ->keyBy('month');
+
+            $monthlySalaries = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $override = $monthlySalaryOverrides->get($m);
+                $monthlySalaries[$m] = [
+                    'current_salary'  => $override && $override->current_salary  !== null ? (float) $override->current_salary  : (float) $currentBasicSalary,
+                    'proposed_salary' => $override && $override->proposed_salary !== null ? (float) $override->proposed_salary : (float) $proposedBasicSalary,
+                ];
+            }
 
             // Get DollertoMVR conversion rate for converting USD to MVR
             $resortSettings = ResortSiteSettings::where('resort_id', $resortId)->first();
@@ -2228,7 +2247,8 @@ class BudgetController extends Controller
                 'department_id' => $position->dept_id,
                 'year' => $year,
                 'current_basic_salary' => $currentBasicSalary,
-                'proposed_basic_salary' => $proposedBasicSalary
+                'proposed_basic_salary' => $proposedBasicSalary,
+                'monthly_salaries' => $monthlySalaries,
             ]);
 
         } catch (\Exception $e) {
@@ -2334,9 +2354,28 @@ class BudgetController extends Controller
                 ->where('year', $year)
                 ->get();
 
-            // Get salaries from resort_vacant_budget_costs table (same for all 12 months)
+            // Shared salary fallback from resort_vacant_budget_costs.
             $currentBasicSalary = $vacantBudgetCost->basic_salary ?? 0;
             $proposedBasicSalary = $vacantBudgetCost->current_salary ?? 0;
+
+            // Per-month overrides from resort_vacant_monthly_salaries.
+            $monthlySalaryOverrides = DB::table('resort_vacant_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('position_id', $positionId)
+                ->where('department_id', $position->dept_id)
+                ->where('year', $year)
+                ->where('vacant_index', $vacantIndex)
+                ->get(['month', 'current_salary', 'proposed_salary'])
+                ->keyBy('month');
+
+            $monthlySalaries = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $override = $monthlySalaryOverrides->get($m);
+                $monthlySalaries[$m] = [
+                    'current_salary'  => $override && $override->current_salary  !== null ? (float) $override->current_salary  : (float) $currentBasicSalary,
+                    'proposed_salary' => $override && $override->proposed_salary !== null ? (float) $override->proposed_salary : (float) $proposedBasicSalary,
+                ];
+            }
 
             // Get DollertoMVR conversion rate for converting USD to MVR
             $resortSettings = ResortSiteSettings::where('resort_id', $resortId)->first();
@@ -2380,7 +2419,8 @@ class BudgetController extends Controller
                 'year' => $year,
                 'details' => $vacantBudgetCost->details ?? null,
                 'current_basic_salary' => $currentBasicSalary,
-                'proposed_basic_salary' => $proposedBasicSalary
+                'proposed_basic_salary' => $proposedBasicSalary,
+                'monthly_salaries' => $monthlySalaries,
             ]);
 
         } catch (\Exception $e) {
@@ -2419,27 +2459,35 @@ class BudgetController extends Controller
             $year = $request->year;
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
-            // Update employee salaries in employees table (same for all 12 months)
-            // Note: Only update if salaries are provided in the first month's data
-            if (!empty($request->monthly_data) && isset($request->monthly_data[0])) {
-                $firstMonthData = $request->monthly_data[0];
-                $currentSalary = $firstMonthData['current_salary'] ?? null;
-                $proposedSalary = $firstMonthData['proposed_salary'] ?? null;
+            // Per-month salary override — write to resort_employee_monthly_salaries
+            // for the specific month being saved. The employees.basic_salary /
+            // proposed_salary record is left alone; the View Budget read path
+            // falls back to it only when no per-month override exists.
+            // (Previous behaviour overwrote the shared employee record and
+            // propagated the edit to every other month on refresh.)
+            if (!empty($request->monthly_data)) {
+                foreach ($request->monthly_data as $monthData) {
+                    if (!isset($monthData['month'])) continue;
+                    $monthNum = (int) $monthData['month'];
+                    $currentSalary  = $monthData['current_salary']  ?? null;
+                    $proposedSalary = $monthData['proposed_salary'] ?? null;
 
-                if ($currentSalary !== null || $proposedSalary !== null) {
-                    $employee = DB::table('employees')->where('id', $employeeId)->first();
-                    if ($employee) {
-                        $updateData = [];
-                        if ($currentSalary !== null) {
-                            $updateData['basic_salary'] = $currentSalary;
-                        }
-                        if ($proposedSalary !== null) {
-                            $updateData['proposed_salary'] = $proposedSalary;
-                        }
-                        if (!empty($updateData)) {
-                            DB::table('employees')->where('id', $employeeId)->update($updateData);
-                        }
-                    }
+                    if ($currentSalary === null && $proposedSalary === null) continue;
+
+                    $updatePayload = [];
+                    if ($currentSalary  !== null) $updatePayload['current_salary']  = $currentSalary;
+                    if ($proposedSalary !== null) $updatePayload['proposed_salary'] = $proposedSalary;
+                    if (empty($updatePayload)) continue;
+
+                    DB::table('resort_employee_monthly_salaries')->updateOrInsert(
+                        [
+                            'employee_id' => $employeeId,
+                            'resort_id'   => $resortId,
+                            'year'        => $year,
+                            'month'       => $monthNum,
+                        ],
+                        array_merge($updatePayload, ['updated_at' => now()])
+                    );
                 }
             }
 
@@ -2619,26 +2667,47 @@ class BudgetController extends Controller
                 }
             }
 
-            // Update vacant salaries in resort_vacant_budget_costs table (same for all 12 months)
-            // Note: Only update if salaries are provided in the first month's data
-            if (!empty($request->monthly_data) && isset($request->monthly_data[0])) {
-                $firstMonthData = $request->monthly_data[0];
-                $proposedSalary = $firstMonthData['current_salary'] ?? null;
-                $currentSalary = $firstMonthData['proposed_salary'] ?? null;
+            // Per-month vacant salary override — write to
+            // resort_vacant_monthly_salaries for the specific month being saved.
+            // resort_vacant_budget_costs.basic_salary / .current_salary is the
+            // shared fallback used when no per-month override exists.
+            $vacantBudgetCostRow = ResortVacantBudgetCost::find($vacantBudgetCostId);
+            $vacantIndex = $vacantBudgetCostRow ? (int) $vacantBudgetCostRow->vacant_index : (int) $request->input('vacant_index', 0);
 
-                if ($currentSalary !== null || $proposedSalary !== null) {
-                    $updateData = [];
-                    if ($currentSalary !== null) {
-                        $updateData['basic_salary'] = $currentSalary;
-                    }
-                    if ($proposedSalary !== null) {
-                        $updateData['current_salary'] = $proposedSalary;
-                    }
-                    if (!empty($updateData)) {
-                        ResortVacantBudgetCost::where('id', $vacantBudgetCostId)->update($updateData);
-                    }
+            if (!empty($request->monthly_data) && $vacantIndex > 0) {
+                foreach ($request->monthly_data as $monthData) {
+                    if (!isset($monthData['month'])) continue;
+                    $monthNum = (int) $monthData['month'];
+                    // saveVacantMonthBudget() now sends salaries straight (no
+                    // historical column swap), so request[current_salary] is
+                    // the Current Basic Salary and [proposed_salary] is the
+                    // Proposed Basic Salary.
+                    $currentSalary  = $monthData['current_salary']  ?? null;
+                    $proposedSalary = $monthData['proposed_salary'] ?? null;
+                    if ($currentSalary === null && $proposedSalary === null) continue;
+
+                    $updatePayload = [];
+                    if ($currentSalary  !== null) $updatePayload['current_salary']  = $currentSalary;
+                    if ($proposedSalary !== null) $updatePayload['proposed_salary'] = $proposedSalary;
+                    if (empty($updatePayload)) continue;
+
+                    DB::table('resort_vacant_monthly_salaries')->updateOrInsert(
+                        [
+                            'resort_id'     => $resortId,
+                            'position_id'   => $positionId,
+                            'department_id' => $departmentId,
+                            'year'          => $year,
+                            'vacant_index'  => $vacantIndex,
+                            'month'         => $monthNum,
+                        ],
+                        array_merge($updatePayload, ['updated_at' => now()])
+                    );
                 }
             }
+
+            // (Legacy shared-record write removed — it propagated the first
+            // month's salary to all 12 months on refresh. Per-month overrides
+            // above are now the source of truth.)
 
             // Insert new month-wise cost configurations (without storing salary data)
             foreach ($request->monthly_data as $monthData) {
