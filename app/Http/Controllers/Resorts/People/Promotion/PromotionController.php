@@ -882,19 +882,51 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
-                // Exclude ONLY employees who currently have a scheduled /
-                // in-progress / pending training session (training_participants
-                // row at status='Pending'). Anyone with no rows, or only
-                // attended/missed sessions, stays in the dropdown.
+                // Per-program completion check — same definition the Probation
+                // details Progress Tracking section uses. The resort's
+                // probationary_learning_programs configures the mandatory
+                // onboarding programs every probationer must complete. For
+                // each employee × required program:
+                //   no training_participants rows                → "Not Started" → EXCLUDE
+                //   any 'Pending' in that program                → "In Progress" → EXCLUDE
+                //   all sessions held, some 'Absent'             → "Absent"      → EXCLUDE
+                //   at least one 'Present' / 'Late' in that prog → "Completed"   → OK
+                // An employee is excluded as soon as ANY required program is
+                // not yet Completed for them.
                 $resortId = $this->resort->resort_id;
 
-                $pendingEmpIds = \DB::table('training_participants as tp')
-                    ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
-                    ->where('ts.resort_id', $resortId)
-                    ->where('tp.status', 'Pending')
-                    ->pluck('tp.employee_id')->unique()->all();
+                $requiredProgramIds = \DB::table('probationary_learning_programs')
+                    ->where('resort_id', $resortId)
+                    ->pluck('program_id')->unique()->all();
 
-                $excludeIds = array_merge($excludeIds, $pendingEmpIds);
+                if (!empty($requiredProgramIds)) {
+                    // (employee_id => [program_id, ...]) for programs they
+                    // have at least one Present/Late attendance in.
+                    $completedByEmp = \DB::table('training_participants as tp')
+                        ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
+                        ->where('ts.resort_id', $resortId)
+                        ->whereIn('ts.training_id', $requiredProgramIds)
+                        ->whereIn('tp.status', ['Present', 'Late'])
+                        ->select('tp.employee_id', 'ts.training_id')
+                        ->get()
+                        ->groupBy('employee_id')
+                        ->map(fn($rows) => $rows->pluck('training_id')->unique()->all())
+                        ->toArray();
+
+                    $activeEmpIds = Employee::where('resort_id', $resortId)
+                        ->where('status', 'Active')
+                        ->pluck('id')->all();
+
+                    $trainingEmployees = [];
+                    foreach ($activeEmpIds as $empId) {
+                        $empCompleted = $completedByEmp[$empId] ?? [];
+                        if (count($empCompleted) < count($requiredProgramIds)) {
+                            // Missing at least one required program → exclude.
+                            $trainingEmployees[] = $empId;
+                        }
+                    }
+                    $excludeIds = array_merge($excludeIds, $trainingEmployees);
+                }
             }
 
 
