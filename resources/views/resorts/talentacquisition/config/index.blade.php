@@ -378,7 +378,10 @@
                                 </div>
                             </div>
 
-                            {{-- Organization Details for Templates --}}
+                            {{-- Organization Details for Templates — commented out per HR
+                                 request; the section duplicates resort settings and is not
+                                 used downstream. Wrap the entire card in a Blade comment so
+                                 no HTML / Blade @if logic runs.
                             <div class="col-12">
                                 <div class="card">
                                     <div class="card-title">
@@ -509,6 +512,7 @@
                                     </form>
                                 </div>
                             </div>
+                            --}}
 
                         </div>
                     </div>

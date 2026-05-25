@@ -270,9 +270,9 @@
                                                readonly
                                                style="background-color: #f0f0f0; cursor: not-allowed; font-weight: 500;"
                                                placeholder="0.00"
-                                               title="Auto-calculated: Percentage × Current Basic Salary">
+                                               title="Auto-calculated: Percentage × Basic Salary (Proposed if entered, else Current)">
                                         <small class="text-muted" style="font-size: 0.7rem; display: block; margin-top: 3px;">
-                                            Formula: {{ $cost->amount }}% × Current Basic Salary
+                                            Formula: {{ $cost->amount }}% × Basic Salary
                                         </small>
                                     </div>
                                                 @endif
@@ -537,24 +537,20 @@ $(document).ready(function() {
         return totalAmount;
     }
 
-    // Function to calculate pension amount (percentage of CURRENT basic salary)
-    // Pension - Employer Contribution is calculated based on Current Basic Salary, not Proposed
-    function calculatePensionAmount(percentage, currentBasicSalary) {
-        if (!currentBasicSalary || currentBasicSalary <= 0) {
+    // Pension formula: basis × (percentage / 100)
+    // Callers pass the EFFECTIVE basis (Proposed when entered, else Current),
+    // computed in setBudgetModalEmployeeData / recalcBudgetModalSalaryBased.
+    function calculatePensionAmount(percentage, basisSalary) {
+        if (!basisSalary || basisSalary <= 0) {
             return 0;
         }
-
-        // Formula: Current Basic Salary × (Percentage / 100)
-        // Pension is calculated on the current salary, not the proposed salary
-        const totalAmount = currentBasicSalary * (percentage / 100);
-
-        return totalAmount;
+        return basisSalary * (percentage / 100);
     }
 
-    // Auto-calculate pension amounts when modal data is set
-    // Pension is calculated based on CURRENT Basic Salary (not Proposed)
-    function autoCalculatePensionAmounts(currentBasicSalary) {
-        console.log('Auto-calculating pension based on Current Basic Salary:', currentBasicSalary);
+    // Auto-calculate pension amounts when modal data is set.
+    // basisSalary = Proposed Basic Salary if entered (> 0), else Current Basic Salary.
+    function autoCalculatePensionAmounts(basisSalary) {
+        console.log('Auto-calculating pension based on basis salary:', basisSalary);
 
         $('.budget-cost-card[data-is-percentage="1"]').each(function() {
             const $card = $(this);
@@ -565,14 +561,14 @@ $(document).ready(function() {
             if (!isOvertimeItem) {
                 const costId = $card.data('cost-id');
                 const percentage = parseFloat($card.find('.budget-cost-percentage').val() || 0);
-                const calculatedAmount = calculatePensionAmount(percentage, currentBasicSalary);
+                const calculatedAmount = calculatePensionAmount(percentage, basisSalary);
                 $card.find('.budget-cost-amount').val(calculatedAmount.toFixed(2));
 
                 // Auto-select pension checkbox if it's a pension item
                 const isPension = costName.toLowerCase().includes('pension');
                 if (isPension && calculatedAmount > 0) {
                     $card.find('.budget-cost-checkbox').prop('checked', true);
-                    console.log(`Auto-selected and calculated ${costName}: ${percentage}% of ${formatAmount(currentBasicSalary, 'USD')} = ${formatAmount(calculatedAmount, 'USD')}`);
+                    console.log(`Auto-selected and calculated ${costName}: ${percentage}% of ${formatAmount(basisSalary, 'USD')} = ${formatAmount(calculatedAmount, 'USD')}`);
                 }
             }
         });
@@ -756,18 +752,17 @@ $(document).ready(function() {
         console.log('=== Modal Total Calculation ===');
         console.log(`Exchange Rate (MVRtoDoller): 1 MVR = ${mvrToUsdRate} USD`);
 
-        // Add Current Basic Salary to total
-        const currentBasicSalary = parseFloat($('#formCurrentSalary').val() || 0);
-        if (currentBasicSalary > 0) {
-            total += currentBasicSalary;
-            console.log(`Current Basic Salary: ${formatAmount(currentBasicSalary, 'USD')} USD`);
-        }
-
-        // Add Proposed Basic Salary to total
-        const proposedBasicSalary = parseFloat($('#formBasicSalary').val() || 0);
-        if (proposedBasicSalary > 0) {
-            total += proposedBasicSalary;
-            console.log(`Proposed Basic Salary: ${formatAmount(proposedBasicSalary, 'USD')} USD`);
+        // Salary basis: Proposed Basic Salary wins whenever it is entered (> 0);
+        // otherwise fall back to Current Basic Salary. Never sum both.
+        // NOTE: input ids are historically swapped — #formBasicSalary holds the
+        // "Current Basic Salary" label, #formCurrentSalary holds "Proposed Basic Salary".
+        const currentBasicSalaryInput  = parseFloat($('#formBasicSalary').val() || 0);
+        const proposedBasicSalaryInput = parseFloat($('#formCurrentSalary').val() || 0);
+        const effectiveBasicSalary = proposedBasicSalaryInput > 0 ? proposedBasicSalaryInput : currentBasicSalaryInput;
+        if (effectiveBasicSalary > 0) {
+            total += effectiveBasicSalary;
+            const usedLabel = proposedBasicSalaryInput > 0 ? 'Proposed Basic Salary' : 'Current Basic Salary';
+            console.log(`${usedLabel} (basis): ${formatAmount(effectiveBasicSalary, 'USD')} USD`);
         }
 
         $('.budget-cost-checkbox:checked').each(function() {
@@ -964,15 +959,16 @@ $(document).ready(function() {
                         $hoursInput.trigger('input');
                     } else {
                         // For pension/other percentage items, auto-calculate
-                        if (typeof window.setBudgetModalEmployeeData === 'function') {
-                            // Re-trigger auto-calculation
-                            const currentSalary = parseFloat($('#formCurrentSalary').val() || 0);
-                            if (currentSalary > 0) {
-                                const $percentageInput = $card.find('.budget-cost-percentage');
-                                const percentage = parseFloat($percentageInput.val() || 0);
-                                const calculatedAmount = calculatePensionAmount(percentage, currentSalary);
-                                $card.find('.budget-cost-amount').val(calculatedAmount.toFixed(2));
-                            }
+                        // Basis = Proposed Basic Salary if entered, else Current Basic Salary.
+                        // (ids are swapped: #formBasicSalary=Current, #formCurrentSalary=Proposed)
+                        const currentBasis  = parseFloat($('#formBasicSalary').val() || 0);
+                        const proposedBasis = parseFloat($('#formCurrentSalary').val() || 0);
+                        const basisSalary   = proposedBasis > 0 ? proposedBasis : currentBasis;
+                        if (basisSalary > 0) {
+                            const $percentageInput = $card.find('.budget-cost-percentage');
+                            const percentage = parseFloat($percentageInput.val() || 0);
+                            const calculatedAmount = calculatePensionAmount(percentage, basisSalary);
+                            $card.find('.budget-cost-amount').val(calculatedAmount.toFixed(2));
                         }
                     }
                 }
