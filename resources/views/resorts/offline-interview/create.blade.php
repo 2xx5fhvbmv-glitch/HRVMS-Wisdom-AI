@@ -82,9 +82,9 @@
                                         <th>Position</th>
                                         <th>Department</th>
                                         <th>No. of position</th>
-                                        <th>Applicants</th>
+                                        <th>Applicant</th>
                                         <th>Application Date</th>
-                                        <th>Required From</th>
+                                        <th>Expiry Date</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -96,10 +96,10 @@
                                             <td>{{ $v->no_of_positions }}</td>
                                             <td>{{ $v->application_count }}</td>
                                             <td>{{ $v->application_date_label }}</td>
-                                            <td>{{ $v->required_starting_label }}</td>
+                                            <td>{{ $v->expiry_date_label }}</td>
                                         </tr>
                                     @empty
-                                        <tr><td colspan="7" class="text-center text-muted">No open vacancies for this resort. Create one in Talent Acquisition &rarr; Vacancies first.</td></tr>
+                                        <tr><td colspan="7" class="text-center text-muted">No active vacancies. Create one in Talent Acquisition &rarr; Vacancies first.</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
