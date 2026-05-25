@@ -485,7 +485,7 @@ $(document).ready(function() {
                             });
                         }
 
-                        total += currentBasicSalary + proposedBasicSalary;
+                        total += proposedBasicSalary > 0 ? proposedBasicSalary : currentBasicSalary;
 
                         // Store employee total
                         if (!window.budgetTotals.positions[positionId]) {
@@ -540,7 +540,7 @@ $(document).ready(function() {
                             });
                         }
 
-                        total += currentBasicSalary + proposedBasicSalary;
+                        total += proposedBasicSalary > 0 ? proposedBasicSalary : currentBasicSalary;
 
                         // Store vacant total
                         if (!window.budgetTotals.positions[positionId]) {
@@ -870,8 +870,8 @@ $(document).ready(function() {
                     }
                 });
 
-                // Add to position total
-                total += currentSalary + proposedSalary + costTotal;
+                // Add to position total: Proposed wins when entered (> 0); otherwise Current
+                total += (proposedSalary > 0 ? proposedSalary : currentSalary) + costTotal;
             }
         });
 
@@ -2412,13 +2412,15 @@ $(document).ready(function() {
                         }
                     });
 
-                    // Add current salary + proposed salary + all cost configurations for this table
-                    const tableTotal = currentSalaryTotal + proposedSalaryTotal + costConfigTotal;
+                    // Salary basis: Proposed wins when entered (> 0); otherwise Current
+                    const effectiveSalaryTotal = proposedSalaryTotal > 0 ? proposedSalaryTotal : currentSalaryTotal;
+                    const tableTotal = effectiveSalaryTotal + costConfigTotal;
                     total += tableTotal;
 
                     console.log('Table total:', {
                         currentSalary: currentSalaryTotal,
                         proposedSalary: proposedSalaryTotal,
+                        effectiveSalary: effectiveSalaryTotal,
                         costConfigs: costConfigTotal,
                         tableTotal: tableTotal
                     });
