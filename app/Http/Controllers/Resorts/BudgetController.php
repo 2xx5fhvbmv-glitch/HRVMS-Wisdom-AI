@@ -678,7 +678,7 @@ class BudgetController extends Controller
                             }
 
                             $today = \Carbon\Carbon::today()->toDateString();
-                            $activeFilled = Employee::where('resort_id', $resortId)
+                            $activeFilled = \App\Models\Employee::where('resort_id', $resortId)
                                 ->where('Position_id', $position->id)
                                 ->where('Dept_id', $position->dept_id)
                                 ->where('status', 'Active')
