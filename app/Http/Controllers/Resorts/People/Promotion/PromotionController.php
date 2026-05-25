@@ -882,21 +882,57 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
-                // training_schedules.status enum is ['Scheduled','Ongoing','Completed','Pending']
-                // — use the canonical 'Ongoing' (capital O) to match the stored value.
-                $trainingScheduleIds = TrainingSchedule::where('resort_id', $this->resort->resort_id)
-                    ->where('status', 'Ongoing')
-                    ->where('end_date', '>=', now())
-                    ->pluck('id');
+                // "Mandatory onboarding training" is configured in
+                // mandatory_learning_programs (resort × program, optionally
+                // scoped to a department/position). An employee has "not
+                // completed" a mandatory program when they have no
+                // training_attendance row at status='Present' for any session
+                // (training_schedules.training_id = program_id) of that program.
+                $resortId = $this->resort->resort_id;
 
-                // training_participants.status enum is ['Pending','Present','Absent','Late'];
-                // "not completed" = anything other than 'Present'.
-                $trainingEmployees = Employee::whereHas('trainingParticipants', function ($q) use ($trainingScheduleIds) {
-                    $q->whereIn('training_schedule_id', $trainingScheduleIds)
-                      ->where('status', '!=', 'Present');
-                })->pluck('id')->toArray();
+                $mandatory = \App\Models\MandatoryLearningProgram::where('resort_id', $resortId)
+                    ->get(['program_id', 'department_id', 'position_id']);
 
-                $excludeIds = array_merge($excludeIds, $trainingEmployees);
+                if ($mandatory->isNotEmpty()) {
+                    $programIds = $mandatory->pluck('program_id')->unique()->all();
+
+                    // (employee_id => [program_id, ...]) of programs they've completed.
+                    $completedByEmp = \DB::table('training_attendance as ta')
+                        ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                        ->where('ts.resort_id', $resortId)
+                        ->whereIn('ts.training_id', $programIds)
+                        ->where('ta.status', 'Present')
+                        ->select('ta.employee_id', 'ts.training_id')
+                        ->get()
+                        ->groupBy('employee_id')
+                        ->map(fn($rows) => $rows->pluck('training_id')->unique()->all())
+                        ->toArray();
+
+                    $emps = Employee::where('resort_id', $resortId)
+                        ->where('status', 'Active')
+                        ->get(['id', 'Dept_id', 'Position_id']);
+
+                    $trainingEmployees = [];
+                    foreach ($emps as $emp) {
+                        $empCompleted = $completedByEmp[$emp->id] ?? [];
+                        foreach ($mandatory as $m) {
+                            // NULL dept/position on the rule = "applies to all".
+                            $deptOk = is_null($m->department_id)
+                                || (int) $m->department_id === (int) $emp->Dept_id;
+                            $posOk  = is_null($m->position_id)
+                                || (int) $m->position_id === (int) $emp->Position_id;
+                            if (!$deptOk || !$posOk) continue;
+
+                            if (!in_array($m->program_id, $empCompleted, true)) {
+                                // At least one applicable mandatory program is not yet completed.
+                                $trainingEmployees[] = $emp->id;
+                                break;
+                            }
+                        }
+                    }
+
+                    $excludeIds = array_merge($excludeIds, $trainingEmployees);
+                }
             }
 
 
