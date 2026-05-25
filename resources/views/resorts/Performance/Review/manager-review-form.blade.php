@@ -287,6 +287,12 @@
     function collectFormData(containerId) {
         var data = {};
         $('#' + containerId).find('input, textarea, select').each(function() {
+            // Skip DISABLED inputs — they represent role-locked fields
+            // that this viewer can't fill. jQuery's .val() still returns
+            // their value, so without this guard the prefilled selfData
+            // value would be POSTed back and the server-side role gate
+            // would reject the submit ("not authorised to fill: …").
+            if (this.disabled) return;
             var name = $(this).attr('name');
             if (!name) return;
             data[name] = $(this).val();

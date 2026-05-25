@@ -300,6 +300,10 @@
     function collectFormData() {
         var data = {};
         $('#form-render').find('input, textarea, select').each(function() {
+            // Skip DISABLED inputs (role-locked fields the viewer can't
+            // fill). jQuery's .val() returns their value regardless of
+            // disabled state, which would trip the server-side role gate.
+            if (this.disabled) return;
             var name = $(this).attr('name');
             if (!name) return;
             if ($(this).attr('type') === 'checkbox') {
