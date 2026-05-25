@@ -648,9 +648,27 @@ class PromotionController extends Controller
             $pendingCount = $promotion->approvals()->where('status', 'Pending')->count();
 
             if ($pendingCount === 0) {
-                // Final approval – update main promotion table
+                // Final approval – mark the promotion Approved.
                 $promotion->status = 'Approved';
                 $promotion->save();
+
+                // If the effective date is already today (or past), apply the
+                // promotion to the employee + fan out the day-of notifications
+                // immediately. Otherwise the daily promotions:notify-effective
+                // scheduler will pick it up on the effective date.
+                $today = \Carbon\Carbon::today()->toDateString();
+                if ($promotion->effective_date && \Carbon\Carbon::parse($promotion->effective_date)->toDateString() <= $today) {
+                    try {
+                        self::dispatchEffectiveDateNotifications($promotion);
+                    } catch (\Throwable $e) {
+                        \Log::error('Promotion apply-on-final-approval failed for #' . $promotion->id . ': ' . $e->getMessage());
+                    }
+                } else {
+                    // Future effective date — at least notify the employee +
+                    // dept HOD/EXCOM that the promotion has been finalised so
+                    // they know to expect the change on the effective date.
+                    self::dispatchFinalApprovedNotifications($promotion);
+                }
             }
 
             if ($hr) {
@@ -1054,6 +1072,221 @@ class PromotionController extends Controller
             return response()->json(['exclude_ids' => $excludeIds]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Apply an approved promotion to the employee's record. Mirrors
+     * TransferController::applyTransferToEmployee — snapshots the pre-promotion
+     * state once (idempotent), then updates Position_id, rank, basic_salary.
+     * Manning sync is a no-op when the position is in the same dept (typical
+     * promotion); cross-dept promotions adjust manning on both sides.
+     */
+    public static function applyPromotionToEmployee(EmployeePromotion $promotion): void
+    {
+        $promotion->loadMissing(['employee', 'newPosition']);
+        $employee = $promotion->employee;
+        if (!$employee) return;
+
+        // One-time snapshot — re-applying must not overwrite original values.
+        if (empty($promotion->pre_promotion_snapshot)) {
+            $promotion->pre_promotion_snapshot = [
+                'Position_id'  => $employee->Position_id,
+                'Dept_id'      => $employee->Dept_id,
+                'rank'         => $employee->rank,
+                'basic_salary' => $employee->basic_salary,
+            ];
+            $promotion->save();
+        }
+
+        $sourceDeptId = $employee->Dept_id;
+        $sourcePosId  = $employee->Position_id;
+
+        // New position drives new rank + (optionally) new dept.
+        $newPosition = $promotion->newPosition;
+        if ($newPosition) {
+            $employee->Position_id = $newPosition->id;
+            if ($newPosition->Rank !== null) {
+                $employee->rank = $newPosition->Rank;
+            }
+            // Cross-dept promotion — also move the employee's Dept_id.
+            if ($newPosition->dept_id && (int) $newPosition->dept_id !== (int) $sourceDeptId) {
+                $employee->Dept_id = $newPosition->dept_id;
+            }
+        }
+
+        // new_salary on the promotion overrides; fall back to current_salary +
+        // salary_increment_amount when new_salary wasn't pre-computed. Never
+        // zero out the salary if the form didn't supply a usable value.
+        $newSalary = null;
+        if ($promotion->new_salary !== null && (float) $promotion->new_salary > 0) {
+            $newSalary = (float) $promotion->new_salary;
+        } elseif ($promotion->salary_increment_amount !== null && (float) $promotion->salary_increment_amount > 0) {
+            $newSalary = (float) ($promotion->current_salary ?? $employee->basic_salary) + (float) $promotion->salary_increment_amount;
+        } elseif ($promotion->salary_increment_percent !== null && (float) $promotion->salary_increment_percent > 0) {
+            $base = (float) ($promotion->current_salary ?? $employee->basic_salary);
+            $newSalary = $base + ($base * ((float) $promotion->salary_increment_percent / 100));
+        }
+        if ($newSalary !== null && $newSalary > 0) {
+            $employee->basic_salary = $newSalary;
+        }
+
+        $employee->save();
+
+        // Manning sync — only when the dept changed; same-dept position change
+        // still needs a sync between the source position (-1) and the target
+        // position (+1) for headcount tracking on the Workforce dashboard.
+        if ((int) $sourcePosId !== (int) $employee->Position_id) {
+            \App\Http\Controllers\Resorts\People\Transfer\TransferController::adjustManningCount(
+                (int) $promotion->resort_id, (int) $sourceDeptId, (int) $sourcePosId, -1
+            );
+            \App\Http\Controllers\Resorts\People\Transfer\TransferController::adjustManningCount(
+                (int) $promotion->resort_id, (int) $employee->Dept_id, (int) $employee->Position_id, +1
+            );
+        }
+    }
+
+    /**
+     * Day-of: apply the promotion to the employee and notify the employee,
+     * their HOD/EXCOM, GM, and HR. Marks effective_day_notified_at so the
+     * scheduler never double-fires. Mirrors TransferController::dispatchEffectiveDateNotifications.
+     */
+    public static function dispatchEffectiveDateNotifications(EmployeePromotion $promotion): void
+    {
+        $promotion->loadMissing(['employee.resortAdmin', 'newPosition', 'currentPosition']);
+
+        self::applyPromotionToEmployee($promotion);
+
+        $employee = $promotion->employee()->first();
+        if (!$employee) return;
+
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+        $oldPosTitle = optional($promotion->currentPosition)->position_title ?? 'previous position';
+        $newPosTitle = optional($promotion->newPosition)->position_title ?? 'new position';
+        $effectiveDate = $promotion->effective_date
+            ? \Carbon\Carbon::parse($promotion->effective_date)->format('d M Y')
+            : 'today';
+        $resortId = $promotion->resort_id;
+
+        $push = function ($recipientId, string $title, string $message) use ($resortId, $promotion) {
+            if (empty($recipientId)) return;
+            event(new ResortNotificationEvent(Common::nofitication(
+                $resortId, 10, $title, $message, $promotion->id, $recipientId, 'People'
+            )));
+        };
+
+        // (1) The employee
+        $push(
+            $employee->id,
+            'Promotion Effective Today',
+            "📌 Congratulations — your promotion from {$oldPosTitle} to {$newPosTitle} takes effect today ({$effectiveDate})."
+        );
+
+        // (2) Dept HOD / EXCOM (the new dept after promotion)
+        $hodRank   = array_search('HOD',   config('settings.Position_Rank'));
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank'));
+        $gmRank    = array_search('GM',    config('settings.Position_Rank'));
+        $leadRanks = array_filter([$hodRank, $excomRank], fn($r) => $r !== false);
+
+        $deptLeads = Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $employee->Dept_id)
+            ->where('status', 'Active')
+            ->whereIn('rank', $leadRanks)
+            ->pluck('id');
+        foreach ($deptLeads as $leadId) {
+            if ((int) $leadId === (int) $employee->id) continue;
+            $push(
+                $leadId,
+                'Employee Promotion Effective Today',
+                "📌 {$employeeName} has been promoted from {$oldPosTitle} to {$newPosTitle} today ({$effectiveDate})."
+            );
+        }
+
+        // (3) GM
+        if ($gmRank !== false) {
+            $gmIds = Employee::where('resort_id', $resortId)
+                ->where('status', 'Active')
+                ->where('rank', $gmRank)
+                ->pluck('id');
+            foreach ($gmIds as $gmId) {
+                $push(
+                    $gmId,
+                    'Employee Promotion Effective Today',
+                    "📌 {$employeeName} has been promoted to {$newPosTitle} today ({$effectiveDate})."
+                );
+            }
+        }
+
+        // (4) HR HOD / EXCOM
+        $hrDept = \App\Models\ResortDepartment::where('resort_id', $resortId)->get()
+            ->first(fn($d) => \App\Helpers\Common::isHRDepartment($d->id));
+        if ($hrDept) {
+            $hrLeads = Employee::where('resort_id', $resortId)
+                ->where('Dept_id', $hrDept->id)
+                ->where('status', 'Active')
+                ->whereIn('rank', $leadRanks)
+                ->pluck('id');
+            foreach ($hrLeads as $leadId) {
+                $push(
+                    $leadId,
+                    'Promotion Effective Today',
+                    "📌 {$employeeName}'s promotion ({$oldPosTitle} → {$newPosTitle}) takes effect today ({$effectiveDate})."
+                );
+            }
+        }
+
+        $promotion->effective_day_notified_at = now();
+        $promotion->save();
+    }
+
+    /**
+     * Sent the moment a promotion is fully Approved but the effective date is
+     * still in the future. Notifies the employee + dept HOD/EXCOM + HR so they
+     * know to expect the change on the effective date. Does NOT touch the
+     * employee record — the scheduler handles that on the effective day.
+     */
+    public static function dispatchFinalApprovedNotifications(EmployeePromotion $promotion): void
+    {
+        $promotion->loadMissing(['employee.resortAdmin', 'newPosition', 'currentPosition']);
+        $employee = $promotion->employee;
+        if (!$employee) return;
+
+        $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
+        $newPosTitle = optional($promotion->newPosition)->position_title ?? 'new position';
+        $effectiveDate = $promotion->effective_date
+            ? \Carbon\Carbon::parse($promotion->effective_date)->format('d M Y')
+            : 'a future date';
+        $resortId = $promotion->resort_id;
+
+        $push = function ($recipientId, string $title, string $message) use ($resortId, $promotion) {
+            if (empty($recipientId)) return;
+            event(new ResortNotificationEvent(Common::nofitication(
+                $resortId, 10, $title, $message, $promotion->id, $recipientId, 'People'
+            )));
+        };
+
+        $push(
+            $employee->id,
+            'Promotion Approved',
+            "🎉 Your promotion to {$newPosTitle} has been approved. Effective date: {$effectiveDate}."
+        );
+
+        $hodRank   = array_search('HOD',   config('settings.Position_Rank'));
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank'));
+        $leadRanks = array_filter([$hodRank, $excomRank], fn($r) => $r !== false);
+
+        $deptLeads = Employee::where('resort_id', $resortId)
+            ->where('Dept_id', $employee->Dept_id)
+            ->where('status', 'Active')
+            ->whereIn('rank', $leadRanks)
+            ->pluck('id');
+        foreach ($deptLeads as $leadId) {
+            if ((int) $leadId === (int) $employee->id) continue;
+            $push(
+                $leadId,
+                'Employee Promotion Approved',
+                "📢 {$employeeName}'s promotion to {$newPosTitle} has been approved. Effective {$effectiveDate}."
+            );
         }
     }
 
