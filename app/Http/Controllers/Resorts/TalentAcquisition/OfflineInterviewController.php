@@ -562,7 +562,9 @@ class OfflineInterviewController extends Controller
         $request->validate([
             'offline_interview_id' => 'required|exists:offline_interviews,id',
             'is_selected'          => 'required|in:Yes,No',
-            'offer_letter'         => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            // Now accepts multiple files (offer letter + contract + …).
+            'offer_letter'         => 'nullable|array',
+            'offer_letter.*'       => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
             'override_email'       => 'nullable|email|max:191',
         ]);
 
@@ -570,22 +572,39 @@ class OfflineInterviewController extends Controller
             ->where('resort_id', $resort_id)
             ->findOrFail($request->input('offline_interview_id'));
 
+        // Collect newly-uploaded files so we can email them after the
+        // transaction commits. Each entry: [path, name, mime].
+        $newlyUploaded = [];
+
         try {
             DB::beginTransaction();
 
             if ($request->hasFile('offer_letter')) {
                 $storePath = $this->applicantStorageRoot($resort_id) . '/oi-' . $oi->id;
-                $stored = $this->storeUploadedFile($request->file('offer_letter'), $storePath);
-                $oi->offer_letter_path = $stored;
-                OfflineInterviewDocument::create([
-                    'offline_interview_id' => $oi->id,
-                    'category' => 'offer_letter',
-                    'original_name' => $request->file('offer_letter')->getClientOriginalName(),
-                    'file_path' => $stored,
-                    'mime_type' => $request->file('offer_letter')->getClientMimeType(),
-                    'size_bytes' => $request->file('offer_letter')->getSize(),
-                    'uploaded_by' => optional($this->resort)->id,
-                ]);
+                foreach ($request->file('offer_letter') as $file) {
+                    if (!$file) continue;
+                    $stored = $this->storeUploadedFile($file, $storePath);
+                    // Remember the LAST one on the OI for the "Current" link.
+                    $oi->offer_letter_path = $stored;
+                    OfflineInterviewDocument::create([
+                        'offline_interview_id' => $oi->id,
+                        'category' => 'offer_letter',
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $stored,
+                        'mime_type' => $file->getClientMimeType(),
+                        'size_bytes' => $file->getSize(),
+                        'uploaded_by' => optional($this->resort)->id,
+                    ]);
+                    // Resolve a local disk path for the mail attachment.
+                    $absolute = \Storage::disk('public')->path($stored);
+                    if (file_exists($absolute)) {
+                        $newlyUploaded[] = [
+                            'path' => $absolute,
+                            'name' => $file->getClientOriginalName(),
+                            'mime' => $file->getClientMimeType(),
+                        ];
+                    }
+                }
             }
 
             $oi->is_selected   = $request->input('is_selected');
@@ -607,11 +626,44 @@ class OfflineInterviewController extends Controller
 
             DB::commit();
 
+            // ── Email the offer letter + contract to the candidate ─────
+            // Sent only when Selected AND at least one new attachment was
+            // uploaded in this submit. All files go in ONE email. Failures
+            // are logged but don't break the wizard.
+            $emailedTo = null;
+            if ($oi->is_selected === 'Yes' && !empty($newlyUploaded)) {
+                $applicant = $oi->applicant;
+                $candidateEmail = $request->input('override_email')
+                    ?: trim((string) optional($applicant)->email);
+                if ($candidateEmail !== '') {
+                    try {
+                        $candidateName = trim((optional($applicant)->first_name ?? '') . ' ' . (optional($applicant)->last_name ?? '')) ?: 'Candidate';
+                        $resortName    = optional(\App\Models\Resort::find($resort_id))->resort_name ?? 'the Resort';
+                        $positionTitle = (string) ($oi->position_title ?: '');
+
+                        \Mail::to($candidateEmail)->send(new \App\Mail\OfflineOfferLetterMail(
+                            $candidateName,
+                            $positionTitle,
+                            $resortName,
+                            $newlyUploaded
+                        ));
+                        $emailedTo = $candidateEmail;
+                    } catch (\Throwable $mailErr) {
+                        \Log::warning('OfflineInterview offer-letter email failed: ' . $mailErr->getMessage());
+                    }
+                }
+            }
+
+            $msg = $oi->is_selected === 'Yes'
+                ? 'Candidate selected — employee record created. They are now visible in People with status Onboarding.'
+                : 'Marked as not selected.';
+            if ($emailedTo) {
+                $msg .= ' Offer letter emailed to ' . $emailedTo . '.';
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => $oi->is_selected === 'Yes'
-                    ? 'Candidate selected — employee record created. They are now visible in People with status Onboarding.'
-                    : 'Marked as not selected.',
+                'message' => $msg,
                 'offline_interview_id' => $oi->id,
                 'employee_id' => $oi->created_employee_id,
             ]);
