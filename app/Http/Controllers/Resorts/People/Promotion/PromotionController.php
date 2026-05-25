@@ -882,24 +882,38 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
-                // Per-program completion check — same definition the Probation
-                // details Progress Tracking section uses. The resort's
-                // probationary_learning_programs configures the mandatory
-                // onboarding programs every probationer must complete. For
-                // each employee × required program:
+                // Only PROBATIONERS are subject to mandatory onboarding —
+                // long-tenured employees who never went through these
+                // programs shouldn't be excluded. Definition matches the
+                // Probation list: probation_end_date still in the future,
+                // OR no end date set AND joined within the last 3 months.
+                //
+                // Per-program completion check uses the same buckets as the
+                // Probation details Progress Tracking section:
                 //   no training_participants rows                → "Not Started" → EXCLUDE
                 //   any 'Pending' in that program                → "In Progress" → EXCLUDE
                 //   all sessions held, some 'Absent'             → "Absent"      → EXCLUDE
                 //   at least one 'Present' / 'Late' in that prog → "Completed"   → OK
-                // An employee is excluded as soon as ANY required program is
-                // not yet Completed for them.
                 $resortId = $this->resort->resort_id;
+                $today = now()->toDateString();
+                $threeMonthsAgo = now()->subMonths(3)->toDateString();
 
                 $requiredProgramIds = \DB::table('probationary_learning_programs')
                     ->where('resort_id', $resortId)
                     ->pluck('program_id')->unique()->all();
 
-                if (!empty($requiredProgramIds)) {
+                $probationerIds = Employee::where('resort_id', $resortId)
+                    ->where('status', 'Active')
+                    ->where(function ($q) use ($today, $threeMonthsAgo) {
+                        $q->whereDate('probation_end_date', '>=', $today)
+                          ->orWhere(function ($q2) use ($threeMonthsAgo) {
+                              $q2->whereNull('probation_end_date')
+                                 ->whereDate('joining_date', '>=', $threeMonthsAgo);
+                          });
+                    })
+                    ->pluck('id')->all();
+
+                if (!empty($requiredProgramIds) && !empty($probationerIds)) {
                     // (employee_id => [program_id, ...]) for programs they
                     // have at least one Present/Late attendance in.
                     $completedByEmp = \DB::table('training_participants as tp')
@@ -907,18 +921,15 @@ class PromotionController extends Controller
                         ->where('ts.resort_id', $resortId)
                         ->whereIn('ts.training_id', $requiredProgramIds)
                         ->whereIn('tp.status', ['Present', 'Late'])
+                        ->whereIn('tp.employee_id', $probationerIds)
                         ->select('tp.employee_id', 'ts.training_id')
                         ->get()
                         ->groupBy('employee_id')
                         ->map(fn($rows) => $rows->pluck('training_id')->unique()->all())
                         ->toArray();
 
-                    $activeEmpIds = Employee::where('resort_id', $resortId)
-                        ->where('status', 'Active')
-                        ->pluck('id')->all();
-
                     $trainingEmployees = [];
-                    foreach ($activeEmpIds as $empId) {
+                    foreach ($probationerIds as $empId) {
                         $empCompleted = $completedByEmp[$empId] ?? [];
                         if (count($empCompleted) < count($requiredProgramIds)) {
                             // Missing at least one required program → exclude.
