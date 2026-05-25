@@ -1316,14 +1316,30 @@ $(document).ready(function() {
                     const resortCosts = response.resort_costs;
                     const monthCostData = response.month_cost_data;
 
-                    // Get salaries from employees table (same for all 12 months)
+                    // Fallback salaries from the employees table. Per-month
+                    // overrides live in response.monthly_salaries[m] when set.
                     const currentBasicSalary = parseFloat(response.current_basic_salary || 0);
                     const proposedBasicSalary = parseFloat(response.proposed_basic_salary || 0);
+                    const monthlySalaries = response.monthly_salaries || {};
+                    const salaryForMonth = function (m) {
+                        const row = monthlySalaries[m] || monthlySalaries[String(m)];
+                        return {
+                            current:  row && row.current_salary  !== undefined ? parseFloat(row.current_salary)  : currentBasicSalary,
+                            proposed: row && row.proposed_salary !== undefined ? parseFloat(row.proposed_salary) : proposedBasicSalary
+                        };
+                    };
 
-                    // Calculate totals
+                    // Calculate totals from per-month effective salaries.
+                    let totalCurrentSalary = 0;
+                    let totalProposedSalary = 0;
+                    for (let mm = 1; mm <= 12; mm++) {
+                        const s = salaryForMonth(mm);
+                        totalCurrentSalary  += s.current;
+                        totalProposedSalary += s.proposed;
+                    }
                     const totals = {
-                        currentSalary: currentBasicSalary * 12, // Same salary for all 12 months
-                        proposedSalary: proposedBasicSalary * 12, // Same salary for all 12 months
+                        currentSalary: totalCurrentSalary,
+                        proposedSalary: totalProposedSalary,
                         costs: {}
                     };
 
@@ -1352,11 +1368,12 @@ $(document).ready(function() {
 
                         // Use same salary for all months (from employees table)
 
+                        const rowSalary = salaryForMonth(m);
                         html += `
                             <tr style="transition: all 0.2s;">
                                 <td class="text-center" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(currentBasicSalary), 'USD')}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(proposedBasicSalary), 'USD')}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.current, 'USD')}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.proposed, 'USD')}</td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-primary btn-edit-month-budget"
                                             data-month="${m}"
@@ -1506,14 +1523,29 @@ $(document).ready(function() {
                     const resortCosts = response.resort_costs;
                     const monthCostData = response.month_cost_data || {};
 
-                    // Get salaries from resort_vacant_budget_costs table (same for all 12 months)
+                    // Fallback salaries from resort_vacant_budget_costs; per-month
+                    // overrides live in response.monthly_salaries[m] when set.
                     const currentBasicSalary = parseFloat(response.current_basic_salary || 0);
                     const proposedBasicSalary = parseFloat(response.proposed_basic_salary || 0);
+                    const monthlySalaries = response.monthly_salaries || {};
+                    const salaryForMonth = function (m) {
+                        const row = monthlySalaries[m] || monthlySalaries[String(m)];
+                        return {
+                            current:  row && row.current_salary  !== undefined ? parseFloat(row.current_salary)  : currentBasicSalary,
+                            proposed: row && row.proposed_salary !== undefined ? parseFloat(row.proposed_salary) : proposedBasicSalary
+                        };
+                    };
 
-                    // Calculate totals
+                    let totalCurrentSalary = 0;
+                    let totalProposedSalary = 0;
+                    for (let mm = 1; mm <= 12; mm++) {
+                        const s = salaryForMonth(mm);
+                        totalCurrentSalary  += s.current;
+                        totalProposedSalary += s.proposed;
+                    }
                     const totals = {
-                        currentSalary: currentBasicSalary * 12, // Same salary for all 12 months
-                        proposedSalary: proposedBasicSalary * 12, // Same salary for all 12 months
+                        currentSalary: totalCurrentSalary,
+                        proposedSalary: totalProposedSalary,
                         costs: {}
                     };
 
@@ -1542,11 +1574,12 @@ $(document).ready(function() {
 
                         // Use same salary for all months (from resort_vacant_budget_costs table)
 
+                        const rowSalary = salaryForMonth(m);
                         html += `
                             <tr style="transition: all 0.2s;">
                                 <td class="text-center" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(currentBasicSalary), 'USD')}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(parseFloat(proposedBasicSalary), 'USD')}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.current, 'USD')}</td>
+                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.proposed, 'USD')}</td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-warning btn-edit-month-budget"
                                             data-month="${m}"
@@ -1788,14 +1821,18 @@ $(document).ready(function() {
         const totalCalls = targetMonths.length;
 
         targetMonths.forEach(function (targetMonth) {
+            // IMPORTANT: salary is stored at employee/vacant level (one value
+            // shared across all 12 months). Sending current_salary /
+            // proposed_salary here would overwrite that shared value and
+            // make EVERY other month appear "changed" on refresh — which is
+            // exactly the bug HR reported. Copy-down therefore only
+            // propagates the cost configurations, never the salary.
             const payload = {
                 position_id:    positionId,
                 department_id:  departmentId,
                 year:           year,
                 monthly_data:   [{
                     month: targetMonth,
-                    current_salary:  basicSalary,
-                    proposed_salary: proposedSalary,
                     cost_configurations: costConfigurations
                 }],
                 _token: csrfToken
@@ -1818,10 +1855,17 @@ $(document).ready(function() {
                 data: payload
             }).done(function (res) {
                 if (res && res.success) {
+                    // Re-read the target row's current salary cells so the
+                    // visual refresh doesn't rewrite them (preserves whatever
+                    // was already shown in those columns).
+                    const $targetRow = $(`td[data-month="${targetMonth}"][${keyAttr}="${keyVal}"]`).first().closest('tr');
+                    const targetCurrent  = $targetRow.length ? parseFloat($targetRow.find('td').eq(1).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0) : basicSalary;
+                    const targetProposed = $targetRow.length ? parseFloat($targetRow.find('td').eq(2).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0) : proposedSalary;
+
                     if (type === 'employee') {
-                        updateEmployeeMonthRow(keyVal, targetMonth, basicSalary, proposedSalary, costConfigurations);
+                        updateEmployeeMonthRow(keyVal, targetMonth, targetCurrent, targetProposed, costConfigurations);
                     } else if (typeof updateVacantMonthRow === 'function') {
-                        updateVacantMonthRow(keyVal, targetMonth, basicSalary, proposedSalary, costConfigurations);
+                        updateVacantMonthRow(keyVal, targetMonth, targetCurrent, targetProposed, costConfigurations);
                     }
                 } else {
                     failed++;
@@ -2351,6 +2395,11 @@ $(document).ready(function() {
     }
 
     // Save vacant month budget via AJAX
+    // NOTE: argument names are historical — `basicSalary` is the value typed
+    // into #formBasicSalary (the modal field labeled "Current Basic Salary")
+    // and `currentSalary` is the value typed into #formCurrentSalary (labeled
+    // "Proposed Basic Salary"). Mirror saveEmployeeMonthBudget so the request
+    // shape matches: current_salary <- basicSalary, proposed_salary <- currentSalary.
     function saveVacantMonthBudget(vacantIndex, vacantBudgetCostId, positionId, departmentId, month, basicSalary, currentSalary, costConfigurations) {
         const details = $('#vacantDetailsSelect').val() || '';
 
@@ -2366,8 +2415,8 @@ $(document).ready(function() {
                 details: details,
                 monthly_data: [{
                     month: month,
-                    current_salary: currentSalary,
-                    proposed_salary: basicSalary,
+                    current_salary: basicSalary,
+                    proposed_salary: currentSalary,
                     cost_configurations: costConfigurations
                 }],
                 _token: csrfToken
