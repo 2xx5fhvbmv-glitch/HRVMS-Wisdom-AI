@@ -1883,7 +1883,16 @@ class ApplicantsController extends Controller
                     $dateLabel = \Carbon\Carbon::parse($mt->meeting_date)->format('d M');
                     $timeLabel = $mt->meeting_time ? \Carbon\Carbon::parse($mt->meeting_time)->format('h:i A') : '';
                     $titleLabel = e($mt->meeting_title ?? 'Onboarding Meeting');
-                    $link       = e($mt->meeting_link ?? '');
+
+                    // Meeting links saved without a scheme (e.g. "hrmeeting.com")
+                    // get treated as RELATIVE by the browser, so clicking turned
+                    // into thewisdom.io/resort/master/hrmeeting.com. Prepend
+                    // https:// when no scheme is present so it opens externally.
+                    $rawLink = trim((string) ($mt->meeting_link ?? ''));
+                    if ($rawLink !== '' && !preg_match('#^[a-z][a-z0-9+.-]*://#i', $rawLink)) {
+                        $rawLink = 'https://' . ltrim($rawLink, '/');
+                    }
+                    $link = e($rawLink);
 
                     // Match the TA interview card markup exactly so the
                     // existing calendar styling carries over cleanly.

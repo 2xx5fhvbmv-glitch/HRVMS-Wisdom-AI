@@ -2593,6 +2593,11 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             editable: true,
             eventLimit: 0, // Allow "more" link when too many events
             navLinks: false,
+            // height/contentHeight = 'auto' tells FullCalendar to render at
+            // natural content height, so day cells don't get clipped to a
+            // fixed area with an internal vertical scrollbar.
+            height: 'auto',
+            contentHeight: 'auto',
             events: function(start, end, timezone, callback) {
                 let Resort_id = $("#Dasboard_resort_id").val();
 
