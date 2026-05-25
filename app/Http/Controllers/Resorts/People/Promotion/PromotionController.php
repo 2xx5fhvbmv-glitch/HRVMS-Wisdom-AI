@@ -869,13 +869,18 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
+                // training_schedules.status enum is ['Scheduled','Ongoing','Completed','Pending']
+                // — use the canonical 'Ongoing' (capital O) to match the stored value.
                 $trainingScheduleIds = TrainingSchedule::where('resort_id', $this->resort->resort_id)
-                    ->where('status', 'ongoing')
+                    ->where('status', 'Ongoing')
                     ->where('end_date', '>=', now())
                     ->pluck('id');
 
+                // training_participants.status enum is ['Pending','Present','Absent','Late'];
+                // "not completed" = anything other than 'Present'.
                 $trainingEmployees = Employee::whereHas('trainingParticipants', function ($q) use ($trainingScheduleIds) {
-                    $q->whereIn('training_schedule_id', $trainingScheduleIds);
+                    $q->whereIn('training_schedule_id', $trainingScheduleIds)
+                      ->where('status', '!=', 'Present');
                 })->pluck('id')->toArray();
 
                 $excludeIds = array_merge($excludeIds, $trainingEmployees);
