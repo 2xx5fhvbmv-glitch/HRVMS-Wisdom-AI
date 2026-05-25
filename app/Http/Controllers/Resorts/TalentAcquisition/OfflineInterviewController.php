@@ -120,18 +120,37 @@ class OfflineInterviewController extends Controller
 
         // ── Step 1: vacancy picker ───────────────────────────────────
         // Step 1 used to be a giant Hiring Requisition form. It's now a
-        // table of the resort's currently-open vacancies (same source as
-        // /talent-acquisition/fresh-applicant). Picking a row hydrates
-        // department / position / division / salary / etc. on the offline
-        // interview shell, so the user goes straight to Step 2 (Applicant
-        // Information) without re-typing requisition data that already
-        // lives on the vacancy.
+        // table of the resort's currently posted vacancies — mirrors the
+        // /talent-acquisition/fresh-applicant filters exactly so HR sees
+        // the same shortlist on both pages:
+        //   - has a t_anotification_children row Approved_By the TA final
+        //     approver AND status='ForwardedToNext'
+        //   - has an application_links row
+        // Picking a row hydrates department / position / division / salary
+        // / etc. on the offline interview shell, so the user goes straight
+        // to Step 2 without re-typing data that already lives on the vacancy.
         $vacancies = \DB::table('vacancies as v')
             ->join('resort_positions as p', 'p.id', '=', 'v.position')
             ->join('resort_departments as d', 'd.id', '=', 'v.department')
-            ->leftJoin('applicant_form_data as a', 'a.Parent_v_id', '=', 'v.id')
+            ->join('t_anotification_parents as tap', 'tap.V_id', '=', 'v.id')
+            ->join('t_anotification_children as tac', 'tac.Parent_ta_id', '=', 'tap.id')
+            ->join('application_links as al', 'al.ta_child_id', '=', 'tac.id')
+            ->leftJoin('applicant_form_data as a', function ($join) {
+                // Don't count applicants whose LATEST status is Rejected
+                // (matches fresh-applicant's leftJoin pattern).
+                $join->on('a.Parent_v_id', '=', 'v.id')
+                    ->whereNotExists(function ($q) {
+                        $q->select(\DB::raw(1))
+                            ->from('applicant_wise_statuses as check_aws')
+                            ->whereRaw('check_aws.Applicant_id = a.id')
+                            ->whereRaw('check_aws.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = a.id)')
+                            ->where('check_aws.status', 'Rejected');
+                    });
+            })
             ->where('v.Resort_id', $resort_id)
-            ->groupBy('v.id', 'p.position_title', 'd.name', 'd.code', 'v.Total_position_required', 'v.required_starting_date', 'v.created_at')
+            ->where('tac.Approved_By', \App\Helpers\Common::TaFinalApproval($resort_id))
+            ->where('tac.status', 'ForwardedToNext')
+            ->groupBy('v.id', 'p.position_title', 'd.name', 'd.code', 'v.Total_position_required')
             ->select(
                 'v.id as vacancy_id',
                 'p.position_title',
@@ -139,16 +158,16 @@ class OfflineInterviewController extends Controller
                 'd.code as department_code',
                 'v.Total_position_required as no_of_positions',
                 \DB::raw('COUNT(DISTINCT a.id) as application_count'),
-                'v.required_starting_date',
-                'v.created_at as vacancy_created_at'
+                \DB::raw('MAX(a.Application_date) as application_date'),
+                \DB::raw('MAX(al.link_Expiry_date) as link_expiry_date')
             )
             ->orderByDesc('v.id')
             ->get()
             ->map(function ($v) {
-                $v->application_date_label = $v->vacancy_created_at
-                    ? \Carbon\Carbon::parse($v->vacancy_created_at)->format('d M Y') : '—';
-                $v->required_starting_label = $v->required_starting_date
-                    ? \Carbon\Carbon::parse($v->required_starting_date)->format('d M Y') : '—';
+                $v->application_date_label = $v->application_date
+                    ? \Carbon\Carbon::parse($v->application_date)->format('d M Y') : '—';
+                $v->expiry_date_label = $v->link_expiry_date
+                    ? \Carbon\Carbon::parse($v->link_expiry_date)->format('d M Y') : '—';
                 return $v;
             });
 
