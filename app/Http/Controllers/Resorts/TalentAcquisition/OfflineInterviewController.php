@@ -117,32 +117,89 @@ class OfflineInterviewController extends Controller
         }
 
         $countries = Country::orderBy('name')->get();
-        $divisions = ResortDivision::where('resort_id', $resort_id)->where('status', 'active')->get();
-        $departments = ResortDepartment::where('resort_id', $resort_id)->where('status', 'active')->get();
 
-        // Pre-populate the cascading dropdowns when continuing a draft so
-        // Section / Position / Reporting render their already-chosen values
-        // without waiting for the JS cascade to fire.
-        $sections = collect();
-        $positions = collect();
-        $reportingCandidates = collect();
-        if ($offlineInterview && $offlineInterview->department_id) {
-            $sections = ResortSection::where('dept_id', $offlineInterview->department_id)
-                ->where('resort_id', $resort_id)->where('status', 'active')->get();
-            $positions = ResortPosition::where('dept_id', $offlineInterview->department_id)
-                ->where('resort_id', $resort_id)->where('status', 'active')->get();
-            $reportingCandidates = Employee::with('resortAdmin')
-                ->where('resort_id', $resort_id)
-                ->whereIn('rank', [1, 2])
-                ->where('Dept_id', $offlineInterview->department_id)
-                ->get()
-                ->map(fn($e) => ['id' => $e->id, 'name' => optional($e->resortAdmin)->full_name]);
+        // ── Step 1: vacancy picker ───────────────────────────────────
+        // Step 1 used to be a giant Hiring Requisition form. It's now a
+        // table of the resort's currently-open vacancies (same source as
+        // /talent-acquisition/fresh-applicant). Picking a row hydrates
+        // department / position / division / salary / etc. on the offline
+        // interview shell, so the user goes straight to Step 2 (Applicant
+        // Information) without re-typing requisition data that already
+        // lives on the vacancy.
+        $vacancies = \DB::table('vacancies as v')
+            ->join('resort_positions as p', 'p.id', '=', 'v.position')
+            ->join('resort_departments as d', 'd.id', '=', 'v.department')
+            ->leftJoin('applicant_form_data as a', 'a.Parent_v_id', '=', 'v.id')
+            ->where('v.Resort_id', $resort_id)
+            ->groupBy('v.id', 'p.position_title', 'd.name', 'd.code', 'v.Total_position_required', 'v.required_starting_date', 'v.created_at')
+            ->select(
+                'v.id as vacancy_id',
+                'p.position_title',
+                'd.name as department_name',
+                'd.code as department_code',
+                'v.Total_position_required as no_of_positions',
+                \DB::raw('COUNT(DISTINCT a.id) as application_count'),
+                'v.required_starting_date',
+                'v.created_at as vacancy_created_at'
+            )
+            ->orderByDesc('v.id')
+            ->get()
+            ->map(function ($v) {
+                $v->application_date_label = $v->vacancy_created_at
+                    ? \Carbon\Carbon::parse($v->vacancy_created_at)->format('d M Y') : '—';
+                $v->required_starting_label = $v->required_starting_date
+                    ? \Carbon\Carbon::parse($v->required_starting_date)->format('d M Y') : '—';
+                return $v;
+            });
+
+        // Selected vacancy details for the preview card when continuing a
+        // draft — pulls position + department names so the preview can be
+        // rendered without an AJAX round-trip.
+        $selectedVacancy = null;
+        if ($offlineInterview && $offlineInterview->position_id) {
+            $selectedVacancy = \App\Models\ResortPosition::with('department')->find($offlineInterview->position_id);
         }
 
         return view('resorts.offline-interview.create', compact(
-            'page_title', 'resort_id', 'offlineInterview', 'countries', 'divisions',
-            'departments', 'sections', 'positions', 'reportingCandidates'
+            'page_title', 'resort_id', 'offlineInterview', 'countries',
+            'vacancies', 'selectedVacancy'
         ));
+    }
+
+    /**
+     * Used by the Step 1 vacancy picker — the JS calls this when the user
+     * clicks "Select" on a vacancy row, to render the details card before
+     * they commit. Returns the full vacancy snapshot so the same payload
+     * can be used by saveStep1 to hydrate the offline_interviews shell.
+     */
+    public function getVacancyDetails($vacancyId)
+    {
+        $resort_id = $this->resort->resort_id;
+        $v = \DB::table('vacancies as v')
+            ->join('resort_positions as p', 'p.id', '=', 'v.position')
+            ->join('resort_departments as d', 'd.id', '=', 'v.department')
+            ->leftJoin('resort_sections as s', 's.id', '=', 'v.section')
+            ->leftJoin('resort_divisions as dv', 'dv.id', '=', 'v.division')
+            ->leftJoin('employees as emp', 'emp.id', '=', 'v.reporting_to')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'emp.Admin_Parent_id')
+            ->where('v.Resort_id', $resort_id)
+            ->where('v.id', $vacancyId)
+            ->select(
+                'v.*',
+                'p.position_title',
+                'p.Rank as position_rank',
+                'd.name as department_name',
+                's.name as section_name',
+                'dv.name as division_name',
+                \DB::raw("CONCAT(COALESCE(ra.first_name,''), ' ', COALESCE(ra.last_name,'')) as reporting_to_name")
+            )
+            ->first();
+
+        if (!$v) {
+            return response()->json(['success' => false, 'message' => 'Vacancy not found.'], 404);
+        }
+
+        return response()->json(['success' => true, 'vacancy' => $v]);
     }
 
     /* ============================================================
@@ -217,34 +274,22 @@ class OfflineInterviewController extends Controller
         $resort_id = $this->resort->resort_id;
         $authId    = optional($this->resort)->id;
 
-        $validated = $request->validate([
-            'budgeted_or_out_of_budget' => 'nullable|in:Budgeted,Out of Budget',
-            'division_id'               => 'nullable|exists:resort_divisions,id',
-            'department_id'             => 'nullable|exists:resort_departments,id',
-            'section_id'                => 'nullable|exists:resort_sections,id',
-            'position_id'               => 'nullable|exists:resort_positions,id',
-            'reporting_to'              => 'nullable|exists:employees,id',
-            'position_title'            => 'nullable|string|max:191',
-            'rank'                      => 'nullable|integer',
-            'required_starting_date'    => 'nullable|date',
-            'employee_type'             => 'nullable|in:Permanant,Casual/Agency,Trainee / Intern,Replacement,Temporary / Project',
-            'service_provider_name'     => 'nullable|string|max:191',
-            'salary'                    => 'nullable|string|max:50',
-            'food'                      => 'nullable|string|max:50',
-            'accommodation'             => 'nullable|string|max:50',
-            'transportation'            => 'nullable|string|max:50',
-            'budget_salary'             => 'nullable|numeric',
-            'proposed_salary'           => 'nullable|numeric',
-            'allowances'                => 'nullable|string|max:191',
-            'medical'                   => 'nullable|string|max:50',
-            'insurance'                 => 'nullable|string|max:50',
-            'pension'                   => 'nullable|string|max:50',
-            'service_charge'            => 'nullable|in:Yes,No',
-            'uniform'                   => 'nullable|in:Yes,No',
-            'benefit_accommodation'     => 'nullable|string|max:50',
-            'recruitment_methods'       => 'nullable|array',
-            'recruitment_methods.*'     => 'in:online_posting,recruiter,agency',
+        $request->validate([
+            'vacancy_id' => 'required|exists:vacancies,id',
         ]);
+
+        // Pull the vacancy + the position's title so we can copy the whole
+        // requisition snapshot onto the offline interview shell.
+        $vacancy = \DB::table('vacancies as v')
+            ->join('resort_positions as p', 'p.id', '=', 'v.position')
+            ->where('v.Resort_id', $resort_id)
+            ->where('v.id', $request->input('vacancy_id'))
+            ->select('v.*', 'p.position_title')
+            ->first();
+
+        if (!$vacancy) {
+            return response()->json(['success' => false, 'message' => 'Vacancy not found in this resort.'], 404);
+        }
 
         // Reuse existing offline interview (continuing draft) or start new.
         $oi = null;
@@ -258,7 +303,35 @@ class OfflineInterviewController extends Controller
             $oi->created_by = $authId;
         }
 
-        $oi->fill($validated);
+        // Map vacancy columns → offline_interviews columns. The legacy
+        // requisition form fields are kept on the OI row so Step 4/5/PDF
+        // logic doesn't have to special-case "from-vacancy" rows.
+        $oi->budgeted_or_out_of_budget = $vacancy->budgeted ?: null;
+        $oi->division_id            = $vacancy->division ?: null;
+        $oi->department_id          = $vacancy->department ?: null;
+        $oi->section_id             = $vacancy->section ?: null;
+        $oi->position_id            = $vacancy->position ?: null;
+        $oi->reporting_to           = $vacancy->reporting_to ?: null;
+        $oi->position_title         = $vacancy->position_title ?: null;
+        $oi->rank                   = $vacancy->rank ?: null;
+        $oi->required_starting_date = $vacancy->required_starting_date ?: null;
+        $oi->employee_type          = $vacancy->employee_type ?: null;
+        $oi->service_provider_name  = $vacancy->service_provider_name ?: null;
+        $oi->salary                 = $vacancy->salary ?: null;
+        $oi->food                   = $vacancy->food ?: null;
+        $oi->accommodation          = $vacancy->accomodation ?: null; // vacancies col is "accomodation"
+        $oi->transportation         = $vacancy->transportation ?: null;
+        $oi->budget_salary          = $vacancy->budgeted_salary ?: null;
+        $oi->proposed_salary        = $vacancy->propsed_salary ?: null; // vacancies col is "propsed_salary"
+        $oi->allowances             = $vacancy->allowance ?: null;
+        $oi->medical                = $vacancy->medical ?: null;
+        $oi->insurance              = $vacancy->insurance ?: null;
+        $oi->pension                = $vacancy->pension ?: null;
+        $oi->service_charge         = $vacancy->service_charge ?: null;
+        $oi->uniform                = $vacancy->uniform ?: null;
+        $oi->benefit_accommodation  = $vacancy->budgeted_accomodation ?: null;
+        $oi->recruitment_methods    = $vacancy->recruitment ? (array) explode(',', $vacancy->recruitment) : null;
+
         $oi->wizard_status = $oi->wizard_status === 'Selected' ? $oi->wizard_status : 'In Progress';
         $oi->current_step  = max((int) $oi->current_step, 1);
         $oi->modified_by   = $authId;
@@ -266,7 +339,7 @@ class OfflineInterviewController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Hiring requisition saved.',
+            'message' => 'Vacancy selected. Proceed to Applicant Information.',
             'offline_interview_id' => $oi->id,
         ]);
     }

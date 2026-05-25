@@ -504,6 +504,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( '/talent-acquisition/get-offline-interview', ['App\Http\Controllers\Resorts\TalentAcquisition\OfflineInterviewController','create'])->name('offline-interview.create');
 
     // Offline Interview wizard — step endpoints + finalize + delete.
+    Route::get('/offline-interview/vacancy/{id}', 'TalentAcquisition\OfflineInterviewController@getVacancyDetails')->name('offline-interview.vacancyDetails')->where('id', '[0-9]+');
     Route::post('/offline-interview/save-step-1', 'TalentAcquisition\OfflineInterviewController@saveStep1')->name('offline-interview.saveStep1');
     Route::post('/offline-interview/save-step-2', 'TalentAcquisition\OfflineInterviewController@saveStep2')->name('offline-interview.saveStep2');
     Route::post('/offline-interview/save-step-3', 'TalentAcquisition\OfflineInterviewController@saveStep3')->name('offline-interview.saveStep3');

@@ -62,177 +62,57 @@
                     </ul>
                 </div>
 
-                {{-- ───────────────────── Step 1 ─ Hiring Requisition Form ───────────────────── --}}
+                {{-- ───────────────────── Step 1 ─ Pick a Vacancy ──────────────────────────── --}}
+                {{-- HR picks an existing posted vacancy. The server hydrates department /
+                     position / salary / etc. on the offline_interview shell so the rest
+                     of the wizard already knows the requisition without re-typing. --}}
                 <fieldset data-step="1">
-                    <div class="card-title px-3 pt-3"><h3>Hiring Request Form</h3></div>
+                    <div class="card-title px-3 pt-3">
+                        <h3>Choose a Vacancy</h3>
+                        <p class="small text-muted mb-0">Pick one of the resort's currently posted positions to hire against. Step 2 onwards uses that vacancy's department, position and budget.</p>
+                    </div>
                     <div class="px-3 pb-3">
-                        <div class="row g-md-4 g-3">
-                            <div class="col-sm-6">
-                                <label class="form-label">BUDGETED OR OUT OF BUDGET?</label>
-                                <select name="budgeted_or_out_of_budget" class="form-select select2t-none">
-                                    <option value="Budgeted" {{ optional($oi)->budgeted_or_out_of_budget === 'Budgeted' ? 'selected' : '' }}>Budgeted</option>
-                                    <option value="Out of Budget" {{ optional($oi)->budgeted_or_out_of_budget === 'Out of Budget' ? 'selected' : '' }}>Out of Budget</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">REQUIRED STARTING DATE</label>
-                                <input type="date" name="required_starting_date" class="form-control"
-                                       value="{{ optional($oi)->required_starting_date ? \Carbon\Carbon::parse($oi->required_starting_date)->format('Y-m-d') : '' }}">
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">DIVISION</label>
-                                <select id="division_id" name="division_id" class="form-select select2t-none">
-                                    <option value="">Select Division</option>
-                                    @foreach($divisions as $d)
-                                        <option value="{{ $d->id }}" {{ optional($oi)->division_id == $d->id ? 'selected' : '' }}>{{ $d->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">DEPARTMENT</label>
-                                <select id="department_id" name="department_id" class="form-select select2t-none">
-                                    <option value="">Select Department</option>
-                                    @foreach($departments as $d)
-                                        <option value="{{ $d->id }}" {{ optional($oi)->department_id == $d->id ? 'selected' : '' }}>{{ $d->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">SECTION</label>
-                                <select id="section_id" name="section_id" class="form-select select2t-none">
-                                    <option value="">Select Section</option>
-                                    @foreach(($sections ?? collect()) as $s)
-                                        <option value="{{ $s->id }}" {{ optional($oi)->section_id == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">POSITION</label>
-                                <select id="position_id" name="position_id" class="form-select select2t-none">
-                                    <option value="">Select Position</option>
-                                    @foreach(($positions ?? collect()) as $p)
-                                        <option value="{{ $p->id }}" {{ optional($oi)->position_id == $p->id ? 'selected' : '' }}>{{ $p->position_title }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">POSITION TITLE</label>
-                                <input type="text" name="position_title" class="form-control" value="{{ optional($oi)->position_title }}">
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">RANK</label>
-                                <input type="number" name="rank" class="form-control" value="{{ optional($oi)->rank }}">
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label">REPORTING TO</label>
-                                <select id="reporting_to" name="reporting_to" class="form-select select2t-none">
-                                    <option value="">Select</option>
-                                    @foreach(($reportingCandidates ?? collect()) as $emp)
-                                        <option value="{{ $emp['id'] }}" {{ optional($oi)->reporting_to == $emp['id'] ? 'selected' : '' }}>{{ $emp['name'] }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label d-block">EMPLOYEE TYPE</label>
-                                @php $et = optional($oi)->employee_type; @endphp
-                                @foreach(['Permanant','Casual/Agency','Trainee / Intern','Replacement','Temporary / Project'] as $type)
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input emp-type" type="radio" name="employee_type" value="{{ $type }}" id="emp_{{ \Str::slug($type) }}" {{ $et === $type ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="emp_{{ \Str::slug($type) }}">{{ $type }}</label>
-                                    </div>
-                                @endforeach
-                            </div>
+                        <input type="hidden" id="selected_vacancy_id" name="vacancy_id"
+                            value="{{ optional($oi)->position_id }}">
+                        <div class="table-responsive">
+                            <table class="table table-LearningProgram w-100 mb-0" id="vacancyPickerTable">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Position</th>
+                                        <th>Department</th>
+                                        <th>No. of position</th>
+                                        <th>Applicants</th>
+                                        <th>Application Date</th>
+                                        <th>Required From</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($vacancies as $v)
+                                        <tr class="vacancy-row" data-vacancy-id="{{ $v->vacancy_id }}" style="cursor:pointer;">
+                                            <td><input type="radio" name="vacancy_pick" value="{{ $v->vacancy_id }}"></td>
+                                            <td>{{ $v->position_title }}</td>
+                                            <td>{{ $v->department_name }} <span class="badge badge-themeGrayLight ms-1">{{ $v->department_code }}</span></td>
+                                            <td>{{ $v->no_of_positions }}</td>
+                                            <td>{{ $v->application_count }}</td>
+                                            <td>{{ $v->application_date_label }}</td>
+                                            <td>{{ $v->required_starting_label }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr><td colspan="7" class="text-center text-muted">No open vacancies for this resort. Create one in Talent Acquisition &rarr; Vacancies first.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
 
-                        {{-- Casual/Agency conditional block --}}
-                        <div id="casualAgencyBlock" class="row g-md-4 g-3 mt-1" style="display:none;">
-                            <div class="col-md-3 col-sm-6">
-                                <label class="form-label">SERVICE PROVIDER NAME</label>
-                                <input type="text" name="service_provider_name" class="form-control" value="{{ optional($oi)->service_provider_name }}">
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label">SALARY</label>
-                                <input type="text" name="salary" class="form-control" value="{{ optional($oi)->salary }}">
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label">FOOD</label>
-                                <input type="text" name="food" class="form-control" value="{{ optional($oi)->food }}">
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label">ACCOMMODATION</label>
-                                <input type="text" name="accommodation" class="form-control" value="{{ optional($oi)->accommodation }}">
-                            </div>
-                            <div class="col-md-3 col-sm-6">
-                                <label class="form-label">TRANSPORTATION</label>
-                                <input type="text" name="transportation" class="form-control" value="{{ optional($oi)->transportation }}">
-                            </div>
-                        </div>
-
-                        <div class="card-title mt-3"><h3>Budget, Funding &amp; Benefits</h3></div>
-                        <div class="row g-md-4 g-3">
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">BUDGET SALARY</label>
-                                <input type="number" step="0.01" name="budget_salary" class="form-control" value="{{ optional($oi)->budget_salary }}">
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">ACCOMMODATION (Benefit)</label>
-                                <input type="text" name="benefit_accommodation" class="form-control" value="{{ optional($oi)->benefit_accommodation }}">
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label d-block">SERVICE CHARGE</label>
-                                @foreach(['Yes','No'] as $v)
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="service_charge" value="{{ $v }}" id="sc_{{ $v }}" {{ optional($oi)->service_charge === $v ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="sc_{{ $v }}">{{ $v }}</label>
-                                    </div>
-                                @endforeach
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">PROPOSED SALARY</label>
-                                <input type="number" step="0.01" name="proposed_salary" class="form-control" value="{{ optional($oi)->proposed_salary }}">
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">ALLOWANCES</label>
-                                <input type="text" name="allowances" class="form-control" value="{{ optional($oi)->allowances }}">
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label d-block">UNIFORM</label>
-                                @foreach(['Yes','No'] as $v)
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="uniform" value="{{ $v }}" id="un_{{ $v }}" {{ optional($oi)->uniform === $v ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="un_{{ $v }}">{{ $v }}</label>
-                                    </div>
-                                @endforeach
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">MEDICAL</label>
-                                <input type="text" name="medical" class="form-control" value="{{ optional($oi)->medical }}">
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">INSURANCE</label>
-                                <input type="text" name="insurance" class="form-control" value="{{ optional($oi)->insurance }}">
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">PENSION</label>
-                                <input type="text" name="pension" class="form-control" value="{{ optional($oi)->pension }}">
-                            </div>
-                        </div>
-
-                        <div class="card-title mt-3"><h3>Recruitment</h3></div>
-                        <div class="row g-md-4 g-3">
-                            @foreach(['online_posting' => 'Online job posting','recruiter' => 'Recruiter','agency' => 'Agency'] as $val => $lbl)
-                                <div class="col-auto">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="recruitment_methods[]" value="{{ $val }}" id="rm_{{ $val }}" {{ in_array($val, $rec, true) ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="rm_{{ $val }}">{{ $lbl }}</label>
-                                    </div>
-                                </div>
-                            @endforeach
+                        {{-- Selected-vacancy preview card. Hidden until a row is picked. --}}
+                        <div id="vacancyPreviewCard" class="cardBorder-block mt-3" style="display:none;">
+                            <div class="card-title"><h3>Selected Vacancy</h3></div>
+                            <div id="vacancyPreviewBody"></div>
                         </div>
                     </div>
                     <div class="card-footer text-end px-3 pb-3">
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-save-draft" data-from-step="1">Save As Draft</button>
-                        <button type="button" class="btn btn-themeSkyblue btn-sm step-next" data-from-step="1">Next</button>
+                        <button type="button" class="btn btn-themeSkyblue btn-sm step-next" data-from-step="1" id="vacancyNextBtn" disabled>Continue to Applicant Information</button>
                     </div>
                 </fieldset>
 
@@ -520,6 +400,86 @@ $(document).ready(function () {
     }
     $(document).on('change', '#is_selected', toggleSelectedHelp);
     toggleSelectedHelp();
+
+    // ── Step 1 vacancy picker ─────────────────────────────────────────
+    // Clicking a row (or its radio) loads that vacancy's details into
+    // the preview card and unlocks the "Continue to Applicant Information"
+    // button. The server hydrates the requisition fields from the chosen
+    // vacancy in saveStep1, so no other form inputs are required here.
+    function loadVacancyPreview(vacancyId) {
+        if (!vacancyId) {
+            $('#vacancyPreviewCard').hide();
+            $('#vacancyPreviewBody').empty();
+            $('#vacancyNextBtn').prop('disabled', true);
+            return;
+        }
+        $.get('{{ url("/resort/offline-interview/vacancy") }}/' + vacancyId, function (resp) {
+            if (!resp || !resp.success || !resp.vacancy) {
+                toastr.error((resp && resp.message) || 'Could not load vacancy.', 'Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+            var v = resp.vacancy;
+            var row = function (label, val) {
+                return '<tr><th class="text-muted" style="width:34%;">' + label + '</th><td>' + (val || '—') + '</td></tr>';
+            };
+            var fmtDate = function (d) {
+                if (!d) return '—';
+                var dt = new Date(d);
+                return isNaN(dt) ? d : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            };
+            var html =
+                '<div class="table-responsive"><table class="table mb-0 small">' +
+                row('Position', v.position_title) +
+                row('Department', v.department_name) +
+                row('Section', v.section_name) +
+                row('Division', v.division_name) +
+                row('Reporting To', v.reporting_to_name && v.reporting_to_name.trim() ? v.reporting_to_name : '—') +
+                row('Employee Type', v.employee_type) +
+                row('Required From', fmtDate(v.required_starting_date)) +
+                row('Budget Salary', v.budgeted_salary) +
+                row('Proposed Salary', v.propsed_salary) +
+                row('Allowances', v.allowance) +
+                row('Medical', v.medical) +
+                row('Insurance', v.insurance) +
+                row('Pension', v.pension) +
+                row('Service Charge', v.service_charge) +
+                row('Uniform', v.uniform) +
+                row('Recruitment Channels', v.recruitment) +
+                '</table></div>';
+            $('#vacancyPreviewBody').html(html);
+            $('#vacancyPreviewCard').show();
+            $('#vacancyNextBtn').prop('disabled', false);
+        }).fail(function () {
+            toastr.error('Could not load vacancy details.', 'Error', { positionClass: 'toast-bottom-right' });
+        });
+    }
+
+    // Click row OR change radio → select that vacancy.
+    $(document).on('click', '.vacancy-row', function () {
+        var id = $(this).data('vacancy-id');
+        $('input[name="vacancy_pick"][value="' + id + '"]').prop('checked', true);
+        $('#selected_vacancy_id').val(id);
+        loadVacancyPreview(id);
+    });
+    $(document).on('change', 'input[name="vacancy_pick"]', function () {
+        var id = $(this).val();
+        $('#selected_vacancy_id').val(id);
+        loadVacancyPreview(id);
+    });
+
+    // When continuing a draft, the controller passes the previously-
+    // chosen position_id via #selected_vacancy_id. Pre-load the preview.
+    var preselectedVacancyId = $('#selected_vacancy_id').val();
+    if (preselectedVacancyId) {
+        // The hidden input stores position_id, not vacancy_id, when a
+        // draft was saved under the old form. Only pre-load if a row
+        // with that vacancy actually exists in the table.
+        var $match = $('.vacancy-row[data-vacancy-id="' + preselectedVacancyId + '"]');
+        if ($match.length) {
+            $match.find('input[name="vacancy_pick"]').prop('checked', true);
+            loadVacancyPreview(preselectedVacancyId);
+        }
+    }
 
     // ── Cascading dropdowns (division → dept → section + position → reporting) ─
     $(document).on('change', '#division_id', function () {
