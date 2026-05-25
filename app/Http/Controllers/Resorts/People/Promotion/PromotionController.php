@@ -67,6 +67,25 @@ class PromotionController extends Controller
             'benefit_grid' => 'nullable|string',
             'comments' => 'nullable|string',
         ]);
+
+        // Server-side vacancy guard — same check the UI surfaces under
+        // NEW POSITION. Stops promotion submissions from bypassing JS.
+        $newPosition = ResortPosition::where('id', $request->new_position)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if ($newPosition) {
+            $vacancy = $this->computePositionVacancy(
+                (int) $this->resort->resort_id,
+                (int) $request->new_position,
+                $newPosition
+            );
+            if (!$vacancy['is_vacant']) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['new_position' => $vacancy['message']]);
+            }
+        }
+
         $formattedEffectiveDate = $request->effective_date ? Carbon::createFromFormat('d/m/Y', $request->effective_date)->format('Y-m-d') : null;
         // dd($formattedEffectiveDate);
         // Store promotion request
@@ -439,16 +458,96 @@ class PromotionController extends Controller
 
     public function getPosDetails(Request $request){
         $resort_id = $this->resort->resort_id;
-        $position = ResortPosition::where('id', $request->position_id)->first();
+        $position = ResortPosition::where('id', $request->position_id)
+            ->where('resort_id', $resort_id)
+            ->first();
+
+        if (!$position) {
+            return response()->json([
+                "success" => false,
+                "message" => "Position not found.",
+            ], 404);
+        }
+
         $emp_grade = Common::getEmpGrade($position->Rank);
-        // dd($emp_grade);
+
+        // Vacancy check — mirror TransferController::isTargetPositionVacant().
+        // Primary source: manning_responses + position_monthly_data (Workforce
+        // Planning headcount); compute filled in real time from Active
+        // employees (exclude those past their last_working_day). Fall back to
+        // resort_positions.no_of_positions when no manning row exists.
+        $vacancyInfo = $this->computePositionVacancy($resort_id, (int) $request->position_id, $position);
+
         return response()->json([
             "success" => true,
             "data" => [
                 "benefit_grid_level" => $emp_grade ?? "N/A",
-                "job_desc_url" => $request->position_id ? route("job.description.by.position", ['posId' => $request->position_id]) : null ,         
+                "job_desc_url" => $request->position_id ? route("job.description.by.position", ['posId' => $request->position_id]) : null,
+                "position_title" => $position->position_title,
+                "is_vacant" => $vacancyInfo['is_vacant'],
+                "vacant_count" => $vacancyInfo['vacant_count'],
+                "filled_count" => $vacancyInfo['filled_count'],
+                "budgeted_headcount" => $vacancyInfo['budgeted_headcount'],
+                "vacancy_message" => $vacancyInfo['message'],
             ]
         ]);
+    }
+
+    /**
+     * Resolve the budgeted headcount, filled count, and vacancy for a position
+     * using the same precedence the Transfer flow uses so promotion + transfer
+     * agree on availability.
+     */
+    private function computePositionVacancy(int $resortId, int $positionId, $position): array
+    {
+        $today = \Carbon\Carbon::today()->toDateString();
+        $activeFilter = function ($q) use ($today) {
+            $q->whereNull('last_working_day')
+              ->orWhereDate('last_working_day', '>', $today);
+        };
+
+        $manningYear = (int) (\DB::table('manning_responses')
+            ->where('resort_id', $resortId)
+            ->where('year', now()->year)
+            ->exists()
+            ? now()->year
+            : \DB::table('manning_responses')->where('resort_id', $resortId)->max('year'));
+
+        $budgeted = null;
+        if ($manningYear) {
+            $seat = \DB::table('position_monthly_data as pmd')
+                ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
+                ->where('mr.resort_id', $resortId)
+                ->where('mr.year', $manningYear)
+                ->where('pmd.position_id', $positionId)
+                ->selectRaw('MAX(pmd.headcount) as budgeted')
+                ->first();
+            if ($seat && $seat->budgeted !== null) {
+                $budgeted = (int) $seat->budgeted;
+            }
+        }
+        if ($budgeted === null) {
+            $budgeted = max(1, (int) ($position->no_of_positions ?? 0));
+        }
+
+        $filled = Employee::where('resort_id', $resortId)
+            ->where('Position_id', $positionId)
+            ->where('status', 'Active')
+            ->where($activeFilter)
+            ->count();
+
+        $vacant = max(0, $budgeted - $filled);
+        $isVacant = $vacant > 0;
+
+        return [
+            'is_vacant' => $isVacant,
+            'vacant_count' => $vacant,
+            'filled_count' => $filled,
+            'budgeted_headcount' => $budgeted,
+            'message' => $isVacant
+                ? 'Position has '.$vacant.' vacant seat(s) ('.$filled.'/'.$budgeted.' filled).'
+                : 'Position is fully occupied ('.$filled.'/'.$budgeted.' filled). No vacant seat available.',
+        ];
     }
 
     public function approval($id){

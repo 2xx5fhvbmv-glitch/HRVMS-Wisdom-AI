@@ -128,7 +128,7 @@
                         <div class="row g-md-4 g-3 align-items-end">
                             <div class="col-sm-6">
                                 <label for="new_position" class="form-label">NEW POSITION <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" name="new_position" id="new_position" aria-label="Default select example" required 
+                                <select class="form-select select2t-none" name="new_position" id="new_position" aria-label="Default select example" required
                                 data-parsley-required-message="Please select new position" data-parsley-errors-container="#pos-error" onchange="getDetails(this.value)">
                                     <option value="">Select New Position</option>
                                     @if($positions)
@@ -138,6 +138,9 @@
                                     @endif
                                 </select>
                                 <div id="pos-error"></div>
+                                <div id="position-vacancy-info" class="mt-2" style="display:none;">
+                                    <span id="position-vacancy-badge" class="badge"></span>
+                                </div>
                             </div>
                             <div class="col-sm-6">
                                 <label for="level" class="form-label">LEVEL <span class="red-mark">*</span></label>
@@ -466,6 +469,11 @@
     }
 
     function getDetails(posId){
+        // Reset vacancy UI whenever the position changes.
+        $('#position-vacancy-info').hide();
+        $('#position-vacancy-badge').removeClass('badge-themeSuccess badge-themeDangerNew').text('');
+        window.__newPositionIsVacant = null;
+
         if (!posId) return;
 
         $.ajax({
@@ -473,10 +481,8 @@
             type: "GET",
             data: { position_id: posId },
             success: function (response) {
-                if (response.success) {       
+                if (response.success) {
                     const gridLevel = response.data.benefit_grid_level;
-
-                    console.log(gridLevel);
 
                     // Set value in Select2 dropdown + sync hidden level input
                     // so the disabled select still submits a value server-side.
@@ -494,11 +500,28 @@
                         $('#new-job-description-link')
                             .removeAttr('href')
                             .removeAttr('target')
-                            .hide(); // Or disable with .addClass('disabled') or similar
+                            .hide();
                     }
-                   
+
+                    // Vacancy badge under NEW POSITION — green when seat is
+                    // open, red when fully occupied. The pre-submit hook
+                    // below uses window.__newPositionIsVacant to block
+                    // promotion into a fully occupied position.
+                    const isVacant = !!response.data.is_vacant;
+                    window.__newPositionIsVacant = isVacant;
+                    $('#position-vacancy-badge')
+                        .removeClass('badge-themeSuccess badge-themeDangerNew')
+                        .addClass(isVacant ? 'badge-themeSuccess' : 'badge-themeDangerNew')
+                        .text(response.data.vacancy_message || '');
+                    $('#position-vacancy-info').show();
+
+                    if (!isVacant) {
+                        toastr.warning(response.data.vacancy_message, 'No Vacancy', {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
                 } else {
-                    toastr.error("Employee details not found!", "Error", {
+                    toastr.error(response.message || "Employee details not found!", "Error", {
                         positionClass: 'toast-bottom-right'
                     });
                 }
@@ -510,6 +533,18 @@
             }
         });
     }
+
+    // Block form submission when the chosen new position has no vacant seat.
+    $(document).on('submit', '#initiate-promotion', function (e) {
+        if ($('#new_position').val() && window.__newPositionIsVacant === false) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            toastr.error('Selected position has no vacant seat. Please pick a different position.', 'Promotion Blocked', {
+                positionClass: 'toast-bottom-right'
+            });
+            return false;
+        }
+    });
 
     function applyFilters() {
         const filters = [];
