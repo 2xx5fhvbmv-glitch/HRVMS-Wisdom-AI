@@ -2491,10 +2491,15 @@ class BudgetController extends Controller
                 }
             }
 
-            // Insert new month-wise cost configurations (without storing salary data)
+            // Insert new month-wise cost configurations (without storing salary data).
+            // cost_configurations may be omitted (e.g. salary-only update) —
+            // skip cost handling in that case to avoid wiping existing rows.
             foreach ($request->monthly_data as $monthData) {
                 $month = $monthData['month'];
-                $costConfigurations = $monthData['cost_configurations'];
+                if (!array_key_exists('cost_configurations', $monthData)) {
+                    continue;
+                }
+                $costConfigurations = $monthData['cost_configurations'] ?? [];
 
                 // Delete existing configurations for this employee, year, and specific month
                 ResortEmployeeBudgetCostConfiguration::where('employee_id', $employeeId)
@@ -2709,10 +2714,16 @@ class BudgetController extends Controller
             // month's salary to all 12 months on refresh. Per-month overrides
             // above are now the source of truth.)
 
-            // Insert new month-wise cost configurations (without storing salary data)
+            // Insert new month-wise cost configurations (without storing salary data).
+            // cost_configurations may be omitted (e.g. when the request only
+            // updates per-month salary) — skip cost handling in that case so we
+            // don't wipe existing cost rows.
             foreach ($request->monthly_data as $monthData) {
                 $month = $monthData['month'];
-                $costConfigurations = $monthData['cost_configurations'];
+                if (!array_key_exists('cost_configurations', $monthData)) {
+                    continue;
+                }
+                $costConfigurations = $monthData['cost_configurations'] ?? [];
 
                 // Delete existing configurations for this vacant position, year, and specific month
                 ResortVacantBudgetCostConfiguration::where('vacant_budget_cost_id', $vacantBudgetCostId)
