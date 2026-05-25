@@ -99,8 +99,33 @@
 {
     ReviewType();
     const BASE_URL = "{{ asset('resorts_assets/lang/en-US.lang') }}";
+
+    // Per-field "Responder Roles" — controls who can fill each field on
+    // the responder page. Empty / missing = everyone (backward-compat).
+    var RESPONDER_ROLE_OPTIONS = {
+        'GM': 'GM', 'EXCOM': 'EXCOM', 'HOD': 'HOD', 'HR': 'HR',
+        'MGR': 'MGR', 'SUP': 'SUP', 'LINE WORKERS': 'LINE WORKERS',
+        'Finance': 'Finance', 'Self': 'Self (appraisee)'
+    };
+    var ROLE_GATED_TYPES = [
+        'text','textarea','password','email','phone','url','number','date','time','hidden',
+        'select','checkbox','radio','checkbox-group','radio-group','file','autocomplete',
+        'header','paragraph','button','starRating','ratingTable'
+    ];
+    var typeUserAttrs = {};
+    ROLE_GATED_TYPES.forEach(function (t) {
+        typeUserAttrs[t] = {
+            responder_roles: {
+                label: 'Responder Roles (who fills)',
+                multiple: true,
+                options: RESPONDER_ROLE_OPTIONS
+            }
+        };
+    });
+
     const options = {
         disableFields: ['autocomplete', 'button'],
+        typeUserAttrs: typeUserAttrs,
         i18n: {
             locale: 'en-US',
             override: {},

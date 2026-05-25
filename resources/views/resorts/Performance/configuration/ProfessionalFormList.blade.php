@@ -171,13 +171,36 @@ $(document).ready(function ()
             };
         }
     };
-    var typeUserAttrs = {
-        starRating: { maxRating: { label: 'Max Rating', value: 5, type: 'number' } },
-        ratingTable: {
-            columnHeadings: { label: 'Column Headings (comma separated)', value: 'Criteria, Rating, Comments', type: 'text' },
-            rowLabels: { label: 'Row Labels (comma separated)', value: 'Communication, Teamwork, Leadership', type: 'text' }
+    // Per-field "Responder Roles" — added to every field type so HR can
+    // pick which role(s) are allowed to fill each field. Empty / missing
+    // means everyone can fill (backward-compat with older forms).
+    var RESPONDER_ROLE_OPTIONS = {
+        'GM': 'GM', 'EXCOM': 'EXCOM', 'HOD': 'HOD', 'HR': 'HR',
+        'MGR': 'MGR', 'SUP': 'SUP', 'LINE WORKERS': 'LINE WORKERS',
+        'Finance': 'Finance', 'Self': 'Self (appraisee)'
+    };
+    var RESPONDER_ROLES_ATTR = {
+        responder_roles: {
+            label: 'Responder Roles (who fills)',
+            multiple: true,
+            options: RESPONDER_ROLE_OPTIONS
         }
     };
+    var ROLE_GATED_TYPES = [
+        'text','textarea','password','email','phone','url','number','date','time','hidden',
+        'select','checkbox','radio','checkbox-group','radio-group','file','autocomplete',
+        'header','paragraph','button','starRating','ratingTable'
+    ];
+    var typeUserAttrs = {
+        starRating: Object.assign({ maxRating: { label: 'Max Rating', value: 5, type: 'number' } }, RESPONDER_ROLES_ATTR),
+        ratingTable: Object.assign({
+            columnHeadings: { label: 'Column Headings (comma separated)', value: 'Criteria, Rating, Comments', type: 'text' },
+            rowLabels: { label: 'Row Labels (comma separated)', value: 'Communication, Teamwork, Leadership', type: 'text' }
+        }, RESPONDER_ROLES_ATTR)
+    };
+    ROLE_GATED_TYPES.forEach(function (t) {
+        if (!typeUserAttrs[t]) typeUserAttrs[t] = Object.assign({}, RESPONDER_ROLES_ATTR);
+    });
 
     const options = {
         disableFields: ['autocomplete', 'button'],
