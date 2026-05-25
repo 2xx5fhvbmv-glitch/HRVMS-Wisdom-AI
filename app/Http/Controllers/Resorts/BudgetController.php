@@ -2072,57 +2072,29 @@ class BudgetController extends Controller
                 }
             }
 
-            // Get proper vacant count for this specific position using resorts_child_notifications
-            // Join path: resorts_child_notifications -> budget_statuses -> manning_responses -> position_monthly_data
-            $totalVacantPositions = 0;
-
-            // Get budget status for this manning response
-            $budgetStatus = BudgetStatus::where('Budget_id', $manningResponse->id)
-                ->orderBy('id', 'desc')
-                ->first();
-
-            if ($budgetStatus) {
-                // Check if this position is in resorts_child_notifications
-                $childNotification = ResortsChildNotifications::where('Parent_msg_id', $budgetStatus->message_id)
-                    ->where('Position_id', $positionId)
-                    ->where('Department_id', $position->dept_id)
-                    ->first();
-
-                if ($childNotification) {
-                    // Position is in manning request, get vacant count from position_monthly_data
-                    // Filtered by position_id, manning_response_id (which already filters by dept_id, year, resort_id)
-                    $positionMonthlyData = PositionMonthlyData::where('position_id', $positionId)
-                        ->where('manning_response_id', $manningResponse->id)
-                        ->get();
-
-                    // Get maximum vacant count across all months for this position
-                    $maxVacantCount = 0;
-                    foreach ($positionMonthlyData as $monthlyDataItem) {
-                        $vacantCount = $monthlyDataItem->vacantcount ?? 0;
-                        $maxVacantCount = max($maxVacantCount, $vacantCount);
-                    }
-
-
-                    $totalVacantPositions = $maxVacantCount;
-
-                } else {
-                    // Position not in resorts_child_notifications, calculate from position_monthly_data
-                    $maxVacantCount = 0;
-                    foreach ($monthlyData as $monthlyDataItem) {
-                        $vacantCount = $monthlyDataItem->vacantcount ?? 0;
-                        $maxVacantCount = max($maxVacantCount, $vacantCount);
-                    }
-                    $totalVacantPositions = $maxVacantCount;
-                }
-            } else {
-                // No budget status, calculate from position_monthly_data
-                $maxVacantCount = 0;
-                foreach ($monthlyData as $monthlyDataItem) {
-                    $vacantCount = $monthlyDataItem->vacantcount ?? 0;
-                    $maxVacantCount = max($maxVacantCount, $vacantCount);
-                }
-                $totalVacantPositions = $maxVacantCount;
+            // Real-time vacant = max(0, budgeted headcount − Active filled).
+            // pmd.vacantcount is a stored field that lags behind reality (not
+            // refreshed when employees are assigned/removed), which is why
+            // Accounting Clerk was rendering Vacant 1 + Vacant 2 even after
+            // a seat was filled. Same formula as Workforce + view-manning +
+            // ViewBudget() page-load logic.
+            $maxHeadcount = 0;
+            foreach ($monthlyData as $monthlyDataItem) {
+                $maxHeadcount = max($maxHeadcount, (int) ($monthlyDataItem->headcount ?? 0));
             }
+
+            $today = \Carbon\Carbon::today()->toDateString();
+            $activeFilled = \App\Models\Employee::where('resort_id', $resortId)
+                ->where('Position_id', $positionId)
+                ->where('Dept_id', $position->dept_id)
+                ->where('status', 'Active')
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('last_working_day')
+                      ->orWhereDate('last_working_day', '>', $today);
+                })
+                ->count();
+
+            $totalVacantPositions = max(0, $maxHeadcount - $activeFilled);
 
             // dd($vacantCounts, $totalVacantPositions, $manningResponse->id, $position);
             return response()->json([
