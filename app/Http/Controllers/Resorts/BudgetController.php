@@ -661,24 +661,41 @@ class BudgetController extends Controller
                         if ($childNotification) {
                             $position->is_in_manning_request = true;
 
-                            // Get vacant count from position_monthly_data for this position
-                            // Filtered by the correct manning_response_id (from Budget_id)
+                            // Real-time vacant = max(0, budgeted headcount − Active filled).
+                            // pmd.vacantcount is a denormalized field that lags
+                            // behind reality (it isn't updated when employees
+                            // are assigned/removed), so reading it directly was
+                            // showing "Vacant 1 / Vacant 2" even after a seat
+                            // had been filled. Use the same headcount-minus-
+                            // active-filled formula as Workforce + view-manning.
                             $positionMonthlyData = PositionMonthlyData::where('position_id', $position->id)
                                 ->where('manning_response_id', $position->Budget_id)
                                 ->get();
 
-                            // Get maximum vacant count across all months for this position
-                            $maxVacantCount = 0;
+                            $maxHeadcount = 0;
                             foreach ($positionMonthlyData as $monthlyData) {
-                                $vacantCount = $monthlyData->vacantcount ?? 0;
-                                $maxVacantCount = max($maxVacantCount, $vacantCount);
+                                $maxHeadcount = max($maxHeadcount, (int) ($monthlyData->headcount ?? 0));
                             }
 
-                            // Set vacant count from position_monthly_data (from manning_responses)
-                            $position->proper_vacant_count = $maxVacantCount;
+                            $today = \Carbon\Carbon::today()->toDateString();
+                            $activeFilled = Employee::where('resort_id', $resortId)
+                                ->where('Position_id', $position->id)
+                                ->where('Dept_id', $position->dept_id)
+                                ->where('status', 'Active')
+                                ->where(function ($q) use ($today) {
+                                    $q->whereNull('last_working_day')
+                                      ->orWhereDate('last_working_day', '>', $today);
+                                })
+                                ->count();
 
-                            // If no vacant count from position_monthly_data, check resort_vacant_budget_costs as fallback
-                            if ($position->proper_vacant_count == 0) {
+                            $position->proper_vacant_count = max(0, $maxHeadcount - $activeFilled);
+
+                            // If headcount is unknown (no manning row), fall back
+                            // to resort_vacant_budget_costs as the legacy hint —
+                            // but clamp to (budgeted - filled) wouldn't apply
+                            // here since we don't know the budget. Keep the
+                            // legacy count only when we genuinely have no signal.
+                            if ($maxHeadcount === 0 && $position->proper_vacant_count == 0) {
                                 $actualVacantCount = DB::table('resort_vacant_budget_costs')
                                     ->where('position_id', $position->id)
                                     ->where('department_id', $position->dept_id)
