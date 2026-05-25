@@ -310,7 +310,7 @@ class Employee extends Model
 
     public function disciplinarySubmits()
     {
-        return $this->hasMany(DisciplinarySubmit::class, 'Employee_id', 'id');
+        return $this->hasMany(\App\Models\disciplinarySubmit::class, 'Employee_id', 'id');
     }
     public function trainingParticipants()
     {
