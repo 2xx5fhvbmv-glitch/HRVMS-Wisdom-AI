@@ -1821,18 +1821,18 @@ $(document).ready(function() {
         const totalCalls = targetMonths.length;
 
         targetMonths.forEach(function (targetMonth) {
-            // IMPORTANT: salary is stored at employee/vacant level (one value
-            // shared across all 12 months). Sending current_salary /
-            // proposed_salary here would overwrite that shared value and
-            // make EVERY other month appear "changed" on refresh — which is
-            // exactly the bug HR reported. Copy-down therefore only
-            // propagates the cost configurations, never the salary.
+            // Salary is now per-month (resort_employee_monthly_salaries /
+            // resort_vacant_monthly_salaries), so copy-down can safely
+            // propagate both salary AND cost configurations to the target
+            // month only — without touching any other month.
             const payload = {
                 position_id:    positionId,
                 department_id:  departmentId,
                 year:           year,
                 monthly_data:   [{
                     month: targetMonth,
+                    current_salary:  basicSalary,
+                    proposed_salary: proposedSalary,
                     cost_configurations: costConfigurations
                 }],
                 _token: csrfToken
@@ -1855,17 +1855,10 @@ $(document).ready(function() {
                 data: payload
             }).done(function (res) {
                 if (res && res.success) {
-                    // Re-read the target row's current salary cells so the
-                    // visual refresh doesn't rewrite them (preserves whatever
-                    // was already shown in those columns).
-                    const $targetRow = $(`td[data-month="${targetMonth}"][${keyAttr}="${keyVal}"]`).first().closest('tr');
-                    const targetCurrent  = $targetRow.length ? parseFloat($targetRow.find('td').eq(1).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0) : basicSalary;
-                    const targetProposed = $targetRow.length ? parseFloat($targetRow.find('td').eq(2).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0) : proposedSalary;
-
                     if (type === 'employee') {
-                        updateEmployeeMonthRow(keyVal, targetMonth, targetCurrent, targetProposed, costConfigurations);
+                        updateEmployeeMonthRow(keyVal, targetMonth, basicSalary, proposedSalary, costConfigurations);
                     } else if (typeof updateVacantMonthRow === 'function') {
-                        updateVacantMonthRow(keyVal, targetMonth, targetCurrent, targetProposed, costConfigurations);
+                        updateVacantMonthRow(keyVal, targetMonth, basicSalary, proposedSalary, costConfigurations);
                     }
                 } else {
                     failed++;
