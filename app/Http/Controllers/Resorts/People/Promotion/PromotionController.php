@@ -882,39 +882,28 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
-                // Mirror the four onboarding-training buckets used by the
-                // Probation module's resolveOnboardingTraining() so the
-                // promotion filter agrees with what HR already sees there:
-                //   no training_participants rows         → "Not Started" → EXCLUDE
-                //   any session still 'Pending'           → "In Progress" → EXCLUDE
-                //   all sessions held, some 'Absent'      → "Absent"      → EXCLUDE
-                //   all sessions attended (Present/Late)  → "Completed"   → KEEP
+                // "Has completed mandatory onboarding training" = the employee
+                // has at least one training_participants row in this resort
+                // marked 'Present' or 'Late' (i.e., they actually attended a
+                // session). Anyone without any attended session is excluded:
+                //   no training_participants rows               → "Not Started" → EXCLUDE
+                //   only 'Pending' rows (scheduled, not done)   → "In Progress" → EXCLUDE
+                //   only 'Absent' rows (held but missed)        → "Absent"      → EXCLUDE
+                //   at least one 'Present' / 'Late'             → "Completed"   → KEEP
+                // A future Pending session does NOT disqualify someone who has
+                // already attended past sessions — that was the over-exclusion
+                // problem with the stricter "every session attended" rule.
                 $resortId = $this->resort->resort_id;
 
-                // Per-employee tallies across this resort's training participants.
-                $perEmp = \DB::table('training_participants as tp')
+                $attendedEmpIds = \DB::table('training_participants as tp')
                     ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
                     ->where('ts.resort_id', $resortId)
-                    ->select(
-                        'tp.employee_id',
-                        \DB::raw('COUNT(*) as total'),
-                        \DB::raw("SUM(CASE WHEN tp.status IN ('Present','Late') THEN 1 ELSE 0 END) as attended"),
-                        \DB::raw("SUM(CASE WHEN tp.status = 'Pending' THEN 1 ELSE 0 END) as pending")
-                    )
-                    ->groupBy('tp.employee_id')
-                    ->get();
+                    ->whereIn('tp.status', ['Present', 'Late'])
+                    ->pluck('tp.employee_id')->unique()->all();
 
-                // "Completed" = no Pending sessions AND every booked session attended.
-                $completedEmpIds = $perEmp
-                    ->filter(fn($r) => $r->pending == 0 && $r->attended >= $r->total)
-                    ->pluck('employee_id')->all();
-
-                // Exclude every Active employee in this resort whose onboarding
-                // status is NOT 'Completed' — that covers Not Started (no rows),
-                // In Progress (Pending), and Absent (sessions held but missed).
                 $trainingEmployees = Employee::where('resort_id', $resortId)
                     ->where('status', 'Active')
-                    ->whereNotIn('id', $completedEmpIds ?: [0])
+                    ->whereNotIn('id', $attendedEmpIds ?: [0])
                     ->pluck('id')->toArray();
 
                 $excludeIds = array_merge($excludeIds, $trainingEmployees);
