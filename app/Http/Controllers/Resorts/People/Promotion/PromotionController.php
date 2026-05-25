@@ -882,21 +882,32 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
-                // "Mandatory onboarding training" is configured in
-                // mandatory_learning_programs (resort × program, optionally
-                // scoped to a department/position). An employee has "not
-                // completed" a mandatory program when they have no
-                // training_attendance row at status='Present' for any session
-                // (training_schedules.training_id = program_id) of that program.
                 $resortId = $this->resort->resort_id;
+                $trainingEmployees = [];
 
+                // PATH A — employees ENROLLED in a training session whose
+                // attendance is not yet 'Present' (default 'Pending' on
+                // enrollment; 'Absent' / 'Late' also count as "not completed").
+                // This is what catches Roshan: a scheduled session he hasn't
+                // attended yet still keeps him off the promotion list.
+                $enrolledPending = Employee::where('resort_id', $resortId)
+                    ->whereHas('trainingParticipants', function ($q) {
+                        $q->where('status', '!=', 'Present');
+                    })
+                    ->pluck('id')->toArray();
+                $trainingEmployees = array_merge($trainingEmployees, $enrolledPending);
+
+                // PATH B — per-resort mandatory programs (configured in
+                // mandatory_learning_programs, optionally scoped to dept/pos)
+                // that an applicable employee hasn't been marked 'Present'
+                // for in training_attendance. Catches the case where someone
+                // SHOULD do onboarding but was never even enrolled.
                 $mandatory = \App\Models\MandatoryLearningProgram::where('resort_id', $resortId)
                     ->get(['program_id', 'department_id', 'position_id']);
 
                 if ($mandatory->isNotEmpty()) {
                     $programIds = $mandatory->pluck('program_id')->unique()->all();
 
-                    // (employee_id => [program_id, ...]) of programs they've completed.
                     $completedByEmp = \DB::table('training_attendance as ta')
                         ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
                         ->where('ts.resort_id', $resortId)
@@ -912,7 +923,6 @@ class PromotionController extends Controller
                         ->where('status', 'Active')
                         ->get(['id', 'Dept_id', 'Position_id']);
 
-                    $trainingEmployees = [];
                     foreach ($emps as $emp) {
                         $empCompleted = $completedByEmp[$emp->id] ?? [];
                         foreach ($mandatory as $m) {
@@ -924,15 +934,14 @@ class PromotionController extends Controller
                             if (!$deptOk || !$posOk) continue;
 
                             if (!in_array($m->program_id, $empCompleted, true)) {
-                                // At least one applicable mandatory program is not yet completed.
                                 $trainingEmployees[] = $emp->id;
                                 break;
                             }
                         }
                     }
-
-                    $excludeIds = array_merge($excludeIds, $trainingEmployees);
                 }
+
+                $excludeIds = array_merge($excludeIds, array_unique($trainingEmployees));
             }
 
 
