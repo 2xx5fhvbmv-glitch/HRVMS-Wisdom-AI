@@ -846,8 +846,21 @@ class PromotionController extends Controller
             $excludeIds = [];
 
             if (in_array('probation', $filters)) {
-                $probationEmployees = Employee::where('employment_type', 'Probationary')
-                    ->where('resort_id', $this->resort->resort_id)
+                // "On probation" = joined within the last 3 months (so they are
+                // still inside the standard 3-month probation window). We do
+                // NOT rely on employment_type='Probationary' because HR rarely
+                // flips that field once probation ends.
+                $threeMonthsAgo = now()->subMonths(3)->toDateString();
+                $probationEmployees = Employee::where('resort_id', $this->resort->resort_id)
+                    ->where(function ($q) use ($threeMonthsAgo) {
+                        // Either probation_end_date is still in the future, OR
+                        // (no end date set AND joining_date is within 3 months).
+                        $q->where('probation_end_date', '>=', now()->toDateString())
+                          ->orWhere(function ($q2) use ($threeMonthsAgo) {
+                              $q2->whereNull('probation_end_date')
+                                 ->where('joining_date', '>=', $threeMonthsAgo);
+                          });
+                    })
                     ->pluck('id')->toArray();
                 $excludeIds = array_merge($excludeIds, $probationEmployees);
             }
