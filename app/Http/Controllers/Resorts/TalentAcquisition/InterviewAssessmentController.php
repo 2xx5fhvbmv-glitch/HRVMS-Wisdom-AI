@@ -380,16 +380,30 @@ class InterviewAssessmentController extends Controller
                 $kept = [];
                 foreach ($responses as $name => $value) {
                     $allowed = true;
+                    $fieldRef = null;
                     foreach ($structure as $field) {
                         if (($field['name'] ?? null) !== $name) continue;
+                        $fieldRef = $field;
                         $roles = (array) ($field['responder_roles'] ?? []);
                         if (!empty($roles) && !$this->roleMatchesViewer($viewerRoleName, $roles)) {
                             $allowed = false;
-                            $rejected[] = $field['label'] ?? $name;
                         }
                         break;
                     }
-                    if ($allowed) $kept[$name] = $value;
+                    if ($allowed) {
+                        $kept[$name] = $value;
+                        continue;
+                    }
+                    // Disallowed — only flag as a violation if the viewer
+                    // actually entered a value. Disabled inputs still post
+                    // empty strings (or empty arrays for checkbox-group),
+                    // and rejecting those would block every submit.
+                    $hasRealValue = is_array($value)
+                        ? count(array_filter($value, fn($v) => $v !== null && $v !== ''))
+                        : ($value !== null && $value !== '');
+                    if ($hasRealValue) {
+                        $rejected[] = ($fieldRef && isset($fieldRef['label'])) ? $fieldRef['label'] : $name;
+                    }
                 }
                 $responses = $kept;
 

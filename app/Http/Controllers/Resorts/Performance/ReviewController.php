@@ -553,11 +553,24 @@ class ReviewController extends Controller
             }
             $field = $byName[$baseName] ?? null;
             $roles = $field ? (array) ($field['responder_roles'] ?? []) : [];
-            if (empty($roles) || $this->roleMatchesViewer($viewerRole, $roles)) {
+            $allowed = empty($roles) || $this->roleMatchesViewer($viewerRole, $roles);
+
+            if ($allowed) {
                 $kept[$name] = $value;
-            } else {
+                continue;
+            }
+
+            // Disallowed — but only count as a violation if the viewer
+            // actually entered something. The browser still posts disabled
+            // fields as empty (or as the default checkbox/radio "" value)
+            // and rejecting those would block every legitimate submit.
+            $hasRealValue = is_array($value)
+                ? count(array_filter($value, fn($v) => $v !== null && $v !== ''))
+                : ($value !== null && $value !== '');
+            if ($hasRealValue) {
                 $rejected[] = $field['label'] ?? $baseName;
             }
+            // Empty disallowed field → silently drop (don't reject, don't save).
         }
         return [$kept, array_values(array_unique($rejected))];
     }

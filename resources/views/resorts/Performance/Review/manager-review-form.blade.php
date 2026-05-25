@@ -166,14 +166,20 @@
         var html = '';
         if (!Array.isArray(formStructure)) return;
 
+        // The Self Review tab (containerId === 'self-form-render') is a
+        // pure read-only view of what the employee submitted — we hide the
+        // role-lock notes there, otherwise a Self-only field shows "To be
+        // filled by: Self" instead of the employee's actual value.
+        var isSelfTab = (containerId === 'self-form-render');
+
         formStructure.forEach(function(field, idx) {
             var fieldName = field.name || ('field_' + idx);
             var label = field.label || '';
             var value = existingData[fieldName] || '';
-            // Lock the field when: review is read-only, OR the controller
-            // marked it _readonly because the viewer's role isn't allowed
-            // to fill it under its responder_roles list.
-            var roleLocked = !!field._readonly;
+            // Lock the field when: the whole review is read-only, OR — for
+            // the manager tab only — the controller marked it _readonly
+            // because the viewer's role isn't in its responder_roles list.
+            var roleLocked = !isSelfTab && !!field._readonly;
             var disabled = (isReadOnly || roleLocked) ? 'disabled' : '';
 
             // Section headers / paragraph blocks have no input — render label only.
