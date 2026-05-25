@@ -2219,31 +2219,36 @@ $(document).ready(function() {
         const basicSalary = $('#formBasicSalary').val();
         const currentSalary = $('#formCurrentSalary').val();
 
-        // Collect cost configurations
+        // Collect cost configurations. We iterate EVERY cost card (not just
+        // checked boxes) so that unchecking + saving persists as an explicit
+        // $0 override. Without this, the read endpoint's live fallback would
+        // re-fill the cell from the default cost definition on next render,
+        // making it look like the un-check "didn't save".
         const costConfigurations = [];
         const mvrToUsdRate = parseFloat($('#mvrToDollarRate').val() || 1/15.42);
         const dollarToMvrRate = mvrToUsdRate > 0 ? (1 / mvrToUsdRate) : 15.42; // Inverse for USD to MVR conversion
 
-        $('.budget-cost-checkbox:checked').each(function() {
-            const costId = $(this).data('cost-id');
-            const $card = $(this).closest('.budget-cost-card');
-            let value = parseFloat($(`.budget-cost-amount[data-cost-id="${costId}"]`).val() || 0);
-            const currency = $(`.budget-cost-currency[data-cost-id="${costId}"]`).val();
-            const hours = $(`.budget-cost-hours[data-cost-id="${costId}"]`).val() || 0;
+        $('.budget-cost-checkbox').each(function () {
+            const $checkbox = $(this);
+            const isChecked = $checkbox.is(':checked');
+            const costId    = $checkbox.data('cost-id');
+            const currency  = $(`.budget-cost-currency[data-cost-id="${costId}"]`).val() || 'USD';
+            const hours     = $(`.budget-cost-hours[data-cost-id="${costId}"]`).val() || 0;
 
-            // Data is stored in USD in the backend
-            // If currency is MVR, convert MVR to USD before saving
-            // DollertoMVR rate: 1 USD = X MVR, so USD = MVR / DollertoMVR
-            // But we have MVRtoDoller rate: 1 MVR = X USD, so USD = MVR × MVRtoDoller
-            if (currency === 'MVR' && value > 0) {
-                value = value * mvrToUsdRate; // Convert MVR to USD
+            let value = 0;
+            if (isChecked) {
+                value = parseFloat($(`.budget-cost-amount[data-cost-id="${costId}"]`).val() || 0);
+                // Store in USD; convert MVR if needed.
+                if (currency === 'MVR' && value > 0) {
+                    value = value * mvrToUsdRate;
+                }
             }
 
             costConfigurations.push({
                 resort_budget_cost_id: costId,
                 value: value,
                 currency: currency,
-                hours: hours
+                hours: isChecked ? hours : 0
             });
         });
 
