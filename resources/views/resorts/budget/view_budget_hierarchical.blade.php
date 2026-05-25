@@ -1369,6 +1369,18 @@ $(document).ready(function() {
                                             style="padding: 0.25rem 0.5rem;">
                                         <i class="fas fa-edit" style="font-size: 0.75rem;"></i>
                                     </button>
+                                    ${m < 12 ? `
+                                    <button class="btn btn-sm btn-outline-success btn-copy-down"
+                                            data-month="${m}"
+                                            data-month-name="${months[m-1]}"
+                                            data-employee-id="${employeeId}"
+                                            data-position-id="${positionId}"
+                                            data-department-id="${response.department_id}"
+                                            data-type="employee"
+                                            title="Copy ${months[m-1]} values to ${months[m]}"
+                                            style="padding: 0.25rem 0.5rem; margin-left: 2px;">
+                                        <i class="fas fa-arrow-down" style="font-size: 0.75rem;"></i>
+                                    </button>` : ''}
                                 </td>`;
 
                         // Display cost configuration values (read-only)
@@ -1548,6 +1560,19 @@ $(document).ready(function() {
                                             style="padding: 0.25rem 0.5rem;">
                                         <i class="fas fa-edit" style="font-size: 0.75rem;"></i>
                                     </button>
+                                    ${m < 12 ? `
+                                    <button class="btn btn-sm btn-outline-success btn-copy-down"
+                                            data-month="${m}"
+                                            data-month-name="${months[m-1]}"
+                                            data-vacant-index="${vacantIndex}"
+                                            data-vacant-budget-cost-id="${response.vacant_budget_cost_id}"
+                                            data-position-id="${positionId}"
+                                            data-department-id="${response.department_id}"
+                                            data-type="vacant"
+                                            title="Copy ${months[m-1]} values to ${months[m]}"
+                                            style="padding: 0.25rem 0.5rem; margin-left: 2px;">
+                                        <i class="fas fa-arrow-down" style="font-size: 0.75rem;"></i>
+                                    </button>` : ''}
                                 </td>`;
 
                         // Display cost configuration values (read-only)
@@ -1681,6 +1706,150 @@ $(document).ready(function() {
                     toastr.error(errs, { positionClass: 'toast-bottom-right' });
                 }
             });
+        }
+    });
+
+    // Copy-down — take this row's salary + cost values and save them to every
+    // subsequent month for the same employee / vacant. Uses the same backend
+    // save endpoint as the per-month modal, so any server-side validation
+    // continues to apply.
+    $(document).on('click', '.btn-copy-down', function () {
+        const $btn = $(this);
+        const sourceMonth = parseInt($btn.data('month'), 10);
+        const monthName = $btn.data('month-name');
+        const type = $btn.data('type');
+        const positionId = $btn.data('position-id');
+        const departmentId = $btn.data('department-id');
+
+        if (!sourceMonth || sourceMonth >= 12) return;
+
+        // Source row — anchor by data-month + employee/vacant key.
+        const keyAttr = type === 'employee' ? 'data-employee-id' : 'data-vacant-index';
+        const keyVal  = type === 'employee' ? $btn.data('employee-id') : $btn.data('vacant-index');
+        const vacantBudgetCostId = type === 'vacant' ? $btn.data('vacant-budget-cost-id') : null;
+
+        const $sourceRow = $(`td[data-month="${sourceMonth}"][${keyAttr}="${keyVal}"]`).first().closest('tr');
+        if (!$sourceRow.length) {
+            toastr.error('Could not locate source row to copy from.', 'Copy Down', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        // Salary — read from the rendered cell (column 1 = Current, column 2 = Proposed).
+        const currencySymbol = '$';
+        const basicSalary    = parseFloat($sourceRow.find('td').eq(1).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0);
+        const proposedSalary = parseFloat($sourceRow.find('td').eq(2).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0);
+
+        // Cost configurations — preserve original currency + value so the
+        // server can re-store the MVR value (data-original-value) the same
+        // way the per-month modal does. The USD-converted display value is
+        // passed too so the row updates instantly client-side.
+        const costConfigurations = [];
+        $sourceRow.find('td[data-cost-id]').each(function () {
+            const $c = $(this);
+            costConfigurations.push({
+                resort_budget_cost_id: $c.data('cost-id'),
+                currency: $c.data('currency') || 'USD',
+                value: parseFloat($c.data('usd-value') || 0),                       // USD-converted value (what gets stored / displayed)
+                original_value: parseFloat($c.data('original-value') || 0),         // raw MVR (or USD) value
+                hours: 0
+            });
+        });
+
+        // Copy only to the immediately-next month. HR can chain clicks down
+        // the table when they want to fill more rows — this avoids the
+        // earlier "Jan → all of Feb–Dec" behaviour that overwrote months
+        // they had already entered different values for.
+        const nextMonth = sourceMonth + 1;
+        if (nextMonth > 12) return;
+        const monthsLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const nextMonthName = monthsLabels[nextMonth - 1];
+        const targetMonths = [nextMonth];
+
+        Swal.fire({
+            title: 'Copy values to next month?',
+            html: `Copy <strong>${monthName}</strong>'s salary and cost values to <strong>${nextMonthName}</strong>? Any existing entry in ${nextMonthName} will be overwritten.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, copy',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+            performCopyDown();
+        });
+
+        function performCopyDown() {
+        $btn.prop('disabled', true);
+        const original = $btn.html();
+        $btn.html('<i class="fas fa-spinner fa-spin" style="font-size: 0.75rem;"></i>');
+
+        let completed = 0;
+        let failed = 0;
+        const totalCalls = targetMonths.length;
+
+        targetMonths.forEach(function (targetMonth) {
+            const payload = {
+                position_id:    positionId,
+                department_id:  departmentId,
+                year:           year,
+                monthly_data:   [{
+                    month: targetMonth,
+                    current_salary:  basicSalary,
+                    proposed_salary: proposedSalary,
+                    cost_configurations: costConfigurations
+                }],
+                _token: csrfToken
+            };
+
+            const url = (type === 'employee')
+                ? "{{ route('resort.budget.hierarchy.employee.update') }}"
+                : "{{ route('resort.budget.hierarchy.vacant.update') }}";
+
+            if (type === 'employee') {
+                payload.employee_id = keyVal;
+            } else {
+                payload.vacant_index = keyVal;
+                payload.vacant_budget_cost_id = vacantBudgetCostId;
+            }
+
+            $.ajax({
+                url: url,
+                method: 'POST',
+                data: payload
+            }).done(function (res) {
+                if (res && res.success) {
+                    if (type === 'employee') {
+                        updateEmployeeMonthRow(keyVal, targetMonth, basicSalary, proposedSalary, costConfigurations);
+                    } else if (typeof updateVacantMonthRow === 'function') {
+                        updateVacantMonthRow(keyVal, targetMonth, basicSalary, proposedSalary, costConfigurations);
+                    }
+                } else {
+                    failed++;
+                }
+            }).fail(function () {
+                failed++;
+            }).always(function () {
+                completed++;
+                if (completed === totalCalls) {
+                    $btn.prop('disabled', false).html(original);
+                    if (failed === 0) {
+                        toastr.success(`Copied ${monthName} values to ${nextMonthName}.`, 'Copy Down', { positionClass: 'toast-bottom-right' });
+                    } else {
+                        toastr.error(`Failed to copy ${monthName} → ${nextMonthName}.`, 'Copy Down', { positionClass: 'toast-bottom-right' });
+                    }
+
+                    if (type === 'employee' && typeof recalculateEmployeeTableTotals === 'function') {
+                        recalculateEmployeeTableTotals(keyVal);
+                    }
+                    if (typeof updateBadgesHierarchy === 'function') {
+                        updateBadgesHierarchy(positionId);
+                    }
+                    if (typeof window.recalculateAllTotals === 'function') {
+                        window.recalculateAllTotals();
+                    }
+                }
+            });
+        });
         }
     });
 
