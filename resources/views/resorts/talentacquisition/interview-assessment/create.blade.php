@@ -82,12 +82,47 @@
     <script>
         $(document).ready(function () {
             $(".select2t-none").select2();
+
+            // Per-field "Responder Roles" attribute. HR picks who fills each
+            // field when building the form; only matching roles can edit
+            // the field at submit time. Empty / missing = everyone can fill
+            // (backward-compatible with old forms).
+            const RESPONDER_ROLE_OPTIONS = {
+                'GM': 'GM',
+                'EXCOM': 'EXCOM',
+                'HOD': 'HOD',
+                'HR': 'HR',
+                'MGR': 'MGR',
+                'SUP': 'SUP',
+                'LINE WORKERS': 'LINE WORKERS',
+                'Finance': 'Finance',
+                'Self': 'Self (the candidate)'
+            };
+            // Every field type formbuilder.online supports (incl. the
+            // 'button' the user noticed was missing the picker).
+            const FIELD_TYPES = [
+                'text','textarea','password','email','phone','url','number','date','time','hidden',
+                'select','checkbox','radio','checkbox-group','radio-group','file','autocomplete',
+                'header','paragraph','button','starRating','ratingTable'
+            ];
+            const typeUserAttrs = {};
+            FIELD_TYPES.forEach(function (t) {
+                typeUserAttrs[t] = {
+                    responder_roles: {
+                        label: 'Responder Roles (who fills)',
+                        multiple: true,
+                        options: RESPONDER_ROLE_OPTIONS
+                    }
+                };
+            });
+
             const options = {
                 disableFields: ['autocomplete', 'button'],
                 i18n: {
                     locale: 'en-US',
                     override: {}
-                }
+                },
+                typeUserAttrs: typeUserAttrs
             };
 
             const formBuilder =$('#form-builder').formBuilder(options);

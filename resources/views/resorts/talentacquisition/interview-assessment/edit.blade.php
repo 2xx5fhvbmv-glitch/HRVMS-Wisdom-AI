@@ -111,8 +111,33 @@
 
             console.log('Existing Form Structure:', existingFormStructure);
 
-            // Initialize FormBuilder
-            const formBuilder = $('#form-builder').formBuilder();
+            // Per-field "Responder Roles" attribute — same set used on Create.
+            // Lets HR edit which roles can fill each existing field.
+            const RESPONDER_ROLE_OPTIONS = {
+                'GM': 'GM', 'EXCOM': 'EXCOM', 'HOD': 'HOD', 'HR': 'HR',
+                'MGR': 'MGR', 'SUP': 'SUP', 'LINE WORKERS': 'LINE WORKERS',
+                'Finance': 'Finance', 'Self': 'Self (the candidate)'
+            };
+            const FIELD_TYPES = [
+                'text','textarea','password','email','phone','url','number','date','time','hidden',
+                'select','checkbox','radio','checkbox-group','radio-group','file','autocomplete',
+                'header','paragraph','button','starRating','ratingTable'
+            ];
+            const typeUserAttrs = {};
+            FIELD_TYPES.forEach(function (t) {
+                typeUserAttrs[t] = {
+                    responder_roles: {
+                        label: 'Responder Roles (who fills)',
+                        multiple: true,
+                        options: RESPONDER_ROLE_OPTIONS
+                    }
+                };
+            });
+
+            // Initialize FormBuilder with the role-tagging attribute.
+            const formBuilder = $('#form-builder').formBuilder({
+                typeUserAttrs: typeUserAttrs
+            });
 
             // Populate FormBuilder with the existing form structure
             formBuilder.promise.then(() => {

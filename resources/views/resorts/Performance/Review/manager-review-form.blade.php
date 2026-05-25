@@ -170,7 +170,11 @@
             var fieldName = field.name || ('field_' + idx);
             var label = field.label || '';
             var value = existingData[fieldName] || '';
-            var disabled = isReadOnly ? 'disabled' : '';
+            // Lock the field when: review is read-only, OR the controller
+            // marked it _readonly because the viewer's role isn't allowed
+            // to fill it under its responder_roles list.
+            var roleLocked = !!field._readonly;
+            var disabled = (isReadOnly || roleLocked) ? 'disabled' : '';
 
             // Section headers / paragraph blocks have no input — render label only.
             if (field.type === 'header' || field.type === 'paragraph') {
@@ -178,8 +182,11 @@
                 return;
             }
 
-            html += '<div class="form-render-field" data-field-name="' + fieldName + '" data-field-required="' + (field.required ? '1' : '0') + '" data-field-type="' + (field.type || '') + '">';
+            html += '<div class="form-render-field' + (roleLocked ? ' is-role-locked' : '') + '" data-field-name="' + fieldName + '" data-field-required="' + (field.required ? '1' : '0') + '" data-field-type="' + (field.type || '') + '">';
             html += '<label>' + label + (field.required ? ' <span class="text-danger">*</span>' : '') + '</label>';
+            if (roleLocked && field._assigned_to) {
+                html += '<div class="role-lock-note small text-warning mb-1"><i class="fa-regular fa-lock me-1"></i> To be filled by: ' + field._assigned_to + '</div>';
+            }
 
             switch(field.type) {
                 case 'text':

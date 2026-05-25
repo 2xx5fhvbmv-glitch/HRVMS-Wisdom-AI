@@ -135,10 +135,16 @@ class ReviewController extends Controller
         } elseif (empty($template['structure'])) {
             $templateError = 'The configured template "' . e($template['name']) . '" has no fields. Ask HR to open it in the form builder and add at least one question.';
         }
+
+        // Mark each field _readonly + _assigned_to based on the viewer's
+        // role so the form view can disable inputs the viewer can't fill.
+        $viewerRole = $this->viewerRoleForReview($childCycle, 'self');
+        $template = $this->applyRoleGatingToTemplate($template, $viewerRole);
+
         $existingData = $childCycle->self_review_data ? json_decode($childCycle->self_review_data, true) : [];
         $page_title = "Self Review - " . $childCycle->Cycle_Name;
 
-        return view('resorts.Performance.Review.self-review-form', compact('page_title', 'childCycle', 'template', 'templateError', 'existingData', 'windowStatus'));
+        return view('resorts.Performance.Review.self-review-form', compact('page_title', 'childCycle', 'template', 'templateError', 'existingData', 'windowStatus', 'viewerRole'));
     }
 
     public function submitSelfReview(Request $request, $id)
@@ -168,6 +174,19 @@ class ReviewController extends Controller
         $effectiveTemplateId = $childCycle->template_id ?: ($childCycle->Self_Review_Templete ?? null);
         $template = $this->getTemplate($effectiveTemplateId);
         $payload = $request->except(['_token']);
+
+        // Per-field role gating — drop any field the viewer isn't allowed
+        // to fill, and reject the submit when one was attempted (prevents
+        // a savvy user from POSTing field names from another role's section).
+        $viewerRole = $this->viewerRoleForReview($childCycle, 'self');
+        [$payload, $rejectedLabels] = $this->gateSubmittedPayloadByRole($template, $payload, $viewerRole);
+        if (!empty($rejectedLabels)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorised to fill these fields: ' . implode(', ', $rejectedLabels),
+            ], 422);
+        }
+
         $errors = $this->validateAgainstTemplate($template, $payload);
         if (!empty($errors)) {
             return response()->json(['success' => false, 'message' => 'Please fill all required fields', 'errors' => $errors], 422);
@@ -177,6 +196,10 @@ class ReviewController extends Controller
         if (!$realChild) {
             return response()->json(['success' => false, 'message' => 'Review record disappeared mid-submit. Refresh and try again.'], 404);
         }
+        // Merge with any previously-saved data so other-role contributors
+        // can save independently without wiping each other's fields.
+        $existing = $realChild->self_review_data ? (json_decode($realChild->self_review_data, true) ?: []) : [];
+        $payload = array_merge($existing, $payload);
         $realChild->self_review_data = json_encode($payload);
         $realChild->self_review_status = 'completed';
         $realChild->Self_review_date = now()->format('Y-m-d');
@@ -301,11 +324,16 @@ class ReviewController extends Controller
             $effectiveTemplateId = $childCycle->Manager_Review_Templete;
         }
         $template = $this->getTemplate($effectiveTemplateId);
+
+        // Per-field role gating for the manager review form.
+        $viewerRole = $this->viewerRoleForReview($childCycle, 'manager');
+        $template = $this->applyRoleGatingToTemplate($template, $viewerRole);
+
         $selfData = $childCycle->self_review_data ? json_decode($childCycle->self_review_data, true) : [];
         $existingData = $childCycle->manager_review_data ? json_decode($childCycle->manager_review_data, true) : [];
         $page_title = "Manager Review - " . $childCycle->Cycle_Name;
 
-        return view('resorts.Performance.Review.manager-review-form', compact('page_title', 'childCycle', 'template', 'selfData', 'existingData', 'employee', 'windowStatus'));
+        return view('resorts.Performance.Review.manager-review-form', compact('page_title', 'childCycle', 'template', 'selfData', 'existingData', 'employee', 'windowStatus', 'viewerRole'));
     }
 
     public function submitManagerReview(Request $request, $id)
@@ -334,6 +362,18 @@ class ReviewController extends Controller
         $effectiveTemplateId = $childCycle->template_id ?: ($childCycle->Manager_Review_Templete ?? null);
         $template = $this->getTemplate($effectiveTemplateId);
         $payload = $request->except(['_token']);
+
+        // Per-field role gating (manager context — viewer is the manager,
+        // never "Self"). Reject and surface labels of disallowed fields.
+        $viewerRole = $this->viewerRoleForReview($childCycle, 'manager');
+        [$payload, $rejectedLabels] = $this->gateSubmittedPayloadByRole($template, $payload, $viewerRole);
+        if (!empty($rejectedLabels)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorised to fill these fields: ' . implode(', ', $rejectedLabels),
+            ], 422);
+        }
+
         $errors = $this->validateAgainstTemplate($template, $payload);
         if (!empty($errors)) {
             return response()->json(['success' => false, 'message' => 'Please fill all required fields', 'errors' => $errors], 422);
@@ -343,6 +383,10 @@ class ReviewController extends Controller
         if (!$realChild) {
             return response()->json(['success' => false, 'message' => 'Review record disappeared mid-submit. Refresh and try again.'], 404);
         }
+        // Merge with previous data so a multi-role workflow doesn't wipe
+        // values another role already saved.
+        $existing = $realChild->manager_review_data ? (json_decode($realChild->manager_review_data, true) ?: []) : [];
+        $payload = array_merge($existing, $payload);
         $realChild->manager_review_data = json_encode($payload);
         $realChild->manager_review_status = 'completed';
         $realChild->Manager_review_date = now()->format('Y-m-d');
@@ -437,6 +481,96 @@ class ReviewController extends Controller
      * of `preg_match('/(\d+)/', 'ninty_2')` → 2), so when we fall back to the
      * cycle column we must probe each table before declaring "not found".
      */
+    /**
+     * Per-field "responder_roles" plumbing for Performance reviews.
+     *
+     * Resolves the viewer's role for THIS review:
+     *   - 'Self'  when the viewer is the appraisee on this child cycle.
+     *   - 'HR'    when the viewer sits in the HR department.
+     *   - Position_Rank name (GM/EXCOM/HOD/HR/MGR/SUP/LINE WORKERS/Finance)
+     *     based on the employees.rank column otherwise.
+     */
+    private function viewerRoleForReview($childCycle, string $context = 'self'): string
+    {
+        $emp = $this->resort->GetEmployee ?? null;
+        if (!$emp) return '';
+
+        if ($context === 'self') {
+            $participantId = \App\Helpers\Common::resolveEmpMainIdToNumeric($childCycle->Emp_main_id, $this->resort->resort_id);
+            if ((int) $emp->id === (int) $participantId) return 'Self';
+        }
+
+        // HR-dept members always map to "HR" regardless of numeric rank.
+        $deptName = \App\Models\ResortDepartment::where('id', $emp->Dept_id)->value('name') ?? '';
+        if (stripos($deptName, 'Human Resources') !== false) return 'HR';
+
+        $rankConfig = config('settings.Position_Rank');
+        return $rankConfig[$emp->rank] ?? '';
+    }
+
+    /**
+     * Mark every template field with _readonly + _assigned_to so the
+     * responder view can disable inputs + label them. Empty/missing
+     * responder_roles = everyone can fill (backward-compat).
+     */
+    private function applyRoleGatingToTemplate(?array $template, string $viewerRole): ?array
+    {
+        if (!$template || empty($template['structure']) || !is_array($template['structure'])) {
+            return $template;
+        }
+        foreach ($template['structure'] as &$field) {
+            $roles = (array) ($field['responder_roles'] ?? []);
+            $allowed = empty($roles) || $this->roleMatchesViewer($viewerRole, $roles);
+            $field['_readonly']    = !$allowed;
+            $field['_assigned_to'] = $allowed ? '' : implode(', ', $roles);
+        }
+        unset($field);
+        return $template;
+    }
+
+    /**
+     * Drop submitted values for fields the viewer isn't allowed to fill;
+     * return [filteredPayload, rejectedLabels].
+     */
+    private function gateSubmittedPayloadByRole(?array $template, array $payload, string $viewerRole): array
+    {
+        if (!$template || empty($template['structure'])) {
+            return [$payload, []];
+        }
+        $rejected = [];
+        $byName = [];
+        foreach ($template['structure'] as $field) {
+            if (!empty($field['name'])) $byName[$field['name']] = $field;
+        }
+        $kept = [];
+        foreach ($payload as $name => $value) {
+            // ratingTable cells use the {name}_{r}_{c} pattern — match on prefix.
+            $baseName = $name;
+            if (!isset($byName[$baseName])) {
+                foreach ($byName as $fname => $f) {
+                    if (strpos($name, $fname . '_') === 0) { $baseName = $fname; break; }
+                }
+            }
+            $field = $byName[$baseName] ?? null;
+            $roles = $field ? (array) ($field['responder_roles'] ?? []) : [];
+            if (empty($roles) || $this->roleMatchesViewer($viewerRole, $roles)) {
+                $kept[$name] = $value;
+            } else {
+                $rejected[] = $field['label'] ?? $baseName;
+            }
+        }
+        return [$kept, array_values(array_unique($rejected))];
+    }
+
+    private function roleMatchesViewer(string $viewerRole, array $fieldRoles): bool
+    {
+        if ($viewerRole === '') return false;
+        foreach ($fieldRoles as $r) {
+            if (strcasecmp((string) $r, $viewerRole) === 0) return true;
+        }
+        return false;
+    }
+
     private function getTemplate($templateId)
     {
         if (empty($templateId) || $templateId === '0' || $templateId === 0) return null;

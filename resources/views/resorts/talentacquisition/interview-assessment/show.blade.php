@@ -87,6 +87,30 @@
                 formData: filteredData
             });
 
+            // ── Per-field role gating: lock + label fields not assigned
+            //    to the viewer's role. The controller marks each field with
+            //    `_readonly` + `_assigned_to` (a "GM, HR" string). We post-
+            //    process the rendered DOM: disable the input AND drop a
+            //    small caption telling the viewer who fills it.
+            setTimeout(function () {
+                filteredData.forEach(function (field) {
+                    if (!field || !field._readonly || !field.name) return;
+                    var $inputs = $('#form-render').find('[name="' + field.name + '"], [name="' + field.name + '[]"]');
+                    if (!$inputs.length) return;
+                    $inputs.prop('disabled', true).addClass('is-locked');
+                    // Add a one-time caption above the field (or its wrapper).
+                    var $wrapper = $inputs.first().closest('.rendered-form > *, .form-group');
+                    if ($wrapper.length && !$wrapper.find('.role-lock-note').length) {
+                        $wrapper.prepend(
+                            '<div class="role-lock-note small text-warning mb-1">' +
+                            '<i class="fa-regular fa-lock me-1"></i> To be filled by: ' +
+                            field._assigned_to +
+                            '</div>'
+                        );
+                    }
+                });
+            }, 150);
+
             // Pre-fill existing responses if already submitted
             @if($existingResponseData)
             var existingResponses = @json($existingResponseData);

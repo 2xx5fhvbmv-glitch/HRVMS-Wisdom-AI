@@ -205,12 +205,12 @@ class InterviewAssessmentController extends Controller
         $interviewer_id = $this->resort->id;
         $interviewee_id = $applicant_id;
 
-        // Get current user's rank name to filter form sections
+        // Get current user's rank name
         $rankConfig = config('settings.Position_Rank');
         $userRank = $this->rank;
         $userRankName = $rankConfig[$userRank] ?? '';
 
-        // If user is in HR department, map their section to "HR" regardless of actual rank
+        // HR dept members → treat as "HR" regardless of numeric rank.
         $employee = $this->resort->GetEmployee ?? null;
         if ($employee) {
             $userDeptName = \App\Models\ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
@@ -219,63 +219,89 @@ class InterviewAssessmentController extends Controller
             }
         }
 
-        // Filter form structure to only show sections for this user's rank
         $filteredStructure = [];
         $otherSectionsData = [];
 
         if ($form->isNotEmpty()) {
-            $fullStructure = json_decode(json_decode($form[0]->form_structure), true);
+            $fullStructure = json_decode(json_decode($form[0]->form_structure), true) ?: [];
 
-            // Parse sections: h1 headers act as section dividers with rank names
-            $sections = [];
-            $currentSection = null;
-            foreach ($fullStructure as $field) {
-                if (($field['type'] ?? '') === 'header' && ($field['subtype'] ?? '') === 'h1') {
-                    $currentSection = trim(strip_tags($field['label'] ?? ''));
-                    $sections[$currentSection] = [];
+            // Detect mode: does ANY field carry per-field responder_roles?
+            // Yes  → per-field role gating (new flow).
+            // No   → fall back to the legacy H1-section filter so existing
+            //        forms keep working until HR re-saves them.
+            $hasPerFieldRoles = false;
+            foreach ($fullStructure as $f) {
+                if (!empty($f['responder_roles'])) { $hasPerFieldRoles = true; break; }
+            }
+
+            if ($hasPerFieldRoles) {
+                // ── Per-field role gating ───────────────────────────────
+                // Every field is sent to the renderer. Fields the viewer is
+                // NOT a responder for get marked _readonly + _assigned_to
+                // (string of role names) so the view can render them as a
+                // disabled input with a "To be filled by: X, Y" label.
+                foreach ($fullStructure as $field) {
+                    $roles = (array) ($field['responder_roles'] ?? []);
+                    if (empty($roles) || $this->roleMatchesViewer($userRankName, $roles)) {
+                        // Editable for this viewer.
+                        $field['_readonly'] = false;
+                        $field['_assigned_to'] = '';
+                    } else {
+                        $field['_readonly'] = true;
+                        $field['_assigned_to'] = implode(', ', $roles);
+                    }
+                    $filteredStructure[] = $field;
                 }
-                if ($currentSection !== null) {
-                    $sections[$currentSection][] = $field;
+            } else {
+                // ── Legacy H1-section filter ────────────────────────────
+                $sections = [];
+                $currentSection = null;
+                foreach ($fullStructure as $field) {
+                    if (($field['type'] ?? '') === 'header' && ($field['subtype'] ?? '') === 'h1') {
+                        $currentSection = trim(strip_tags($field['label'] ?? ''));
+                        $sections[$currentSection] = [];
+                    }
+                    if ($currentSection !== null) {
+                        $sections[$currentSection][] = $field;
+                    }
+                }
+                foreach ($sections as $sectionName => $sectionFields) {
+                    if (strcasecmp($sectionName, $userRankName) === 0) {
+                        $filteredStructure = array_merge($filteredStructure, $sectionFields);
+                    }
+                }
+
+                // Pull existing responses from OTHER ranks for read-only
+                // display — only relevant under the section-based flow.
+                $otherResponses = DB::table('interview_assessment_responses as iar')
+                    ->join('resort_admins as ra', 'ra.id', '=', 'iar.interviewer_id')
+                    ->leftJoin('employees as emp', 'emp.Admin_Parent_id', '=', 'ra.id')
+                    ->leftJoin('resort_departments as rd', 'rd.id', '=', 'emp.Dept_id')
+                    ->where('iar.form_id', $form[0]->id)
+                    ->where('iar.interviewee_id', $applicant_id)
+                    ->where('iar.interviewer_id', '!=', $interviewer_id)
+                    ->select('iar.*', 'emp.rank as interviewer_rank', 'ra.first_name', 'ra.last_name', 'rd.name as dept_name')
+                    ->get();
+
+                foreach ($otherResponses as $resp) {
+                    $respRankName = isset($resp->interviewer_rank) ? ($rankConfig[$resp->interviewer_rank] ?? 'Unknown') : 'Unknown';
+                    if (isset($resp->dept_name) && stripos($resp->dept_name, 'Human Resources') !== false) {
+                        $respRankName = 'HR';
+                    }
+                    $respSectionFields = $sections[$respRankName] ?? [];
+                    if (!empty($respSectionFields)) {
+                        $otherSectionsData[] = [
+                            'rankName' => $respRankName,
+                            'interviewer_name' => trim(($resp->first_name ?? '') . ' ' . ($resp->last_name ?? '')),
+                            'fields' => $respSectionFields,
+                            'responses' => json_decode($resp->responses, true),
+                            'submitted_at' => $resp->created_at,
+                        ];
+                    }
                 }
             }
 
-            // Build filtered structure for current user's rank
-            foreach ($sections as $sectionName => $sectionFields) {
-                if (strcasecmp($sectionName, $userRankName) === 0) {
-                    $filteredStructure = array_merge($filteredStructure, $sectionFields);
-                }
-            }
-
-            // Get existing responses from OTHER ranks for read-only display
-            $otherResponses = DB::table('interview_assessment_responses as iar')
-                ->join('resort_admins as ra', 'ra.id', '=', 'iar.interviewer_id')
-                ->leftJoin('employees as emp', 'emp.Admin_Parent_id', '=', 'ra.id')
-                ->leftJoin('resort_departments as rd', 'rd.id', '=', 'emp.Dept_id')
-                ->where('iar.form_id', $form[0]->id)
-                ->where('iar.interviewee_id', $applicant_id)
-                ->where('iar.interviewer_id', '!=', $interviewer_id)
-                ->select('iar.*', 'emp.rank as interviewer_rank', 'ra.first_name', 'ra.last_name', 'rd.name as dept_name')
-                ->get();
-
-            foreach ($otherResponses as $resp) {
-                $respRankName = isset($resp->interviewer_rank) ? ($rankConfig[$resp->interviewer_rank] ?? 'Unknown') : 'Unknown';
-                // If interviewer is in HR department, map to "HR" section
-                if (isset($resp->dept_name) && stripos($resp->dept_name, 'Human Resources') !== false) {
-                    $respRankName = 'HR';
-                }
-                $respSectionFields = $sections[$respRankName] ?? [];
-                if (!empty($respSectionFields)) {
-                    $otherSectionsData[] = [
-                        'rankName' => $respRankName,
-                        'interviewer_name' => trim(($resp->first_name ?? '') . ' ' . ($resp->last_name ?? '')),
-                        'fields' => $respSectionFields,
-                        'responses' => json_decode($resp->responses, true),
-                        'submitted_at' => $resp->created_at,
-                    ];
-                }
-            }
-
-            // Check if current user already submitted a response
+            // Current user's own previous submission (for pre-fill).
             $existingResponse = InterviewAssessmentResponseForm::where('form_id', $form[0]->id)
                 ->where('interviewee_id', $applicant_id)
                 ->where('interviewer_id', $interviewer_id)
@@ -287,6 +313,19 @@ class InterviewAssessmentController extends Controller
         $existingResponseData = $existingResponse ? json_decode($existingResponse->responses, true) : null;
 
         return view('resorts.talentacquisition.interview-assessment.show',compact('form','interviewer_id','interviewee_id','page_title','filteredStructure','existingResponseData','otherSectionsData','userRankName'));
+    }
+
+    /**
+     * True when the viewer's role name (rank name OR "HR" for HR-dept members)
+     * appears in the field's responder_roles list. Case-insensitive.
+     */
+    private function roleMatchesViewer(string $viewerRoleName, array $fieldRoles): bool
+    {
+        if ($viewerRoleName === '') return false;
+        foreach ($fieldRoles as $r) {
+            if (strcasecmp((string) $r, $viewerRoleName) === 0) return true;
+        }
+        return false;
     }
 
     public function saveResponse(Request $request, $formId)
@@ -317,6 +356,49 @@ class InterviewAssessmentController extends Controller
                 }
                 if ($value !== null) {
                     $responses[$key] = $value;
+                }
+            }
+
+            // ── Phase 3: per-field role enforcement ─────────────────────
+            // Only persist values for fields whose responder_roles include
+            // the viewer (or fields with no role restriction at all).
+            // Without this guard a savvy user could POST a hidden field
+            // name from another role's section.
+            $formRow = InterviewAssessmentForm::find($formId);
+            if ($formRow) {
+                $structure = json_decode(json_decode($formRow->form_structure), true) ?: [];
+                $rankConfig = config('settings.Position_Rank');
+                $viewerRoleName = $rankConfig[$this->rank] ?? '';
+                if (($emp = $this->resort->GetEmployee ?? null)) {
+                    $deptName = \App\Models\ResortDepartment::where('id', $emp->Dept_id)->value('name') ?? '';
+                    if (stripos($deptName, 'Human Resources') !== false) {
+                        $viewerRoleName = 'HR';
+                    }
+                }
+
+                $rejected = [];
+                $kept = [];
+                foreach ($responses as $name => $value) {
+                    $allowed = true;
+                    foreach ($structure as $field) {
+                        if (($field['name'] ?? null) !== $name) continue;
+                        $roles = (array) ($field['responder_roles'] ?? []);
+                        if (!empty($roles) && !$this->roleMatchesViewer($viewerRoleName, $roles)) {
+                            $allowed = false;
+                            $rejected[] = $field['label'] ?? $name;
+                        }
+                        break;
+                    }
+                    if ($allowed) $kept[$name] = $value;
+                }
+                $responses = $kept;
+
+                if (!empty($rejected)) {
+                    $msg = 'You are not authorised to fill these fields: ' . implode(', ', $rejected);
+                    if ($request->ajax()) {
+                        return response()->json(['success' => false, 'message' => $msg], 422);
+                    }
+                    return redirect()->back()->with('error', $msg);
                 }
             }
 
