@@ -280,8 +280,17 @@
                                     <tbody id="topCountriesWiseCount">
                                         @if(isset($topCountries) && $topCountries->count() > 0)
                                             @foreach($topCountries as $country)
+                                                @php
+                                                    // countries.flag_url is empty in the prod DB, so derive
+                                                    // a CDN flag URL from countries.shortname (ISO-2).
+                                                    $flagSrc = !empty($country->flag_url)
+                                                        ? $country->flag_url
+                                                        : (!empty($country->country_code)
+                                                            ? 'https://flagcdn.com/24x18/' . strtolower($country->country_code) . '.png'
+                                                            : asset('admin_assets/files/user-image.png'));
+                                                @endphp
                                                 <tr>
-                                                    <td><img src="{{ $country->flag_url }}" alt="flag" class="flag"> {{ $country->country }}</td>
+                                                    <td><img src="{{ $flagSrc }}" alt="flag" class="flag" onerror="this.style.display='none';"> {{ $country->country }}</td>
                                                     <td>{{ $country->total_count }}</td>
                                                 </tr>
                                             @endforeach

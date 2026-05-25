@@ -326,8 +326,8 @@ class TalentAcquisitionDashboardController extends Controller
             if (!$canSeeAllDepts && $userDeptId) {
                 $topCountriesQuery->where('vacancies.department', $userDeptId);
             }
-            $topCountries = $topCountriesQuery->selectRaw('countries.name as country, countries.flag_url, COUNT(applicant_form_data.id) as total_count')
-                ->groupBy('countries.name', 'countries.flag_url')
+            $topCountries = $topCountriesQuery->selectRaw('countries.name as country, countries.flag_url, countries.shortname as country_code, COUNT(applicant_form_data.id) as total_count')
+                ->groupBy('countries.name', 'countries.flag_url', 'countries.shortname')
                 ->orderByDesc('total_count')
                 ->limit(10)
                 ->get();
