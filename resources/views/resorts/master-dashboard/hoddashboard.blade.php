@@ -1502,8 +1502,11 @@
                 right: 'next'
             },
             editable: true,
-            eventLimit: 0, 
+            eventLimit: 0,
             navLinks: false,
+            // Render at natural content height (no internal vertical scrollbar).
+            height: 'auto',
+            contentHeight: 'auto',
             events: function(start, end, timezone, callback) {
                 let Resort_id = $("#Dasboard_resort_id").val();
 

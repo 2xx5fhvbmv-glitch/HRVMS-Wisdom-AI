@@ -828,6 +828,9 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             editable: true,
             eventLimit: 0, // Allow "more" link when too many events
             navLinks: false,
+            // Render at natural content height (no internal vertical scrollbar).
+            height: 'auto',
+            contentHeight: 'auto',
             events: function(start, end, timezone, callback) {
                 let Resort_id = $("#Dasboard_resort_id").val();
 
