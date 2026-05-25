@@ -7,7 +7,12 @@
                     <h5 class="modal-title" id="budgetCostModalLabel">
                         <i class="fas fa-wallet me-2"></i>Budget Cost Assignment
                     </h5>
-                    <small class="text-muted">
+                    {{-- Hidden by request — the Dept / Position / Type context
+                         line was noisy in the modal header. The ids below stay
+                         in the DOM so existing JS that writes to them (e.g.
+                         $('#modalTableType').text(...)) doesn't break, but
+                         visually nothing is rendered. --}}
+                    <small class="text-muted" style="display:none;">
                         <span class="me-3"><i class="fas fa-building me-1"></i><strong>Dept:</strong> <span id="modalDepartmentName">-</span></span>
                         <span class="me-3"><i class="fas fa-user-tie me-1"></i><strong>Position:</strong> <span id="modalPositionName">-</span></span>
                         <span><i class="fas fa-tag me-1"></i><strong>Type:</strong> <span id="modalTableType">-</span></span>
@@ -989,6 +994,11 @@ $(document).ready(function() {
 
     // Initialize Details select visibility when modal is shown
     $('#budgetCostModal').on('shown.bs.modal', function() {
+        // Force "Select Details" placeholder on every open — even if a value
+        // was picked in a previous session of this modal. HR asked for the
+        // default option to be selected each time the modal appears.
+        $('#vacantDetailsSelect').val('');
+
         // Toggle Details select based on current table type
         toggleDetailsSelect();
 
