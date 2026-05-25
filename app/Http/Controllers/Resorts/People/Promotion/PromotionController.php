@@ -882,31 +882,19 @@ class PromotionController extends Controller
             }
 
             if (in_array('training', $filters)) {
-                // "Has completed mandatory onboarding training" = the employee
-                // has at least one training_participants row in this resort
-                // marked 'Present' or 'Late' (i.e., they actually attended a
-                // session). Anyone without any attended session is excluded:
-                //   no training_participants rows               → "Not Started" → EXCLUDE
-                //   only 'Pending' rows (scheduled, not done)   → "In Progress" → EXCLUDE
-                //   only 'Absent' rows (held but missed)        → "Absent"      → EXCLUDE
-                //   at least one 'Present' / 'Late'             → "Completed"   → KEEP
-                // A future Pending session does NOT disqualify someone who has
-                // already attended past sessions — that was the over-exclusion
-                // problem with the stricter "every session attended" rule.
+                // Exclude ONLY employees who currently have a scheduled /
+                // in-progress / pending training session (training_participants
+                // row at status='Pending'). Anyone with no rows, or only
+                // attended/missed sessions, stays in the dropdown.
                 $resortId = $this->resort->resort_id;
 
-                $attendedEmpIds = \DB::table('training_participants as tp')
+                $pendingEmpIds = \DB::table('training_participants as tp')
                     ->join('training_schedules as ts', 'ts.id', '=', 'tp.training_schedule_id')
                     ->where('ts.resort_id', $resortId)
-                    ->whereIn('tp.status', ['Present', 'Late'])
+                    ->where('tp.status', 'Pending')
                     ->pluck('tp.employee_id')->unique()->all();
 
-                $trainingEmployees = Employee::where('resort_id', $resortId)
-                    ->where('status', 'Active')
-                    ->whereNotIn('id', $attendedEmpIds ?: [0])
-                    ->pluck('id')->toArray();
-
-                $excludeIds = array_merge($excludeIds, $trainingEmployees);
+                $excludeIds = array_merge($excludeIds, $pendingEmpIds);
             }
 
 
