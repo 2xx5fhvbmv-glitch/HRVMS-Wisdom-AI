@@ -237,7 +237,7 @@
                 <fieldset data-step="3" style="display:none;">
                     <div class="card-title px-3 pt-3"><h3>Upload Candidate Documents</h3></div>
                     <div class="px-3 pb-3">
-                        <label class="form-label">UPLOAD CV &amp; OTHER RELEVANT DOCUMENTS (PNG, JPEG, PDF, Excel — multiple files allowed)</label>
+                        <label class="form-label">OTHER RELEVANT DOCUMENTS (PNG, JPEG, PDF, Excel — multiple files allowed)</label>
                         <input type="file" name="documents[]" class="form-control" multiple accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls">
 
                         @if($oi && $oi->documents->where('category','documents')->count())
@@ -337,12 +337,18 @@
                                 </select>
                             </div>
                             <div class="col-md-6" id="offerLetterBlock">
-                                <label class="form-label">SEND AN OFFER LETTER (PNG, JPEG, PDF)</label>
-                                <input type="file" name="offer_letter" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
-                                @if($oi && $oi->offer_letter_path)
-                                    <small class="text-muted d-block mt-1">
-                                        Current: <a href="{{ \Storage::url($oi->offer_letter_path) }}" target="_blank">{{ basename($oi->offer_letter_path) }}</a>
-                                    </small>
+                                <label class="form-label">Send Offer Letter and Contract (PNG, JPEG, PDF — multiple files allowed)</label>
+                                <input type="file" name="offer_letter[]" class="form-control" accept=".pdf,.png,.jpg,.jpeg" multiple>
+                                <small class="text-muted d-block mt-1">All selected files will be attached to a single email sent to the candidate.</small>
+                                @if($oi)
+                                    @php $offerDocs = $oi->documents->where('category', 'offer_letter'); @endphp
+                                    @if($offerDocs->count())
+                                        <ul class="mt-2 mb-0 small">
+                                            @foreach($offerDocs as $doc)
+                                                <li><a href="{{ \Storage::url($doc->file_path) }}" target="_blank">{{ $doc->original_name }}</a></li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 @endif
                             </div>
                         </div>
