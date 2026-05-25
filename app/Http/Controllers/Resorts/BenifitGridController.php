@@ -650,18 +650,31 @@ class BenifitGridController extends Controller
                     ->where('resort_id', $resort_id)
                     ->first();
 
-            // dd($benefit_grid);
-            $benefitGridChildren = ResortBenifitGridChild::join('leave_categories as lc','lc.id','=','resort_benefit_grid_child.leave_cat_id')->where('rank',$benefit_grid->emp_grade)->get();
-            // dd($benefitGridChildren);
-            $isViewMode = true;  // Set flag to indicate this is editing an existing record
+            if (!$benefit_grid) {
+                abort(404);
+            }
+
+            // Mirror view($id): scope children to THIS benefit grid and pull
+            // the leave_category_name from leave_categories — otherwise the
+            // page shows "N/A (In Days)" for every row and duplicates counts
+            // because multiple grids share the same rank.
+            $benefitGridChildren = ResortBenifitGridChild::join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
+                ->where('benefit_grid_id', $benefit_grid->id)
+                ->where('rank', $benefit_grid->emp_grade)
+                ->select('resort_benefit_grid_child.*', 'lc.leave_type as leave_category_name')
+                ->get();
+
+            $isViewMode = true;
             $selected_linen_array = explode(',', $benefit_grid->linen);
             $selected_laundry = explode(',', $benefit_grid->laundry);
             $selected_sports =  explode(',', $benefit_grid->sports_and_entertainment_facilities);
-            $LeaveCategories = LeaveCategory::where('resort_id',$resort_id)->get();
+            $LeaveCategories = LeaveCategory::where('resort_id', $resort_id)->get();
             $emp_grade = config('settings.eligibilty');
 
             return view('resorts.benifitgrid.view')->with(compact(
-                'page_title', 'resort_id', 'sports', 'benefit_grid','benefitGridChildren', 'isViewMode','selected_linen_array','selected_laundry','selected_sports'
+                'page_title', 'resort_id', 'sports', 'benefit_grid', 'benefitGridChildren',
+                'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports',
+                'LeaveCategories', 'emp_grade'
             ));
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
