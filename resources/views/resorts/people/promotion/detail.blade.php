@@ -132,6 +132,71 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Approval History — same panel rendered on the approval
+                     page; surfaces every approver's decision + justification
+                     (the rejection / on-hold reason that was previously
+                     invisible). --}}
+                @if($promotion->approvals && $promotion->approvals->count())
+                <div class="cardBorder-block mb-4">
+                    <div class="card-title">
+                        <h3>Approval History</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table-lableNew w-100">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 14%;">Stage</th>
+                                        <th style="width: 22%;">Approver</th>
+                                        <th style="width: 14%;">Status</th>
+                                        <th style="width: 14%;">Date</th>
+                                        <th>Justification</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($promotion->approvals->sortBy('id') as $apr)
+                                        @php
+                                            $approverName = optional(optional($apr->approver)->resortAdmin)->full_name ?? '—';
+                                            $approverPos  = optional(optional($apr->approver)->position)->position_title;
+                                            $statusBadge  = match($apr->status) {
+                                                'Approved' => 'badge-themeSuccess',
+                                                'Rejected' => 'badge-themeDanger',
+                                                'On Hold'  => 'badge-themeSkyblue',
+                                                default    => 'badge-themeWarning',
+                                            };
+                                            $whenActed = $apr->approved_at
+                                                ? \Carbon\Carbon::parse($apr->approved_at)->format('d M Y · g:i a')
+                                                : ($apr->status !== 'Pending' && $apr->updated_at
+                                                    ? \Carbon\Carbon::parse($apr->updated_at)->format('d M Y · g:i a')
+                                                    : '—');
+                                        @endphp
+                                        <tr>
+                                            <td><b>{{ $apr->approval_rank ?? '—' }}</b></td>
+                                            <td>
+                                                {{ $approverName }}
+                                                @if($approverPos)
+                                                    <br><small class="text-muted">{{ $approverPos }}</small>
+                                                @endif
+                                            </td>
+                                            <td><span class="badge {{ $statusBadge }}">{{ $apr->status }}</span></td>
+                                            <td>{{ $whenActed }}</td>
+                                            <td>
+                                                @if(!empty($apr->remarks))
+                                                    <span>{{ $apr->remarks }}</span>
+                                                @else
+                                                    <span class="text-muted"><em>No justification provided</em></span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 @if($promotion->status == 'Approved')
                     <div class="card-footer">
                         <div class="row g-2">

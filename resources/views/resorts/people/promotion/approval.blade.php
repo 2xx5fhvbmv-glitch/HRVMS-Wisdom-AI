@@ -149,13 +149,78 @@
                         </div>
                     </div>
                 </div>
-            
-                @if($promotion->status != 'Approved' && $promotion->status != 'Rejected')
+
+                {{-- Approval History — one row per approver showing the action
+                     they took (Approved / Rejected / On Hold / still Pending),
+                     who they are, their justification, and when they acted.
+                     This is what surfaces the rejection reason that was
+                     previously invisible to anyone reading the request. --}}
+                @if($promotion->approvals && $promotion->approvals->count())
+                <div class="cardBorder-block mb-4">
+                    <div class="card-title">
+                        <h3>Approval History</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table-lableNew w-100">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 14%;">Stage</th>
+                                        <th style="width: 22%;">Approver</th>
+                                        <th style="width: 14%;">Status</th>
+                                        <th style="width: 14%;">Date</th>
+                                        <th>Justification</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($promotion->approvals->sortBy('id') as $apr)
+                                        @php
+                                            $approverName = optional(optional($apr->approver)->resortAdmin)->full_name ?? '—';
+                                            $approverPos  = optional(optional($apr->approver)->position)->position_title;
+                                            $statusBadge  = match($apr->status) {
+                                                'Approved' => 'badge-themeSuccess',
+                                                'Rejected' => 'badge-themeDanger',
+                                                'On Hold'  => 'badge-themeSkyblue',
+                                                default    => 'badge-themeWarning',
+                                            };
+                                            $whenActed = $apr->approved_at
+                                                ? \Carbon\Carbon::parse($apr->approved_at)->format('d M Y · g:i a')
+                                                : ($apr->status !== 'Pending' && $apr->updated_at
+                                                    ? \Carbon\Carbon::parse($apr->updated_at)->format('d M Y · g:i a')
+                                                    : '—');
+                                        @endphp
+                                        <tr>
+                                            <td><b>{{ $apr->approval_rank ?? '—' }}</b></td>
+                                            <td>
+                                                {{ $approverName }}
+                                                @if($approverPos)
+                                                    <br><small class="text-muted">{{ $approverPos }}</small>
+                                                @endif
+                                            </td>
+                                            <td><span class="badge {{ $statusBadge }}">{{ $apr->status }}</span></td>
+                                            <td>{{ $whenActed }}</td>
+                                            <td>
+                                                @if(!empty($apr->remarks))
+                                                    <span>{{ $apr->remarks }}</span>
+                                                @else
+                                                    <span class="text-muted"><em>No justification provided</em></span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                @if(!empty($canAct) && $promotion->status != 'Approved' && $promotion->status != 'Rejected')
                     <form id="review-approval" data-parsley-validate>
-                        <div class="mb-3"> 
-                            <label for="comments" class="form-label">COMMENTS</label>
+                        <div class="mb-3">
+                            <label for="comments" class="form-label">JUSTIFICATION</label>
                             <textarea id="comments" rows="3" class="form-control"
-                                placeholder="Add your review comments here..."></textarea>
+                                placeholder="Add your justification for this decision..."></textarea>
                         </div>
                         <div class="mb-3 d-none" id="followup-container">
                             <label for="followup_date" class="form-label">Follow-Up Date</label>

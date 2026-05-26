@@ -14,7 +14,7 @@
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
-                            <span>People</span>
+                            <span>Promotion</span>
                             <h1>Dashboard</h1>
                         </div>
                     </div>
@@ -91,12 +91,15 @@
                                 <div class="col">
                                     <h3 class="text-nowrap">Basic Salary</h3>
                                 </div>
-                                <div class="col-auto">
+                                {{-- Filter hidden by request — chart now defaults to Year-Wise.
+                                     The select stays in the DOM (display:none) because the
+                                     fetchData() JS reads its value via $('#basicSalaryFilter'). --}}
+                                <div class="col-auto" style="display:none;">
                                     <div class="form-group">
                                         <select class="form-select" id="basicSalaryFilter">
-                                            <option value="month" selected>Month-Wise</option>
+                                            <option value="month">Month-Wise</option>
                                             <option value="quarter">Quarter-Wise</option>
-                                            <option value="year">Year-Wise</option>
+                                            <option value="year" selected>Year-Wise</option>
                                         </select>
                                     </div>
                                 </div>
@@ -163,7 +166,10 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-xl-2 col-sm-3  col-auto"> 
+                                {{-- Date picker filter hidden by request. The hidden input
+                                     stays in the DOM so the change-listener wired to
+                                     #dateFilter still binds without errors. --}}
+                                <div class="col-xl-2 col-sm-3 col-auto" style="display:none;">
                                     <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
                                 </div>
                                 <div class="col-auto">
@@ -216,8 +222,8 @@
             getPromotionTable();
         });
 
-        // Initial load
-        fetchData('month');
+        // Initial load — default to year-wise (the filter UI is hidden).
+        fetchData('year');
 
         // Filter listener
         document.getElementById('basicSalaryFilter').addEventListener('change', function () {
