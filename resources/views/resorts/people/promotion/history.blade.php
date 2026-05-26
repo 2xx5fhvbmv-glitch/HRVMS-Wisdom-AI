@@ -126,8 +126,8 @@
                 { data: 'old_jd', name: 'old_jd' },
                 { data: 'new_jd', name: 'new_jd' },
                 { data: 'old_benifit_grid', name: 'old_benifit_grid' },
-                { data: 'new_benifit_grid', name: 'new_benifit_grid' }
-                {data:'created_at',visible:false,searchable:false},
+                { data: 'new_benifit_grid', name: 'new_benifit_grid' },
+                { data: 'created_at', visible: false, searchable: false }
             ]
         });
     }

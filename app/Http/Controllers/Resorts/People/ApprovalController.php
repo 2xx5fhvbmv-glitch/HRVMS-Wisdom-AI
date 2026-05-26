@@ -520,9 +520,12 @@ class ApprovalController extends Controller
         }
         elseif($request['action'] == 'promotion') {
 
+            // route('promotion.review.action') is a POST route — the buttons
+            // were emitting method=GET which made the AJAX call 405. Use POST
+            // so handlePromotionApproval is actually reached.
             $approve_url = [
                 'route' => route('promotion.review.action', ['id' => base64_encode($request['id']), 'action' => 'Approved']),
-                'method' => 'GET',
+                'method' => 'POST',
                 'action' => 'Approved',
                 'status'=> 'Approved',
                 'id' => $request['id'],
@@ -530,7 +533,7 @@ class ApprovalController extends Controller
             ];
             $hold_url = [
                 'route' => route('promotion.review.action', ['id' => base64_encode($request['id']), 'action' => 'On Hold']),
-                'method' => 'GET',
+                'method' => 'POST',
                 'action' => 'Hold',
                 'status'=> 'On Hold',
                 'id' => $request['id'],
@@ -538,32 +541,35 @@ class ApprovalController extends Controller
             ];
             $reject_url = [
                 'route' => route('promotion.review.action', ['id' => base64_encode($request['id']), 'action' => 'Rejected']),
-                'method' => 'GET',
+                'method' => 'POST',
                 'action' => 'Rejected',
                 'status'=> 'Rejected',
                 'id' => $request['id'],
                 'key' => 'id',
             ];
-            
+
             $view_route = route('promotion.details', ['id' => base64_encode($request['id'])]);
 
         }elseif ($request['action'] == 'resignation') {
 
+            // updateStatus() does base64_decode($request->resignation_id),
+            // so the value posted MUST be base64-encoded. Sending the raw id
+            // resulted in "No query results for [EmployeeResignation]".
             $approve_url = [
                 'route' => route('people.employee-resignation.status-update'),
                 'method' => 'POST',
                 'action' => 'Approved',
                 'status'=> 'Approved',
-                'id' => $request['id'],
+                'id' => base64_encode($request['id']),
                 'key' => 'resignation_id',
             ];
-            
+
             $reject_url = [
                 'route' => route('people.employee-resignation.status-update'),
                 'method' => 'POST',
                 'action' => 'Rejected',
                 'status'=> 'Rejected',
-                'id' => $request['id'],
+                'id' => base64_encode($request['id']),
                 'key' => 'resignation_id',
             ];
             $view_route = route('people.employee-resignation.show', ['id' => base64_encode($request['id'])]);
