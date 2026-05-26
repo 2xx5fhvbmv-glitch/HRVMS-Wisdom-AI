@@ -397,17 +397,28 @@ class PromotionController extends Controller
                     return \Carbon\Carbon::parse($row->effective_date)->format('d M Y');
                 })
               ->addColumn('status', function ($row) {
-                    // $approval = $row->approvals->first(); // gets the first approval
-
-                    // if (!$approval) {
-                    //     return '<span class="badge badge-secondary">No Status</span>';
-                    // }
+                    // For a still-Pending promotion, show WHICH stage is
+                    // currently waiting (e.g. "Pending — GM") so HR can tell
+                    // at a glance whether HOD or Finance or GM is the
+                    // bottleneck. approvals are persisted in chain order
+                    // (smallest id = earliest stage).
+                    if ($row->status === 'Pending') {
+                        $nextStage = $row->approvals
+                            ->where('status', 'Pending')
+                            ->sortBy('id')
+                            ->first();
+                        $stageLabel = $nextStage->approval_rank ?? null;
+                        $label = $stageLabel
+                            ? "Pending — {$stageLabel} approval"
+                            : 'Pending';
+                        return '<span class="badge badge-themeWarning">' . e($label) . '</span>';
+                    }
 
                     return match ($row->status) {
                         'Approved' => '<span class="badge badge-themeSuccess">Approved</span>',
                         'Rejected' => '<span class="badge badge-themeDanger">Rejected</span>',
                         'On Hold'  => '<span class="badge badge-themeSkyblue">On Hold</span>',
-                        default    => '<span class="badge badge-themeWarning">Pending</span>',
+                        default    => '<span class="badge badge-themeWarning">' . e($row->status) . '</span>',
                     };
                 })
 
@@ -765,6 +776,11 @@ class PromotionController extends Controller
         $promotion = EmployeePromotion::with(['approvals', 'employee'])->findOrFail($id);
         $comments = $request->input('comments', null);
         $currentEmployee = $this->resort->GetEmployee; // Assuming current logged-in employee
+        // Eager-load relations the actor descriptor needs ($actorLabel below
+        // reads resortAdmin->full_name, position->position_title, department->name).
+        if ($currentEmployee) {
+            $currentEmployee->loadMissing(['resortAdmin', 'position', 'department']);
+        }
         $actionName = $action;
         $hr = Employee::where('resort_id',$this->resort->resort_id)->where('Admin_Parent_id',$promotion->created_by)->first();
 
@@ -825,6 +841,23 @@ class PromotionController extends Controller
             'approved_at' => now(),
         ]);
 
+        // Actor descriptor for HR notifications — "Ankit (HOD of Finance)",
+        // "Ankit (Finance Manager)", etc. Falls back to just the name if the
+        // employee record has no position / department row.
+        $actorName = optional(optional($currentEmployee)->resortAdmin)->full_name ?? 'Approver';
+        $actorRankLabel = config('settings.Position_Rank')[$currentEmployee->rank] ?? null;
+        $actorDeptName  = optional($currentEmployee->department)->name;
+        $actorPosTitle  = optional($currentEmployee->position)->position_title;
+        if ($actorRankLabel && $actorDeptName) {
+            $actorDescriptor = "{$actorRankLabel} of {$actorDeptName}";
+        } elseif ($actorPosTitle) {
+            $actorDescriptor = $actorPosTitle;
+        } else {
+            $actorDescriptor = '';
+        }
+        $actorLabel = $actorName . ($actorDescriptor ? " ({$actorDescriptor})" : '');
+        $employeeName = $promotion->employee->resortAdmin->full_name ?? 'Employee';
+
         // Handle Approved
         if ($actionName === 'Approved') {
             $pendingCount = $promotion->approvals()->where('status', 'Pending')->count();
@@ -854,11 +887,24 @@ class PromotionController extends Controller
             }
 
             if ($hr) {
+                // "Finalized" wording only when ALL stages are done. While
+                // intermediate stages are still pending we send a more
+                // accurate "stage approved" notification — HR was getting
+                // mis-led into thinking the promotion was complete after the
+                // first approver clicked Approve.
+                if ($pendingCount === 0) {
+                    $title = 'Promotion Finalized';
+                    $body  = "📢 Promotion for {$employeeName} has been fully approved. Final approval by {$actorLabel}.";
+                } else {
+                    $stageLabel = $currentApproval->approval_rank ?? 'Stage';
+                    $title = 'Promotion Stage Approved';
+                    $body  = "📢 Promotion for {$employeeName} — {$stageLabel} approved by {$actorLabel}. Awaiting next stage.";
+                }
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,
-                    'Employee Promotion Finalized',
-                    "📢 Promotion for " . $promotion->employee->resortAdmin->full_name . " has been approved",
+                    $title,
+                    $body,
                     0,
                     $hr->id,
                     'People'
@@ -878,11 +924,12 @@ class PromotionController extends Controller
             $promotion->save();
 
             if ($hr) {
+                $reason = trim((string) $comments) !== '' ? " Reason: {$comments}" : '';
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,
-                    'Employee Promotion Rejected',
-                    "📢 Promotion for " . $promotion->employee->resortAdmin->full_name . " has been rejected.",
+                    'Promotion Rejected',
+                    "📢 Promotion for {$employeeName} has been rejected by {$actorLabel}.{$reason}",
                     0,
                     $hr->id,
                     'People'
@@ -906,11 +953,15 @@ class PromotionController extends Controller
             }
             $promotion->save();
             if ($hr) {
+                $reason = trim((string) $comments) !== '' ? " Reason: {$comments}" : '';
+                $tillDate = $promotion->follow_up_date
+                    ? \Carbon\Carbon::parse($promotion->follow_up_date)->format('d M Y')
+                    : '—';
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,
-                    'Employee Promotion put On Hold',
-                    "📢 Promotion for " . $promotion->employee->resortAdmin->full_name . " has been put on hold till date ".$promotion->follow_up_date,
+                    'Promotion On Hold',
+                    "📢 Promotion for {$employeeName} has been put on hold by {$actorLabel} till {$tillDate}.{$reason}",
                     0,
                     $hr->id,
                     'People'

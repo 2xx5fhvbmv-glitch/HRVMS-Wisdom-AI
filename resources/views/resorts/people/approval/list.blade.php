@@ -39,7 +39,11 @@
                                 @endif
                             </select>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        {{-- Position filter hidden by request. Select stays in
+                             the DOM (display:none) because JS elsewhere reads
+                             $('.Position') / $('#position-filter') and would
+                             otherwise error. --}}
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6" style="display:none;">
                             <select id="position-filter" class="form-select select2t-none mb-2 Position" name="position" aria-label="Default select example">
                                 <option selected value="">Select Position</option>
                             </select>
