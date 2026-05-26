@@ -215,13 +215,27 @@
                                             </a>
                                         </td>
                                     </tr>
+                                    {{-- Mirror Current Details layout — "View Benefit Grid"
+                                         link lives in the same table as a third row, instead
+                                         of being tucked under the BENEFIT GRID UPDATE field. --}}
+                                    <tr>
+                                        <td>New Benefit Grid:</td>
+                                        <td>
+                                            <a class="a-link view-benifit-grid" id="new-view-benifit-grid"
+                                               style="display:none;" target="_blank">View Benefit Grid</a>
+                                        </td>
+                                    </tr>
                                 </table>
                             </div>
                             <div class="col-md-6">
                                 <label for="benefit_grid" class="form-label">BENEFIT GRID UPDATE <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" id="benefit_grid" name="benefit_grid"
-                                    aria-label="Default select example" required
-                                    data-parsley-required-message="Please select benefit grid" data-parsley-errors-container="#benefitgrid-error">
+                                {{-- Benefit Grid is always read-only on this form — it's derived
+                                     from the selected New Position (matches the chosen Level)
+                                     via getDetails(). The hidden input below carries the value
+                                     to the server since a disabled <select> doesn't submit. --}}
+                                <select class="form-select select2t-none" id="benefit_grid" disabled
+                                    aria-label="Default select example"
+                                    data-parsley-errors-container="#benefitgrid-error">
                                     <option value="">BENEFIT GRID UPDATE</option>
                                     @if($benefitGrids)
                                         @foreach($benefitGrids as $grid)
@@ -229,11 +243,10 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <input type="hidden" id="benefit_grid_value" name="benefit_grid" required
+                                    data-parsley-required-message="Please select a New Position to auto-fill Benefit Grid"
+                                    data-parsley-errors-container="#benefitgrid-error">
                                 <div id="benefitgrid-error"></div>
-                                {{-- Mirror the Current Details "View Benefit Grid" link so HR
-                                     can preview the chosen grid before submitting. --}}
-                                <a class="a-link view-benifit-grid mt-1 d-inline-block" id="new-view-benifit-grid"
-                                   style="display:none;" target="_blank">View Benefit Grid</a>
                             </div>
                             <div class="col-md-6">
                                 <label for="comments" class="form-label">COMMENTS</label>
@@ -281,9 +294,12 @@
         });
 
         // New Benefit Grid — when a value is picked, expose a "View Benefit
-        // Grid" link pointing at the benefit-grid page for that level.
+        // Grid" link pointing at the benefit-grid page for that level. Also
+        // keep the hidden #benefit_grid_value in sync because the visible
+        // select is disabled and a disabled <select> isn't form-submitted.
         $('#benefit_grid').on('change', function () {
             var level = $(this).val();
+            $('#benefit_grid_value').val(level || '');
             if (level) {
                 var url = "{{ url('resort/people/benefit-grid/view') }}/" + encodeURIComponent(level);
                 $('#new-view-benifit-grid').attr('href', url).show();

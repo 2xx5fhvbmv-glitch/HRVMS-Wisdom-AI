@@ -12,7 +12,11 @@ class EmployeePromotionApproval extends Model
 
 
     protected $fillable = [
-        'promotion_id','status','approval_rank','approved_by','remarks',
+        'promotion_id','status','approval_rank','approved_by','remarks','approved_at',
+    ];
+
+    protected $casts = [
+        'approved_at' => 'datetime',
     ];
 
     public function approver()

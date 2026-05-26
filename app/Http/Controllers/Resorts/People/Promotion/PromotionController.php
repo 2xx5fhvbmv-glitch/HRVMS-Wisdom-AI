@@ -217,7 +217,50 @@ class PromotionController extends Controller
             })
             ->get();
 
+        // HOD Approver Logic — the EMPLOYEE'S current dept HOD/EXCOM is the
+        // FIRST gate: they justify the promotion request (with comments)
+        // before Finance / GM can act. Same pool-fan-out pattern so EXCOM or
+        // HOD can act for each other, and everyone in the pool is notified.
+        $hodRank   = array_search('HOD',   config('settings.Position_Rank')) ?: 2;
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank')) ?: 1;
+        $employeeDeptId = (int) optional($promotion->employee)->Dept_id;
+        $employeeBeingPromotedId = (int) $promotion->employee_id;
+        $initiatorAdminId = (int) $promotion->created_by;
+
+        $hodPool = collect();
+        if ($employeeDeptId > 0) {
+            $hodPool = Employee::with('resortAdmin')
+                ->where('resort_id', $this->resort->resort_id)
+                ->where('Dept_id', $employeeDeptId)
+                ->where('status', 'Active')
+                ->whereIn('rank', [$hodRank, $excomRank])
+                ->get();
+        }
+
+        // Self-approval guard — always drop the employee being promoted.
+        $hodPool     = $hodPool    ->reject(fn($e) => (int) $e->id === $employeeBeingPromotedId)->values();
+        $financePool = $financePool->reject(fn($e) => (int) $e->id === $employeeBeingPromotedId)->values();
+        $gmPool      = $gmPool     ->reject(fn($e) => (int) $e->id === $employeeBeingPromotedId)->values();
+
+        // Drop the initiator from each pool — but only when at least one
+        // OTHER candidate remains. When the initiator is the ONLY HOD of the
+        // employee's dept (a small-dept edge case the user flagged), they
+        // need to stay in the pool so the chain has someone to act on the
+        // HOD slot. The $canAct gate in approval() also allows the initiator
+        // to act on an HOD slot they're assigned to.
+        $dropInitiator = function ($pool) use ($initiatorAdminId) {
+            $withoutInitiator = $pool->reject(fn($e) => (int) ($e->Admin_Parent_id ?? 0) === $initiatorAdminId)->values();
+            return $withoutInitiator->isNotEmpty() ? $withoutInitiator : $pool;
+        };
+
+        $hodPool     = $dropInitiator($hodPool);
+        $financePool = $dropInitiator($financePool);
+        $gmPool      = $dropInitiator($gmPool);
+
         $promotionApprovalFlow = collect();
+        if ($hodPool->isNotEmpty()) {
+            $promotionApprovalFlow->push(['approver' => $hodPool->first(), 'rank' => 'HOD', 'pool' => $hodPool]);
+        }
         if ($financePool->isNotEmpty()) {
             $promotionApprovalFlow->push(['approver' => $financePool->first(), 'rank' => 'Finance', 'pool' => $financePool]);
         }
@@ -288,6 +331,20 @@ class PromotionController extends Controller
                 'newPosition',
                 'approvals'
             ])->where('resort_id',$this->resort->resort_id)->select('*');
+
+            // Dept-scope guard — HOD/MGR/SUP/etc. see ONLY their own dept's
+            // promotions; HR / GM / master-admin / L&D get full access via
+            // Common::hasFullDataAccess() returning true (so this is a no-op
+            // for them). Match by the employee's CURRENT dept (the HOD whose
+            // justification is needed); we don't broaden to the new dept so
+            // a target-dept HOD doesn't see a request they're not in the
+            // approval chain for.
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds)) {
+                $promotions->whereHas('employee', function ($q) use ($scopedDeptIds) {
+                    $q->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                });
+            }
 
             // HR sees all statuses; others only limited
             // if (!$isHR) {
@@ -636,16 +693,71 @@ class PromotionController extends Controller
             'employee.position',
             'employee.department',
             'employee.resortAdmin',
-            'currentPosition', 
+            'currentPosition',
             'newPosition',
-            'approvals',
-            'createdBy.GetEmployee', 
+            // Eager-load approver name + position so the Approval History
+            // section can render "who acted" + "their role" without N+1.
+            'approvals.approver.resortAdmin',
+            'approvals.approver.position',
+            'approvals.approver.department',
+            'createdBy.GetEmployee',
             'modifiedBy'
-        ])->where('id',$promotionId)->first();   
-        // dd($promotion->createdBy->GetEmployee->position->position_title);  
-        return view('resorts.people.promotion.approval',compact('page_title','promotion'));
+        ])->where('id',$promotionId)->first();
 
+        // Live fallback for the budget-exceed warning — promotions submitted
+        // before the budgeted_salary column existed have NULL there, so the
+        // warning never fires for them. Re-compute against today's budget so
+        // approvers still see the warning. Only fall back when truly empty.
+        if ($promotion
+            && empty($promotion->budgeted_salary)
+            && $promotion->newPosition
+        ) {
+            $promotion->budgeted_salary = $this->computeBudgetedSalaryForPosition(
+                (int) $promotion->resort_id,
+                (int) $promotion->new_position_id,
+                $promotion->newPosition
+            );
+        }
 
+        // Decide whether the logged-in user is allowed to actually
+        // Approve / Reject / On-Hold this promotion. Hidden in the view when
+        // $canAct is false. Rules:
+        //   1. User must own an actionable approval slot (direct, delegate,
+        //      Finance/GM pool, or HOD-of-same-dept pool).
+        //   2. All EARLIER approvers in the chain must already be Approved.
+        //   3. INITIATOR generally blocked from acting on their own request,
+        //      EXCEPT when the only slot they can act on is an HOD slot
+        //      assigned to them — small-dept edge case where the initiator
+        //      is also the only HOD of the employee's dept.
+        //   4. Finalised promotions (Approved/Rejected) never show buttons.
+        $canAct = false;
+        if ($promotion
+            && !in_array($promotion->status, ['Approved', 'Rejected'], true)
+            && Auth::guard('resort-admin')->check()
+        ) {
+            $currentAdminId  = (int) Auth::guard('resort-admin')->user()->id;
+            $currentEmployee = optional($this->resort)->GetEmployee;
+            $isInitiator     = ((int) $promotion->created_by === $currentAdminId);
+
+            if ($currentEmployee) {
+                $slot = $this->findActionableApproval($promotion, $currentEmployee);
+                if ($slot && $this->earlierApprovalsAllApproved($promotion, $slot->id)) {
+                    if (!$isInitiator) {
+                        $canAct = true;
+                    } else {
+                        // Initiator allowed to act ONLY when they're assigned
+                        // to an HOD slot (i.e. they're also the dept HOD and
+                        // there's no other HOD to take the action).
+                        if ($slot->approval_rank === 'HOD'
+                            && (int) $slot->approved_by === (int) $currentEmployee->id) {
+                            $canAct = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return view('resorts.people.promotion.approval', compact('page_title', 'promotion', 'canAct'));
     }
 
     public function handlePromotionApproval(Request $request, $id, $action)
@@ -663,31 +775,18 @@ class PromotionController extends Controller
             ->first();
 
         $delegateComment = '';
+        // Fallback chain (delegate → Finance/GM pool → HOD-of-same-dept pool)
+        // is the same one the approval page's $canAct uses, so the UI and the
+        // server agree on who is allowed to act.
         if (!$currentApproval) {
-            // Check if current user is a delegate for any pending approver
-            $pendingApprovals = $promotion->approvals()->whereIn('status', ['Pending', 'On Hold'])->get();
-            foreach ($pendingApprovals as $pa) {
-                if (Common::hasDelegationAuthority($currentEmployee->id, $pa->approved_by, $this->resort->resort_id)) {
-                    $currentApproval = $pa;
+            $slot = $this->findActionableApproval($promotion, $currentEmployee);
+            if ($slot) {
+                $currentApproval = $slot;
+                // Mark as delegate-comment only when this user isn't the
+                // nominal approved_by on the row (true for delegation AND
+                // pool-fallback).
+                if ((int) $slot->approved_by !== (int) $currentEmployee->id) {
                     $delegateComment = ' (Acted by delegate)';
-                    break;
-                }
-            }
-        }
-
-        // Pool fallback — if the logged-in user belongs to the Finance or GM
-        // approver pool, let them act on the pending approval slot for that
-        // role even when first()-picked someone else for `approved_by`.
-        // Without this Finance HOD couldn't approve when the row was assigned
-        // to the DOF (or vice-versa).
-        if (!$currentApproval) {
-            $userRole = $this->getUserPromotionRole($currentEmployee->id, $this->resort->resort_id);
-            if ($userRole) {
-                $currentApproval = $promotion->approvals()
-                    ->where('approval_rank', $userRole)
-                    ->whereIn('status', ['Pending', 'On Hold'])
-                    ->first();
-                if ($currentApproval) {
                     // Re-assign so the audit trail names who actually acted.
                     $currentApproval->approved_by = $currentEmployee->id;
                 }
@@ -701,9 +800,13 @@ class PromotionController extends Controller
             ], 403);
         }
 
-        // Ensure previous approvers (lower rank) have approved
+        // Ensure earlier approvers in the chain have approved first.
+        // approval_rank is a STRING (e.g. 'HOD', 'Finance', 'GM') so
+        // alphabetical `<` doesn't reflect chain order. We persist the
+        // approvers in the order they were pushed at submit time, so the
+        // primary-key `id` is the source of truth for chain order.
         $pendingBefore = $promotion->approvals()
-            ->where('approval_rank', '<', $currentApproval->approval_rank)
+            ->where('id', '<', $currentApproval->id)
             ->get();
 
         foreach ($pendingBefore as $previousApproval) {
@@ -833,14 +936,28 @@ class PromotionController extends Controller
             'employee.position',
             'employee.department',
             'employee.resortAdmin',
-            'currentPosition', 
+            'currentPosition',
             'newPosition',
-            'approvals',
-            'createdBy.GetEmployee', 
+            'approvals.approver.resortAdmin',
+            'approvals.approver.position',
+            'approvals.approver.department',
+            'createdBy.GetEmployee',
             'modifiedBy'
-        ])->where('id',$promotionId)->first();   
+        ])->where('id',$promotionId)->first();
 
-        // dd($promotion->createdBy->GetEmployee->position->position_title);  
+        // Live fallback so the budget-exceed warning fires even on promotions
+        // submitted before the budgeted_salary column existed.
+        if ($promotion
+            && empty($promotion->budgeted_salary)
+            && $promotion->newPosition
+        ) {
+            $promotion->budgeted_salary = $this->computeBudgetedSalaryForPosition(
+                (int) $promotion->resort_id,
+                (int) $promotion->new_position_id,
+                $promotion->newPosition
+            );
+        }
+
         return view('resorts.people.promotion.detail',compact('page_title','promotion'));
     }
     
@@ -1032,6 +1149,72 @@ class PromotionController extends Controller
         if ($isGm) return 'GM';
 
         return null;
+    }
+
+    /**
+     * Find the approval row this user is authorised to act on for a given
+     * promotion, OR null if none. Checks in priority order:
+     *   1) direct slot (approvals.approved_by = current employee id)
+     *   2) delegation (Common::hasDelegationAuthority)
+     *   3) Finance / GM role pool (via getUserPromotionRole)
+     *   4) HOD pool of the SAME department as the slot's original approver
+     *      (so EXCOM / other HODs can step in for the first()-picked HOD)
+     *
+     * Returns the EmployeePromotionApproval row when actionable.
+     */
+    private function findActionableApproval(EmployeePromotion $promotion, $currentEmployee)
+    {
+        if (!$currentEmployee) return null;
+
+        $resortId = (int) $this->resort->resort_id;
+        $approvals = $promotion->approvals()->whereIn('status', ['Pending', 'On Hold'])->get();
+        if ($approvals->isEmpty()) return null;
+
+        // 1) Direct slot
+        $direct = $approvals->firstWhere('approved_by', $currentEmployee->id);
+        if ($direct) return $direct;
+
+        // 2) Delegation
+        foreach ($approvals as $a) {
+            if (Common::hasDelegationAuthority($currentEmployee->id, $a->approved_by, $resortId)) {
+                return $a;
+            }
+        }
+
+        // 3) Finance / GM role pool
+        $userRole = $this->getUserPromotionRole($currentEmployee->id, $resortId);
+        if ($userRole) {
+            $slot = $approvals->firstWhere('approval_rank', $userRole);
+            if ($slot) return $slot;
+        }
+
+        // 4) HOD pool fallback — same dept as the slot's nominal approver.
+        $hodRank   = array_search('HOD',   config('settings.Position_Rank')) ?: 2;
+        $excomRank = array_search('EXCOM', config('settings.Position_Rank')) ?: 1;
+        if (in_array((int) $currentEmployee->rank, [$hodRank, $excomRank], true)) {
+            foreach ($approvals->where('approval_rank', 'HOD') as $slot) {
+                $slotEmp = Employee::find($slot->approved_by);
+                if ($slotEmp && (int) $slotEmp->Dept_id === (int) $currentEmployee->Dept_id) {
+                    return $slot;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * True when every approval row with id < $approvalId is already Approved.
+     * Used to gate UI buttons + server actions so a later-stage approver
+     * can't act before earlier stages have completed.
+     */
+    private function earlierApprovalsAllApproved(EmployeePromotion $promotion, $approvalId): bool
+    {
+        $earlier = $promotion->approvals()->where('id', '<', $approvalId)->get(['status']);
+        foreach ($earlier as $a) {
+            if ($a->status !== 'Approved') return false;
+        }
+        return true;
     }
 
     public function GetEmployeeWiseFilterData(Request $request)
@@ -1314,6 +1497,29 @@ class PromotionController extends Controller
             }
         }
 
+        // (5) Reporting manager — the employee's direct supervisor needs a
+        // heads-up that the team change is now in effect (could be the new
+        // dept's manager after a cross-dept promotion). Skip when the manager
+        // is the employee themselves, the dept HOD pool, or the GM (already
+        // notified above) to avoid duplicate pings.
+        if (!empty($employee->reporting_to)) {
+            $alreadyNotified = collect()
+                ->concat($deptLeads ?? collect())
+                ->push($employee->id)
+                ->map(fn($v) => (int) $v)
+                ->all();
+            if (isset($gmIds)) {
+                $alreadyNotified = array_merge($alreadyNotified, $gmIds->map(fn($v) => (int) $v)->all());
+            }
+            if (!in_array((int) $employee->reporting_to, $alreadyNotified, true)) {
+                $push(
+                    (int) $employee->reporting_to,
+                    'Team Member Promotion Effective Today',
+                    "📌 Your team member {$employeeName} has been promoted from {$oldPosTitle} to {$newPosTitle} today ({$effectiveDate})."
+                );
+            }
+        }
+
         $promotion->effective_day_notified_at = now();
         $promotion->save();
     }
@@ -1366,6 +1572,20 @@ class PromotionController extends Controller
                 'Employee Promotion Approved',
                 "📢 {$employeeName}'s promotion to {$newPosTitle} has been approved. Effective {$effectiveDate}."
             );
+        }
+
+        // Reporting manager — heads-up to the employee's direct supervisor
+        // (unless they're already in the dept-leads set or are the employee
+        // themselves).
+        if (!empty($employee->reporting_to)) {
+            $alreadyNotified = $deptLeads->push($employee->id)->map(fn($v) => (int) $v)->all();
+            if (!in_array((int) $employee->reporting_to, $alreadyNotified, true)) {
+                $push(
+                    (int) $employee->reporting_to,
+                    'Team Member Promotion Approved',
+                    "📢 Your team member {$employeeName}'s promotion to {$newPosTitle} has been approved. Effective {$effectiveDate}."
+                );
+            }
         }
     }
 

@@ -32,8 +32,28 @@ class DashboardController extends Controller
         $positions = ResortPosition::where('resort_id',$resort_id)->where('status','active')->get();
         $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
         $total_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Active','On Leave'])->count();
-        $pending_promotion = EmployeePromotion::where('resort_id',$resort_id)->where('status','Pending')->count();
-        $approved_promotion = EmployeePromotion::where('resort_id',$resort_id)->where('status','Approved')->count();
+
+        // Dept-scope guard — non-HR HOD/EXCOM only see their own dept's
+        // promotion counts + chart data. HR / GM / master admin / L&D get
+        // unrestricted access (Common::hasFullDataAccess() = true → null).
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        $scopeEmployeeDept = function ($q) use ($scopedDeptIds) {
+            if (is_array($scopedDeptIds)) {
+                $q->whereHas('employee', function ($qq) use ($scopedDeptIds) {
+                    $qq->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                });
+            }
+        };
+
+        $pending_promotion  = EmployeePromotion::where('resort_id', $resort_id)
+            ->where('status', 'Pending')
+            ->tap($scopeEmployeeDept)
+            ->count();
+        $approved_promotion = EmployeePromotion::where('resort_id', $resort_id)
+            ->where('status', 'Approved')
+            ->tap($scopeEmployeeDept)
+            ->count();
+
         $employees = Employee::with(['resortAdmin','position','department'])->where('resort_id',$resort_id)->where('status','Active')->get();
         $currentYear = now()->year;
         $lastYear = now()->subYear()->year;
@@ -41,13 +61,17 @@ class DashboardController extends Controller
         $labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
         $thisYearData = EmployeePromotion::selectRaw('MONTH(effective_date) as month, COUNT(*) as total')
+            ->where('resort_id', $resort_id)
             ->whereYear('effective_date', $currentYear)
+            ->tap($scopeEmployeeDept)
             ->groupBy('month')
             ->pluck('total', 'month')
             ->toArray();
 
         $lastYearData = EmployeePromotion::selectRaw('MONTH(effective_date) as month, COUNT(*) as total')
+            ->where('resort_id', $resort_id)
             ->whereYear('effective_date', $lastYear)
+            ->tap($scopeEmployeeDept)
             ->groupBy('month')
             ->pluck('total', 'month')
             ->toArray();
@@ -77,6 +101,14 @@ class DashboardController extends Controller
         $available_rank = $rank[$current_rank] ?? '';
         $isHR = ($available_rank === "HR");
         $query = EmployeePromotion::with(['employee.resortAdmin', 'employee.department'])->where('resort_id',$this->resort->resort_id);
+
+        // Dept-scope guard — same rule as the Promotion List page.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds)) {
+            $query->whereHas('employee', function ($q) use ($scopedDeptIds) {
+                $q->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+            });
+        }
 
         if ($request->employee) {
             $query->where('employee_id', $request->employee);
