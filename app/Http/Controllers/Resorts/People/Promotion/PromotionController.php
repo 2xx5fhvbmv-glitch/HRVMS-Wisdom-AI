@@ -92,6 +92,14 @@ class PromotionController extends Controller
         
         $JobDescription =  JobDescription::where('Resort_id', $this->resort->resort_id)->where('Position_id', $request->new_position)->first();
         $jd_id = $JobDescription ? $JobDescription->id : null;
+        // Snapshot the target-position budgeted salary at submit time so the
+        // approval / detail views show the same "exceeds budget" warning HR
+        // saw on the form, even if the underlying budget rows change later.
+        // We re-compute server-side (don't trust the hidden form field).
+        $budgetedSalaryAtSubmit = $newPosition
+            ? $this->computeBudgetedSalaryForPosition((int) $this->resort->resort_id, (int) $request->new_position, $newPosition)
+            : 0.0;
+
         $promotion = EmployeePromotion::create([
             'resort_id' => $this->resort->resort_id,
             'Jd_id' => $jd_id,
@@ -103,6 +111,7 @@ class PromotionController extends Controller
             'salary_increment_percent' => $request->salary_inc,
             'salary_increment_amount' => $request->salary_amt,
             'new_salary'=>$request->hdn_new_basic_salary,
+            'budgeted_salary' => $budgetedSalaryAtSubmit,
             'effective_date' => $formattedEffectiveDate,
             'updated_benefit_grid' => $request->benefit_grid,
             'comments' => $request->comments,
@@ -478,6 +487,8 @@ class PromotionController extends Controller
         // resort_positions.no_of_positions when no manning row exists.
         $vacancyInfo = $this->computePositionVacancy($resort_id, (int) $request->position_id, $position);
 
+        $budgetedSalary = $this->computeBudgetedSalaryForPosition($resort_id, (int) $request->position_id, $position);
+
         return response()->json([
             "success" => true,
             "data" => [
@@ -489,8 +500,76 @@ class PromotionController extends Controller
                 "filled_count" => $vacancyInfo['filled_count'],
                 "budgeted_headcount" => $vacancyInfo['budgeted_headcount'],
                 "vacancy_message" => $vacancyInfo['message'],
+                "budgeted_salary" => $budgetedSalary,
             ]
         ]);
+    }
+
+    /**
+     * The highest budgeted monthly basic salary for a position in this resort.
+     * Picks the max of (proposed-if-set, else current) across every salary
+     * source for that position — active employees, vacant rows, and any
+     * per-month overrides. Used by the promotion form to flag "salary
+     * exceeds budget" before submit.
+     */
+    private function computeBudgetedSalaryForPosition(int $resortId, int $positionId, $position): float
+    {
+        $year   = (int) now()->year;
+        $deptId = (int) ($position->dept_id ?? 0);
+        $candidates = [];
+
+        // --- 1. Active employees in this position ---
+        $employees = \DB::table('employees')
+            ->where('resort_id', $resortId)
+            ->where('Position_id', $positionId)
+            ->where('status', 'Active')
+            ->get(['id', 'basic_salary', 'proposed_salary']);
+
+        foreach ($employees as $emp) {
+            $effective = (float) ($emp->proposed_salary > 0 ? $emp->proposed_salary : ($emp->basic_salary ?? 0));
+            if ($effective > 0) $candidates[] = $effective;
+
+            // Per-month employee overrides
+            $monthly = \DB::table('resort_employee_monthly_salaries')
+                ->where('employee_id', $emp->id)
+                ->where('resort_id', $resortId)
+                ->where('year', $year)
+                ->get(['current_salary', 'proposed_salary']);
+            foreach ($monthly as $m) {
+                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
+                if ($eff > 0) $candidates[] = $eff;
+            }
+        }
+
+        // --- 2. Vacant budget rows for this position ---
+        // resort_vacant_budget_costs.basic_salary    = Current (per legacy mapping)
+        // resort_vacant_budget_costs.current_salary  = Proposed
+        $vacants = \DB::table('resort_vacant_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('position_id', $positionId)
+            ->where('department_id', $deptId)
+            ->where('year', $year)
+            ->get(['vacant_index', 'basic_salary', 'current_salary']);
+
+        foreach ($vacants as $v) {
+            $effective = (float) ($v->current_salary > 0 ? $v->current_salary : ($v->basic_salary ?? 0));
+            if ($effective > 0) $candidates[] = $effective;
+
+            // Per-month vacant overrides
+            $monthly = \DB::table('resort_vacant_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('position_id', $positionId)
+                ->where('department_id', $deptId)
+                ->where('year', $year)
+                ->where('vacant_index', $v->vacant_index)
+                ->get(['current_salary', 'proposed_salary']);
+            foreach ($monthly as $m) {
+                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
+                if ($eff > 0) $candidates[] = $eff;
+            }
+        }
+
+        return $candidates ? (float) max($candidates) : 0.0;
     }
 
     /**

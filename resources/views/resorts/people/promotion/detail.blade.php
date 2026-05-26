@@ -78,7 +78,20 @@
                                     </tr>
                                     <tr>
                                         <th>New Salary:</th>
-                                        <td><b>{!! Common::formatCurrency($promotion->new_salary, 'USD') !!}</b></td>
+                                        <td>
+                                            <b>{!! Common::formatCurrency($promotion->new_salary, 'USD') !!}</b>
+                                            @if(!empty($promotion->budgeted_salary) && (float) $promotion->new_salary > (float) $promotion->budgeted_salary)
+                                                <div class="alert alert-warning py-1 px-2 mt-1 mb-0"
+                                                     style="font-size: 0.85rem; border-left: 4px solid #f0ad4e;">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                                    Salary exceeded budget — proposed
+                                                    {!! Common::formatCurrency($promotion->new_salary, 'USD') !!}
+                                                    is higher than the budgeted
+                                                    {!! Common::formatCurrency($promotion->budgeted_salary, 'USD') !!}
+                                                    for the target position.
+                                                </div>
+                                            @endif
+                                        </td>
                                     </tr>
                                     <tr>
                                         <th>Updated Job Description:</th>

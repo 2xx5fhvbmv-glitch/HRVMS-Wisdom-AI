@@ -19,7 +19,7 @@ class EmployeePromotion extends Model
         'resort_id','employee_id','current_position_id','new_position_id','effective_date',
         'new_level','current_salary','salary_increment_percent','salary_increment_amount','Jd_id',
         'new_salary','updated_benefit_grid','comments','status','follow_up_date','letter_dispatched','created_by','modified_by',
-        'effective_day_notified_at','pre_promotion_snapshot'
+        'effective_day_notified_at','pre_promotion_snapshot','budgeted_salary'
     ];
 
     protected $casts = [

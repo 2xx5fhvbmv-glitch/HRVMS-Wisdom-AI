@@ -119,9 +119,21 @@
                                     </tr>
                                     <tr>
                                         <th>Salary Increment:</th>
-                                        <td>{!! Common::formatCurrency($promotion->current_salary, 'USD') !!}<i class="fa-regular fa-arrow-right mx-2"></i>
-                                        <b>{!! Common::formatCurrency($promotion->new_salary, 'USD') !!}</b>
+                                        <td>
+                                            {!! Common::formatCurrency($promotion->current_salary, 'USD') !!}<i class="fa-regular fa-arrow-right mx-2"></i>
+                                            <b>{!! Common::formatCurrency($promotion->new_salary, 'USD') !!}</b>
                                             <span class="badge badge-themeNew1">{{$promotion->salary_increment_percent}}% increase</span>
+                                            @if(!empty($promotion->budgeted_salary) && (float) $promotion->new_salary > (float) $promotion->budgeted_salary)
+                                                <div class="alert alert-warning py-1 px-2 mt-2 mb-0"
+                                                     style="font-size: 0.85rem; border-left: 4px solid #f0ad4e;">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                                    Salary exceeded budget — proposed
+                                                    {!! Common::formatCurrency($promotion->new_salary, 'USD') !!}
+                                                    is higher than the budgeted
+                                                    {!! Common::formatCurrency($promotion->budgeted_salary, 'USD') !!}
+                                                    for the target position.
+                                                </div>
+                                            @endif
                                         </td>
                                     </tr>
                                     <tr>

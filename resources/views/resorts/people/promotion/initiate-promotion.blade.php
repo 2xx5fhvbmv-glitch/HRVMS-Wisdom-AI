@@ -195,6 +195,17 @@
                                         <td>New Basic Salary:</td>
                                         <td id="new_basic_salary"></td>
                                         <input type="hidden" id="hdn_new_basic_salary" name="hdn_new_basic_salary"/>
+                                        <input type="hidden" id="hdn_budgeted_salary" name="hdn_budgeted_salary"/>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" style="padding-top:0;">
+                                            <div id="salary_budget_warning"
+                                                 class="alert alert-warning py-1 px-2 mt-1 mb-0"
+                                                 style="display:none; font-size:0.85rem; border-left:4px solid #f0ad4e;">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                                <span id="salary_budget_warning_text"></span>
+                                            </div>
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td>Job Description:</td>
@@ -308,6 +319,24 @@
             return parseFloat(value.replace(/,/g, '')) || 0;
         }
 
+        // Toggle the "salary exceeds budget" yellow banner under New Basic
+        // Salary based on the current new-salary value vs the target
+        // position's budgeted salary (captured in getDetails()).
+        function checkSalaryAgainstBudget() {
+            const newSal    = parseFloat($('#hdn_new_basic_salary').val() || 0);
+            const budgeted  = parseFloat(window.__budgetedSalary || $('#hdn_budgeted_salary').val() || 0);
+            if (budgeted > 0 && newSal > budgeted) {
+                const msg = 'Salary exceeded budget — proposed $' + newSal.toFixed(2)
+                          + ' is higher than the budgeted $' + budgeted.toFixed(2)
+                          + ' for the target position.';
+                $('#salary_budget_warning_text').text(msg);
+                $('#salary_budget_warning').show();
+            } else {
+                $('#salary_budget_warning').hide();
+            }
+        }
+        window.__checkSalaryAgainstBudget = checkSalaryAgainstBudget;
+
         $('#salary_inc').on('input', function () {
             const perc = parseFloat($(this).val());
             const basicSalary = parseSalary($('#basic_salary').text());
@@ -330,6 +359,7 @@
                 $('#hdn_new_basic_salary').val();
 
             }
+            checkSalaryAgainstBudget();
         });
 
         $('#salary_amt').on('input', function () {
@@ -354,6 +384,7 @@
                 $('#hdn_new_basic_salary').val();
 
             }
+            checkSalaryAgainstBudget();
         });
 
         $('#initiate-promotion').on('submit', function (e) {
@@ -473,6 +504,12 @@
         $('#position-vacancy-info').hide();
         $('#position-vacancy-badge').removeClass('badge-themeSuccess badge-themeDangerNew').text('');
         window.__newPositionIsVacant = null;
+        // Reset budget-exceed warning whenever the position changes — fresh
+        // position means we re-fetch the budgeted salary and re-check.
+        window.__budgetedSalary = 0;
+        $('#hdn_budgeted_salary').val('');
+        $('#salary_budget_warning').hide();
+        $('#salary_budget_warning_text').text('');
 
         if (!posId) return;
 
@@ -520,6 +557,14 @@
                             positionClass: 'toast-bottom-right'
                         });
                     }
+
+                    // Capture the budgeted salary for the target position and
+                    // run the exceed-budget check on whatever new salary is
+                    // currently in the form (in case salary was typed first).
+                    const budgeted = parseFloat(response.data.budgeted_salary || 0);
+                    window.__budgetedSalary = budgeted;
+                    $('#hdn_budgeted_salary').val(budgeted);
+                    checkSalaryAgainstBudget();
                 } else {
                     toastr.error(response.message || "Employee details not found!", "Error", {
                         positionClass: 'toast-bottom-right'
