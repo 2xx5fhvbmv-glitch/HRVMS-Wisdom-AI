@@ -62,6 +62,40 @@ class EmployeeResignationController extends Controller
                 }
             }
 
+            // Honour the index-page filters (none of these were applied
+            // before — controller dropped department / position / status
+            // / search on the floor).
+            $deptId     = $request->filled('department_id') ? (int) $request->department_id : null;
+            $positionId = $request->filled('position_id')   ? (int) $request->position_id   : null;
+            $statusVal  = $request->filled('status')        ? trim((string) $request->status) : null;
+            $searchTerm = $request->filled('search_term')   ? trim((string) $request->search_term) : null;
+
+            if ($statusVal) {
+                $empResignations->where('status', $statusVal);
+            }
+            if ($deptId) {
+                $empResignations->whereHas('employee', fn($q) => $q->where('Dept_id', $deptId));
+            }
+            if ($positionId) {
+                $empResignations->whereHas('employee', fn($q) => $q->where('Position_id', $positionId));
+            }
+            if ($searchTerm) {
+                // Search across the canonical "Employee Name, ID or
+                // Manager Name" hint shown in the input placeholder.
+                // Manager Name = the employee's reporting supervisor.
+                $empResignations->whereHas('employee', function ($q) use ($searchTerm) {
+                    $q->where('Emp_id', 'like', "%{$searchTerm}%")
+                      ->orWhereHas('resortAdmin', function ($raQ) use ($searchTerm) {
+                          $raQ->where('first_name', 'like', "%{$searchTerm}%")
+                              ->orWhere('last_name', 'like', "%{$searchTerm}%");
+                      })
+                      ->orWhereHas('reportingTo.resortAdmin', function ($mgrQ) use ($searchTerm) {
+                          $mgrQ->where('first_name', 'like', "%{$searchTerm}%")
+                               ->orWhere('last_name', 'like', "%{$searchTerm}%");
+                      });
+                });
+            }
+
             $employeeResignations = $empResignations->get();
             
             
@@ -167,8 +201,46 @@ class EmployeeResignationController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $resignationId = base64_decode($id);
-        $employeeResignation = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
+        // Eager-load hod + hr (with their resortAdmin) so the show.blade
+        // can resolve names without lazy-load round-trips. Without this
+        // the relations get lazy-fetched and the chain still works, but
+        // it's wasteful — and it doesn't help the rows where hod_id /
+        // hr_id were never recorded at create time (see fallback below).
+        $employeeResignation = EmployeeResignation::with([
+                'employee.resortAdmin',
+                'employee.department',
+                'employee.position',
+                'hod.resortAdmin',
+                'hod.position',
+                'hr.resortAdmin',
+                'hr.position',
+            ])
             ->findOrFail($resignationId);
+
+        // Some resignations were created before hod_id / hr_id started
+        // being captured (or via a code path that skipped FindResortHOD /
+        // FindResortHR). Fall back to resolving them from the employee's
+        // current department HOD and the resort's HR so the view shows
+        // SOMEONE instead of a blank "HOD Name:" line. We attach the
+        // resolved Employees to the resignation as dynamic properties so
+        // the existing blade markup keeps working unchanged.
+        if (empty($employeeResignation->hod_id) && $employeeResignation->employee) {
+            $hodFallback = \App\Helpers\Common::FindResortHODDepartment(
+                $this->resort->resort_id,
+                $employeeResignation->employee->Dept_id
+            );
+            if ($hodFallback) {
+                $hodFallback->load(['resortAdmin', 'position']);
+                $employeeResignation->setRelation('hod', $hodFallback);
+            }
+        }
+        if (empty($employeeResignation->hr_id)) {
+            $hrFallback = \App\Helpers\Common::FindResortHR($this->resort);
+            if ($hrFallback) {
+                $hrFallback->load(['resortAdmin', 'position']);
+                $employeeResignation->setRelation('hr', $hrFallback);
+            }
+        }
 
         $user = $this->resort->GetEmployee;
        
@@ -220,6 +292,27 @@ class EmployeeResignationController extends Controller
             $employeeResignation->hod_meeting_status = 'Completed';
             $employeeResignation->hod_comments = $request->meeting_comment;
             $employeeResignation->save();
+
+            // Notify HR — they're the next stage in the chain. Without
+            // this they had to chase the bell list manually to learn
+            // that HOD had signed off.
+            if ($status === 'Approved' && $employeeResignation->hr_id) {
+                $hodName = $user->resortAdmin ? $user->resortAdmin->full_name : 'HOD';
+                $empName = $employeeResignation->employee && $employeeResignation->employee->resortAdmin
+                    ? $employeeResignation->employee->resortAdmin->full_name
+                    : 'employee';
+                $msg = "📝 {$hodName} approved the resignation for {$empName}. Please review and approve.";
+                $notificationHtml = Common::nofitication(
+                    $this->resort->resort_id,
+                    10,
+                    'Resignation Awaiting HR Approval',
+                    $msg,
+                    0,
+                    $employeeResignation->hr_id,
+                    'People'
+                );
+                event(new \App\Events\ResortNotificationEvent($notificationHtml));
+            }
         }elseif($employeeResignation->hr_status === 'Pending' && $is_hr == true) {
             if($employeeResignation->hod_status == 'Approved'){
                 $employeeResignation->hr_status = $status;

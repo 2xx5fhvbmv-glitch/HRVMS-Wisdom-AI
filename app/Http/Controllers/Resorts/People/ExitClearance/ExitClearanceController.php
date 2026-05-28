@@ -36,6 +36,33 @@ class ExitClearanceController extends Controller
         if(!$this->resort) return;
     }
 
+    /**
+     * Fire a People-module bell notification to one Employee. Mirrors the
+     * shape used by sendReminder() and the salary-increment notification
+     * fan-out so the bell list stays consistent.
+     *
+     * Silently no-ops when the recipient id is empty — callers don't have
+     * to null-check before invoking.
+     */
+    private function notifyExit($recipientEmployeeId, string $title, string $message): void
+    {
+        if (empty($recipientEmployeeId)) return;
+        try {
+            $notificationHtml = \App\Helpers\Common::nofitication(
+                $this->resort->resort_id,
+                10,
+                $title,
+                $message,
+                0,
+                (int) $recipientEmployeeId,
+                'People'
+            );
+            event(new \App\Events\ResortNotificationEvent($notificationHtml));
+        } catch (\Throwable $e) {
+            \Log::warning('Exit clearance notify failed: ' . $e->getMessage());
+        }
+    }
+
     public function index(Request $request)
     {
         
@@ -48,9 +75,30 @@ class ExitClearanceController extends Controller
             ->get();
 
         if ($request->ajax()) {
+            // Honour the dropdown filters posted by the index page. The old
+            // controller dropped them on the floor — department_id /
+            // position_id / status were sent but never read, which is why
+            // "other filters not working" was reported.
+            //
+            // Status default: when the filter dropdown is left blank we
+            // keep the page's original behaviour and only surface
+            // resignations that have been Approved (the rows that actually
+            // need clearance). Picking a value from the dropdown REPLACES
+            // that default so HR can audit other states.
+            $deptId     = $request->filled('department_id') ? (int) $request->department_id : null;
+            $positionId = $request->filled('position_id')   ? (int) $request->position_id   : null;
+            $statusVal  = $request->filled('status')        ? trim((string) $request->status) : null;
+
             $employeeResignations = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
                 ->where('resort_id', $resort_id)
-                ->where('status', '=', 'Approved')
+                ->when($statusVal, fn($q) => $q->where('status', $statusVal),
+                                   fn($q) => $q->where('status', 'Approved'))
+                ->when($deptId, function ($q) use ($deptId) {
+                    $q->whereHas('employee', fn($eq) => $eq->where('Dept_id', $deptId));
+                })
+                ->when($positionId, function ($q) use ($positionId) {
+                    $q->whereHas('employee', fn($eq) => $eq->where('Position_id', $positionId));
+                })
                 ->get();
 
             $edit_class = '';
@@ -101,7 +149,24 @@ class ExitClearanceController extends Controller
                         default    => '<span class="badge badge-themeWarning">Pending</span>',
                     };
 
-                    return '<a href="#statusModal" data-bs-toggle="modal" data-id="' . $employeeResignation->id . '" class="status-modal-trigger">' . $statusBadge . '</a>';
+                    // Trigger the Exit Clearance Status modal. The previous
+                    // markup used `href="#statusModal" data-bs-toggle="modal"`
+                    // — but the actual modal id is `#exitClear-modal`, so
+                    // Bootstrap intercepted the click, looked up a target
+                    // that didn't exist, and the jQuery handler below
+                    // never got a chance to run. Use javascript:void(0)
+                    // and let the delegated `.status-modal-trigger`
+                    // handler in index.blade.php open the right modal.
+                    //
+                    // Adding a small history icon + cursor:pointer +
+                    // title attribute so the badge clearly reads as
+                    // clickable — HR couldn't tell it opened a modal.
+                    return '<a href="javascript:void(0);" data-id="' . $employeeResignation->id . '" '
+                         . 'class="status-modal-trigger" title="Click to view clearance status history" '
+                         . 'style="text-decoration:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">'
+                         . $statusBadge
+                         . '<i class="fa fa-history" style="font-size:11px; color:#888;"></i>'
+                         . '</a>';
                 })
                 ->addColumn('action', function ($employeeResignation) use ($edit_class) {
                     return '
@@ -135,7 +200,23 @@ class ExitClearanceController extends Controller
         $page_title = 'Exit Clearance Details';
         $resort_id = $this->resort->resort_id;
 
-        $exit_clearance = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position','reason_title'])
+        $exit_clearance = EmployeeResignation::with([
+                'employee.resortAdmin',
+                'employee.department',
+                'employee.position',
+                // Reporting supervisor — Employee.reporting_to → Employee → resortAdmin
+                'employee.reportingTo:id,Admin_Parent_id,Position_id,Dept_id',
+                'employee.reportingTo.resortAdmin:id,first_name,last_name',
+                'employee.reportingTo.position:id,position_title',
+                // HOD + HR who own this resignation (used by the People Details card)
+                'hod:id,Admin_Parent_id,Position_id',
+                'hod.resortAdmin:id,first_name,last_name',
+                'hod.position:id,position_title',
+                'hr:id,Admin_Parent_id,Position_id',
+                'hr.resortAdmin:id,first_name,last_name',
+                'hr.position:id,position_title',
+                'reason_title',
+            ])
             ->where('id', $id)
             ->where('resort_id', $resort_id)
             ->firstOrFail();
@@ -224,7 +305,7 @@ class ExitClearanceController extends Controller
                     ->first();
 
                 if (!$chkExitClearanceFormAssignment) {
-                    
+
                     $exitClearanceFormAssignment = ExitClearanceFormAssignment::create([
                         'resort_id' => $resort_id,
                         'department_id' => $department_id,
@@ -237,6 +318,24 @@ class ExitClearanceController extends Controller
                         'deadline_date' => $deadLineDate,
                         'status' => 'Pending',
                     ]);
+
+                    // Notify the department's HOD (or fallback rank we
+                    // picked above) — they need to know a clearance form
+                    // landed in their queue. Was silently created
+                    // before; HR had to chase by hand.
+                    if ($employee) {
+                        $resignation = EmployeeResignation::with('employee.resortAdmin')
+                            ->find($request->employee_resignation_id);
+                        $empName = $resignation
+                            ? (optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee')
+                            : 'employee';
+                        $this->notifyExit(
+                            $employee->id,
+                            'New Exit Clearance Form Assigned',
+                            "📋 You have been assigned an exit clearance form for {$empName}."
+                            . " Deadline: " . Carbon::parse($deadLineDate)->format('d M Y') . "."
+                        );
+                    }
 
                 }else{
                     
@@ -314,7 +413,7 @@ class ExitClearanceController extends Controller
                 ->first();
 
             if (!$chkExitClearanceFormAssignment) {
-                
+
                 $exitClearanceFormAssignment = ExitClearanceFormAssignment::create([
                     'resort_id' => $resort_id,
                     'emp_resignation_id' => $request->employee_resignation_id,
@@ -327,6 +426,19 @@ class ExitClearanceController extends Controller
                     'status' => 'Pending',
                     'reminder_frequency' => $request->reminder_frequency ?? null,
                 ]);
+
+                // Notify the resigning employee that an exit interview
+                // form is now waiting for them to fill in.
+                $resignation = EmployeeResignation::with('employee.resortAdmin')
+                    ->find($request->employee_resignation_id);
+                if ($resignation && $resignation->employee_id) {
+                    $this->notifyExit(
+                        $resignation->employee_id,
+                        'Exit Interview Form Assigned',
+                        "📋 An exit interview form has been assigned to you ({$template->form_name})."
+                        . " Please complete it by " . Carbon::parse($deadLineDate)->format('d M Y') . "."
+                    );
+                }
 
             }else{
                 $chkExitClearanceFormAssignment->update([
@@ -345,12 +457,21 @@ class ExitClearanceController extends Controller
         $id = base64_decode($id);
         $page_title = 'Exit Clearance Form Response';
         $response_has = false;
+        // NB: variable name is misleading — in the blade `$is_submitted`
+        // actually means "form is editable / Submit button visible".
+        // Treat it as: this view is editable when the assignment is
+        // still Pending. Once status is Completed it falls back to
+        // read-only (existing behaviour).
         $is_submitted = false;
 
         $resort_id = $this->resort->resort_id;
         $exitClearanceFormAssignment = ExitClearanceFormAssignment::where('id', $id)
             ->where('resort_id', $resort_id)
             ->firstOrFail();
+
+        if (trim((string) $exitClearanceFormAssignment->status) === 'Pending') {
+            $is_submitted = true;
+        }
 
         $employeeResignation = EmployeeResignation::where('id', $exitClearanceFormAssignment->emp_resignation_id)
             ->where('resort_id', $resort_id)
@@ -526,6 +647,25 @@ class ExitClearanceController extends Controller
 
         ]);
 
+        // Notify HR (the resignation's hr_id, or the resort HR fallback)
+        // that a department has completed their clearance form so HR can
+        // verify and progress the offboarding.
+        $resignation = EmployeeResignation::with('employee.resortAdmin')
+            ->find($exitClearanceFormAssignment->emp_resignation_id);
+        if ($resignation) {
+            $hrId = $resignation->hr_id;
+            if (empty($hrId)) {
+                $hrFallback = \App\Helpers\Common::FindResortHR($this->resort);
+                $hrId = optional($hrFallback)->id;
+            }
+            $empName = optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee';
+            $this->notifyExit(
+                $hrId,
+                'Exit Clearance Form Completed',
+                "✅ A department clearance form has been completed for {$empName}."
+            );
+        }
+
         return response()->json([
             'success' => true,
             'status' => 'success',
@@ -535,16 +675,111 @@ class ExitClearanceController extends Controller
     }
 
 
+    /**
+     * Web-side submit for an EMPLOYEE-assigned exit interview form. Mirrors
+     * departmentFormResponseStore() but scoped to assigned_to_type='employee'
+     * and notifies HR instead of relying on the department-completed ping.
+     *
+     * The web exit-clearance-form-view used to POST to the department
+     * endpoint, which silently rejected employee assignments — leaving HR
+     * with no way to capture exit interview responses from the website.
+     */
+    public function employeeFormResponseStore(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $exitClearanceFormAssignment = ExitClearanceFormAssignment::where('id', $request->exit_clearance_assignment_id)
+            ->where('resort_id', $resort_id)
+            ->where('assigned_to_type', 'employee')
+            ->firstOrFail();
+
+        $exitClearanceForm = ExitClearanceForm::where('id', $exitClearanceFormAssignment->form_id)
+            ->where('resort_id', $resort_id)
+            ->firstOrFail();
+
+        $formStructure = json_decode($exitClearanceForm->form_structure, true);
+        $responseData = [];
+
+        foreach ($formStructure as $field) {
+            $fieldName = $field['name'] ?? null;
+            $fieldType = $field['type'] ?? null;
+            if (!$fieldName) continue;
+
+            if ($fieldType === 'file' && $request->hasFile($fieldName)) {
+                $uploadedFiles = $request->file($fieldName);
+                $path = config('settings.ExitClearanceAttachments');
+                $filePaths = [];
+                $rows = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
+                foreach ($rows as $uploadedFile) {
+                    if (!$uploadedFile) continue;
+                    $fileName = time() . '_' . $uploadedFile->getClientOriginalName();
+                    $destinationPath = $path . '/' . $exitClearanceFormAssignment->id . '/' . $fieldName;
+                    $fullDestinationPath = public_path($destinationPath);
+                    if (!file_exists($fullDestinationPath)) {
+                        mkdir($fullDestinationPath, 0777, true);
+                    }
+                    $uploadedFile->move($fullDestinationPath, $fileName);
+                    $filePaths[] = $destinationPath . '/' . $fileName;
+                }
+                $responseData[$fieldName] = $filePaths;
+            } else {
+                $responseData[$fieldName] = $request->input($fieldName, null);
+            }
+        }
+
+        $existing = ExitClearanceFormResponse::where('assignment_id', $exitClearanceFormAssignment->id)->first();
+        if ($existing) {
+            $existing->update(['response_data' => json_encode($responseData)]);
+        } else {
+            ExitClearanceFormResponse::create([
+                'assignment_id'  => $exitClearanceFormAssignment->id,
+                'response_data'  => json_encode($responseData),
+                'submitted_by'   => Auth::guard('resort-admin')->user()->id,
+                'submitted_date' => Carbon::now(),
+            ]);
+        }
+
+        $exitClearanceFormAssignment->update([
+            'status'         => 'Completed',
+            'completed_date' => Carbon::now(),
+        ]);
+
+        // Notify HR — same shape as the API formSubmit + the department
+        // completion notification, so the bell log reads consistently.
+        $resignation = EmployeeResignation::with('employee.resortAdmin')
+            ->find($exitClearanceFormAssignment->emp_resignation_id);
+        if ($resignation) {
+            $hrId = $resignation->hr_id;
+            if (empty($hrId)) {
+                $hrFallback = \App\Helpers\Common::FindResortHR($this->resort);
+                $hrId = optional($hrFallback)->id;
+            }
+            $empName = optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee';
+            $this->notifyExit(
+                $hrId,
+                'Exit Interview Form Submitted',
+                "📋 {$empName} has submitted their exit interview form. Please review the responses."
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'status'  => 'success',
+            'message' => 'Exit interview form submitted successfully.',
+            'data'    => $responseData,
+        ]);
+    }
+
     // mark as Complete by hr
     public function markAsComplete(Request $request, $id)
     {
         $id = base64_decode($id);
-        $resort_id = $this->resort->resort_id;  
+        $resort_id = $this->resort->resort_id;
 
         $employeeResignation =  EmployeeResignation::where('id', $id)
             ->where('resort_id', $resort_id)
             ->firstOrFail();
-            
+
         $exitClearanceFormAssignments = ExitClearanceFormAssignment::where('emp_resignation_id', $id)
             ->where('resort_id', $resort_id)
             ->where('status','!=','Pending')
@@ -554,6 +789,37 @@ class ExitClearanceController extends Controller
             $employeeResignation->update([
                 'status' => 'Completed',
             ]);
+
+            // Now that exit clearance is signed off, transition the
+            // employee from 'Offboarding' to 'Terminated'. ProbationController
+            // (and any future resignation-approve flow) should set the
+            // employee to 'Offboarding' on initiation — this is the
+            // counterpart that finalises the lifecycle.
+            $employee = Employee::find($employeeResignation->employee_id);
+            if ($employee && $employee->status === 'Offboarding') {
+                $employee->update(['status' => 'Terminated']);
+            }
+
+            // Notify the employee + HR that offboarding is officially
+            // closed out. Final-state event in the lifecycle.
+            $empName = $employee && $employee->resortAdmin
+                ? $employee->resortAdmin->full_name
+                : 'employee';
+            $this->notifyExit(
+                $employeeResignation->employee_id,
+                'Exit Clearance Completed',
+                "🎉 Your exit clearance has been finalised. All the best for your next role."
+            );
+            $hrId = $employeeResignation->hr_id;
+            if (empty($hrId)) {
+                $hrFallback = \App\Helpers\Common::FindResortHR($this->resort);
+                $hrId = optional($hrFallback)->id;
+            }
+            $this->notifyExit(
+                $hrId,
+                'Exit Clearance Marked Complete',
+                "✅ Exit clearance for {$empName} has been marked complete."
+            );
         }else{
             return back()->with('error', 'Please complete all exit clearance forms before mark as completed.');
         }

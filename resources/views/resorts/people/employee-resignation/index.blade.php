@@ -25,24 +25,30 @@
                     <div class="row g-md-3 g-2 align-items-center">
                         <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
                             <div class="input-group">
-                                <input type="search" class="form-control "
+                                <input type="search" class="form-control" id="resignationSearch"
                                     placeholder="Search by Employee Name, ID or Manager Name" />
                                 <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            {{-- "All" entries use the `ALL` sentinel because
+                                 Select2 folds duplicate `value=""` options
+                                 into one. The AJAX callback translates ALL
+                                 back to '' so the controller sees no filter. --}}
                             <select class="form-select select2t-none" id="deptFilter" data-placeholder="By Department">
                                 <option value=""></option>
+                                <option value="ALL">All Departments</option>
                                 @if($departments)
                                     @foreach($departments as $department)
                                         <option value="{{ $department->id }}">{{ $department->name }}</option>
-                                    @endforeach             
+                                    @endforeach
                                 @endif
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select select2t-none" id="positionFilter" data-placeholder="By Position">
                                 <option value=""></option>
+                                <option value="ALL">All Positions</option>
                                 @if($positions)
                                     @foreach($positions as $position)
                                         <option value="{{ $position->id }}">{{ $position->position_title }}</option>
@@ -58,9 +64,12 @@
                                 <option value="Completed">Completed</option>
                             </select>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        {{-- Date-range filter disabled per request — backend
+                             never honoured `date_range` and the column it
+                             would filter wasn't decided. --}}
+                        {{-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <input type="text" class="form-control datepicker" id="datapicker" data-placeholder="Date Range"/>
-                        </div>
+                        </div> --}}
                     </div>
                 </div>
                 <div class="table-responsive mb-3">
@@ -129,7 +138,7 @@
 @section('import-scripts')
  <script>
 
-    $(document).ready(function(){        
+    $(document).ready(function(){
         getExitClearanceData();
         $('.select2t-none').select2();
         $('.datepicker').datepicker({
@@ -138,11 +147,18 @@
             startDate: new Date() // Restrict to upcoming dates only
         });
 
-        $('#deptFilter, #positionFilter, #statusFilter, #datapicker').on('change', function () {
+        // Date filter removed — `#datapicker` no longer exists.
+        $('#deptFilter, #positionFilter, #statusFilter').on('change', function () {
             getExitClearanceData();
         });
-    
-        
+
+        // Search input was inert (no id, no handler). Debounce keystrokes
+        // so we don't fire an AJAX request per character.
+        let _resignationSearchTimer = null;
+        $('#resignationSearch').on('input', function () {
+            clearTimeout(_resignationSearchTimer);
+            _resignationSearchTimer = setTimeout(getExitClearanceData, 300);
+        });
     });
 
     function getExitClearanceData() {
@@ -164,10 +180,14 @@
                 url: "{{ route('people.employee-resignation.index') }}",
                 type: 'GET',
                 data: function (d) {
-                    d.department_id = $('#deptFilter').val();
-                    d.position_id = $('#positionFilter').val();
-                    d.status = $('#statusFilter').val();
-                    d.date_range = $('#datapicker').val();
+                    // ALL sentinel → no filter (Select2 dedupe workaround).
+                    let dept = $('#deptFilter').val();
+                    let pos  = $('#positionFilter').val();
+                    d.department_id = (dept === 'ALL') ? '' : dept;
+                    d.position_id   = (pos  === 'ALL') ? '' : pos;
+                    d.status        = $('#statusFilter').val();
+                    d.search_term   = $('#resignationSearch').val();
+                    // d.date_range = $('#datapicker').val();  // calendar filter disabled
                }
             },
             columns: [

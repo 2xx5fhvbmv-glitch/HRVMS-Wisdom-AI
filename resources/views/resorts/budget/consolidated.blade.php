@@ -80,7 +80,7 @@
                                     <button class="accordion-button" type="button" data-bs-toggle="collapse"
                                         data-bs-target="#collapse{{ $iteation }}" aria-expanded="true" aria-controls="collapse{{ $iteation }}">
                                         <h3>{{ $key }}</h3>
-                                        <span class="badge badge-dark">Budget: $ @if(array_key_exists($key,$DepartmentTotal))  {{ $DepartmentTotal[$key]}} @endif</span>
+                                        <span class="badge badge-dark">Budget: {!! array_key_exists($key,$DepartmentTotal) ? Common::formatCurrency($DepartmentTotal[$key], 'USD') : (Common::GetResortCurrencySymbol() . ' 0.00') !!}</span>
                                         <a href="#" class="text-lightblue fw-500 fs-13">WSB: $11,985</a>
                                         <!-- <a href="#" class="btn btn-xs btn-coolblue">compare</a> -->
                                     </button>
@@ -564,12 +564,11 @@ aria-hidden="true">
                     if (costCell) {
                         // MVRtoDoller field stores: 1 MVR = X USD, so multiply
                         const valueInUSD = cost.currency === 'MVR' ? cost.value * data.mvr_to_dollar_rate : cost.value;
-                        const displaySymbol = cost.currency === 'MVR' ? 'MVR ' : '$';
-                        const displayValue = cost.currency === 'MVR' ? cost.value : valueInUSD;
-
                         costCell.setAttribute('data-value', valueInUSD);
                         costCell.setAttribute('data-currency', cost.currency);
-                        costCell.textContent = displaySymbol + parseFloat(displayValue).toFixed(2);
+                        // Always render in the SYSTEM currency via formatAmount
+                        // (was hardcoded '$' / 'MVR ' regardless of resort setting).
+                        costCell.textContent = formatAmount(valueInUSD, 'USD');
                     }
                 });
             }
@@ -649,7 +648,7 @@ aria-hidden="true">
             const grandTotal = totalBasicSalary + totalCurrentSalary + Object.values(costTotals).reduce((a, b) => a + b, 0);
             const badge = positionElement.querySelector('.accordion-button .positionGrandTotal');
             if (badge) {
-                badge.textContent = 'Budget: $' + grandTotal.toFixed(2);
+                badge.textContent = 'Budget: ' + formatAmount(grandTotal, 'USD');
             }
 
             return grandTotal;
@@ -667,7 +666,7 @@ aria-hidden="true">
 
             const badge = sectionElement.querySelector('.accordion-button .sectionGrandTotal');
             if (badge) {
-                badge.textContent = 'Budget: $' + sectionTotal.toFixed(2);
+                badge.textContent = 'Budget: ' + formatAmount(sectionTotal, 'USD');
             }
 
             return sectionTotal;
@@ -690,7 +689,7 @@ aria-hidden="true">
 
             const badge = departmentElement.querySelector('.accordion-button .departmentGrandTotal');
             if (badge) {
-                badge.textContent = 'Budget: $' + departmentTotal.toFixed(2);
+                badge.textContent = 'Budget: ' + formatAmount(departmentTotal, 'USD');
             }
 
             return departmentTotal;
@@ -708,7 +707,7 @@ aria-hidden="true">
 
             const badge = divisionElement.querySelector('.accordion-button .divisionGrandTotal');
             if (badge) {
-                badge.textContent = 'Budget: $' + divisionTotal.toFixed(2);
+                badge.textContent = 'Budget: ' + formatAmount(divisionTotal, 'USD');
             }
 
             return divisionTotal;

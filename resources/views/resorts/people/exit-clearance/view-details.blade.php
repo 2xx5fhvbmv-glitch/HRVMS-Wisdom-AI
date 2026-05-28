@@ -49,11 +49,21 @@
                                        <tr>
                                             <th>Employment Duration:</th>
                                             <td>
-                                                {{
-                                                    \Carbon\Carbon::parse($exit_clearance->employee->joining_date)->format('d M Y')
-                                                    . ' - ' .
-                                                    \Carbon\Carbon::parse($exit_clearance->last_working_day)->format('d M Y')
-                                                }}
+                                                @php
+                                                    $joinDate = \Carbon\Carbon::parse($exit_clearance->employee->joining_date);
+                                                    $endDate  = \Carbon\Carbon::parse($exit_clearance->last_working_day);
+                                                    // Carbon diff in years/months/days, dropping any
+                                                    // zero leading parts so a short tenure reads
+                                                    // "1 month 7 days" instead of "0 years 1 month 7 days".
+                                                    $diff     = $joinDate->diff($endDate);
+                                                    $parts    = [];
+                                                    if ($diff->y > 0) $parts[] = $diff->y . ' year'  . ($diff->y > 1 ? 's' : '');
+                                                    if ($diff->m > 0) $parts[] = $diff->m . ' month' . ($diff->m > 1 ? 's' : '');
+                                                    if ($diff->d > 0) $parts[] = $diff->d . ' day'   . ($diff->d > 1 ? 's' : '');
+                                                    $tenure   = $parts ? implode(' ', $parts) : '0 days';
+                                                @endphp
+                                                {{ $joinDate->format('d M Y') }} - {{ $endDate->format('d M Y') }}
+                                                <span style="color:#666;">({{ $tenure }})</span>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -96,8 +106,60 @@
                                         <tr>
                                             <th>Attachments:</th>
                                             <td>
-                                                <img src="assets/images/pdf1.svg" alt="icon"
-                                                    class="me-2">lorem-ipsum.pdf
+                                                {{-- `resignation_letter` is stored as JSON
+                                                    `{"Filename":"...", "Child_id":<id>}` by the
+                                                    API resignation flow (see
+                                                    API\ResignationController::store). When the
+                                                    record was created via a path that skipped the
+                                                    file upload, the column is NULL and there's
+                                                    genuinely nothing to show. --}}
+                                                @php
+                                                    $attachment = !empty($exit_clearance->resignation_letter)
+                                                        ? json_decode($exit_clearance->resignation_letter, true)
+                                                        : null;
+                                                    $attachmentName = is_array($attachment)
+                                                        ? ($attachment['Filename'] ?? null)
+                                                        : null;
+                                                    $attachmentChildId = is_array($attachment)
+                                                        ? ($attachment['Child_id'] ?? null)
+                                                        : null;
+                                                    $attachmentUrl = null;
+                                                    if ($attachmentChildId) {
+                                                        try {
+                                                            $cfm = \App\Models\ChildFileManagement::find($attachmentChildId);
+                                                            if ($cfm && !empty($cfm->File_Path)) {
+                                                                // File_Path is the wasabi/s3 key
+                                                                // captured by AWSEmployeeFileUpload.
+                                                                // Use Storage::disk('wasabi') so
+                                                                // signed URL respects whichever
+                                                                // driver is configured.
+                                                                $disk = config('filesystems.default') === 'wasabi'
+                                                                    ? 'wasabi' : 'public';
+                                                                if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($cfm->File_Path)) {
+                                                                    $attachmentUrl = \Illuminate\Support\Facades\Storage::disk($disk)
+                                                                        ->temporaryUrl($cfm->File_Path, now()->addMinutes(30));
+                                                                }
+                                                            }
+                                                        } catch (\Throwable $e) {
+                                                            $attachmentUrl = null;
+                                                        }
+                                                    }
+                                                @endphp
+                                                @if($attachmentName)
+                                                    @if($attachmentUrl)
+                                                        <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener">
+                                                            <i class="fa-regular fa-file-pdf me-1" style="color:#c0392b;"></i>
+                                                            {{ $attachmentName }}
+                                                        </a>
+                                                    @else
+                                                        <span title="File reference exists but the stored file could not be located">
+                                                            <i class="fa-regular fa-file-pdf me-1" style="color:#999;"></i>
+                                                            {{ $attachmentName }}
+                                                        </span>
+                                                    @endif
+                                                @else
+                                                    <span class="text-muted">No attachment</span>
+                                                @endif
                                             </td>
                                         </tr>
                                     </tbody>
@@ -106,6 +168,111 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- People Details: Supervisor + HOD (with comments) + HR
+                     (with comments). Was previously not rendered — the
+                     data is on the resignation model (hod_id / hr_id /
+                     hod_comments / hr_comments) and on the employee
+                     (reporting_to). Added so HR can see WHO owns the
+                     resignation and WHAT each approver said. --}}
+                @php
+                    $supervisor = optional($exit_clearance->employee)->reportingTo;
+                    $supervisorName = optional(optional($supervisor)->resortAdmin)->full_name;
+                    $supervisorPos  = optional(optional($supervisor)->position)->position_title;
+
+                    $hodName = optional(optional($exit_clearance->hod)->resortAdmin)->full_name;
+                    $hodPos  = optional(optional($exit_clearance->hod)->position)->position_title;
+                    $hrName  = optional(optional($exit_clearance->hr)->resortAdmin)->full_name;
+                    $hrPos   = optional(optional($exit_clearance->hr)->position)->position_title;
+
+                    $statusBadge = function ($s) {
+                        $s = trim((string) $s);
+                        if ($s === '') return '<span class="badge badge-themeWarning">Pending</span>';
+                        $cls = match ($s) {
+                            'Approved', 'Completed' => 'badge-themeSuccess',
+                            'Rejected'              => 'badge-themeDanger',
+                            'On Hold'               => 'badge-themeSkyblue',
+                            default                 => 'badge-themeWarning',
+                        };
+                        return '<span class="badge ' . $cls . '">' . e($s) . '</span>';
+                    };
+                @endphp
+                <div class="row g-xxl-4 g-3 mb-md-4 mb-3">
+                    <div class="col-lg-4">
+                        <div class="bg-themeGrayLight h-100">
+                            <div class="card-title mb-0"><h3>Reporting Supervisor</h3></div>
+                            <div class="table-responsive">
+                                <table class="table table-lable mb-1">
+                                    <tbody>
+                                        <tr>
+                                            <th>Name:</th>
+                                            <td>{{ $supervisorName ?: '—' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Position:</th>
+                                            <td>{{ $supervisorPos ?: '—' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="bg-themeGrayLight h-100">
+                            <div class="card-title mb-0"><h3>HOD</h3></div>
+                            <div class="table-responsive">
+                                <table class="table table-lable mb-1">
+                                    <tbody>
+                                        <tr>
+                                            <th>Name:</th>
+                                            <td>{{ $hodName ?: '—' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Position:</th>
+                                            <td>{{ $hodPos ?: '—' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Status:</th>
+                                            <td>{!! $statusBadge($exit_clearance->hod_status) !!}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Comments:</th>
+                                            <td>{{ $exit_clearance->hod_comments ?: '—' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="bg-themeGrayLight h-100">
+                            <div class="card-title mb-0"><h3>HR</h3></div>
+                            <div class="table-responsive">
+                                <table class="table table-lable mb-1">
+                                    <tbody>
+                                        <tr>
+                                            <th>Name:</th>
+                                            <td>{{ $hrName ?: '—' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Position:</th>
+                                            <td>{{ $hrPos ?: '—' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Status:</th>
+                                            <td>{!! $statusBadge($exit_clearance->hr_status) !!}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Comments:</th>
+                                            <td>{{ $exit_clearance->hr_comments ?: '—' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-themeGrayLight mb-md-4 mb-3 @if(App\Helpers\Common::checkRouteWisePermission('people.exit-clearance',config('settings.resort_permissions.edit')) == false) d-none @endif">
                     <div class="card-title mb-0">
                         <div class="d-flex justify-content-between align-items-center">
@@ -113,6 +280,21 @@
                             <a class="btn btn-themeSkyblue" href="{{route('people.exit-clearance.employeeFormAssignment', base64_encode($exit_clearance->id))}}">Assign Employee Form</a>
                         </div>
                     </div>
+                    {{-- Empty-state: no clearance forms have been assigned
+                         to this resignation yet. The section header used to
+                         render blank when the @foreach found nothing; now
+                         it points HR at the "Assign Employee Form" button. --}}
+                    @if(count($exitClearanceFormAssignments) === 0)
+                        <div class="text-center py-4" style="color:#888; font-size:13px;">
+                            <i class="fa-regular fa-clipboard fa-2x mb-2" style="display:block; color:#bbb;"></i>
+                            No exit interview / clearance forms have been assigned yet.
+                            @if($is_hr)
+                                Use <strong>Assign Employee Form</strong> above to add one.
+                            @else
+                                Nothing has been assigned to you for this resignation.
+                            @endif
+                        </div>
+                    @endif
                     @foreach($exitClearanceFormAssignments as $exitClearanceFormAssignment)
                         <div class="row g-xxl-4 g-md-3 g-2">
                             <div class="col-lg-6">

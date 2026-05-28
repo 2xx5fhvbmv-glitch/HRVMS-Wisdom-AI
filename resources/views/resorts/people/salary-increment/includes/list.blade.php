@@ -37,8 +37,13 @@
                  </div>
 
                  <div class="@if(Common::checkRouteWisePermission('people.salary-increment.index',config('settings.resort_permissions.create')) == false) d-none @endif">
+                    {{-- This form EDITS existing pending increments (posts to
+                         bulk-update). It's not a "create new increment" form —
+                         that flow lives on /resort/people/salary-increment.
+                         Labels reflect the edit-existing intent so HR doesn't
+                         confuse it with the cards-based create page. --}}
                     <div class="salaryIncrementManageForm-bgBlock bg-themeGrayLight mb-md-4 mb-3 d-none">
-                         <h6 class="fw-600 mb-2">Bulk Action: <span id="employeeCount">0</span> Employees</h6>
+                         <h6 class="fw-600 mb-2">Edit Selected Pending Increments: <span id="employeeCount">0</span> Selected</h6>
                          <form action="{{ route('people.salary-increment.bulk-update') }}" method="POST" class="row g-md-3 g-2 salary-increment-bulk-form">
                               @csrf
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
@@ -50,15 +55,20 @@
                                    </select>
                               </div>
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
+                                   {{-- Default to Fixed; matches the create flow which no
+                                        longer shows the "Pay Increase Type" placeholder. --}}
                                    <select class="form-select select2t-none pay-increase-type" name="pay_increase_type" required>
-                                        <option selected value="">Pay Increase Type</option>
                                         @foreach ($payIncreaseTypes as $key => $type)
-                                             <option value="{{ $key }}">{{ $type }}</option>
+                                             <option value="{{ $key }}" {{ $key === 'Fixed' ? 'selected' : '' }}>{{ $type }}</option>
                                         @endforeach
                                    </select>
                               </div>
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-                                   <input type="text" class="form-control" name="value" placeholder="Enter value" />
+                                   <div class="input-group value-input-group">
+                                        <span class="input-group-text currency-prefix">{{ Common::GetResortCurrencySymbol() }}</span>
+                                        <input type="number" class="form-control value" name="value" placeholder="Enter fixed value" min="0" max="999999.99" />
+                                        <span class="input-group-text percent-suffix d-none">%</span>
+                                   </div>
                               </div>
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                                    <input type="text" class="form-control datepicker" name="effective_date" placeholder="Effective Date" />
@@ -67,7 +77,7 @@
                                    <input type="text" class="form-control" name="remark" placeholder="Remark" />
                               </div>
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-                                   <button class="btn btn-themeBlue w-100" type="submit">Apply To Selected</button>
+                                   <button class="btn btn-themeBlue w-100" type="submit">Update Selected</button>
                               </div>
                          </form>
                     </div>
@@ -108,9 +118,23 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div id="ajax-modal-body">
-                
+
             </div>
-            
+
+        </div>
+    </div>
+</div>
+
+{{-- Read-only modal — initiator + approval chain + pending stage. Shared
+     by HR / Finance / GM so anyone can see the full trail at a glance. --}}
+<div class="modal fade" id="viewData-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Salary Increment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div id="ajax-view-modal-body"></div>
         </div>
     </div>
 </div>
@@ -145,6 +169,29 @@
                          toastr.success(response.message, "Error", {
                               positionClass: 'toast-bottom-right'
                          });
+                    }
+               });
+          });
+
+          // View modal (read-only approval-chain panel). Same delegated
+          // pattern as Edit — fetches HTML on demand and drops it into the
+          // viewData-modal body.
+          $(document).on('click', '.open-ajax-view-modal', function(e) {
+               e.preventDefault();
+               var url = $(this).attr('href');
+               $('#ajax-view-modal-body').html('<div class="modal-body text-center py-4 text-muted">Loading…</div>');
+               $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                         if (response.status === 'success') {
+                              $('#ajax-view-modal-body').html(response.html);
+                         } else {
+                              $('#ajax-view-modal-body').html('<div class="modal-body text-danger">Failed to load details.</div>');
+                         }
+                    },
+                    error: function() {
+                         $('#ajax-view-modal-body').html('<div class="modal-body text-danger">Failed to load details.</div>');
                     }
                });
           });

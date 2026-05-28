@@ -103,19 +103,40 @@ $('#submit-form').on('click', function (e) {
     let form = $('#view-interview-form')[0];
     let formData = new FormData(form); // Capture file + input data
 
+    // Pick the correct endpoint by assignment type. The old code always
+    // hit department-response-store, which silently rejected employee
+    // assignments (firstOrFail on assigned_to_type='department') — that's
+    // why employees couldn't submit their exit interview from the web.
+    @php
+        $assignmentType = strtolower((string) $exitClearanceFormAssignment->assigned_to_type);
+    @endphp
+    let submitUrl = @json($assignmentType === 'employee'
+        ? route('people.exit-clearance.employee-response-store')
+        : route('people.exit-clearance.department-response-store'));
+
     $.ajax({
-        url: "{{ route('people.exit-clearance.department-response-store') }}",
+        url: submitUrl,
         type: "POST",
         data: formData,
-        processData: false, 
-        contentType: false, 
+        processData: false,
+        contentType: false,
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
         success: function (response) {
             if (response.success) {
                 toastr.success(response.message || "Form submitted successfully!");
+                // Re-render in read-only mode after a successful submit so the
+                // user can't double-submit and the page state matches the new
+                // assignment.status='Completed'.
+                $('#form-render :input').prop('disabled', true);
+                $('#submit-form').prop('disabled', true).hide();
+            } else {
+                toastr.error(response.message || "An error occurred while submitting the form.");
             }
         },
         error: function (xhr) {
-            toastr.error(xhr.responseJSON.message || "An error occurred while submitting the form.");
+            let msg = 'An error occurred while submitting the form.';
+            if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+            toastr.error(msg);
         }
     });
 });
@@ -178,9 +199,14 @@ $('#submit-form').on('click', function (e) {
                });
           });
 
-        if($is_submitted == false){
-             $('#form-render :input').prop('disabled', true);
-        }
+        // Use Blade conditional — `$is_submitted` is a PHP variable
+        // (set in employeeFormAssignmentShow) and isn't interpolated
+        // into JS unless wrapped in {{ }} or output via @if. The plain
+        // JS form `if($is_submitted == false)` would throw
+        // ReferenceError at runtime.
+        @if(empty($is_submitted))
+            $('#form-render :input').prop('disabled', true);
+        @endif
     });
 </script>
 @endsection

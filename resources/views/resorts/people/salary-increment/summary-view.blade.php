@@ -84,8 +84,9 @@
                                 <td>{{$employee['employee_department']}}</td>
                                 <td>{!! Common::formatCurrency($employee['previous_salary'], 'USD') !!}</td>
                                 <td>{!! Common::formatCurrency($employee['new_salary'], 'USD') !!}</td>
-                                <td>@if($employee['pay_increase_type'] == App\Models\PeopleSalaryIncrement::PAY_INCREASE_TYPE_FIXED) $@endif{{$employee['value']}} @if($employee['pay_increase_type'] == App\Models\PeopleSalaryIncrement::PAY_INCREASE_TYPE_PERCENTAGE) % @endif</td>
-                                <td>{{$employee['effective_date']}}</td>
+                                <td>@if($employee['pay_increase_type'] == App\Models\PeopleSalaryIncrement::PAY_INCREASE_TYPE_FIXED){{ Common::GetResortCurrencySymbol() }} @endif{{$employee['value']}}@if($employee['pay_increase_type'] == App\Models\PeopleSalaryIncrement::PAY_INCREASE_TYPE_PERCENTAGE) %@endif</td>
+                                {{-- Match the canonical date format used across the app: "27 Nov 2025" --}}
+                                <td>{{ !empty($employee['effective_date']) ? \Carbon\Carbon::parse($employee['effective_date'])->format('d M Y') : '-' }}</td>
                                 <td>{{$employee['remark']}}</td>
                             </tr>
                          @endforeach

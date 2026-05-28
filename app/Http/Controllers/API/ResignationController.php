@@ -278,6 +278,42 @@ class ResignationController extends Controller
             $ExitClearanceFormAssignment->status        =   'Completed';
             $ExitClearanceFormAssignment->save();
 
+            // Notify HR (and the resignation owner) that the employee has
+            // submitted their exit interview form so HR can review and
+            // progress the offboarding. Was previously silent — HR had to
+            // refresh the page to discover the response had landed.
+            try {
+                $resignationRow = \App\Models\EmployeeResignation::with('employee.resortAdmin')
+                    ->find($ExitClearanceFormAssignment->emp_resignation_id);
+                if ($resignationRow) {
+                    $hrId = $resignationRow->hr_id;
+                    if (empty($hrId)) {
+                        // Resignations created via paths that skipped
+                        // FindResortHR end up with hr_id = NULL. Fall back
+                        // to the resort HR so we don't drop the ping.
+                        $resortAdmin = Auth::guard('api')->user();
+                        $hrFallback = $resortAdmin ? Common::FindResortHR($resortAdmin) : null;
+                        $hrId = optional($hrFallback)->id;
+                    }
+                    if ($hrId) {
+                        $empName = optional(optional($resignationRow->employee)->resortAdmin)->full_name ?: 'employee';
+                        $msg = "📋 {$empName} has submitted their exit interview form. Please review the responses.";
+                        $notificationHtml = Common::nofitication(
+                            $this->resort_id,
+                            10,
+                            'Exit Interview Form Submitted',
+                            $msg,
+                            0,
+                            (int) $hrId,
+                            'People'
+                        );
+                        event(new \App\Events\ResortNotificationEvent($notificationHtml));
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Exit interview form submit notify failed: ' . $e->getMessage());
+            }
+
             // Commit the transaction
             DB::commit();
             return response()->json([

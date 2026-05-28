@@ -766,12 +766,13 @@ class DashboardController extends Controller
     {
         $currentYear = Carbon::now()->year;
 
-        // --- Estimated liability (department budgets for current-year manning budgets) ---
-        $estimated = (float) \App\Models\StoreManningResponseParent::whereHas('manningbudget', function ($q) use ($currentYear) {
-                $q->where('year', $currentYear);
-            })
-            ->where('Resort_id', $resort_id)
-            ->sum('Total_Department_budget');
+        // --- Estimated liability ---
+        // Canonical calc — same source as the Initial Liability Estimation
+        // page AND Budget → View Budget so all three headlines agree
+        // (previously this used the denormalized Total_Department_budget +
+        // keyword-matched template costs, producing a much smaller figure
+        // than the Initial Liability page).
+        $estimated = \App\Helpers\Common::computeYearlyBudgetTotal($resort_id, (int) $currentYear);
 
         // --- Monthly actual paid (per month, current year) ---
         $monthlyPayroll = DB::table('payroll')
@@ -819,6 +820,12 @@ class DashboardController extends Controller
         //     Total was the manning budget only (= the Payroll category),
         //     so the other 5 categories' estimates appeared in the breakdown
         //     but were excluded from the headline figure.
+        // Per-category cost templates from resort_budget_costs — used ONLY
+        // for the Estimation-vs-Actual breakdown below. $estimated already
+        // holds the canonical headline figure from Common::computeYearlyBudgetTotal,
+        // so we do NOT re-overwrite it here (doing so produced the old
+        // sub-1k figure on the People Dashboard while Initial Liability
+        // showed 37k+).
         $budgetByParticular = DB::table('resort_budget_costs')
             ->where('resort_id', $resort_id)
             ->select('particulars', DB::raw('SUM(amount) as total'))
@@ -838,15 +845,15 @@ class DashboardController extends Controller
             return $sum;
         };
 
-        // Preserve the manning-budget figure for the Payroll row; replace
-        // $estimated with the all-categories sum used everywhere else.
-        $manningBudget = $estimated;
-        $estimated = $manningBudget
-            + $budgetMatch(['Work Permit'])
-            + $budgetMatch(['Medical'])
-            + $budgetMatch(['Insurance'])
-            + $budgetMatch(['Quota'])
-            + $budgetMatch(['Visa']);
+        // Payroll-row estimate for the per-category table — pulled from the
+        // current-year manning department-budget sum (the same field the
+        // legacy headline used). Kept as a per-row figure now that the
+        // headline lives in Common::computeYearlyBudgetTotal.
+        $manningBudget = (float) \App\Models\StoreManningResponseParent::whereHas('manningbudget', function ($q) use ($currentYear) {
+                $q->where('year', $currentYear);
+            })
+            ->where('Resort_id', $resort_id)
+            ->sum('Total_Department_budget');
 
         // --- Build monthly trend (remaining liability after each month) ---
         $remaining   = $estimated;

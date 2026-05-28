@@ -31,18 +31,26 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                            {{-- "All Departments" uses a sentinel value `ALL`
+                                 instead of an empty string. Select2 folds
+                                 duplicate `value=""` options into one, which is
+                                 why the explicit "All" entry wasn't rendering.
+                                 The sentinel is converted back to '' in the
+                                 AJAX callback so the controller sees no filter. --}}
                             <select class="form-select select2t-none" id="deptFilter" data-placeholder="By Department">
                                 <option value=""></option>
+                                <option value="ALL">All Departments</option>
                                 @if($departments)
                                     @foreach($departments as $department)
                                         <option value="{{ $department->id }}">{{ $department->name }}</option>
-                                    @endforeach             
+                                    @endforeach
                                 @endif
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select select2t-none" id="positionFilter" data-placeholder="By Position">
                                 <option value=""></option>
+                                <option value="ALL">All Positions</option>
                                 @if($positions)
                                     @foreach($positions as $position)
                                         <option value="{{ $position->id }}">{{ $position->position_title }}</option>
@@ -58,9 +66,14 @@
                                 <option value="Completed">Completed</option>
                             </select>
                         </div>
-                        <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                        {{-- Calendar / date-range filter disabled per request.
+                             Backend never honoured `date_range`, and the
+                             column it would filter (resignation_date /
+                             last_working_day) wasn't decided. Re-enable
+                             once the spec is clear. --}}
+                        {{-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <input type="text" class="form-control datepicker" id="datapicker" data-placeholder="Date Range"/>
-                        </div>
+                        </div> --}}
                     </div>
                 </div>
                 <div class="table-responsive mb-3">
@@ -224,7 +237,12 @@
                             $('#listDep-modal').modal('hide');
                             $('#select_dep').val('').trigger('change');
                             $('#datapicker_modal').val('');
-                            $('#exitClearanceAssignForm').reset(); 
+                            // `.reset()` is a DOM method, not jQuery —
+                            // calling it on the jQuery wrapper threw
+                            // "reset is not a function". Use the raw
+                            // form node.
+                            const f = document.getElementById('exitClearanceAssignForm');
+                            if (f) f.reset();
                             getExitClearanceData();
                         } 
                     },
@@ -246,7 +264,9 @@
             autoclose: true
         });
 
-        $('#deptFilter, #positionFilter, #statusFilter, #datapicker').on('change', function () {
+        // Calendar filter (#datapicker) commented out — re-add it here
+        // once the spec for date_range is decided.
+        $('#deptFilter, #positionFilter, #statusFilter').on('change', function () {
             getExitClearanceData();
         });
     
@@ -271,10 +291,15 @@
                 url: "{{ route('people.exit-clearance') }}",
                 type: 'GET',
                 data: function (d) {
-                    d.department_id = $('#deptFilter').val();
-                    d.position_id = $('#positionFilter').val();
+                    // 'ALL' = the explicit "All Departments / All Positions"
+                    // entry. Backend treats blank as "no filter", so map the
+                    // sentinel back to '' before sending.
+                    let dept = $('#deptFilter').val();
+                    let pos  = $('#positionFilter').val();
+                    d.department_id = (dept === 'ALL') ? '' : dept;
+                    d.position_id   = (pos  === 'ALL') ? '' : pos;
                     d.status = $('#statusFilter').val();
-                    d.date_range = $('#datapicker').val();
+                    // d.date_range = $('#datapicker').val();  // calendar filter disabled
                 }
             },
             columns: [
@@ -291,40 +316,45 @@
         });
     }
 
-        $(document).on('click', '.status-modal-trigger', function () {
+        $(document).on('click', '.status-modal-trigger', function (e) {
+            e.preventDefault();
             const resignationId = $(this).data('id');
             const modal = $('#exitClear-modal');
             const statusList = $('#exit-clearance-status-list');
 
-            statusList.empty();
+            // Open the modal first with a loading placeholder so the user
+            // gets immediate feedback, then swap in the timeline data.
+            statusList.html('<li><div><p class="text-muted">Loading…</p></div></li>');
+            modal.modal('show');
 
             $.ajax({
-                url: "{{ route('people.exit-clearance.get-status') }}", 
+                url: "{{ route('people.exit-clearance.get-status') }}",
                 type: 'GET',
                 data: { resignation_id: resignationId },
                 success: function (response) {
-                    if (response.success && response.data.length > 0) {
+                    statusList.empty();
+                    if (response.success && response.data && response.data.length > 0) {
                         response.data.forEach(function (value) {
+                            const formName = value.exit_clearance_form
+                                ? value.exit_clearance_form.form_name
+                                : 'Clearance Form';
                             const statusItem = `
                                 <li class="${value.status === 'Completed' ? 'active' : ''}">
                                     <div>
-                                        <h6>${value.exit_clearance_form.form_name}</h6>
+                                        <h6>${formName}</h6>
                                         ${value.deadline_date ? `<p>Due Date ${value.deadline_date}</p>` : ''}
                                     </div>
                                 </li>`;
                             statusList.append(statusItem);
                         });
                     } else {
-                        statusList.append('<li><div><p>No status updates available.</p></div></li>');
+                        statusList.html('<li><div><p>No status updates available.</p></div></li>');
                     }
                 },
                 error: function () {
-                    toastr.error("An error occurred while fetching status updates.", "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                    statusList.html('<li><div><p class="text-danger">Failed to load status updates.</p></div></li>');
                 }
             });
-            modal.modal('show');
         });
 </script>
 @endsection

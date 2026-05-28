@@ -1624,6 +1624,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('people/salary-increment/bulk-update-status', 'People\SalaryIncrementController@bulkUpdateStatus')->name('people.salary-increment.bulk-update-status');
       Route::get('people/salary-increment/edit/{id}', 'People\SalaryIncrementController@edit')->name('people.salary-increment.edit');
       Route::post('people/salary-increment/update/{id}', 'People\SalaryIncrementController@update')->name('people.salary-increment.update');
+      Route::get('people/salary-increment/view/{id}', 'People\SalaryIncrementController@viewDetail')->name('people.salary-increment.view');
 
       // Employee Salary Increment Module
       // Finance and Gm Module
@@ -1834,6 +1835,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
       Route::get('people/exit-clearance/department-form/{id}', 'People\ExitClearance\ExitClearanceController@departmentForm')->name('people.exit-clearance.department-form');
       Route::post('people/exit-clearance/department-response-store', 'People\ExitClearance\ExitClearanceController@departmentFormResponseStore')->name('people.exit-clearance.department-response-store');
+      Route::post('people/exit-clearance/employee-response-store', 'People\ExitClearance\ExitClearanceController@employeeFormResponseStore')->name('people.exit-clearance.employee-response-store');
 
       Route::get('people/exit-clearance/employee-certificate/{id}', 'People\ExitClearance\ExitClearanceController@employementCertificate')->name('people.exit-clearance.employement-certificate');
       Route::get('people/exit-clearance/send-reminder/{id}', 'People\ExitClearance\ExitClearanceController@sendReminder')->name('people.exit-clearance.sendReminder');

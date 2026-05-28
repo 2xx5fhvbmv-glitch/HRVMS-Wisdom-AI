@@ -52,6 +52,7 @@
                       <table id="salaryIncrementList" class="table table-salaryIncreSummary  w-100 mb-0" style="max-height: 500px;">
                             <thead>
                                  <tr>
+                                      <th style="width:32px;"><input type="checkbox" id="selectAllIncrements" title="Select all"></th>
                                       <th>Employee ID</th>
                                       <th>Employee Name</th>
                                       <th>Position</th>
@@ -62,6 +63,7 @@
                                       <th>Increment Type</th>
                                       <th>Effective Date</th>
                                       <th>Remarks</th>
+                                      <th>Status</th>
                                  </tr>
                             </thead>
                             <tbody>
@@ -104,10 +106,17 @@
                                 <div class="col-auto">
                                     <a href="#" class="btn btn-themeNeon btn-sm request-change" data-bs-toggle="modal" data-bs-target="#reqChange-modal">Request Change</a>
                                 </div>
-                                <div class="col-auto ms-auto">
-                                    <a href="#" class="btn btn-themeSkyblue btn-sm request-hold" data-status="Hold">On Hold</a>
-                                </div>
-                                <div class="col-auto">
+                                {{-- On Hold only makes sense when at least one
+                                     row is currently Pending. If every visible
+                                     row is already Hold, this button is hidden —
+                                     Approve / Reject / Request Change stay
+                                     available so the approver can still act. --}}
+                                @if(!empty($showHoldButton))
+                                    <div class="col-auto ms-auto">
+                                        <a href="#" class="btn btn-themeSkyblue btn-sm request-hold" data-status="Hold">On Hold</a>
+                                    </div>
+                                @endif
+                                <div class="col-auto @if(empty($showHoldButton)) ms-auto @endif">
                                     <a href="#" class="btn btn-themeBlue btn-sm submit-status-btn" data-status="Approved">Approve</a>
                                 </div>
                                 <div class="col-auto">
@@ -211,7 +220,7 @@
                           "lengthMenu": [[-1], ["All"]],
                           processing: true,
                           serverSide: true,
-                          order:[[10, 'desc']],
+                          order:[[12, 'desc']],
                           ajax: {
                                 url: '{{ route("people.salary-increment.summary-list") }}',
                                 dataSrc: function (json) {
@@ -221,9 +230,21 @@
                                 $('.monthly-payroll-increase').text(`${formatAmount(json.monthlyPayrollIncrease, 'USD')}`);
                                 $('.annual-payroll-increase').text(`${formatAmount(json.annualPayrollIncrease, 'USD')}`);
                                 return json.data;
-                              }     
+                              }
                           },
                           columns: [
+                                 // Per-row checkbox so the approver can act
+                                 // on individual increments (Approve / Reject
+                                 // / Hold / Request Change apply to the
+                                 // selected rows only, not the whole table).
+                                 {
+                                    data: null,
+                                    orderable: false,
+                                    searchable: false,
+                                    render: function (data, type, row) {
+                                        return '<input type="checkbox" class="increment-row-check" data-id="' + row.id + '">';
+                                    }
+                                 },
                                  { data: 'Emp_id', name: 'Emp_id' },
                                  { data: 'employee_name', name: 'employee_name' },
                                  { data: 'position_title', name: 'position_title' },
@@ -234,21 +255,59 @@
                                  { data: 'increment_type', name: 'increment_type' },
                                  { data: 'effective_date', name: 'effective_date' },
                                  { data: 'remarks', name: 'remarks' },
+                                 { data: 'status_info', name: 'status_info', orderable: false, searchable: false },
                                  {data:'created_at',visible:false,searchable:false},
                           ]
                  });
           };
 
+          // Collect only the rows the approver actually ticked. Returns
+          // the full DataTables row objects (so the existing submit
+          // handlers don't need to change shape). When nothing is
+          // selected the buttons short-circuit with a toast — bulk
+          // accidents (approving every pending row by mistake) were a
+          // real complaint, so the explicit-select pattern is the fix.
+          function getSelectedIncrementRows() {
+              let table = $('#salaryIncrementList').DataTable();
+              let selectedIds = $('.increment-row-check:checked').map(function () {
+                  return String($(this).data('id'));
+              }).get();
+              if (selectedIds.length === 0) return [];
+              return table.rows().data().toArray().filter(function (r) {
+                  return selectedIds.indexOf(String(r.id)) !== -1;
+              });
+          }
+          function requireSelection() {
+              const rows = getSelectedIncrementRows();
+              if (rows.length === 0) {
+                  toastr.error("Please select at least one employee.", "Error", {
+                      positionClass: 'toast-bottom-right'
+                  });
+              }
+              return rows;
+          }
+
+          // Master select-all in the header — toggles every visible row.
+          $(document).on('change', '#selectAllIncrements', function () {
+              $('.increment-row-check').prop('checked', $(this).is(':checked'));
+          });
+          // Untick the header when a row check is unticked manually.
+          $(document).on('change', '.increment-row-check', function () {
+              if (!$(this).is(':checked')) {
+                  $('#selectAllIncrements').prop('checked', false);
+              }
+          });
+
           $(document).on('click', '.submit-status-btn', function(e) {
                e.preventDefault();
                let status = $(this).data('status');
-               let table = $('#salaryIncrementList').DataTable();
-               let tableData = table.rows().data().toArray();
+               let rows = requireSelection();
+               if (rows.length === 0) return;
 
                if (status === 'Approved') {
                     Swal.fire({
                          title: 'Are you sure?',
-                         text: "You are about to approve the salary increment.",
+                         text: 'You are about to approve ' + rows.length + ' salary increment(s).',
                          icon: 'warning',
                          showCancelButton: true,
                          confirmButtonText: 'Confirm',
@@ -256,13 +315,13 @@
                          confirmButtonColor: "#014653"
                     }).then((result) => {
                          if (result.isConfirmed) {
-                              submitStatus(status, tableData);
+                              submitStatus(status, rows);
                          }
                     });
                } else if (status === 'Rejected') {
                     $('#reject-modal').modal('show');
                } else {
-                    submitStatus(status, tableData);
+                    submitStatus(status, rows);
                }
           });
 
@@ -275,10 +334,10 @@
                     return;
                }
 
-               let table = $('#salaryIncrementList').DataTable();
-               let tableData = table.rows().data().toArray();
-               
-               submitStatus('Rejected', tableData, rejectReason);
+               let rows = requireSelection();
+               if (rows.length === 0) return;
+
+               submitStatus('Rejected', rows, rejectReason);
                $('#reject-modal').modal('hide');
           });
 
@@ -338,15 +397,29 @@
 
          $('#holdSubmitBtn').on('click',function(e){
             e.preventDefault();
-            let table = $('#salaryIncrementList').DataTable();
-            let tableData = table.rows().data().toArray();
-            let remark = $('textarea[name="request_hold"]').val();
-            let hold_date = $('input[name="hold_date"]').val();  
-            if(requestChange == ''){
+            // Only act on the rows the user actually ticked, not every
+            // pending row on screen. Defined in the parent ready() block.
+            let tableData = (typeof requireSelection === 'function')
+                ? requireSelection()
+                : $('#salaryIncrementList').DataTable().rows().data().toArray();
+            if (tableData.length === 0) return;
+            let remark = ($('textarea[name="request_hold"]').val() || '').trim();
+            let hold_date = ($('input[name="hold_date"]').val() || '').trim();
+
+            // Both fields are required. The old check tested `requestChange`
+            // (the form id), which is always truthy, so the validation
+            // never fired and the backend blew up on an empty due_date.
+            if (!hold_date) {
+                toastr.error("Please pick a Hold Date", "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
+                return;
+            }
+            if (!remark) {
                 toastr.error("Please write your comment", "Error", {
                     positionClass: 'toast-bottom-right'
                 });
-                return ;
+                return;
             }
 
             $.ajax({
@@ -369,7 +442,15 @@
                          }
                     },
                     error: function(xhr) {
-                         alert('An error occurred. Please try again.');
+                         // Surface validation errors (422) instead of a
+                         // generic alert so HR knows which field is missing.
+                         let msg = 'An error occurred. Please try again.';
+                         if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                             msg = Object.values(xhr.responseJSON.errors).map(e => e[0]).join('<br>');
+                         } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                             msg = xhr.responseJSON.message;
+                         }
+                         toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
                     }
                });
         });
@@ -384,8 +465,12 @@
 
         $('#submitBtn').on('click',function(e){
             e.preventDefault();
-            let table = $('#salaryIncrementList').DataTable();
-            let tableData = table.rows().data().toArray();
+            // Same per-row selection rule as Approve/Reject — only the
+            // ticked rows get marked Change-Request.
+            let tableData = (typeof requireSelection === 'function')
+                ? requireSelection()
+                : $('#salaryIncrementList').DataTable().rows().data().toArray();
+            if (tableData.length === 0) return;
             let requestChange = $('textarea[name="request_change"]').val();
             if(requestChange == ''){
                 toastr.error("Please write your comment", "Error", {
