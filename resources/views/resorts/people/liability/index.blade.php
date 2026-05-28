@@ -110,13 +110,13 @@
                                 <div class="row g-md-3 g-2 align-items-center">
                                     <div class="col-xxl-4 col-xl-5 col-lg-5 col-md-7 col-sm-8 ">
                                         <div class="input-group">
-                                            <input type="search" class="form-control "
+                                            <input type="search" id="liabilityEmpSearch" class="form-control"
                                                 placeholder="Search by Employee Name, ID or Manager Name" />
                                             <i class="fa-solid fa-search"></i>
                                         </div>
                                     </div>
                                     <div class="col-xxl-2 col-lg-3 col-md-4 col-sm-4 col-6">
-                                        <select class="form-select select2t-none" data-placeholder="By Department">
+                                        <select id="liabilityEmpDeptFilter" class="form-select select2t-none" data-placeholder="By Department">
                                             <option value="">By Department</option>
                                             @if($resort_departments && count($resort_departments) > 0)
                                                 @foreach($resort_departments as $department)
@@ -153,6 +153,8 @@
                         </div>
                         <div class="tab-pane fade " id="tabPane3" role="tabpanel" aria-labelledby="tab3" tabindex="0">
                             <div class="row g-xxl-4 g-3 mb-md-4 mb-3">
+                                {{-- Estimation vs Actual comparison chart hidden by request — used hardcoded demo numbers, not real data. --}}
+                                {{--
                                 <div class="col-xxl-12 col-xl-12 col-lg-12">
                                     <div class="bg-themeGrayLight h-100">
                                         <div class="card-title">
@@ -173,9 +175,20 @@
                                         </div>
                                     </div>
                                 </div>
+                                --}}
                                 <div class="col-xxl-12 col-xl-12 col-lg-12">
                                     <div class="bg-themeGrayLight h-100">
                                         <div class="table-responsive">
+                                            {{-- Table is now driven by the chartData / per-category breakdown the
+                                                 controller computes for this year. Estimated comes from the
+                                                 resort_budget_costs cost templates per category; Actual is the
+                                                 YTD spend the same controller already aggregated above for the
+                                                 Liability Reduction Trend; Remaining = max(Estimated - Actual, 0).
+                                                 The 5th "Cost Difference" column has been commented out by request. --}}
+                                            {{-- $estVsActualRows is built server-side in
+                                                 LiabilityEstimationController@index, so this
+                                                 view never has to re-create the $budgetMatch
+                                                 closure or reach for $monthlyVisa locals. --}}
                                             <table class="table table-lable table- mb-1">
                                                 <thead>
                                                     <tr>
@@ -183,52 +196,25 @@
                                                         <th>Estimated Cost</th>
                                                         <th>Actual Cost</th>
                                                         <th>Remaining Liability</th>
-                                                        <th>Liability Differen</th>
+                                                        {{-- Cost Difference column hidden by request --}}
+                                                        {{-- <th>Liability Difference</th> --}}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr>
-                                                        <td>Salaries</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-success">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>Overtime</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-danger">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>Salaries</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-success">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>Overtime</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-danger">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>Salaries</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-success">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>Overtime</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 5,000</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 4,500</td>
-                                                        <td>{{ Common::GetResortCurrencySymbol() }} 500</td>
-                                                        <td><span class="text-danger">{{ Common::GetResortCurrencySymbol() }} 500</span></td>
-                                                    </tr>
+                                                    @foreach($estVsActualRows as $row)
+                                                        @php
+                                                            $estimated = (float) ($row['estimated'] ?? 0);
+                                                            $actual    = (float) ($row['actual']    ?? 0);
+                                                            $remaining = max($estimated - $actual, 0);
+                                                        @endphp
+                                                        <tr>
+                                                            <td>{{ $row['label'] }}</td>
+                                                            <td>{!! Common::formatCurrency($estimated, 'MVR') !!}</td>
+                                                            <td>{!! Common::formatCurrency($actual,    'MVR') !!}</td>
+                                                            <td>{!! Common::formatCurrency($remaining, 'MVR') !!}</td>
+                                                            {{-- <td><span class="text-{{ $estimated >= $actual ? 'success' : 'danger' }}">{!! Common::formatCurrency($estimated - $actual, 'MVR') !!}</span></td> --}}
+                                                        </tr>
+                                                    @endforeach
                                                 </tbody>
                                             </table>
                                         </div>
@@ -321,9 +307,32 @@
             pageLength: 6,
             processing: true,
             serverSide: true,
-            ajax: '{{ route("people.liabilities.data") }}',
+            ajax: {
+                url: '{{ route("people.liabilities.data") }}',
+                data: function (d) {
+                    // Forward the in-header Search input + Department picker
+                    // to the server. Without this the controls did nothing
+                    // because the underlying DataTable had searching:false.
+                    d.search_term   = $('#liabilityEmpSearch').val();
+                    d.department_id = $('#liabilityEmpDeptFilter').val();
+                }
+            },
             columns: columns
         });
+
+        // Re-run the table when the search box / department picker changes.
+        var liabilitySearchTimer = null;
+        $(document).off('input.liabSrch keyup.liabSrch', '#liabilityEmpSearch')
+            .on('input.liabSrch keyup.liabSrch', '#liabilityEmpSearch', function () {
+                clearTimeout(liabilitySearchTimer);
+                liabilitySearchTimer = setTimeout(function () {
+                    if (liabilityTable) liabilityTable.ajax.reload();
+                }, 350);
+            });
+        $(document).off('change.liabDept', '#liabilityEmpDeptFilter')
+            .on('change.liabDept', '#liabilityEmpDeptFilter', function () {
+                if (liabilityTable) liabilityTable.ajax.reload();
+            });
     }
     function loadLiabilityDetails(btn) {
         const empId = $(btn).data('emp-id');
@@ -438,22 +447,41 @@
                 backgroundColor: '#014653',
                 fill: false,
                 tension: 0.4,
-                pointRadius: 0,
-                // pointBackgroundColor: '#014653'
+                // Make points visible at a small size so the hover tooltip has
+                // something to latch onto. The previous pointRadius:0 made
+                // every month invisible, and combined with Chart.js's default
+                // tooltip mode (intersect:true) the hover never fired.
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#014653',
             }]
         },
         options: {
             responsive: true,
+            // Tooltip fires when the cursor is NEAR a point (any month),
+            // not only when it lands exactly on the point. Without this
+            // hovering anywhere on the chart did nothing.
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
             scales: {
                 y: {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Remaining Liability (USD)'
+                        text: 'Remaining Liability ({{ Common::GetResortCurrencySymbol() }})'
                     },
                     grid: {
-                        display: false // Hide grid lines on the x-axis
+                        display: false
                     },
+                    ticks: {
+                        // Format y-axis labels with the system currency symbol
+                        // (was hardcoded "USD" and broke on MVR resorts).
+                        callback: function (value) {
+                            return '{{ Common::GetResortCurrencySymbol() }} ' + Number(value).toLocaleString();
+                        }
+                    }
                 },
                 x: {
                     title: {
@@ -461,16 +489,25 @@
                         text: 'Month'
                     },
                     grid: {
-                        display: false // Hide grid lines on the x-axis
+                        display: false
                     },
                 }
             },
             plugins: {
                 legend: { display: true },
                 tooltip: {
+                    enabled: true,
                     callbacks: {
-                        label: function(context) {
-                            return currencySymbol + ' ' + context.formattedValue;
+                        // Hover label was returning "undefined  <value>" because
+                        // `currencySymbol` was never defined in this scope.
+                        // Pull the real numeric value off the dataset, format
+                        // with thousand-separators, and prepend the system
+                        // currency symbol.
+                        label: function (context) {
+                            var raw = context.parsed && context.parsed.y !== undefined
+                                ? context.parsed.y
+                                : context.raw;
+                            return '{{ Common::GetResortCurrencySymbol() }} ' + Number(raw).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         }
                     }
                 }
@@ -479,6 +516,9 @@
     });
 
 
+    // Estimation vs Actual bar chart commented out — canvas was removed from
+    // the tab markup and the chart had hardcoded demo data anyway.
+    /*
     const ctc = document.getElementById('myBarChart').getContext('2d');
     const myBarChart = new Chart(ctc, {
         type: 'bar',
@@ -551,5 +591,6 @@
             }
         }
     });
+    */
 </script>
 @endsection

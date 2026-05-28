@@ -49,27 +49,17 @@ class LiabilityEstimationController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
         
-        // whereHas (not with) — the year must actually FILTER the summed rows.
-        // `with([...])` only constrains the eager-loaded relation and leaves
-        // the sum spanning every year's manning budget.
-        $manning_budget = StoreManningResponseParent::where('resort_id', $resortId)
-            ->whereHas('manningbudget', function($query) use ($currentYear) {
-                $query->where('year', $currentYear);
-            })
-            ->sum('Total_Department_budget');
-
-        // Total Estimated must include every cost category we break out below,
-        // not just the manning (Payroll) budget — otherwise the headline figure
-        // looks smaller than the breakdown total and Liability Reduction is
-        // mathematically misleading. Aggregate by particulars keyword to match
-        // the Estimation-vs-Actual rows (Payroll + Work Permit + Medical +
-        // Insurance + Quota + Visa).
+        // Total Estimated Liability — shared canonical calc in Common so the
+        // Initial Liability headline AND the People Dashboard Liability
+        // Tracker AND Budget → View Budget all agree.
+        $estimated_liability = Common::computeYearlyBudgetTotal($resortId, $currentYear);
+        // Cost-category breakdowns for the Estimation-vs-Actual table use the
+        // same particulars-keyword approach as before (cost templates only).
         $budgetByParticular = DB::table('resort_budget_costs')
             ->where('resort_id', $resortId)
             ->select('particulars', DB::raw('SUM(amount) as total'))
             ->groupBy('particulars')
             ->pluck('total', 'particulars')->toArray();
-
         $budgetMatch = function (array $keywords) use ($budgetByParticular) {
             $sum = 0.0;
             foreach ($budgetByParticular as $particular => $amount) {
@@ -82,13 +72,6 @@ class LiabilityEstimationController extends Controller
             }
             return $sum;
         };
-
-        $estimated_liability = (float) $manning_budget
-            + $budgetMatch(['Work Permit'])
-            + $budgetMatch(['Medical'])
-            + $budgetMatch(['Insurance'])
-            + $budgetMatch(['Quota'])
-            + $budgetMatch(['Visa']);
 
         // ✅ Current Liability from Payroll Reviews for the year
         $payrolls = Payroll::with('reviews')
@@ -310,27 +293,61 @@ class LiabilityEstimationController extends Controller
             $reductionData[] = round($liabilityRemaining, 2);
         }
 
-        // The Employees DataTable's allowance columns MUST come from the same
-        // source getLiabilityData() uses to build the row data —
-        // PayrollReviewAllowances.allowance_type for the current year.
-        // Sourcing it from resort_budget_costs instead produced columns (e.g.
-        // "Pension - Employer Contibution") with no matching row-data key,
-        // causing the DataTables "Requested unknown parameter" warning.
-        $allowanceTypes = PayrollReviewAllowances::with('payrollReview')
-            ->whereHas('payrollReview', fn($q) => $q->whereYear('created_at', now()->year))
-            ->select('allowance_type')
-            ->distinct()
-            ->pluck('allowance_type');
+        // Allowance column set — DERIVED from the same resort_budget_costs
+        // catalog that getLiabilityData() uses to build per-employee column
+        // values. Anything classified as OT / Insurance / Recruitment falls
+        // into its own dedicated column; everything else is treated as a
+        // named allowance. Both the table <th> headers and the JS column
+        // generator (`allowanceColumns` in index.blade.php) read $allowanceTypes,
+        // so the labels MUST match the data keys produced server-side or
+        // DataTables raises "Requested unknown parameter".
+        $rawCosts = DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['particulars', 'cost_title']);
+        $isOtCost          = fn($n) => stripos((string) $n, 'overtime') !== false || preg_match('/\bot\b/i', (string) $n);
+        $isInsuranceCost   = fn($n) => stripos((string) $n, 'insurance') !== false;
+        $isRecruitmentCost = fn($n) => stripos((string) $n, 'recruitment') !== false
+            || stripos((string) $n, 'work permit') !== false
+            || stripos((string) $n, 'work visa') !== false
+            || stripos((string) $n, 'quota slot') !== false;
+        $allowanceTypes = collect($rawCosts)
+            ->map(fn($c) => $c->particulars ?: ($c->cost_title ?: 'Other'))
+            ->reject(fn($n) => $isOtCost($n) || $isInsuranceCost($n) || $isRecruitmentCost($n))
+            ->unique()
+            ->values();
 
-            // dd($labels, $reductionData);
+        // Pre-compute the Estimation vs Actual table rows on the server so the
+        // view doesn't have to re-derive them (and so the `$budgetMatch`
+        // closure stays controller-local).
+        $estVsActualRows = [
+            ['label' => 'Salaries',        'estimated' => $budgetMatch(['Payroll','Salary']),       'actual' => $chartData['Salaries']        ?? 0],
+            ['label' => 'Overtime',        'estimated' => $budgetMatch(['Overtime','OT']),          'actual' => $chartData['OTA']             ?? 0],
+            ['label' => 'Service Charge',  'estimated' => $budgetMatch(['Service Charge']),         'actual' => $chartData['Service Charge']  ?? 0],
+            ['label' => 'Work Permit',     'estimated' => $budgetMatch(['Work Permit']),            'actual' => $chartData['Work Permit']     ?? 0],
+            ['label' => 'Medical',         'estimated' => $budgetMatch(['Medical']),                'actual' => $chartData['Medical Permit']  ?? 0],
+            ['label' => 'Insurance',       'estimated' => $budgetMatch(['Insurance']),              'actual' => $chartData['Insurance']       ?? 0],
+            ['label' => 'Quota',           'estimated' => $budgetMatch(['Quota']),                  'actual' => $chartData['Quota Slot']      ?? 0],
+            ['label' => 'Visa',            'estimated' => $budgetMatch(['Visa']),                   'actual' => array_sum((array) ($monthlyVisa ?? []))],
+            ['label' => 'Recruitment Fee', 'estimated' => $budgetMatch(['Recruitment']),            'actual' => $chartData['Recruitment Fee'] ?? 0],
+        ];
+        foreach ($allowanceBreakdown as $type => $amount) {
+            $estVsActualRows[] = [
+                'label'     => 'Allowance - ' . ucfirst($type),
+                'estimated' => $budgetMatch([$type]),
+                'actual'    => $amount,
+            ];
+        }
+
         return view('resorts.people.liability.index', compact(
-            'page_title', 
+            'page_title',
             'resortId', 'current_liability',
             'resort_departments','employees','estimated_liability',
             'liability_reduction','chartData',
             'labels',
-            'reductionData','allowanceTypes'
-        ));     
+            'reductionData','allowanceTypes',
+            'estVsActualRows'
+        ));
     }
 
     public function addCost()
@@ -348,92 +365,150 @@ class LiabilityEstimationController extends Controller
         $resortId = $this->resort->resort_id;
         $currentYear = now()->year;
 
-        // Get distinct allowance types
-        $allowanceTypes = PayrollReviewAllowances::with('payrollReview')
-            ->whereHas('payrollReview', fn($q) => $q->whereYear('created_at', $currentYear))
-            ->select('allowance_type')
-            ->distinct()
-            ->pluck('allowance_type');
+        // ── Allowance / OT / Insurance / Recruitment column buckets ───────
+        // The Employees Tab columns mirror what HR sees on Budget → View
+        // Budget. Allowance types come from the BUDGET cost catalog
+        // (resort_budget_costs) — that's the source view-budget renders
+        // columns from. The per-row totals come from
+        // resort_employee_budget_cost_configurations summed per cost across
+        // all 12 months of the year. Each cost is classified by name into
+        // one of: OT / Insurance / Recruitment / Allowance.
+        // Pull the FULL cost row (amount/unit/frequency/details) so
+        // Common::annualCostForEmployee() can compute the live fallback for
+        // months without an explicit override — same rule view-budget uses.
+        $resortCosts = DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+
+        $classify = function ($name) {
+            $n = strtolower($name ?? '');
+            if (strpos($n, 'overtime') !== false || preg_match('/\bot\b/i', $n)) return 'ot';
+            if (strpos($n, 'insurance') !== false)        return 'insurance';
+            if (strpos($n, 'recruitment') !== false)      return 'recruitment';
+            if (strpos($n, 'work permit') !== false)      return 'recruitment';
+            if (strpos($n, 'work visa') !== false)        return 'recruitment';
+            if (strpos($n, 'quota slot') !== false)       return 'recruitment';
+            return 'allowance';
+        };
+
+        // Group COSTS (not just ids) by classification so the per-employee
+        // sum function below can pass each row to annualCostForEmployee.
+        $allowanceCostsByLabel = []; // ['Language Allowance' => [costObj, costObj], ...]
+        $otCosts = $insuranceCosts = $recruitmentCosts = [];
+        foreach ($resortCosts as $c) {
+            $label = $c->particulars ?: ($c->cost_title ?: 'Other');
+            switch ($classify($label)) {
+                case 'ot':          $otCosts[]          = $c; break;
+                case 'insurance':   $insuranceCosts[]   = $c; break;
+                case 'recruitment': $recruitmentCosts[] = $c; break;
+                default:
+                    $allowanceCostsByLabel[$label][] = $c;
+            }
+        }
+        $allowanceLabels = array_keys($allowanceCostsByLabel);
 
         $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        $searchTerm   = trim((string) $request->input('search_term', ''));
+        $departmentId = $request->input('department_id');
+
         $query = Employee::with(['resortAdmin', 'department', 'position'])
             ->where('resort_id', $resortId)
             ->where('status', 'active')
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
-            ->select('id', 'Admin_Parent_id', 'Emp_id', 'Dept_id', 'Position_id', 'nationality', 'basic_salary', 'joining_date');
+            ->when(!empty($departmentId), fn($q) => $q->where('Dept_id', $departmentId))
+            ->when($searchTerm !== '', function ($q) use ($searchTerm) {
+                $q->where(function ($w) use ($searchTerm) {
+                    $w->where('Emp_id', 'like', "%{$searchTerm}%")
+                      ->orWhereHas('resortAdmin', function ($qa) use ($searchTerm) {
+                          $qa->where('first_name', 'like', "%{$searchTerm}%")
+                             ->orWhere('last_name', 'like', "%{$searchTerm}%")
+                             ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', "%{$searchTerm}%");
+                      });
+                });
+            })
+            ->select('id', 'Admin_Parent_id', 'Emp_id', 'Dept_id', 'Position_id', 'nationality', 'religion', 'basic_salary', 'proposed_salary', 'joining_date');
 
+        // Helper — annual budgeted salary for one employee using the same
+        // precedence as view-budget (Proposed wins when > 0, else Current,
+        // fall back to employees row).
+        $annualSalaryFor = function ($empRow) use ($resortId, $currentYear) {
+            $sharedFallback = (float) ($empRow->proposed_salary > 0
+                ? $empRow->proposed_salary
+                : ($empRow->basic_salary ?? 0));
+
+            $monthlyOverrides = DB::table('resort_employee_monthly_salaries')
+                ->where('employee_id', $empRow->id)
+                ->where('resort_id', $resortId)
+                ->where('year', $currentYear)
+                ->get(['month', 'current_salary', 'proposed_salary'])
+                ->keyBy('month');
+
+            $total = 0.0;
+            for ($m = 1; $m <= 12; $m++) {
+                $row = $monthlyOverrides->get($m);
+                if ($row) {
+                    $total += (float) ($row->proposed_salary > 0
+                        ? $row->proposed_salary
+                        : ($row->current_salary > 0
+                            ? $row->current_salary
+                            : $sharedFallback));
+                } else {
+                    $total += $sharedFallback;
+                }
+            }
+            return $total;
+        };
+
+        // Helper — annual sum of a bucket of cost rows for ONE employee.
+        // Uses Common::annualCostForEmployee for each cost so saved overrides
+        // AND live template-fallback are included, matching what HR sees on
+        // Budget → View Budget (the previous costSumFor only summed saved
+        // override rows, so employees like Fatima — who have only fallback
+        // values — showed $0 across every allowance column).
+        $costBucketTotal = function ($empRow, array $costs) use ($resortId, $currentYear) {
+            if (empty($costs)) return 0.0;
+            $sum = 0.0;
+            foreach ($costs as $cost) {
+                $sum += Common::annualCostForEmployee($resortId, $currentYear, $cost, $empRow);
+            }
+            return $sum;
+        };
+
+        // All amounts below are USD (budget config persists in USD); pass
+        // through Common::formatCurrency so the resort's display currency
+        // and conversion are applied consistently.
         $datatable = datatables()->of($query)
             ->addColumn('employee_name', fn($row) => optional($row->resortAdmin)->full_name ?? 'N/A')
-            ->addColumn('department', fn($row) => optional($row->department)->name ?? 'N/A')
-            ->addColumn('position', fn($row) => optional($row->position)->position_title ?? 'N/A')
-            ->addColumn('salary', fn($row) => Common::GetResortCurrencySymbol() . ' ' . number_format($row->basic_salary, 2))
+            ->addColumn('department',    fn($row) => optional($row->department)->name ?? 'N/A')
+            ->addColumn('position',      fn($row) => optional($row->position)->position_title ?? 'N/A')
+            ->addColumn('salary',        fn($row) => Common::formatCurrency($annualSalaryFor($row), 'USD'))
 
-            ->addColumn('ot', function ($row) use ($currentYear) {
-                $totalOT = PayrollReview::where('employee_id', $row->id)
-                    ->whereYear('created_at', $currentYear)
-                    ->sum(DB::raw('regularOTPay + holidayOTPay'));
-                return Common::GetResortCurrencySymbol() . ' ' . number_format($totalOT, 2);
-            })
+            ->addColumn('ot',         fn($row) => Common::formatCurrency($costBucketTotal($row, $otCosts),          'USD'))
+            ->addColumn('insurance',  fn($row) => Common::formatCurrency($costBucketTotal($row, $insuranceCosts),   'USD'))
+            ->addColumn('recruitment',fn($row) => Common::formatCurrency($costBucketTotal($row, $recruitmentCosts), 'USD'));
 
-            ->addColumn('service_charge', function ($row) use ($currentYear) {
-                $totalSC = PayrollReview::where('employee_id', $row->id)
-                    ->whereYear('created_at', $currentYear)
-                    ->sum('service_charge');
-                return Common::GetResortCurrencySymbol() . ' ' . number_format($totalSC, 2);
-            })
-
-            ->addColumn('insurance', function ($row) use ($currentYear) {
-                $insurance = $row->EmployeeInsurance()
-                    ->whereYear('insurance_end_date', $currentYear)
-                    ->sum('Premium');
-                return Common::GetResortCurrencySymbol() . ' ' . number_format($insurance, 2);
-            })
-
-            ->addColumn('recruitment', function ($row) use ($currentYear) {
-                $isNewHire = $row->joining_date && Carbon::parse($row->joining_date)->year == $currentYear;
-
-                if (!$isNewHire) return Common::GetResortCurrencySymbol() . ' 0.00';
-
-                $recruitmentCost = DB::table('resort_budget_costs')
-                    ->where('resort_id', $row->resort_id)
-                    ->whereIn('particulars', [
-                        'Recruitment Fee', 'Work Permit fee', 'Quota Slot Deposit',
-                        'Work Visa Medical test fee', 'Medical Insurance'
-                    ])->sum('amount');
-
-                return Common::GetResortCurrencySymbol() . ' ' . number_format($recruitmentCost, 2);
-            });
-
-        // Add dynamic allowance columns
-        foreach ($allowanceTypes as $type) {
-            $columnKey = strtolower(str_replace(' ', '_', $type));
-
-            $datatable->addColumn($columnKey, function ($row) use ($type, $currentYear) {
-                $amount = PayrollReviewAllowances::where('allowance_type', $type)
-                    ->whereHas('payrollReview', function ($q) use ($row, $currentYear) {
-                        $q->where('employee_id', $row->id)
-                            ->whereYear('created_at', $currentYear);
-                    })->sum('amount');
-                return Common::GetResortCurrencySymbol() . ' ' . number_format($amount, 2);
+        // One DataTable column per allowance label. The column key matches
+        // the JS bridge in index.blade.php: lowercase + underscore the label.
+        foreach ($allowanceLabels as $label) {
+            $columnKey = strtolower(str_replace(' ', '_', $label));
+            $costs = $allowanceCostsByLabel[$label];
+            $datatable->addColumn($columnKey, function ($row) use ($costs, $costBucketTotal) {
+                return Common::formatCurrency($costBucketTotal($row, $costs), 'USD');
             });
         }
 
-        $datatable->addColumn('total', function ($row) use ($currentYear) {
-            $salary = $row->basic_salary;
-            $ot = PayrollReview::where('employee_id', $row->id)
-                ->whereYear('created_at', $currentYear)
-                ->sum(DB::raw('regularOTPay + holidayOTPay'));
-            $serviceCharge = PayrollReview::where('employee_id', $row->id)
-                ->whereYear('created_at', $currentYear)
-                ->sum('service_charge');
-            $insurance = $row->EmployeeInsurance()
-                ->whereYear('insurance_end_date', $currentYear)
-                ->sum('Premium');
-            $allowance = PayrollReviewAllowances::whereHas('payrollReview', function ($q) use ($row, $currentYear) {
-                $q->where('employee_id', $row->id)->whereYear('created_at', $currentYear);
-            })->sum('amount');
-
-            return Common::GetResortCurrencySymbol() . ' ' . number_format($salary + $ot + $serviceCharge + $insurance + $allowance, 2);
+        $datatable->addColumn('total', function ($row) use (
+            $annualSalaryFor, $costBucketTotal, $otCosts, $insuranceCosts, $recruitmentCosts, $allowanceCostsByLabel
+        ) {
+            $total  = $annualSalaryFor($row);
+            $total += $costBucketTotal($row, $otCosts);
+            $total += $costBucketTotal($row, $insuranceCosts);
+            $total += $costBucketTotal($row, $recruitmentCosts);
+            foreach ($allowanceCostsByLabel as $costs) {
+                $total += $costBucketTotal($row, $costs);
+            }
+            return Common::formatCurrency($total, 'USD');
         });
 
         $datatable->addColumn('details', fn($row) => '');
@@ -518,6 +593,107 @@ class LiabilityEstimationController extends Controller
         }
 
         return response()->json(['html' => $html]);
+    }
+
+    /**
+     * Total annual budget across the resort, using the SAME source the Budget
+     * → View Budget page aggregates from so the two headlines agree:
+     *
+     *   per-month employee salaries  (override → employees.proposed > current)
+     * + per-month employee costs     (resort_employee_budget_cost_configurations)
+     * + per-month vacant salaries    (override → resort_vacant_budget_costs.current > basic)
+     * + per-month vacant costs       (resort_vacant_budget_cost_configurations)
+     *
+     * Both salary buckets prefer the Proposed value when non-zero, falling
+     * back to the Current value — mirrors the view-budget render logic.
+     */
+    private function computeYearlyBudgetTotal($resortId, int $year): float
+    {
+        // -- 1. Employee salaries --------------------------------------------
+        $activeEmployees = DB::table('employees')
+            ->where('resort_id', $resortId)
+            ->where('status', 'Active')
+            ->get(['id', 'basic_salary', 'proposed_salary']);
+
+        $empMonthlyOverrides = DB::table('resort_employee_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['employee_id', 'month', 'current_salary', 'proposed_salary'])
+            ->groupBy('employee_id');
+
+        $employeeSalaryTotal = 0.0;
+        foreach ($activeEmployees as $emp) {
+            $sharedFallback = (float) ($emp->proposed_salary > 0
+                ? $emp->proposed_salary
+                : ($emp->basic_salary ?? 0));
+
+            $monthsByMonth = $empMonthlyOverrides->get($emp->id, collect())->keyBy('month');
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly = $monthsByMonth->get($m);
+                if ($monthly) {
+                    $effective = (float) ($monthly->proposed_salary > 0
+                        ? $monthly->proposed_salary
+                        : ($monthly->current_salary > 0
+                            ? $monthly->current_salary
+                            : $sharedFallback));
+                } else {
+                    $effective = $sharedFallback;
+                }
+                $employeeSalaryTotal += $effective;
+            }
+        }
+
+        // -- 2. Employee per-month cost configurations -----------------------
+        $employeeCostTotal = (float) DB::table('resort_employee_budget_cost_configurations')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->sum('value');
+
+        // -- 3. Vacant salaries ----------------------------------------------
+        $vacants = DB::table('resort_vacant_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
+
+        $vacantMonthlyOverrides = DB::table('resort_vacant_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['position_id', 'department_id', 'vacant_index', 'month', 'current_salary', 'proposed_salary'])
+            ->groupBy(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index);
+
+        $vacantSalaryTotal = 0.0;
+        foreach ($vacants as $v) {
+            // Per legacy ResortVacantBudgetCost mapping: basic_salary = Current,
+            // current_salary = Proposed. Match the precedence the View Budget
+            // page uses (Proposed when entered, else Current).
+            $sharedFallback = (float) ($v->current_salary > 0
+                ? $v->current_salary
+                : ($v->basic_salary ?? 0));
+
+            $key = $v->position_id . '|' . $v->department_id . '|' . $v->vacant_index;
+            $monthsByMonth = $vacantMonthlyOverrides->get($key, collect())->keyBy('month');
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly = $monthsByMonth->get($m);
+                if ($monthly) {
+                    $effective = (float) ($monthly->proposed_salary > 0
+                        ? $monthly->proposed_salary
+                        : ($monthly->current_salary > 0
+                            ? $monthly->current_salary
+                            : $sharedFallback));
+                } else {
+                    $effective = $sharedFallback;
+                }
+                $vacantSalaryTotal += $effective;
+            }
+        }
+
+        // -- 4. Vacant per-month cost configurations -------------------------
+        $vacantCostTotal = (float) DB::table('resort_vacant_budget_cost_configurations')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->sum('value');
+
+        return $employeeSalaryTotal + $employeeCostTotal + $vacantSalaryTotal + $vacantCostTotal;
     }
 
 }

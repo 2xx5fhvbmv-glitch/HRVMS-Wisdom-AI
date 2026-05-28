@@ -70,5 +70,16 @@ class PeopleSalaryIncrementStatus extends Model
     {
         return $this->belongsTo(Employee::class,'employee_id','id');
     }
-    
+
+    /**
+     * The Employee who acted on this stage (Approved / Rejected / Hold /
+     * Change-Request). `approved_by` is an Employee.id — the column is
+     * named for the original approve flow but it's the generic "actor" for
+     * every transition. Used by the summary-list / view modal to show
+     * "Hold By: <name>" etc.
+     */
+    public function approver()
+    {
+        return $this->belongsTo(Employee::class, 'approved_by', 'id');
+    }
 }

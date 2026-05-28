@@ -582,62 +582,9 @@ class PromotionController extends Controller
      */
     private function computeBudgetedSalaryForPosition(int $resortId, int $positionId, $position): float
     {
-        $year   = (int) now()->year;
-        $deptId = (int) ($position->dept_id ?? 0);
-        $candidates = [];
-
-        // --- 1. Active employees in this position ---
-        $employees = \DB::table('employees')
-            ->where('resort_id', $resortId)
-            ->where('Position_id', $positionId)
-            ->where('status', 'Active')
-            ->get(['id', 'basic_salary', 'proposed_salary']);
-
-        foreach ($employees as $emp) {
-            $effective = (float) ($emp->proposed_salary > 0 ? $emp->proposed_salary : ($emp->basic_salary ?? 0));
-            if ($effective > 0) $candidates[] = $effective;
-
-            // Per-month employee overrides
-            $monthly = \DB::table('resort_employee_monthly_salaries')
-                ->where('employee_id', $emp->id)
-                ->where('resort_id', $resortId)
-                ->where('year', $year)
-                ->get(['current_salary', 'proposed_salary']);
-            foreach ($monthly as $m) {
-                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
-                if ($eff > 0) $candidates[] = $eff;
-            }
-        }
-
-        // --- 2. Vacant budget rows for this position ---
-        // resort_vacant_budget_costs.basic_salary    = Current (per legacy mapping)
-        // resort_vacant_budget_costs.current_salary  = Proposed
-        $vacants = \DB::table('resort_vacant_budget_costs')
-            ->where('resort_id', $resortId)
-            ->where('position_id', $positionId)
-            ->where('department_id', $deptId)
-            ->where('year', $year)
-            ->get(['vacant_index', 'basic_salary', 'current_salary']);
-
-        foreach ($vacants as $v) {
-            $effective = (float) ($v->current_salary > 0 ? $v->current_salary : ($v->basic_salary ?? 0));
-            if ($effective > 0) $candidates[] = $effective;
-
-            // Per-month vacant overrides
-            $monthly = \DB::table('resort_vacant_monthly_salaries')
-                ->where('resort_id', $resortId)
-                ->where('position_id', $positionId)
-                ->where('department_id', $deptId)
-                ->where('year', $year)
-                ->where('vacant_index', $v->vacant_index)
-                ->get(['current_salary', 'proposed_salary']);
-            foreach ($monthly as $m) {
-                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
-                if ($eff > 0) $candidates[] = $eff;
-            }
-        }
-
-        return $candidates ? (float) max($candidates) : 0.0;
+        // Delegates to the shared Common helper so Promotion + Salary
+        // Increment (and any future module) compute budget the same way.
+        return \App\Helpers\Common::computeBudgetedSalaryForPosition($resortId, $positionId, $position);
     }
 
     /**

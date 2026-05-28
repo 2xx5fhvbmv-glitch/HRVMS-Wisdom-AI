@@ -561,7 +561,13 @@ class ProbationController extends Controller
         $employee = Employee::findOrFail($id);
         $employee->probation_status = 'Failed';
         $employee->employment_type = 'Probationary';
-        $employee->status = 'Terminated';
+        // Mark the employee as Offboarding (not Terminated yet) — the
+        // actual termination happens when ExitClearance@markAsComplete
+        // finalises the clearance forms + F&F settlement. Before this
+        // change, employees were flipped to Terminated the instant
+        // probation was failed, even though their offboarding hadn't
+        // started — see migration 2026_05_28_120000.
+        $employee->status = 'Offboarding';
         $employee->save();
 
         $this->ensureExitClearanceRecord($employee, $request->input('remarks'));
@@ -865,8 +871,10 @@ class ProbationController extends Controller
         $employee->probation_status = $type === 'success' ? 'Confirmed' : 'Failed';
         $employee->probation_letter_path = $pdfPath;
         $employee->employment_type = $request->employment_type ?? 'Full-time'; // default fallback
-        // Confirmed → keep Active; Failed → terminate (matches failProbation()).
-        $employee->status = $type === 'success' ? 'Active' : 'Terminated';
+        // Confirmed → keep Active; Failed → Offboarding (matches
+        // failProbation()). Actual Terminated transition happens on
+        // ExitClearance@markAsComplete once clearance is finalised.
+        $employee->status = $type === 'success' ? 'Active' : 'Offboarding';
         $employee->probation_review_date = now();
         $employee->probation_confirmed_by = $this->resort->GetEmployee->id;
         $employee->save();

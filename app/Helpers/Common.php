@@ -4344,6 +4344,256 @@ class Common
         return self::GetResortCurrencySymbol() . ' ' . number_format($converted, $decimals);
     }
 
+    /**
+     * Live fallback for a single resort_budget_cost row for one month —
+     * mirrors BudgetController::computeBudgetCostMonthlyValue so the
+     * Liability page can replicate the view-budget "no saved override
+     * means compute from template" rule.
+     *
+     * Inputs: $cost is a row/object from resort_budget_costs.
+     * Output: USD amount this cost contributes to the given month.
+     */
+    public static function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary): float
+    {
+        $details = trim((string) ($cost->details ?? 'Both'));
+        if ($details === 'Locals Only' && !$isLocal)  return 0.0;
+        if ($details === 'Xpat Only'   &&  $isLocal)  return 0.0;
+        if ($details === 'Muslim Only' && !$isMuslim) return 0.0;
+
+        $amount = (float) ($cost->amount ?? 0);
+        $unit   = strtoupper(trim((string) ($cost->amount_unit ?? 'USD')));
+        $freq   = strtolower(trim((string) ($cost->frequency ?? 'Month')));
+
+        // Percentage costs (e.g. Pension 7%) are a % of basic salary.
+        $base = ($unit === '%') ? ($basicSalary * $amount / 100) : $amount;
+
+        if (str_contains($freq, 'year'))     return round($base / 12, 2);
+        if (str_contains($freq, 'quarter'))  return round($base / 3, 2);
+        if (str_contains($freq, 'dai')) {
+            $daysInMonth = (int) date('t', mktime(0, 0, 0, $month, 1, $year));
+            return round($base * $daysInMonth, 2);
+        }
+        if (str_contains($freq, 'one time')) {
+            return $month === 1 ? round($base, 2) : 0.0;
+        }
+        // Default: a monthly cost.
+        return round($base, 2);
+    }
+
+    /**
+     * Annual total of one cost (from resort_budget_costs) for one employee —
+     * combines explicit saved per-month overrides from
+     * resort_employee_budget_cost_configurations with the live fallback
+     * (computeBudgetCostMonthlyValue) for any month that has no saved row.
+     * Mirrors how Budget → View Budget renders the cell.
+     */
+    public static function annualCostForEmployee($resortId, int $year, $cost, $employee): float
+    {
+        $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
+        $isMuslim = strtolower(trim((string) ($employee->religion    ?? ''))) === 'muslim';
+        $basicForPercent = (float) ($employee->basic_salary ?? 0);
+
+        $savedByMonth = \DB::table('resort_employee_budget_cost_configurations')
+            ->where('employee_id', $employee->id)
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->where('resort_budget_cost_id', $cost->id)
+            ->pluck('value', 'month');
+
+        $total = 0.0;
+        for ($m = 1; $m <= 12; $m++) {
+            if (isset($savedByMonth[$m])) {
+                $total += (float) $savedByMonth[$m];
+            } else {
+                $total += self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent);
+            }
+        }
+        return $total;
+    }
+
+    /**
+     * Highest budgeted MONTHLY basic salary for a position in this resort —
+     * shared by Promotion (warns when new salary exceeds budget) and Salary
+     * Increment (same warning when increment + current > budget). Picks the
+     * max of (proposed-if-set, else current) across every salary source for
+     * that position — active employees, vacant rows, and per-month overrides.
+     */
+    public static function computeBudgetedSalaryForPosition($resortId, int $positionId, $position = null): float
+    {
+        if (!$position) {
+            $position = \DB::table('resort_positions')->where('id', $positionId)->first(['id', 'dept_id']);
+        }
+        if (!$position) return 0.0;
+
+        $year   = (int) now()->year;
+        $deptId = (int) ($position->dept_id ?? 0);
+        $candidates = [];
+
+        // 1. Active employees in this position
+        $employees = \DB::table('employees')
+            ->where('resort_id', $resortId)
+            ->where('Position_id', $positionId)
+            ->where('status', 'Active')
+            ->get(['id', 'basic_salary', 'proposed_salary']);
+
+        foreach ($employees as $emp) {
+            $effective = (float) ($emp->proposed_salary > 0 ? $emp->proposed_salary : ($emp->basic_salary ?? 0));
+            if ($effective > 0) $candidates[] = $effective;
+
+            $monthly = \DB::table('resort_employee_monthly_salaries')
+                ->where('employee_id', $emp->id)
+                ->where('resort_id', $resortId)
+                ->where('year', $year)
+                ->get(['current_salary', 'proposed_salary']);
+            foreach ($monthly as $m) {
+                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
+                if ($eff > 0) $candidates[] = $eff;
+            }
+        }
+
+        // 2. Vacant budget rows for this position
+        $vacants = \DB::table('resort_vacant_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('position_id', $positionId)
+            ->where('department_id', $deptId)
+            ->where('year', $year)
+            ->get(['vacant_index', 'basic_salary', 'current_salary']);
+
+        foreach ($vacants as $v) {
+            $effective = (float) ($v->current_salary > 0 ? $v->current_salary : ($v->basic_salary ?? 0));
+            if ($effective > 0) $candidates[] = $effective;
+
+            $monthly = \DB::table('resort_vacant_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('position_id', $positionId)
+                ->where('department_id', $deptId)
+                ->where('year', $year)
+                ->where('vacant_index', $v->vacant_index)
+                ->get(['current_salary', 'proposed_salary']);
+            foreach ($monthly as $m) {
+                $eff = (float) ($m->proposed_salary > 0 ? $m->proposed_salary : ($m->current_salary ?? 0));
+                if ($eff > 0) $candidates[] = $eff;
+            }
+        }
+
+        return $candidates ? (float) max($candidates) : 0.0;
+    }
+
+    /**
+     * Total annual budget across the resort — the canonical "Total Estimated
+     * Liability" figure used wherever the headline appears (Initial Liability
+     * Estimation page, People Dashboard Liability Tracker card, etc.).
+     *
+     * Source data MUST match what HR sees on Budget → View Budget:
+     *   per-month employee salaries  (override → employees.proposed > current)
+     * + per-month employee costs     (saved overrides ∪ live fallback from templates)
+     * + per-month vacant salaries    (override → resort_vacant_budget_costs.current > basic)
+     * + per-month vacant costs       (resort_vacant_budget_cost_configurations)
+     *
+     * Both salary buckets prefer the Proposed value when non-zero, falling
+     * back to the Current value — mirrors the view-budget render logic.
+     */
+    public static function computeYearlyBudgetTotal($resortId, int $year): float
+    {
+        // -- 1. Employee salaries --------------------------------------------
+        // Pull nationality + religion alongside salary fields so annualCostForEmployee()
+        // below can correctly apply Locals/Xpat/Muslim filtering on the template fallback.
+        $activeEmployees = \DB::table('employees')
+            ->where('resort_id', $resortId)
+            ->where('status', 'Active')
+            ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion']);
+
+        $empMonthlyOverrides = \DB::table('resort_employee_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['employee_id', 'month', 'current_salary', 'proposed_salary'])
+            ->groupBy('employee_id');
+
+        $employeeSalaryTotal = 0.0;
+        foreach ($activeEmployees as $emp) {
+            $sharedFallback = (float) ($emp->proposed_salary > 0
+                ? $emp->proposed_salary
+                : ($emp->basic_salary ?? 0));
+
+            $monthsByMonth = $empMonthlyOverrides->get($emp->id, collect())->keyBy('month');
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly = $monthsByMonth->get($m);
+                if ($monthly) {
+                    $effective = (float) ($monthly->proposed_salary > 0
+                        ? $monthly->proposed_salary
+                        : ($monthly->current_salary > 0
+                            ? $monthly->current_salary
+                            : $sharedFallback));
+                } else {
+                    $effective = $sharedFallback;
+                }
+                $employeeSalaryTotal += $effective;
+            }
+        }
+
+        // -- 2. Employee per-month cost configurations -----------------------
+        // Sum saved overrides + live fallback (per template definition) the
+        // same way view-budget renders each cell. The simple
+        // sum('value') previously missed every employee × cost × month with
+        // no explicit override, so the headline was massively understated.
+        $resortCosts = \DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+
+        $employeeCostTotal = 0.0;
+        foreach ($activeEmployees as $emp) {
+            foreach ($resortCosts as $cost) {
+                $employeeCostTotal += self::annualCostForEmployee($resortId, $year, $cost, $emp);
+            }
+        }
+
+        // -- 3. Vacant salaries ----------------------------------------------
+        $vacants = \DB::table('resort_vacant_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
+
+        $vacantMonthlyOverrides = \DB::table('resort_vacant_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['position_id', 'department_id', 'vacant_index', 'month', 'current_salary', 'proposed_salary'])
+            ->groupBy(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index);
+
+        $vacantSalaryTotal = 0.0;
+        foreach ($vacants as $v) {
+            // Per legacy ResortVacantBudgetCost mapping: basic_salary = Current,
+            // current_salary = Proposed.
+            $sharedFallback = (float) ($v->current_salary > 0
+                ? $v->current_salary
+                : ($v->basic_salary ?? 0));
+
+            $key = $v->position_id . '|' . $v->department_id . '|' . $v->vacant_index;
+            $monthsByMonth = $vacantMonthlyOverrides->get($key, collect())->keyBy('month');
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly = $monthsByMonth->get($m);
+                if ($monthly) {
+                    $effective = (float) ($monthly->proposed_salary > 0
+                        ? $monthly->proposed_salary
+                        : ($monthly->current_salary > 0
+                            ? $monthly->current_salary
+                            : $sharedFallback));
+                } else {
+                    $effective = $sharedFallback;
+                }
+                $vacantSalaryTotal += $effective;
+            }
+        }
+
+        // -- 4. Vacant per-month cost configurations -------------------------
+        $vacantCostTotal = (float) \DB::table('resort_vacant_budget_cost_configurations')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->sum('value');
+
+        return $employeeSalaryTotal + $employeeCostTotal + $vacantSalaryTotal + $vacantCostTotal;
+    }
+
     public static function getDisplayCurrency()
     {
         $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
