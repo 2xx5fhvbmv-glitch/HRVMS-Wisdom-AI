@@ -360,21 +360,17 @@ class PromotionController extends Controller
 
             if (is_array($scopedDeptIds)) {
                 $promotions->where(function ($q) use ($scopedDeptIds, $isFinancePoolMember) {
-                    // Dept HOD view: every IN-FLIGHT promotion for an
-                    // employee currently in my dept(s). "In flight" =
-                    // overall status is Pending or On Hold. Once the
-                    // promotion is finalised (Approved / Rejected) it
-                    // drops out of the dept HOD's list.
-                    //
-                    // We don't gate on the HOD-stage status — the dept
-                    // HOD wants to track promotions for their team
-                    // through Finance + GM stages too. Without this
-                    // loosening, a dept HOD's list went empty as soon
-                    // as they approved their stage, even though their
-                    // employees were still mid-promotion.
+                    // Dept HOD view: every IN-FLIGHT promotion whose
+                    // NEW POSITION belongs to my dept(s). Scoping by the
+                    // destination dept (newPosition.dept_id) — not the
+                    // employee's current dept — matches the user's mental
+                    // model: a promotion belongs to the team it lands
+                    // in, not the team the employee is leaving. Once
+                    // the promotion is finalised (Approved / Rejected)
+                    // it drops out so the list stays an active inbox.
                     $q->where(function ($deptQ) use ($scopedDeptIds) {
-                        $deptQ->whereHas('employee', function ($eq) use ($scopedDeptIds) {
-                                $eq->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                        $deptQ->whereHas('newPosition', function ($pq) use ($scopedDeptIds) {
+                                $pq->whereIn('dept_id', $scopedDeptIds ?: [0]);
                             })
                             ->whereIn('status', ['Pending', 'On Hold']);
                     });
