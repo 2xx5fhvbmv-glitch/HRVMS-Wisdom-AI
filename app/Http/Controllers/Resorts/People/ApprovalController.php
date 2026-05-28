@@ -219,6 +219,14 @@ class ApprovalController extends Controller
                 ->where('resort_id', $resort->resort_id)
                 ->where('status', 'Pending');
 
+            // Resignation chain is HOD → HR — only those two roles can act
+            // (see EmployeeResignationController@updateStatus). If the
+            // logged-in user isn't HOD, HR, or a delegate for either, we
+            // force an empty result. Without this guard the query
+            // dropped through with no rank filter and surfaced every
+            // Pending resignation to GM (rank 8) — who then got
+            // "You are not authorized to update this resignation
+            // status." when they clicked Approve.
             if ($rank == 2) {
                 $empResignations->where(function($q) use ($employee, $delegatedForIds) {
                     $q->where('hod_id', $employee->id)
@@ -229,6 +237,10 @@ class ApprovalController extends Controller
                     $q->where('hr_id', $employee->id)
                       ->orWhereIn('hr_id', $delegatedForIds);
                 })->where('hr_status', 'Pending');
+            } else {
+                // Not part of the resignation chain — show nothing so the
+                // inbox never offers an action that the server will refuse.
+                $empResignations->whereRaw('1 = 0');
             }
 
             // Apply filters for resignations
@@ -376,22 +388,50 @@ class ApprovalController extends Controller
             $isGmPool      = in_array($employee->id, $employeesForGmRole, true)
                              || !empty(array_intersect($delegatedForIds, $employeesForGmRole));
 
+            // Only surface a transfer when the user's stage is the
+            // NEXT actionable one — their approval row is Pending AND
+            // every earlier-id row for the same transfer is 'Approved'.
+            // Without this guard, a GM saw transfers where Finance was
+            // still Pending and got "You cannot act on this request
+            // until previous approvers have approved it." from
+            // handleApproval() at TransferController:887-893.
+            //
+            // Raw NOT EXISTS so the inner/outer references stay
+            // unambiguous (using whereDoesntHave's nested closure caused
+            // alias collisions between two rows of the same table).
+            $noEarlierUnapprovedSql = "NOT EXISTS (
+                SELECT 1
+                FROM employee_transfers_approval earlier_ap
+                WHERE earlier_ap.transfer_id = employee_transfers_approval.transfer_id
+                  AND earlier_ap.id < employee_transfers_approval.id
+                  AND earlier_ap.status <> 'Approved'
+            )";
+            $userActionablePredicate = function ($q) use ($noEarlierUnapprovedSql) {
+                $q->where('status', 'Pending')->whereRaw($noEarlierUnapprovedSql);
+            };
+
             $transferQuery = EmployeeTransfer::where('resort_id', $resort->resort_id)
                 ->whereIn('status', ['Pending', 'On Hold'])
-                ->where(function ($outer) use ($approverIds, $isFinancePool, $isGmPool) {
-                    // Direct assignment / delegation.
-                    $outer->whereHas('approvals', function ($q) use ($approverIds) {
-                        $q->where('status', 'Pending')->whereIn('approved_by', $approverIds);
+                ->where(function ($outer) use ($approverIds, $isFinancePool, $isGmPool, $userActionablePredicate) {
+                    // Direct assignment / delegation — and only when
+                    // there's no earlier-stage row still Pending.
+                    $outer->whereHas('approvals', function ($q) use ($approverIds, $userActionablePredicate) {
+                        $q->whereIn('approved_by', $approverIds);
+                        $userActionablePredicate($q);
                     });
-                    // OR any pending approval whose role this user qualifies for.
+                    // OR any pending approval whose role this user
+                    // qualifies for via the Finance / GM pool — same
+                    // "all earlier rows Approved" guard applied.
                     if ($isFinancePool) {
-                        $outer->orWhereHas('approvals', function ($q) {
-                            $q->where('status', 'Pending')->where('approval_rank', 'Finance');
+                        $outer->orWhereHas('approvals', function ($q) use ($userActionablePredicate) {
+                            $q->where('approval_rank', 'Finance');
+                            $userActionablePredicate($q);
                         });
                     }
                     if ($isGmPool) {
-                        $outer->orWhereHas('approvals', function ($q) {
-                            $q->where('status', 'Pending')->where('approval_rank', 'GM');
+                        $outer->orWhereHas('approvals', function ($q) use ($userActionablePredicate) {
+                            $q->where('approval_rank', 'GM');
+                            $userActionablePredicate($q);
                         });
                     }
                 })
