@@ -332,17 +332,26 @@ class PromotionController extends Controller
                 'approvals'
             ])->where('resort_id',$this->resort->resort_id)->select('*');
 
-            // Dept-scope guard — HOD/MGR/SUP/etc. see ONLY their own dept's
-            // promotions; HR / GM / master-admin / L&D get full access via
-            // Common::hasFullDataAccess() returning true (so this is a no-op
-            // for them).
+            // Role-based "my inbox" scoping.
             //
-            // Finance approver pool needs a cross-dept exception: a Finance
-            // HOD / EXCOM / DOF / Finance Manager has to see promotions
-            // from OTHER departments once the HOD stage has approved and
-            // the chain has reached Finance. Without this, Finance HOD's
-            // list was empty for any promotion that didn't happen to be
-            // for a Finance-dept employee — exactly the bug the user hit.
+            //   - hasFullDataAccess()   (HR / GM / master-admin / L&D etc.)
+            //         → see EVERYTHING. No filter applied.
+            //   - Finance approver pool (rank=Finance, DOF/Finance Manager
+            //         title, or rank 1/2 in Finance dept)
+            //         → see promotions where the Finance approval row is
+            //           currently Pending or On Hold (i.e. their action
+            //           is needed). PLUS their own dept's HOD-stage inbox
+            //           below if they're also a dept HOD/EXCOM.
+            //   - Dept HOD / EXCOM (everyone else who reaches this branch)
+            //         → see promotions for employees CURRENTLY in their
+            //           dept where the HOD approval row is Pending or On
+            //           Hold. Once HOD acts, the row drops out of their
+            //           list — "my inbox" UX, confirmed by the user.
+            //
+            // Without this, F&B HOD kept seeing promotions they'd
+            // already approved (which had moved on to Finance / GM),
+            // and Finance HOD couldn't see cross-dept promotions waiting
+            // at the Finance stage.
             $scopedDeptIds = Common::getScopedDepartmentIds();
             $userPromotionRole = $loggedInUserId
                 ? $this->getUserPromotionRole($loggedInUserId, $resort_id)
@@ -351,25 +360,27 @@ class PromotionController extends Controller
 
             if (is_array($scopedDeptIds)) {
                 $promotions->where(function ($q) use ($scopedDeptIds, $isFinancePoolMember) {
-                    // Own-dept rule (the default scope).
-                    $q->whereHas('employee', function ($eq) use ($scopedDeptIds) {
-                        $eq->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                    // Dept HOD inbox: HOD-stage Pending/On Hold for an
+                    // employee in my dept(s).
+                    $q->where(function ($hodQ) use ($scopedDeptIds) {
+                        $hodQ->whereHas('employee', function ($eq) use ($scopedDeptIds) {
+                                $eq->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                            })
+                            ->whereHas('approvals', function ($aq) {
+                                $aq->where('approval_rank', 'HOD')
+                                   ->whereIn('status', ['Pending', 'On Hold']);
+                            });
                     });
 
-                    // Cross-dept rule for Finance approver pool: include
-                    // any promotion where the Finance approval row is
-                    // present AND the HOD stage has already Approved.
-                    // We don't gate on Finance.status='Pending' so that
-                    // Finance HOD can still see promotions they've
-                    // already acted on (history visibility).
+                    // Finance pool inbox: cross-dept visibility for any
+                    // promotion where the Finance stage is Pending /
+                    // On Hold. Finance approver pool is a horizontal
+                    // bench — they act regardless of which dept the
+                    // employee belongs to.
                     if ($isFinancePoolMember) {
-                        $q->orWhere(function ($financeQ) {
-                            $financeQ->whereHas('approvals', function ($aq) {
-                                $aq->where('approval_rank', 'Finance');
-                            })->whereHas('approvals', function ($aq) {
-                                $aq->where('approval_rank', 'HOD')
-                                   ->where('status', 'Approved');
-                            });
+                        $q->orWhereHas('approvals', function ($aq) {
+                            $aq->where('approval_rank', 'Finance')
+                               ->whereIn('status', ['Pending', 'On Hold']);
                         });
                     }
                 });
