@@ -360,16 +360,23 @@ class PromotionController extends Controller
 
             if (is_array($scopedDeptIds)) {
                 $promotions->where(function ($q) use ($scopedDeptIds, $isFinancePoolMember) {
-                    // Dept HOD inbox: HOD-stage Pending/On Hold for an
-                    // employee in my dept(s).
-                    $q->where(function ($hodQ) use ($scopedDeptIds) {
-                        $hodQ->whereHas('employee', function ($eq) use ($scopedDeptIds) {
+                    // Dept HOD view: every IN-FLIGHT promotion for an
+                    // employee currently in my dept(s). "In flight" =
+                    // overall status is Pending or On Hold. Once the
+                    // promotion is finalised (Approved / Rejected) it
+                    // drops out of the dept HOD's list.
+                    //
+                    // We don't gate on the HOD-stage status — the dept
+                    // HOD wants to track promotions for their team
+                    // through Finance + GM stages too. Without this
+                    // loosening, a dept HOD's list went empty as soon
+                    // as they approved their stage, even though their
+                    // employees were still mid-promotion.
+                    $q->where(function ($deptQ) use ($scopedDeptIds) {
+                        $deptQ->whereHas('employee', function ($eq) use ($scopedDeptIds) {
                                 $eq->whereIn('Dept_id', $scopedDeptIds ?: [0]);
                             })
-                            ->whereHas('approvals', function ($aq) {
-                                $aq->where('approval_rank', 'HOD')
-                                   ->whereIn('status', ['Pending', 'On Hold']);
-                            });
+                            ->whereIn('status', ['Pending', 'On Hold']);
                     });
 
                     // Finance pool inbox: cross-dept visibility for any
