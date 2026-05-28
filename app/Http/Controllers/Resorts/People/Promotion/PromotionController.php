@@ -763,7 +763,20 @@ class PromotionController extends Controller
 
     public function handlePromotionApproval(Request $request, $id, $action)
     {
-        $promotion = EmployeePromotion::with(['approvals', 'employee'])->findOrFail($id);
+        // The approval-inbox row generates this URL with base64_encode($id)
+        // (see ApprovalController@getApprovedRequests, ~:567); the
+        // approval detail page sends the raw integer. Accept both:
+        // try base64_decode and use it when the result is numeric,
+        // otherwise fall back to the raw value. Was 404ing from the
+        // inbox because findOrFail('Nw==') has no matching row.
+        $resolvedId = $id;
+        if (!ctype_digit((string) $id)) {
+            $decoded = base64_decode((string) $id, true);
+            if ($decoded !== false && ctype_digit($decoded)) {
+                $resolvedId = $decoded;
+            }
+        }
+        $promotion = EmployeePromotion::with(['approvals', 'employee'])->findOrFail($resolvedId);
         $comments = $request->input('comments', null);
         $currentEmployee = $this->resort->GetEmployee; // Assuming current logged-in employee
         // Eager-load relations the actor descriptor needs ($actorLabel below
