@@ -335,14 +335,43 @@ class PromotionController extends Controller
             // Dept-scope guard — HOD/MGR/SUP/etc. see ONLY their own dept's
             // promotions; HR / GM / master-admin / L&D get full access via
             // Common::hasFullDataAccess() returning true (so this is a no-op
-            // for them). Match by the employee's CURRENT dept (the HOD whose
-            // justification is needed); we don't broaden to the new dept so
-            // a target-dept HOD doesn't see a request they're not in the
-            // approval chain for.
+            // for them).
+            //
+            // Finance approver pool needs a cross-dept exception: a Finance
+            // HOD / EXCOM / DOF / Finance Manager has to see promotions
+            // from OTHER departments once the HOD stage has approved and
+            // the chain has reached Finance. Without this, Finance HOD's
+            // list was empty for any promotion that didn't happen to be
+            // for a Finance-dept employee — exactly the bug the user hit.
             $scopedDeptIds = Common::getScopedDepartmentIds();
+            $userPromotionRole = $loggedInUserId
+                ? $this->getUserPromotionRole($loggedInUserId, $resort_id)
+                : null;
+            $isFinancePoolMember = ($userPromotionRole === 'Finance');
+
             if (is_array($scopedDeptIds)) {
-                $promotions->whereHas('employee', function ($q) use ($scopedDeptIds) {
-                    $q->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                $promotions->where(function ($q) use ($scopedDeptIds, $isFinancePoolMember) {
+                    // Own-dept rule (the default scope).
+                    $q->whereHas('employee', function ($eq) use ($scopedDeptIds) {
+                        $eq->whereIn('Dept_id', $scopedDeptIds ?: [0]);
+                    });
+
+                    // Cross-dept rule for Finance approver pool: include
+                    // any promotion where the Finance approval row is
+                    // present AND the HOD stage has already Approved.
+                    // We don't gate on Finance.status='Pending' so that
+                    // Finance HOD can still see promotions they've
+                    // already acted on (history visibility).
+                    if ($isFinancePoolMember) {
+                        $q->orWhere(function ($financeQ) {
+                            $financeQ->whereHas('approvals', function ($aq) {
+                                $aq->where('approval_rank', 'Finance');
+                            })->whereHas('approvals', function ($aq) {
+                                $aq->where('approval_rank', 'HOD')
+                                   ->where('status', 'Approved');
+                            });
+                        });
+                    }
                 });
             }
 
@@ -858,6 +887,42 @@ class PromotionController extends Controller
                 )));
             }
 
+            // Notify the NEXT stage's approver pool so they know it's now
+            // their turn — previously only HR was pinged when a stage
+            // approved, so Finance HOD / GM had to discover via the list.
+            // Find the first still-Pending approval row (smallest id =
+            // earliest stage in the chain) and fan out to that role's pool.
+            if ($pendingCount > 0) {
+                $nextApproval = $promotion->approvals()
+                    ->where('status', 'Pending')
+                    ->orderBy('id')
+                    ->first();
+                if ($nextApproval) {
+                    $nextStagePool = $this->buildPromotionApproverPool(
+                        (string) $nextApproval->approval_rank,
+                        (int) $this->resort->resort_id,
+                        $promotion
+                    );
+                    $stageBody = "📢 Promotion for {$employeeName} is now awaiting your {$nextApproval->approval_rank} approval. " .
+                                 "Previous stage approved by {$actorLabel}.";
+                    foreach ($nextStagePool as $member) {
+                        if (!$member || empty($member->id)) continue;
+                        // Don't ping the employee being promoted, even if
+                        // they happen to be in the pool.
+                        if ((int) $member->id === (int) $promotion->employee_id) continue;
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            10,
+                            'Promotion Awaiting Your Approval',
+                            $stageBody,
+                            0,
+                            $member->id,
+                            'People'
+                        )));
+                    }
+                }
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Promotion Approved Successfully.',
@@ -1112,6 +1177,79 @@ class PromotionController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Return the approver pool (Employee collection) for a given approval
+     * stage on a promotion. Mirrors the pool-build logic in initiate()
+     * (lines ~181-218) so the people notified on stage-approved are the
+     * same set that was eligible at initiate time.
+     *
+     *  - 'HOD'     → employees in the SUBJECT's current dept with rank
+     *                HOD (2) or EXCOM (1)
+     *  - 'Finance' → Finance pool (rank=Finance, DOF/Finance Manager
+     *                titles, or rank 1/2 in Finance dept)
+     *  - 'GM'      → rank=GM (8) or position.Rank=GM
+     */
+    private function buildPromotionApproverPool(string $rank, int $resortId, ?EmployeePromotion $promotion = null)
+    {
+        $hodRank       = array_search('HOD',     config('settings.Position_Rank')) ?: 2;
+        $excomRank     = array_search('EXCOM',   config('settings.Position_Rank')) ?: 1;
+        $financeRank   = array_search('Finance', config('settings.Position_Rank')) ?: 7;
+        $gmRank        = array_search('GM',      config('settings.Position_Rank')) ?: 8;
+        $financeTitles = ['Director of Finance', 'Finance Manager'];
+
+        if ($rank === 'Finance') {
+            $financeDeptIds = ResortDepartment::where('resort_id', $resortId)
+                ->get()
+                ->filter(fn($d) => Common::isFinanceDepartment($d->id))
+                ->pluck('id');
+
+            return Employee::with('resortAdmin')
+                ->where('resort_id', $resortId)
+                ->where('status', 'Active')
+                ->where(function ($q) use ($financeRank, $financeTitles, $financeDeptIds) {
+                    $q->where('rank', $financeRank)
+                      ->orWhereHas('position', function ($pq) use ($financeRank, $financeTitles) {
+                          $pq->where('Rank', $financeRank)
+                             ->orWhereIn('position_title', $financeTitles);
+                      });
+                    if ($financeDeptIds->isNotEmpty()) {
+                        $q->orWhere(function ($qq) use ($financeDeptIds) {
+                            $qq->whereIn('Dept_id', $financeDeptIds)
+                               ->whereIn('rank', [1, 2]);
+                        });
+                    }
+                })
+                ->get();
+        }
+
+        if ($rank === 'GM') {
+            return Employee::with('resortAdmin')
+                ->where('resort_id', $resortId)
+                ->where('status', 'Active')
+                ->where(function ($q) use ($gmRank) {
+                    $q->where('rank', $gmRank)
+                      ->orWhereHas('position', function ($pq) use ($gmRank) {
+                          $pq->where('Rank', $gmRank);
+                      });
+                })
+                ->get();
+        }
+
+        if ($rank === 'HOD' && $promotion) {
+            $deptId = (int) optional($promotion->employee)->Dept_id;
+            if ($deptId > 0) {
+                return Employee::with('resortAdmin')
+                    ->where('resort_id', $resortId)
+                    ->where('Dept_id', $deptId)
+                    ->where('status', 'Active')
+                    ->whereIn('rank', [$hodRank, $excomRank])
+                    ->get();
+            }
+        }
+
+        return collect();
     }
 
     /**
