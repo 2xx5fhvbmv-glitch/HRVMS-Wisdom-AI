@@ -317,24 +317,116 @@ class LiabilityEstimationController extends Controller
             ->unique()
             ->values();
 
-        // Pre-compute the Estimation vs Actual table rows on the server so the
-        // view doesn't have to re-derive them (and so the `$budgetMatch`
-        // closure stays controller-local).
+        // Pre-compute the Estimation vs Actual table rows on the server.
+        //
+        // Estimated column was using $budgetMatch which only summed the raw
+        // `amount` column from resort_budget_costs (one-time template
+        // figure, no annualisation, no per-employee multiplication). That
+        // made Medical show $3,200, Insurance $3,200 etc. — single-template
+        // base amounts, not real annual budgets. Replaced with the SAME
+        // per-employee × per-cost × 12-month aggregation that powers the
+        // consolidated/view-budget pages so the Estimated column reflects
+        // actual annual budget commitments per category.
+        $estimatedByCategory = [
+            'Salaries'        => 0.0,
+            'Overtime'        => 0.0,
+            'Service Charge'  => 0.0,
+            'Work Permit'     => 0.0,
+            'Medical'         => 0.0,
+            'Insurance'       => 0.0,
+            'Quota'           => 0.0,
+            'Visa'            => 0.0,
+            'Recruitment Fee' => 0.0,
+        ];
+        // Allowance buckets — keyed by the same display label used in
+        // $allowanceBreakdown / $chartData / $allowanceTypes.
+        $allowanceEstimated = [];
+
+        $classifyForEstVsActual = function (string $name): string {
+            $n = strtolower($name);
+            if (stripos($n, 'service charge') !== false)                return 'Service Charge';
+            if (stripos($n, 'overtime') !== false || preg_match('/\bot\b/i', $n)) return 'Overtime';
+            if (stripos($n, 'work permit') !== false)                   return 'Work Permit';
+            if (stripos($n, 'work visa') !== false || stripos($n, 'visa') !== false) return 'Visa';
+            if (stripos($n, 'medical') !== false)                       return 'Medical';
+            if (stripos($n, 'insurance') !== false)                     return 'Insurance';
+            if (stripos($n, 'quota') !== false)                         return 'Quota';
+            if (stripos($n, 'recruitment') !== false)                   return 'Recruitment Fee';
+            if (stripos($n, 'salary') !== false || stripos($n, 'payroll') !== false) return 'Salaries';
+            return 'Allowance'; // becomes "Allowance - <type>" below
+        };
+
+        // Salary leg first — use the same chain Common::computeYearlyBudgetTotal
+        // walks (monthly override → proposed/current → fallback to
+        // employees row). Sums to the Salaries row.
+        $activeEmployees = DB::table('employees')
+            ->where('resort_id', $resortId)
+            ->where('status', 'Active')
+            ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion']);
+        $empMonthlyOverrides = DB::table('resort_employee_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('year', $currentYear)
+            ->get(['employee_id', 'month', 'current_salary', 'proposed_salary'])
+            ->groupBy('employee_id');
+        foreach ($activeEmployees as $emp) {
+            $sharedFallback = (float) ($emp->proposed_salary > 0
+                ? $emp->proposed_salary
+                : ($emp->basic_salary ?? 0));
+            $monthsByMonth = $empMonthlyOverrides->get($emp->id, collect())->keyBy('month');
+            for ($m = 1; $m <= 12; $m++) {
+                $row = $monthsByMonth->get($m);
+                $effective = $row
+                    ? (float) ($row->proposed_salary > 0
+                        ? $row->proposed_salary
+                        : ($row->current_salary > 0
+                            ? $row->current_salary
+                            : $sharedFallback))
+                    : $sharedFallback;
+                $estimatedByCategory['Salaries'] += $effective;
+            }
+        }
+
+        // Cost leg — for each active employee × each cost template, sum
+        // annualCostForEmployee into the right bucket. Fetch cost
+        // templates locally so this block doesn't depend on a variable
+        // defined later in the controller.
+        $resortCostsForEst = DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+        foreach ($activeEmployees as $emp) {
+            foreach ($resortCostsForEst as $cost) {
+                $annual = Common::annualCostForEmployee($resortId, $currentYear, $cost, $emp);
+                if ($annual <= 0) continue;
+                $label = $cost->particulars ?: ($cost->cost_title ?: 'Other');
+                $cat   = $classifyForEstVsActual($label);
+                if ($cat === 'Allowance') {
+                    $allowanceEstimated[$label] = ($allowanceEstimated[$label] ?? 0) + $annual;
+                } else {
+                    $estimatedByCategory[$cat] += $annual;
+                }
+            }
+        }
+
         $estVsActualRows = [
-            ['label' => 'Salaries',        'estimated' => $budgetMatch(['Payroll','Salary']),       'actual' => $chartData['Salaries']        ?? 0],
-            ['label' => 'Overtime',        'estimated' => $budgetMatch(['Overtime','OT']),          'actual' => $chartData['OTA']             ?? 0],
-            ['label' => 'Service Charge',  'estimated' => $budgetMatch(['Service Charge']),         'actual' => $chartData['Service Charge']  ?? 0],
-            ['label' => 'Work Permit',     'estimated' => $budgetMatch(['Work Permit']),            'actual' => $chartData['Work Permit']     ?? 0],
-            ['label' => 'Medical',         'estimated' => $budgetMatch(['Medical']),                'actual' => $chartData['Medical Permit']  ?? 0],
-            ['label' => 'Insurance',       'estimated' => $budgetMatch(['Insurance']),              'actual' => $chartData['Insurance']       ?? 0],
-            ['label' => 'Quota',           'estimated' => $budgetMatch(['Quota']),                  'actual' => $chartData['Quota Slot']      ?? 0],
-            ['label' => 'Visa',            'estimated' => $budgetMatch(['Visa']),                   'actual' => array_sum((array) ($monthlyVisa ?? []))],
-            ['label' => 'Recruitment Fee', 'estimated' => $budgetMatch(['Recruitment']),            'actual' => $chartData['Recruitment Fee'] ?? 0],
+            ['label' => 'Salaries',        'estimated' => $estimatedByCategory['Salaries'],        'actual' => $chartData['Salaries']        ?? 0],
+            ['label' => 'Overtime',        'estimated' => $estimatedByCategory['Overtime'],        'actual' => $chartData['OTA']             ?? 0],
+            ['label' => 'Service Charge',  'estimated' => $estimatedByCategory['Service Charge'],  'actual' => $chartData['Service Charge']  ?? 0],
+            ['label' => 'Work Permit',     'estimated' => $estimatedByCategory['Work Permit'],     'actual' => $chartData['Work Permit']     ?? 0],
+            ['label' => 'Medical',         'estimated' => $estimatedByCategory['Medical'],         'actual' => $chartData['Medical Permit']  ?? 0],
+            ['label' => 'Insurance',       'estimated' => $estimatedByCategory['Insurance'],       'actual' => $chartData['Insurance']       ?? 0],
+            ['label' => 'Quota',           'estimated' => $estimatedByCategory['Quota'],           'actual' => $chartData['Quota Slot']      ?? 0],
+            ['label' => 'Visa',            'estimated' => $estimatedByCategory['Visa'],            'actual' => array_sum((array) ($monthlyVisa ?? []))],
+            ['label' => 'Recruitment Fee', 'estimated' => $estimatedByCategory['Recruitment Fee'], 'actual' => $chartData['Recruitment Fee'] ?? 0],
         ];
         foreach ($allowanceBreakdown as $type => $amount) {
+            $label = 'Allowance - ' . ucfirst($type);
             $estVsActualRows[] = [
-                'label'     => 'Allowance - ' . ucfirst($type),
-                'estimated' => $budgetMatch([$type]),
+                'label'     => $label,
+                // $allowanceEstimated is keyed by the cost particulars
+                // string ("Language Allowance"), $type is the same string,
+                // so match directly.
+                'estimated' => $allowanceEstimated[$type] ?? 0,
                 'actual'    => $amount,
             ];
         }

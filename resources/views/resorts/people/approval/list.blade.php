@@ -148,17 +148,38 @@
                     return d;
                 })(),
                 success: function (response) {
-                    if (response && response.success) {
+                    // Promotion / transfer / resignation endpoints return
+                    // different success shapes — some `{success: true}`,
+                    // some `{status: 'success'}`. Treat either as success.
+                    var isSuccess = response && (response.success === true || response.status === 'success');
+                    var isError   = response && (response.success === false || response.status === 'error');
+
+                    if (isSuccess) {
                         toastr.success(response.message || 'Done.', 'Success', { positionClass: 'toast-bottom-right' });
-                        datatablelist();
+                        // Refresh the page so the actioned row drops out
+                        // of the inbox and counters / cached state are
+                        // re-read. Follows redirect_url when provided
+                        // (eg. promotion returns the list URL), otherwise
+                        // reloads the current inbox.
+                        setTimeout(function () {
+                            if (response.redirect_url) {
+                                window.location.href = response.redirect_url;
+                            } else {
+                                window.location.reload();
+                            }
+                        }, 400);
+                    } else if (isError) {
+                        toastr.error(response.message || 'Action failed.', 'Error', { positionClass: 'toast-bottom-right' });
                     } else if (response && response.message) {
-                        toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
+                        // Ambiguous shape — server didn't 4xx/5xx and
+                        // sent a message but no success / status flag.
+                        // Surface it as success rather than error.
+                        toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
+                        setTimeout(function () { window.location.reload(); }, 400);
                     } else {
-                        // Endpoints that return a redirect/view rather than JSON
-                        // (some GET-based actions) reach here with response as
-                        // HTML — treat as success since the server didn't 4xx/5xx.
+                        // No JSON body (HTML / redirect response).
                         toastr.success('Updated.', 'Success', { positionClass: 'toast-bottom-right' });
-                        datatablelist();
+                        setTimeout(function () { window.location.reload(); }, 400);
                     }
                 },
                 error: function (xhr) {
@@ -193,12 +214,22 @@
                     return d;
                 })(),
                 success: function (response) {
-                    if (!response || response.success !== false) {
+                    var isErr = response && (response.success === false || response.status === 'error');
+                    if (!isErr) {
                         toastr.success((response && response.message) || 'Rejected.', 'Success', { positionClass: 'toast-bottom-right' });
                         $('#rejectionModal').modal('hide');
                         $('#rejectionReason').val('');
                         pendingReject = null;
-                        datatablelist();
+                        // Refresh so the rejected row drops out of the
+                        // inbox immediately. Same redirect/reload pattern
+                        // as the Approve/Hold flow above.
+                        setTimeout(function () {
+                            if (response && response.redirect_url) {
+                                window.location.href = response.redirect_url;
+                            } else {
+                                window.location.reload();
+                            }
+                        }, 400);
                     } else {
                         toastr.error(response.message || 'Reject failed.', 'Error', { positionClass: 'toast-bottom-right' });
                     }

@@ -87,9 +87,15 @@
                                  { data: 'employee_name', name: 'employee_name' },
                                  { data: 'position_title', name: 'position_title' },
                                  { data: 'department_name', name: 'department_name' },
-                                 { data: 'previous_salary', name: 'previous_salary' ,render: function(data) { return currencySymbol + ' ' + data; }},
-                                 { data: 'new_salary', name: 'new_salary', render: function(data) { return currencySymbol + ' ' + data; }},
-                                 { data: 'increment_amount', name: 'increment_amount',render: function(data) { return currencySymbol + ' ' + data; } },
+                                 // formatAmount converts USD-stored values
+                                 // to the resort's display currency (MVR or
+                                 // Dollar) AND switches the symbol. Was
+                                 // emitting symbol-only via currencySymbol +
+                                 // raw USD digits, which showed MVR with
+                                 // USD numbers on MVR-display resorts.
+                                 { data: 'previous_salary',  name: 'previous_salary',  render: function(d){ return formatAmount(d, 'USD'); }},
+                                 { data: 'new_salary',       name: 'new_salary',       render: function(d){ return formatAmount(d, 'USD'); }},
+                                 { data: 'increment_amount', name: 'increment_amount', render: function(d){ return formatAmount(d, 'USD'); }},
                                  { data: 'increment_type', name: 'increment_type' },
                                  { data: 'effective_date', name: 'effective_date' },
                                  { data: 'remarks', name: 'remarks' },

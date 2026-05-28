@@ -863,57 +863,18 @@ class BudgetController extends Controller
         $page_title = 'Consolidated Budget';
         try {
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
-            $parent_Consolidate = StoreConsolidateBudgetParent::where('Resort_id',auth()->guard('resort-admin')->user()->resort_id)->latest()->first();
-            $MainArray=array();
-            $DepartmentTotal=array();
-            $DepartmentArray=array();
-            if(isset($parent_Consolidate))
-            {
-                $child_Consolidate = StoreConsolidateBudgetChild::where("Parent_SCB_id",$parent_Consolidate->id)->latest()->first();
-                $header = json_decode($child_Consolidate->header);
-                $data = json_decode($child_Consolidate->Data);
-                $header = array_slice($header, 7);
-                if(!empty($data))
-                {
-                    foreach($data as $k=>$p)
-                    {
-                        $internalArray=array();
-                        $division = $p[0];
-                        $Department = $p[1];
-                        $Position = $p[2];
-                        $NoOfPosition = $p[3];
-                        $Rank = $p[4];
-                        $Nation= $p[5];
-                        $Salary = $p[6];
-                        $Resortdepartment = ResortDepartment::where('resort_id', $this->resort->resort_id)->where('slug',$Department)->first();
-                        $Resortposition = ResortPosition::where('resort_id', $this->resort->resort_id)
-                                        ->where('slug', $Position)->first();
-                        $remainingValues = array_slice($p, 6);
+            $year     = (int) now()->year;
 
-                        if(!in_array($Resortdepartment->id,$DepartmentArray) || array_key_exists($Resortdepartment->name, $MainArray))
-                        {
-                            $entry = [
-                                $Resortposition->position_title,
-                                $NoOfPosition,
-                                $Rank,
-                                $Nation,
-                            ];
-                            $MainArray[$Resortdepartment->name][] = array_merge($entry, $remainingValues);
-                            $oldArray_value = array_key_exists($Resortdepartment->name, $DepartmentTotal)  ?  $DepartmentTotal[$Resortdepartment->name] : 0;
-                            $DepartmentTotal[$Resortdepartment->name]= array_sum($remainingValues) + $oldArray_value ;
-                            $DepartmentArray[] = $Resortdepartment->id;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                $header  = [];
-                $data  = [];
-                $Resortposition =     collect();
-                $DepartmentTotal=[];
-            }
-            // dd($DepartmentTotal);
+            // The page used to read from `store_consolidate_budget_parents` /
+            // `store_consolidate_budget_children` — a frozen JSON snapshot
+            // that only refreshed when someone explicitly clicked Save. So
+            // any salary edit, cost-template change, employee add/remove
+            // or per-employee cost override since the last save would make
+            // the per-dept totals diverge from the Liability page and the
+            // view-budget page. Live-compute now using the same source data
+            // as Common::computeYearlyBudgetTotal — single source of truth.
+            [$MainArray, $DepartmentTotal, $header] = $this->buildLiveConsolidatedArrays($resortId, $year);
+
             $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
             return view('resorts.budget.consolidated')->with(compact('page_title','MainArray','header','DepartmentTotal','resortId','employeeRankPosition'));
@@ -922,6 +883,309 @@ class BudgetController extends Controller
             \Log::emergency("Line: ".$e->getLine());
             \Log::emergency("Message: ".$e->getMessage());
         }
+    }
+
+    /**
+     * Build the consolidated-budget arrays LIVE so the per-dept totals
+     * match the Liability page and view-budget.
+     *
+     * Returns [$MainArray, $DepartmentTotal, $header] in the exact shape
+     * resources/views/resorts/budget/consolidated.blade.php expects:
+     *
+     *   $MainArray = [
+     *       'Dept Name' => [
+     *           [position_title, employee_count, rank, nationality,
+     *            current_basic_salary, jan_total, feb_total, ..., dec_total],
+     *           ...
+     *       ],
+     *       ...
+     *   ];
+     *   $DepartmentTotal = ['Dept Name' => annual_total, ...];
+     *   $header          = ['Jan 2026', 'Feb 2026', ..., 'Dec 2026'];
+     *
+     * Each monthly column for a position group = sum of (salary_m + sum
+     * of cost_configs_m) across every employee in that position group.
+     * Salary uses the same override-then-fallback chain
+     * Common::computeYearlyBudgetTotal walks; cost configs use saved
+     * resort_employee_budget_cost_configurations overrides ∪ live
+     * fallback from resort_budget_costs templates (via
+     * Common::computeBudgetCostMonthlyValue).
+     */
+    private function buildLiveConsolidatedArrays(int $resortId, int $year): array
+    {
+        $header = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $header[] = Carbon::create($year, $m, 1)->format('M Y');
+        }
+
+        // Per-employee saved overrides (resort_employee_budget_cost_configurations)
+        // are stored as USD per project convention — no conversion needed.
+        //
+        // Cost TEMPLATES (resort_budget_costs) however have an `amount_unit`
+        // column that can be 'MVR', 'USD', or '%'. When the live fallback
+        // formula (Common::computeBudgetCostMonthlyValue) returns the value
+        // for an MVR template, that value is denominated in MVR — view-budget's
+        // JS multiplies by mvrToUsdRate (1/15.42) before summing. Mirror
+        // that here. e.g. "Ramadan Bonus = 3000 MVR/year" should add
+        // $194.55/year per applicable Maldivian, not $3,000.
+        $dollarToMvr = (float) (DB::table('resort_site_settings')
+            ->where('resort_id', $resortId)
+            ->value('DollertoMVR') ?: 15.42);
+        if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+        $mvrToUsdRate = 1.0 / $dollarToMvr;
+
+        $departments = ResortDepartment::where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'name']);
+
+        $resortCosts = DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+
+        // Pre-fetch all per-month salary overrides once, keyed by employee.
+        $empMonthlyOverrides = DB::table('resort_employee_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['employee_id', 'month', 'current_salary', 'proposed_salary'])
+            ->groupBy('employee_id');
+
+        // Pre-fetch all saved cost-config overrides once, keyed by
+        // (employee_id, resort_budget_cost_id, month). All values are
+        // stored in USD per project convention.
+        $savedCostOverrides = DB::table('resort_employee_budget_cost_configurations')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['employee_id', 'resort_budget_cost_id', 'month', 'value']);
+        $savedByKey = [];
+        foreach ($savedCostOverrides as $row) {
+            $savedByKey[$row->employee_id][$row->resort_budget_cost_id][$row->month] = (float) $row->value;
+        }
+
+        $MainArray = [];
+        $DepartmentTotal = [];
+
+        foreach ($departments as $dept) {
+            $employees = DB::table('employees')
+                ->where('resort_id', $resortId)
+                ->where('Dept_id', $dept->id)
+                ->where('status', 'Active')
+                ->get(['id', 'Position_id', 'nationality', 'religion', 'basic_salary', 'proposed_salary']);
+
+            if ($employees->isEmpty()) continue;
+
+            $byPosition = $employees->groupBy('Position_id');
+            $deptTotal  = 0.0;
+
+            foreach ($byPosition as $positionId => $emps) {
+                if (!$positionId) continue;
+
+                $position = DB::table('resort_positions')
+                    ->where('id', $positionId)
+                    ->first(['position_title', 'Rank']);
+                if (!$position) continue;
+
+                // Aggregate monthly totals across every employee in this
+                // position group.
+                $monthly = array_fill(1, 12, 0.0);
+
+                foreach ($emps as $emp) {
+                    $isLocal  = strtolower(trim((string) ($emp->nationality ?? ''))) === 'maldivian';
+                    $isMuslim = strtolower(trim((string) ($emp->religion    ?? ''))) === 'muslim';
+                    $basicForPercent = (float) ($emp->basic_salary ?? 0);
+
+                    $sharedFallback = (float) ($emp->proposed_salary > 0
+                        ? $emp->proposed_salary
+                        : ($emp->basic_salary ?? 0));
+                    $monthsByMonth = $empMonthlyOverrides->get($emp->id, collect())->keyBy('month');
+
+                    for ($m = 1; $m <= 12; $m++) {
+                        // --- salary leg (stored as USD) ---
+                        $row = $monthsByMonth->get($m);
+                        $salary = $row
+                            ? (float) ($row->proposed_salary > 0
+                                ? $row->proposed_salary
+                                : ($row->current_salary > 0
+                                    ? $row->current_salary
+                                    : $sharedFallback))
+                            : $sharedFallback;
+
+                        // --- cost configs leg ---
+                        // Saved override: trust as USD (per convention).
+                        // Live fallback: respect $cost->amount_unit and
+                        // convert MVR templates to USD (matches view-budget).
+                        $costSum = 0.0;
+                        foreach ($resortCosts as $cost) {
+                            if (isset($savedByKey[$emp->id][$cost->id][$m])) {
+                                $costSum += $savedByKey[$emp->id][$cost->id][$m];
+                            } else {
+                                $val = Common::computeBudgetCostMonthlyValue(
+                                    $cost, $m, $year, $isLocal, $isMuslim, $basicForPercent
+                                );
+                                if (strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR') {
+                                    $val *= $mvrToUsdRate;
+                                }
+                                $costSum += $val;
+                            }
+                        }
+
+                        $monthly[$m] += $salary + $costSum;
+                    }
+                }
+
+                // Display values for the row header columns. The first
+                // employee in the group seeds nation + basic salary; the
+                // count goes in column 1 (No. of position).
+                $first = $emps->first();
+                $rankLabel = $position->Rank ?? '—';
+                $nation    = $first->nationality ?? '—';
+
+                // Currency-bearing cells (basic salary + 12 monthly totals)
+                // are pre-rendered through Common::formatCurrency so they
+                // switch symbol + value when the resort display currency
+                // toggles between Dollar and MVR. Was emitted as raw
+                // number_format strings before — the badge total swapped
+                // currency at render time but the inner table cells stayed
+                // in raw USD numbers, which is what the user reported.
+                $basicCell = Common::formatCurrency((float) $first->basic_salary, 'USD');
+
+                $rowArr = [
+                    $position->position_title,
+                    $emps->count(),
+                    $rankLabel,
+                    $nation,
+                    $basicCell,
+                ];
+                for ($m = 1; $m <= 12; $m++) {
+                    $rowArr[] = Common::formatCurrency($monthly[$m], 'USD');
+                }
+
+                $MainArray[$dept->name][] = $rowArr;
+                $deptTotal += array_sum($monthly);
+            }
+
+            // -- vacant salaries + vacant cost configs for this dept --
+            // view-budget rolls vacant slots into the per-dept badge
+            // total (each vacant_index counts as another budgeted
+            // position). Mirror that here so the consolidated dept
+            // total = view-budget's dept total.
+            //
+            // CRITICAL: resort_vacant_budget_costs can carry STALE rows
+            // from before a slot was filled (e.g. HRM has a vacant row
+            // worth $7,893.75 but headcount=1 and the slot is now
+            // filled). view-budget's getPositionEmployees endpoint
+            // recomputes the live vacancy count as
+            //   max(0, maxHeadcount - activeFilled)
+            // (see BudgetController:2287-2303) and only loads vacant
+            // indexes <= that count. Apply the same filter here so
+            // orphaned vacant rows don't inflate the dept total.
+            $realVacantCountByPosition = []; // populated below if vacants exist
+            $vacantSalTotal = 0.0;
+            $vacants = DB::table('resort_vacant_budget_costs')
+                ->where('resort_id', $resortId)
+                ->where('department_id', $dept->id)
+                ->where('year', $year)
+                ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
+
+            if ($vacants->isNotEmpty()) {
+                // Real-vacancy count per position (max budgeted headcount
+                // minus currently-Active filled). Keep only vacants whose
+                // vacant_index falls inside that range.
+                $vacantPositionIds = $vacants->pluck('position_id')->unique()->all();
+                $maxHeadByPosition = DB::table('position_monthly_data')
+                    ->whereIn('position_id', $vacantPositionIds)
+                    ->selectRaw('position_id, MAX(COALESCE(headcount, 0)) as max_head')
+                    ->groupBy('position_id')
+                    ->pluck('max_head', 'position_id')
+                    ->toArray();
+                $today = Carbon::today()->toDateString();
+                $filledByPosition = DB::table('employees')
+                    ->where('resort_id', $resortId)
+                    ->where('Dept_id', $dept->id)
+                    ->whereIn('Position_id', $vacantPositionIds)
+                    ->where('status', 'Active')
+                    ->where(function ($q) use ($today) {
+                        $q->whereNull('last_working_day')
+                          ->orWhereDate('last_working_day', '>', $today);
+                    })
+                    ->selectRaw('Position_id, COUNT(*) as filled')
+                    ->groupBy('Position_id')
+                    ->pluck('filled', 'Position_id')
+                    ->toArray();
+                $realVacantCountByPosition = [];
+                foreach ($vacantPositionIds as $pid) {
+                    $maxHead = (int) ($maxHeadByPosition[$pid] ?? 0);
+                    $filled  = (int) ($filledByPosition[$pid] ?? 0);
+                    $realVacantCountByPosition[$pid] = max(0, $maxHead - $filled);
+                }
+                $vacants = $vacants->filter(function ($v) use ($realVacantCountByPosition) {
+                    $real = $realVacantCountByPosition[$v->position_id] ?? 0;
+                    return (int) $v->vacant_index <= $real;
+                })->values();
+            }
+
+            if ($vacants->isNotEmpty()) {
+                $vacantMonthlyOverrides = DB::table('resort_vacant_monthly_salaries')
+                    ->where('resort_id', $resortId)
+                    ->where('year', $year)
+                    ->where('department_id', $dept->id)
+                    ->get(['position_id', 'department_id', 'vacant_index', 'month', 'current_salary', 'proposed_salary'])
+                    ->groupBy(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index);
+
+                $vacantSalTotal = 0.0;
+                foreach ($vacants as $v) {
+                    // Per legacy ResortVacantBudgetCost mapping: basic_salary
+                    // = Current; current_salary = Proposed. Same precedence
+                    // chain Common::computeYearlyBudgetTotal uses.
+                    $sharedFallback = (float) ($v->current_salary > 0
+                        ? $v->current_salary
+                        : ($v->basic_salary ?? 0));
+                    $key = $v->position_id . '|' . $v->department_id . '|' . $v->vacant_index;
+                    $monthsByMonth = $vacantMonthlyOverrides->get($key, collect())->keyBy('month');
+                    for ($m = 1; $m <= 12; $m++) {
+                        $r = $monthsByMonth->get($m);
+                        $eff = $r
+                            ? (float) ($r->proposed_salary > 0
+                                ? $r->proposed_salary
+                                : ($r->current_salary > 0
+                                    ? $r->current_salary
+                                    : $sharedFallback))
+                            : $sharedFallback;
+                        $vacantSalTotal += $eff;
+                    }
+                }
+                $deptTotal += $vacantSalTotal;
+            }
+
+            // Vacant cost configs are linked to the surviving vacant
+            // rows via `vacant_budget_cost_id`. Sum only the configs
+            // whose parent vacant row passed the stale-filter above —
+            // otherwise an orphaned vacant_budget_cost row drags its
+            // cost configs into the dept total even though view-budget
+            // ignores them.
+            $survivingVacantIds = $vacants->pluck('id')->all();
+            $vacantCostTotal = 0.0;
+            if (!empty($survivingVacantIds)) {
+                $vacantCostTotal = (float) DB::table('resort_vacant_budget_cost_configurations')
+                    ->where('resort_id', $resortId)
+                    ->where('department_id', $dept->id)
+                    ->where('year', $year)
+                    ->whereIn('vacant_budget_cost_id', $survivingVacantIds)
+                    ->sum('value');
+            }
+            $deptTotal += $vacantCostTotal;
+
+            if (!empty($MainArray[$dept->name])) {
+                $DepartmentTotal[$dept->name] = $deptTotal;
+            } elseif ($vacantSalTotal ?? 0 || $vacantCostTotal) {
+                // Dept has no filled employees but does have vacant
+                // budget — keep it visible with the vacant-only total.
+                $DepartmentTotal[$dept->name] = $deptTotal;
+                $MainArray[$dept->name] = []; // no display rows yet
+            }
+        }
+
+        return [$MainArray, $DepartmentTotal, $header];
     }
 
     public function viewConsolidatedBudget(Request $request, $resortId)
