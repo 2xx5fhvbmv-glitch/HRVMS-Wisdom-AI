@@ -141,6 +141,41 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Salary Increment list — when resort displays MVR, currency cells
+       become "MVR 1,542.00" (3 tokens) and used to wrap "MVR" on one
+       line and "1,542.00" on the next inside the narrow Increment
+       column. nowrap on every body cell keeps each value on one line;
+       headers still wrap normally. */
+    #salaryIncrementList tbody td {
+        white-space: nowrap;
+        vertical-align: middle;
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+    #salaryIncrementList thead th {
+        white-space: normal;
+        font-size: 12.5px;
+        padding: 8px 10px;
+        vertical-align: middle;
+    }
+    /* The "Last Activity" stage column carries multi-line content
+       (Finance: badge — reason / GM: badge — reason). Let it wrap so
+       the badge stack stays compact and readable instead of fighting
+       the global nowrap above. */
+    #salaryIncrementList tbody td:nth-last-child(2) {
+        white-space: normal;
+        min-width: 220px;
+        max-width: 320px;
+        line-height: 1.4;
+    }
+    /* Remark column — long free text shouldn't blow up the table. */
+    #salaryIncrementList tbody td:nth-last-child(3) {
+        white-space: normal;
+        max-width: 180px;
+        word-break: break-word;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -270,9 +305,15 @@
                          { data: 'employee_name', name: 'employee_name' },
                          { data: 'position_title', name: 'position_title' },
                          { data: 'department_name', name: 'department_name' },
-                         { data: 'previous_salary', name: 'previous_salary', render: function(data) { return currencySymbol + ' ' + data; } },
-                         { data: 'new_salary', name: 'new_salary', render: function(data) { return currencySymbol + ' ' + data; } },
-                         { data: 'increment_amount', name: 'increment_amount', render: function(data) { return currencySymbol + ' ' + data; } },
+                         // Use formatAmount() so the symbol AND value both
+                         // switch when the resort display currency toggles.
+                         // The old `currencySymbol + ' ' + data` printed the
+                         // right symbol but never converted the USD-stored
+                         // value, so MVR-display showed "MVR 7200" instead
+                         // of "MVR 111,024".
+                         { data: 'previous_salary',  name: 'previous_salary',  render: function(d) { return formatAmount(d, 'USD'); } },
+                         { data: 'new_salary',       name: 'new_salary',       render: function(d) { return formatAmount(d, 'USD'); } },
+                         { data: 'increment_amount', name: 'increment_amount', render: function(d) { return formatAmount(d, 'USD'); } },
                          { data: 'increment_type', name: 'increment_type' },
                          { data: 'effective_date', name: 'effective_date' },
                          { data: 'remarks', name: 'remarks' },

@@ -4400,12 +4400,30 @@ class Common
             ->where('resort_budget_cost_id', $cost->id)
             ->pluck('value', 'month');
 
+        // Cost TEMPLATES with amount_unit='MVR' return live-fallback values
+        // in MVR; per project convention we always emit USD totals so the
+        // display layer can do MVR display at render time. Multiply MVR
+        // template values by 1/DollertoMVR to convert to USD before
+        // summing — same rule view-budget JS applies via mvrToUsdRate.
+        // Saved overrides are USD already and aren't touched.
+        $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
+        $mvrToUsdRate  = 1.0;
+        if ($isMvrTemplate) {
+            $dollarToMvr = (float) (\DB::table('resort_site_settings')
+                ->where('resort_id', $resortId)
+                ->value('DollertoMVR') ?: 15.42);
+            if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+            $mvrToUsdRate = 1.0 / $dollarToMvr;
+        }
+
         $total = 0.0;
         for ($m = 1; $m <= 12; $m++) {
             if (isset($savedByMonth[$m])) {
                 $total += (float) $savedByMonth[$m];
             } else {
-                $total += self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent);
+                $val = self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent);
+                if ($isMvrTemplate) $val *= $mvrToUsdRate;
+                $total += $val;
             }
         }
         return $total;
@@ -4554,6 +4572,49 @@ class Common
             ->where('year', $year)
             ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
 
+        // Filter out STALE vacant rows — same rule view-budget enforces
+        // (BudgetController::getPositionEmployees, ~:2287-2303). A vacant
+        // row only counts when its vacant_index falls inside the live
+        // vacancy headcount = max(0, max_budgeted_headcount - active_filled).
+        // Without this, an orphaned vacant_budget_cost row (typical when
+        // a slot was filled after the row was created) inflates the
+        // Liability headline by its salary + cost configs even though
+        // the slot no longer needs to be filled.
+        if ($vacants->isNotEmpty()) {
+            $vacPosIds = $vacants->pluck('position_id')->unique()->all();
+            $maxHeadByPosition = \DB::table('position_monthly_data')
+                ->whereIn('position_id', $vacPosIds)
+                ->selectRaw('position_id, MAX(COALESCE(headcount, 0)) as max_head')
+                ->groupBy('position_id')
+                ->pluck('max_head', 'position_id')
+                ->toArray();
+            $today = \Carbon\Carbon::today()->toDateString();
+            $filledByPosition = \DB::table('employees')
+                ->where('resort_id', $resortId)
+                ->whereIn('Position_id', $vacPosIds)
+                ->where('status', 'Active')
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('last_working_day')
+                      ->orWhereDate('last_working_day', '>', $today);
+                })
+                ->selectRaw('Position_id, COUNT(*) as filled')
+                ->groupBy('Position_id')
+                ->pluck('filled', 'Position_id')
+                ->toArray();
+            $realVacantCountByPosition = [];
+            foreach ($vacPosIds as $pid) {
+                $realVacantCountByPosition[$pid] = max(
+                    0,
+                    (int) ($maxHeadByPosition[$pid] ?? 0)
+                    - (int) ($filledByPosition[$pid] ?? 0)
+                );
+            }
+            $vacants = $vacants->filter(function ($v) use ($realVacantCountByPosition) {
+                $real = $realVacantCountByPosition[$v->position_id] ?? 0;
+                return (int) $v->vacant_index <= $real;
+            })->values();
+        }
+
         $vacantMonthlyOverrides = \DB::table('resort_vacant_monthly_salaries')
             ->where('resort_id', $resortId)
             ->where('year', $year)
@@ -4586,9 +4647,13 @@ class Common
         }
 
         // -- 4. Vacant per-month cost configurations -------------------------
-        $vacantCostTotal = (float) \DB::table('resort_vacant_budget_cost_configurations')
+        // Same stale-filter as above — only sum configs whose parent
+        // vacant row survived the headcount check.
+        $survivingVacantIds = $vacants->pluck('id')->all();
+        $vacantCostTotal = empty($survivingVacantIds) ? 0.0 : (float) \DB::table('resort_vacant_budget_cost_configurations')
             ->where('resort_id', $resortId)
             ->where('year', $year)
+            ->whereIn('vacant_budget_cost_id', $survivingVacantIds)
             ->sum('value');
 
         return $employeeSalaryTotal + $employeeCostTotal + $vacantSalaryTotal + $vacantCostTotal;

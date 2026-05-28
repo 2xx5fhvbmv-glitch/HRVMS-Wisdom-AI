@@ -24,17 +24,17 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{!! Common::formatCurrency($estimated_liability, 'MVR') !!}</strong>
+                            <h6>Total Estimated Liability {{ date('Y') }}</h6><strong>{!! Common::formatCurrency($estimated_liability, 'USD') !!}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Current Liability</h6><strong>{!! Common::formatCurrency($current_liability, 'MVR') !!}</strong>
+                            <h6>Current Liability</h6><strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Liability Reduction</h6><strong>{!! Common::formatCurrency($liability_reduction, 'MVR') !!}</strong>
+                            <h6>Liability Reduction</h6><strong>{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
                         </div>
                     </div>
                 </div>
@@ -209,10 +209,10 @@
                                                         @endphp
                                                         <tr>
                                                             <td>{{ $row['label'] }}</td>
-                                                            <td>{!! Common::formatCurrency($estimated, 'MVR') !!}</td>
-                                                            <td>{!! Common::formatCurrency($actual,    'MVR') !!}</td>
-                                                            <td>{!! Common::formatCurrency($remaining, 'MVR') !!}</td>
-                                                            {{-- <td><span class="text-{{ $estimated >= $actual ? 'success' : 'danger' }}">{!! Common::formatCurrency($estimated - $actual, 'MVR') !!}</span></td> --}}
+                                                            <td>{!! Common::formatCurrency($estimated, 'USD') !!}</td>
+                                                            <td>{!! Common::formatCurrency($actual,    'USD') !!}</td>
+                                                            <td>{!! Common::formatCurrency($remaining, 'USD') !!}</td>
+                                                            {{-- <td><span class="text-{{ $estimated >= $actual ? 'success' : 'danger' }}">{!! Common::formatCurrency($estimated - $actual, 'USD') !!}</span></td> --}}
                                                         </tr>
                                                     @endforeach
                                                 </tbody>
@@ -230,6 +230,44 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Liability "Employees" tab — the table has ~22 columns of currency
+       cells. Default Bootstrap spacing made every $ value wrap (e.g. "$"
+       on one line and "7,200.00" below) and header titles like
+       "Male - Based / Airport Based Allowance" used 4+ lines of vertical
+       space. Tightening cells so each row fits on a single visual line
+       and the horizontal scroll feels intentional. */
+    .table-liabilityOverEmpPeopleEmp th,
+    .table-liabilityOverEmpPeopleEmp td {
+        white-space: nowrap;
+        padding: 6px 10px !important;
+        font-size: 12.5px;
+        vertical-align: middle;
+    }
+    .table-liabilityOverEmpPeopleEmp th {
+        font-weight: 600;
+        background-color: #f6f8f9;
+    }
+    /* Allow the multi-word allowance headers to wrap so the column
+       itself doesn't get extremely wide. Body cells stay nowrap so the
+       currency stays on one line. */
+    .table-liabilityOverEmpPeopleEmp thead th {
+        white-space: normal;
+        min-width: 90px;
+        max-width: 140px;
+    }
+    /* First couple of identity columns (ID, Name, Dept, Position,
+       Nationality) get a touch more breathing room than currency cells. */
+    .table-liabilityOverEmpPeopleEmp td:nth-child(-n+5) {
+        padding-right: 12px !important;
+    }
+    .table-liabilityOverEmpPeopleEmp tbody td {
+        border-color: #e9eef0;
+    }
+    /* Horizontal scrollbar stays usable on the wrapping table-responsive
+       container that already wraps this table. */
+    .table-responsive { -webkit-overflow-scrolling: touch; }
+</style>
 @endsection
 
 @section('import-scripts')
