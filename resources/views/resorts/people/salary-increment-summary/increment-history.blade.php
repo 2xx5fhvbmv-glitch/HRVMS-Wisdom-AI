@@ -54,6 +54,32 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* History page Status column carries up to 3 stacked rows on Rejected:
+       the badge, "Rejected by Finance: <actor> on <date>", and "Reason:
+       <text>". Each row must stay on a single line; when actor names
+       and dates make the content overflow, scroll horizontally inside
+       the cell instead of wrapping. Same pattern as
+       /salary-increment/list and /summary-list. */
+    #salaryIncrementList tbody td:last-child {
+        min-width: 240px;
+        max-width: 360px;
+        line-height: 1.4;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+    }
+    #salaryIncrementList tbody td:last-child > div {
+        white-space: nowrap;
+    }
+    #salaryIncrementList tbody td:last-child::-webkit-scrollbar {
+        height: 5px;
+    }
+    #salaryIncrementList tbody td:last-child::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.18);
+        border-radius: 3px;
+    }
+</style>
 @endsection
 
 @section('import-scripts')

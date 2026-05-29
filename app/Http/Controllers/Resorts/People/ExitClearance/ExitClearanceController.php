@@ -89,10 +89,26 @@ class ExitClearanceController extends Controller
             $positionId = $request->filled('position_id')   ? (int) $request->position_id   : null;
             $statusVal  = $request->filled('status')        ? trim((string) $request->status) : null;
 
+            // Per-employee filter — used when the Employee Detail page
+            // "Clearance" tab forwards ?empId=<base64>. When scoped to one
+            // employee we drop the default status='Approved' filter so HR
+            // sees that employee's clearance regardless of resignation state.
+            $empIdFilter = null;
+            if ($request->filled('empId')) {
+                $decoded = base64_decode((string) $request->empId, true);
+                if ($decoded !== false && ctype_digit((string) $decoded)) {
+                    $empIdFilter = (int) $decoded;
+                }
+            }
+
             $employeeResignations = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
                 ->where('resort_id', $resort_id)
-                ->when($statusVal, fn($q) => $q->where('status', $statusVal),
-                                   fn($q) => $q->where('status', 'Approved'))
+                ->when($empIdFilter, function ($q) use ($empIdFilter) {
+                    $q->where('employee_id', $empIdFilter);
+                }, function ($q) use ($statusVal) {
+                    $q->when($statusVal, fn($qq) => $qq->where('status', $statusVal),
+                                         fn($qq) => $qq->where('status', 'Approved'));
+                })
                 ->when($deptId, function ($q) use ($deptId) {
                     $q->whereHas('employee', fn($eq) => $eq->where('Dept_id', $deptId));
                 })

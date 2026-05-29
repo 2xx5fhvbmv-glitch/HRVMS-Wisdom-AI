@@ -31,7 +31,9 @@
                                     <i class="fa-solid fa-ellipsis-vertical"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
-                                    <li><a class="dropdown-item" href="{{route('people.employees.details', base64_encode($employee->id))}}">View Profile</a></li>
+                                    {{-- "View Profile" hidden here — this IS the
+                                         profile page, so the link only round-tripped
+                                         to itself. --}}
                                     <!-- <li><a class="dropdown-item" href="#">Edit Employee</a></li> -->
                                     <li><a class="dropdown-item add-to-team-btn" href="#" data-emp-id="{{$employee->id}}">
                                     Add to Team / Assign Role</a></li>
@@ -123,23 +125,46 @@
                                     </tr>
                                 </tbody>
                             </table>
+                            {{-- Per-employee sidebar tabs. Every link must carry the
+                                 employee identifier so the destination page can scope
+                                 to this employee. Existing modules (Probation,
+                                 Promotion, Xpat, T&A, Accommodation) already accept a
+                                 base64-encoded employee id. Leave / File Management /
+                                 Announcement / Clearance / Requests were previously
+                                 dead (`javascript:void(0)`) and are now wired to the
+                                 closest matching list page, with the employee id in
+                                 the query string. Destinations that don't yet honor
+                                 the filter will surface the global list — wire the
+                                 server-side filter on those pages in follow-up
+                                 work. --}}
                             <ul>
                                 <!-- <li><a href="#">Workforce Planning</a></li> -->
                                 <li><a href="{{route('people.probation.details',[base64_encode($employee->id)])}}">Probation</a></li>
                                 <li><a href="{{ route('people.promotion.history', [base64_encode($employee->id)]) }}">Promotion</a></li>
                                 <li><a href="{{route('resort.visa.XpactEmpDetails',[base64_encode($employee->id)])}}">Xpat</a></li>
                                 <li><a href="{{ route('resort.timeandattendance.employee.details', [ base64_encode($employee->id)]); }}">Time & Attendance</a></li>
-                                <li><a href="javascript:void(0);">Leave</a></li>
+                                {{-- Leave: opens the per-employee leave history PAGE
+                                     (not the PDF download). LeaveController::employeeLevePage
+                                     resolves the employee's latest leave and 302-redirects to
+                                     leave.details, which already renders the full
+                                     leave-history table for that employee. --}}
+                                <li><a href="{{ route('leave.employee.page', ['empID' => base64_encode($employee->id)]) }}">Leave</a></li>
                                 <li><a href="{{ route('resort.accommodation.AccommodationEmployeeDetails', [base64_encode($employee->id)]) }}">Accommodation</a></li>
                                 <!-- <li><a href="#">Payroll</a></li> -->
                                 <!-- <li><a href="#">People Relation</a></li> -->
                                 <!-- <li><a href="#">L&D</a></li> -->
                                 <!-- <li><a href="#">Survey</a></li> -->
                                 <!-- <li><a href="#">Incident</a></li> -->
-                                <li><a href="javascript:void(0);">File Management</a></li>
-                                <li><a href="javascript:void(0);">Announcement</a></li>
-                                <li><a href="javascript:void(0);">Clearance</a></li>
-                                <li><a href="javascript:void(0);">Requests</a></li>
+                                {{-- File Management: lands on the employees-folder
+                                     page. Each active employee already has a
+                                     categorized folder named after their Emp_id
+                                     (see Employee::created hook). Passing
+                                     emp_code lets that page focus the matching
+                                     folder once it consumes the filter. --}}
+                                <li><a href="{{ route('Employees.Documents', ['emp_code' => $employee->Emp_id]) }}">File Management</a></li>
+                                <li><a href="{{ route('people.announcements', ['empId' => base64_encode($employee->id)]) }}">Announcement</a></li>
+                                <li><a href="{{ route('people.exit-clearance', ['empId' => base64_encode($employee->id)]) }}">Clearance</a></li>
+                                <li><a href="{{ route('people.approvel.index', ['empId' => base64_encode($employee->id)]) }}">Requests</a></li>
                             </ul>
                         </div>
                     </div>
@@ -234,7 +259,9 @@
                                                                         <option value="">Select Gender</option>
                                                                         <option {{$employee->resortAdmin->gender == "male" ? "Selected" : ""}} value="male">Male</option>
                                                                         <option {{$employee->resortAdmin->gender == "female" ? "Selected" : ""}} value="female">Female</option>
-                                                                        <option {{$employee->resortAdmin->gender == "other" ? "Selected" : ""}} value="other">Other</option>
+                                                                        {{-- "Other" intentionally removed per HR policy:
+                                                                             gender is collected only for legal/visa records
+                                                                             where Male / Female are the only accepted values. --}}
                                                                     </select>
                                                                 </td>
                                                             </tr>
@@ -371,11 +398,18 @@
                                                             <th>Mobile Number:</th>
                                                             <td>
                                                                 <span class="view-mode">{{ $employee->resortAdmin->personal_phone }}</span>
-                                                                <input type="text" name="personal_phone" class="form-control edit-mode d-none"
+                                                                {{-- type="tel" surfaces the phone keyboard on mobile.
+                                                                     Pattern allows + as first char (country code),
+                                                                     digits, spaces, dashes, brackets. minlength/maxlength
+                                                                     reflect real-world phone-number lengths including
+                                                                     the +CC prefix. --}}
+                                                                <input type="tel" name="personal_phone" class="form-control edit-mode d-none"
                                                                        value="{{ $employee->resortAdmin->personal_phone }}"
-                                                                       required pattern="^[0-9+\-\s]{7,20}$"
-                                                                       minlength="7" maxlength="20"
-                                                                       placeholder="Enter mobile number">
+                                                                       required pattern="^\+?[0-9\-\s()]{7,25}$"
+                                                                       minlength="7" maxlength="25"
+                                                                       inputmode="tel" autocomplete="tel"
+                                                                       placeholder="e.g. +960 9123456">
+                                                                <small class="form-text text-muted edit-mode d-none">Include country code, e.g. +91 9098765432</small>
                                                             </td>
                                                         </tr>
                                                         <tr>
@@ -535,11 +569,38 @@
                                                             <tr>
                                                                 <th>Biometrics:</th>
                                                                 <td>
-                                                                    @if($employee->biometric_file)
-                                                                        <a href="{{ URL::asset($employee->biometric_file) }}" target="_blank"><i class="fa fa-file"></i></a>
-                                                                    @else
-                                                                        <input type="file" name="biometric_file" class="form-control edit-mode d-none">
-                                                                    @endif
+                                                                    {{-- Biometrics file is stored on Wasabi/S3 via
+                                                                         Common::AWSEmployeeFileUpload, so `biometric_file`
+                                                                         holds an S3 key like
+                                                                         `12/public/categorized/abc.../xyz.pdf` — NOT a
+                                                                         public-folder path. The previous markup used
+                                                                         URL::asset($employee->biometric_file) which
+                                                                         resolved to a 404 (the file isn't in /public).
+                                                                         Resolve a temporary signed URL through the
+                                                                         canonical helper instead so the link actually
+                                                                         opens the document. --}}
+                                                                    @php
+                                                                        $_bio = null;
+                                                                        if (!empty($employee->biometric_file)) {
+                                                                            $_bioResult = Common::GetApplicantAWSFile($employee->biometric_file);
+                                                                            $_bio = ($_bioResult['success'] ?? false) ? ($_bioResult['NewURLshow'] ?? null) : null;
+                                                                        }
+                                                                    @endphp
+                                                                    <span class="view-mode">
+                                                                        @if($_bio)
+                                                                            <a href="{{ $_bio }}" target="_blank" rel="noopener">
+                                                                                <i class="fa fa-file"></i> View
+                                                                            </a>
+                                                                        @else
+                                                                            <span class="text-muted">—</span>
+                                                                        @endif
+                                                                    </span>
+                                                                    {{-- File input always rendered (was only rendered when
+                                                                         no file existed, so users couldn't replace an
+                                                                         existing biometric record). Hidden until Edit
+                                                                         like every other field. --}}
+                                                                    <input type="file" name="biometric_file" class="form-control edit-mode d-none"
+                                                                           accept=".pdf,.jpg,.jpeg,.png,.gif,.svg,.webp,.heic,.heif">
                                                                 </td>
                                                             </tr>
 
@@ -600,35 +661,7 @@
                                     <div class="card-title mb-lg-3">
                                         <h3>Recent Activities</h3>
                                     </div>
-                                    <div class="row g-xxl-4 g-lg-3 g-2">
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Annual Leave</h6>
-                                                    <p>From 01 Nov 2024 to 5 Jan 2025</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Time-off requests</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Permissions</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeYellow">Pending</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    @include('resorts.people.employee._partials.recent-activities')
                                 </div>
 
                                 <div class="tab-pane fade" id="tabPane2" role="tabpanel" aria-labelledby="#tab2"
@@ -669,7 +702,16 @@
                                                                 <th>Mobile Number:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->resortAdmin->personal_phone}}</span>
-                                                                    <input type="text" name="personal_phone" class="form-control edit-mode d-none" value="{{$employee->resortAdmin->personal_phone}}">
+                                                                    {{-- type=tel + permissive pattern so HR can paste
+                                                                         in international numbers like "+91 9098765432".
+                                                                         Matches the Personal-Information Mobile field. --}}
+                                                                    <input type="tel" name="personal_phone" class="form-control edit-mode d-none"
+                                                                           value="{{$employee->resortAdmin->personal_phone}}"
+                                                                           pattern="^\+?[0-9\-\s()]{7,25}$"
+                                                                           minlength="7" maxlength="25"
+                                                                           inputmode="tel" autocomplete="tel"
+                                                                           placeholder="e.g. +960 9123456">
+                                                                    <small class="form-text text-muted edit-mode d-none">Include country code, e.g. +91 9098765432</small>
                                                                 </td>
                                                             </tr>
 
@@ -891,8 +933,18 @@
                                                                 <th>TIN:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->tin ?? "N/A"}}</span>
-                                                                   <input type="text" class="form-control edit-mode d-none" name="tin" pattern="\d{6,10}" maxlength="10" class="form-control" value="{{$employee->tin}}">
-
+                                                                    <input type="text" class="form-control edit-mode d-none" name="tin" id="tin-input"
+                                                                           pattern="\d{6,10}" maxlength="10"
+                                                                           value="{{$employee->tin}}"
+                                                                           placeholder="6–10 digit TIN">
+                                                                    {{-- Required-TIN notice — appears when EWT Status is
+                                                                         toggled on in Salary Details below. JS in
+                                                                         `submitEmploymentUpdate` also blocks save if
+                                                                         this state is true and the input is empty. --}}
+                                                                    <small id="tin-required-notice" class="form-text text-danger d-none">
+                                                                        <i class="fa-solid fa-circle-exclamation me-1"></i>
+                                                                        TIN is required when EWT Status is Enrolled.
+                                                                    </small>
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -1241,33 +1293,20 @@
                                     <div class="card-title mb-lg-3">
                                         <h3>Recent Activities</h3>
                                     </div>
-                                    <div class="row g-xxl-4 g-lg-3 g-2">
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Annual Leave</h6>
-                                                    <p>From 01 Nov 2024 to 5 Jan 2025</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Time-off requests</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Permissions</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeYellow">Pending</span>
-                                            </div>
+                                    @include('resorts.people.employee._partials.recent-activities')
+
+                                    {{-- Employment change-log feed. Populated via AJAX
+                                         (people.employees.employment-logs) so the
+                                         table-of-edits doesn't bloat first render.
+                                         The wrapper carries the employee id; the
+                                         loader script lives at the bottom of the
+                                         page (look for loadEmploymentLogs). --}}
+                                    <div class="card-title mb-lg-3 mt-4">
+                                        <h3>Employment Change Log</h3>
+                                    </div>
+                                    <div id="employment-logs-wrap" data-employee-id="{{ $employee->id }}">
+                                        <div class="text-center text-muted py-3">
+                                            <i class="fa-solid fa-spinner fa-spin"></i> Loading change log…
                                         </div>
                                     </div>
                                 </div>
@@ -1373,35 +1412,7 @@
                                     <div class="card-title mb-lg-3">
                                         <h3>Recent Activities</h3>
                                     </div>
-                                    <div class="row g-xxl-4 g-lg-3 g-2">
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Annual Leave</h6>
-                                                    <p>From 01 Nov 2024 to 5 Jan 2025</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Time-off requests</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Permissions</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeYellow">Pending</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    @include('resorts.people.employee._partials.recent-activities')
                                 </div>
 
                                 <div class="tab-pane fade" id="tabPane4" role="tabpanel" aria-labelledby="tab4" tabindex="0">
@@ -1517,35 +1528,7 @@
                                     <div class="card-title mb-lg-3">
                                         <h3>Recent Activities</h3>
                                     </div>
-                                    <div class="row g-xxl-4 g-lg-3 g-2">
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Annual Leave</h6>
-                                                    <p>From 01 Nov 2024 to 5 Jan 2025</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Time-off requests</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeSuccess">Approved</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                            <div class="recentActPeopleEmp-block">
-                                                <div>
-                                                    <h6>Permissions</h6>
-                                                    <p>Lorem ipsum is dummy text of industry</p>
-                                                </div>
-                                                <span class="badge badge-themeYellow">Pending</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    @include('resorts.people.employee._partials.recent-activities')
                                 </div>
 
                                 <div class="tab-pane fade" id="tabPane5" role="tabpanel" aria-labelledby="tab5" tabindex="0">
@@ -1585,8 +1568,23 @@
                                                                     <td>
                                                                         <span class="view-mode">{{ $doc->expiry_date ? \Carbon\Carbon::parse($doc->expiry_date)->format('d M Y') : '-' }}</span>
                                                                         <input type="text" name="expiry_dates[]" class="form-control edit-mode d-none datepicker" value="{{ $doc->expiry_date ? \Carbon\Carbon::parse($doc->expiry_date)->format('d/m/Y') : '' }}">
-                                                                        @if($doc->document_file)
-                                                                            <a href="{{ URL::asset($doc->document_file) }}" target="_blank" class="ms-2"><i class="fa fa-file"></i></a>
+                                                                        {{-- Document is stored on Wasabi/S3 under
+                                                                             `document_path` (NOT `document_file` —
+                                                                             that column doesn't exist; the link
+                                                                             always failed silently). Use
+                                                                             Common::GetApplicantAWSFile to mint a
+                                                                             temporary signed URL — same pattern as
+                                                                             the Biometrics row. --}}
+                                                                        @if(!empty($doc->document_path))
+                                                                            @php
+                                                                                $_docResult = Common::GetApplicantAWSFile($doc->document_path);
+                                                                                $_docUrl = ($_docResult['success'] ?? false) ? ($_docResult['NewURLshow'] ?? null) : null;
+                                                                            @endphp
+                                                                            @if($_docUrl)
+                                                                                <a href="{{ $_docUrl }}" target="_blank" rel="noopener" class="ms-2" title="View document">
+                                                                                    <i class="fa fa-file"></i>
+                                                                                </a>
+                                                                            @endif
                                                                         @endif
                                                                     </td>
                                                                 </tr>
@@ -1608,35 +1606,7 @@
                                         <h3>Recent Activities</h3>
                                     </div>
 
-                                    <div class="row g-xxl-4 g-lg-3 g-2">
-                                        <div class="col-xl-4 col-lg-6">
-                                        <div class="recentActPeopleEmp-block">
-                                            <div>
-                                            <h6>Annual Leave</h6>
-                                            <p>From 01 Nov 2024 to 5 Jan 2025</p>
-                                            </div>
-                                            <span class="badge badge-themeSuccess">Approved</span>
-                                        </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                        <div class="recentActPeopleEmp-block">
-                                            <div>
-                                            <h6>Time-off requests</h6>
-                                            <p>Lorem ipsum is dummy text of industry</p>
-                                            </div>
-                                            <span class="badge badge-themeSuccess">Approved</span>
-                                        </div>
-                                        </div>
-                                        <div class="col-xl-4 col-lg-6">
-                                        <div class="recentActPeopleEmp-block">
-                                            <div>
-                                            <h6>Permissions</h6>
-                                            <p>Lorem ipsum is dummy text of industry</p>
-                                            </div>
-                                            <span class="badge badge-themeYellow">Pending</span>
-                                        </div>
-                                        </div>
-                                    </div>
+                                    @include('resorts.people.employee._partials.recent-activities')
                                 </div>
 
                                 <div class="tab-pane fade" id="tabPane6" role="tabpanel" aria-labelledby="tab6" tabindex="0">
@@ -1760,14 +1730,127 @@
             </form>
         </div>
     </div>
+
+    {{-- Employment-section sensitive-edit confirmation modal. Employment
+         data drives payroll, benefit-grid eligibility, reporting lines
+         and tax records — accidental edits cascade widely, so a second
+         confirmation is warranted before the AJAX PUT fires. --}}
+    <div class="modal fade" id="employmentEditConfirmModal" tabindex="-1" aria-labelledby="employmentEditConfirmLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="employmentEditConfirmLabel">
+                        <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>
+                        Confirm Employment Update
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2"><strong>This is sensitive data.</strong></p>
+                    <p class="mb-0 text-muted" style="font-size: 13px;">
+                        Employment information drives payroll, benefit-grid
+                        entitlements, reporting structure and statutory
+                        records. Changes apply immediately. Are you sure
+                        you want to save these edits?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-themeBlue btn-sm" id="confirm-emp-info-save">
+                        Yes, Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('import-css')
+<style>
+    /* Pin the 3-dot kebab to the top-right corner of the profile sidebar.
+       default.css already absolute-positions
+       `.empDetailPeopleEmp-sidebar .dropdown` at top:22px / right:22px,
+       but the rendered button was visually drifting toward the centre.
+       Force the corner with !important so cached/legacy theme rules can't
+       override. Same approach as the grid card fix on /people/employees. */
+    .empDetailPeopleEmp-sidebar { position: relative !important; }
+    .empDetailPeopleEmp-sidebar .dropdown,
+    .empDetailPeopleEmp-sidebar .table-dropdown {
+        position: absolute !important;
+        top: 10px !important;
+        right: 12px !important;
+        left: auto !important;
+        z-index: 5;
+    }
+    .empDetailPeopleEmp-sidebar .dotsV-link {
+        padding: 4px 8px !important;
+        line-height: 1 !important;
+    }
+
+    /* Leave Destination bug — the field uses select2-airport-search, and
+       select2 inserts a separate .select2-container right after the
+       original <select>. Bootstrap's `.d-none` hides the original select,
+       but select2's rendered widget kept showing → users could open and
+       select an airport before ever clicking Edit. Hide the widget too
+       while the underlying select is in view mode; `removeClass('d-none')`
+       in the edit toggle automatically restores it. */
+    .select2-airport-search.d-none + .select2-container {
+        display: none !important;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
 
 <script>
+    // ------------------------------------------------------------------
+    // Tab persistence across reloads. Every section submit (Personal
+    // Info, Employment, Salary, Allowances, Bank, Status, Activate,
+    // etc.) calls location.reload(), which kicked the user back to the
+    // default Personal Details tab. Persist the active tab id in the
+    // URL hash so the browser's automatic hash preservation on reload
+    // drops them back where they were.
+    //
+    // - Bootstrap fires `shown.bs.tab` whenever a tab activates; we
+    //   record its target into location.hash via history.replaceState
+    //   (avoids polluting browser history with every tab click).
+    // - On DOM ready, look at location.hash. If it matches one of the
+    //   tab panes, programmatically activate the matching nav-link.
+    // ------------------------------------------------------------------
+    (function () {
+        function activateTabFromHash() {
+            var hash = (window.location.hash || '').replace(/^#/, '');
+            if (!hash) return;
+            // Only handle our employee-detail tabPaneN ids — don't
+            // hijack other potential anchor links on the page.
+            if (!/^tabPane\d+$/.test(hash)) return;
+            var trigger = document.querySelector('[data-bs-target="#' + hash + '"]');
+            if (!trigger) return;
+            try {
+                // Bootstrap 5 Tab API.
+                var tab = bootstrap.Tab.getOrCreateInstance(trigger);
+                tab.show();
+            } catch (e) {
+                // Fallback for environments where the bootstrap global
+                // hasn't loaded yet — defer until DOM ready.
+                $(trigger).tab && $(trigger).tab('show');
+            }
+        }
+
+        $(document).on('shown.bs.tab', '[data-bs-toggle="tab"]', function (e) {
+            var target = (e.target.getAttribute('data-bs-target') || '').replace(/^#/, '');
+            if (!target || !/^tabPane\d+$/.test(target)) return;
+            // replaceState so we don't add a history entry per tab click.
+            if (history.replaceState) {
+                history.replaceState(null, '', '#' + target);
+            } else {
+                window.location.hash = '#' + target;
+            }
+        });
+
+        $(document).ready(activateTabFromHash);
+    })();
+
     // Function to load HOD list (defined globally to be accessible from all script blocks)
     function loadHODList() {
         const currentDeptId = $('[name="Dept_id"]').val() || $('#department-select').data('current-department') || '';
@@ -1890,17 +1973,29 @@
         $('#assignTeamForm').on('submit', function (e) {
             e.preventDefault();
 
+            var $form = $(this);
+            var $submitBtn = $form.find('button[type="submit"]').prop('disabled', true);
+
             $.ajax({
                 url: "{{ route('people.employees.assign-team') }}",
                 type: "POST",
-                data: $(this).serialize(),
+                data: $form.serialize(),
                 success: function (response) {
-                    $('#assignModal').modal('hide');
                     if (response.status === 'success') {
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
-                        // Optionally refresh or update the team list
+                        // Modal id is #assignTeamModal (not #assignModal —
+                        // that was a typo that left the dialog open after a
+                        // successful assignment).
+                        $('#assignTeamModal').modal('hide');
+                        // Reset form + select2 so a second assignment starts
+                        // clean.
+                        $form[0].reset();
+                        $form.find('select.select2t-none').trigger('change');
+                        // Reload to refresh the Teams row in the sidebar
+                        // with the new assignment.
+                        setTimeout(function () { window.location.reload(); }, 800);
                     } else {
                         toastr.error(response.message, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -1912,6 +2007,9 @@
                     toastr.error("Something went wrong. Please try again.", "Error", {
                         positionClass: 'toast-bottom-right'
                     });
+                },
+                complete: function () {
+                    $submitBtn.prop('disabled', false);
                 }
             });
         });
@@ -2438,7 +2536,44 @@
             });
         });
 
-        $('#btn-emp-info-save').on('click', function () {
+        // ----------------------------------------------------------------
+        // EWT Status → TIN required flow. When the user toggles EWT to
+        // Enrolled in Salary Details, the TIN field (in Employment
+        // Information above) becomes mandatory. We:
+        //   1. show an inline notice next to the TIN input,
+        //   2. focus + highlight the TIN field so the user can type
+        //      without scrolling around,
+        //   3. block the Employment save AJAX if EWT is on and TIN is
+        //      still empty (the server-side save accepts whatever, so
+        //      gating is purely client-side).
+        // ----------------------------------------------------------------
+        function syncEwtTinRequirement() {
+            var ewtEnabled = $('#ewt_status').is(':checked');
+            var $tin = $('#tin-input');
+            var $notice = $('#tin-required-notice');
+            if (ewtEnabled) {
+                $notice.removeClass('d-none');
+                $tin.attr('required', 'required').addClass('border-danger');
+                // Open the Employment edit row if it's not already open
+                // and pull focus to TIN so the user knows where to type.
+                if ($tin.hasClass('d-none')) {
+                    $('.edit-emp-info').trigger('click');
+                }
+                setTimeout(function () { $tin.focus(); }, 50);
+            } else {
+                $notice.addClass('d-none');
+                $tin.removeAttr('required').removeClass('border-danger');
+            }
+        }
+
+        $(document).on('change', '#ewt_status', syncEwtTinRequirement);
+
+        // Employment data drives payroll, benefit-grid, reporting + tax
+        // — surface a sensitive-edit confirmation modal before firing
+        // the AJAX. The actual PUT lives in `submitEmploymentUpdate`
+        // and only runs once the user clicks "Yes, Save Changes" in
+        // #employmentEditConfirmModal.
+        function submitEmploymentUpdate() {
             let formData = {
                 _token: $('meta[name="csrf-token"]').attr('content'), // CSRF token
                 employee_id: '{{ $employee->id }}',
@@ -2459,6 +2594,9 @@
                 reporting_to: $('[name="reporting_to"]').val(),
             };
 
+            var $confirmBtn = $('#confirm-emp-info-save').prop('disabled', true)
+                .html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving…');
+
             $.ajax({
                 url: '{{ route("employee.update.employment-data") }}',
                 method: 'POST',
@@ -2468,6 +2606,11 @@
                         toastr.success(response.message, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
+                        $('#employmentEditConfirmModal').modal('hide');
+                        // Refresh the change-log so the diff that just
+                        // landed appears at the top before the reload
+                        // race (the full-page reload below still fires).
+                        loadEmploymentLogs(1);
                         location.reload(); // Reload to show updated data
                         $('.datepicker').datepicker({
                             format: 'dd/mm/yyyy',
@@ -2477,6 +2620,7 @@
                         toastr.error('Failed to update information.', "Error", {
                             positionClass: 'toast-bottom-right'
                         });
+                        $confirmBtn.prop('disabled', false).html('Yes, Save Changes');
                     }
                 },
                 error: function (xhr) {
@@ -2484,8 +2628,75 @@
                         positionClass: 'toast-bottom-right'
                     });
                     console.log(xhr.responseText);
+                    $confirmBtn.prop('disabled', false).html('Yes, Save Changes');
                 }
             });
+        }
+
+        $('#btn-emp-info-save').on('click', function () {
+            // Client-side gate: EWT Enrolled requires a TIN. Block the
+            // confirmation modal from opening if EWT is on but TIN is
+            // empty so the user is forced to fill it before the
+            // sensitive-data confirmation flow.
+            var ewtEnabled = $('#ewt_status').is(':checked');
+            var tinVal = ($('#tin-input').val() || '').trim();
+            if (ewtEnabled && !tinVal) {
+                toastr.error('Enter the TIN before saving — required when EWT Status is Enrolled.',
+                    'TIN required', { positionClass: 'toast-bottom-right' });
+                $('#tin-input').focus();
+                $('#tin-required-notice').removeClass('d-none');
+                return;
+            }
+            // Open the sensitive-edit confirmation modal instead of
+            // posting straight to the server. #confirm-emp-info-save
+            // below performs the actual save once confirmed.
+            $('#employmentEditConfirmModal').modal('show');
+        });
+
+        $(document).on('click', '#confirm-emp-info-save', function () {
+            submitEmploymentUpdate();
+        });
+
+        // ----------------------------------------------------------------
+        // Employment Change Log — AJAX-loaded into #employment-logs-wrap.
+        // Loaded on DOM ready (so the first render of the Employment tab
+        // has data) and re-loaded after a successful Employment save so
+        // the change just made appears at the top without a hard reload
+        // race.
+        // ----------------------------------------------------------------
+        function loadEmploymentLogs(page) {
+            var $wrap = $('#employment-logs-wrap');
+            if (!$wrap.length) return;
+            var empId = $wrap.data('employee-id');
+            if (!empId) return;
+            $.ajax({
+                url: '{{ route("people.employees.employment-logs") }}',
+                method: 'GET',
+                data: { employee_id: empId, page: page || 1 },
+                success: function (response) {
+                    if (response && response.success) {
+                        $wrap.html(response.html);
+                    } else {
+                        $wrap.html('<div class="text-muted text-center py-3">No change-log data.</div>');
+                    }
+                },
+                error: function () {
+                    $wrap.html('<div class="text-danger text-center py-3">Could not load change log.</div>');
+                }
+            });
+        }
+
+        // Initial load.
+        loadEmploymentLogs(1);
+
+        // Intercept pagination links inside the change-log wrapper so we
+        // stay on the page (instead of navigating to ?page=N at the top).
+        $(document).on('click', '#employment-logs-wrap .pagination a', function (e) {
+            e.preventDefault();
+            var href = $(this).attr('href') || '';
+            var match = href.match(/[?&]page=(\d+)/);
+            var page = match ? parseInt(match[1], 10) : 1;
+            loadEmploymentLogs(page);
         });
 
 
@@ -3310,10 +3521,17 @@
                 // Custom Parsley validators
                 window.Parsley.addValidator('mobile_number', {
                     validateString: function(value) {
-                        return /^(\+\d{1,4}\s?)?[0-9]{10}$/.test(value);
+                        // Strip optional + and any whitespace / dashes /
+                        // brackets so HR can paste numbers in any common
+                        // format (e.g. "+91 90987-65432" or "(960) 9123456").
+                        // ITU-T E.164 allows up to 15 digits; minimum 7
+                        // covers short country numbers like Maldives 7-digit
+                        // formats.
+                        var stripped = String(value || '').replace(/[\s()\-]/g, '').replace(/^\+/, '');
+                        return /^[0-9]{7,15}$/.test(stripped);
                     },
                     messages: {
-                        en: 'Please enter a valid 10-digit mobile number, optionally prefixed with a valid country code.'
+                        en: 'Please enter a valid mobile number (7–15 digits, optionally prefixed with +country code).'
                     }
                 });
 

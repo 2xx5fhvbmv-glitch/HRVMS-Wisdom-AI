@@ -78,7 +78,10 @@
 
                         
                         <div class="col-auto ms-auto">
-                            <button id="delete-selected" class="btn btn-danger btn-sm">Delete</button>
+                            {{-- Bulk Delete intentionally hidden — destructive employee
+                                 removal must go through Resignation / Exit Clearance.
+                                 The selection-driven Export action stays. --}}
+                            {{-- <button id="delete-selected" class="btn btn-danger btn-sm">Delete</button> --}}
 
                             <button id="exportSelectedEmployees" class="btn btn-themeBlue btn-sm">Export</button>
                         </div>
@@ -212,6 +215,28 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Pin the 3-dot kebab to the top-right corner of every employee card.
+       default.css line ~4800 already absolutely-positions
+       `.empListPeopleEmp-block .dropdown` at top:22px / right:22px, but
+       the rendered card was still showing the kebab visually drifted
+       toward the centre. Force the corner with !important so a cached
+       theme stylesheet or a later rule can't pull it back. Match the
+       same selector to keep the override specific to this card type. */
+    .empListPeopleEmp-block { position: relative !important; }
+    .empListPeopleEmp-block .dropdown,
+    .empListPeopleEmp-block .table-dropdown {
+        position: absolute !important;
+        top: 10px !important;
+        right: 12px !important;
+        left: auto !important;
+        z-index: 5;
+    }
+    .empListPeopleEmp-block .dotsV-link {
+        padding: 4px 8px !important;
+        line-height: 1 !important;
+    }
+</style>
 @endsection
 
 

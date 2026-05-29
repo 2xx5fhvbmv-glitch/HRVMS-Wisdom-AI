@@ -300,6 +300,14 @@
                     d.position_id   = (pos  === 'ALL') ? '' : pos;
                     d.status = $('#statusFilter').val();
                     // d.date_range = $('#datapicker').val();  // calendar filter disabled
+
+                    // Forward ?empId=<base64> from the URL when the page is
+                    // opened from the Employee Detail "Clearance" tab so the
+                    // datatable scopes to that employee's clearance only.
+                    const empIdFromUrl = new URLSearchParams(window.location.search).get('empId');
+                    if (empIdFromUrl) {
+                        d.empId = empIdFromUrl;
+                    }
                 }
             },
             columns: [

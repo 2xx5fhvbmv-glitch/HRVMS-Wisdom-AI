@@ -38,6 +38,7 @@ use Hash;
 use Config;
 use Common;
 use DB;
+use Schema;
 use Carbon\Carbon;
 class EmployeeController extends Controller
 {
@@ -699,33 +700,70 @@ class EmployeeController extends Controller
             return abort(403, 'You do not have access to this employee.');
         }
         $emp_benigit_grid = Common::getBenefitGrid($employee->position->Rank,$this->resort->resort_id);
-        // dd($employee);
-        $benefit_grid = DB::table('resort_benifit_grid as rbg')
-            ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
-            ->where('rbg.resort_id', $this->resort->resort_id)
-            ->where('rbg.emp_grade', $employee->position->Rank)
-            ->where('rbg.status','active')
-            ->get();
         $benefitGrids = ResortBenifitGrid::where('resort_id',$this->resort->resort_id)->where('status','active')->get();
-        // Calculate total leaves taken by the employee for the current year
+
+        // ------------------------------------------------------------------
+        // Leaves Remaining (canonical recipe — mirrors LeaveController::apply
+        // around lc-join + per-category balance). The previous implementation
+        // summed `allocated_days` across every benefit-grid child row, which
+        // included allowance/perk rows (R&R, language allowance, etc.) — that
+        // inflated the badge to absurd numbers like 604. The leave module
+        // counts only rows that join to `leave_categories` via `leave_cat_id`,
+        // honors gender/religion eligibility, excludes Absent/Present/DayOff,
+        // and uses per-category `max(0, allocated - used)` (so unused days in
+        // one category can't be cancelled out by overuse in another).
+        // ------------------------------------------------------------------
         $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
         $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
-        $leavesTaken = DB::table('employees_leaves')
-            ->where('emp_id', base64_decode($id))
-            ->where('status', 'Approved')
-            ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
-                $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
-                    ->orWhereBetween('to_date', [$currentYearStart, $currentYearEnd]);
-            })
-            ->sum('total_days');
+        $empGender = strtolower((string) ($employee->resortAdmin->gender ?? ''));
+        $empReligion = strtolower((string) ($employee->religion ?? ''));
+        $empRank = $employee->rank ?? $employee->position->Rank ?? null;
+        $empGrade = $emp_benigit_grid->emp_grade ?? $employee->position->Rank ?? null;
+        $empGridId = $emp_benigit_grid->id ?? null;
+        $excludedLeaveTypes = ['Absent', 'Present', 'DayOff'];
 
-        // Total allocation (sum of all allocated days across leave categories)
-        if($benefit_grid->isEmpty()) {
-            $totalAllocation = 0; // No benefits found, set to 0
+        if (!$empGridId) {
+            $remianing_leaves = 0;
         } else {
-            $totalAllocation = $benefit_grid->sum('allocated_days');
+            $leaveCategoryRows = DB::table('resort_benefit_grid_child as rbgc')
+                ->join('leave_categories as lc', 'lc.id', '=', 'rbgc.leave_cat_id')
+                ->where('rbgc.benefit_grid_id', $empGridId)
+                ->where('rbgc.rank', $empGrade)
+                ->where('rbgc.allocated_days', '>', 0)
+                ->where('lc.resort_id', $this->resort->resort_id)
+                ->whereNotIn('lc.leave_type', $excludedLeaveTypes)
+                ->when($empRank !== null, function ($q) use ($empRank) {
+                    $q->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$empRank]);
+                })
+                ->where(function ($q) use ($empGender, $empReligion) {
+                    $q->where('rbgc.eligible_emp_type', 'all');
+                    if ($empGender !== '') {
+                        $q->orWhere('rbgc.eligible_emp_type', $empGender);
+                    }
+                    if ($empReligion === 'muslim') {
+                        $q->orWhere('rbgc.eligible_emp_type', 'muslim');
+                    }
+                })
+                ->select('rbgc.allocated_days', 'rbgc.leave_cat_id')
+                ->get();
+
+            $usedByCat = DB::table('employees_leaves')
+                ->select('leave_category_id', DB::raw('SUM(total_days) as used_days'))
+                ->where('emp_id', $employee->id)
+                ->where('status', 'Approved')
+                ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
+                    $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
+                        ->orWhereBetween('to_date', [$currentYearStart, $currentYearEnd]);
+                })
+                ->groupBy('leave_category_id')
+                ->pluck('used_days', 'leave_category_id');
+
+            $remianing_leaves = (int) $leaveCategoryRows->sum(function ($row) use ($usedByCat) {
+                $allocated = (int) ($row->allocated_days ?? 0);
+                $used = (int) ($usedByCat[$row->leave_cat_id] ?? 0);
+                return max(0, $allocated - $used);
+            });
         }
-        $remianing_leaves = $totalAllocation - $leavesTaken;
         $teams = SOSTeamManagementModel::where('resort_id',$resort_id)->get();
         $roles = SOSRolesAndPermission::where('resort_id',$resort_id)->get();
         $nationality = config('settings.nationalities');
@@ -818,7 +856,156 @@ class EmployeeController extends Controller
             }
 
         $airports = config('airports', ['national' => [], 'international' => []]);
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports'));
+
+        // ------------------------------------------------------------------
+        // Recent Activities — the previous markup showed 3 hardcoded
+        // "Lorem ipsum" cards on every employee's profile. Replace with the
+        // employee's 3 most-recent real activities, drawn from the modules
+        // that actually have application/approval flows: leaves,
+        // promotions, salary increments. Each entry exposes a uniform
+        // {title, subtitle, status, badge_class} shape so the blade can
+        // iterate without per-type branches.
+        // ------------------------------------------------------------------
+        $badgeFor = function ($status) {
+            $s = strtolower((string) $status);
+            if (in_array($s, ['approved', 'completed', 'paid'])) return 'badge-themeSuccess';
+            if (in_array($s, ['rejected', 'cancelled', 'canceled'])) return 'badge-themeDanger';
+            if (in_array($s, ['hold', 'on hold', 'paused', 'in progress'])) return 'badge-themeSkyblue';
+            return 'badge-themeWarning'; // Pending / unknown
+        };
+
+        $recentActivities = collect();
+
+        // Last few leaves for this employee
+        $leaveRows = DB::table('employees_leaves as el')
+            ->leftJoin('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
+            ->where('el.emp_id', $employee->id)
+            ->orderByDesc('el.id')
+            ->limit(3)
+            ->get(['el.id', 'el.from_date', 'el.to_date', 'el.status', 'el.created_at', 'lc.leave_type']);
+        foreach ($leaveRows as $r) {
+            $from = $r->from_date ? Carbon::parse($r->from_date)->format('d M Y') : '—';
+            $to   = $r->to_date   ? Carbon::parse($r->to_date)->format('d M Y')   : '—';
+            $recentActivities->push((object) [
+                'title'       => ($r->leave_type ?: 'Leave') . ' Request',
+                'subtitle'    => 'From ' . $from . ' to ' . $to,
+                'status'      => $r->status ?: 'Pending',
+                'badge_class' => $badgeFor($r->status),
+                'when'        => $r->created_at,
+            ]);
+        }
+
+        // Last promotion for this employee
+        if (Schema::hasTable('employee_promotions')) {
+            $promo = DB::table('employee_promotions')
+                ->where('employee_id', $employee->id)
+                ->orderByDesc('id')
+                ->first(['id', 'status', 'effective_date', 'created_at']);
+            if ($promo) {
+                $eff = $promo->effective_date ? Carbon::parse($promo->effective_date)->format('d M Y') : null;
+                $recentActivities->push((object) [
+                    'title'       => 'Promotion',
+                    'subtitle'    => $eff ? ('Effective ' . $eff) : 'Effective date pending',
+                    'status'      => $promo->status ?: 'Pending',
+                    'badge_class' => $badgeFor($promo->status),
+                    'when'        => $promo->created_at,
+                ]);
+            }
+        }
+
+        // Last salary increment for this employee
+        if (Schema::hasTable('people_salary_increment')) {
+            $inc = DB::table('people_salary_increment')
+                ->where('employee_id', $employee->id)
+                ->orderByDesc('id')
+                ->first(['id', 'status', 'effective_date', 'increment_amount', 'increment_type', 'created_at']);
+            if ($inc) {
+                $eff = $inc->effective_date ? Carbon::parse($inc->effective_date)->format('d M Y') : null;
+                $recentActivities->push((object) [
+                    'title'       => 'Salary Increment',
+                    'subtitle'    => $eff ? ('Effective ' . $eff) : 'Awaiting effective date',
+                    'status'      => $inc->status ?: 'Pending',
+                    'badge_class' => $badgeFor($inc->status),
+                    'when'        => $inc->created_at,
+                ]);
+            }
+        }
+
+        // Latest Employment-tab edit (from the audit log we now maintain)
+        if (Schema::hasTable('employee_employment_audit_logs')) {
+            $log = DB::table('employee_employment_audit_logs')
+                ->where('employee_id', $employee->id)
+                ->orderByDesc('id')
+                ->first(['id', 'label', 'field', 'new_value', 'created_at']);
+            if ($log) {
+                $recentActivities->push((object) [
+                    'title'       => 'Employment Update',
+                    'subtitle'    => ($log->label ?: $log->field) . ($log->new_value ? ' → ' . $log->new_value : ''),
+                    'status'      => 'Saved',
+                    'badge_class' => 'badge-themeSuccess',
+                    'when'        => $log->created_at,
+                ]);
+            }
+        }
+
+        // Latest resignation (Exit Clearance flow)
+        if (Schema::hasTable('employee_resignation')) {
+            $resig = DB::table('employee_resignation')
+                ->where('employee_id', $employee->id)
+                ->orderByDesc('id')
+                ->first(['id', 'status', 'last_working_day', 'created_at']);
+            if ($resig) {
+                $lwd = $resig->last_working_day ? Carbon::parse($resig->last_working_day)->format('d M Y') : null;
+                $recentActivities->push((object) [
+                    'title'       => 'Resignation Submitted',
+                    'subtitle'    => $lwd ? ('Last working day ' . $lwd) : 'Last working day pending',
+                    'status'      => $resig->status ?: 'Pending',
+                    'badge_class' => $badgeFor($resig->status),
+                    'when'        => $resig->created_at,
+                ]);
+            }
+        }
+
+        // Latest expiry document edit / upload
+        if (Schema::hasTable('employees_documents')) {
+            $doc = DB::table('employees_documents')
+                ->where('employee_id', $employee->id)
+                ->orderByDesc('id')
+                ->first(['id', 'document_title', 'expiry_date', 'updated_at', 'created_at']);
+            if ($doc) {
+                $exp = $doc->expiry_date ? Carbon::parse($doc->expiry_date)->format('d M Y') : null;
+                $recentActivities->push((object) [
+                    'title'       => 'Document: ' . ($doc->document_title ?: 'Untitled'),
+                    'subtitle'    => $exp ? ('Expires ' . $exp) : 'Uploaded',
+                    'status'      => $exp ? 'Tracked' : 'Uploaded',
+                    'badge_class' => 'badge-themeSuccess',
+                    'when'        => $doc->updated_at ?: $doc->created_at,
+                ]);
+            }
+        }
+
+        // Onboarding milestone — every employee has a created_at, so this
+        // guarantees Recent Activities is never empty for any employee.
+        if (!empty($employee->created_at)) {
+            $joinDate = $employee->joining_date
+                ? Carbon::parse($employee->joining_date)->format('d M Y')
+                : Carbon::parse($employee->getRawOriginal('created_at') ?: $employee->created_at)->format('d M Y');
+            $recentActivities->push((object) [
+                'title'       => 'Onboarded',
+                'subtitle'    => 'Joined on ' . $joinDate,
+                'status'      => 'Completed',
+                'badge_class' => 'badge-themeSuccess',
+                'when'        => $employee->getRawOriginal('created_at') ?: $employee->created_at,
+            ]);
+        }
+
+        // Sort by most-recent created_at and keep top 3 across all sources
+        $recentActivities = $recentActivities
+            ->sortByDesc(fn($a) => $a->when ? Carbon::parse($a->when)->timestamp : 0)
+            ->take(3)
+            ->values();
+
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities'));
     }
 
     public function assignToTeam(Request $request)
@@ -1103,6 +1290,29 @@ class EmployeeController extends Controller
             ->first();
 
         $employee = Employee::findOrFail($request->employee_id);
+
+        // ---------- Capture old values for the audit log -----------------
+        // Snapshot the existing field values BEFORE mutating the model so
+        // the audit-log diff sees real before/after pairs. Resolves
+        // FK ids to human-readable labels (Position / Department / etc.)
+        // so the log table doesn't show raw integers.
+        $oldSnapshot = [
+            'status'             => $employee->status,
+            'joining_date'       => $employee->joining_date,
+            'benefit_grid_level' => $employee->benefit_grid_level,
+            'tin'                => $employee->tin,
+            'probation_end_date' => $employee->probation_end_date,
+            'contract_type'      => $employee->contract_type,
+            'termination_date'   => $employee->termination_date,
+            'Position_id'        => optional($employee->position)->position_title,
+            'Section_id'         => optional($employee->section)->section_title ?? optional($employee->section)->name,
+            'Dept_id'            => optional($employee->department)->name,
+            'division_id'        => optional($employee->division)->name,
+            'reporting_to'       => optional(optional($employee->reportingTo)->resortAdmin)->full_name,
+            'email'              => optional($employee->resortAdmin)->email,
+            'personal_phone'     => optional($employee->resortAdmin)->personal_phone,
+        ];
+
         $employee->status = $request->status;
         $employee->joining_date = $formattedJoinDate;
         $employee->benefit_grid_level = $request->benefit_grid_level;
@@ -1129,7 +1339,110 @@ class EmployeeController extends Controller
         $employee->resortAdmin->personal_phone = $request->personal_phone;
         $employee->resortAdmin->save();
 
+        // ---------- Write audit log rows for every changed field --------
+        $newPosition = ResortPosition::find($request->Position_id);
+        $newSection  = $request->Section_id ? ResortSection::find($request->Section_id) : null;
+        $newDept     = $request->Dept_id ? ResortDepartment::find($request->Dept_id) : null;
+        $newDivision = $request->division_id ? ResortDivision::find($request->division_id) : null;
+        $newReporter = $request->reporting_to
+            ? Employee::with('resortAdmin')->find($request->reporting_to)
+            : null;
+
+        $newSnapshot = [
+            'status'             => $request->status,
+            'joining_date'       => $formattedJoinDate,
+            'benefit_grid_level' => $request->benefit_grid_level,
+            'tin'                => $request->tin,
+            'probation_end_date' => $formattedProbationEndDate,
+            'contract_type'      => $request->contract_type,
+            'termination_date'   => $formattedTerminationDate,
+            'Position_id'        => $newPosition->position_title ?? null,
+            'Section_id'         => $newSection->section_title ?? $newSection->name ?? null,
+            'Dept_id'            => $newDept->name ?? null,
+            'division_id'        => $newDivision->name ?? null,
+            'reporting_to'       => optional(optional($newReporter)->resortAdmin)->full_name,
+            'email'              => $request->email,
+            'personal_phone'     => $request->personal_phone,
+        ];
+
+        $this->writeEmploymentAuditLog($employee, $oldSnapshot, $newSnapshot);
+
         return response()->json(['success' => true ,'message' => "Employment data Updated!"]);
+    }
+
+    /**
+     * Per-field diff → one audit log row per changed field.
+     * Surfaced at the bottom of the Employment tab. Fields with the
+     * same canonical value are skipped so HR doesn't see noise rows
+     * when nothing actually changed.
+     */
+    private function writeEmploymentAuditLog(Employee $employee, array $old, array $new): void
+    {
+        $labels = [
+            'status'             => 'Employment Status',
+            'joining_date'       => 'Joining Date',
+            'benefit_grid_level' => 'Benefit Grid Level',
+            'tin'                => 'TIN',
+            'probation_end_date' => 'Probation End Date',
+            'contract_type'      => 'Contract Type',
+            'termination_date'   => 'Termination Date',
+            'Position_id'        => 'Position',
+            'Section_id'         => 'Section',
+            'Dept_id'            => 'Department',
+            'division_id'        => 'Division',
+            'reporting_to'       => 'Reporting To',
+            'email'              => 'Email Address',
+            'personal_phone'     => 'Mobile Number',
+        ];
+
+        $admin = Auth::guard('resort-admin')->user();
+        $changedById = $admin->id ?? null;
+
+        foreach ($labels as $field => $label) {
+            $oldVal = $old[$field] ?? null;
+            $newVal = $new[$field] ?? null;
+
+            // Treat null / empty string / "N/A" as equivalent so a
+            // blank-on-both-sides field doesn't become a log entry.
+            $normalize = fn($v) => $v === null ? '' : trim((string) $v);
+            if ($normalize($oldVal) === $normalize($newVal)) {
+                continue;
+            }
+
+            \App\Models\EmployeeEmploymentAuditLog::create([
+                'resort_id'   => $this->resort->resort_id,
+                'employee_id' => $employee->id,
+                'field'       => $field,
+                'label'       => $label,
+                'old_value'   => $oldVal !== null ? (string) $oldVal : null,
+                'new_value'   => $newVal !== null ? (string) $newVal : null,
+                'changed_by'  => $changedById,
+            ]);
+        }
+    }
+
+    /**
+     * Paginated audit-log feed for the Employment tab. Renders a
+     * partial HTML block (table rows + pagination) consumed via AJAX
+     * from detail.blade.php so the page doesn't need to ship every
+     * log row at first render.
+     */
+    public function employmentLogs(Request $request)
+    {
+        $employeeId = (int) $request->employee_id;
+        if (!$employeeId) {
+            return response()->json(['success' => false, 'html' => '']);
+        }
+
+        $logs = \App\Models\EmployeeEmploymentAuditLog::with('changedByAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('employee_id', $employeeId)
+            ->orderByDesc('id')
+            ->paginate(10, ['*'], 'page', (int) ($request->page ?? 1));
+
+        $html = view('resorts.people.employee._partials.employment-logs', compact('logs'))->render();
+
+        return response()->json(['success' => true, 'html' => $html]);
     }
 
     public function updateSalary(Request $request)

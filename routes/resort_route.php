@@ -609,6 +609,10 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/leave/leave-histroy', 'Leave\LeaveController@getLeaveHistory')->name('leave.history');
     Route::get('/leave/history/detail', 'Leave\LeaveController@getLeaveHistoryDetail')->name('leave.history.detail');
     Route::get('/leave-history/download-pdf/{empID}', 'Leave\LeaveController@downloadPdf')->name('leave.history.download-pdf');
+    // Per-employee Leave page entry used by the Employee Detail "Leave" tab.
+    // Resolves the employee's latest leave and redirects to leave.details so
+    // the existing rich history view is reused (instead of downloading PDF).
+    Route::get('/leave-history/employee/{empID}', 'Leave\LeaveController@employeeLeavePage')->name('leave.employee.page');
     Route::post('/leave/application/store','Leave\LeaveController@store')->name('leave-applications.store');
 
     Route::get('/get/employees-on-leave', 'Leave\LeaveController@getEmployeesOnLeave')->name('getEmployeesOnLeave');
@@ -1701,6 +1705,9 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::post('/people/employee/update-emergency-contacts', 'People\Employee\EmployeeController@updateEmergencyContacts')->name('employee.update.emergency-contacts');
        Route::post('/people/employee/update-additional-info', 'People\Employee\EmployeeController@updateAdditionalInfo')->name('employee.update.additional-info');
        Route::post('/people/employee/update-employment-data', 'People\Employee\EmployeeController@updateEmploymentData')->name('employee.update.employment-data');
+       // Paginated audit log for the Employment tab (sensitive-data
+       // change trail).
+       Route::get('/people/employee/employment-logs', 'People\Employee\EmployeeController@employmentLogs')->name('people.employees.employment-logs');
       Route::post('/people/employee/update-salary', 'People\Employee\EmployeeController@updateSalary')->name('employee.update.salary');
 
        Route::post('/people/employee/update-education/{id}', 'People\Employee\EmployeeController@updateEducationDetails')->name('employee.update.eduDetails');

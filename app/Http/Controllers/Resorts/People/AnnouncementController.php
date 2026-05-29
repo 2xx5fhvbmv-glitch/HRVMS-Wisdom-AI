@@ -85,6 +85,15 @@ class AnnouncementController extends Controller
             if($request->date){
                 $query->where('published_date',$request->date);
             }
+            // Per-employee filter — used when the Employee Detail page
+            // "Announcement" tab forwards ?empId=<base64>. Filters to
+            // announcements whose employee_id matches the scoped employee.
+            if ($request->filled('empId')) {
+                $decoded = base64_decode((string) $request->empId, true);
+                if ($decoded !== false && ctype_digit((string) $decoded)) {
+                    $query->where('employee_id', (int) $decoded);
+                }
+            }
             return datatables()->of($query)
                 ->addColumn('title', function ($row) {
                     return $row->category->name ?? '-';

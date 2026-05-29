@@ -16,7 +16,10 @@
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
                         <li><a class="dropdown-item" href="{{route('people.employees.details', base64_encode($employee->id))}}">View Profile</a></li>
-                        <li><a class="dropdown-item delete-employee" href="#" data-emp-id="{{$employee->id}}">Delete Employee</a></li>
+                        {{-- Delete intentionally hidden — destructive employee removal
+                             must go through Resignation / Exit Clearance, not a card
+                             dropdown. Uncomment if a hard-delete entry point is needed. --}}
+                        {{-- <li><a class="dropdown-item delete-employee" href="#" data-emp-id="{{$employee->id}}">Delete Employee</a></li> --}}
                         <li>
                             <a class="dropdown-item add-to-team-btn" href="#" data-emp-id="{{ $employee->id }}">
                                 Add to Team / Assign Role
@@ -37,7 +40,7 @@
                 <p>{{ $employee->position->position_title }}</p>
                 <div class="block">
                     <table>
-                        <tr><td>Department:</td><td>{{ $employee->department->name }}</td></tr>
+                        <tr><td>Department:</td><td>{{ $employee->department->name ?? '-' }}</td></tr>
                         <tr><td>Status</td><td>
                             @if($employee->status == 'Active')
                                 <span class="badge badge-themeSuccess">{{ $employee->status }}</span>
@@ -46,6 +49,34 @@
                             @endif
                         </td></tr>
                         <tr><td>Employment Type</td><td>{{$employee->employment_type}}</td></tr>
+                        {{-- Email + phone surfaced on the card so HR can dial / mail
+                             without clicking into the profile. Email truncates when
+                             long; full address sits in the title attribute on hover. --}}
+                        <tr>
+                            <td>Mobile</td>
+                            <td>
+                                @php $_mob = $employee->resortAdmin->personal_phone ?? null; @endphp
+                                @if($_mob)
+                                    <a href="tel:{{ $_mob }}" class="text-decoration-none">{{ $_mob }}</a>
+                                @else
+                                    -
+                                @endif
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Email</td>
+                            <td>
+                                @php $_em = $employee->resortAdmin->email ?? null; @endphp
+                                @if($_em)
+                                    <a href="mailto:{{ $_em }}"
+                                       class="text-decoration-none d-inline-block text-truncate"
+                                       style="max-width: 160px; vertical-align: bottom;"
+                                       title="{{ $_em }}">{{ $_em }}</a>
+                                @else
+                                    -
+                                @endif
+                            </td>
+                        </tr>
                     </table>
                 </div>
                 <div class="form-check">
