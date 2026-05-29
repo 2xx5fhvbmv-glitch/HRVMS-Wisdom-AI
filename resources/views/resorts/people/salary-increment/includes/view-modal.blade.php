@@ -35,8 +35,13 @@
     $initiatorName = $initiator
         ? trim(($initiator->first_name ?? '') . ' ' . ($initiator->last_name ?? ''))
         : '—';
-    $initiatedAt = $peopleSalaryIncrement->created_at
-        ? Carbon::parse($peopleSalaryIncrement->created_at)->format('d M Y h:i A')
+    // PeopleSalaryIncrement::getCreatedAtAttribute formats created_at
+    // through the resort's date+time settings (e.g. "28/05/2026 16:54").
+    // Carbon::parse can't auto-detect that d/m/Y layout — use the raw
+    // underlying timestamp instead.
+    $rawCreatedAt = $peopleSalaryIncrement->getRawOriginal('created_at');
+    $initiatedAt  = $rawCreatedAt
+        ? Carbon::parse($rawCreatedAt)->format('d M Y h:i A')
         : '—';
 @endphp
 <div class="modal-body">

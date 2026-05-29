@@ -190,6 +190,31 @@
         font-size: 14px !important;
         color: #6c757d;
     }
+    /* Cap the back face of each card so the budget-exceed warning + a
+       long Remark can't push the "Back" button off the bottom of the
+       viewport. JS sets an explicit `height: <natural content>px` on
+       .back to match .front — max-height + overflow-y:auto sit on top
+       so the card scrolls internally instead of growing past the
+       viewport. Front face is unaffected (its content is fixed-size). */
+    .salaryIncrementManag-block.back {
+        max-height: 78vh;
+        overflow-y: auto;
+        /* Subtle inner scrollbar so the user can tell it scrolls. */
+        scrollbar-width: thin;
+    }
+    .salaryIncrementManag-block.back::-webkit-scrollbar {
+        width: 6px;
+    }
+    .salaryIncrementManag-block.back::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.18);
+        border-radius: 3px;
+    }
+    /* Same cap on the flip container so the .front face — which JS
+       resizes to match .back's natural height — doesn't waste extra
+       vertical space below its real content. */
+    .salaryIncrementManag-inner {
+        max-height: 78vh;
+    }
 </style>
 @endsection
 
