@@ -319,7 +319,7 @@
                                 <div>
                                     <h6>Deposit Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalDepositAmount'], 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalDepositAmount'], 'USD') !!}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -329,7 +329,7 @@
                                 <div>
                                     <h6>Total Work Permit Fee</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitAmount'], 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitAmount'], 'USD') !!}</strong>
 
                                     </div>
                                 </div>
@@ -340,7 +340,7 @@
                                 <div>
                                     <h6>Total Slot Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalQuotaSlotPayment'], 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalQuotaSlotPayment'], 'USD') !!}</strong>
                                       
                                     </div>
                                 </div>
@@ -351,7 +351,7 @@
                                 <div>
                                     <h6>Total Medical Insurance</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalInsurancePayment'], 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalInsurancePayment'], 'USD') !!}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -361,7 +361,7 @@
                                 <div>
                                     <h6>Total Work Permit Medical Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'USD') !!}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -371,7 +371,7 @@
                                 <div>
                                     <h6>Visa Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'USD') !!}</strong>
                                     </div>
                                 </div>
                             </div>

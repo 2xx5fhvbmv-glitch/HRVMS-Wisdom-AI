@@ -16,7 +16,7 @@
             <div class="empDetail-block">
                 <div>
                     <h6>Total Liability</h6>
-                    <strong>{!! Common::formatCurrency($TotalLiabilites, 'MVR') !!}</strong>
+                    <strong>{!! Common::formatCurrency($TotalLiabilites, 'USD') !!}</strong>
                 </div>
 
             </div>
@@ -25,7 +25,7 @@
             <div class="empDetail-block">
                 <div>
                     <h6>Paid Liability</h6>
-                    <strong>{!! Common::formatCurrency($TotalPaidLaibilites, 'MVR') !!} </strong>
+                    <strong>{!! Common::formatCurrency($TotalPaidLaibilites, 'USD') !!} </strong>
                 </div>
 
             </div>
@@ -34,7 +34,7 @@
             <div class="empDetail-block">
                 <div>
                     <h6>Balance Liability</h6>
-                    <strong>{!! Common::formatCurrency($TotalBalanceLiability, 'MVR') !!}</strong>
+                    <strong>{!! Common::formatCurrency($TotalBalanceLiability, 'USD') !!}</strong>
                 </div>
 
             </div>
@@ -53,9 +53,9 @@
             </div>
             <div>
                 <ul class="mb-0">
-                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetWorkPermitFees, 'MVR') !!}</li>
-                    <li>Paid Liability: {!! Common::formatCurrency($totalPermit, 'MVR') !!}</li>
-                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceWorkPermitfees, 'MVR') !!}</li>
+                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetWorkPermitFees, 'USD') !!}</li>
+                    <li>Paid Liability: {!! Common::formatCurrency($totalPermit, 'USD') !!}</li>
+                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceWorkPermitfees, 'USD') !!}</li>
                 </ul>
 
             </div>
@@ -70,9 +70,9 @@
             </div>
             <div>
                 <ul class="mb-0">
-                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetQuotaSlotDeposit, 'MVR') !!}</li>
-                    <li>Paid Liability: {!! Common::formatCurrency($totalQuota, 'MVR') !!}</li>
-                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceQuotaSlotDeposit, 'MVR') !!}</li>
+                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetQuotaSlotDeposit, 'USD') !!}</li>
+                    <li>Paid Liability: {!! Common::formatCurrency($totalQuota, 'USD') !!}</li>
+                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceQuotaSlotDeposit, 'USD') !!}</li>
                 </ul>
 
             </div>
@@ -86,9 +86,9 @@
             </div>
             <div>
                 <ul class="mb-0">
-                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetVisaFees, 'MVR') !!}</li>
-                    <li>Paid Liability: {!! Common::formatCurrency($totalVisa, 'MVR') !!}</li>
-                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceBudgetVisaFees, 'MVR') !!}</li>
+                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetVisaFees, 'USD') !!}</li>
+                    <li>Paid Liability: {!! Common::formatCurrency($totalVisa, 'USD') !!}</li>
+                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceBudgetVisaFees, 'USD') !!}</li>
                 </ul>
 
             </div>
@@ -102,9 +102,9 @@
             </div>
             <div>
                 <ul class="mb-0">
-                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetMedicalInsuranceInternational, 'MVR') !!}</li>
-                    <li>Paid Liability: {!! Common::formatCurrency($totalInsurance, 'MVR') !!}</li>
-                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceMedicalInsuranceInternational, 'MVR') !!}</li>
+                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetMedicalInsuranceInternational, 'USD') !!}</li>
+                    <li>Paid Liability: {!! Common::formatCurrency($totalInsurance, 'USD') !!}</li>
+                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceMedicalInsuranceInternational, 'USD') !!}</li>
                 </ul>
 
             </div>
@@ -118,9 +118,9 @@
             </div>
             <div>
                 <ul class="mb-0">
-                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetWorkPermitMedicalTestFee, 'MVR') !!}</li>
-                    <li>Paid Liability: {!! Common::formatCurrency($totalMedical, 'MVR') !!}</li>
-                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceWorkPermitMedicalTestFee, 'MVR') !!}</li>
+                    <li>Total Liability: {!! Common::formatCurrency($TotalBudgetWorkPermitMedicalTestFee, 'USD') !!}</li>
+                    <li>Paid Liability: {!! Common::formatCurrency($totalMedical, 'USD') !!}</li>
+                    <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceWorkPermitMedicalTestFee, 'USD') !!}</li>
                 </ul>
 
             </div>

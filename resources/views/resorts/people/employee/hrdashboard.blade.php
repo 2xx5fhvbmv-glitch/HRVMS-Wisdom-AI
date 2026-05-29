@@ -913,7 +913,7 @@
                         <div class="leaveUser-bgBlock mb-md-3 mb-2">
                             <h6>Total Estimated Liability</h6>
                             <div>
-                                <strong>{{ Common::formatCurrency($liabilityEstimated, 'MVR', 2) }}</strong>
+                                <strong>{{ Common::formatCurrency($liabilityEstimated, 'USD', 2) }}</strong>
                                 <span>({{ $liabilityYear }})</span>
                             </div>
                         </div>
@@ -928,7 +928,7 @@
                                                 @forelse($liabilityMonthlyTrend as $row)
                                                 <tr>
                                                     <td>{{ $row['month'] }}</td>
-                                                    <th>{{ Common::formatCurrency($row['paid'], 'MVR', 2) }}</th>
+                                                    <th>{{ Common::formatCurrency($row['paid'], 'USD', 2) }}</th>
                                                 </tr>
                                                 @empty
                                                 <tr>
@@ -947,7 +947,7 @@
                                         <div class="progress-bar" role="progressbar" style="width: {{ $liabilityPaidPercent }}%"
                                             aria-valuenow="{{ $liabilityPaidPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
                                     </div>
-                                    <span>{{ Common::formatCurrency($liabilityActualPaid, 'MVR', 2) }}</span>
+                                    <span>{{ Common::formatCurrency($liabilityActualPaid, 'USD', 2) }}</span>
                                 </div>
                                 <h6 class="fw-600 mb-2">Manual Adjustments</h6>
                                 <p>No manual adjustments recorded</p>
@@ -968,11 +968,11 @@
                                             @forelse($liabilityCostComparison as $row)
                                             <tr>
                                                 <td>{{ $row['category'] }}</td>
-                                                <td>{{ Common::formatCurrency($row['estimated'], 'MVR', 2) }}</td>
-                                                <td>{{ Common::formatCurrency($row['actual'], 'MVR', 2) }}</td>
+                                                <td>{{ Common::formatCurrency($row['estimated'], 'USD', 2) }}</td>
+                                                <td>{{ Common::formatCurrency($row['actual'], 'USD', 2) }}</td>
                                                 <td>
                                                     <span class="{{ $row['remaining'] < 0 ? 'text-themeDanger' : 'text-themeSuccess' }}">
-                                                        {{ Common::formatCurrency($row['remaining'], 'MVR', 2) }}
+                                                        {{ Common::formatCurrency($row['remaining'], 'USD', 2) }}
                                                     </span>
                                                 </td>
                                             </tr>
