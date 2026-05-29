@@ -64,6 +64,7 @@
                                       <th>Effective Date</th>
                                       <th>Remarks</th>
                                       <th>Status</th>
+                                      <th>Last Activty</th>
                                  </tr>
                             </thead>
                             <tbody>
@@ -196,6 +197,31 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Last Activity column on summary-list — same single-line + inner
+       horizontal scroll rules as the /salary-increment/list page so a
+       long stage remark scrolls inside the cell instead of stretching
+       the column or wrapping mid-text. Two rows (Finance + GM) stack
+       vertically; each row stays on one line. */
+    #salaryIncrementList tbody td:last-child {
+        min-width: 240px;
+        max-width: 320px;
+        line-height: 1.4;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+    }
+    #salaryIncrementList tbody td:last-child > div {
+        white-space: nowrap;
+    }
+    #salaryIncrementList tbody td:last-child::-webkit-scrollbar {
+        height: 5px;
+    }
+    #salaryIncrementList tbody td:last-child::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.18);
+        border-radius: 3px;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -220,17 +246,23 @@
                           "lengthMenu": [[-1], ["All"]],
                           processing: true,
                           serverSide: true,
-                          order:[[12, 'desc']],
+                          // created_at is now column 13 (last_activity
+                          // was inserted at 12, pushing the hidden
+                          // created_at down one slot).
+                          order:[[13, 'desc']],
                           ajax: {
                                 url: '{{ route("people.salary-increment.summary-list") }}',
                                 dataSrc: function (json) {
-
-                                $('.current-basic-salary').text(`${formatAmount(json.currentBasicSalary, 'USD')}`);
-                                $('.new-basic-salary').text(`${formatAmount(json.newBasicSalary, 'USD')}`);
-                                $('.monthly-payroll-increase').text(`${formatAmount(json.monthlyPayrollIncrease, 'USD')}`);
-                                $('.annual-payroll-increase').text(`${formatAmount(json.annualPayrollIncrease, 'USD')}`);
-                                return json.data;
-                              }
+                                    // Reset the Financial Impact card to
+                                    // ZERO every time the table reloads;
+                                    // the recompute below tracks the
+                                    // user's actual selection rather
+                                    // than always showing the full-table
+                                    // totals. User asked for
+                                    // 0-when-none-selected behaviour.
+                                    recomputeFinancialImpact();
+                                    return json.data;
+                                }
                           },
                           columns: [
                                  // Per-row checkbox so the approver can act
@@ -260,6 +292,11 @@
                                  { data: 'effective_date', name: 'effective_date' },
                                  { data: 'remarks', name: 'remarks' },
                                  { data: 'status_info', name: 'status_info', orderable: false, searchable: false },
+                                 // Per-stage Finance / GM breakdown — same
+                                 // render the /salary-increment/list page
+                                 // uses, dropped in here so the approver
+                                 // can read the chain at a glance.
+                                 { data: 'last_activity', name: 'last_activity', orderable: false, searchable: false },
                                  {data:'created_at',visible:false,searchable:false},
                           ]
                  });
@@ -291,15 +328,50 @@
               return rows;
           }
 
-          // Master select-all in the header — toggles every visible row.
+          // Recompute the four Financial Impact tiles from the currently
+          // SELECTED rows. Zero when nothing is ticked, sum of selected
+          // when one or more rows are ticked. User asked for the cards
+          // to track selection rather than the whole table.
+          function recomputeFinancialImpact() {
+              let prevTotal = 0;
+              let newTotal  = 0;
+              let table = $.fn.dataTable.isDataTable('#salaryIncrementList')
+                  ? $('#salaryIncrementList').DataTable()
+                  : null;
+              if (table) {
+                  let selectedIds = $('.increment-row-check:checked').map(function () {
+                      return String($(this).data('id'));
+                  }).get();
+                  if (selectedIds.length > 0) {
+                      table.rows().data().toArray().forEach(function (r) {
+                          if (selectedIds.indexOf(String(r.id)) !== -1) {
+                              prevTotal += parseFloat(r.previous_salary || 0);
+                              newTotal  += parseFloat(r.new_salary || 0);
+                          }
+                      });
+                  }
+              }
+              let monthlyDelta = newTotal - prevTotal;
+              let annualDelta  = monthlyDelta * 12;
+              $('.current-basic-salary').text(formatAmount(prevTotal, 'USD'));
+              $('.new-basic-salary').text(formatAmount(newTotal, 'USD'));
+              $('.monthly-payroll-increase').text(formatAmount(monthlyDelta, 'USD'));
+              $('.annual-payroll-increase').text(formatAmount(annualDelta, 'USD'));
+          }
+
+          // Master select-all in the header — toggles every visible row,
+          // then recomputes the Financial Impact tiles in one pass.
           $(document).on('change', '#selectAllIncrements', function () {
               $('.increment-row-check').prop('checked', $(this).is(':checked'));
+              recomputeFinancialImpact();
           });
-          // Untick the header when a row check is unticked manually.
+          // Untick the header when a row check is unticked manually;
+          // refresh tiles for either tick or untick.
           $(document).on('change', '.increment-row-check', function () {
               if (!$(this).is(':checked')) {
                   $('#selectAllIncrements').prop('checked', false);
               }
+              recomputeFinancialImpact();
           });
 
           $(document).on('click', '.submit-status-btn', function(e) {

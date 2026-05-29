@@ -159,15 +159,30 @@
         padding: 8px 10px;
         vertical-align: middle;
     }
-    /* The "Last Activity" stage column carries multi-line content
-       (Finance: badge — reason / GM: badge — reason). Let it wrap so
-       the badge stack stays compact and readable instead of fighting
-       the global nowrap above. */
+    /* The "Last Activity" stage column carries two rows — Finance and
+       GM, each "label: badge — reason". User wants each row on a SINGLE
+       LINE (no wrap between badge and reason); when the reason is too
+       long the cell scrolls horizontally so the column width stays
+       bounded.
+       The cell itself stacks the two inner <div>s vertically; each div
+       is whitespace:nowrap so the row never wraps mid-text. */
     #salaryIncrementList tbody td:nth-last-child(2) {
-        white-space: normal;
-        min-width: 220px;
+        min-width: 240px;
         max-width: 320px;
         line-height: 1.4;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+    }
+    #salaryIncrementList tbody td:nth-last-child(2) > div {
+        white-space: nowrap;
+    }
+    #salaryIncrementList tbody td:nth-last-child(2)::-webkit-scrollbar {
+        height: 5px;
+    }
+    #salaryIncrementList tbody td:nth-last-child(2)::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.18);
+        border-radius: 3px;
     }
     /* Remark column — long free text shouldn't blow up the table. */
     #salaryIncrementList tbody td:nth-last-child(3) {

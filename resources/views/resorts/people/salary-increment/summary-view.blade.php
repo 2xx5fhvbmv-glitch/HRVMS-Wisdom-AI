@@ -74,8 +74,16 @@
                             <tr>
                                 <td>{{$employee['employee_code']}}</td>
                                 <td>
+                                    @php
+                                        // Fallback for any row whose URL fails
+                                        // (e.g. legacy session data with the old
+                                        // GetAdminResortProfile path). Matches
+                                        // the grid-view fix.
+                                        $_defaultPic = url(config('settings.default_picture'));
+                                    @endphp
                                     <div class="tableUser-block">
-                                        <div class="img-circle"><img src="{{$employee['employee_image']}}" alt="user">
+                                        <div class="img-circle"><img src="{{$employee['employee_image']}}" alt="user"
+                                             onerror="this.onerror=null;this.src='{{ $_defaultPic }}';">
                                         </div>
                                         <span class="userApplicants-btn">{{$employee['employee_name']}}</span>
                                     </div>

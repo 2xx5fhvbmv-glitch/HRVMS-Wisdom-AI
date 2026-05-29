@@ -42,6 +42,10 @@ class Kernel extends ConsoleKernel
         // Day-of promotion notifications + apply the employee position/rank/
         // salary update when an Approved promotion's effective_date arrives.
         $schedule->command('promotions:notify-effective')->dailyAt('06:20');
+        // Day-of salary-increment apply — flips employee.basic_salary +
+        // related fields when an Approved increment's effective_date
+        // arrives. Idempotent via people_salary_increment.effective_day_applied_at.
+        $schedule->command('salary-increment:apply-effective')->dailyAt('06:25');
 
         
 
