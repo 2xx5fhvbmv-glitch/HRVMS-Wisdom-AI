@@ -1351,6 +1351,18 @@ class FileManageController extends Controller
                 $allBuilder->whereIn('id', $allowedFolderIds ?: [0]);
                 $rootBuilder->whereIn('id', $allowedFolderIds ?: [0]);
             }
+            // Per-employee filter — used when the Employee Detail page
+            // "File Management" tab forwards ?emp_code=<Emp_id>. Each
+            // active employee's categorized folder is named after their
+            // Emp_id (e.g. "DR-22"; see Employee::created hook), so a
+            // Folder_Name match scopes the listing to just that folder.
+            // Authorization filter above still wins — privileged users
+            // see the folder, restricted users only if they had access.
+            if ($request->filled('emp_code')) {
+                $empCode = (string) $request->emp_code;
+                $allBuilder->where('Folder_Name', $empCode);
+                $rootBuilder->where('Folder_Name', $empCode);
+            }
             $AllFolderList = $allBuilder->get();
             $FolderList    = $rootBuilder->get();
 

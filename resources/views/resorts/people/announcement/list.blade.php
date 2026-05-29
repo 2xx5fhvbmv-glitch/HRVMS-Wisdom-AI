@@ -213,6 +213,11 @@
                     d.status = $('#statusFilter').val();
                     d.department = $('#deptFilter').val();
                     d.archived = $('#toggleArchivedAnnouncements').is(':checked') ? 1 : 0;
+                    // Forward ?empId=<base64> from the URL when the page is
+                    // opened from the Employee Detail "Announcement" tab so
+                    // the list scopes to announcements for that employee.
+                    const empIdFromUrl = new URLSearchParams(window.location.search).get('empId');
+                    if (empIdFromUrl) { d.empId = empIdFromUrl; }
                     let selectedDate = $('.datepicker').val();
                     if (selectedDate) {
                         let parts = selectedDate.split('/');

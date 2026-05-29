@@ -406,6 +406,18 @@ class LeaveController extends Controller
                 }
             }
 
+            // Per-employee scope — used when the Employee Detail page
+            // "Leave" tab forwards ?empId=<base64>. Layered AFTER the
+            // role-based scope so a restricted user can never see leaves
+            // they wouldn't otherwise have access to (the filter only
+            // narrows, never widens).
+            if (request()->filled('empId')) {
+                $decoded = base64_decode((string) request()->empId, true);
+                if ($decoded !== false && ctype_digit((string) $decoded)) {
+                    $leave_requests_query->where('el.emp_id', (int) $decoded);
+                }
+            }
+
                 $leaveRequests = $leave_requests_query->select(
                     'el.*',
                     'e.Emp_id as employee_id',
@@ -848,6 +860,29 @@ class LeaveController extends Controller
 
             return response()->json(['error' => 'An unexpected error occurred.'], 500);
         }
+    }
+
+    /**
+     * Per-employee Leave page entry point used by the Employee Detail
+     * sidebar "Leave" tab. Routes the user to the leave-request list
+     * (resorts.leaves.leave.request) scoped to the target employee via
+     * ?empId=<base64> so HR sees ONLY that employee's leave requests —
+     * not the global list. The request() method honors the same ?empId
+     * filter, so an employee with no leaves yet still lands on a scoped
+     * (empty) view instead of the global inbox.
+     */
+    public function employeeLeavePage($empID)
+    {
+        if(Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized access');
+        }
+        $decoded = base64_decode((string) $empID, true);
+        $empIdInt = ($decoded !== false && ctype_digit((string) $decoded)) ? (int) $decoded : 0;
+        if (!$empIdInt) {
+            return redirect()->back()->with('error', 'Invalid employee.');
+        }
+        // Forward the empID through so request() can scope the list.
+        return redirect()->route('leave.request', ['empId' => $empID]);
     }
 
     public function details($leave_id)

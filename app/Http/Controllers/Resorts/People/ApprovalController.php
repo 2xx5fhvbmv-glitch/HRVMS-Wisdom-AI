@@ -489,7 +489,29 @@ class ApprovalController extends Controller
             ];
             
             $mergedRequests = collect($collections)->collapse();
-            
+
+            // Per-employee filter — used when the Employee Detail page
+            // "Requests" tab forwards ?empId=<base64>. Each merged row
+            // carries the Employee.Emp_id code (e.g. "DR-22"), not the
+            // numeric id, so decode the URL param → look up the code →
+            // keep only matching rows.
+            $empIdFromUrl = $request->get('empId');
+            if (!empty($empIdFromUrl)) {
+                $decoded = base64_decode((string) $empIdFromUrl, true);
+                if ($decoded !== false && ctype_digit((string) $decoded)) {
+                    $scopedCode = Employee::where('id', (int) $decoded)
+                        ->where('resort_id', $resort->resort_id)
+                        ->value('Emp_id');
+                    if ($scopedCode) {
+                        $mergedRequests = $mergedRequests->filter(
+                            fn($r) => ($r['emp_id'] ?? null) === $scopedCode
+                        );
+                    } else {
+                        $mergedRequests = collect();
+                    }
+                }
+            }
+
             // Sort all requests by created_at descending
             $sortedMergedRequests = $mergedRequests->sortByDesc(function ($request) {
                 // Must match the display format used to build $request['created_at']

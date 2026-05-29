@@ -187,7 +187,9 @@
                                                                         <option value="">Select Gender</option>
                                                                         <option {{$employee->resortAdmin->gender == "male" ? "Selected" : ""}} value="male">Male</option>
                                                                         <option {{$employee->resortAdmin->gender == "female" ? "Selected" : ""}} value="female">Female</option>
-                                                                        <option {{$employee->resortAdmin->gender == "other" ? "Selected" : ""}} value="other">Other</option>
+                                                                        {{-- "Other" intentionally removed — HR policy: gender
+                                                                             collected only for legal/visa records where
+                                                                             Male / Female are the only accepted values. --}}
                                                                     </select>
                                                                 </td>
                                                             </tr>

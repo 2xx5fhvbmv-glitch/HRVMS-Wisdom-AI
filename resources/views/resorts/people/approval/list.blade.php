@@ -334,6 +334,11 @@
                 d.department_id = $('#department-filter').val();
                 d.position_id = $('#position-filter').val();
                 d.search = $('#search-box').val();
+                // Forward ?empId=<base64> from the URL when the page is
+                // opened from the Employee Detail "Requests" tab so the
+                // inbox scopes to that employee's pending requests only.
+                const empIdFromUrl = new URLSearchParams(window.location.search).get('empId');
+                if (empIdFromUrl) { d.empId = empIdFromUrl; }
             }
         },
         columns: [

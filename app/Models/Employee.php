@@ -240,13 +240,19 @@ class Employee extends Model
     
     public function sosTeams()
     {
+        // SOS convention (matches ResortAdmin::sosTeamMemberships and the SOS
+        // Configuration / Dashboard modules): sos_team_members.emp_id stores
+        // the resort_admins.id, which on the Employee model is the
+        // Admin_Parent_id column. Using Employee.id here meant the Teams row
+        // on the employee detail page never matched assignments made via
+        // either the SOS module or the "Assign to Team" modal.
         return $this->belongsToMany(
             SOSTeamManagementModel::class,
             'sos_team_members',
-            'emp_id',     // Foreign key on pivot table referencing Employee
-            'team_id',    // Foreign key on pivot table referencing Team
-            'id',         // Local key on Employee table
-            'id'          // Local key on Team table
+            'emp_id',              // FK on pivot → resort_admins.id
+            'team_id',             // FK on pivot → sos_teams.id
+            'Admin_Parent_id',     // Local key on employees
+            'id'                   // Local key on sos_teams
         )->withPivot('role_id')->withTimestamps();
     }
     
