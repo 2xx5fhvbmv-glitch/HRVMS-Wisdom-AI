@@ -59,7 +59,7 @@
                                             <p><b>Department</b>{{$PaymentRequestChild->Department_name}} . <b>Position</b> {{ $PaymentRequestChild->Position_name}}</p>
                                         </div>
                                     </div>
-                                    <strong class="d-block text-end mt-sm-0 mt-2">Amount : {!! Common::formatCurrency($PaymentRequestChild->TotalAmount, 'MVR') !!}</strong>
+                                    <strong class="d-block text-end mt-sm-0 mt-2">Amount : {!! Common::formatCurrency($PaymentRequestChild->TotalAmount, 'USD') !!}</strong>
                                     <a target="_blank" href="{{route('resort.visa.PaymentRequestThrowRenewal',[$id,base64_encode($PaymentRequestChild->id)])}}"  class="btn btn-themeBlue btn-sm btn-xs me-3">Renewal</a>
 
                                 </div>
@@ -67,7 +67,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Work Permit</label>
-                                            <span>Last Paid: 2024-01-01 | Due Date: {{$PaymentRequestChild->LastWorkPermitDate}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->WorkPermitAmt, 'MVR') !!}</span>
+                                            <span>Last Paid: 2024-01-01 | Due Date: {{$PaymentRequestChild->LastWorkPermitDate}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->WorkPermitAmt, 'USD') !!}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -75,7 +75,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Insurance</label>
-                                            <span>Last Paid: {{$PaymentRequestChild->LastInsuranceDate ?? 'N/A'}} | Due Date:  {{$PaymentRequestChild->InsuranceDate ?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->InsurancePrimume, 'MVR') !!}</span>
+                                            <span>Last Paid: {{$PaymentRequestChild->LastInsuranceDate ?? 'N/A'}} | Due Date:  {{$PaymentRequestChild->InsuranceDate ?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->InsurancePrimume, 'USD') !!}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -84,7 +84,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Work Permit Medical Test Fee </label>
-                                            <span>Last Paid: {{$PaymentRequestChild->LastMedicalReportDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->MedicalReportDate?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->MedicalReportFees, 'MVR') !!}</span>
+                                            <span>Last Paid: {{$PaymentRequestChild->LastMedicalReportDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->MedicalReportDate?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->MedicalReportFees, 'USD') !!}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -92,7 +92,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Quota Slot</label>
-                                            <span>Last Paid: {{$PaymentRequestChild->LastQuotaslotDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->QuotaslotDate?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->QuotaslotAmt, 'MVR') !!}</span>
+                                            <span>Last Paid: {{$PaymentRequestChild->LastQuotaslotDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->QuotaslotDate?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->QuotaslotAmt, 'USD') !!}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -100,7 +100,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Visa</label>
-                                            <span>Last Paid: {{$PaymentRequestChild->LastVisaDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->VisaDate?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->VisaAmt, 'MVR') !!} </span>
+                                            <span>Last Paid: {{$PaymentRequestChild->LastVisaDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->VisaDate?? 'N/A'}} | Amount: {!! Common::formatCurrency($PaymentRequestChild->VisaAmt, 'USD') !!} </span>
                                         </div>
                                     </div>
                                 @endif
@@ -113,7 +113,7 @@
                     @endif
                         <div class="mt-3 PayReqprice-bar d-flex align-items-center justify-content-between">
                                 <span>Total Amount</span>
-                                <label>{!! Common::formatCurrency($GrandTotal ?? 0, 'MVR') !!}</label>
+                                <label>{!! Common::formatCurrency($GrandTotal ?? 0, 'USD') !!}</label>
                             </div>
                             <div class="d-none d-md-block" style="height: 136px;"></div>
 

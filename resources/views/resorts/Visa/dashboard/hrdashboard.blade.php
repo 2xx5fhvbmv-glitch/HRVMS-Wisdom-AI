@@ -38,7 +38,7 @@
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         <p class="mb-0  fw-500">{{$VisaWallet->WalletName}}</p>
-                                        <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'MVR') !!}</strong>
+                                        <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'USD') !!}</strong>
                                     </div>
                                     <a href="#">
                                         <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -414,7 +414,7 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <h6>{{$VisaWallet->WalletName}}</h6>
-                                                                <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'MVR') !!}</strong>
+                                                                <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'USD') !!}</strong>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -436,12 +436,12 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <div class="d-flex align-items-center">
-                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode(Common::convertToDisplayCurrency($VisaWallet->Xpact_Amt, 'MVR'))}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
+                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode(Common::convertToDisplayCurrency($VisaWallet->Xpact_Amt, 'USD'))}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
                                                                         <img src="{{URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                                                                     </a> </h6>
                                                                 </div>
                                                             
-                                                                <strong>{!! Common::formatCurrency($VisaWallet->Xpact_Amt, 'MVR') !!}</strong>
+                                                                <strong>{!! Common::formatCurrency($VisaWallet->Xpact_Amt, 'USD') !!}</strong>
                                                             </div>
                                                             
                                                         </div>

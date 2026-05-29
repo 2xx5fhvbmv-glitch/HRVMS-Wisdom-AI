@@ -20,15 +20,30 @@
                         <span class="position">{{$employee->department->name}}</span>
                         <span class="date">Joining Date: {{Carbon\Carbon::parse($employee->joining_date)->format('d M Y')}}</span>
 
+                        @php
+                            // Legacy data: some employee rows have
+                            // basic_salary stored in MVR with
+                            // basic_salary_currency='MVR' (pre-USD-only
+                            // convention). Trust the per-row column when
+                            // present so MVR-stored values get converted to
+                            // the resort's display currency correctly.
+                            // formatCurrency('MVR', value) handles the
+                            // MVR→display conversion at render time.
+                            $basicCurrency = $employee->basic_salary_currency
+                                ?: 'USD';
+                        @endphp
                         <div class="d-flex bg">
                             <p>Current Basic Salary</p>
-                            <p>{!! App\Helpers\Common::formatCurrency($employee->basic_salary, 'USD') !!}</p>
+                            <p>{!! App\Helpers\Common::formatCurrency($employee->basic_salary, $basicCurrency) !!}</p>
                         </div>
                         <div class="bg">
                             <div class="d-flex">
                                 <p>Last Increment Amount:</p>
+                                {{-- The increment amount is in the same
+                                     currency as the basic_salary it
+                                     incremented. Reuse $basicCurrency. --}}
                                 <p>{!! !empty($employee->last_increment_salary_amount)
-                                    ? App\Helpers\Common::formatCurrency($employee->last_increment_salary_amount, 'USD')
+                                    ? App\Helpers\Common::formatCurrency($employee->last_increment_salary_amount, $basicCurrency)
                                     : '-' !!}</p>
                             </div>
                             <div class="d-flex">
