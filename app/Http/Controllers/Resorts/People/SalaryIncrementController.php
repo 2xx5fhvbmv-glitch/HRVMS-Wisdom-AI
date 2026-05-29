@@ -86,6 +86,37 @@ class SalaryIncrementController extends Controller
     }
 
     /**
+     * Apply an Approved salary increment to the employee's record —
+     * sets basic_salary, incremented_date, last increment amount/type,
+     * notes. Stamps effective_day_applied_at on the increment so the
+     * daily command treats this row as done.
+     *
+     * Static so both `updateStatus` (immediate apply when the GM
+     * approves a same-day increment) and
+     * App\Console\Commands\ApplyEffectiveSalaryIncrement (daily
+     * catch-up for future-dated rows) can call the same path.
+     */
+    public static function applyApprovedIncrementToEmployee(PeopleSalaryIncrement $increment): bool
+    {
+        if ($increment->status !== 'Approved') return false;
+        if (!empty($increment->effective_day_applied_at)) return false; // already applied
+
+        $employee = Employee::find($increment->employee_id);
+        if (!$employee) return false;
+
+        $employee->update([
+            'basic_salary'                  => $increment->new_salary,
+            'incremented_date'              => $increment->effective_date,
+            'last_increment_salary_amount'  => $increment->increment_amount,
+            'last_salary_increment_type'    => $increment->increment_type,
+            'notes'                         => $increment->remarks,
+        ]);
+
+        $increment->update(['effective_day_applied_at' => now()]);
+        return true;
+    }
+
+    /**
      * Fan out notifications for any state transition on a salary increment.
      *
      * Recipients depend on the action + the stage that acted:
@@ -114,6 +145,26 @@ class SalaryIncrementController extends Controller
         $hr = $increment->created_by
             ? Employee::with('resortAdmin')->where('Admin_Parent_id', $increment->created_by)->first()
             : null;
+
+        // HR department pool — HOD (rank 2) + EXCOM (rank 1) of any
+        // department flagged as HR by Common::isHRDepartment(). Used on
+        // every Approved action so the entire HR dept (not only the
+        // initiator) is in the loop when Finance or GM signs off. Was
+        // previously notifying only the single resort-admin who created
+        // the increment — HR HOD/EXCOM had to refresh the list manually.
+        $hrDeptIds = ResortDepartment::where('resort_id', $resortId)
+            ->get()
+            ->filter(fn($d) => Common::isHRDepartment($d->id))
+            ->pluck('id');
+        $hrPool = collect();
+        if ($hrDeptIds->isNotEmpty()) {
+            $hrPool = Employee::with('resortAdmin')
+                ->where('resort_id', $resortId)
+                ->where('status', 'Active')
+                ->whereIn('Dept_id', $hrDeptIds)
+                ->whereIn('rank', [1, 2])
+                ->get();
+        }
 
         $employeeName  = optional($subject->resortAdmin)->full_name ?: '';
         $effectiveFmt  = !empty($increment->effective_date)
@@ -147,7 +198,14 @@ class SalaryIncrementController extends Controller
                 if ($actorRank === 'Finance') {
                     $recipients = $recipients->merge($pools['gm']);   // next stage
                 }
-                $recipients = $recipients->push($hr)->push($subject);
+                // HR dept HOD + EXCOM get pinged on EVERY Approved
+                // action (Finance approval AND GM final approval), so
+                // the whole HR department stays informed without
+                // refreshing the list. Per-user request.
+                $recipients = $recipients
+                    ->merge($hrPool)
+                    ->push($hr)
+                    ->push($subject);
                 break;
             case 'Rejected':
             case 'Hold':
@@ -667,7 +725,12 @@ class SalaryIncrementController extends Controller
                 $incrementAmount = $inc['value'] ;
             }
 
-            $employee_image = Common::GetAdminResortProfile($employee->Admin_Parent_id);
+            // GetAdminResortProfile crashes on orphaned Admin_Parent_id
+            // AND doesn't validate the file exists — returns a path that
+            // 404s, producing the broken-image icon HR saw on this page.
+            // Use the modern helper that returns the default picture URL
+            // when the chain is incomplete.
+            $employee_image = Common::getResortUserPicture($employee->Admin_Parent_id ?? null);
             $arr_increments[] = [
                 'emp_id' => $inc['emp_id'],
                 'employee_code' => $employee->Emp_id,
@@ -1122,13 +1185,45 @@ class SalaryIncrementController extends Controller
                             }
                             return $html;
                         })
+                        // Per-stage breakdown — "Finance: Pending / GM: Pending"
+                        // — same render the /list page already shows. User
+                        // wants this column on summary-list too so they don't
+                        // have to switch pages to see chain progress.
+                        ->addColumn('last_activity', function($row){
+                            $badgeFor = function (string $status): string {
+                                return match (trim($status)) {
+                                    'Approved'       => 'badge-themeSuccess',
+                                    'Rejected'       => 'badge-themeDanger',
+                                    'Hold'           => 'badge-themeSkyblue',
+                                    'On Hold'        => 'badge-themeSkyblue',
+                                    'Change-Request' => 'badge-themeSkyblue',
+                                    default          => 'badge-themeWarning',
+                                };
+                            };
+                            // Same .card-salaryIncrementSum strong{font-size:26px}
+                            // hijack as elsewhere on this page — use <span>
+                            // with explicit weight/size + !important on
+                            // every inline rule.
+                            $stageRow = function (string $label, $stage) use ($badgeFor) {
+                                if (!$stage) return '';
+                                $status  = e((string) $stage->status);
+                                $remarks = !empty($stage->remarks) ? ' &mdash; ' . e($stage->remarks) : '';
+                                return '<div class="mb-1" style="font-size:12px !important; line-height:1.3 !important;">'
+                                    . '<span style="font-weight:600; font-size:12px !important;">' . e($label) . ':</span> '
+                                    . '<span class="badge ' . $badgeFor($stage->status) . '" style="font-size:11px !important; font-weight:500 !important; padding:2px 6px !important;">' . $status . '</span>'
+                                    . '<span style="font-size:12px !important;">' . $remarks . '</span>'
+                                    . '</div>';
+                            };
+                            return $stageRow('Finance', $row->peopleSalaryIncrementStatusFinance)
+                                 . $stageRow('GM',      $row->peopleSalaryIncrementStatusGM);
+                        })
                         ->with([
                             'currentBasicSalary' => $currentBasicSalary,
                             'newBasicSalary' => $newBasicSalary,
                             'monthlyPayrollIncrease' => $monthlyPayrollIncrease,
                             'annualPayrollIncrease' => $annualPayrollIncrease
                         ])
-                        ->rawColumns(['Emp_id','department_name','employee_name','position_title','status_info'])
+                        ->rawColumns(['Emp_id','department_name','employee_name','position_title','status_info','last_activity'])
                         ->make(true);
                 }
         
@@ -1243,24 +1338,37 @@ class SalaryIncrementController extends Controller
                         }
     
                         $peopleSalaryIncrementStatusGm =  PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id)->where('approval_rank', 'GM')->where('status', '!=','Pending')->first();
-    
+
                         if($peopleSalaryIncrementStatusGm){
                             $increment->update([
                                 'status' => $peopleSalaryIncrementStatusGm->status,
                             ]);
 
-                            //update employee Basic Salary
-
-                            $employee = Employee::find($increment->employee_id);
-                            if($employee) {
-                                $employee->update([
-                                    'basic_salary' => $increment->new_salary,
-                                    'incremented_date' => $increment->effective_date,
-                                    'last_increment_salary_amount' => $increment->increment_amount,
-                                    'last_salary_increment_type'=> $increment->increment_type,
-                                    'notes'  => $increment->remarks,
-                                ]);
+                            // Apply the salary change to the employee ONLY when:
+                            //   (1) GM marked it Approved (not Rejected/etc), AND
+                            //   (2) the effective_date is today or earlier.
+                            // For future-dated increments we leave the employee
+                            // row alone — the daily scheduler command
+                            // `salary-increment:apply-effective` picks the row
+                            // up on the effective date, applies the change,
+                            // and stamps `effective_day_applied_at` to keep
+                            // it idempotent (mirrors the promotion module).
+                            $isApproved = $peopleSalaryIncrementStatusGm->status === 'Approved';
+                            $effectiveToday = !empty($increment->effective_date)
+                                && \Carbon\Carbon::parse($increment->effective_date)->toDateString() <= \Carbon\Carbon::today()->toDateString();
+                            if (!($isApproved && $effectiveToday)) {
+                                // Skip the immediate-apply block — either the
+                                // GM action wasn't an approval, or the
+                                // increment is future-dated and waits for
+                                // its day-of run.
+                                continue;
                             }
+
+                            // Reuse the shared apply helper so updateStatus
+                            // and the daily catch-up command write through
+                            // exactly the same fields and stamp the
+                            // idempotency timestamp.
+                            self::applyApprovedIncrementToEmployee($increment->fresh());
                         }
                     }else{
                         return response()->json([
@@ -1555,7 +1663,17 @@ class SalaryIncrementController extends Controller
             ->with([
                 'employee.resortAdmin:id,first_name,last_name',
                 'employee.department:id,name',
-                'employee.position:id,position_title'
+                'employee.position:id,position_title',
+                // Per-stage rows carry the reject_reason, remarks, AND the
+                // actor (via approved_by / modified_by). Pull approver →
+                // Employee → resortAdmin too so we can resolve the actor's
+                // name and append "by <Actor>" on Rejected rows.
+                'peopleSalaryIncrementStatusFinance:id,people_salary_increment_id,status,remarks,reject_reason,approved_by,action_date,modified_by',
+                'peopleSalaryIncrementStatusFinance.approver:id,Admin_Parent_id',
+                'peopleSalaryIncrementStatusFinance.approver.resortAdmin:id,first_name,last_name',
+                'peopleSalaryIncrementStatusGM:id,people_salary_increment_id,status,remarks,reject_reason,approved_by,action_date,modified_by',
+                'peopleSalaryIncrementStatusGM.approver:id,Admin_Parent_id',
+                'peopleSalaryIncrementStatusGM.approver.resortAdmin:id,first_name,last_name',
             ])
             ->get();
 
@@ -1591,9 +1709,70 @@ class SalaryIncrementController extends Controller
                             'Change-Request'  => 'badge-themeSkyblue',
                             default           => 'badge-themeWarning',
                         };
-                        return '<span class="badge ' . $class . '" style="font-size:11px !important; font-weight:500 !important; padding:2px 8px !important;">'
+                        $html = '<span class="badge ' . $class . '" style="font-size:11px !important; font-weight:500 !important; padding:2px 8px !important;">'
                             . e($status ?: '-')
                             . '</span>';
+
+                        // Append "Rejected by <Stage>: <reason>" + actor
+                        // name on Rejected rows. The reject_reason lives
+                        // on PeopleSalaryIncrementStatus of whichever
+                        // stage rejected (Finance OR GM); the actor name
+                        // is resolved via approved_by → Employee →
+                        // resortAdmin with a modified_by fallback for
+                        // older rows that never set approved_by.
+                        if ($status === 'Rejected') {
+                            $finance = $row->peopleSalaryIncrementStatusFinance;
+                            $gm      = $row->peopleSalaryIncrementStatusGM;
+                            $stageRow = null;
+                            $stageLabel = null;
+                            if ($finance && trim((string) $finance->status) === 'Rejected') {
+                                $stageRow   = $finance;
+                                $stageLabel = 'Finance';
+                            } elseif ($gm && trim((string) $gm->status) === 'Rejected') {
+                                $stageRow   = $gm;
+                                $stageLabel = 'GM';
+                            }
+                            if ($stageRow) {
+                                // Resolve actor name with the same fallback
+                                // chain used on the summary-list page:
+                                //  1. approved_by → Employee → resortAdmin
+                                //  2. modified_by → ResortAdmin (model
+                                //     boot-hook auto-sets it on every
+                                //     update — rescues historical rows).
+                                $actorName = optional(optional($stageRow)->approver?->resortAdmin)->full_name;
+                                if (empty($actorName) && !empty($stageRow->modified_by)) {
+                                    static $adminNameCache = [];
+                                    $mid = (int) $stageRow->modified_by;
+                                    if (!array_key_exists($mid, $adminNameCache)) {
+                                        $ra = \App\Models\ResortAdmin::select('id','first_name','last_name')->find($mid);
+                                        $adminNameCache[$mid] = $ra
+                                            ? trim(($ra->first_name ?? '') . ' ' . ($ra->last_name ?? ''))
+                                            : null;
+                                    }
+                                    $actorName = $adminNameCache[$mid];
+                                }
+                                $reason = $stageRow->reject_reason ?: $stageRow->remarks;
+                                $when   = !empty($stageRow->action_date)
+                                    ? ' on ' . e(Carbon::parse($stageRow->action_date)->format('d M Y'))
+                                    : '';
+                                // Line 1 — who and when.
+                                $html .= '<div style="font-size:11px !important; line-height:1.3 !important; margin-top:3px; color:#555;">'
+                                    . '<span style="font-weight:600; font-size:11px !important;">Rejected by '
+                                    . e($stageLabel) . ':</span> '
+                                    . '<span style="font-size:11px !important;">'
+                                    . e($actorName ?: '—') . $when
+                                    . '</span>'
+                                    . '</div>';
+                                // Line 2 — reason text, only when present.
+                                if (!empty($reason)) {
+                                    $html .= '<div style="font-size:11px !important; line-height:1.3 !important; color:#555;">'
+                                        . '<span style="font-weight:600; font-size:11px !important;">Reason:</span> '
+                                        . '<span style="font-size:11px !important;">' . e($reason) . '</span>'
+                                        . '</div>';
+                                }
+                            }
+                        }
+                        return $html;
                     })
 
                     ->rawColumns(['Emp_id','department_name','employee_name','position_title','status'])
