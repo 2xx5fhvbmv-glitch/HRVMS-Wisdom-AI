@@ -34,6 +34,103 @@
                     </div>
                     <hr>
                     <fieldset data-setp="1">
+                        {{-- ───────────────── Hire against a vacancy (optional) ──────────────────
+                             Collapsible panel at the very top of Step 1. If HR picks a vacancy,
+                             the JS at the bottom of this view pre-fills Department/Position/Division
+                             on Step 2 and locks them. Skipping leaves the form behaving exactly
+                             like before — direct hires don't need to do anything here.
+                             Server provides $vacancies from EmployeeController::create using the
+                             same TA-final-approval filter as /talent-acquisition/get-offline-interview. --}}
+                        <div class="cardBorder-block mb-3" id="vacancyPickerPanel">
+                            <div class="card-title px-3 pt-3 d-flex justify-content-between align-items-center"
+                                 data-bs-toggle="collapse" data-bs-target="#vacancyPickerCollapse"
+                                 aria-expanded="false" aria-controls="vacancyPickerCollapse"
+                                 style="cursor: pointer;">
+                                <div>
+                                    <h3 class="mb-0">
+                                        <i class="fa-solid fa-briefcase me-2 text-primary"></i>
+                                        Hire against a vacancy
+                                        <small class="text-muted ms-2" style="font-size: 13px; font-weight: 400;">(optional)</small>
+                                    </h3>
+                                    <p class="small text-muted mb-0 mt-1">
+                                        Pick an open vacancy to auto-fill Department, Position and Division on Step 2.
+                                        Skip for direct hires.
+                                    </p>
+                                </div>
+                                <i class="fa-solid fa-chevron-down" id="vacancyPickerChevron"></i>
+                            </div>
+                            <div class="collapse" id="vacancyPickerCollapse">
+                                <div class="px-3 pb-3">
+                                    <input type="hidden" id="selected_vacancy_id" name="vacancy_id" value="">
+                                    <input type="hidden" id="selected_vacancy_position_id" name="vacancy_position_id" value="">
+                                    <input type="hidden" id="selected_vacancy_department_id" name="vacancy_department_id" value="">
+                                    <input type="hidden" id="selected_vacancy_division_id" name="vacancy_division_id" value="">
+
+                                    @if($vacancies->isNotEmpty())
+                                        <div class="table-responsive">
+                                            <table class="table table-LearningProgram w-100 mb-0" id="vacancyPickerTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th></th>
+                                                        <th>Position</th>
+                                                        <th>Department</th>
+                                                        <th>Division</th>
+                                                        <th>No. of positions</th>
+                                                        <th>Link expiry</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($vacancies as $v)
+                                                        <tr class="vacancy-row"
+                                                            data-vacancy-id="{{ $v->vacancy_id }}"
+                                                            data-position-id="{{ $v->position_id }}"
+                                                            data-position-title="{{ $v->position_title }}"
+                                                            data-department-id="{{ $v->department_id }}"
+                                                            data-department-name="{{ $v->department_name }}"
+                                                            data-division-id="{{ $v->division_id }}"
+                                                            data-division-name="{{ $v->division_name }}"
+                                                            data-gm-approved-iso="{{ $v->gm_approved_at_iso }}"
+                                                            data-gm-approved-label="{{ $v->gm_approved_at_label }}"
+                                                            style="cursor: pointer;">
+                                                            <td><input type="radio" name="vacancy_pick" value="{{ $v->vacancy_id }}"></td>
+                                                            <td>{{ $v->position_title }}</td>
+                                                            <td>{{ $v->department_name }} <span class="badge bg-light text-dark ms-1">{{ $v->department_code }}</span></td>
+                                                            <td>{{ $v->division_name ?? '—' }}</td>
+                                                            <td>{{ $v->no_of_positions }}</td>
+                                                            <td>{{ $v->expiry_date_label }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {{-- Selected-vacancy summary + clear button (visible only after a pick). --}}
+                                        <div id="vacancyPickerSummary" class="alert alert-info mt-3 d-none" role="alert">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong>Hiring against:</strong>
+                                                    <span id="vacancyPickerSummaryText"></span>
+                                                    <div class="small text-muted mt-1">
+                                                        Department, Position and Division on Step 2 will be pre-filled and locked.
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" id="vacancyPickerClear">
+                                                    Clear selection
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div class="alert alert-light text-center text-muted mb-0" role="alert">
+                                            <i class="fa-solid fa-circle-info me-1"></i>
+                                            No open vacancies are ready for hiring right now.
+                                            Continue below for a direct hire, or create a vacancy in
+                                            <strong>Talent Acquisition &rarr; Vacancies</strong> first.
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="peopleEmpCreationPersonalDetails-form mt-2">
                             <div class="row g-md-3 g-2 mb-md-5 mb-4">
                                 <div class="col-12">
@@ -118,23 +215,23 @@
                                         data-parsley-pattern-message="Only letters are allowed.">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="email_address" class="form-label">Email Address<span
+                                    <label for="email_address" class="form-label">Official Email Address<span
                                             class="req_span">*</span></label>
                                     <input type="email" class="form-control" id="email_address" name="email_address"
-                                        placeholder="Email Address" required data-parsley-type="email"
-                                        data-parsley-required-message="Email address is required."
+                                        placeholder="Official Email Address" required data-parsley-type="email"
+                                        data-parsley-required-message="Official email address is required."
                                         data-parsley-type-message="Please enter a valid email address.">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="mobile_num" class="form-label">Mobile Number<span
+                                    <label for="mobile_num" class="form-label">Official Mobile Number<span
                                             class="req_span">*</span></label>
                                     <div>
                                         <input type="tel" class="form-control" id="mobile_num" name="mobile_num"
-                                            placeholder="Mobile Number" required
+                                            placeholder="e.g. +960 9123456" required
+                                            inputmode="tel" autocomplete="tel" maxlength="25"
                                             data-parsley-required-message="Mobile number is required."
-                                            data-parsley-mobile_number
-                                            data-parsley-mobile_number-message="Please enter a valid 10-digit mobile number, optionally prefixed with a valid country code.">
-
+                                            data-parsley-mobile_number>
+                                        <small class="form-text text-muted">Include country code, e.g. +91 9098765432</small>
                                     </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
@@ -151,10 +248,12 @@
                                     <label for="gender" class="form-label">Gender <span
                                             class="req_span">*</span></label>
                                     <select class="form-select select2t-none" id="gender" name="gender" required>
-                                        <option value="">select gender</option>
+                                        <option value="">Select Gender</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
-                                        <option value="other">other</option>
+                                        {{-- "Other" intentionally removed — HR policy: gender
+                                             collected only for legal/visa records where
+                                             Male / Female are the only accepted values. --}}
                                     </select>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
@@ -207,35 +306,65 @@
                                         <option value="O-">O-</option>
                                     </select>
                                 </div>
+                                {{-- Passport Number and NID are mutually-exclusive
+                                     identification documents. The form requires AT
+                                     LEAST ONE — passport-only (expat), NID-only
+                                     (Maldivian), or both. The * markers + required
+                                     state on each are recomputed every time either
+                                     field changes by syncIdDocRequirements() bound
+                                     in the scripts section.
+
+                                     Additionally: Passport Expiry Date becomes
+                                     required ONLY when a Passport Number is entered. --}}
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="passport_numb" class="form-label">PASSPORT NUMBER<span
-                                            class="req_span">*</span></label>
+                                    <label for="passport_numb" class="form-label">
+                                        PASSPORT NUMBER
+                                        <span class="req_span passport-required-marker">*</span>
+                                    </label>
                                     <input type="text" class="form-control" id="passport_numb" name="passport_numb"
-                                        placeholder="Passport Number" required
-                                        data-parsley-required-message="Passport number is required."
+                                        placeholder="Passport Number"
+                                        data-parsley-required-message="Enter either a Passport Number or NID."
                                         data-parsley-pattern="^[A-Za-z0-9]{5,20}$"
                                         data-parsley-pattern-message="Please enter a valid passport number (5-20 alphanumeric characters).">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="passport_expiry_date" class="form-label">Passport expiry date <span
-                                            class="req_span">*</span></label>
+                                    <label for="passport_expiry_date" class="form-label">
+                                        Passport expiry date
+                                        <span class="req_span passport-expiry-required-marker d-none">*</span>
+                                    </label>
                                     <input type="text" class="form-control datepicker" id="passport_expiry_date"
-                                        name="passport_expiry_date" placeholder="Passport Expiry Date" required
-                                        data-parsley-required-message="Passport expiry date is required."
+                                        name="passport_expiry_date" placeholder="Passport Expiry Date"
+                                        data-parsley-required-message="Passport expiry date is required when a passport number is entered."
                                         data-parsley-pattern="^\d{2}/\d{2}/\d{4}$"
                                         data-parsley-pattern-message="Please enter a valid date in DD/MM/YYYY format.">
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="nid" class="form-label">NID</label>
+                                    <label for="nid" class="form-label">
+                                        NID
+                                        <span class="req_span nid-required-marker">*</span>
+                                    </label>
                                     <input type="text" class="form-control" id="nid" name="nid"
-                                        placeholder="NID" data-parsley-required-message="NID is required."
+                                        placeholder="NID"
+                                        data-parsley-required-message="Enter either a Passport Number or NID."
                                         data-parsley-pattern="^[A-Z]{1,2}[0-9]{6,9}$"
                                         data-parsley-pattern-message="Please enter a valid Maldivian NID. It should start with 1-2 uppercase letters followed by 6-9 digits."
                                         data-parsley-trigger="input">
                                 </div>
                                 <div class="col-12">
                                     <div class="address-block">
+                                        {{-- "Same as Present Address" — copies the Present
+                                             address block into Permanent in one click. Live-
+                                             mirrors edits while checked; unchecking clears
+                                             the Permanent fields so users aren't left with
+                                             stale data. JS lives in syncIdDocRequirements'
+                                             sibling helpers above. --}}
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="sameAsPresentAddress">
+                                            <label class="form-check-label small text-muted" for="sameAsPresentAddress">
+                                                Permanent address is same as Present address
+                                            </label>
+                                        </div>
                                         <div class="row g-md-3 g-2 align-items-end">
                                             <div class="col-lg-4 col-sm-6">
                                                 <label for="permanent_addLine1" class="form-label">PERMANENT
@@ -353,11 +482,14 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="emg_number" class="form-label">Contact Number<span
                                             class="req_span">*</span></label>
-                                    <input type="number" class="form-control" id="emg_number" name="emg_contact_number"
-                                        placeholder="Number" required
+                                    {{-- type=tel (not number) so the leading "+" character isn't
+                                         silently stripped by the browser. --}}
+                                    <input type="tel" class="form-control" id="emg_number" name="emg_contact_number"
+                                        placeholder="e.g. +960 9123456" required
+                                        inputmode="tel" autocomplete="tel" maxlength="25"
                                         data-parsley-required-message="Mobile number is required."
-                                        data-parsley-mobile_number
-                                        data-parsley-mobile_number-message="Please enter a valid 10-digit mobile number, optionally prefixed with a valid country code.">
+                                        data-parsley-mobile_number>
+                                    <small class="form-text text-muted">Include country code, e.g. +91 9098765432</small>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
@@ -478,19 +610,20 @@
                                         name="employee_id" value="{{ $employee_id }}" placeholder="Employee ID">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="email_add_step2" class="form-label">Email Address<span
+                                    <label for="email_add_step2" class="form-label">Official Email Address<span
                                             class="req_span">*</span></label>
                                     <input type="text" class="form-control" id="email_add_step2"
-                                        name="email_add_step2" placeholder="Email Address" required>
+                                        name="email_add_step2" placeholder="Official Email Address" required>
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="mobile_num_s2" class="form-label">Mobile Number<span
+                                    <label for="mobile_num_s2" class="form-label">Official Mobile Number<span
                                             class="req_span">*</span></label>
-                                    <input type="text" class="form-control" id="mobile_num_s2" name="mobile_num_s2"
-                                        required placeholder="Mobile Number"
+                                    <input type="tel" class="form-control" id="mobile_num_s2" name="mobile_num_s2"
+                                        required placeholder="e.g. +960 9123456"
+                                        inputmode="tel" autocomplete="tel" maxlength="25"
                                         data-parsley-required-message="Mobile number is required."
-                                        data-parsley-mobile_number
-                                        data-parsley-mobile_number-message="Please enter a valid 10-digit mobile number, optionally prefixed with a valid country code.">
+                                        data-parsley-mobile_number>
+                                    <small class="form-text text-muted">Include country code, e.g. +91 9098765432</small>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="division" class="form-label">Division <span
@@ -582,10 +715,19 @@
 
 
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="probation_exp_date" class="form-label">PROBATION EXP DATE<span
-                                            class="req_span">*</span></label>
-                                    <input type="text" class="form-control datepicker" id="probation_exp_date"
-                                        name="probation_exp_date" placeholder="dd/mm/yyyy" disabled>
+                                    <label for="probation_exp_date" class="form-label">
+                                        PROBATION EXP DATE<span class="req_span">*</span>
+                                    </label>
+                                    {{-- Auto-derived from Joining Date + 3 months whenever
+                                         EMPLOYMENT STATUS is Probationary. Disabled so HR
+                                         can't drift the probation window off the standard
+                                         policy. The server recomputes the same value on
+                                         save, so a tampered/disabled-but-empty submission
+                                         still lands the correct date. --}}
+                                    <input type="text" class="form-control" id="probation_exp_date"
+                                        name="probation_exp_date" placeholder="dd/mm/yyyy" disabled readonly
+                                        title="Auto-set to Joining Date + 3 months">
+                                    <small class="form-text text-muted">Auto: joining date + 3 months</small>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6">
@@ -609,12 +751,18 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="basic_salary" class="form-label">Basic Salary <span
                                             class="req_span">*</span></label>
-                                    <input type="number" min="1" class="form-control" id="basic_salary"
-                                        name="basic_salary" placeholder="Basic Salary" required
-                                        data-parsley-required-message="Basic salary is required."
-                                        data-parsley-type="number" data-parsley-min="1"
-                                        data-parsley-type-message="Please enter a valid number."
-                                        data-parsley-min-message="Basic salary must be at least 1.">
+                                    {{-- Currency-symbol prefix syncs with Currency Type.
+                                         updateSalaryCurrencySymbol() below keeps both
+                                         the basic-salary and pension prefixes in step. --}}
+                                    <div class="input-group">
+                                        <span class="input-group-text salary-currency-symbol" id="basic_salary_symbol">MVR</span>
+                                        <input type="number" min="1" step="0.01" class="form-control" id="basic_salary"
+                                            name="basic_salary" placeholder="Basic Salary" required
+                                            data-parsley-required-message="Basic salary is required."
+                                            data-parsley-type="number" data-parsley-min="1"
+                                            data-parsley-type-message="Please enter a valid number."
+                                            data-parsley-min-message="Basic salary must be at least 1.">
+                                    </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="currency_type" class="form-label">Currency Type <span
@@ -639,11 +787,15 @@
                                 <div class="row g-md-3 g-2 mb-md-4 mb-3">
                                     <div class="col-lg-4 col-sm-6">
                                         <label for="pension" class="form-label">Pension</label>
-                                        <input type="number" min="0" class="form-control" id="pension"
-                                            name="pension" placeholder="Pension" data-parsley-required="false"
-                                            data-parsley-required-message="Pension is required for Maldivian employees."
-                                            data-parsley-min="0" data-parsley-min-message="Pension must be at least 0."
-                                            data-parsley-trigger="change">
+                                        <div class="input-group">
+                                            <span class="input-group-text salary-currency-symbol" id="pension_symbol">MVR</span>
+                                            <input type="number" min="0" step="0.01" class="form-control" id="pension"
+                                                name="pension" placeholder="Pension" data-parsley-required="false"
+                                                data-parsley-required-message="Pension is required for Maldivian employees."
+                                                data-parsley-min="0" data-parsley-min-message="Pension must be at least 0."
+                                                data-parsley-trigger="change">
+                                        </div>
+                                        <small class="form-text text-muted">7% of Basic Salary for Maldivian employees.</small>
                                     </div>
                                     <div class="col-lg-2 col-sm-6">
                                         <label for="ewt_status" class="form-label">EWT STATUS</label>
@@ -818,9 +970,13 @@
                                         </select>
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
-                                        <label class="form-label">IBAN <span class="req_span">*</span></label>
+                                        <label class="form-label">IBAN</label>
+                                        {{-- IBAN is optional — not every bank/country issues
+                                             one (e.g. domestic Maldivian accounts). Pattern
+                                             validator still fires when a value IS entered so
+                                             a typo'd IBAN is caught. --}}
                                         <input type="text" class="form-control iban" name="bank[0][iban]"
-                                            placeholder="IBAN" required data-parsley-required-message="IBAN is required."
+                                            placeholder="IBAN (optional)"
                                             data-parsley-pattern="^[A-Z0-9]{8,34}$"
                                             data-parsley-pattern-message="Please enter a valid IBAN (8-34 alphanumeric characters, uppercase).">
                                     </div>
@@ -1021,11 +1177,18 @@
                                         <div class="col-lg-4 col-sm-6">
                                             <label for="reference_contact" class="form-label">Reference Contact <span
                                                     class="req_span">*</span></label>
-                                            <input type="text" class="form-control reference_contact"
-                                                name="experience[0][reference_contact]" placeholder="Reference Contact"
-                                                required data-parsley-pattern="^\d{10,15}$"
+                                            {{-- Same loosened phone-number rule as the
+                                                 Personal / Emergency / Step-2 mobile inputs:
+                                                 optional `+`, digits + separators, 7–15
+                                                 digits total. Lets HR enter international
+                                                 reference numbers like "+1 833 747-9077". --}}
+                                            <input type="tel" class="form-control reference_contact"
+                                                name="experience[0][reference_contact]" placeholder="e.g. +1 833 747-9077"
+                                                inputmode="tel" autocomplete="tel" maxlength="25"
+                                                required
                                                 data-parsley-required-message="Reference contact is required."
-                                                data-parsley-pattern-message="Please enter a valid contact number (10-15 digits).">
+                                                data-parsley-mobile_number>
+                                            <small class="form-text text-muted">Include country code, e.g. +91 9098765432</small>
                                         </div>
                                         <div class="col-12">
                                             <a href="javascript:void(0);"
@@ -1113,6 +1276,21 @@
             display: flex;
             flex-direction: column;
         }
+
+        /* Vacancy-locked dropdowns on Step 2 — softer than `disabled` grey
+           so the field still reads as filled, with a small lock icon hint. */
+        .vacancy-locked,
+        .select2-container--default.select2-container--disabled .select2-selection.vacancy-locked-widget {
+            background-color: #eef5ff !important;
+            border-color: #b3d4ff !important;
+            cursor: not-allowed;
+        }
+        #vacancyPickerTable tbody tr.table-active {
+            background-color: #eef5ff !important;
+        }
+        #vacancyPickerTable tbody tr:hover {
+            background-color: #f7fbff;
+        }
     </style>
 @endsection
 
@@ -1120,6 +1298,102 @@
 
     {{-- old --}}
     <script type="text/javascript">
+        // ----------------------------------------------------------------
+        // Mutually-required ID docs + conditional Passport Expiry.
+        // Rules:
+        //   • At least one of {Passport Number, NID} must be entered.
+        //   • Entering one removes the * (and `required`) from the other.
+        //   • Passport Expiry Date is required ONLY when Passport Number
+        //     is non-empty. Hides the * + clears `required` otherwise.
+        // ----------------------------------------------------------------
+        function syncIdDocRequirements() {
+            var $pass = $('#passport_numb');
+            var $nid  = $('#nid');
+            var $expiry = $('#passport_expiry_date');
+
+            var hasPass = ($pass.val() || '').trim() !== '';
+            var hasNid  = ($nid.val()  || '').trim() !== '';
+
+            // Passport ↔ NID at-least-one logic. When neither is filled,
+            // both stay required so the user must enter one. Once either
+            // is filled the other's required state is lifted.
+            if (hasNid && !hasPass) {
+                $pass.removeAttr('required');
+                $('.passport-required-marker').addClass('d-none');
+            } else {
+                $pass.attr('required', 'required');
+                $('.passport-required-marker').removeClass('d-none');
+            }
+
+            if (hasPass && !hasNid) {
+                $nid.removeAttr('required');
+                $('.nid-required-marker').addClass('d-none');
+            } else {
+                $nid.attr('required', 'required');
+                $('.nid-required-marker').removeClass('d-none');
+            }
+
+            // Passport Expiry follows Passport Number.
+            if (hasPass) {
+                $expiry.attr('required', 'required');
+                $('.passport-expiry-required-marker').removeClass('d-none');
+            } else {
+                $expiry.removeAttr('required');
+                $('.passport-expiry-required-marker').addClass('d-none');
+                // Clear Parsley's red error state if it was previously
+                // flagged when there was no passport number anyway.
+                if ($.fn.parsley && $expiry.parsley) {
+                    try { $expiry.parsley().reset(); } catch (e) {}
+                }
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // "Same as Present Address" — copies the Present Address block
+        // into the Permanent Address block when checked. Unchecking the
+        // box clears the permanent fields so users don't end up with
+        // accidentally-saved duplicate text.
+        //
+        // Field map: each Present field's id starts with `pres_` and the
+        // corresponding Permanent field with `permanent_` — we mirror
+        // them 1:1.
+        // ----------------------------------------------------------------
+        // Field map keyed by `name` attribute (the markup uses `present_*`
+        // for Present and a mix of `permanent_addLine1` / `parmanent_*`
+        // (legacy typo) for Permanent — `name=` is the only reliable
+        // selector for both blocks.
+        var PERMANENT_FIELD_MAP = [
+            ['present_addLine1',     'permanent_addLine1'],
+            ['present_addLine2',     'parmanent_addline2'],
+            ['present_city',         'parmanent_city'],
+            ['present_state',        'parmanent_state'],
+            ['present_postal_code',  'parmanent_postal_code'],
+            ['present_country',      'parmanent_country'],
+        ];
+        function copyPresentToPermanent() {
+            PERMANENT_FIELD_MAP.forEach(function (pair) {
+                var src = $('[name="' + pair[0] + '"]');
+                var dst = $('[name="' + pair[1] + '"]');
+                if (!src.length || !dst.length) return;
+                if (dst.is('select')) {
+                    dst.val(src.val()).trigger('change');
+                } else {
+                    dst.val(src.val()).trigger('input');
+                }
+            });
+        }
+        function clearPermanentAddress() {
+            PERMANENT_FIELD_MAP.forEach(function (pair) {
+                var dst = $('[name="' + pair[1] + '"]');
+                if (!dst.length) return;
+                if (dst.is('select')) {
+                    dst.val('').trigger('change');
+                } else {
+                    dst.val('').trigger('input');
+                }
+            });
+        }
+
         $(document).ready(function() {
             initSelect2AndValidation();
             initParsleyValidation();
@@ -1130,6 +1404,284 @@
                 autoclose: true, // Close the picker after selection
                 todayHighlight: true // Highlight today's date
             });
+
+            // Bind the Passport / NID / Expiry conditional-require logic.
+            $('#passport_numb, #nid').on('input change', syncIdDocRequirements);
+            syncIdDocRequirements();
+
+            // "Same as Present Address" toggle.
+            $(document).on('change', '#sameAsPresentAddress', function () {
+                if ($(this).is(':checked')) {
+                    copyPresentToPermanent();
+                } else {
+                    clearPermanentAddress();
+                }
+            });
+
+            // ----------------------------------------------------------------
+            // "Hire against a vacancy" picker (collapsible panel above Step 1).
+            // Picking a row stores the position/department/division ids in the
+            // hidden inputs and pre-fills + LOCKS the matching Step 2 dropdowns
+            // so HR can't accidentally drift off the chosen vacancy.
+            // "Clear selection" unlocks them and lets HR fall back to a manual
+            // pick. The whole panel is optional — skipping it leaves Step 2
+            // exactly as it always was.
+            // ----------------------------------------------------------------
+            // Inject a single <option> for the chosen id/label if it isn't
+            // already present, select it, and disable the dropdown. Crucially
+            // we do NOT trigger `change` — that would fire the Division →
+            // Department → Section → Position AJAX cascade and wipe sibling
+            // values mid-prefill (this was the original "department isn't
+            // getting auto-filled" bug). Select2 needs an `option` element to
+            // exist before .val() will display the label.
+            function lockStep2Field($field, valueId, valueLabel) {
+                if (!$field.length || !valueId) return;
+                valueId = String(valueId);
+                if ($field.find('option[value="' + valueId + '"]').length === 0) {
+                    $field.append(new Option(valueLabel || valueId, valueId, true, true));
+                }
+                $field.val(valueId);
+                // Re-render the Select2 widget so the new option shows
+                // without forcing a `change` event.
+                if ($field.data('select2')) {
+                    try { $field.trigger('change.select2'); } catch (e) {}
+                }
+                $field.prop('disabled', true).addClass('vacancy-locked');
+                if ($field.data('select2')) {
+                    try { $field.select2({ disabled: true }); } catch (e) {}
+                }
+                $field.attr('data-vacancy-locked-value', valueId);
+                $field.attr('data-vacancy-locked-label', valueLabel || '');
+            }
+            function unlockStep2Field($field) {
+                if (!$field.length) return;
+                $field.prop('disabled', false).removeClass('vacancy-locked');
+                if ($field.data('select2')) {
+                    try { $field.select2({ disabled: false }); } catch (e) {}
+                }
+                $field.removeAttr('data-vacancy-locked-value');
+                $field.removeAttr('data-vacancy-locked-label');
+            }
+
+            function applyVacancyToStep2($row) {
+                var positionId    = $row.data('position-id');
+                var positionTitle = $row.data('position-title');
+                var deptId        = $row.data('department-id');
+                var deptName      = $row.data('department-name');
+                var divisionId    = $row.data('division-id');
+                var divisionName  = $row.data('division-name');
+
+                // Hidden inputs (these go to the server with the form).
+                $('#selected_vacancy_id').val($row.data('vacancy-id'));
+                $('#selected_vacancy_position_id').val(positionId || '');
+                $('#selected_vacancy_department_id').val(deptId || '');
+                $('#selected_vacancy_division_id').val(divisionId || '');
+
+                // Inject + lock all three Step-2 fields. Order doesn't matter
+                // here because lockStep2Field doesn't fire the cascade —
+                // each field is independently set with its known option.
+                if (divisionId) lockStep2Field($('#division'),   divisionId, divisionName);
+                if (deptId)     lockStep2Field($('#department'), deptId,     deptName);
+                if (positionId) lockStep2Field($('#position'),   positionId, positionTitle);
+
+                // Reporting Person + Section dropdowns are normally filled
+                // by the existing #department.on('change') cascade. We
+                // deliberately suppress that cascade during the vacancy
+                // lock (to keep sibling values intact), so call both
+                // endpoints directly here. Helpers were defined inside a
+                // closure and not reachable from this scope — inline the
+                // AJAX so this code is self-contained.
+                if (deptId) {
+                    // --- Reporting Person ---
+                    $.ajax({
+                        url: '{{ route('people.getReportingPerson') }}',
+                        type: 'GET',
+                        data: { department_id: deptId },
+                        success: function (res) {
+                            var $rp = $('#reporting_person');
+                            var html = '<option></option>';
+                            $.each((res && res.data) || [], function (_, person) {
+                                var name = '';
+                                if (person.first_name || person.last_name) {
+                                    name = ((person.first_name || '') + ' ' + (person.last_name || '')).trim();
+                                } else if (person.name) {
+                                    name = person.name;
+                                }
+                                html += '<option value="' + person.id + '">' + name + '</option>';
+                            });
+                            $rp.html(html);
+                            // Re-render select2 without firing change so
+                            // we don't accidentally clear sibling fields.
+                            if ($rp.data('select2')) {
+                                try { $rp.trigger('change.select2'); } catch (e) {}
+                            }
+                        }
+                    });
+
+                    // --- Section ---
+                    // Section stays user-editable (not locked) — the
+                    // vacancy doesn't have a section, just a department.
+                    $.ajax({
+                        url: '{{ route('people.getSectionByDepartment') }}',
+                        type: 'GET',
+                        data: { department_id: deptId },
+                        success: function (res) {
+                            var $sec = $('#section');
+                            var html = '<option></option>';
+                            $.each((res && res.sections) || [], function (_, section) {
+                                html += '<option value="' + section.id + '">' + section.name + '</option>';
+                            });
+                            $sec.html(html);
+                            if ($sec.data('select2')) {
+                                try { $sec.trigger('change.select2'); } catch (e) {}
+                            }
+                        }
+                    });
+                }
+
+                // ---- Joining Date floor = GM approval date of the vacancy.
+                // An employee can't join before HR was even cleared to hire
+                // against the position. We:
+                //   • set a min date on the datepicker (so earlier dates
+                //     aren't selectable),
+                //   • add a Parsley `data-parsley-mindate` so paste/manual
+                //     entry is still validated,
+                //   • surface a small inline notice with the floor date.
+                var gmIso   = $row.data('gm-approved-iso');   // YYYY-MM-DD
+                var gmLabel = $row.data('gm-approved-label'); // d M Y
+                if (gmIso) {
+                    var parts = String(gmIso).split('-'); // [yyyy, mm, dd]
+                    var dpMin = parts[2] + '/' + parts[1] + '/' + parts[0];
+                    var $jd = $('#joining_date');
+                    $jd.attr('data-min-iso', gmIso);
+                    $jd.attr('data-parsley-mindate', gmIso);
+                    $jd.attr('data-parsley-mindate-message',
+                        'Joining date cannot be before the vacancy was approved by GM (' + gmLabel + ').');
+                    // Re-init the datepicker with the new lower bound.
+                    try {
+                        $jd.datepicker('remove');
+                        $jd.datepicker({
+                            format: 'dd/mm/yyyy',
+                            autoclose: true,
+                            todayHighlight: true,
+                            startDate: dpMin
+                        });
+                    } catch (e) {}
+                    // Inline notice next to the field.
+                    if ($('#joining_date_gm_hint').length === 0) {
+                        $jd.after('<small id="joining_date_gm_hint" class="form-text text-info">' +
+                            '<i class="fa-solid fa-circle-info me-1"></i>' +
+                            'Must be on or after the vacancy\'s GM approval date (' + gmLabel + ').' +
+                            '</small>');
+                    } else {
+                        $('#joining_date_gm_hint').html(
+                            '<i class="fa-solid fa-circle-info me-1"></i>' +
+                            'Must be on or after the vacancy\'s GM approval date (' + gmLabel + ').'
+                        );
+                    }
+                    // If a date was already typed and is earlier than the
+                    // floor, clear it so the user has to pick a valid one.
+                    var existing = $jd.val();
+                    if (existing && /^\d{2}\/\d{2}\/\d{4}$/.test(existing)) {
+                        var existingParts = existing.split('/');
+                        var existingIso = existingParts[2] + '-' + existingParts[1] + '-' + existingParts[0];
+                        if (existingIso < gmIso) {
+                            $jd.val('');
+                        }
+                    }
+                }
+
+                // Benefit Grid Level is derived from the position's rank.
+                // The page already does this on #position change → calls
+                // getBenefitGridByPosition, populates the dropdown + the
+                // entitle switches + #position_rank. We can't rely on the
+                // change event firing (we intentionally suppress it during
+                // lock to avoid the AJAX cascade wiping other fields), so
+                // call the same endpoint directly and re-apply the result.
+                if (positionId) {
+                    $.ajax({
+                        url: '{{ route('people.getBenefitGridByPosition') }}',
+                        type: 'GET',
+                        data: { position_id: positionId },
+                        success: function (res) {
+                            if (!res) return;
+                            lockStep2Field(
+                                $('#benefit_grid_level'),
+                                res.benfitGrid_emp_id,
+                                res.emp_grade_name
+                            );
+                            $('#position_rank').val(res.position_rank || '');
+                            $('#entitle_switch').prop('checked', res.service === 'yes');
+                            $('#entitle_public_holiday_overtime').prop('checked', res.holiday_overtime === 'yes');
+                            $('#entitle_overtime').prop('checked', res.overtime === 'yes');
+                        }
+                    });
+                }
+
+                // Visual: highlight the picked row + show summary alert.
+                $('#vacancyPickerTable tbody tr').removeClass('table-active');
+                $row.addClass('table-active');
+                var summaryHtml = (positionTitle || '—')
+                    + ' · ' + (deptName || '—')
+                    + (divisionName ? ' · ' + divisionName : '');
+                $('#vacancyPickerSummaryText').text(summaryHtml);
+                $('#vacancyPickerSummary').removeClass('d-none');
+            }
+
+            function clearVacancySelection() {
+                $('#selected_vacancy_id, #selected_vacancy_position_id, #selected_vacancy_department_id, #selected_vacancy_division_id').val('');
+                $('#vacancyPickerTable input[name="vacancy_pick"]').prop('checked', false);
+                $('#vacancyPickerTable tbody tr').removeClass('table-active');
+                $('#vacancyPickerSummary').addClass('d-none');
+                unlockStep2Field($('#department'));
+                unlockStep2Field($('#position'));
+                unlockStep2Field($('#division'));
+                unlockStep2Field($('#benefit_grid_level'));
+                // Restore the Joining Date to its default unbounded state.
+                var $jd = $('#joining_date');
+                $jd.removeAttr('data-min-iso')
+                   .removeAttr('data-parsley-mindate')
+                   .removeAttr('data-parsley-mindate-message');
+                try {
+                    $jd.datepicker('remove');
+                    $jd.datepicker({ format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true });
+                } catch (e) {}
+                $('#joining_date_gm_hint').remove();
+            }
+
+            // Row click → select the radio + apply.
+            $(document).on('click', '.vacancy-row', function (e) {
+                if ($(e.target).is('button, a')) return;
+                var $row = $(this);
+                $row.find('input[name="vacancy_pick"]').prop('checked', true);
+                applyVacancyToStep2($row);
+            });
+            // Radio change → apply (covers keyboard navigation).
+            $(document).on('change', 'input[name="vacancy_pick"]', function () {
+                var $row = $(this).closest('.vacancy-row');
+                if ($row.length) applyVacancyToStep2($row);
+            });
+            // Clear button → unlock + reset.
+            $(document).on('click', '#vacancyPickerClear', function () {
+                clearVacancySelection();
+            });
+            // Chevron rotation when the collapse opens/closes.
+            $(document).on('shown.bs.collapse', '#vacancyPickerCollapse', function () {
+                $('#vacancyPickerChevron').addClass('fa-chevron-up').removeClass('fa-chevron-down');
+            });
+            $(document).on('hidden.bs.collapse', '#vacancyPickerCollapse', function () {
+                $('#vacancyPickerChevron').addClass('fa-chevron-down').removeClass('fa-chevron-up');
+            });
+            // Re-mirror live while the toggle is on so edits to Present
+            // propagate to Permanent without un-checking + re-checking.
+            $(document).on('input change',
+                '[name="present_addLine1"], [name="present_addLine2"], [name="present_city"], ' +
+                '[name="present_state"], [name="present_postal_code"], [name="present_country"]',
+                function () {
+                    if ($('#sameAsPresentAddress').is(':checked')) {
+                        copyPresentToPermanent();
+                    }
+                });
         });
 
         function initDatePicker() {
@@ -1188,12 +1740,38 @@
                 });
 
                 // Custom Parsley validators
-                window.Parsley.addValidator('mobile_number', {
-                    validateString: function(value) {
-                        return /^(\+\d{1,4}\s?)?[0-9]{10}$/.test(value);
+
+                // mindate — used on Joining Date when a vacancy is picked.
+                // requirement is an ISO date (YYYY-MM-DD); value is whatever
+                // the datepicker stores (DD/MM/YYYY). Returns true if the
+                // value's ISO form is >= requirement.
+                window.Parsley.addValidator('mindate', {
+                    requirementType: 'string',
+                    validateString: function (value, requirement) {
+                        if (!value || !requirement) return true;
+                        var m = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                        if (!m) return true; // pattern validator handles format errors
+                        var iso = m[3] + '-' + m[2] + '-' + m[1];
+                        return iso >= requirement;
                     },
                     messages: {
-                        en: 'Please enter a valid 10-digit mobile number, optionally prefixed with a valid country code.'
+                        en: 'Date is earlier than the allowed minimum.'
+                    }
+                });
+
+                // Mobile number — the old rule required EXACTLY 10 digits
+                // and rejected anything else (incl. valid country-prefixed
+                // numbers of other lengths). Loosen to ITU-T E.164: optional
+                // `+`, then 7–15 digits after stripping common separators
+                // (spaces, dashes, brackets). This matches the same rule
+                // we use on the Employee Detail page.
+                window.Parsley.addValidator('mobile_number', {
+                    validateString: function(value) {
+                        var stripped = String(value || '').replace(/[\s()\-]/g, '').replace(/^\+/, '');
+                        return /^[0-9]{7,15}$/.test(stripped);
+                    },
+                    messages: {
+                        en: 'Please enter a valid mobile number (7–15 digits, optionally prefixed with +country code).'
                     }
                 });
 
@@ -1292,22 +1870,50 @@
 
 
         $(document).ready(function() {
-            $('#basic_salary').on('keyup', function() {
+            // ------------------------------------------------------------
+            // Currency-symbol sync. Basic Salary + Pension share the
+            // same currency (Pension is 7% of Basic for Maldivian
+            // employees, so they live in the same denomination). The
+            // Currency Type dropdown drives both prefixes — MVR → "MVR",
+            // USD → "$". One place to change if we ever add EUR/etc.
+            // ------------------------------------------------------------
+            var CURRENCY_SYMBOLS = {
+                'MVR':    'MVR',
+                'USD':    '$',
+                'Dollar': '$'
+            };
+            function updateSalaryCurrencySymbol() {
+                var c = $('#currency_type').val() || 'MVR';
+                var label = CURRENCY_SYMBOLS[c] || c;
+                $('.salary-currency-symbol').text(label);
+            }
+            $('#currency_type').on('change', updateSalaryCurrencySymbol);
+            updateSalaryCurrencySymbol();
 
-                const nationality = $('#nationality').val();
-                const $pensionField = $('#pension');
-
+            // ------------------------------------------------------------
+            // Pension auto-calc + required-flag for Maldivian. Was
+            // bound to `keyup` only — broke when HR pasted the salary
+            // or changed it via the spinner. `input` covers both. The
+            // pension is 7% of Basic Salary in the SAME currency as the
+            // Basic Salary; changing Currency Type doesn't shift the
+            // ratio, so no extra hook needed there.
+            // ------------------------------------------------------------
+            function syncPensionFromBasic() {
+                var nationality = $('#nationality').val();
+                var $pensionField = $('#pension');
                 if (nationality === 'Maldivian') {
                     $pensionField.attr('data-parsley-required', 'true');
                     $pensionField.attr('data-parsley-required-message',
                         'Pension is required for Maldivian employees.');
-                    const basicSalary = parseFloat($(this).val()) || 0;
-                    const calculatedPension = (basicSalary * 0.07).toFixed(2);
-                    $pensionField.val(calculatedPension);
+                    var basicSalary = parseFloat($('#basic_salary').val()) || 0;
+                    $pensionField.val((basicSalary * 0.07).toFixed(2));
+                } else {
+                    $pensionField.attr('data-parsley-required', 'false');
                 }
-
-                $pensionField.parsley().validate();
-            });
+                try { $pensionField.parsley().validate(); } catch (e) {}
+            }
+            $('#basic_salary').on('input', syncPensionFromBasic);
+            $('#nationality').on('change', syncPensionFromBasic);
         });
     </script>
 
@@ -1743,6 +2349,35 @@
                 // initSelect2AndValidation();
                 let formData = new FormData(this);
                 console.log(formData);
+
+                // Pre-flight upload-size check. PHP's post_max_size on this
+                // server is typically 8 MB; if the form is bigger PHP
+                // discards the body before Laravel sees it, $request
+                // arrives empty, and Eloquent throws confusing
+                // "first_name cannot be null" errors. Warn the user up
+                // front with the actual offending size.
+                //
+                // 16 MB is a safe ceiling that fits a generous-but-sane
+                // budget even on default PHP installs. If the server is
+                // tuned higher (see post_max_size in php.ini), this just
+                // protects the user from accidentally trying to upload
+                // a multi-hundred-MB CV.
+                var MAX_UPLOAD_BYTES = 16 * 1024 * 1024; // 16 MB
+                var totalBytes = 0;
+                for (var pair of formData.entries()) {
+                    if (pair[1] instanceof File) totalBytes += pair[1].size;
+                }
+                if (totalBytes > MAX_UPLOAD_BYTES) {
+                    var mb = (totalBytes / (1024 * 1024)).toFixed(1);
+                    toastr.error(
+                        'The form is too large to upload (' + mb + ' MB). ' +
+                        'Reduce the size of CV / certificate uploads and try again.',
+                        'Upload too large',
+                        { positionClass: 'toast-bottom-right' }
+                    );
+                    return;
+                }
+
                 $.ajax({
                     url: '{{ route('people.employees.store') }}',
                     type: 'POST',
@@ -1757,7 +2392,14 @@
                             toastr.success(response.message, "Success", {
                                 positionClass: 'toast-bottom-right'
                             });
-                            window.location.href = response.redirect_url;
+                            // Tolerant of either `redirect_url` (current
+                            // controller payload) or `redirect` (older
+                            // pattern). Falls back to the People dashboard
+                            // so the browser never lands at `undefined`
+                            // and bounces to the super-admin URL.
+                            var to = response.redirect_url || response.redirect
+                                || '{{ route("people.hr.dashboard") }}';
+                            window.location.href = to;
                         } else {
                             toastr.error(response.message, "Error", {
                                 positionClass: 'toast-bottom-right'
@@ -1765,8 +2407,31 @@
                         }
                     },
                     error: function(xhr) {
-                        toastr.error(xhr.responseJSON.message, "Error", {
-                            positionClass: 'toast-bottom-right'
+                        // Resilient error surfacing.
+                        //   • 422 Laravel validation → show every field's
+                        //     first message,
+                        //   • JSON error responses → show .message,
+                        //   • 500 / non-JSON / network → generic message +
+                        //     log the raw payload so we can diagnose.
+                        // The old code did `xhr.responseJSON.message` and
+                        // crashed when responseJSON was undefined (any
+                        // 500/HTML response), masking the real failure.
+                        var msg = 'Failed to save employee. Please try again.';
+                        try {
+                            if (xhr && xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                                var lines = [];
+                                $.each(xhr.responseJSON.errors, function (_, arr) {
+                                    if (Array.isArray(arr) && arr.length) lines.push(arr[0]);
+                                });
+                                if (lines.length) msg = lines.join('<br>');
+                            } else if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            }
+                        } catch (e) { /* fall through to generic msg */ }
+                        console.error('[employees.store] failed', xhr && xhr.status, xhr && xhr.responseText);
+                        toastr.error(msg, "Error", {
+                            positionClass: 'toast-bottom-right',
+                            allowHtml: true
                         });
                     }
                 });
@@ -2144,12 +2809,25 @@
 
     <script>
         $(document).ready(function() {
+            // Helper: skip the cascading wipe on dependent fields that were
+            // locked by the vacancy picker. Without this, picking Section
+            // after applying a vacancy fired #section.on('change') which
+            // wiped the locked Position dropdown — leaving "Position required".
+            function wipeIfNotLocked($field) {
+                if ($field.hasClass('vacancy-locked')) return false;
+                $field.html('<option></option>').trigger('change');
+                return true;
+            }
+
             // Division -> Department
             $('#division').on('change', function() {
+                // Don't repopulate Department if it's locked to a vacancy —
+                // doing so would clobber the chosen department option.
+                if ($('#department').hasClass('vacancy-locked')) return;
                 let divisionId = $(this).val();
-                $('#department').html('<option></option>').trigger('change');
-                $('#section').html('<option></option>').trigger('change');
-                $('#position').html('<option></option>').trigger('change');
+                wipeIfNotLocked($('#department'));
+                wipeIfNotLocked($('#section'));
+                wipeIfNotLocked($('#position'));
                 if (!divisionId) return;
                 $.ajax({
                     url: '{{ route('people.getDepartmentsByDivision') }}',
@@ -2171,8 +2849,8 @@
             // Department -> Section
             $('#department').on('change', function() {
                 let departmentId = $(this).val();
-                $('#section').html('<option></option>').trigger('change');
-                $('#position').html('<option></option>').trigger('change');
+                wipeIfNotLocked($('#section'));
+                wipeIfNotLocked($('#position'));
                 if (!departmentId) return;
                 getReportingPerson(departmentId);
                 $.ajax({
@@ -2202,6 +2880,10 @@
             // Section -> Position
             $('#section').on('change', function() {
                 let sectionId = $(this).val();
+                // Don't wipe a locked Position — that's the bug where
+                // picking Section after applying a vacancy left Position
+                // empty + "Position required".
+                if ($('#position').hasClass('vacancy-locked')) return;
                 $('#position').html('<option></option>').trigger('change');
                 if (!sectionId) return;
                 loadPositions({
@@ -2253,15 +2935,73 @@
         });
 
         $(document).ready(function() {
-            function toggleProbationExpDate() {
-                if ($('#employment_status').val() === 'Probationary') {
-                    $('#probation_exp_date').prop('disabled', false).prop('required', true);
-                } else {
-                    $('#probation_exp_date').prop('disabled', true).val('').prop('required', false);
+            // ------------------------------------------------------------
+            // Probation End Date is ALWAYS derived from Joining Date + 3
+            // months. HR doesn't pick it directly — the field stays
+            // disabled. Probationary employees automatically appear in
+            // the Probation module because the back-end sets
+            // probation_status='Active' when employment_type=Probationary.
+            // ------------------------------------------------------------
+            function recomputeProbationEndDate() {
+                if ($('#employment_status').val() !== 'Probationary') {
+                    $('#probation_exp_date').val('');
+                    return;
                 }
+                var jd = $('#joining_date').val();
+                if (!/^\d{2}\/\d{2}\/\d{4}$/.test(jd)) {
+                    $('#probation_exp_date').val('');
+                    return;
+                }
+                var parts = jd.split('/');
+                // Build a UTC date to avoid timezone roll-over flipping
+                // the day around midnight.
+                var dt = new Date(Date.UTC(
+                    parseInt(parts[2], 10),
+                    parseInt(parts[1], 10) - 1,
+                    parseInt(parts[0], 10)
+                ));
+                dt.setUTCMonth(dt.getUTCMonth() + 3);
+                var dd = String(dt.getUTCDate()).padStart(2, '0');
+                var mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+                var yyyy = dt.getUTCFullYear();
+                $('#probation_exp_date').val(dd + '/' + mm + '/' + yyyy);
+            }
+            function toggleProbationExpDate() {
+                // Stay disabled regardless — it's a derived field, not a
+                // user input. Just recompute or clear depending on whether
+                // the employment status is Probationary.
+                $('#probation_exp_date').prop('disabled', true).prop('readonly', true);
+                recomputeProbationEndDate();
             }
             $('#employment_status').on('change', toggleProbationExpDate);
+            // bootstrap-datepicker fires `changeDate` on calendar pick;
+            // listen for it explicitly so picking via the widget (not
+            // typing) also rolls the probation date forward.
+            $('#joining_date').on('change input changeDate', recomputeProbationEndDate);
             toggleProbationExpDate();
+
+            // When HR manually changes the Benefit Grid Level (overriding
+            // the position default), pull that level's entitlements so the
+            // Service Charge / Overtime / Public Holiday OT switches stay
+            // honest. Skips when the level was changed by us via the
+            // vacancy-picker programmatic set (the picker already wrote
+            // the switches based on the position's grid).
+            $(document).on('change', '#benefit_grid_level', function () {
+                var grade = $(this).val();
+                if (!grade) return;
+                if ($(this).hasClass('vacancy-locked')) return;
+                $.ajax({
+                    url: '{{ route('people.getBenefitGridByLevel') }}',
+                    type: 'GET',
+                    data: { benefit_grid_level: grade },
+                    success: function (res) {
+                        if (!res || !res.success) return;
+                        $('#entitle_switch').prop('checked', res.service === 'yes');
+                        $('#entitle_public_holiday_overtime').prop('checked', res.holiday_overtime === 'yes');
+                        $('#entitle_overtime').prop('checked', res.overtime === 'yes');
+                    }
+                });
+            });
 
             $('#position').on('change', function() {
 

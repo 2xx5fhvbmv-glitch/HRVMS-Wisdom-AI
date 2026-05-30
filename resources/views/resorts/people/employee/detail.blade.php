@@ -1685,6 +1685,7 @@
                     <option value="">Status</option>
                     <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
                     <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
+                    <option {{$employee->status == "Probationary" ? "Selected" : ""}} value="Probationary">Probationary</option>
                     <option {{$employee->status == "Inactive" ? "Selected" : ""}} value="Inactive">Inactive</option>
                     <option {{$employee->status == "Terminated" ? "Selected" : ""}} value="Terminated">Terminated</option>
                     <option {{$employee->status == "Resigned" ? "Selected" : ""}} value="Resigned">Resigned</option>

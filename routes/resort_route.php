@@ -1694,6 +1694,9 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::get('people/employee/position-by-section', 'People\Employee\EmployeeController@getPositionBySection')->name('people.getPositionBySection');
        Route::get('people/employee/get-reporting-person', 'People\Employee\EmployeeController@getReportingPerson')->name('people.getReportingPerson');
        Route::get('people/employee/get-benifit-grid', 'People\Employee\EmployeeController@getBenefitGridByPosition')->name('people.getBenefitGridByPosition');
+       // Look up benefit-grid entitlements by the level (emp_grade) directly —
+       // used when HR overrides the auto-picked level on the create form.
+       Route::get('people/employee/get-benifit-grid-by-level', 'People\Employee\EmployeeController@getBenefitGridByLevel')->name('people.getBenefitGridByLevel');
 
 
 
