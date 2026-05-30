@@ -90,6 +90,21 @@ class ResortLoginController extends Controller
                 ]);
             }
 
+            // 5b. Web-portal access gate.
+            //   LINE WORKERS (rank 6) and SUPERVISORS (rank 5) are mobile-app
+            //   only. MGR / HOD / EXCOM / GM / HR / Finance can use both web
+            //   and the API. Mobile API login (API\LoginController) is not
+            //   affected by this check.
+            //   Rank source: config('settings.Position_Rank').
+            $appOnlyRanks = [5, 6]; // SUP, LINE WORKERS
+            $empRank = $resort_admin->GetEmployee->rank ?? null;
+            if ($empRank !== null && in_array((int) $empRank, $appOnlyRanks, true)) {
+                return response()->json([
+                    'success' => false,
+                    'msg' => 'Web portal access is not available for this role. Please use the HRVMS-Wisdom AI mobile app to sign in.'
+                ]);
+            }
+
             // 6. Successful login
             Auth::guard('resort-admin')->login($resort_admin, $request->remember);
 

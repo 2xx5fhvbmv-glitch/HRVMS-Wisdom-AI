@@ -309,7 +309,75 @@ class EmployeeController extends Controller
         $nationalitys = config('settings.nationalities');
         $countries = config('settings.countries');
 
-        return view('resorts.people.employee.create',compact('page_title','resort_id','resort_divisions','departments','employee_id','positions','sections','payrollAllowance','nationalitys','countries'));
+        // ------------------------------------------------------------------
+        // "Hire against a vacancy" picker (collapsible panel at the top of
+        // Step 1). Uses the SAME filter as the offline-interview picker
+        // (TalentAcquisition/OfflineInterviewController::create) so HR sees
+        // a consistent shortlist on both pages: vacancies whose TA approval
+        // is complete (Approved_By = TaFinalApproval, status =
+        // ForwardedToNext) and which have an active application_links row.
+        // Selecting one pre-fills Department/Position/Division in Step 2.
+        // The panel is optional — direct hires skip it entirely.
+        // ------------------------------------------------------------------
+        $vacancies = collect();
+        if (Schema::hasTable('vacancies')
+            && Schema::hasTable('t_anotification_parents')
+            && Schema::hasTable('t_anotification_children')
+            && Schema::hasTable('application_links')) {
+            $vacancies = DB::table('vacancies as v')
+                ->join('resort_positions as p', 'p.id', '=', 'v.position')
+                ->join('resort_departments as d', 'd.id', '=', 'v.department')
+                // Division is reached through the department row
+                // (resort_departments.division_id → resort_divisions.id).
+                // resort_positions has no Division_id column — the earlier
+                // join on p.Division_id caused a 1054 Unknown column error.
+                ->leftJoin('resort_divisions as dv', 'dv.id', '=', 'd.division_id')
+                ->join('t_anotification_parents as tap', 'tap.V_id', '=', 'v.id')
+                ->join('t_anotification_children as tac', 'tac.Parent_ta_id', '=', 'tap.id')
+                ->join('application_links as al', 'al.ta_child_id', '=', 'tac.id')
+                ->where('v.Resort_id', $resort_id)
+                ->where('tac.Approved_By', Common::TaFinalApproval($resort_id))
+                ->where('tac.status', 'ForwardedToNext')
+                ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('d.id', $scopedDeptIds))
+                ->groupBy(
+                    'v.id', 'p.id', 'p.position_title', 'd.id', 'd.name',
+                    'd.code', 'dv.id', 'dv.name', 'v.Total_position_required'
+                )
+                ->select(
+                    'v.id as vacancy_id',
+                    'p.id as position_id',
+                    'p.position_title',
+                    'd.id as department_id',
+                    'd.name as department_name',
+                    'd.code as department_code',
+                    'dv.id as division_id',
+                    'dv.name as division_name',
+                    'v.Total_position_required as no_of_positions',
+                    DB::raw('MAX(al.link_Expiry_date) as link_expiry_date'),
+                    // GM (final-approval) timestamp — the row that flipped
+                    // the vacancy into the "ready to interview" state. Used
+                    // on the create page to clamp the Joining Date minimum
+                    // (an employee can't join before HR was even cleared to
+                    // hire them).
+                    DB::raw('MAX(tac.updated_at) as gm_approved_at')
+                )
+                ->orderByDesc('v.id')
+                ->get()
+                ->map(function ($v) {
+                    $v->expiry_date_label = $v->link_expiry_date
+                        ? \Carbon\Carbon::parse($v->link_expiry_date)->format('d M Y')
+                        : '—';
+                    $v->gm_approved_at_iso = $v->gm_approved_at
+                        ? \Carbon\Carbon::parse($v->gm_approved_at)->format('Y-m-d')
+                        : null;
+                    $v->gm_approved_at_label = $v->gm_approved_at
+                        ? \Carbon\Carbon::parse($v->gm_approved_at)->format('d M Y')
+                        : null;
+                    return $v;
+                });
+        }
+
+        return view('resorts.people.employee.create',compact('page_title','resort_id','resort_divisions','departments','employee_id','positions','sections','payrollAllowance','nationalitys','countries','vacancies'));
     }
 
     public function store(Request $request)
@@ -348,10 +416,36 @@ class EmployeeController extends Controller
 
             $dob = Carbon::createFromFormat('d/m/Y', $request->date_birth)->format('Y-m-d');
             $joining_date = Carbon::createFromFormat('d/m/Y', $request->joining_date)->format('Y-m-d');
-            $probation_end_date = null;
-            if (!empty($request->probation_end_date)) {
-                    $probation_end_date = Carbon::createFromFormat('d/m/Y', $request->probation_end_date)->format('Y-m-d');
-            }
+
+            // Probation window is policy-driven (joining_date + 3 months)
+            // and the field on the form is disabled. We derive it server-
+            // side regardless of what the client posts so a tampered or
+            // empty submission still lands the correct date — but only for
+            // employees whose employment_type is Probationary. For any
+            // other employment type (Full-Time, Contract, etc.) we leave
+            // probation_end_date NULL and probation_status='Confirmed' so
+            // the Probation module ignores them.
+            $isProbationary  = ($request->employment_status === 'Probationary');
+            $probation_end_date = $isProbationary
+                ? Carbon::createFromFormat('Y-m-d', $joining_date)->addMonths(3)->format('Y-m-d')
+                : null;
+            $probation_status = $isProbationary ? 'Active' : 'Confirmed';
+
+            // Every newly-created employee lands in 'Onboarding'. That's
+            // the lifecycle state expected by:
+            //   • the Onboarding module (People → Onboarding) which
+            //     surfaces them for orientation, document collection,
+            //     facility tours, etc.
+            //   • the Activate Employee button on the detail page, which
+            //     specifically requires status='Onboarding' to fire
+            //     (see EmployeeController::activate around line 1251).
+            // The Probationary flow doesn't kick in here — it's the
+            // ACTIVATE step that decides whether the employee becomes
+            // 'Probationary' (when employment_type='Probationary') or
+            // straight 'Active'. probation_status is still set to
+            // 'Active' so the Probation module picks them up the
+            // moment they're activated.
+            $initial_status = 'Onboarding';
 
             $employee = Employee::create([
                 'resort_id' => $this->resort->resort_id,
@@ -365,7 +459,7 @@ class EmployeeController extends Controller
                 'reporting_to'=> $request->reporting_person,
                 'is_employee' => 1,
                 'rank'=> $request->position_rank,
-                'status' => 'Active',
+                'status' => $initial_status,
                 'dob' =>$dob ,
                 'marital_status' => $request->marital_status,
                 'nationality'=> $request->nationality,
@@ -375,12 +469,24 @@ class EmployeeController extends Controller
                 'employment_type' => $request->employment_status,
                 'passport_number' => $request->passport_numb,
                 'nid' => $request->nid,
-                'present_address' => $request->present_addLine1 . ', ' . $request->present_addLine2.','. $request->parmanent_city.','.$request->parmanent_state.','. $request->parmanent_postal_code.','. $request->parmanent_country,
+                // BUG FIX: the previous concatenation mixed Present + Permanent
+                // address parts (used present_addLine1/2 then parmanent_city/state/
+                // postal/country). Use the actual present_* fields, collapse empty
+                // segments, and trim trailing commas so a sparsely-filled address
+                // doesn't end with ", , , ,".
+                'present_address' => collect([
+                    $request->present_addLine1,
+                    $request->present_addLine2,
+                    $request->present_city,
+                    $request->present_state,
+                    $request->present_postal_code,
+                    $request->present_country,
+                ])->filter(fn($v) => !is_null($v) && trim((string) $v) !== '')->implode(', '),
                 'tin' => $request->tin,
                 'contract_type'=> $request->contract_type,
                 'payment_mode' => $request->payment_mode,
                 'probation_end_date' => $probation_end_date,
-                'probation_status' => $request->probation_end_date ? 'Active' : 'Confirmed',
+                'probation_status'   => $probation_status,
                 'basic_salary' => $request->basic_salary,
                 'basic_salary_currency'=> $request->basic_salary_currency,
                 'emg_cont_first_name' => $request->emg_contact_fname,
@@ -663,11 +769,16 @@ class EmployeeController extends Controller
 
             DB::commit();
             Session::forget('employee_form');
+            // JS reads `redirect_url` — the old `redirect` key was
+            // undefined on the client, so window.location.href became
+            // `undefined` and the browser fell back to a relative path
+            // that landed on the super-admin route. Target the People
+            // dashboard explicitly.
             return response()->json([
-                'success' => true,
-                'status' => 'success',
-                'message' => 'Employee created successfully!',
-                'redirect' => route('people.employees')
+                'success'      => true,
+                'status'       => 'success',
+                'message'      => 'Employee created successfully!',
+                'redirect_url' => route('people.hr.dashboard'),
             ]);
        }catch (\Exception $e) {
             DB::rollBack();
@@ -1046,7 +1157,7 @@ class EmployeeController extends Controller
     {
         $request->validate([
             'emp_id' => 'required|exists:employees,id',
-            'status' => 'required|in:Active,Inactive,Terminated,Resigned,On Leave,Suspended'
+            'status' => 'required|in:Active,Onboarding,Probationary,Inactive,Terminated,Resigned,On Leave,Suspended'
         ]);
 
 
@@ -1081,6 +1192,9 @@ class EmployeeController extends Controller
             $resortAdmin = $employee->resortAdmin;
             $resortAdmin->password = $hashedPassword;
             $resortAdmin->save();
+            // Hydrate GetEmployee so the notification template can read
+            // Emp_id for the mobile-app login section of the email.
+            $resortAdmin->setRelation('GetEmployee', $employee);
             $resortAdmin->sendResortemployee($this->resort->resort, $resortAdmin, $plainPassword);
 
             return response()->json([
@@ -1146,12 +1260,23 @@ class EmployeeController extends Controller
         }
 
         $employee->joining_date = \Carbon\Carbon::createFromFormat('d/m/Y', $request->joining_date)->format('Y-m-d');
-        $employee->status = 'Active';
+        // After activation, lifecycle status branches on employment type.
+        //   • Probationary employees go straight to 'Probationary' so the
+        //     Probation module list and the lifecycle badge both reflect
+        //     the in-probation state. probation_status was already set to
+        //     'Active' during create, so they appear in the Probation
+        //     listing immediately.
+        //   • Everyone else moves to 'Active' as before.
+        $employee->status = ($employee->employment_type === 'Probationary')
+            ? 'Probationary'
+            : 'Active';
         $employee->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Employee activated. They will now appear in Payroll and Attendance.',
+            'message' => $employee->status === 'Probationary'
+                ? 'Employee activated. They are now in the Probation module and will show in Payroll / Attendance.'
+                : 'Employee activated. They will now appear in Payroll and Attendance.',
         ]);
     }
 
@@ -1940,6 +2065,33 @@ class EmployeeController extends Controller
             'service' => $benefitGrid->service_charge == 1 ? 'yes' : 'no',
             'overtime' => $benefitGrid->overtime,
             'holiday_overtime' => $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
+        ]);
+    }
+
+    /**
+     * Look up entitlements directly by the Benefit Grid Level (emp_grade).
+     * Used when HR overrides the auto-selected level on the create form —
+     * the entitle-for-service-charge / OT / holiday-OT switches must follow
+     * whatever level is currently picked, not the original position default.
+     */
+    public function getBenefitGridByLevel(Request $request){
+        $grade = $request->benefit_grid_level;
+        if (!$grade) {
+            return response()->json(['success' => false, 'message' => 'Benefit grid level is required.'], 422);
+        }
+        $benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'active')
+            ->where('emp_grade', $grade)
+            ->first();
+        if (!$benefitGrid) {
+            return response()->json(['success' => false, 'message' => 'No benefit grid configured for this level.'], 404);
+        }
+        return response()->json([
+            'success'         => true,
+            'emp_grade_name'  => config('settings.Position_Rank')[$benefitGrid->emp_grade] ?? null,
+            'service'         => $benefitGrid->service_charge == 1 ? 'yes' : 'no',
+            'overtime'        => $benefitGrid->overtime,
+            'holiday_overtime'=> $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
         ]);
     }
 

@@ -53,13 +53,20 @@ class ResortRegistrationEmail extends ResetPasswordNotification
     $login_route = route('resort.loginindex');
     $login_button = '<a style="padding:5px 10px;background-color:#DA2128;color:#ffffff" href="'.$login_route.'">Login here</a>';
 
+    // Employee ID is needed for the mobile app login (the app authenticates
+    // with Emp_id + password, not email). The ResortAdmin row owns the
+    // login credentials but the Emp_id lives on the related Employee row.
+    // Eager-loading isn't guaranteed here, so look it up directly.
+    $employee_id = optional($this->resort_admin->GetEmployee)->Emp_id ?? '';
+
     $emailTemplate = EmailTemplate::find(config('settings.email_template.resort_registration_notification'));
 
     $subjectLine = isset( $emailTemplate ) && $emailTemplate->subject != '' ? $emailTemplate->subject : 'Account Credentials | HRVMS-WisdomAI';
 
     $data['body'] = isset( $emailTemplate ) && $emailTemplate->body != '' ? $emailTemplate->body : "<p>Dear [User Name],</p>
             <p>Welcome to [Resort Name]! Your account has been successfully registered. Below are your credentials to access your account:</p>
-            <p><strong>Email:</strong> [Email]</p>
+            <p><strong>Employee ID:</strong> [Employee ID] <span style=\"color:#888;font-size:12px;\">(use this with the mobile app)</span></p>
+            <p><strong>Email:</strong> [Email] <span style=\"color:#888;font-size:12px;\">(use this with the web portal)</span></p>
             <p><strong>Password:</strong> [Password]</p>
             <p>Please keep these credentials safe and do not share them with anyone. You can log in to your account using the following link:</p>
 
@@ -73,6 +80,7 @@ class ResortRegistrationEmail extends ResetPasswordNotification
       "[User Name]",
       "[Resort Name]",
       "[Email]",
+      "[Employee ID]",
       "[Password]",
       "[Login Url]",
     ];
@@ -81,6 +89,7 @@ class ResortRegistrationEmail extends ResetPasswordNotification
       $user_name,
       $resort_name,
       $email,
+      $employee_id,
       $password,
       $login_button,
     ];
