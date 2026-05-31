@@ -25,9 +25,9 @@
                                 <th class="text-nowrap sticky-col sticky-col-1">Name</th>
                                 <th class="text-nowrap sticky-col sticky-col-2">Status</th>
                                 <th class="text-nowrap sticky-col sticky-col-3">Rank</th>
-                                <th class="text-nowrap sticky-col sticky-col-4">Nationality</th>
-                                <th class="text-nowrap text-end sticky-col sticky-col-5">Current Basic Salary</th>
-                                <th class="text-nowrap text-end sticky-col sticky-col-6">Proposed Basic Salary</th>
+                                <th class="text-nowrap text-nowrap">Nationality</th>
+                                <th class="text-nowrap text-end text-nowrap">Current Basic Salary</th>
+                                <th class="text-nowrap text-end text-nowrap">Proposed Basic Salary</th>
                                 @foreach ($header as $h)
                                     <th class="text-nowrap text-end scrollable-col">{{ $h }}</th>
                                 @endforeach
@@ -74,9 +74,9 @@
                                             @endphp
                                             {{ $AvailableRank }}
                                         </td>
-                                        <td class="sticky-col sticky-col-4">{{ $employee->nationality ?? '-' }}</td>
-                                        <td class="text-end sticky-col sticky-col-5 basic-salary-cell" data-value="{{ $displayBasicSalary }}">{!! Common::formatCurrency($displayBasicSalary, 'USD') !!}</td>
-                                        <td class="text-end sticky-col sticky-col-6 current-salary-cell" data-value="{{ $displayCurrentSalary }}">{!! Common::formatCurrency($displayCurrentSalary, 'USD') !!}</td>
+                                        <td class="text-nowrap">{{ $employee->nationality ?? '-' }}</td>
+                                        <td class="text-end text-nowrap basic-salary-cell" data-value="{{ $displayBasicSalary }}">{!! Common::formatCurrency($displayBasicSalary, 'USD') !!}</td>
+                                        <td class="text-end text-nowrap current-salary-cell" data-value="{{ $displayCurrentSalary }}">{!! Common::formatCurrency($displayCurrentSalary, 'USD') !!}</td>
                                         @foreach ($resortCosts as $cost)
                                             @php
                                                 // Use yearly aggregated value or 0 if not configured
@@ -143,11 +143,11 @@
                                             @endphp
                                             {{ $AvailableRank }}
                                         </td>
-                                        <td class="text-muted sticky-col sticky-col-4">-</td>
-                                        <td class="text-end sticky-col sticky-col-5 basic-salary-cell {{ $vacantBasicSalary > 0 ? '' : 'text-muted' }}" data-value="{{ $vacantBasicSalary }}">
+                                        <td class="text-muted text-nowrap">-</td>
+                                        <td class="text-end text-nowrap basic-salary-cell {{ $vacantBasicSalary > 0 ? '' : 'text-muted' }}" data-value="{{ $vacantBasicSalary }}">
                                             {!! Common::formatCurrency($vacantBasicSalary, 'USD') !!}
                                         </td>
-                                        <td class="text-end sticky-col sticky-col-6 current-salary-cell {{ $vacantCurrentSalary > 0 ? '' : 'text-muted' }}" data-value="{{ $vacantCurrentSalary }}">
+                                        <td class="text-end text-nowrap current-salary-cell {{ $vacantCurrentSalary > 0 ? '' : 'text-muted' }}" data-value="{{ $vacantCurrentSalary }}">
                                             {!! Common::formatCurrency($vacantCurrentSalary, 'USD') !!}
                                         </td>
                                         @foreach ($resortCosts as $cost)
@@ -262,9 +262,9 @@
                                     <td class="sticky-col sticky-col-1 fw-bold">TOTAL</td>
                                     <td class="sticky-col sticky-col-2"></td>
                                     <td class="sticky-col sticky-col-3"></td>
-                                    <td class="sticky-col sticky-col-4 text-end"><small>{{ $totalRows }} Position(s)</small></td>
-                                    <td class="text-end sticky-col sticky-col-5 fw-bold">{!! Common::formatCurrency($totalBasicSalary, 'USD') !!}</td>
-                                    <td class="text-end sticky-col sticky-col-6 fw-bold">{!! Common::formatCurrency($totalCurrentSalary, 'USD') !!}</td>
+                                    <td class="text-nowrap text-end"><small>{{ $totalRows }} Position(s)</small></td>
+                                    <td class="text-end text-nowrap fw-bold">{!! Common::formatCurrency($totalBasicSalary, 'USD') !!}</td>
+                                    <td class="text-end text-nowrap fw-bold">{!! Common::formatCurrency($totalCurrentSalary, 'USD') !!}</td>
                                     @foreach ($resortCosts as $cost)
                                         <td class="text-end scrollable-col fw-bold">{!! Common::formatCurrency($costTotals[$cost->id], 'USD') !!}</td>
                                     @endforeach
@@ -351,23 +351,20 @@
 .sticky-col-3 {
     left: 240px;
     min-width: 100px;
-}
-
-.sticky-col-4 {
-    left: 340px;
-    min-width: 110px;
-}
-
-.sticky-col-5 {
-    left: 450px;
-    min-width: 180px;
-}
-
-.sticky-col-6 {
-    left: 630px;
-    min-width: 130px;
+    /* Right border at the end of the sticky region so users see where
+       the horizontal scroll begins. Sticky region is now: Name, Status,
+       Rank — Nationality / Current Basic Salary / Proposed Basic Salary
+       scroll with the rest so wide allowance tables don't push them off-
+       screen before scroll is usable. */
     border-right: 2px solid #dee2e6;
 }
+
+/* sticky-col-4 / -5 / -6 were used to freeze Nationality, Current
+   Basic Salary, and Proposed Basic Salary on the left. Removed from
+   the table markup so the horizontal scroll starts right after Rank
+   per user request. CSS rules left in place as no-ops for now (they
+   match no markup) so nothing else regresses if they're referenced
+   elsewhere — safe to delete in a future cleanup. */
 
 /* Custom scrollbar */
 .table-wrapper::-webkit-scrollbar {
