@@ -2397,15 +2397,19 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
 
-            // Get manning response
+            // Get manning response — OPTIONAL. The previous build 403'd the
+            // request when no manning row existed, which silently zero'd
+            // out the view-budget badges for every dept that hadn't been
+            // put through manning yet (Executive Office, L&D, Security
+            // and POM on live — all rendering as $0.00). The canonical
+            // helpers and employee tables don't depend on a manning row,
+            // so we proceed even when it's missing and source the
+            // metadata (vacant count, monthly data) from the persisted
+            // budget tables instead.
             $manningResponse = ManningResponse::where('dept_id', $position->dept_id)
                 ->where('year', $year)
                 ->where('resort_id', $resortId)
                 ->first();
-
-            if (!$manningResponse) {
-                return response()->json(['success' => false, 'message' => 'No budget found']);
-            }
 
             // Get employees
             $employees = DB::table('employees as e')
@@ -2427,10 +2431,13 @@ class BudgetController extends Controller
                     'e.incremented_date'
                 ]);
 
-            // Get position monthly data
-            $monthlyData = PositionMonthlyData::where('position_id', $positionId)
-                ->where('manning_response_id', $manningResponse->id)
-                ->get();
+            // Get position monthly data — empty collection when there's no
+            // manning response (downstream loops handle empty gracefully).
+            $monthlyData = $manningResponse
+                ? PositionMonthlyData::where('position_id', $positionId)
+                    ->where('manning_response_id', $manningResponse->id)
+                    ->get()
+                : collect();
 
             // Get vacant position counts
             $vacantCounts = [];
@@ -2439,22 +2446,28 @@ class BudgetController extends Controller
                 $vacantCounts[$i] = $monthData ? $monthData->vacantcount : 0;
             }
 
-            // Process employee budget data
-            foreach ($employees as $employee) {
-                $smrp = StoreManningResponseParent::where('Resort_id', $resortId)
-                    ->where('Department_id', $position->dept_id)
-                    ->where('Budget_id', $manningResponse->id)
-                    ->first();
-
-                if ($smrp) {
-                    $budgetChild = StoreManningResponseChild::where('Parent_SMRP_id', $smrp->id)
-                        ->where('Emp_id', $employee->Empid)
+            // Process employee budget data — only meaningful when there IS
+            // a manning response. For depts without one, the
+            // StoreManningResponseParent / Child rows don't exist, and the
+            // canonical helpers (called downstream in getEmployeeMonthlyData)
+            // fall back to the employee's basic_salary anyway.
+            if ($manningResponse) {
+                foreach ($employees as $employee) {
+                    $smrp = StoreManningResponseParent::where('Resort_id', $resortId)
+                        ->where('Department_id', $position->dept_id)
+                        ->where('Budget_id', $manningResponse->id)
                         ->first();
 
-                    if ($budgetChild) {
-                        $employee->smrp_child_id = $budgetChild->id;
-                        $employee->proposed_basic_salary = $budgetChild->Proposed_Basic_salary ?? 0;
-                        $employee->months_data = json_decode($budgetChild->Months, true) ?? [];
+                    if ($smrp) {
+                        $budgetChild = StoreManningResponseChild::where('Parent_SMRP_id', $smrp->id)
+                            ->where('Emp_id', $employee->Empid)
+                            ->first();
+
+                        if ($budgetChild) {
+                            $employee->smrp_child_id = $budgetChild->id;
+                            $employee->proposed_basic_salary = $budgetChild->Proposed_Basic_salary ?? 0;
+                            $employee->months_data = json_decode($budgetChild->Months, true) ?? [];
+                        }
                     }
                 }
             }
@@ -2483,13 +2496,27 @@ class BudgetController extends Controller
 
             $totalVacantPositions = max(0, $maxHeadcount - $activeFilled);
 
-            // dd($vacantCounts, $totalVacantPositions, $manningResponse->id, $position);
+            // Fallback for depts without a manning response: count
+            // persisted vacant rows in resort_vacant_budget_costs for
+            // this (position, year). PMD-driven max(0, headcount-filled)
+            // returns 0 when PMD is empty, so without this the view-budget
+            // JS would render no Vacant rows for Executive Office / L&D /
+            // Security even when HR has actual vacant slot data.
+            if (!$manningResponse || $totalVacantPositions === 0) {
+                $persistedVacantCount = ResortVacantBudgetCost::where('position_id', $positionId)
+                    ->where('department_id', $position->dept_id)
+                    ->where('resort_id', $resortId)
+                    ->where('year', $year)
+                    ->count();
+                $totalVacantPositions = max($totalVacantPositions, $persistedVacantCount);
+            }
+
             return response()->json([
                 'success' => true,
                 'employees' => $employees,
                 'vacant_counts' => $vacantCounts,
                 'total_vacant_positions' => $totalVacantPositions,
-                'manning_response_id' => $manningResponse->id,
+                'manning_response_id' => $manningResponse ? $manningResponse->id : null,
                 'position' => $position
             ]);
 
