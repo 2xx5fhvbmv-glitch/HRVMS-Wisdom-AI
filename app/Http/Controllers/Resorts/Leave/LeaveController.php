@@ -916,14 +916,17 @@ class LeaveController extends Controller
         }
 
         // Empty-state fallback: redirect back to the employee detail page
-        // with a flash toast instead of dumping the user onto the global
-        // leave list (the previous fallback was the source of "I clicked
-        // Leave and got somebody else's data" reports). The flash key is
-        // read by the master layout's toastr bootstrap so no extra JS
-        // wiring is needed on the detail page.
-        return redirect()
-            ->route('people.employees.details', ['id' => $empID])
-            ->with('info_message', 'This employee has no leave history yet.');
+        // with a query-string flag instead of a session flash. Flash works
+        // on local but is fragile on live — depending on session driver,
+        // middleware order, and view cache, the value can be consumed or
+        // dropped before Blade renders (which is why the toast didn't
+        // appear after the first try). A URL param round-trips through
+        // every layer untouched. The detail page's bottom-of-page script
+        // reads ?leave_empty=1 and fires the toast on page load.
+        return redirect()->route('people.employees.details', [
+            'id'          => $empID,
+            'leave_empty' => 1,
+        ]);
     }
 
     public function details($leave_id)
