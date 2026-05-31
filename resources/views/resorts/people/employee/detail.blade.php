@@ -3706,5 +3706,21 @@
                 });
             });
         });
+
+        // Flash-message → toastr bridge.
+        // Used by LeaveController::employeeLeavePage when the employee has
+        // no leave history — instead of dumping the user onto the global
+        // leave inbox, we redirect back here with session('info_message')
+        // set and surface it as a toast on page load.
+        $(function () {
+            @if (session('info_message'))
+                if (typeof toastr !== 'undefined') {
+                    toastr.info(@json(session('info_message')), 'Info', {
+                        positionClass: 'toast-bottom-right',
+                        timeOut: 4000
+                    });
+                }
+            @endif
+        });
 </script>
 @endsection

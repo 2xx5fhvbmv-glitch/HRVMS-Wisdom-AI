@@ -915,10 +915,15 @@ class LeaveController extends Controller
             ]);
         }
 
-        // No leaves yet — keep the previous fallback so the user still lands
-        // somewhere sensible. Pass the empId so the list page can scope its
-        // empty state to this employee instead of showing the global inbox.
-        return redirect()->route('leave.request', ['empId' => $empID]);
+        // Empty-state fallback: redirect back to the employee detail page
+        // with a flash toast instead of dumping the user onto the global
+        // leave list (the previous fallback was the source of "I clicked
+        // Leave and got somebody else's data" reports). The flash key is
+        // read by the master layout's toastr bootstrap so no extra JS
+        // wiring is needed on the detail page.
+        return redirect()
+            ->route('people.employees.details', ['id' => $empID])
+            ->with('info_message', 'This employee has no leave history yet.');
     }
 
     public function details($leave_id)
