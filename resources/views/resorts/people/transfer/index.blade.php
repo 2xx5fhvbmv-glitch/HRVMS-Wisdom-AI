@@ -137,11 +137,15 @@
                         <div class="col-md-6 col-sm-6">
                             <label for="proposed_salary" class="form-label">PROPOSED SALARY</label>
                             <input type="number" step="0.01" min="0" id="proposed_salary" name="proposed_salary" class="form-control" placeholder="Proposed Salary"
-                                data-parsley-type="number" data-parsley-min="0">
+                                data-parsley-type="number" data-parsley-min="0"
+                                title="Used by the BUDGET module as the planned future salary. Payroll continues to use Basic Salary until an approved Salary Increment is applied.">
                             {{-- Shown via JS when Transfer Status = Temporary. The server
                                  also rejects a non-empty proposed_salary in that case. --}}
                             <small id="proposed_salary_temp_warning" class="text-danger d-block mt-1" style="display:none !important;">
                                 Proposed Salary is not allowed in a Temporary transfer.
+                            </small>
+                            <small class="form-text text-muted" style="font-size:11px;">
+                                Used by Budget; Payroll uses Basic Salary until an Increment is approved.
                             </small>
                         </div>
                         {{-- Allowances / Benefit Grid for the chosen target position

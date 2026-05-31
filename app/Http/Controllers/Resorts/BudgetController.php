@@ -574,25 +574,57 @@ class BudgetController extends Controller
                     ->pluck('id')->toArray();
         }
 
-        $departments = ManningResponse::with('department')
-            ->whereHas('department', function ($query) use ($resortId, $rank_wise_departments) {
-                $query->where('resort_id', $resortId)
-                    ->whereIn('id', $rank_wise_departments);
-            })
+        // Iterate ALL active departments (subject to role scope), then
+        // look up the optional matching ManningResponse + non-terminal
+        // BudgetStatus for metadata. Iterating manning_responses directly
+        // (as the prior code did) silently DROPPED departments that
+        // hadn't been put through a manning cycle yet — exactly the
+        // Exec Office / L&D / Security gap on live.
+        $manningByDept = ManningResponse::with('department')
+            ->where('manning_responses.year', $year)
+            ->where('manning_responses.resort_id', $resortId)
+            ->whereIn('dept_id', $rank_wise_departments)
             ->leftJoin('budget_statuses as bs', function ($join) {
                 $join->on('bs.Budget_id', '=', 'manning_responses.id');
             })
-            ->where('manning_responses.year', $year)
-            ->where('manning_responses.resort_id', $resortId)
             ->whereIn('bs.id', function ($query) {
                 $query->select(DB::raw('MAX(id)'))
                     ->from('budget_statuses')
                     ->groupBy('Budget_id');
             })
-            ->groupBy('manning_responses.id')
-            ->orderBy('bs.id', 'desc')
             ->whereNotIn('bs.status', ['Rejected', 'Accepted', 'Approved'])
-            ->get(['bs.Budget_id','bs.message_id as Message_id', 'manning_responses.*']);
+            ->get(['bs.Budget_id', 'bs.message_id as Message_id', 'manning_responses.*'])
+            ->keyBy('dept_id');
+
+        $catalogDepartments = ResortDepartment::where('resort_id', $resortId)
+            ->whereIn('id', $rank_wise_departments)
+            ->where('status', 'active')
+            ->get();
+
+        // Synthesize the "$departments" the rest of the method expects:
+        // a collection of objects with `dept_id`, `Budget_id`, `Message_id`
+        // and the manning-response columns. Depts without a manning get
+        // null Budget_id / Message_id but still flow through the loop.
+        $departments = $catalogDepartments->map(function ($dept) use ($manningByDept) {
+            $manning = $manningByDept->get($dept->id);
+            if ($manning) {
+                $manning->dept_id = $dept->id;
+                return $manning;
+            }
+            // Stub object with the minimum fields the downstream code reads.
+            return (object) [
+                'id'                   => null,
+                'dept_id'              => $dept->id,
+                'Budget_id'            => null,
+                'Message_id'           => null,
+                'department'           => $dept,
+                'year'                 => $dept->year ?? null,
+                'resort_id'            => $dept->resort_id ?? null,
+                'total_headcount'      => 0,
+                'total_filled_positions' => 0,
+                'total_vacant_positions' => 0,
+            ];
+        });
 
         foreach ($departments as $department) {
             // Ensure we get vacant count from manning_responses properly filtered by position, dept_id, year, resort_id
@@ -853,276 +885,6 @@ class BudgetController extends Controller
             'resortCosts',
             'approvedBudgetIdsLookup'
         ));
-    }
-
-    /**
-     * Clone all year-keyed budget overrides from a source year into a
-     * target year for the current resort.
-     *
-     * Tables cloned (year-keyed):
-     *   - resort_employee_budget_cost_configurations
-     *   - resort_employee_monthly_salaries
-     *   - resort_vacant_budget_costs            (+ associated configs / monthly salaries)
-     *   - resort_vacant_budget_cost_configurations
-     *   - resort_vacant_monthly_salaries
-     *
-     * Tables NOT cloned (resort-wide / not year-keyed):
-     *   - resort_budget_costs (cost templates apply across all years)
-     *   - employees_allowance (applies across all years)
-     *
-     * Idempotent: skips rows that already exist in the target year for
-     * the same (employee/vacant, cost, month) tuple. So if HR ran the
-     * clone, manually edited a few cells, then re-ran it, their manual
-     * edits stay intact and only the missing rows get added.
-     *
-     * POST {from_year, to_year}. Returns JSON with row counts per table
-     * so the UI toast can confirm "237 employee cost rows + 12 vacant
-     * salary rows copied from 2026 to 2027".
-     */
-    public function cloneBudgetFromYear(Request $request)
-    {
-        if (Common::checkRouteWisePermission('resort.budget.viewbudget', config('settings.resort_permissions.create')) == false) {
-            return response()->json(['success' => false, 'message' => 'You do not have permission to clone a budget.'], 403);
-        }
-
-        $fromYear = (int) $request->input('from_year');
-        $toYear   = (int) $request->input('to_year');
-        $resortId = (int) $this->resort->resort_id;
-
-        if ($fromYear < 2000 || $fromYear > 2100 || $toYear < 2000 || $toYear > 2100 || $fromYear === $toYear) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pick two different valid years.',
-            ], 422);
-        }
-
-        $audit = ['from' => $fromYear, 'to' => $toYear, 'resort_id' => $resortId];
-        $counts = [];
-        $now = now();
-        $userId = auth()->guard('resort-admin')->user()->id ?? 0;
-
-        \DB::beginTransaction();
-        try {
-            // ---- 1. employee_budget_cost_configurations -------------------
-            // Each row is keyed on (employee_id, cost_id, dept, position,
-            // year, month) so the dedupe lookup is straightforward.
-            $srcEmpCosts = \DB::table('resort_employee_budget_cost_configurations')
-                ->where('resort_id', $resortId)
-                ->where('year', $fromYear)
-                ->get();
-            $existingEmpCostKeys = \DB::table('resort_employee_budget_cost_configurations')
-                ->where('resort_id', $resortId)
-                ->where('year', $toYear)
-                ->get(['employee_id', 'resort_budget_cost_id', 'department_id', 'position_id', 'month'])
-                ->map(fn($r) => $r->employee_id . '|' . $r->resort_budget_cost_id . '|' . $r->department_id . '|' . $r->position_id . '|' . $r->month)
-                ->flip();
-            $empCostInserts = [];
-            foreach ($srcEmpCosts as $row) {
-                $key = $row->employee_id . '|' . $row->resort_budget_cost_id . '|' . $row->department_id . '|' . $row->position_id . '|' . $row->month;
-                if (isset($existingEmpCostKeys[$key])) continue;
-                $empCostInserts[] = [
-                    'employee_id'           => $row->employee_id,
-                    'resort_budget_cost_id' => $row->resort_budget_cost_id,
-                    'value'                 => $row->value,
-                    'currency'              => $row->currency,
-                    'department_id'         => $row->department_id,
-                    'position_id'           => $row->position_id,
-                    'resort_id'             => $resortId,
-                    'year'                  => $toYear,
-                    'month'                 => $row->month,
-                    'basic_salary'          => $row->basic_salary,
-                    'current_salary'        => $row->current_salary,
-                    'hours'                 => $row->hours,
-                    'created_by'            => $userId,
-                    'modified_by'           => $userId,
-                    'created_at'            => $now,
-                    'updated_at'            => $now,
-                ];
-            }
-            if (!empty($empCostInserts)) {
-                // Chunked insert so we don't blow MySQL's max packet size on
-                // resorts with hundreds of active employees × dozens of costs.
-                foreach (array_chunk($empCostInserts, 500) as $chunk) {
-                    \DB::table('resort_employee_budget_cost_configurations')->insert($chunk);
-                }
-            }
-            $counts['employee_cost_overrides'] = count($empCostInserts);
-
-            // ---- 2. employee_monthly_salaries -----------------------------
-            $srcEmpSalaries = \DB::table('resort_employee_monthly_salaries')
-                ->where('resort_id', $resortId)
-                ->where('year', $fromYear)
-                ->get();
-            $existingEmpSalKeys = \DB::table('resort_employee_monthly_salaries')
-                ->where('resort_id', $resortId)
-                ->where('year', $toYear)
-                ->get(['employee_id', 'month'])
-                ->map(fn($r) => $r->employee_id . '|' . $r->month)
-                ->flip();
-            $empSalInserts = [];
-            foreach ($srcEmpSalaries as $row) {
-                $key = $row->employee_id . '|' . $row->month;
-                if (isset($existingEmpSalKeys[$key])) continue;
-                $empSalInserts[] = [
-                    'employee_id'     => $row->employee_id,
-                    'resort_id'       => $resortId,
-                    'year'            => $toYear,
-                    'month'           => $row->month,
-                    'current_salary'  => $row->current_salary ?? 0,
-                    'proposed_salary' => $row->proposed_salary ?? 0,
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
-                ];
-            }
-            if (!empty($empSalInserts)) {
-                foreach (array_chunk($empSalInserts, 500) as $chunk) {
-                    \DB::table('resort_employee_monthly_salaries')->insert($chunk);
-                }
-            }
-            $counts['employee_salary_overrides'] = count($empSalInserts);
-
-            // ---- 3. vacant_budget_costs (parent rows) ---------------------
-            $srcVacants = \DB::table('resort_vacant_budget_costs')
-                ->where('resort_id', $resortId)
-                ->where('year', $fromYear)
-                ->get();
-            // Maps old-vacant-id → new-vacant-id so child config / monthly
-            // rows below can be re-pointed correctly.
-            $vacantIdMap = [];
-            $existingVacKeys = \DB::table('resort_vacant_budget_costs')
-                ->where('resort_id', $resortId)
-                ->where('year', $toYear)
-                ->get(['id', 'position_id', 'department_id', 'vacant_index'])
-                ->keyBy(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index);
-            $vacantInserts = 0;
-            foreach ($srcVacants as $row) {
-                $key = $row->position_id . '|' . $row->department_id . '|' . $row->vacant_index;
-                if (isset($existingVacKeys[$key])) {
-                    // Already exists — reuse existing id for the child mapping.
-                    $vacantIdMap[$row->id] = $existingVacKeys[$key]->id;
-                    continue;
-                }
-                $newVacantId = \DB::table('resort_vacant_budget_costs')->insertGetId([
-                    'position_id'    => $row->position_id,
-                    'department_id'  => $row->department_id,
-                    'resort_id'      => $resortId,
-                    'year'           => $toYear,
-                    'vacant_index'   => $row->vacant_index,
-                    'basic_salary'   => $row->basic_salary,
-                    'current_salary' => $row->current_salary,
-                    'created_at'     => $now,
-                    'updated_at'     => $now,
-                ]);
-                $vacantIdMap[$row->id] = $newVacantId;
-                $vacantInserts++;
-            }
-            $counts['vacant_slots'] = $vacantInserts;
-
-            // ---- 4. vacant_budget_cost_configurations (children) ----------
-            if (!empty($vacantIdMap)) {
-                $srcVacConfigs = \DB::table('resort_vacant_budget_cost_configurations')
-                    ->where('resort_id', $resortId)
-                    ->where('year', $fromYear)
-                    ->whereIn('vacant_budget_cost_id', array_keys($vacantIdMap))
-                    ->get();
-                // Dedupe by (new vacant id, cost id, month) — if the target
-                // year already had child rows for this vacant, leave them.
-                $existingVacCfgKeys = \DB::table('resort_vacant_budget_cost_configurations')
-                    ->where('resort_id', $resortId)
-                    ->where('year', $toYear)
-                    ->whereIn('vacant_budget_cost_id', array_values($vacantIdMap))
-                    ->get(['vacant_budget_cost_id', 'resort_budget_cost_id', 'month'])
-                    ->map(fn($r) => $r->vacant_budget_cost_id . '|' . $r->resort_budget_cost_id . '|' . $r->month)
-                    ->flip();
-                $vacCfgInserts = [];
-                foreach ($srcVacConfigs as $row) {
-                    $newVacId = $vacantIdMap[$row->vacant_budget_cost_id] ?? null;
-                    if (!$newVacId) continue;
-                    $key = $newVacId . '|' . $row->resort_budget_cost_id . '|' . $row->month;
-                    if (isset($existingVacCfgKeys[$key])) continue;
-                    $vacCfgInserts[] = [
-                        'vacant_budget_cost_id' => $newVacId,
-                        'resort_budget_cost_id' => $row->resort_budget_cost_id,
-                        'value'                 => $row->value,
-                        'currency'              => $row->currency,
-                        'resort_id'             => $resortId,
-                        'year'                  => $toYear,
-                        'month'                 => $row->month,
-                        'hours'                 => $row->hours ?? 0,
-                        'created_at'            => $now,
-                        'updated_at'            => $now,
-                    ];
-                }
-                if (!empty($vacCfgInserts)) {
-                    foreach (array_chunk($vacCfgInserts, 500) as $chunk) {
-                        \DB::table('resort_vacant_budget_cost_configurations')->insert($chunk);
-                    }
-                }
-                $counts['vacant_cost_overrides'] = count($vacCfgInserts);
-            } else {
-                $counts['vacant_cost_overrides'] = 0;
-            }
-
-            // ---- 5. vacant_monthly_salaries -------------------------------
-            $srcVacSalaries = \DB::table('resort_vacant_monthly_salaries')
-                ->where('resort_id', $resortId)
-                ->where('year', $fromYear)
-                ->get();
-            $existingVacSalKeys = \DB::table('resort_vacant_monthly_salaries')
-                ->where('resort_id', $resortId)
-                ->where('year', $toYear)
-                ->get(['position_id', 'department_id', 'vacant_index', 'month'])
-                ->map(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index . '|' . $r->month)
-                ->flip();
-            $vacSalInserts = [];
-            foreach ($srcVacSalaries as $row) {
-                $key = $row->position_id . '|' . $row->department_id . '|' . $row->vacant_index . '|' . $row->month;
-                if (isset($existingVacSalKeys[$key])) continue;
-                $vacSalInserts[] = [
-                    'position_id'     => $row->position_id,
-                    'department_id'   => $row->department_id,
-                    'vacant_index'    => $row->vacant_index,
-                    'resort_id'       => $resortId,
-                    'year'            => $toYear,
-                    'month'           => $row->month,
-                    'current_salary'  => $row->current_salary ?? 0,
-                    'proposed_salary' => $row->proposed_salary ?? 0,
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
-                ];
-            }
-            if (!empty($vacSalInserts)) {
-                foreach (array_chunk($vacSalInserts, 500) as $chunk) {
-                    \DB::table('resort_vacant_monthly_salaries')->insert($chunk);
-                }
-            }
-            $counts['vacant_salary_overrides'] = count($vacSalInserts);
-
-            \DB::commit();
-
-            $totalCopied = array_sum($counts);
-            $message = $totalCopied === 0
-                ? "Nothing to copy from {$fromYear} — already up to date in {$toYear}."
-                : "Copied " . number_format($totalCopied) . " rows from {$fromYear} to {$toYear}.";
-
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'counts'  => $counts,
-            ]);
-        } catch (\Throwable $e) {
-            \DB::rollBack();
-            \Log::error('[cloneBudgetFromYear] failed', array_merge($audit, [
-                'exception' => get_class($e),
-                'message'   => $e->getMessage(),
-                'file'      => $e->getFile(),
-                'line'      => $e->getLine(),
-            ]));
-            return response()->json([
-                'success' => false,
-                'message' => 'Copy failed: ' . $e->getMessage(),
-            ], 500);
-        }
     }
 
     public function ConsolidateBudget(Request $request)
@@ -1466,7 +1228,44 @@ class BudgetController extends Controller
             ->get();
         }
 
-        if ($yearlyBudgets->isNotEmpty())
+        // Department iteration source-of-truth: ALL active resort_departments
+        // (subject to the role scope above), NOT just departments with a
+        // matching manning response. The prior implementation iterated
+        // `foreach ($yearlyBudgets as $response)` — so a department that
+        // hadn't been put through manning yet (e.g. Executive Office,
+        // Learning and Development, Security) silently vanished from the
+        // consolidated view even though it had active employees and
+        // vacant slots that DID exist in the canonical aggregator.
+        //
+        // Now: we fetch `$inScopeDeptIds` from the same role rules, then
+        // iterate those departments. The manning response (if any) is
+        // looked up by dept_id for metadata only.
+        $manningByDept = $yearlyBudgets->keyBy('dept_id');
+
+        if (($employeeRankPosition['position'] != "HR" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM")) && ($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM")) && ($employeeRankPosition['position'] != "Finance" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM"))) {
+            // Non-HR/GM/Finance HOD: own department only.
+            $inScopeDeptIds = [$this->resort->getEmployee->Dept_id];
+        } elseif ($employeeRankPosition['position'] == "Finance" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM")) {
+            // Finance: depts whose manning has reached Finance / GM stage.
+            $inScopeDeptIds = $yearlyBudgets->pluck('dept_id')->all();
+        } elseif ($employeeRankPosition['position'] == "GM" && ($employeeRankPosition['rank'] == "HOD" || $employeeRankPosition['rank'] == "XCOM")) {
+            // GM: depts whose manning has reached GM stage.
+            $inScopeDeptIds = $yearlyBudgets->pluck('dept_id')->all();
+        } else {
+            // HR / master admin / catchall: ALL active departments of the
+            // resort, even those without a manning response yet.
+            $inScopeDeptIds = ResortDepartment::where('resort_id', $resortId)
+                ->where('status', 'active')
+                ->pluck('id')
+                ->all();
+        }
+
+        $departmentsInScope = ResortDepartment::with('division', 'sections')
+            ->whereIn('id', $inScopeDeptIds)
+            ->where('resort_id', $resortId)
+            ->get();
+
+        if ($departmentsInScope->isNotEmpty())
         {
             // Initialize the consolidated budget array and retrieve unique headers
             $consolidatedBudget = [];
@@ -1475,10 +1274,10 @@ class BudgetController extends Controller
                 ->pluck('particulars')
                 ->toArray();
 
-            foreach ($yearlyBudgets as $response) {
-                $department = ResortDepartment::with('division', 'sections')->find($response->dept_id);
-
-                if (!$department) continue;
+            foreach ($departmentsInScope as $department) {
+                // Optional metadata — null when this dept hasn't been put
+                // through manning for the year yet.
+                $response = $manningByDept->get($department->id);
 
                 $divisionName = $department->division ? $department->division->name : 'No Division';
                 $divisionId = $department->division ? $department->division->id : 0;
@@ -1493,14 +1292,17 @@ class BudgetController extends Controller
                     ];
                 }
 
-                // Initialize department if not exists
+                // Initialize department if not exists. Manning-response
+                // metadata is optional — depts without a manning row yet
+                // show zero headcounts but still render their employees
+                // and vacant slots from the canonical helpers.
                 if (!isset($consolidatedBudget[$divisionName]['departments'][$departmentName])) {
                     $consolidatedBudget[$divisionName]['departments'][$departmentName] = [
                         'department_id' => $departmentId,
-                        'manning_response_id' => $response->id,
-                        'total_headcount' => $response->total_headcount,
-                        'filled_positions' => $response->total_filled_positions,
-                        'vacant_positions' => $response->total_vacant_positions,
+                        'manning_response_id' => $response ? $response->id : null,
+                        'total_headcount'     => $response ? $response->total_headcount : 0,
+                        'filled_positions'    => $response ? $response->total_filled_positions : 0,
+                        'vacant_positions'    => $response ? $response->total_vacant_positions : 0,
                         'sections' => [],
                         'positions' => []
                     ];
@@ -1552,7 +1354,7 @@ class BudgetController extends Controller
 
                     // Get vacant count from resorts_child_notifications through manning_response
                     // resorts_child_notifications -> budget_statuses -> manning_responses -> position_monthly_data
-                    $budgetStatus = BudgetStatus::where('Budget_id', $response->id)->first();
+                    $budgetStatus = $response ? BudgetStatus::where('Budget_id', $response->id)->first() : null;
                     $isPositionInManningRequest = false;
 
                     // Initialize max counts
@@ -1561,8 +1363,13 @@ class BudgetController extends Controller
                     $maxVacantFromMonthly = 0;
                     $maxVacantcount = 0;
 
-                    // Get position monthly data for this specific position from the manning_response
-                    $positionMonthlyDataForPosition = $response->positionMonthlyData->where('position_id', $positionId);
+                    // Get position monthly data for this specific position from the manning_response.
+                    // Empty collection when this dept has no manning yet — the
+                    // canonical helpers below still aggregate employees and
+                    // vacants from their respective tables.
+                    $positionMonthlyDataForPosition = $response
+                        ? $response->positionMonthlyData->where('position_id', $positionId)
+                        : collect();
 
                     // Calculate max counts across all months for this position
                     foreach ($positionMonthlyDataForPosition as $dataByMonth) {
@@ -1666,69 +1473,82 @@ class BudgetController extends Controller
                         $employee->yearly_total = Common::annualBudgetForEmployee($resortId, (int) $selectedYear, $employee);
                     }
 
-                    // Load vacant budget cost configurations - SUM FOR ENTIRE YEAR
+                    // Load vacant budget cost configurations - SUM FOR ENTIRE YEAR.
+                    //
+                    // Previously this iterated `for ($i = 1; $i <= $maxVacantcount;
+                    // $i++)` where $maxVacantcount came from position_monthly_data
+                    // (i.e. manning response). That silently DROPPED every
+                    // vacant row in resort_vacant_budget_costs whose position
+                    // had no PMD entry — exactly the F&B $6,628 gap we saw on
+                    // live (and the $20,350 HR gap, and $76,144 Accounting gap).
+                    //
+                    // Now we iterate the persisted vacant rows directly so
+                    // every vacant slot HR created for this (dept, position,
+                    // year) shows up regardless of manning state.
                     $vacantConfigurations = [];
-                    for ($i = 1; $i <= $maxVacantcount; $i++) {
-                        $vacantBudgetCost = ResortVacantBudgetCost::where('position_id', $positionId)
-                            ->where('department_id', $departmentId)
-                            ->where('resort_id', $resortId)
-                            ->where('year', $selectedYear)
-                            ->where('vacant_index', $i)
-                            ->first();
+                    $vacantRowsForPosition = ResortVacantBudgetCost::where('position_id', $positionId)
+                        ->where('department_id', $departmentId)
+                        ->where('resort_id', $resortId)
+                        ->where('year', $selectedYear)
+                        ->orderBy('vacant_index')
+                        ->get();
+                    // Bump $maxVacantcount so calculatePositionTotal's loop
+                    // (which still iterates by index) sees every slot.
+                    $maxVacantcount = max($maxVacantcount, $vacantRowsForPosition->count());
+                    foreach ($vacantRowsForPosition as $vacantBudgetCost) {
+                        $i = (int) $vacantBudgetCost->vacant_index ?: 1;
 
-                        if ($vacantBudgetCost) {
-                            // Get all monthly configurations for this vacant position
-                            $vacantCostConfigs = ResortVacantBudgetCostConfiguration::where('vacant_budget_cost_id', $vacantBudgetCost->id)
-                                ->get();
+                        // Get all monthly configurations for this vacant position
+                        $vacantCostConfigs = ResortVacantBudgetCostConfiguration::where('vacant_budget_cost_id', $vacantBudgetCost->id)
+                            ->get();
 
-                            // For consolidated budget: Always use base values from resort_vacant_budget_costs * 12 (same as budget view)
-                            $yearlyBasicSalary = ($vacantBudgetCost->basic_salary ?? 0) * 12;
-                            $yearlyCurrentSalary = ($vacantBudgetCost->current_salary ?? 0) * 12;
+                        // For consolidated budget: Always use base values from resort_vacant_budget_costs * 12 (same as budget view)
+                        $yearlyBasicSalary = ($vacantBudgetCost->basic_salary ?? 0) * 12;
+                        $yearlyCurrentSalary = ($vacantBudgetCost->current_salary ?? 0) * 12;
 
-                            // Update the vacant budget cost with yearly totals
-                            $vacantBudgetCost->basic_salary = $yearlyBasicSalary;
-                            $vacantBudgetCost->current_salary = $yearlyCurrentSalary;
+                        // Update the vacant budget cost with yearly totals
+                        $vacantBudgetCost->basic_salary = $yearlyBasicSalary;
+                        $vacantBudgetCost->current_salary = $yearlyCurrentSalary;
 
-                            // Aggregate budget costs by resort_budget_cost_id (sum all months)
-                            $aggregatedVacantConfigs = [];
-                            foreach ($vacantCostConfigs as $config) {
-                                $costId = $config->resort_budget_cost_id;
+                        // Aggregate budget costs by resort_budget_cost_id (sum all months)
+                        $aggregatedVacantConfigs = [];
+                        foreach ($vacantCostConfigs as $config) {
+                            $costId = $config->resort_budget_cost_id;
 
-                                if (!isset($aggregatedVacantConfigs[$costId])) {
-                                    $aggregatedVacantConfigs[$costId] = (object)[
-                                        'resort_budget_cost_id' => $costId,
-                                        'value' => 0,
-                                        'currency' => $config->currency,
-                                        'hours' => 0
-                                    ];
-                                }
-
-                                $aggregatedVacantConfigs[$costId]->value += $config->value;
-                                $aggregatedVacantConfigs[$costId]->hours += $config->hours ?? 0;
+                            if (!isset($aggregatedVacantConfigs[$costId])) {
+                                $aggregatedVacantConfigs[$costId] = (object)[
+                                    'resort_budget_cost_id' => $costId,
+                                    'value' => 0,
+                                    'currency' => $config->currency,
+                                    'hours' => 0
+                                ];
                             }
 
-                            $vacantConfigurations[$i] = [
-                                'vacant_budget_cost' => $vacantBudgetCost,
-                                'configurations' => collect(array_values($aggregatedVacantConfigs))
-                            ];
-
-                            // Yearly total: canonical helper. Note we pass the
-                            // ORIGINAL DB row (with monthly basic_salary /
-                            // current_salary), NOT the one mutated above where
-                            // we set them to yearly×12. The helper computes its
-                            // own salary leg from per-month overrides.
-                            $vacantForHelper = (object) [
-                                'id'             => $vacantBudgetCost->id,
-                                'position_id'    => $vacantBudgetCost->position_id,
-                                'department_id'  => $vacantBudgetCost->department_id,
-                                'vacant_index'   => $vacantBudgetCost->vacant_index,
-                                // Reverse the ×12 we did above so the helper
-                                // sees monthly values as fallback.
-                                'basic_salary'   => $yearlyBasicSalary / 12,
-                                'current_salary' => $yearlyCurrentSalary / 12,
-                            ];
-                            $vacantConfigurations[$i]['yearly_total'] = Common::annualBudgetForVacantSlot($resortId, (int) $selectedYear, $vacantForHelper);
+                            $aggregatedVacantConfigs[$costId]->value += $config->value;
+                            $aggregatedVacantConfigs[$costId]->hours += $config->hours ?? 0;
                         }
+
+                        $vacantConfigurations[$i] = [
+                            'vacant_budget_cost' => $vacantBudgetCost,
+                            'configurations' => collect(array_values($aggregatedVacantConfigs))
+                        ];
+
+                        // Yearly total: canonical helper. Note we pass the
+                        // ORIGINAL DB row (with monthly basic_salary /
+                        // current_salary), NOT the one mutated above where
+                        // we set them to yearly×12. The helper computes its
+                        // own salary leg from per-month overrides.
+                        $vacantForHelper = (object) [
+                            'id'             => $vacantBudgetCost->id,
+                            'position_id'    => $vacantBudgetCost->position_id,
+                            'department_id'  => $vacantBudgetCost->department_id,
+                            'vacant_index'   => $vacantBudgetCost->vacant_index,
+                            // Reverse the ×12 we did above so the helper
+                            // sees monthly values as fallback.
+                            'basic_salary'   => $yearlyBasicSalary / 12,
+                            'current_salary' => $yearlyCurrentSalary / 12,
+                        ];
+                        $vacantConfigurations[$i]['yearly_total'] = Common::annualBudgetForVacantSlot($resortId, (int) $selectedYear, $vacantForHelper);
                     }
 
                     $positionData = [
