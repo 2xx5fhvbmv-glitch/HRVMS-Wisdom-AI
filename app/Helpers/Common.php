@@ -4810,48 +4810,19 @@ class Common
             ->where('year', $year)
             ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
 
-        // Filter out STALE vacant rows — same rule view-budget enforces
-        // (BudgetController::getPositionEmployees, ~:2287-2303). A vacant
-        // row only counts when its vacant_index falls inside the live
-        // vacancy headcount = max(0, max_budgeted_headcount - active_filled).
-        // Without this, an orphaned vacant_budget_cost row (typical when
-        // a slot was filled after the row was created) inflates the
-        // Liability headline by its salary + cost configs even though
-        // the slot no longer needs to be filled.
-        if ($vacants->isNotEmpty()) {
-            $vacPosIds = $vacants->pluck('position_id')->unique()->all();
-            $maxHeadByPosition = \DB::table('position_monthly_data')
-                ->whereIn('position_id', $vacPosIds)
-                ->selectRaw('position_id, MAX(COALESCE(headcount, 0)) as max_head')
-                ->groupBy('position_id')
-                ->pluck('max_head', 'position_id')
-                ->toArray();
-            $today = \Carbon\Carbon::today()->toDateString();
-            $filledByPosition = \DB::table('employees')
-                ->where('resort_id', $resortId)
-                ->whereIn('Position_id', $vacPosIds)
-                ->where('status', 'Active')
-                ->where(function ($q) use ($today) {
-                    $q->whereNull('last_working_day')
-                      ->orWhereDate('last_working_day', '>', $today);
-                })
-                ->selectRaw('Position_id, COUNT(*) as filled')
-                ->groupBy('Position_id')
-                ->pluck('filled', 'Position_id')
-                ->toArray();
-            $realVacantCountByPosition = [];
-            foreach ($vacPosIds as $pid) {
-                $realVacantCountByPosition[$pid] = max(
-                    0,
-                    (int) ($maxHeadByPosition[$pid] ?? 0)
-                    - (int) ($filledByPosition[$pid] ?? 0)
-                );
-            }
-            $vacants = $vacants->filter(function ($v) use ($realVacantCountByPosition) {
-                $real = $realVacantCountByPosition[$v->position_id] ?? 0;
-                return (int) $v->vacant_index <= $real;
-            })->values();
-        }
+        // Stale-vacant filter REMOVED at user's request to align Liability
+        // headline with the Consolidated Budget total. The two pages now
+        // share the same semantic: "full budgeted commitment for the
+        // year" — every resort_vacant_budget_costs row HR ever created
+        // counts toward the total. Stale rows (slot filled after the
+        // vacant row was created) inflate the headline by their salary +
+        // cost configs, which matches what consolidated already shows.
+        //
+        // If a user reports a vacant they expected to be dropped, the
+        // resolution is to delete that orphaned resort_vacant_budget_costs
+        // row at source rather than filtering it out of aggregators. The
+        // consolidated view exposes the per-row breakdown so HR can drill
+        // in and clean up.
 
         $vacantMonthlyOverrides = \DB::table('resort_vacant_monthly_salaries')
             ->where('resort_id', $resortId)
