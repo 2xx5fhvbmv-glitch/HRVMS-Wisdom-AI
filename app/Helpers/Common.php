@@ -1123,47 +1123,60 @@ class Common
             // /public/uploads/... 404s on any standard deployment.
             $urlPath = preg_replace('#^public/#', '', $relPath);
             $url = url($urlPath);
-        } else {
-            // Wasabi / S3. Storage::disk()->url() returns a relative path
-            // when the disk's `url` config is empty (e.g. WASABI_URL='' in
-            // the env) — that's why the rendered <img> on live showed
-            // `/public/uploads/...` even after we routed the upload to
-            // Wasabi. Build the full https URL from endpoint + bucket
-            // ourselves so it works without requiring WASABI_URL to be set.
-            $diskCfg = config('filesystems.disks.' . $driver);
-            $explicitUrl = $diskCfg['url'] ?? null;
-            if ($explicitUrl) {
-                $url = rtrim($explicitUrl, '/') . '/' . ltrim($relPath, '/');
-            } else {
-                $endpoint = rtrim((string) ($diskCfg['endpoint'] ?? ''), '/');
-                $bucket   = (string) ($diskCfg['bucket'] ?? '');
-                $usePathStyle = (bool) ($diskCfg['use_path_style_endpoint'] ?? false);
-                if ($endpoint && $bucket) {
-                    if ($usePathStyle) {
-                        // {endpoint}/{bucket}/{path}
-                        $url = $endpoint . '/' . $bucket . '/' . ltrim($relPath, '/');
-                    } else {
-                        // Virtual-hosted: {bucket}.{endpoint-host}/{path}
-                        $parts = parse_url($endpoint);
-                        $scheme = $parts['scheme'] ?? 'https';
-                        $host   = $parts['host']   ?? '';
-                        $url    = $scheme . '://' . $bucket . '.' . $host . '/' . ltrim($relPath, '/');
-                    }
-                } else {
-                    // Last-resort fallback so we never return a broken
-                    // /public/... path. Let Storage try; if it returns
-                    // something usable, fine, otherwise the caller sees
-                    // an obviously-bad URL and can investigate the disk
-                    // config rather than wondering why the image is blank.
-                    $url = \Storage::disk($driver)->url($relPath);
-                }
-            }
+            $stamp = optional($resort->updated_at)->getTimestamp();
+            return $stamp ? $url . '?v=' . $stamp : $url;
         }
 
-        // Cache-buster keyed on the row's updated_at — old rows that still
-        // carry the fixed "brand_logo.png" filename get a fresh URL whenever
-        // the resort record is touched. Stamped filenames already bypass
-        // cache; the suffix is harmless there.
+        // Wasabi / S3 — generate a pre-signed (temporary) URL.
+        //
+        // Why not just build the bucket URL? The Wasabi account on prod
+        // has *Public Use Of Objects* disabled — bucket-served URLs
+        // return `AccessDenied: Public use of objects is not allowed by
+        // this account`. A pre-signed URL is signed with the bucket
+        // credentials, so the request is authenticated and Wasabi serves
+        // it regardless of the public-use restriction.
+        //
+        // Tradeoff: signed URLs change every page render, so the browser
+        // can't cache the image across navigations. For a small brand
+        // logo this is fine; if it ever becomes a hot path we'd cache
+        // the signed URL in memory for ~23h (within the 24h validity).
+        try {
+            $expiresAt = \Carbon\Carbon::now()->addDay();
+            return \Storage::disk($driver)->temporaryUrl($relPath, $expiresAt);
+        } catch (\Throwable $e) {
+            \Log::warning('[GetResortLogo] temporaryUrl() failed, falling back to manual URL', [
+                'driver'    => $driver,
+                'rel_path'  => $relPath,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
+        // Manual URL builder — fires only when temporaryUrl() throws
+        // (older flysystem-aws-s3 versions, mis-configured disk). If
+        // your Wasabi account is later switched to allow public reads,
+        // bucket policy applied, and credentials work — this is the URL
+        // shape you want.
+        $diskCfg = config('filesystems.disks.' . $driver);
+        $explicitUrl = $diskCfg['url'] ?? null;
+        if ($explicitUrl) {
+            $url = rtrim($explicitUrl, '/') . '/' . ltrim($relPath, '/');
+        } else {
+            $endpoint = rtrim((string) ($diskCfg['endpoint'] ?? ''), '/');
+            $bucket   = (string) ($diskCfg['bucket'] ?? '');
+            $usePathStyle = (bool) ($diskCfg['use_path_style_endpoint'] ?? false);
+            if ($endpoint && $bucket) {
+                if ($usePathStyle) {
+                    $url = $endpoint . '/' . $bucket . '/' . ltrim($relPath, '/');
+                } else {
+                    $parts = parse_url($endpoint);
+                    $scheme = $parts['scheme'] ?? 'https';
+                    $host   = $parts['host']   ?? '';
+                    $url    = $scheme . '://' . $bucket . '.' . $host . '/' . ltrim($relPath, '/');
+                }
+            } else {
+                $url = \Storage::disk($driver)->url($relPath);
+            }
+        }
         $stamp = optional($resort->updated_at)->getTimestamp();
         return $stamp ? $url . '?v=' . $stamp : $url;
 	}
@@ -6153,8 +6166,10 @@ class Common
 
     public static function GetApplicantAWSFile($path)
     {
-        // Get storage driver from environment variable (s3, local, wasabi)
-        $storageDriver = env('STORAGE_DRIVER', 's3');
+        // Read from config (env() returns null when prod runs
+        // `php artisan config:cache`, which made every upload helper
+        // silently fall back to the broken 's3' default).
+        $storageDriver = config('settings.storage_driver');
 
         // Determine which disk to use
         $diskName = 's3'; // default
@@ -7477,8 +7492,14 @@ class Common
     {
         $data = [];
         try {
-            // Get storage driver from environment variable (s3, local, wasabi)
-            $storageDriver = env('STORAGE_DRIVER', 's3');
+            // Read from config — env() returns null when prod runs
+            // `php artisan config:cache`, which made this helper silently
+            // route to the 's3' default disk. That's the source of the
+            // 403 InvalidAccessKeyId error on profile-picture uploads on
+            // live (resort uses Wasabi for storage, but the AWS_* keys
+            // were never set, so the 's3' fallback hit Amazon with bad
+            // credentials).
+            $storageDriver = config('settings.storage_driver');
 
             $newFileName = $file->getClientOriginalName();
             $mimeType = $file->getClientMimeType();

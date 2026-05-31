@@ -27,7 +27,12 @@ class StorageHelper
 
     public static function driver(): string
     {
-        return self::$cachedDriver ??= env('STORAGE_DRIVER', 's3');
+        // Read from config — env() returns null when prod runs
+        // `php artisan config:cache`, which made every uploader silently
+        // route to the 's3' default with bad / missing AWS_* keys
+        // (InvalidAccessKeyId 403 on live). See config/settings.php where
+        // 'storage_driver' freezes env('STORAGE_DRIVER') at cache time.
+        return self::$cachedDriver ??= (string) config('settings.storage_driver');
     }
 
     public static function disk()
