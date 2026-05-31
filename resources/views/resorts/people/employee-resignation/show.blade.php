@@ -49,11 +49,47 @@
                                        <tr>
                                             <th>Employment Duration:</th>
                                             <td>
-                                                {{
-                                                    \Carbon\Carbon::parse($employeeResignation->employee->joining_date)->format('d M Y')
-                                                    . ' - ' .
-                                                    \Carbon\Carbon::parse($employeeResignation->last_working_day)->format('d M Y')
-                                                }}
+                                                @php
+                                                    $jd = $employeeResignation->employee->joining_date ?? null;
+                                                    // End of the employment span. Prefer the
+                                                    // confirmed last_working_day; fall back to
+                                                    // resignation_date so freshly-submitted
+                                                    // resignations (no LWD yet) still show a
+                                                    // meaningful tenure.
+                                                    $end = $employeeResignation->last_working_day
+                                                        ?? $employeeResignation->resignation_date
+                                                        ?? null;
+                                                    $tenureLabel = null;
+                                                    if ($jd && $end) {
+                                                        $start = \Carbon\Carbon::parse($jd);
+                                                        $finish = \Carbon\Carbon::parse($end);
+                                                        if ($finish->greaterThanOrEqualTo($start)) {
+                                                            $diff = $start->diff($finish);
+                                                            // Build "X year(s) Y month(s)" with
+                                                            // sensible fallbacks for short stints.
+                                                            $parts = [];
+                                                            if ($diff->y > 0) {
+                                                                $parts[] = $diff->y . ' year' . ($diff->y === 1 ? '' : 's');
+                                                            }
+                                                            if ($diff->m > 0) {
+                                                                $parts[] = $diff->m . ' month' . ($diff->m === 1 ? '' : 's');
+                                                            }
+                                                            if (empty($parts)) {
+                                                                // Less than a month — show days
+                                                                // instead of an empty bracket.
+                                                                $days = $start->diffInDays($finish);
+                                                                $parts[] = $days . ' day' . ($days === 1 ? '' : 's');
+                                                            }
+                                                            $tenureLabel = implode(' ', $parts);
+                                                        }
+                                                    }
+                                                @endphp
+                                                {{ $jd ? \Carbon\Carbon::parse($jd)->format('d M Y') : 'N/A' }}
+                                                -
+                                                {{ $end ? \Carbon\Carbon::parse($end)->format('d M Y') : 'N/A' }}
+                                                @if($tenureLabel)
+                                                    <span class="text-muted">({{ $tenureLabel }})</span>
+                                                @endif
                                             </td>
                                         </tr>
                                     </tbody>
@@ -96,8 +132,34 @@
                                         <tr>
                                             <th>Attachments:</th>
                                             <td>
-                                                <img src="assets/images/pdf1.svg" alt="icon"
-                                                    class="me-2">lorem-ipsum.pdf
+                                                {{-- Was hardcoded to "lorem-ipsum.pdf" with a
+                                                     static icon — clicked nothing, downloaded
+                                                     nothing. Real attachment lives in
+                                                     employee_resignation.resignation_letter
+                                                     as a Wasabi/S3 key, so resolve it through
+                                                     Common::GetApplicantAWSFile (same helper
+                                                     as biometric + expiry-document links). --}}
+                                                @php
+                                                    $_attachPath = $employeeResignation->resignation_letter ?? null;
+                                                    $_attachUrl = null;
+                                                    if (!empty($_attachPath)) {
+                                                        $_res = \Common::GetApplicantAWSFile($_attachPath);
+                                                        $_attachUrl = ($_res['success'] ?? false) ? ($_res['NewURLshow'] ?? null) : null;
+                                                    }
+                                                @endphp
+                                                @if(!empty($_attachUrl))
+                                                    <a href="{{ $_attachUrl }}" target="_blank" rel="noopener" class="text-decoration-none">
+                                                        <i class="fa fa-file-pdf text-danger me-2"></i>
+                                                        {{ basename($_attachPath) }}
+                                                    </a>
+                                                @elseif(!empty($_attachPath))
+                                                    <span class="text-muted">
+                                                        <i class="fa fa-file me-2"></i>{{ basename($_attachPath) }}
+                                                        <small>(file not accessible — re-upload required)</small>
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">No attachment</span>
+                                                @endif
                                             </td>
                                         </tr>
                                     </tbody>
@@ -119,7 +181,35 @@
                                         <tbody>
                                             <tr>
                                                 <th>HOD Name:</th>
-                                                <td>{{$employeeResignation->hod->resortAdmin->full_name ?? ''}}</td>
+                                                <td>
+                                                    @php
+                                                        // Resolve HOD name through every path we have, in order
+                                                        // of authority. Empty cell was happening because the
+                                                        // resignation row had hod_id but the linked Employee's
+                                                        // resortAdmin was missing — falling back through the
+                                                        // employee's direct reporting line + dept HOD lookup
+                                                        // covers that. Final fallback is the employee's
+                                                        // raw reporting_to so the column is never blank.
+                                                        $_hodName = null;
+                                                        $candidates = [
+                                                            optional(optional($employeeResignation->hod)->resortAdmin)->full_name,
+                                                            optional(optional(optional($employeeResignation->employee)->reportingTo)->resortAdmin)->full_name,
+                                                        ];
+                                                        if (!empty($employeeResignation->employee->Dept_id)) {
+                                                            $_hodFromDept = \App\Helpers\Common::FindResortHODDepartment(
+                                                                $employeeResignation->resort_id,
+                                                                $employeeResignation->employee->Dept_id
+                                                            );
+                                                            if ($_hodFromDept) {
+                                                                $candidates[] = optional(optional($_hodFromDept)->resortAdmin)->full_name;
+                                                            }
+                                                        }
+                                                        foreach ($candidates as $c) {
+                                                            if (!empty(trim((string) $c))) { $_hodName = $c; break; }
+                                                        }
+                                                    @endphp
+                                                    {{ $_hodName ?: 'N/A' }}
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <th>HOD Status:</th>
@@ -159,7 +249,23 @@
                                         <tbody>
                                             <tr>
                                                 <th>HR Name:</th>
-                                                <td>{{$employeeResignation->hr->resortAdmin->full_name ?? ''}}</td>
+                                                <td>
+                                                    @php
+                                                        // Same defensive resolution as HOD Name: prefer the
+                                                        // saved hr_id approver, then fall back to the resort's
+                                                        // canonical HR (FindResortHR) so the cell isn't blank
+                                                        // when the relationship target was soft-deleted or
+                                                        // its resortAdmin row went missing.
+                                                        $_hrName = optional(optional($employeeResignation->hr)->resortAdmin)->full_name;
+                                                        if (empty(trim((string) $_hrName))) {
+                                                            $_hrFallback = \App\Helpers\Common::FindResortHR((object) [
+                                                                'resort_id' => $employeeResignation->resort_id,
+                                                            ]);
+                                                            $_hrName = optional(optional($_hrFallback)->resortAdmin)->full_name;
+                                                        }
+                                                    @endphp
+                                                    {{ $_hrName ?: 'N/A' }}
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <th>HR Status:</th>

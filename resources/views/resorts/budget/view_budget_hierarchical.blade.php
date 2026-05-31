@@ -450,7 +450,21 @@ $(document).ready(function() {
         });
     }
 
-    // Load employee budget total
+    // Load employee budget total.
+    //
+    // Aligns view-budget to the same canonical aggregator that consolidated-
+    // budget + Liability + Common::computeYearlyBudgetTotal use:
+    //   salary leg per month = monthly_salaries[m].proposed_salary > 0
+    //                          ? proposed_salary
+    //                          : (current_salary > 0 ? current_salary : fallback)
+    //   cost leg per month   = sum(monthCostLookup[m][*].value) with MVR→USD
+    //
+    // Before this fix the JS was using the SHARED current_basic_salary × 12
+    // for the salary leg, ignoring the per-month overrides HR set on the
+    // manning response. That's why view-budget and consolidated-budget
+    // disagreed by exactly the amount of those overrides (e.g. DOF $112k
+    // vs $90k — view-budget was reading the employees.basic_salary × 12
+    // while consolidated was reading the $7,500/mo override).
     function loadEmployeeBudgetTotal(employeeId, positionId) {
         return new Promise((resolve) => {
             $.ajax({
@@ -464,28 +478,47 @@ $(document).ready(function() {
                 },
                 success: function(response) {
                     if (response.success) {
-                        let total = 0;
-                        const currentBasicSalary = parseFloat(response.current_basic_salary || 0) * 12;
-                        const proposedBasicSalary = parseFloat(response.proposed_basic_salary || 0) * 12;
-
-                        const monthCostData = response.month_cost_data || {};
-                        const mvrToUsdRate = window.mvrToDollarRate || 1/15.42;
-
-                        for (let m = 1; m <= 12; m++) {
-                            const monthData = monthCostData[m] || {};
-                            Object.keys(monthData).forEach(costId => {
-                                const costData = monthData[costId];
-                                let costValue = parseFloat(costData.value || 0);
-                                const currency = costData.currency || 'USD';
-
-                                if (currency === 'MVR' && costValue > 0) {
-                                    costValue = costValue * mvrToUsdRate;
-                                }
-                                total += costValue;
-                            });
+                        // CANONICAL annual total — same value the consolidated
+                        // aggregator computes for this employee, returned by
+                        // BudgetController::getEmployeeMonthlyData via
+                        // Common::annualBudgetForEmployee. Using it directly
+                        // forces view-budget and consolidated to agree to the
+                        // cent.
+                        //
+                        // The fallback (manual per-month sum) preserves the
+                        // old behaviour if the server response is from a
+                        // pre-helper deploy that doesn't include the field.
+                        let total = parseFloat(response.annual_total_usd);
+                        if (!Number.isFinite(total)) {
+                            const currentFallback  = parseFloat(response.current_basic_salary  || 0);
+                            const proposedFallback = parseFloat(response.proposed_basic_salary || 0);
+                            const monthlySalaries  = response.monthly_salaries || {};
+                            const monthCostData    = response.month_cost_data  || {};
+                            const allowanceMonthlyUsd = parseFloat(response.employee_allowance_monthly_usd || 0);
+                            const mvrToUsdRate     = window.mvrToDollarRate || (1 / 15.42);
+                            total = 0;
+                            for (let m = 1; m <= 12; m++) {
+                                const row = monthlySalaries[m] || {};
+                                const proposed = parseFloat(row.proposed_salary !== undefined && row.proposed_salary !== null
+                                    ? row.proposed_salary : proposedFallback);
+                                const current  = parseFloat(row.current_salary  !== undefined && row.current_salary  !== null
+                                    ? row.current_salary  : currentFallback);
+                                const monthSalary = proposed > 0
+                                    ? proposed
+                                    : (current > 0 ? current : (proposedFallback > 0 ? proposedFallback : currentFallback));
+                                total += monthSalary;
+                                const monthData = monthCostData[m] || {};
+                                Object.keys(monthData).forEach(costId => {
+                                    const costData = monthData[costId];
+                                    let costValue = parseFloat(costData.value || 0);
+                                    if ((costData.currency || 'USD') === 'MVR' && costValue > 0) {
+                                        costValue = costValue * mvrToUsdRate;
+                                    }
+                                    total += costValue;
+                                });
+                                total += allowanceMonthlyUsd;
+                            }
                         }
-
-                        total += proposedBasicSalary > 0 ? proposedBasicSalary : currentBasicSalary;
 
                         // Store employee total
                         if (!window.budgetTotals.positions[positionId]) {
@@ -519,28 +552,40 @@ $(document).ready(function() {
                 },
                 success: function(response) {
                     if (response.success) {
-                        let total = 0;
-                        const currentBasicSalary = parseFloat(response.current_basic_salary || 0) * 12;
-                        const proposedBasicSalary = parseFloat(response.proposed_basic_salary || 0) * 12;
-
-                        const monthCostData = response.month_cost_data || {};
-                        const mvrToUsdRate = window.mvrToDollarRate || 1/15.42;
-
-                        for (let m = 1; m <= 12; m++) {
-                            const monthData = monthCostData[m] || {};
-                            Object.keys(monthData).forEach(costId => {
-                                const costData = monthData[costId];
-                                let costValue = parseFloat(costData.value || 0);
-                                const currency = costData.currency || 'USD';
-
-                                if (currency === 'MVR' && costValue > 0) {
-                                    costValue = costValue * mvrToUsdRate;
-                                }
-                                total += costValue;
-                            });
+                        // CANONICAL annual total for this vacant slot — same
+                        // value the consolidated aggregator computes, returned
+                        // by BudgetController::getVacantMonthlyData via
+                        // Common::annualBudgetForVacantSlot. Manual per-month
+                        // sum kept as a fallback for any pre-helper response.
+                        let total = parseFloat(response.annual_total_usd);
+                        if (!Number.isFinite(total)) {
+                            const currentFallback  = parseFloat(response.current_basic_salary  || 0);
+                            const proposedFallback = parseFloat(response.proposed_basic_salary || 0);
+                            const monthlySalaries  = response.monthly_salaries || {};
+                            const monthCostData    = response.month_cost_data  || {};
+                            const mvrToUsdRate     = window.mvrToDollarRate || (1 / 15.42);
+                            total = 0;
+                            for (let m = 1; m <= 12; m++) {
+                                const row = monthlySalaries[m] || {};
+                                const proposed = parseFloat(row.proposed_salary !== undefined && row.proposed_salary !== null
+                                    ? row.proposed_salary : proposedFallback);
+                                const current  = parseFloat(row.current_salary  !== undefined && row.current_salary  !== null
+                                    ? row.current_salary  : currentFallback);
+                                const monthSalary = proposed > 0
+                                    ? proposed
+                                    : (current > 0 ? current : (proposedFallback > 0 ? proposedFallback : currentFallback));
+                                total += monthSalary;
+                                const monthData = monthCostData[m] || {};
+                                Object.keys(monthData).forEach(costId => {
+                                    const costData = monthData[costId];
+                                    let costValue = parseFloat(costData.value || 0);
+                                    if ((costData.currency || 'USD') === 'MVR' && costValue > 0) {
+                                        costValue = costValue * mvrToUsdRate;
+                                    }
+                                    total += costValue;
+                                });
+                            }
                         }
-
-                        total += proposedBasicSalary > 0 ? proposedBasicSalary : currentBasicSalary;
 
                         // Store vacant total
                         if (!window.budgetTotals.positions[positionId]) {

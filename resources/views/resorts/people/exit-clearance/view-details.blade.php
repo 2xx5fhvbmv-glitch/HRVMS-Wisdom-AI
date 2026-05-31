@@ -355,9 +355,37 @@
                             </div>
                             <div class="form-check">
                                     <input class="form-check-input dep-arrangement-checkbox" type="checkbox" id="passport_validity" value="option3" @if(isset($exit_clearance->departure_arrangements) && $exit_clearance->departure_arrangements['passport_validity'] == 1) checked @endif>
-                                    <label class="form-check-label" for="passport_validity">Has the employee’s passport validity
-                                        been verified? <span>(Passport Validity: 14 April 2025 and Visa Validity : 14 April
-                                        2025)</span></label>
+                                    <label class="form-check-label" for="passport_validity">Has the employee’s passport validity been verified?
+                                        @php
+                                            // Dynamic passport + visa expiry pulled from the OCR-
+                                            // extracted VisaEmployeeExpiryData rows. Was hardcoded
+                                            // to "14 April 2025" before. Falls back to "N/A" so
+                                            // the label still reads cleanly when no doc is on file.
+                                            $_hrPassportExpiry = null;
+                                            $_hrVisaExpiry = null;
+                                            if (!empty($exit_clearance->employee->id)) {
+                                                $row = \App\Models\VisaEmployeeExpiryData::where('resort_id', $exit_clearance->resort_id)
+                                                    ->where('employee_id', $exit_clearance->employee->id)
+                                                    ->where('DocumentName', 'Passport_Copy')
+                                                    ->latest('id')->first();
+                                                if ($row) {
+                                                    $f = $row->Ai_extracted_data['extracted_fields'] ?? [];
+                                                    $raw = $f['Date of Expiry'] ?? $f['Passport Expiry Date'] ?? null;
+                                                    if ($raw) { try { $_hrPassportExpiry = \Carbon\Carbon::parse($raw)->format('d M Y'); } catch (\Throwable $e) {} }
+                                                }
+                                                $row = \App\Models\VisaEmployeeExpiryData::where('resort_id', $exit_clearance->resort_id)
+                                                    ->where('employee_id', $exit_clearance->employee->id)
+                                                    ->where('DocumentName', 'Visa')
+                                                    ->latest('id')->first();
+                                                if ($row) {
+                                                    $f = $row->Ai_extracted_data['extracted_fields'] ?? [];
+                                                    $raw = $f['Visa Expiry Date'] ?? null;
+                                                    if ($raw) { try { $_hrVisaExpiry = \Carbon\Carbon::parse($raw)->format('d M Y'); } catch (\Throwable $e) {} }
+                                                }
+                                            }
+                                        @endphp
+                                        <span>(Passport Validity: {{ $_hrPassportExpiry ?: 'N/A' }} &middot; Visa Validity: {{ $_hrVisaExpiry ?: 'N/A' }})</span>
+                                    </label>
                             </div>
                         </div>
                         <div class="col-xl-7 col-md-6">
@@ -382,26 +410,90 @@
                         </div>
                         <div class="col-auto"><a href="javascript:void()" data-url="{{ route('people.exit-clearance.sendReminder',base64_encode($exit_clearance->id)) }}" class="a-linkTheme " id="send-reminder-btn">Send Reminder To Employee</a></div>
                         
+                            {{-- Mark-as-Complete route is POST and expects a
+                                 base64-encoded id. The previous markup passed
+                                 the raw id and used an <a> — both wrong, so
+                                 every click silently 404'd. Use a form with
+                                 a confirm() so the action is intentional. --}}
+                            @php
+                                $_markAsCompleteUrl = route('people.exit-clearance.markAsComplete', base64_encode($exit_clearance->id));
+                                $_isCompleted = ($exit_clearance->status ?? null) === 'Completed';
+                            @endphp
                             @if($is_hr == false && $is_assigned == true)
                                 <div class="col-auto ms-auto"> <a href="{{route('people.exit-clearance.department-form',base64_encode($exit_clearance->id))}}" class="btn btn-themeSkyblue btn-sm">Clearance Form</a></div>
                             @elseif($is_hr == true && $is_assigned == true)
                                 <div class="col-auto ms-auto"> <a href="{{route('people.exit-clearance.department-form',base64_encode($exit_clearance->id))}}" class="btn btn-themeSkyblue btn-sm">Clearance Form</a></div>
-                                <div class="col-auto"><a href="{{route('payroll.final.settlement')}}" class="btn  btn-themeBlue btn-sm">Full And Final
-                                                            Settlement</a></div>
-                                <div class="col-auto"><a href="{{route('people.exit-clearance.markAsComplete',$exit_clearance->id)}}" class="btn  btn-themeGreenNew btn-sm">Mark As Completed</a>
-                                </div>
+                                <div class="col-auto"><a href="{{route('payroll.final.settlement')}}" class="btn  btn-themeBlue btn-sm">Full And Final Settlement</a></div>
+                                @if($_isCompleted)
+                                    <div class="col-auto"><span class="badge badge-themeSuccess px-3 py-2"><i class="fa-solid fa-check me-1"></i> Completed</span></div>
+                                @else
+                                    <div class="col-auto">
+                                        {{-- Confirmation modal pattern matches the
+                                             department view — see #markCompleteModal
+                                             defined below. --}}
+                                        <button type="button" class="btn btn-themeGreenNew btn-sm"
+                                                data-bs-toggle="modal" data-bs-target="#markCompleteModal">
+                                            Mark As Completed
+                                        </button>
+                                    </div>
+                                @endif
                             @elseif($is_hr == true && $is_assigned == false)
-                                <div class="col-auto ms-auto"><a href="{{route('payroll.final.settlement')}}" class="btn  btn-themeBlue btn-sm">Full And Final
-                                                            Settlement</a></div>
-                                <div class="col-auto"><a href="{{route('people.exit-clearance.markAsComplete',$exit_clearance->id)}}" class="btn  btn-themeGreenNew btn-sm">Mark As Completed</a>
-                                </div>
-
+                                <div class="col-auto ms-auto"><a href="{{route('payroll.final.settlement')}}" class="btn  btn-themeBlue btn-sm">Full And Final Settlement</a></div>
+                                @if($_isCompleted)
+                                    <div class="col-auto"><span class="badge badge-themeSuccess px-3 py-2"><i class="fa-solid fa-check me-1"></i> Completed</span></div>
+                                @else
+                                    <div class="col-auto">
+                                        {{-- Confirmation modal pattern matches the
+                                             department view — see #markCompleteModal
+                                             defined below. --}}
+                                        <button type="button" class="btn btn-themeGreenNew btn-sm"
+                                                data-bs-toggle="modal" data-bs-target="#markCompleteModal">
+                                            Mark As Completed
+                                        </button>
+                                    </div>
+                                @endif
                             @endif
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    {{-- Mark-As-Completed confirmation modal + hidden submission form.
+         Shared by both Mark As Completed buttons in the footer above. --}}
+    @if(!$_isCompleted)
+        <form id="markCompleteForm" action="{{ $_markAsCompleteUrl }}" method="POST" class="d-none">
+            @csrf
+        </form>
+        <div class="modal fade" id="markCompleteModal" tabindex="-1" aria-labelledby="markCompleteModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="markCompleteModalLabel">
+                            <i class="fa-solid fa-circle-check text-success me-2"></i>
+                            Mark Exit Clearance Completed
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-1">Mark this exit clearance as <strong>Completed</strong>?</p>
+                        <p class="text-muted mb-0" style="font-size: 13px;">
+                            This finalises the employee's offboarding — the
+                            resignation moves to Completed and the employee's
+                            status flips from Offboarding to Terminated. This
+                            action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-themeGreenNew btn-sm" id="markCompleteConfirmBtn">
+                            Yes, Mark Completed
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection
 
 @section('import-css')
@@ -427,6 +519,13 @@
     
     });
 
+    // Modal Confirm → submit the hidden Mark-As-Completed form. Replaces
+    // the old onsubmit="return confirm(...)" native browser dialog.
+    $(document).on('click', '#markCompleteConfirmBtn', function () {
+        $(this).prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Marking…');
+        $('#markCompleteForm').trigger('submit');
+    });
+
     $('#send-reminder-btn').on('click', function (e) {
         e.preventDefault();
         var url = $(this).data('url');
@@ -445,9 +544,10 @@
                 }
             },
             error: function (xhr) {
-                toastr.error(xhr.responseJSON.message || 'Something went wrong!', "Error", {
-                    positionClass: 'toast-bottom-right'
-                });
+                var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message)
+                    ? xhr.responseJSON.message
+                    : 'Something went wrong while sending the reminder.';
+                toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
             }
         });
     });
@@ -530,7 +630,10 @@ function sendEmploymentCertificate() {
             }
         },
         error: function(xhr) {
-            toastr.error(xhr.responseJSON.message || 'Something went wrong!');
+            var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message)
+                ? xhr.responseJSON.message
+                : 'Something went wrong while sending the certificate.';
+            toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
         }
     });
 }

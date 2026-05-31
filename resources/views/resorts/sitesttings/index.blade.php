@@ -48,17 +48,52 @@
                 </div>
 
 
+                {{-- FX-rate policy (May 2026 developer reference):
+                       - Canonical rate: 1 USD = MVR 15.42 (system-wide).
+                       - DollertoMVR is the ONLY stored / editable value.
+                       - MVR → USD is always derived by division.
+                       - Both fields are read-only — operators must not edit
+                         the rate at runtime; the dev-reference doc bakes
+                         15.42 in as fixed.
+                       - MVRtoDoller is rendered as a calculated read-only
+                         label and submitted as a hidden derived value so
+                         legacy code paths keep getting the right number
+                         until they're migrated to compute it themselves.
+                --}}
+                @php
+                    $_dollarToMvr = isset($SiteSettings->DollertoMVR) && (float) $SiteSettings->DollertoMVR > 0
+                        ? (float) $SiteSettings->DollertoMVR
+                        : 15.42;
+                    $_mvrToDollarDerived = 1.0 / $_dollarToMvr;
+                @endphp
                 <div class="row">
                     <div class="col-md-2 mb-3">
                         <label class="form-label" for="header_img">  </label>
-                            <label for="MVRtoDoller" class="form-label">MVR To Doller  <span class="red-mark">*</span></label>
-                            <input type="number" class="form-control" id="MVRtoDoller" name="MVRtoDoller" value="{{ old('MVRtoDoller',(isset( $SiteSettings->MVRtoDoller)) ?  $SiteSettings->MVRtoDoller : '') }}" placeholder="MVR To Doller Exchange Rate ">
+                        <label for="DollertoMVR" class="form-label">
+                            USD &rarr; MVR <span class="red-mark">*</span>
+                        </label>
+                        <input type="number" step="0.01" class="form-control" id="DollertoMVR" name="DollertoMVR"
+                               value="{{ old('DollertoMVR', $_dollarToMvr) }}"
+                               readonly
+                               title="Locked at the system-wide canonical rate (1 USD = 15.42 MVR)."
+                               style="background-color:#f1f5f9; cursor: not-allowed;">
+                        <small class="form-text text-muted">Fixed system rate</small>
                     </div>
 
                     <div class="col-md-2 mb-3">
                         <label class="form-label" for="header_img">  </label>
-                            <label for="DollertoMVR" class="form-label"> Doller To MVR   <span class="red-mark">*</span></label>
-                            <input type="number" class="form-control" id="DollertoMVR" name="DollertoMVR" value="{{ old('DollertoMVR',(isset( $SiteSettings->DollertoMVR)) ?  $SiteSettings->DollertoMVR : '') }}" placeholder="Doller To MVR  Exchange Rate ">
+                        <label for="MVRtoDoller_display" class="form-label">MVR &rarr; USD</label>
+                        <input type="text" class="form-control" id="MVRtoDoller_display"
+                               value="{{ number_format($_mvrToDollarDerived, 6) }}"
+                               readonly
+                               title="Derived as 1 / (USD → MVR). Never edited directly — multiplying by a stored inverse introduces rounding drift."
+                               style="background-color:#f1f5f9; cursor: not-allowed;">
+                        {{-- Hidden field keeps the legacy column in sync with the
+                             derived value on save. Callers that still read
+                             MVRtoDoller therefore can't drift from the
+                             canonical inverse. --}}
+                        <input type="hidden" name="MVRtoDoller" value="{{ $_mvrToDollarDerived }}">
+                        <small class="form-text text-muted">Derived: 1 &divide; ({{ number_format($_dollarToMvr, 2) }})</small>
                     </div>
                     <div class="col-md-4 mb-3">
                         <div>
@@ -242,16 +277,14 @@ $(document).ready(function(){
                     FinalApproval:{
                         required: true,
                     },
-                    MVRtoDoller: {
-                        required: true,
-                        maxlength:2,
-                        maxlength:7,
-                    },
+                    // FX rate fields are read-only and pre-populated server-side
+                    // with the canonical 15.42 rate. MVRtoDoller is now a hidden
+                    // derived value (no user input → no validation needed).
+                    // DollertoMVR is still in the payload but locked at 15.42,
+                    // so we only sanity-check presence — length rules removed
+                    // since "15.42" was failing the previous min:2 / max:7 mix.
                     DollertoMVR: {
                         required: true,
-                        minlength:2,
-                        maxlength:7,
-
                     },
                     country:{
                         required: true,
@@ -274,11 +307,10 @@ $(document).ready(function(){
                         required: "Please chiose one at  currency.",
                         // maximum: "request massage must be less than  to 700."
                     },
-                    MVRtoDoller:{
-                        required:"Please Enter MVR to Doller Exchanges Rate.",
-                    },
+                    // MVRtoDoller validator removed — the field is now a
+                    // hidden derived value, never user-input.
                     DollertoMVR:{
-                        required: "Please Enter Doller to MVR Exchange Rate.",
+                        required: "Exchange rate must be set (1 USD = 15.42 MVR).",
                     },
                     FinalApproval:{
                         required: "Please Select  Final Approval .",

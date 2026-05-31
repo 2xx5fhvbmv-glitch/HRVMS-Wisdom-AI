@@ -207,12 +207,17 @@ aria-hidden="true">
                         $("#SendToGMButton").prop("disabled", false);
                     }
 
-                    // Calculate all totals after content loads
-                    setTimeout(function() {
-                        if (typeof window.recalculateAllTotals === 'function') {
-                            window.recalculateAllTotals();
-                        }
-                    }, 500);
+                    // NOTE: do NOT call recalculateAllTotals here. The server
+                    // already rendered each level's `calculated_total` using
+                    // Common::annualBudgetForEmployee / annualBudgetForVacantSlot
+                    // (the canonical aggregator that includes per-month salary
+                    // overrides + cost-template live fallback + per-employee
+                    // allowances). The client-side recalculation only sees
+                    // configured_basic + configured_current + saved cost
+                    // configs in the `data-value` cells, which excludes the
+                    // allowance leg, so re-running it here would silently
+                    // discard the allowance numbers and diverge from
+                    // /resort/budget/view-budget.
                 },
                 error: function(xhr) {
                     console.error('Error fetching data:', xhr);
@@ -470,9 +475,18 @@ aria-hidden="true">
                         updateBudgetTableRow(data.data);
                     }
 
-                    setTimeout(function() {
-                        window.recalculateAllTotals();
-                    }, 100);
+                    // Refresh badges via the canonical AJAX path instead of
+                    // running the client-side recalc, which would exclude
+                    // per-employee allowances and the live cost-template
+                    // fallback. See the canonical totals note in
+                    // fetchConsolidatedBudget's success handler.
+                    const yearForReload =
+                        document.getElementById('year')?.value ||
+                        document.getElementById('SendToFinanceYear')?.value ||
+                        new Date().getFullYear();
+                    if (yearForReload) {
+                        fetchConsolidatedBudget(yearForReload);
+                    }
                 } else {
                     alert('Error: ' + (data.message || 'Failed to save budget cost configuration'));
                 }

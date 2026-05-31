@@ -1497,27 +1497,19 @@ class EmployeeController extends Controller
 
     /**
      * Per-field diff → one audit log row per changed field.
-     * Surfaced at the bottom of the Employment tab. Fields with the
-     * same canonical value are skipped so HR doesn't see noise rows
-     * when nothing actually changed.
+     *
+     * The Employee-column diff (status, joining_date, Position_id, basic_salary,
+     * etc.) is now handled by EmployeeEmploymentAuditObserver, which captures
+     * the same fields from EVERY mutation path (Promotion approval, Salary
+     * Increment apply, Activate, etc.) — not just this controller. This
+     * method only needs to handle the columns the observer can't see:
+     * email + personal_phone, which live on the related ResortAdmin row.
      */
     private function writeEmploymentAuditLog(Employee $employee, array $old, array $new): void
     {
         $labels = [
-            'status'             => 'Employment Status',
-            'joining_date'       => 'Joining Date',
-            'benefit_grid_level' => 'Benefit Grid Level',
-            'tin'                => 'TIN',
-            'probation_end_date' => 'Probation End Date',
-            'contract_type'      => 'Contract Type',
-            'termination_date'   => 'Termination Date',
-            'Position_id'        => 'Position',
-            'Section_id'         => 'Section',
-            'Dept_id'            => 'Department',
-            'division_id'        => 'Division',
-            'reporting_to'       => 'Reporting To',
-            'email'              => 'Email Address',
-            'personal_phone'     => 'Mobile Number',
+            'email'          => 'Email Address',
+            'personal_phone' => 'Mobile Number',
         ];
 
         $admin = Auth::guard('resort-admin')->user();
@@ -1527,8 +1519,6 @@ class EmployeeController extends Controller
             $oldVal = $old[$field] ?? null;
             $newVal = $new[$field] ?? null;
 
-            // Treat null / empty string / "N/A" as equivalent so a
-            // blank-on-both-sides field doesn't become a log entry.
             $normalize = fn($v) => $v === null ? '' : trim((string) $v);
             if ($normalize($oldVal) === $normalize($newVal)) {
                 continue;
