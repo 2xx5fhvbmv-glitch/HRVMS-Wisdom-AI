@@ -881,7 +881,30 @@ class LeaveController extends Controller
         if (!$empIdInt) {
             return redirect()->back()->with('error', 'Invalid employee.');
         }
-        // Forward the empID through so request() can scope the list.
+
+        // Per the docstring above: resolve this employee's MOST RECENT leave
+        // record and land on leave.details for it so the user sees the rich
+        // history view, not the global leave inbox.
+        //
+        // Previously this method redirected to leave.request?empId=<encoded>,
+        // which dropped the user onto the global Leave Requests list filtered
+        // (loosely) by employee — confusing UX, since "see this employee's
+        // leave" should open THIS employee's leave page, not a filtered list.
+        $latestLeave = EmployeeLeave::where('emp_id', $empIdInt)
+            ->where('resort_id', $this->resort->resort_id)
+            ->latest('id')
+            ->select('id')
+            ->first();
+
+        if ($latestLeave) {
+            return redirect()->route('leave.details', [
+                'leave_id' => base64_encode($latestLeave->id),
+            ]);
+        }
+
+        // No leaves yet — keep the previous fallback so the user still lands
+        // somewhere sensible. Pass the empId so the list page can scope its
+        // empty state to this employee instead of showing the global inbox.
         return redirect()->route('leave.request', ['empId' => $empID]);
     }
 

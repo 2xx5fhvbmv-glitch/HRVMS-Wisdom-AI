@@ -86,7 +86,7 @@
                             <ul>
                                 <!-- <li><a href="#">Workforce Planning</a></li> -->
                                 <li><a href="{{route('people.probation.details',[base64_encode($employee->id)])}}">Probation</a></li>
-                                <li><a href="{{ route('people.promotion.history', [base64_encode($employee->id)]) }}">Promotion</a></li>
+                                <li><a href="{{ route('people.promotion.history', ['employee_id' => $employee->id]) }}">Promotion</a></li>
                                 <li><a href="{{route('resort.visa.XpactEmpDetails',[base64_encode($employee->id)])}}">Xpat</a></li>
                                 <li><a href="{{ route('resort.timeandattendance.employee.details', [ base64_encode($employee->id)]); }}">Time & Attendance</a></li>
                                 <li><a href="#">Leave</a></li>
