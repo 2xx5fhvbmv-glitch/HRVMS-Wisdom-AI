@@ -51,16 +51,37 @@
                             <span class="badge badge-white">#{{$employee->Emp_id}}</span>
                             <p>{{$employee->position->position_title}}</p>
                             <div class="position">{{$employee->department->name}}</div>
-                            <select class="form-select  active mb-2" id="statusFilter" disabled>
-                                <option value="">Status</option>
-                                <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
-                                <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
-                                <option {{$employee->status == "Inactive" ? "Selected" : ""}} value="Inactive">Inactive</option>
-                                <option {{$employee->status == "Terminated" ? "Selected" : ""}} value="Terminated">Terminated</option>
-                                <option {{$employee->status == "Resigned" ? "Selected" : ""}} value="Resigned">Resigned</option>
-                                <option {{$employee->status == "On Leave" ? "Selected" : ""}} value="On Leave">On Leave</option>
-                                <option {{$employee->status == "Suspended" ? "Selected" : ""}} value="Suspended">Suspended</option>
-                            </select>
+                            {{-- Status badge.
+                                 Previously a disabled <select>, which the
+                                 browser rendered with a dropdown chevron even
+                                 though it wasn't interactive — the real status
+                                 change goes through the "Change Status" item
+                                 in the kebab menu above. Swapped for a plain
+                                 themed badge so the chevron is gone. Colour
+                                 is mapped to status via the existing
+                                 badge-theme* classes used elsewhere on this
+                                 page (kept consistent with the rest of the
+                                 app rather than introducing new CSS). --}}
+                            @php
+                                $_statusBadge = match (trim((string) $employee->status)) {
+                                    'Active'      => 'badge-themeSuccess',
+                                    'Onboarding'  => 'badge-themeWarning',
+                                    'On Leave'    => 'badge-themeSkyblue',
+                                    'Suspended'   => 'badge-themeSkyblue',
+                                    'Inactive'    => 'badge-themeDanger',
+                                    'Terminated'  => 'badge-themeDanger',
+                                    'Resigned'    => 'badge-themeDanger',
+                                    default       => 'badge-themeWarning',
+                                };
+                            @endphp
+                            <div class="mb-2">
+                                <span id="statusFilter"
+                                      class="badge {{ $_statusBadge }} statusBadge"
+                                      data-status="{{ $employee->status }}"
+                                      style="font-size:13px; font-weight:500; padding:6px 14px; border-radius:999px;">
+                                    {{ $employee->status ?: 'Status' }}
+                                </span>
+                            </div>
 
                             {{-- Activate Employee — shown only while the employee is
                                  still in the pre-joining 'Onboarding' state. HR uses
@@ -140,7 +161,12 @@
                             <ul>
                                 <!-- <li><a href="#">Workforce Planning</a></li> -->
                                 <li><a href="{{route('people.probation.details',[base64_encode($employee->id)])}}">Probation</a></li>
-                                <li><a href="{{ route('people.promotion.history', [base64_encode($employee->id)]) }}">Promotion</a></li>
+                                {{-- Promotion route has no path placeholder; positional args become a
+     keyless query string (?MjAy), so getHistory couldn't read it and
+     the page fell back to showing every employee's promotions. Using
+     ?employee_id=<id> (raw int, not base64) — that's the param name
+     getHistory reads first (see PromotionController@getHistory). --}}
+<li><a href="{{ route('people.promotion.history', ['employee_id' => $employee->id]) }}">Promotion</a></li>
                                 <li><a href="{{route('resort.visa.XpactEmpDetails',[base64_encode($employee->id)])}}">Xpat</a></li>
                                 <li><a href="{{ route('resort.timeandattendance.employee.details', [ base64_encode($employee->id)]); }}">Time & Attendance</a></li>
                                 {{-- Leave: opens the per-employee leave history PAGE
@@ -2041,8 +2067,28 @@
                         const empId = $('#modal-emp-id').val();
                         const newStatus = $('#modal-status').val();
 
-                        // ✅ Update status select field value
-                        $('#statusFilter').val(newStatus);
+                        // Update the status badge. #statusFilter is now a
+                        // <span>, not a <select>, so .val() would silently
+                        // no-op — set the text instead, and swap the colour
+                        // class to match the new status (mirrors the
+                        // server-side $_statusBadge map above).
+                        const $badge = $('#statusFilter');
+                        const newClass = ({
+                            'Active':      'badge-themeSuccess',
+                            'Onboarding':  'badge-themeWarning',
+                            'On Leave':    'badge-themeSkyblue',
+                            'Suspended':   'badge-themeSkyblue',
+                            'Inactive':    'badge-themeDanger',
+                            'Terminated':  'badge-themeDanger',
+                            'Resigned':    'badge-themeDanger',
+                        })[newStatus] || 'badge-themeWarning';
+                        $badge
+                            .text(newStatus)
+                            .attr('data-status', newStatus)
+                            .removeClass(function (_, cls) {
+                                return (cls.match(/(^|\s)badge-theme\S+/g) || []).join(' ');
+                            })
+                            .addClass(newClass);
                         $('#modal-status').val(newStatus);
 
                         // ✅ Close modal if using Bootstrap modal
