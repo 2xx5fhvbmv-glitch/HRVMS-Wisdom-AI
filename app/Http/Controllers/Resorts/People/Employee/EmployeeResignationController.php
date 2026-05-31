@@ -71,7 +71,24 @@ class EmployeeResignationController extends Controller
             $searchTerm = $request->filled('search_term')   ? trim((string) $request->search_term) : null;
 
             if ($statusVal) {
-                $empResignations->where('status', $statusVal);
+                // BUG FIX: the Pending dropdown option was matching only
+                // rows with status='Pending' literally, but the badge
+                // renderer below falls through `default => Pending` for
+                // ANY unknown / null / legacy status value. Result was
+                // "3 rows showing Pending badge, filter shows only 1".
+                // For Pending, include the same set of values the badge
+                // treats as Pending — i.e. anything that isn't one of
+                // the explicitly-named buckets.
+                if ($statusVal === 'Pending') {
+                    $knownStatuses = ['Completed', 'Approved', 'Rejected', 'On Hold', 'In Progress'];
+                    $empResignations->where(function ($q) use ($knownStatuses) {
+                        $q->whereNull('status')
+                          ->orWhere('status', '')
+                          ->orWhereNotIn('status', $knownStatuses);
+                    });
+                } else {
+                    $empResignations->where('status', $statusVal);
+                }
             }
             if ($deptId) {
                 $empResignations->whereHas('employee', fn($q) => $q->where('Dept_id', $deptId));

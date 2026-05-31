@@ -18,7 +18,6 @@ use App\Imports\VisaNationalityImport;
 use App\Models\VisaConfigReminder;
 use App\Models\VisaDocumentType;
 use App\Models\VisaDocumentSegmentation;
-use App\Models\ResortSiteSettings;
 use App\Models\VisaWallets;
 use App\Models\VisaXpactAmounts;
 use Illuminate\Support\Facades\Validator;
@@ -43,7 +42,10 @@ class ConfigurationController extends Controller
     {
         $page_title="Configuration";
         $nationality = config('settings.nationalities');
-        $ResortSiteSettings =  ResortSiteSettings::where('resort_id',$this->resort->resort_id)->first(['MVRtoDoller','DollertoMVR']);
+        // Removed: $ResortSiteSettings read of MVRtoDoller / DollertoMVR.
+        // The value was fetched and immediately discarded (never passed to
+        // the view) — dead code. Per the May 2026 FX-rate policy, MVRtoDoller
+        // is deprecated anyway; consumers must derive via 1 / DollertoMVR.
         // Match the actual DB strings (hyphen variant, plus the existing typo
         // 'Recrutment Fee' which seed/admin entries use). Comparison happens
         // on LOWER(TRIM(...)), so each row hides regardless of casing/spacing.

@@ -138,12 +138,18 @@
                                             <th>Nationality</th>
                                             <th>Salary</th>
                                             <th>OT</th>
+                                            <th>Service Charge</th>
                                              {{-- Dynamically add Allowance columns --}}
                                             @foreach($allowanceTypes as $type)
                                                 <th>{{ $type }}</th>
                                             @endforeach
+                                            <th>Employee Allowance</th>
                                             <th>Insurance</th>
-                                            <th>Recruitment</th>
+                                            <th>Work Permit</th>
+                                            <th>Visa</th>
+                                            <th>Medical</th>
+                                            <th>Quota</th>
+                                            <th>Recruitment Fee</th>
                                             <th>Total</th>
                                             <th></th>
                                         </tr>
@@ -310,6 +316,7 @@
             { data: 'nationality', name: 'nationality' },
             { data: 'salary', name: 'basic_salary', title: 'Salary' },
             { data: 'ot', name: 'ot', title: 'OT' },
+            { data: 'service_charge', name: 'service_charge', title: 'Service Charge' },
         ];
 
         // Inject dynamic allowance columns
@@ -322,8 +329,13 @@
         });
 
         columns.push(
+            { data: 'employee_allowance', name: 'employee_allowance', title: 'Employee Allowance' },
             { data: 'insurance', name: 'insurance', title: 'Insurance' },
-            { data: 'recruitment', name: 'recruitment', title: 'Recruitment' },
+            { data: 'work_permit', name: 'work_permit', title: 'Work Permit' },
+            { data: 'visa', name: 'visa', title: 'Visa' },
+            { data: 'medical', name: 'medical', title: 'Medical' },
+            { data: 'quota', name: 'quota', title: 'Quota' },
+            { data: 'recruitment_fee', name: 'recruitment_fee', title: 'Recruitment Fee' },
             { data: 'total', name: 'total', title: 'Total' },
             {
                 data: 'details',

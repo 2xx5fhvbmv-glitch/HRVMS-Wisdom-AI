@@ -30,11 +30,19 @@ class SitesettignsController extends Controller
     public function getCurrencyRates($resortId)
     {
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
-        // dd($settings);
+
+        // Per the FX-rate developer reference (May 2026):
+        //   - Canonical rate: 1 USD = 15.42 MVR (DollertoMVR).
+        //   - MVR → USD is ALWAYS derived by division. Never store / read
+        //     a separate MVRtoDoller column — multiplying by a stored
+        //     inverse like 0.06484 introduces rounding drift
+        //     (7710 × 0.06484 = $499.92 instead of $500.00).
+        $dollarToMvr = (float) ($settings->DollertoMVR ?? 15.42);
+        if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
 
         return response()->json([
-            'usd_to_mvr' => $settings->DollertoMVR ?? 15.42,  // Default if not set
-            'mvr_to_usd' => $settings->MVRtoDoller ?? 0.065
+            'usd_to_mvr' => $dollarToMvr,           // multiply USD by this
+            'mvr_to_usd' => 1.0 / $dollarToMvr,     // divide MVR by DollertoMVR (== multiply by this)
         ]);
     }
 
@@ -74,9 +82,23 @@ class SitesettignsController extends Controller
 
            try
            {
+                        // FX-rate policy (May 2026 dev reference):
+                        //   - DollertoMVR is the only stored rate. Locked to
+                        //     15.42 (system-wide canonical rate); a submitted
+                        //     value is honoured if it parses as a positive
+                        //     number, otherwise it falls back to 15.42.
+                        //   - MVRtoDoller is deprecated. We overwrite it with
+                        //     the derived inverse so any legacy reader still
+                        //     gets the right number until those callers are
+                        //     migrated to deriving via division themselves.
+                        $dollarToMvr = is_numeric($request->DollertoMVR) && (float) $request->DollertoMVR > 0
+                            ? (float) $request->DollertoMVR
+                            : 15.42;
+                        $mvrToDollarDerived = 1.0 / $dollarToMvr;
+
                         $collection=['currency' => $currency,
-                                        "MVRtoDoller"=>$request->MVRtoDoller,
-                                        "DollertoMVR"=>$request->DollertoMVR,
+                                        "MVRtoDoller"=>$mvrToDollarDerived,
+                                        "DollertoMVR"=>$dollarToMvr,
                                         // "Doller_img"=>'dollar-sign.svg',
                                         // "MVR_img"=>'maldives-currency-icon.svg',
                                         "Doller_img"=>'doller-currency-icon.svg',

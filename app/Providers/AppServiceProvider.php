@@ -35,6 +35,15 @@ class AppServiceProvider extends ServiceProvider
         Paginator::useBootstrap();
         Schema::defaultStringLength(191);
 
+        // Audit log for the Employment tab. Without this observer the
+        // change log only captured edits made through
+        // EmployeeController::updateEmploymentData; updates from the
+        // Promotion / Salary Increment / Exit Clearance / Activate
+        // flows all bypassed it. The observer compares old vs new on
+        // every Employee::updated and writes one log row per tracked
+        // column that genuinely changed.
+        \App\Models\Employee::observe(\App\Observers\EmployeeEmploymentAuditObserver::class);
+
         // Most timestamp models in this project (PublicHoliday,
         // ResortNotification, Incidents, Announcement, etc.) define
         // getCreatedAtAttribute / getUpdatedAtAttribute accessors that

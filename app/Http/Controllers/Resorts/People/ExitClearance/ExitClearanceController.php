@@ -106,8 +106,24 @@ class ExitClearanceController extends Controller
                 ->when($empIdFilter, function ($q) use ($empIdFilter) {
                     $q->where('employee_id', $empIdFilter);
                 }, function ($q) use ($statusVal) {
-                    $q->when($statusVal, fn($qq) => $qq->where('status', $statusVal),
-                                         fn($qq) => $qq->where('status', 'Approved'));
+                    // Same UI/data-mismatch fix as the Resignation index:
+                    // the status badge falls through `default => Pending`
+                    // for any value not in the explicit set, so the
+                    // "Pending" filter must include those rows too —
+                    // otherwise users see N badges in the table but the
+                    // filter shows only the literal-Pending subset.
+                    if ($statusVal === 'Pending') {
+                        $knownStatuses = ['Completed', 'Approved', 'Rejected', 'On Hold', 'In Progress'];
+                        $q->where(function ($qq) use ($knownStatuses) {
+                            $qq->whereNull('status')
+                               ->orWhere('status', '')
+                               ->orWhereNotIn('status', $knownStatuses);
+                        });
+                    } elseif ($statusVal) {
+                        $q->where('status', $statusVal);
+                    } else {
+                        $q->where('status', 'Approved');
+                    }
                 })
                 ->when($deptId, function ($q) use ($deptId) {
                     $q->whereHas('employee', fn($eq) => $eq->where('Dept_id', $deptId));
@@ -942,11 +958,22 @@ class ExitClearanceController extends Controller
             event(new \App\Events\ResortNotificationEvent($notificationHtml));
         }
 
-        return back()->with('success', 'Reminders sent to all pending assignees.');
+        // BUG FIX: was returning `back()->with('success', ...)`, a redirect
+        // response. The JS handler does an AJAX GET expecting JSON, so the
+        // response had no `success` property → the success branch failed and
+        // the error toast "Could not send reminder" fired even though the
+        // emails went out. Return JSON to match the contract.
+        if ($exitClearanceFormAssignments->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No pending assignees to remind.',
+            ]);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Reminders sent to all pending assignees.'
+            'message' => 'Reminder sent to ' . count($exitClearanceFormAssignments)
+                . ' pending assignee' . (count($exitClearanceFormAssignments) === 1 ? '' : 's') . '.',
         ]);
     }
 

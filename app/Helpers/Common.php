@@ -4511,6 +4511,160 @@ class Common
      * Both salary buckets prefer the Proposed value when non-zero, falling
      * back to the Current value — mirrors the view-budget render logic.
      */
+    /**
+     * Canonical per-employee annual budget total in USD.
+     *
+     * Single source of truth — called by:
+     *   • BudgetController::buildLiveConsolidatedArrays   (consolidated-budget page)
+     *   • BudgetController::getEmployeeMonthlyData        (view-budget AJAX endpoint)
+     *   • Common::computeYearlyBudgetTotal                 (Liability page + headline)
+     *
+     * Returns the same number regardless of caller, so the three pages
+     * can't drift. Before this helper existed, each page had its own
+     * aggregator and they kept diverging every time a new cost source
+     * was added (allowances, MVR templates, per-month overrides, etc.).
+     *
+     * Components summed (all USD per project convention):
+     *   1. Salary leg — resort_employee_monthly_salaries override per month,
+     *      falling back to proposed_salary > 0 then current_salary then
+     *      employees.basic_salary.
+     *   2. Cost-template leg — saved overrides in
+     *      resort_employee_budget_cost_configurations (USD), with live
+     *      fallback from resort_budget_costs through
+     *      computeBudgetCostMonthlyValue. MVR-unit templates converted to
+     *      USD via 1/DollertoMVR.
+     *   3. Per-employee allowance leg — employees_allowance rows. MVR rows
+     *      converted to USD inside the SUM. Treated as monthly (matches
+     *      PayrollController::fetchTimeAttendance) → added once per month.
+     *
+     * $employee is expected to have: id, basic_salary, proposed_salary,
+     * nationality, religion. Pass a stdClass / model row from any source.
+     */
+    public static function annualBudgetForEmployee($resortId, int $year, $employee): float
+    {
+        $empId = (int) ($employee->id ?? 0);
+        if (!$empId) return 0.0;
+
+        // Used by the allowance leg below. The cost-template leg gets its
+        // own MVR→USD conversion internally via annualCostForEmployee().
+        $dollarToMvr = (float) (\DB::table('resort_site_settings')
+            ->where('resort_id', $resortId)
+            ->value('DollertoMVR') ?: 15.42);
+        if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+
+        // -- 1. Salary leg ---------------------------------------------------
+        $sharedFallback = (float) (($employee->proposed_salary ?? 0) > 0
+            ? $employee->proposed_salary
+            : ($employee->basic_salary ?? 0));
+
+        $monthlySalaries = \DB::table('resort_employee_monthly_salaries')
+            ->where('employee_id', $empId)
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->get(['month', 'current_salary', 'proposed_salary'])
+            ->keyBy('month');
+
+        $salaryTotal = 0.0;
+        for ($m = 1; $m <= 12; $m++) {
+            $row = $monthlySalaries->get($m);
+            if ($row) {
+                $salaryTotal += (float) (($row->proposed_salary ?? 0) > 0
+                    ? $row->proposed_salary
+                    : (($row->current_salary ?? 0) > 0
+                        ? $row->current_salary
+                        : $sharedFallback));
+            } else {
+                $salaryTotal += $sharedFallback;
+            }
+        }
+
+        // -- 2. Cost-template leg --------------------------------------------
+        $resortCosts = \DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+
+        $costTotal = 0.0;
+        foreach ($resortCosts as $cost) {
+            $costTotal += self::annualCostForEmployee($resortId, $year, $cost, $employee);
+        }
+
+        // -- 3. Per-employee allowance leg -----------------------------------
+        $allowanceMonthly = (float) \DB::table('employees_allowance')
+            ->where('employee_id', $empId)
+            ->selectRaw(
+                "COALESCE(SUM(CASE WHEN amount_unit = 'MVR' "
+              . "THEN amount * (1.0 / {$dollarToMvr}) ELSE amount END), 0) as total"
+            )
+            ->value('total');
+        $allowanceTotal = $allowanceMonthly * 12;
+
+        return $salaryTotal + $costTotal + $allowanceTotal;
+    }
+
+    /**
+     * Canonical per-vacant-slot annual budget total in USD.
+     *
+     * Vacant slots have no per-employee allowance leg (they don't exist
+     * as employees yet). Salary + cost configs only.
+     *
+     * $vacant is expected to have: id, position_id, department_id,
+     * vacant_index, basic_salary, current_salary. Typically a row from
+     * resort_vacant_budget_costs.
+     */
+    public static function annualBudgetForVacantSlot($resortId, int $year, $vacant): float
+    {
+        $vacantId = (int) ($vacant->id ?? 0);
+        $positionId   = (int) ($vacant->position_id ?? 0);
+        $departmentId = (int) ($vacant->department_id ?? 0);
+        $vacantIndex  = (int) ($vacant->vacant_index ?? 0);
+        if (!$vacantId || !$positionId || !$departmentId) return 0.0;
+
+        // -- 1. Salary leg ---------------------------------------------------
+        // Per legacy ResortVacantBudgetCost mapping:
+        //   basic_salary  = Current
+        //   current_salary = Proposed
+        $sharedFallback = (float) (($vacant->current_salary ?? 0) > 0
+            ? $vacant->current_salary
+            : ($vacant->basic_salary ?? 0));
+
+        $monthlySalaries = \DB::table('resort_vacant_monthly_salaries')
+            ->where('resort_id', $resortId)
+            ->where('position_id', $positionId)
+            ->where('department_id', $departmentId)
+            ->where('vacant_index', $vacantIndex)
+            ->where('year', $year)
+            ->get(['month', 'current_salary', 'proposed_salary'])
+            ->keyBy('month');
+
+        $salaryTotal = 0.0;
+        for ($m = 1; $m <= 12; $m++) {
+            $row = $monthlySalaries->get($m);
+            if ($row) {
+                $salaryTotal += (float) (($row->proposed_salary ?? 0) > 0
+                    ? $row->proposed_salary
+                    : (($row->current_salary ?? 0) > 0
+                        ? $row->current_salary
+                        : $sharedFallback));
+            } else {
+                $salaryTotal += $sharedFallback;
+            }
+        }
+
+        // -- 2. Cost-template leg --------------------------------------------
+        // Vacant cost configs are SAVED rows only — there's no live-template
+        // fallback because the slot has no employee context (nationality /
+        // religion) for the Locals/Xpat/Muslim filter. Matches view-budget's
+        // getVacantMonthlyData behaviour.
+        $costTotal = (float) \DB::table('resort_vacant_budget_cost_configurations')
+            ->where('resort_id', $resortId)
+            ->where('year', $year)
+            ->where('vacant_budget_cost_id', $vacantId)
+            ->sum('value');
+
+        return $salaryTotal + $costTotal;
+    }
+
     public static function computeYearlyBudgetTotal($resortId, int $year): float
     {
         // -- 1. Employee salaries --------------------------------------------
@@ -4656,7 +4810,25 @@ class Common
             ->whereIn('vacant_budget_cost_id', $survivingVacantIds)
             ->sum('value');
 
-        return $employeeSalaryTotal + $employeeCostTotal + $vacantSalaryTotal + $vacantCostTotal;
+        // -- 5. Per-employee allowance leg -----------------------------------
+        // Matches annualBudgetForEmployee()'s third leg. Without this, the
+        // Liability headline diverges from view-budget / consolidated-budget
+        // by the sum of every active employee's employees_allowance × 12.
+        $dollarToMvr = (float) (\DB::table('resort_site_settings')
+            ->where('resort_id', $resortId)
+            ->value('DollertoMVR') ?: 15.42);
+        if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+        $empIds = $activeEmployees->pluck('id')->all();
+        $allowanceMonthlySum = empty($empIds) ? 0.0 : (float) \DB::table('employees_allowance')
+            ->whereIn('employee_id', $empIds)
+            ->selectRaw(
+                "COALESCE(SUM(CASE WHEN amount_unit = 'MVR' "
+              . "THEN amount * (1.0 / {$dollarToMvr}) ELSE amount END), 0) as total"
+            )
+            ->value('total');
+        $allowanceTotal = $allowanceMonthlySum * 12;
+
+        return $employeeSalaryTotal + $employeeCostTotal + $vacantSalaryTotal + $vacantCostTotal + $allowanceTotal;
     }
 
     public static function getDisplayCurrency()
@@ -7380,8 +7552,49 @@ class Common
      */
     public static function calculatePositionTotal($positionData, $resortCosts, $resortId)
     {
-        // Get MVR to Dollar conversion rate
-        $mvrToDollarRate = 0.065; // Default value
+        // Canonical path: per-employee and per-vacant yearly_total have been
+        // pre-computed by BudgetController::viewConsolidatedBudget via
+        // annualBudgetForEmployee / annualBudgetForVacantSlot. Summing those
+        // here keeps the consolidated badges aligned with view-budget. We
+        // still fall back to the legacy aggregation for any caller that
+        // doesn't set yearly_total on the rows.
+
+        $grandTotal = 0.0;
+        $missingYearlyTotal = false;
+
+        if (!empty($positionData['employees'])) {
+            foreach ($positionData['employees'] as $employee) {
+                if (isset($employee->yearly_total)) {
+                    $grandTotal += (float) $employee->yearly_total;
+                } else {
+                    $missingYearlyTotal = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$missingYearlyTotal &&
+            !empty($positionData['max_counts']['max_vacantcount']) &&
+            $positionData['max_counts']['max_vacantcount'] > 0) {
+            for ($i = 1; $i <= $positionData['max_counts']['max_vacantcount']; $i++) {
+                $vacantConfig = $positionData['vacant_configurations'][$i] ?? null;
+                if ($vacantConfig) {
+                    if (isset($vacantConfig['yearly_total'])) {
+                        $grandTotal += (float) $vacantConfig['yearly_total'];
+                    } else {
+                        $missingYearlyTotal = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$missingYearlyTotal) {
+            return $grandTotal;
+        }
+
+        // -- Legacy fallback (only when canonical yearly_total absent) -------
+        $mvrToDollarRate = 0.065;
         $resortSettings = ResortSiteSettings::where('resort_id', $resortId)->first();
         if ($resortSettings && $resortSettings->MVRtoDoller) {
             $mvrToDollarRate = $resortSettings->MVRtoDoller;
@@ -7391,12 +7604,10 @@ class Common
         $totalCurrentSalary = 0;
         $costTotals = [];
 
-        // Initialize cost totals array
         foreach ($resortCosts as $cost) {
             $costTotals[$cost->id] = 0;
         }
 
-        // Sum employee salaries and costs
         if (!empty($positionData['employees'])) {
             foreach ($positionData['employees'] as $employee) {
                 $totalBasicSalary += $employee->configured_basic_salary ?? 0;
@@ -7404,7 +7615,6 @@ class Common
 
                 if (isset($employee->budget_configurations) && $employee->budget_configurations->isNotEmpty()) {
                     foreach ($employee->budget_configurations as $config) {
-                        // Convert to USD if needed (value is already yearly total)
                         $valueInUSD = $config->currency === 'MVR'
                             ? $config->value * $mvrToDollarRate
                             : $config->value;
@@ -7414,7 +7624,6 @@ class Common
             }
         }
 
-        // Sum vacant salaries and costs
         if (!empty($positionData['max_counts']['max_vacantcount']) && $positionData['max_counts']['max_vacantcount'] > 0) {
             for ($i = 1; $i <= $positionData['max_counts']['max_vacantcount']; $i++) {
                 $vacantConfig = $positionData['vacant_configurations'][$i] ?? null;
@@ -7424,7 +7633,6 @@ class Common
 
                     if (isset($vacantConfig['configurations'])) {
                         foreach ($vacantConfig['configurations'] as $config) {
-                            // Convert to USD if needed (value is already yearly total)
                             $valueInUSD = $config->currency === 'MVR'
                                 ? $config->value * $mvrToDollarRate
                                 : $config->value;
@@ -7435,10 +7643,7 @@ class Common
             }
         }
 
-        // Calculate grand total: basic salary + current salary + all cost totals
-        $grandTotal = $totalBasicSalary + $totalCurrentSalary + array_sum($costTotals);
-
-        return $grandTotal;
+        return $totalBasicSalary + $totalCurrentSalary + array_sum($costTotals);
     }
 
     /**
