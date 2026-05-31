@@ -119,7 +119,19 @@ class PayrollController extends Controller
                 }
             }
 
-            if (!$isSupervisor && !$isApproverWithAccess) {
+            // Finance department leadership (HOD / EXCOM) get direct
+            // access to the Run Payroll page alongside the Supervisor.
+            // Finance EXCOM also has the approval-workflow path above,
+            // but that requires a PayrollApproval row to already exist —
+            // for the FIRST payroll run of a cycle there isn't one yet,
+            // so we'd 403 the very user who needs to kick the run off.
+            // Allow Finance HOD/EXCOM by department, regardless of
+            // approval state, mirroring the dashboard's Run Payroll
+            // button visibility (see resorts/payroll/dashboard/dashboard.blade.php).
+            $isFinanceLead = in_array($rank, ['HOD', 'EXCOM'], true)
+                && Common::isFinanceDepartment($employee->Dept_id ?? null);
+
+            if (!$isSupervisor && !$isApproverWithAccess && !$isFinanceLead) {
                 return abort(403, 'You do not have permission to access this page.');
             }
         }
