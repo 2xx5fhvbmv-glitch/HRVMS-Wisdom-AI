@@ -4282,10 +4282,19 @@ class Common
 
         $displayCurrency = $settings->currency; // 'MVR' or 'Dollar'
 
+        // Per the FX-rate developer reference (May 2026): DollertoMVR
+        // (canonical 15.42) is the only stored rate. The MVR→USD direction
+        // MUST be derived by division — not by multiplying a stored inverse
+        // — to avoid float-truncation drift. The doc's worked example is
+        // exactly this case: 7710 × 0.06484 = $499.92 (wrong, what users saw)
+        // vs 7710 ÷ 15.42 = $500.00 (correct).
+        $dollarToMvr = (float) ($settings->DollertoMVR ?: 15.42);
+        if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+
         if ($displayCurrency === 'MVR' && strtoupper($sourceCurrency) === 'USD') {
-            return round($amount * (float) $settings->DollertoMVR, 2);
+            return round($amount * $dollarToMvr, 2);
         } elseif ($displayCurrency !== 'MVR' && strtoupper($sourceCurrency) === 'MVR') {
-            return round($amount * (float) $settings->MVRtoDoller, 2);
+            return round($amount / $dollarToMvr, 2);
         }
 
         return round($amount, 2);
@@ -4313,13 +4322,20 @@ class Common
 
         $displayCurrency = $settings->currency; // 'MVR' or 'Dollar'
 
+        // Same canonical-rate rule as convertToDisplayCurrency: derive MVR
+        // ↔ USD from a single DollertoMVR (15.42), never from a stored
+        // inverse. Without this, round-tripping a value through
+        // display→storage loses cents to truncation drift.
+        $dollarToMvr = (float) ($settings->DollertoMVR ?: 15.42);
+        if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+
         // Shown in USD, column stores MVR → USD → MVR.
         if ($displayCurrency !== 'MVR' && strtoupper($storageCurrency) === 'MVR') {
-            return round($displayAmount * (float) $settings->DollertoMVR, 2);
+            return round($displayAmount * $dollarToMvr, 2);
         }
         // Shown in MVR, column stores USD → MVR → USD.
         if ($displayCurrency === 'MVR' && strtoupper($storageCurrency) === 'USD') {
-            return round($displayAmount * (float) $settings->MVRtoDoller, 2);
+            return round($displayAmount / $dollarToMvr, 2);
         }
 
         // Display currency already equals storage currency — no conversion.
