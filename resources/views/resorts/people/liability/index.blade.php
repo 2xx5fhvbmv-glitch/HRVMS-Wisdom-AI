@@ -413,8 +413,13 @@
 </script>
 
 <script type="module">
-   const chartLabels = {!! json_encode(array_keys($chartData)) !!};
-    const chartValues = {!! json_encode(array_values($chartData)) !!};
+   // chartDataDisplay = $chartData values pre-converted to the resort's
+   // current display currency (USD or MVR). $chartData itself stays USD
+   // because it feeds the Est-vs-Actual table via formatCurrency. Using
+   // the display version here makes the doughnut tooltip render in the
+   // unit shown in the headline cards.
+   const chartLabels = {!! json_encode(array_keys($chartDataDisplay ?? $chartData)) !!};
+    const chartValues = {!! json_encode(array_values($chartDataDisplay ?? $chartData)) !!};
 
     // Auto-generate pastel colors if too many labels
     const baseColors = [
@@ -481,8 +486,12 @@
         plugins: [doughnutLabelsInside]
     });
 
+    // reductionDataDisplay = monthly remaining-liability values in the
+    // resort's display currency. $reductionData stays USD for downstream
+    // PHP consumers; the chart uses the display version so the y-axis
+    // labels (also formatted with GetResortCurrencySymbol) match the data.
     const trendLabels = {!! json_encode($labels) !!};
-    const trendData = {!! json_encode($reductionData) !!};
+    const trendData = {!! json_encode($reductionDataDisplay ?? $reductionData) !!};
 
     const trendCtx = document.getElementById('liabilityTrendChart').getContext('2d');
 
@@ -492,7 +501,7 @@
             labels: {!! json_encode($labels) !!},
             datasets: [{
                 label: 'Remaining Liability',
-                data: {!! json_encode($reductionData) !!},
+                data: {!! json_encode($reductionDataDisplay ?? $reductionData) !!},
                 borderColor: '#014653',
                 backgroundColor: '#014653',
                 fill: false,

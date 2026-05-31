@@ -49,22 +49,28 @@ class LiabilityEstimationController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->get();
 
-        // Currency normalisation up-front. Headline numbers and the trend
-        // chart subtract payroll spend (stored in the resort's display
-        // currency — MVR for Maldivian resorts) from a USD-denominated
-        // Estimated Liability. Without converting first, an MVR resort's
-        // Current Liability reads ~15.42× larger than reality and the
-        // monthly reduction trend hits zero in January.
+        // Display-currency conversion. Per the project's canonical rule
+        // ("Money stored in USD" — budget/salary/cost/payroll all keep USD
+        // as the storage unit; only render-time conversion happens), every
+        // figure used by this method is treated as USD source. The chart
+        // values are pre-converted to the resort's CURRENT display currency
+        // at the end of the method so the doughnut tooltip and the line
+        // chart y-axis match what users see in the headline cards.
+        //
+        // The Est-vs-Actual table keeps USD-source values and lets the
+        // shared Common::formatCurrency helper convert per render — that
+        // path already handles the Dollar/MVR toggle correctly.
         $dollarToMvr = (float) (DB::table('resort_site_settings')
             ->where('resort_id', $resortId)
             ->value('DollertoMVR') ?: 15.42);
         if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
-        $mvrToUsdRate = 1.0 / $dollarToMvr;
-        $resortCurrency = DB::table('resort_site_settings')
+        $resortDisplayCurrency = DB::table('resort_site_settings')
             ->where('resort_id', $resortId)
             ->value('currency'); // 'Dollar' or 'MVR'
-        $payrollIsMvr = strcasecmp((string) $resortCurrency, 'MVR') === 0;
-        $payrollToUsd = fn($v) => $payrollIsMvr ? ((float) ($v ?? 0)) * $mvrToUsdRate : (float) ($v ?? 0);
+        $displayRate = strcasecmp((string) $resortDisplayCurrency, 'MVR') === 0
+            ? $dollarToMvr
+            : 1.0;
+        $mvrToUsdRate = 1.0 / $dollarToMvr;
 
         // Total Estimated Liability — shared canonical calc in Common so the
         // Initial Liability headline AND the People Dashboard Liability
@@ -183,12 +189,39 @@ class LiabilityEstimationController extends Controller
             ->whereIn('id', $employeeIdsWithRenewals)
             ->get();
 
-        // payroll.total_payroll is SUM(payroll_reviews.net_salary) in the
-        // resort's display currency. The five renewal totals below are USD.
-        // Normalise the payroll leg to USD so the headline doesn't mix
-        // currencies (the previous formula produced ~15.42× the real
-        // Current Liability on any MVR resort).
-        $payrollLiability = $payrollToUsd($payrolls->sum('total_payroll'));
+        // Source: SUM(earned_salary + earnings_overtime + earnings_allowance
+        // + service_charge) across approved + locked payroll_reviews.
+        //
+        // Earlier this used $payrolls->sum('total_payroll') (only written
+        // by saveSummaryToPayroll → only LOCKED payrolls); then briefly
+        // SUM(total_earnings), which silently included an unaccounted
+        // residual on rows where total_earnings was hand-adjusted at
+        // payroll time without a matching component row (seen on payroll
+        // #19 reviews 61 / 66 — $3,197 of phantom earnings not surfaced in
+        // any breakdown column). The Cost Distribution chart sums per
+        // component, so total_earnings made the headline > chart total.
+        //
+        // Summing the four visible component columns directly guarantees
+        // the headline always equals the chart's grand total. If a payroll
+        // adjustment ever needs to appear in the headline, it must be
+        // written into one of the component columns (or a new categorised
+        // column added) so it can also surface as a chart slice — no more
+        // silent "Other".
+        //
+        // Draft payrolls excluded — drafts aren't committed spend. All
+        // values are USD (canonical storage); formatCurrency converts at
+        // render time.
+        $payrollLiability = (float) DB::table('payroll_reviews')
+            ->join('payroll', 'payroll_reviews.payroll_id', '=', 'payroll.id')
+            ->where('payroll.resort_id', $resortId)
+            ->whereYear('payroll.start_date', $currentYear)
+            ->whereIn('payroll.status', ['approved', 'locked'])
+            ->sum(DB::raw(
+                'COALESCE(payroll_reviews.earned_salary, 0) + '
+              . 'COALESCE(payroll_reviews.earnings_overtime, 0) + '
+              . 'COALESCE(payroll_reviews.earnings_allowance, 0) + '
+              . 'COALESCE(payroll_reviews.service_charge, 0)'
+            ));
 
         $current_liability = $payrollLiability
                         + $totalVisa
@@ -199,10 +232,15 @@ class LiabilityEstimationController extends Controller
 
         $liability_reduction = $estimated_liability - $current_liability;
          // === Earnings ===
+        // Same status filter as $payrollLiability above. Without this, draft
+        // payrolls' payroll_reviews rows leak into the chart's Salaries /
+        // OTA / Service Charge slices, making the Cost Distribution total
+        // disagree with the Current Liability headline.
         $payrollReviews = DB::table('payroll_reviews')
             ->join('payroll', 'payroll_reviews.payroll_id', '=', 'payroll.id')
             ->where('payroll.resort_id', $resortId)
             ->whereYear('payroll.start_date', $currentYear)
+            ->whereIn('payroll.status', ['approved', 'locked'])
             ->selectRaw('
                 SUM(earned_salary) as salaries,
                 SUM(earnings_overtime) as ota,
@@ -217,12 +255,14 @@ class LiabilityEstimationController extends Controller
         // any MVR allowance entry inflated the slice by that factor. Convert
         // MVR rows to USD inside the SUM so the chart's allowance segments
         // line up with everything else. $mvrToUsdRate is defined once at the
-        // top of this method now.
+        // top of this method now. Status filter mirrors the headline source
+        // so draft-payroll allowances stay out of the chart.
         $allowanceBreakdown = DB::table('payroll_review_allowances as pra')
             ->join('payroll_reviews as pr', 'pra.payroll_review_id', '=', 'pr.id')
             ->join('payroll as p', 'pr.payroll_id', '=', 'p.id')
             ->where('p.resort_id', $resortId)
             ->whereYear('p.start_date', $currentYear)
+            ->whereIn('p.status', ['approved', 'locked'])
             ->select('pra.allowance_type', DB::raw(
                 "SUM(CASE WHEN pra.amount_unit = 'MVR' THEN pra.amount * {$mvrToUsdRate}"
               . " ELSE pra.amount END) as total_amount"
@@ -231,31 +271,26 @@ class LiabilityEstimationController extends Controller
             ->pluck('total_amount', 'pra.allowance_type')
             ->toArray();
 
-        // Currency-mixing fix: payroll_reviews stores salaries / OT /
-        // service charge in the RESORT'S display currency (often MVR for
-        // Maldivian resorts), while Work Permit / Quota / Medical / Insurance
-        // are computed per-employee in USD (project convention). Mixing them
-        // straight into the same chart total turned Salaries into a 60-70%
-        // slice purely from the 15.42× scale mismatch. $payrollToUsd is
-        // defined once at the top of this method.
+        // All chart slices are USD-source — payroll_reviews aggregates,
+        // renewal totals, and allowance breakdowns all keep USD as the
+        // storage unit (see comment on $payrollLiability above). The doughnut
+        // tooltip / line-chart y-axis values get a single display-currency
+        // pass at the end of this method so MVR mode actually shows MVR
+        // magnitudes; proportions stay correct in both modes because every
+        // slice is in the same source currency before that conversion.
         //
-        // The previous build had a 'Recruitment Fee' slice reading
-        // `$recruitmentCosts->recruitment_fee ?? 0`, but $recruitmentCosts
-        // was never declared in this scope (it only exists inside
-        // getLiabilityData()), so the slice was always 0. There is no
-        // canonical "actual recruitment spend" table — recruitment is a
-        // budgeted cost-template figure, surfaced in the Estimation vs
-        // Actual table's Recruitment Fee row, not in this actual-spend
-        // chart. Drop the always-zero slice rather than fake it.
+        // No 'Recruitment Fee' slice — actual recruitment spend isn't
+        // tracked in any table; the Est-vs-Actual row shows the budgeted
+        // figure (Estimated column) with $0 Actual by design.
         $chartData = [
-            'Salaries'         => $payrollToUsd($payrollReviews->salaries ?? 0),
-            'OTA'              => $payrollToUsd($payrollReviews->ota ?? 0),
+            'Salaries'         => (float) ($payrollReviews->salaries ?? 0),
+            'OTA'              => (float) ($payrollReviews->ota ?? 0),
             'Work Permit'      => (float) $totalPermit,
             'Visa'             => (float) $totalVisa, // present in Current Liability headline; was missing from the doughnut.
             'Quota Slot'       => (float) $totalQuota,
             'Medical Permit'   => (float) $totalMedical,
             'Insurance'        => (float) $totalInsurance,
-            'Service Charge'   => $payrollToUsd($payrollReviews->service_charge ?? 0),
+            'Service Charge'   => (float) ($payrollReviews->service_charge ?? 0),
         ];
 
         // Allowance breakdown is already in USD after the CASE WHEN above.
@@ -264,14 +299,25 @@ class LiabilityEstimationController extends Controller
         }
         // dd($chartData);
 
-        // Monthly buckets — same date-field choice as the headline above so
-        // the trend chart and the headline don't disagree about which month
-        // a renewal lands in.
-        $monthlyLiability = DB::table('payroll')
-            ->where('resort_id', $resortId)
-            ->whereYear('start_date', $currentYear)
-            ->selectRaw('MONTH(start_date) as month, SUM(total_payroll) as total')
-            ->groupBy(DB::raw('MONTH(start_date)'))
+        // Monthly buckets — same source as $payrollLiability above (sum of
+        // the four component columns across approved + locked payrolls) so
+        // the headline, the trend, and the chart all agree on what counts
+        // as "spent".
+        $monthlyLiability = DB::table('payroll_reviews')
+            ->join('payroll', 'payroll_reviews.payroll_id', '=', 'payroll.id')
+            ->where('payroll.resort_id', $resortId)
+            ->whereYear('payroll.start_date', $currentYear)
+            ->whereIn('payroll.status', ['approved', 'locked'])
+            ->selectRaw(
+                'MONTH(payroll.start_date) as month, '
+              . 'SUM('
+              . '  COALESCE(payroll_reviews.earned_salary, 0) + '
+              . '  COALESCE(payroll_reviews.earnings_overtime, 0) + '
+              . '  COALESCE(payroll_reviews.earnings_allowance, 0) + '
+              . '  COALESCE(payroll_reviews.service_charge, 0)'
+              . ') as total'
+            )
+            ->groupBy(DB::raw('MONTH(payroll.start_date)'))
             ->pluck('total', 'month')
             ->toArray();
 
@@ -320,14 +366,11 @@ class LiabilityEstimationController extends Controller
         for ($m = 1; $m <= 12; $m++) {
             $monthName = Carbon::create($currentYear, $m)->format('M Y');
 
-            // Monthly actual paid. payroll.total_payroll is in the resort's
-            // display currency; the renewal totals (WP / Medical / Insurance
-            // / Quota / Visa) are USD. $liabilityRemaining is USD (it starts
-            // at $estimated_liability). Normalise the payroll leg so we
-            // don't subtract MVR rupiya from USD dollars — the previous code
-            // dropped the curve to zero in January for MVR resorts.
+            // Monthly actual paid — every column is USD source (canonical
+            // storage). $liabilityRemaining is USD too (starts at
+            // $estimated_liability). No per-component conversion needed.
             $monthlyPaid =
-                $payrollToUsd($monthlyLiability[$m] ?? 0) +
+                ($monthlyLiability[$m]  ?? 0) +
                 ($monthlyWorkPermit[$m] ?? 0) +
                 ($monthlyMedical[$m]    ?? 0) +
                 ($monthlyInsurance[$m]  ?? 0) +
@@ -500,11 +543,28 @@ class LiabilityEstimationController extends Controller
             ];
         }
 
+        // Chart.js gets a display-currency version of every numeric series
+        // (doughnut slice values + line-chart reductionData) so MVR-mode
+        // tooltips and y-axis labels reflect the user's currency choice.
+        // $chartData / $reductionData themselves stay USD because
+        // estVsActualRows reads $chartData and the blade routes those
+        // through Common::formatCurrency (which does its own conversion).
+        $chartDataDisplay = [];
+        foreach ($chartData as $k => $v) {
+            $chartDataDisplay[$k] = round(((float) $v) * $displayRate, 2);
+        }
+        $reductionDataDisplay = array_map(
+            fn($v) => round(((float) $v) * $displayRate, 2),
+            $reductionData
+        );
+        $displayCurrencySymbol = Common::GetResortCurrencySymbol();
+
         return view('resorts.people.liability.index', compact(
             'page_title',
             'resortId', 'current_liability',
             'resort_departments','employees','estimated_liability',
             'liability_reduction','chartData',
+            'chartDataDisplay','reductionDataDisplay','displayCurrencySymbol',
             'labels',
             'reductionData','allowanceTypes',
             'estVsActualRows'
