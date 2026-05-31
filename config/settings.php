@@ -686,6 +686,33 @@ return [
 		3 => ['3' => 'HR', '2' => 'HOD', '8' => 'GM'],   // HR: 3 rounds
 	],
 
+    /*
+    |--------------------------------------------------------------------------
+    | EWT (Employee Withholding Tax) — Maldives MIRA brackets
+    |--------------------------------------------------------------------------
+    |
+    | Monthly remuneration brackets used by Common::computeEwtDeduction()
+    | to display the indicative tax for any employee with EWT Status =
+    | Enrolled. These are the published Maldives MIRA Employee Withholding
+    | Tax brackets — confirm against the latest MIRA notice each tax year
+    | and bump here. The helper deducts ONLY the portion of salary that
+    | falls inside each band (progressive, not flat).
+    |
+    | Each row: ['upto' => monthly MVR ceiling | null for the top band,
+    |             'rate' => decimal fraction (0.05 = 5%)].
+    |
+    | Reference: https://www.mira.gov.mv (search "Employee Withholding Tax").
+    | If your figures differ, edit this array — the rest of the code
+    | reads from here.
+    */
+    'ewt_brackets_mvr' => [
+        ['upto' => 60000,  'rate' => 0.00],   //  0% on the first MVR 60,000
+        ['upto' => 100000, 'rate' => 0.055],  //  5.5% on the next slice up to 100k
+        ['upto' => 150000, 'rate' => 0.08],   //  8% on the next slice up to 150k
+        ['upto' => 200000, 'rate' => 0.12],   // 12% on the next slice up to 200k
+        ['upto' => null,   'rate' => 0.15],   // 15% on everything above 200k
+    ],
+
 	'eligibilty' => [
 		'8' => 'GM',
 		'1' => 'EXCOM',

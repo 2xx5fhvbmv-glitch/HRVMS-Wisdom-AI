@@ -4931,6 +4931,59 @@ class Common
         return $settings ? (float) $settings->DollertoMVR : 15.42;
     }
 
+    /**
+     * Compute the Employee Withholding Tax (EWT) deduction for a single
+     * month, given the employee's monthly gross remuneration in MVR.
+     *
+     * Progressive — the tax is the sum of (slice × bracket rate) for
+     * each band the salary crosses, NOT a flat rate on the whole amount.
+     *
+     * Returns 0 if salary is below the first taxable band, or if the
+     * `ewt_brackets_mvr` config is empty / malformed (defensive — better
+     * to deduct nothing than to error out the payroll calc).
+     *
+     * Currently INFORMATIONAL only — surfaced on the Employee profile
+     * as an indicative figure. Payroll does not yet deduct EWT
+     * automatically; wire this into PayrollController::fetchTimeAttendance
+     * once the user confirms the bracket figures against the latest MIRA
+     * notice and signs off on the deduction line item rendering.
+     *
+     * @param float $monthlyGrossMvr Employee's monthly gross salary in MVR.
+     * @return float Monthly EWT deduction in MVR.
+     */
+    public static function computeEwtDeduction(float $monthlyGrossMvr): float
+    {
+        if ($monthlyGrossMvr <= 0) return 0.0;
+
+        $brackets = config('settings.ewt_brackets_mvr', []);
+        if (empty($brackets) || !is_array($brackets)) return 0.0;
+
+        $tax = 0.0;
+        $previousCeiling = 0.0;
+        foreach ($brackets as $bracket) {
+            $ceiling = $bracket['upto'] ?? null; // null = open-ended top band
+            $rate    = (float) ($bracket['rate'] ?? 0);
+
+            if ($ceiling === null) {
+                // Top band — anything still uncovered.
+                $sliceAmount = $monthlyGrossMvr - $previousCeiling;
+                if ($sliceAmount > 0) {
+                    $tax += $sliceAmount * $rate;
+                }
+                break;
+            }
+
+            $sliceTop = min((float) $ceiling, $monthlyGrossMvr);
+            $sliceAmount = $sliceTop - $previousCeiling;
+            if ($sliceAmount > 0) {
+                $tax += $sliceAmount * $rate;
+            }
+            $previousCeiling = (float) $ceiling;
+            if ($monthlyGrossMvr <= $ceiling) break;
+        }
+        return round($tax, 2);
+    }
+
     public static function getServiceCharge($employee_id, $resortId,$payrollId){
         $service_charge = PayrollServiceCharge::where('payroll_id',$payrollId)->where('employee_id',$employee_id)->first();
 

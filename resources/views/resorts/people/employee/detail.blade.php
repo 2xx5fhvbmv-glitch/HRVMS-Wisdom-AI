@@ -1125,6 +1125,25 @@
                                                                         </div>
                                                                     </div>
                                                                     @endif
+                                                                    {{-- Indicative EWT (Maldives MIRA brackets, from
+                                                                         config/settings.php). Shown ONLY when EWT is
+                                                                         enrolled — gives HR a sanity-check number to
+                                                                         compare against the actual deduction once
+                                                                         payroll is wired to apply it. Pure information;
+                                                                         no payroll math is done from this value. --}}
+                                                                    @if($employee->ewt_status == 'yes' && $totalMonthlyEarningMvr > 0)
+                                                                        @php
+                                                                            $indicativeEwtMvr = \App\Helpers\Common::computeEwtDeduction((float) $totalMonthlyEarningMvr);
+                                                                        @endphp
+                                                                        <div class="mt-2" style="font-size:12px;">
+                                                                            <span class="badge bg-info text-dark"
+                                                                                  title="Computed per Maldives MIRA monthly EWT brackets (see config/settings.php). Informational only — payroll does not yet apply this deduction automatically.">
+                                                                                <i class="fa-solid fa-circle-info me-1"></i>
+                                                                                Indicative monthly EWT: MVR {{ number_format($indicativeEwtMvr, 2) }}
+                                                                                <small class="ms-1 text-muted">(on MVR {{ number_format($totalMonthlyEarningMvr, 2) }} gross)</small>
+                                                                            </span>
+                                                                        </div>
+                                                                    @endif
                                                                 </td>
                                                             </tr>
                                                         </tbody>

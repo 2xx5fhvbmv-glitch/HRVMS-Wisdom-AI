@@ -267,7 +267,11 @@
                                 <div class="col-md-3 col-sm-6 ">
                                     <label for="txt-proposed-salary" class="form-label">PROPOSED SALARY <span class="req_span">*</span></label>
                                     <input type="text" class="form-control" id="txt-proposed-salary"
-                                        placeholder="Proposed Salary" name="proposed_salary" required>
+                                        placeholder="Proposed Salary" name="proposed_salary" required
+                                        title="Used by the BUDGET module as the planned future salary for this position. Payroll continues to use the employee's Basic Salary until an approved Salary Increment is applied. If you set this without an approved increment, budget will diverge from payroll for this employee.">
+                                    <small class="form-text text-muted" style="font-size:11px;">
+                                        Used by Budget; Payroll uses Basic Salary until an Increment is approved.
+                                    </small>
                                 </div>
                                 <div class="col-md-3 col-sm-6 ">
                                     <label for="txt-allowances" class="form-label">ALLOWANCES</label>
