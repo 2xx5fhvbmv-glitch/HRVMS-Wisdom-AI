@@ -976,9 +976,63 @@ class SalaryIncrementController extends Controller
             // Approve / Reject / Request Change stay available.
             $showHoldButton = false;
 
-            $ids = PeopleSalaryIncrement::whereIn('status',['Pending','Hold','Change-Request'])->where('resort_id', $this->resort->resort_id)
-                ->pluck('id');
-              
+        // Role detection moved BEFORE the query so we can scope the visible
+        // set to rows where THIS user still has an action to take. Without
+        // this, Finance saw rows they'd already approved, clicked Approve a
+        // second time, and re-fired the GM notification each click. Same
+        // for GM seeing GM-approved rows. Approved-by-self rows now move
+        // straight to the approver's own history page.
+        $financeManagerTitles = ['Director of Finance', 'Finance Manager'];
+
+        $positionIds = ResortPosition::where('resort_id', $this->resort->resort_id)
+            ->whereIn('position_title', $financeManagerTitles)
+            ->pluck('id');
+
+        $financeApprover = Employee::with(['resortAdmin', 'position'])
+            ->whereIn('position_id', $positionIds)
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('Admin_Parent_id',$this->resort->id)
+            ->select('id')
+            ->first();
+
+        $gmApprover = Employee::with('position')->where('rank', 8)
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('Admin_Parent_id',$this->resort->id)
+            ->select('id')
+            ->first();
+
+            $currentEmpId = $this->resort->GetEmployee->id ?? null;
+            // Check direct match OR delegation authority for Finance/GM approver
+            $isFinanceOrDelegate = $financeApprover && ($financeApprover->id == $currentEmpId || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $financeApprover->id, $this->resort->resort_id));
+            $isGMOrDelegate = $gmApprover && ($gmApprover->id == $currentEmpId || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $gmApprover->id, $this->resort->resort_id));
+
+            // Build the base in-progress set, then per-role scope so a stage
+            // that's already finished its turn drops off the user's list.
+            $baseQuery = PeopleSalaryIncrement::whereIn('status', ['Pending', 'Hold', 'Change-Request'])
+                ->where('resort_id', $this->resort->resort_id);
+
+            if ($isFinanceOrDelegate) {
+                // Only rows where the Finance stage is still actionable.
+                $baseQuery->whereHas('peopleSalaryIncrementStatusFinance', function ($q) {
+                    $q->whereIn('status', ['Pending', 'Hold', 'Change-Request']);
+                });
+            } elseif ($isGMOrDelegate) {
+                // Only rows where Finance already approved AND GM stage is
+                // still actionable. Without the Finance gate, GM would see
+                // rows that haven't reached them yet.
+                $baseQuery->whereHas('peopleSalaryIncrementStatusFinance', function ($q) {
+                        $q->where('status', 'Approved');
+                    })
+                    ->whereHas('peopleSalaryIncrementStatusGM', function ($q) {
+                        $q->whereIn('status', ['Pending', 'Hold', 'Change-Request']);
+                    });
+            }
+            // For everyone else (e.g. HR — who creates increments but doesn't
+            // approve them) the unfiltered in-progress set stays. HR needs to
+            // see what's still in flight regardless of which stage it's at.
+
+            $ids = $baseQuery->pluck('id');
+
             $query = PeopleSalaryIncrement::whereIn('id', $ids)->whereIn('status',['Pending','Hold','Change-Request'])
                 ->select('id', 'employee_id', 'increment_type', 'effective_date', 'value', 'pay_increase_type', 'previous_salary', 'new_salary', 'increment_amount', 'remarks', 'status', 'due_date', 'created_at')
                 ->with([
@@ -1005,29 +1059,6 @@ class SalaryIncrementController extends Controller
             if($query->count() > 0) {
                 $downloadBtn = true;
             }
-        $financeManagerTitles = ['Director of Finance', 'Finance Manager'];
-
-        $positionIds = ResortPosition::where('resort_id', $this->resort->resort_id)
-            ->whereIn('position_title', $financeManagerTitles)
-            ->pluck('id');
-
-        $financeApprover = Employee::with(['resortAdmin', 'position'])
-            ->whereIn('position_id', $positionIds)
-            ->where('resort_id', $this->resort->resort_id)
-            ->where('Admin_Parent_id',$this->resort->id)
-            ->select('id')
-            ->first();
-
-        $gmApprover = Employee::with('position')->where('rank', 8)
-            ->where('resort_id', $this->resort->resort_id)
-            ->where('Admin_Parent_id',$this->resort->id)
-            ->select('id')
-            ->first();
-
-            $currentEmpId = $this->resort->GetEmployee->id ?? null;
-            // Check direct match OR delegation authority for Finance/GM approver
-            $isFinanceOrDelegate = $financeApprover && ($financeApprover->id == $currentEmpId || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $financeApprover->id, $this->resort->resort_id));
-            $isGMOrDelegate = $gmApprover && ($gmApprover->id == $currentEmpId || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $gmApprover->id, $this->resort->resort_id));
 
             // Footer visibility: show Approve / Reject / Request Change
             // for any row that's Pending OR Hold (held rows can still be
@@ -1649,16 +1680,58 @@ class SalaryIncrementController extends Controller
         $page_title = 'Salary Increment History';
         $employeeId = base64_decode($request->id);
 
-        // History is terminal-state only — Approved / Rejected. In-progress
-        // rows (Pending / Hold / Change-Request) live on the summary-list
-        // page (people.salary-increment.summary-list); leaking them into
-        // history makes "Hold" appear here as if it were a final outcome.
-        $ids = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)
-            ->whereIn('status', ['Approved', 'Rejected'])
+        // History scoping — terminal-state only:
+        //  • Default (HR / non-approvers): rows where the OVERALL status is
+        //    Approved or Rejected.
+        //  • Finance approver (or delegate): ALSO show rows where their own
+        //    Finance stage is Approved/Rejected, even if the overall row is
+        //    still 'Pending' waiting on GM. Without this, after Finance
+        //    approves they lose track of what they signed off — the row
+        //    disappears from the summary-list (correctly — they have no
+        //    pending action) but doesn't yet show in history either.
+        //  • GM approver (or delegate): same idea for the GM stage.
+        $resortId = $this->resort->resort_id;
+        $financeManagerTitles = ['Director of Finance', 'Finance Manager'];
+        $financePositionIds = ResortPosition::where('resort_id', $resortId)
+            ->whereIn('position_title', $financeManagerTitles)
+            ->pluck('id');
+        $financeApprover = Employee::whereIn('position_id', $financePositionIds)
+            ->where('resort_id', $resortId)
+            ->where('Admin_Parent_id', $this->resort->id)
+            ->select('id')->first();
+        $gmApprover = Employee::where('rank', 8)
+            ->where('resort_id', $resortId)
+            ->where('Admin_Parent_id', $this->resort->id)
+            ->select('id')->first();
+        $currentEmpId = $this->resort->GetEmployee->id ?? null;
+        $isFinanceOrDelegate = $financeApprover
+            && ($financeApprover->id == $currentEmpId
+                || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $financeApprover->id, $resortId));
+        $isGMOrDelegate = $gmApprover
+            && ($gmApprover->id == $currentEmpId
+                || \App\Helpers\Common::hasDelegationAuthority($currentEmpId, $gmApprover->id, $resortId));
+
+        $ids = PeopleSalaryIncrement::where('resort_id', $resortId)
+            ->where(function ($q) use ($isFinanceOrDelegate, $isGMOrDelegate) {
+                $q->whereIn('status', ['Approved', 'Rejected']);
+                if ($isFinanceOrDelegate) {
+                    $q->orWhereHas('peopleSalaryIncrementStatusFinance', function ($q2) {
+                        $q2->whereIn('status', ['Approved', 'Rejected']);
+                    });
+                }
+                if ($isGMOrDelegate) {
+                    $q->orWhereHas('peopleSalaryIncrementStatusGM', function ($q2) {
+                        $q2->whereIn('status', ['Approved', 'Rejected']);
+                    });
+                }
+            })
             ->pluck('id');
 
+        // Note: the legacy where('status', IN [Approved, Rejected]) filter
+        // below has been removed — the per-role $ids set now drives the
+        // visible set, so a "Pending overall / Finance-Approved" row can
+        // appear in Finance's history without being filtered back out.
         $query = PeopleSalaryIncrement::whereIn('id', $ids)
-            ->whereIn('status', ['Approved', 'Rejected'])
             ->select('id', 'employee_id', 'increment_type', 'effective_date', 'value', 'pay_increase_type', 'previous_salary', 'new_salary', 'increment_amount', 'remarks', 'status','created_at')
             ->with([
                 'employee.resortAdmin:id,first_name,last_name',
