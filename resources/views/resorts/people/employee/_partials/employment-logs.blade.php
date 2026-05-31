@@ -11,13 +11,20 @@
      reads consistently regardless of which writer produced the row
      (manual writeEmploymentAuditLog vs the EmployeeEmploymentAuditObserver). --}}
 @php
-    // Which source columns get money / date formatting. Mirrors
-    // EmployeeEmploymentAuditObserver::TRACKED so the two writers
-    // produce visually-consistent rows.
+    // Which source columns get money / date / lookup formatting.
+    // Mirrors EmployeeEmploymentAuditObserver::TRACKED so the two
+    // writers produce visually-consistent rows.
     $dateFields  = ['joining_date', 'probation_end_date', 'termination_date'];
     $moneyFields = ['basic_salary', 'proposed_salary'];
 
-    $formatLogValue = function ($field, $value) use ($dateFields, $moneyFields) {
+    // benefit_grid_level is stored as the rank number (1, 2, 4, 5, 6, 8)
+    // — same map used by the dropdown on the Employment tab (see
+    // detail.blade.php line ~941). Resolve to the human label so the
+    // audit log shows "EXCOM" / "HOD" / "LINE WORKERS" instead of
+    // "1" / "2" / "6".
+    $eligibilityMap = config('settings.eligibilty') ?? [];
+
+    $formatLogValue = function ($field, $value) use ($dateFields, $moneyFields, $eligibilityMap) {
         if ($value === null || $value === '') {
             return '—';
         }
@@ -35,6 +42,12 @@
             // "4,500.00". Two-decimal formatting matches the rest of the
             // app (salary increment summary, payroll review, etc.).
             return number_format((float) $value, 2);
+        }
+        if ($field === 'benefit_grid_level') {
+            // Numeric rank → label. Fall back to the raw value if the
+            // config doesn't have an entry (e.g. an unexpected level).
+            $key = (string) $value;
+            return $eligibilityMap[$key] ?? $value;
         }
         return $value;
     };
