@@ -4437,12 +4437,29 @@ class Common
      * Inputs: $cost is a row/object from resort_budget_costs.
      * Output: USD amount this cost contributes to the given month.
      */
-    public static function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary): float
+    public static function computeBudgetCostMonthlyValue($cost, int $month, int $year, bool $isLocal, bool $isMuslim, float $basicSalary, ?int $benefitGridLevel = null): float
     {
         $details = trim((string) ($cost->details ?? 'Both'));
         if ($details === 'Locals Only' && !$isLocal)  return 0.0;
         if ($details === 'Xpat Only'   &&  $isLocal)  return 0.0;
         if ($details === 'Muslim Only' && !$isMuslim) return 0.0;
+
+        // Benefit-grade scope (new in 2026-06). When a template is scoped
+        // to specific benefit_grid_levels (e.g. Medical Insurance Int'l
+        // → "1,8" = EXCOM + GM; OT → "5,6" = SUP + Line Workers), apply
+        // it only to employees whose level matches. NULL/empty means
+        // "all grades" — backward-compatible with rows that pre-date
+        // this column.
+        $gridScope = trim((string) ($cost->benefit_grid_levels ?? ''));
+        if ($gridScope !== '') {
+            $allowed = array_filter(array_map(
+                fn($v) => (int) trim($v),
+                explode(',', $gridScope)
+            ));
+            if (!empty($allowed) && !in_array((int) ($benefitGridLevel ?? 0), $allowed, true)) {
+                return 0.0;
+            }
+        }
 
         $amount = (float) ($cost->amount ?? 0);
         $unit   = strtoupper(trim((string) ($cost->amount_unit ?? 'USD')));
@@ -4476,6 +4493,7 @@ class Common
         $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
         $isMuslim = strtolower(trim((string) ($employee->religion    ?? ''))) === 'muslim';
         $basicForPercent = (float) ($employee->basic_salary ?? 0);
+        $benefitGridLevel = isset($employee->benefit_grid_level) ? (int) $employee->benefit_grid_level : null;
 
         $savedByMonth = \DB::table('resort_employee_budget_cost_configurations')
             ->where('employee_id', $employee->id)
@@ -4505,7 +4523,7 @@ class Common
             if (isset($savedByMonth[$m])) {
                 $total += (float) $savedByMonth[$m];
             } else {
-                $val = self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent);
+                $val = self::computeBudgetCostMonthlyValue($cost, $m, $year, $isLocal, $isMuslim, $basicForPercent, $benefitGridLevel);
                 if ($isMvrTemplate) $val *= $mvrToUsdRate;
                 $total += $val;
             }
@@ -4757,7 +4775,7 @@ class Common
         $activeEmployees = \DB::table('employees')
             ->where('resort_id', $resortId)
             ->where('status', 'Active')
-            ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion']);
+            ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
 
         $empMonthlyOverrides = \DB::table('resort_employee_monthly_salaries')
             ->where('resort_id', $resortId)

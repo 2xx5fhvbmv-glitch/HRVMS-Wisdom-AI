@@ -84,39 +84,34 @@ class BudgetCostController extends Controller
     {
         try {
             $resort_id = Auth::guard('resort-admin')->user()->resort_id;
-            // Check if the user selected an existing division
-            if ($request->filled('cost')) {
-                // Existing division selected
-                $cost = new ResortBudgetCost();
-                $cost->resort_id = $resort_id;
-                $cost->cost_title = $request->cost;
-                $cost->particulars = ucwords($request->particulars);
-                $cost->amount = $request->amount;
-                $cost->amount_unit = $request->amount_unit;
-                $cost->cost_type = $request->cost_type;
-                $cost->frequency = $request->frequency;
-                $cost->details = $request->details;
-                $cost->status = $request->status;
-                $cost->is_payroll_allowance = $request->is_payroll_allowance ?? 0;
-                $cost->save();
-            } else {
-                // No division selected, so create a new division
-                $cost = new ResortBudgetCost();
-                $cost->resort_id = $resort_id;
-                $cost->cost_title = $request->cost_name;
-                $cost->particulars = ucwords($request->particulars);
-                $cost->amount = $request->amount;
-                $cost->amount_unit = $request->amount_unit;
-                $cost->cost_type = $request->cost_type;
-                $cost->frequency = $request->frequency;
-                $cost->details = $request->details;
-                $cost->status = $request->status;
-                $cost->is_payroll_allowance = $request->is_payroll_allowance ?? 0;
-                $cost->save();
+
+            // Comma-serialise the multi-select benefit_grid_levels list
+            // before persist. The form posts an array (e.g. ["1","8"]);
+            // we store "1,8" so Common::computeBudgetCostMonthlyValue's
+            // explode(',') reader picks it up. NULL when the user didn't
+            // tick anything = "all grades" (backward-compatible default).
+            $gridLevels = $request->input('benefit_grid_levels');
+            if (is_array($gridLevels)) {
+                $gridLevels = implode(',', array_filter(array_map('intval', $gridLevels)));
             }
+            $gridLevels = $gridLevels === '' ? null : $gridLevels;
+
+            $cost = new ResortBudgetCost();
+            $cost->resort_id = $resort_id;
+            $cost->cost_title = $request->filled('cost') ? $request->cost : $request->cost_name;
+            $cost->particulars = ucwords($request->particulars);
+            $cost->amount = $request->amount;
+            $cost->amount_unit = $request->amount_unit;
+            $cost->cost_type = $request->cost_type;
+            $cost->frequency = $request->frequency;
+            $cost->details = $request->details;
+            $cost->benefit_grid_levels = $gridLevels;
+            $cost->status = $request->status;
+            $cost->is_payroll_allowance = $request->is_payroll_allowance ?? 0;
+            $cost->save();
 
             return response()->json(['success' => true, 'message' => 'Cost added successfully.']);
-                
+
         } catch( \Exception $e ) {
             \Log::emergency( "File: ".$e->getFile() );
             \Log::emergency( "Line: ".$e->getLine() );
@@ -161,6 +156,15 @@ class BudgetCostController extends Controller
             $cost->details = $request->input('details');
             $cost->status = $request->input('status');
             $cost->is_payroll_allowance = $request->input('is_payroll_allowance', 0); // Default to 0 if not provided
+
+            // Benefit-grade scope. Accepts either the array form posted
+            // by the multi-select or the comma-string form posted by the
+            // inline-edit row. NULL when blank = "all grades".
+            $gridLevels = $request->input('benefit_grid_levels');
+            if (is_array($gridLevels)) {
+                $gridLevels = implode(',', array_filter(array_map('intval', $gridLevels)));
+            }
+            $cost->benefit_grid_levels = $gridLevels === '' ? null : $gridLevels;
 
             // Save the changes
             $cost->save();

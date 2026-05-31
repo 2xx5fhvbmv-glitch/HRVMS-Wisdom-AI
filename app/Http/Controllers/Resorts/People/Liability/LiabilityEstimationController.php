@@ -91,7 +91,7 @@ class LiabilityEstimationController extends Controller
             $activeForBreakdown = DB::table('employees')
                 ->where('resort_id', $resortId)
                 ->where('status', 'Active')
-                ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion']);
+                ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
             foreach ($activeForBreakdown as $emp) {
                 $shared = (float) (($emp->proposed_salary ?? 0) > 0
                     ? $emp->proposed_salary
@@ -525,7 +525,7 @@ class LiabilityEstimationController extends Controller
         $activeEmployees = DB::table('employees')
             ->where('resort_id', $resortId)
             ->where('status', 'Active')
-            ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion']);
+            ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion', 'benefit_grid_level']);
         $empMonthlyOverrides = DB::table('resort_employee_monthly_salaries')
             ->where('resort_id', $resortId)
             ->where('year', $currentYear)
@@ -737,7 +737,7 @@ class LiabilityEstimationController extends Controller
                       });
                 });
             })
-            ->select('id', 'Admin_Parent_id', 'Emp_id', 'Dept_id', 'Position_id', 'nationality', 'religion', 'basic_salary', 'proposed_salary', 'joining_date');
+            ->select('id', 'Admin_Parent_id', 'Emp_id', 'Dept_id', 'Position_id', 'nationality', 'religion', 'basic_salary', 'proposed_salary', 'joining_date', 'benefit_grid_level');
 
         // Salary leg helper — mirrors the canonical helper's salary leg
         // (per-month override → proposed/current → employees-row fallback).
