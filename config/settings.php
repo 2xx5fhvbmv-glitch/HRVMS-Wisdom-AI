@@ -1,5 +1,14 @@
 <?php
 return [
+    // Storage driver for file uploads. Reads STORAGE_DRIVER env at config-
+    // load time so `php artisan config:cache` (run on every prod deploy)
+    // freezes the value into the cached config. Helpers and controllers
+    // MUST use config('settings.storage_driver') rather than
+    // env('STORAGE_DRIVER', ...) — env() returns null in cached-config
+    // mode, which is what made the brand-logo render
+    // /public/uploads/... on live instead of the Wasabi URL.
+    'storage_driver' => env('STORAGE_DRIVER', 'local'),
+
 	'site_logo_folder' => 'public/uploads/logos',
 	'site_favicon_folder' => 'public/uploads/favicon',
 	'auth_sign_folder' => 'public/uploads/signs',

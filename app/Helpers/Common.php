@@ -1106,21 +1106,63 @@ class Common
         if (!$resort || !$resort->logo) {
             return url(config('settings.default_picture'));
         }
-        // Resolve via the same disk we upload to (env STORAGE_DRIVER).
-        // On prod (wasabi/s3) Storage::disk()->url() returns the
-        // bucket-served URL; locally url() falls through to the public path.
-        // Without this, prod uploads land on Wasabi but the page kept
-        // generating the wrong /public/uploads/... URL and showed the
-        // default placeholder.
+        // Resolve via the same disk we upload to. Read from config so the
+        // value survives `php artisan config:cache` on prod — env() returns
+        // null in cached-config mode, which is exactly why live was
+        // rendering /public/uploads/... instead of the Wasabi URL.
         $basePath = config('settings.brand_logo_folder');
-        $driver   = env('STORAGE_DRIVER', 'local');
+        $driver   = config('settings.storage_driver');
         $relPath  = $basePath . '/' . $resort->logo;
-        $url = ($driver === 'local')
-            ? url($relPath)
-            : \Storage::disk($driver)->url($relPath);
+
+        if ($driver === 'local') {
+            // brand_logo_folder is stored as "public/uploads/brand_logos"
+            // because Common::uploadFile() uses it as a filesystem path
+            // (and the Laravel app sits in a sibling of public/). For the
+            // PUBLIC URL we must strip the leading "public/" — the web
+            // server's document root IS the public/ directory, so
+            // /public/uploads/... 404s on any standard deployment.
+            $urlPath = preg_replace('#^public/#', '', $relPath);
+            $url = url($urlPath);
+        } else {
+            // Wasabi / S3. Storage::disk()->url() returns a relative path
+            // when the disk's `url` config is empty (e.g. WASABI_URL='' in
+            // the env) — that's why the rendered <img> on live showed
+            // `/public/uploads/...` even after we routed the upload to
+            // Wasabi. Build the full https URL from endpoint + bucket
+            // ourselves so it works without requiring WASABI_URL to be set.
+            $diskCfg = config('filesystems.disks.' . $driver);
+            $explicitUrl = $diskCfg['url'] ?? null;
+            if ($explicitUrl) {
+                $url = rtrim($explicitUrl, '/') . '/' . ltrim($relPath, '/');
+            } else {
+                $endpoint = rtrim((string) ($diskCfg['endpoint'] ?? ''), '/');
+                $bucket   = (string) ($diskCfg['bucket'] ?? '');
+                $usePathStyle = (bool) ($diskCfg['use_path_style_endpoint'] ?? false);
+                if ($endpoint && $bucket) {
+                    if ($usePathStyle) {
+                        // {endpoint}/{bucket}/{path}
+                        $url = $endpoint . '/' . $bucket . '/' . ltrim($relPath, '/');
+                    } else {
+                        // Virtual-hosted: {bucket}.{endpoint-host}/{path}
+                        $parts = parse_url($endpoint);
+                        $scheme = $parts['scheme'] ?? 'https';
+                        $host   = $parts['host']   ?? '';
+                        $url    = $scheme . '://' . $bucket . '.' . $host . '/' . ltrim($relPath, '/');
+                    }
+                } else {
+                    // Last-resort fallback so we never return a broken
+                    // /public/... path. Let Storage try; if it returns
+                    // something usable, fine, otherwise the caller sees
+                    // an obviously-bad URL and can investigate the disk
+                    // config rather than wondering why the image is blank.
+                    $url = \Storage::disk($driver)->url($relPath);
+                }
+            }
+        }
+
         // Cache-buster keyed on the row's updated_at — old rows that still
         // carry the fixed "brand_logo.png" filename get a fresh URL whenever
-        // the resort record is touched. New stamped filenames already bypass
+        // the resort record is touched. Stamped filenames already bypass
         // cache; the suffix is harmless there.
         $stamp = optional($resort->updated_at)->getTimestamp();
         return $stamp ? $url . '?v=' . $stamp : $url;

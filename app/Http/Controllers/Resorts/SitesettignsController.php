@@ -136,18 +136,56 @@ class SitesettignsController extends Controller
                         $ext      = $logoFile->getClientOriginalExtension();
                         $fileName = 'brand_logo_' . time() . '.' . $ext;
                         $basePath = config('settings.brand_logo_folder');
-                        $driver   = env('STORAGE_DRIVER', 'local');
+                        $driver   = config('settings.storage_driver');
 
-                        if ($driver === 'local') {
-                            Common::uploadFile($logoFile, $fileName, $basePath);
-                        } else {
-                            // Storage::disk handles directory creation, content
-                            // type detection, and bucket-relative paths for
-                            // both 'wasabi' and 's3' disks defined in
-                            // config/filesystems.php.
-                            \Storage::disk($driver)->putFileAs($basePath, $logoFile, $fileName);
+                        // Diagnostic log so live can confirm: did the upload
+                        // actually route via Wasabi, and what's the resolved
+                        // driver? Removable once the live issue is closed.
+                        \Log::info('[brand-logo-upload] start', [
+                            'driver'      => $driver,
+                            'base_path'   => $basePath,
+                            'file_name'   => $fileName,
+                            'orig_name'   => $logoFile->getClientOriginalName(),
+                            'size_bytes'  => $logoFile->getSize(),
+                            'resort_id'   => $resort_id,
+                        ]);
+
+                        try {
+                            if ($driver === 'local') {
+                                Common::uploadFile($logoFile, $fileName, $basePath);
+                                \Log::info('[brand-logo-upload] LOCAL ok', ['path' => $basePath . '/' . $fileName]);
+                            } else {
+                                // Storage::disk handles directory creation,
+                                // content-type detection, and bucket paths
+                                // for the 'wasabi' / 's3' disks.
+                                $stored = \Storage::disk($driver)->putFileAs($basePath, $logoFile, $fileName);
+                                \Log::info('[brand-logo-upload] '.strtoupper($driver).' putFileAs returned', ['stored' => $stored]);
+
+                                // Confirm the file actually landed by re-reading
+                                // the object. If exists() returns false the
+                                // upload silently failed (credentials, ACL,
+                                // bucket policy, etc.) and the DB column would
+                                // point at a non-existent object.
+                                $exists = \Storage::disk($driver)->exists($basePath . '/' . $fileName);
+                                \Log::info('[brand-logo-upload] post-write exists()', ['exists' => $exists]);
+                            }
+                            $resort->logo = $fileName;
+                        } catch (\Throwable $e) {
+                            \Log::error('[brand-logo-upload] FAILED', [
+                                'driver'    => $driver,
+                                'exception' => get_class($e),
+                                'message'   => $e->getMessage(),
+                                'file'      => $e->getFile(),
+                                'line'      => $e->getLine(),
+                            ]);
+                            // Surface the error to the AJAX caller so the
+                            // toastr shows something actionable instead of a
+                            // green success while the file went nowhere.
+                            return response()->json([
+                                'success' => false,
+                                'msg'     => 'Logo upload failed: ' . $e->getMessage(),
+                            ], 500);
                         }
-                        $resort->logo = $fileName;
                     }
 
                     $resort->save();
