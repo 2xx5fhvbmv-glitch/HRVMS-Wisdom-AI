@@ -1106,12 +1106,22 @@ class Common
         if (!$resort || !$resort->logo) {
             return url(config('settings.default_picture'));
         }
-        $url = url(config('settings.brand_logo_folder')) . '/' . $resort->logo;
-        // Cache-buster keyed on the row's updated_at. Old DB rows that still
+        // Resolve via the same disk we upload to (env STORAGE_DRIVER).
+        // On prod (wasabi/s3) Storage::disk()->url() returns the
+        // bucket-served URL; locally url() falls through to the public path.
+        // Without this, prod uploads land on Wasabi but the page kept
+        // generating the wrong /public/uploads/... URL and showed the
+        // default placeholder.
+        $basePath = config('settings.brand_logo_folder');
+        $driver   = env('STORAGE_DRIVER', 'local');
+        $relPath  = $basePath . '/' . $resort->logo;
+        $url = ($driver === 'local')
+            ? url($relPath)
+            : \Storage::disk($driver)->url($relPath);
+        // Cache-buster keyed on the row's updated_at — old rows that still
         // carry the fixed "brand_logo.png" filename get a fresh URL whenever
-        // the resort record is touched, so the browser stops serving the
-        // stale cached image. New uploads (timestamped filenames) already
-        // bypass cache, but the suffix is harmless there.
+        // the resort record is touched. New stamped filenames already bypass
+        // cache; the suffix is harmless there.
         $stamp = optional($resort->updated_at)->getTimestamp();
         return $stamp ? $url . '?v=' . $stamp : $url;
 	}

@@ -356,14 +356,17 @@ $(document).ready(function(){
                                 toastr.success(response.msg, "Success", {
                                     positionClass: 'toast-bottom-right'
                                 });
-                                // Refresh the brand-logo preview with the
-                                // server-returned URL (already cache-busted
-                                // via ?v=<timestamp>). Without this the
-                                // user sees no visual confirmation that
-                                // the new logo took effect.
-                                if (response.logo_url) {
-                                    $('#Resortimg').attr('src', response.logo_url);
-                                }
+                                // Full reload after save so the brand-logo
+                                // preview AND every other place that calls
+                                // Common::GetResortLogo (header bar, etc.)
+                                // pick up the new image. The server-side
+                                // cache-buster (?v=<updated_at>) makes the
+                                // browser fetch the fresh file from Wasabi
+                                // / S3 / local instead of the cached copy.
+                                // Delay long enough for the toaster to read.
+                                setTimeout(function () {
+                                    window.location.reload();
+                                }, 900);
                             } else {
                                 toastr.error(response.msg, "Error", {
                                     positionClass: 'toast-bottom-right'

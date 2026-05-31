@@ -121,17 +121,32 @@ class SitesettignsController extends Controller
                     // - Detection: use hasFile(), not isset(). isset() is true
                     //   even when the multipart field is present with no actual
                     //   file, and getClientOriginalExtension() then throws.
-                    // - Unique filename: the previous build wrote
-                    //   "brand_logo.{ext}" every time. Browsers aggressively
-                    //   cached the URL, so users uploaded a new logo and
-                    //   the OLD one kept showing — the "not uploading"
-                    //   symptom. Suffix the filename with a timestamp so
-                    //   each upload has a unique URL and naturally busts
-                    //   the cache.
+                    // - Unique filename: previous build wrote "brand_logo.{ext}"
+                    //   every time → cached old logo never refreshed. Stamped
+                    //   filename gives each upload a unique URL.
+                    // - Storage driver: route via STORAGE_DRIVER env so prod
+                    //   (where the local public/ folder isn't writable from
+                    //   the app server) hits Wasabi instead. Same pattern as
+                    //   Common::UploadProfileAwsPic. Without this the upload
+                    //   "worked" locally but silently failed on live because
+                    //   the file was written to a path the web server never
+                    //   served.
                     if ($request->hasFile('profile_picture')) {
-                        $ext = $request->file('profile_picture')->getClientOriginalExtension();
+                        $logoFile = $request->file('profile_picture');
+                        $ext      = $logoFile->getClientOriginalExtension();
                         $fileName = 'brand_logo_' . time() . '.' . $ext;
-                        Common::uploadFile($request->file('profile_picture'), $fileName, config('settings.brand_logo_folder'));
+                        $basePath = config('settings.brand_logo_folder');
+                        $driver   = env('STORAGE_DRIVER', 'local');
+
+                        if ($driver === 'local') {
+                            Common::uploadFile($logoFile, $fileName, $basePath);
+                        } else {
+                            // Storage::disk handles directory creation, content
+                            // type detection, and bucket-relative paths for
+                            // both 'wasabi' and 's3' disks defined in
+                            // config/filesystems.php.
+                            \Storage::disk($driver)->putFileAs($basePath, $logoFile, $fileName);
+                        }
                         $resort->logo = $fileName;
                     }
 
