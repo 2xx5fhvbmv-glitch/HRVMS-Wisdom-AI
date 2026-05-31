@@ -22,9 +22,26 @@
                 @php
                     $currentEmployee = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
                     $rankPos = $currentEmployee ? App\Helpers\Common::getEmployeeRankPosition($currentEmployee) : ['rank' => null];
-                    $isSupervisor = ($rankPos['rank'] ?? '') === 'SUP';
+                    $currentRank = $rankPos['rank'] ?? '';
+
+                    // Original gate: Supervisor only.
+                    $isSupervisor = $currentRank === 'SUP';
+
+                    // Additional gate: Finance department HOD / XCOM.
+                    // Finance leadership owns payroll execution alongside HR,
+                    // so the Run Payroll button now appears for them too.
+                    // Uses the canonical Common::isFinanceDepartment helper
+                    // (matches "Finance", "Accounting", "Accounts", common
+                    // short codes, and loose-contains variants like
+                    // "Finance & Accounting") rather than hard-coding a
+                    // single department name.
+                    $isFinanceLead = $currentEmployee
+                        && in_array($currentRank, ['HOD', 'EXCOM'], true)
+                        && App\Helpers\Common::isFinanceDepartment($currentEmployee->Dept_id ?? null);
+
+                    $canRunPayroll = $isSupervisor || $isFinanceLead;
                 @endphp
-                @if($isSupervisor)
+                @if($canRunPayroll)
                 <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
                 @endif
             </div>
