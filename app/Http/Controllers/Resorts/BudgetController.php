@@ -2327,18 +2327,19 @@ class BudgetController extends Controller
             $year = $request->input('year', date('Y'));
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
-            // Get manning response for this department
+            // Get manning response for this department — OPTIONAL. The
+            // previous build returned `success: false` when the dept had
+            // no manning row yet, which silently zero'd out the dept's
+            // sub-tree (sections + positions + employee badges) in the
+            // view-budget JS. The "No budget found for this department"
+            // banner came from here. The dept catalog itself — sections,
+            // positions, employees — exists independently of manning, so
+            // we return the structure regardless. Manning is only needed
+            // for the workflow-state metadata which we leave null.
             $manningResponse = ManningResponse::where('dept_id', $departmentId)
                 ->where('year', $year)
                 ->where('resort_id', $resortId)
                 ->first();
-
-            if (!$manningResponse) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No budget found for this department'
-                ]);
-            }
 
             // Get sections
             $sections = ResortSection::where('dept_id', $departmentId)
