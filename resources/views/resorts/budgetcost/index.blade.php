@@ -198,10 +198,10 @@
                         </div>
 
                         <div class="form-group mb-20">
-                            
-                            <label  class="form-label " for="cost-select">Select Details<span class="req_span">*</span></label>    
+
+                            <label  class="form-label " for="cost-select">Select Details<span class="req_span">*</span></label>
                             <select id="details-select" name="details"
-                               data-parsley-errors-container="#div-details" 
+                               data-parsley-errors-container="#div-details"
                                required data-parsley-required-message="Please select a details."
                              class="form-select select2t-none" required>
                                 <option value="">Select Details</option>
@@ -212,6 +212,29 @@
                             </select>
                             <div id="div-details"></div>
 
+                        </div>
+
+                        {{-- Benefit-grade scope. Comma-separated list of
+                             benefit_grid_level ids that this template applies
+                             to. The eligibility filter on `details`
+                             (Xpat / Locals / Muslim / Both) intersects with
+                             this — an employee must match BOTH to receive
+                             the cost. Leave blank for "all grades". --}}
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="benefit-grid-levels-select">
+                                Limit to Benefit Grades
+                                <small class="text-muted ms-1" style="font-weight:400;">(optional — leave blank for all)</small>
+                            </label>
+                            <select id="benefit-grid-levels-select" name="benefit_grid_levels[]" class="form-select select2t-none" multiple data-placeholder="All grades (no filter)">
+                                @php $_eligMap = config('settings.eligibilty', []); ksort($_eligMap); @endphp
+                                @foreach($_eligMap as $level => $label)
+                                    <option value="{{ $level }}">{{ $label }} (level {{ $level }})</option>
+                                @endforeach
+                            </select>
+                            <small class="form-text text-muted" style="font-size:11px;">
+                                Examples: <strong>Medical Insurance International</strong> → tick EXCOM + GM only.
+                                <strong>OT</strong> → tick SUP + Line Workers only.
+                            </small>
                         </div>
 
                         <div class="form-group mb-3">

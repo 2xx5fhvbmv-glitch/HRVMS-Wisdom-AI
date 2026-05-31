@@ -1038,7 +1038,7 @@ class BudgetController extends Controller
                 ->where('resort_id', $resortId)
                 ->where('Dept_id', $dept->id)
                 ->where('status', 'Active')
-                ->get(['id', 'Position_id', 'nationality', 'religion', 'basic_salary', 'proposed_salary']);
+                ->get(['id', 'Position_id', 'nationality', 'religion', 'basic_salary', 'proposed_salary', 'benefit_grid_level']);
 
             if ($employees->isEmpty()) continue;
 
