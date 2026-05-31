@@ -339,10 +339,105 @@ class LiabilityEstimationController extends Controller
         // No 'Recruitment Fee' slice — actual recruitment spend isn't
         // tracked in any table; the Est-vs-Actual row shows the budgeted
         // figure (Estimated column) with $0 Actual by design.
-        // Service Charge intentionally absent — it's a pass-through to
-        // employees, not a resort cost, so it neither reduces the
-        // liability nor belongs in the Cost Distribution doughnut.
-        $chartData = [
+        // === Cost Distribution chart: ANNUAL estimated breakdown ===
+        //
+        // Previously this chart showed YTD payroll + renewal totals only,
+        // which meant cost-template items budgeted but never tracked as
+        // discrete spend events (Food Cost, Pension, Tickets, Ramadan
+        // Bonus, …) never appeared. HR couldn't see "where the money
+        // is budgeted to go" — only "what's been paid so far". Switched
+        // to annual estimated distribution so every line item in
+        // resort_budget_costs gets a slice, sized by its annual
+        // contribution to Total Estimated Liability.
+        //
+        // Slice sources:
+        //   • Salaries       = SUM of active employees' basic_salary × 12
+        //   • Per-Template   = SUM of annualCostForEmployee(t, e) over all
+        //                       active employees (one slice per template:
+        //                       Food Cost, Pension, OT Normal, …)
+        //   • Per-Allowance  = SUM of employees_allowance × 12 by type
+        //                       (matches the per-employee allowance leg)
+        //   • Vacant Slots   = SUM of annualBudgetForVacantSlot
+        //
+        // Service Charge intentionally absent — pass-through cost.
+        $chartData = [];
+
+        // --- Salaries leg (active employees, basic × 12) ---
+        $salariesAnnual = 0.0;
+        foreach ($activeForBreakdown as $emp) {
+            $shared = (float) (($emp->proposed_salary ?? 0) > 0
+                ? $emp->proposed_salary
+                : ($emp->basic_salary ?? 0));
+            $salariesAnnual += $shared * 12;
+        }
+        if ($salariesAnnual > 0) {
+            $chartData['Salaries'] = round($salariesAnnual, 2);
+        }
+
+        // --- Per-template legs (one slice per resort_budget_costs row) ---
+        // Tiny templates (< 0.5% of the leg) get rolled into "Other"
+        // so a 23-slice doughnut doesn't become unreadable.
+        $perTemplate = [];
+        foreach ($costsForBreakdown as $cost) {
+            $sum = 0.0;
+            foreach ($activeForBreakdown as $emp) {
+                $sum += Common::annualCostForEmployee($resortId, $currentYear, $cost, $emp);
+            }
+            if ($sum > 0) {
+                $label = $cost->particulars ?: ($cost->cost_title ?: 'Other');
+                $perTemplate[$label] = ($perTemplate[$label] ?? 0) + $sum;
+            }
+        }
+        arsort($perTemplate);
+        // Roll small templates into Other for readability.
+        $threshold = max(($estLegCostTemplate ?? array_sum($perTemplate)) * 0.005, 1.0);
+        $other = 0.0;
+        foreach ($perTemplate as $label => $val) {
+            if ($val < $threshold) {
+                $other += $val;
+            } else {
+                $chartData[$label] = round($val, 2);
+            }
+        }
+        if ($other > 0) {
+            $chartData['Other Cost Templates'] = round($other, 2);
+        }
+
+        // --- Per-employee allowance leg (employees_allowance × 12) ---
+        // These slices come from a SEPARATE table (employees_allowance),
+        // not from cost templates. Surfacing them as their own slices
+        // matches the breakdown modal's "Per-Employee Allowances" leg.
+        if (!empty($empIdsForBreakdown ?? [])) {
+            $allowanceByType = DB::table('employees_allowance')
+                ->whereIn('employee_id', $empIdsForBreakdown)
+                ->selectRaw(
+                    "amount_unit, allowance_type, COALESCE(SUM(CASE WHEN amount_unit = 'MVR' "
+                  . "THEN amount * (1.0 / {$dollarToMvr}) ELSE amount END), 0) as total"
+                )
+                ->groupBy('amount_unit', 'allowance_type')
+                ->get();
+            // Bucket by allowance_type (sum across MVR/USD rows of same name)
+            $allowanceUsdAnnual = [];
+            foreach ($allowanceByType as $row) {
+                $key = $row->allowance_type ?: 'Allowance';
+                $allowanceUsdAnnual[$key] = ($allowanceUsdAnnual[$key] ?? 0) + ((float) $row->total * 12);
+            }
+            foreach ($allowanceUsdAnnual as $type => $annualTotal) {
+                if ($annualTotal > 0) {
+                    $chartData['Allowance - ' . ucfirst($type)] = round($annualTotal, 2);
+                }
+            }
+        }
+
+        // --- Vacant slots leg ---
+        if (($estLegVacant ?? 0) > 0) {
+            $chartData['Vacant Slots'] = round($estLegVacant, 2);
+        }
+
+        // === YTD actuals (for the Estimation vs Actual table only) ===
+        // The Est-vs-Actual table needs YTD spend per category, not the
+        // annual estimated values now in $chartData. Build that here.
+        $ytdActuals = [
             'Salaries'         => (float) ($payrollReviews->salaries ?? 0),
             'OTA'              => (float) ($payrollReviews->ota ?? 0),
             'Work Permit'      => (float) $totalPermit,
@@ -350,13 +445,11 @@ class LiabilityEstimationController extends Controller
             'Quota Slot'       => (float) $totalQuota,
             'Medical Permit'   => (float) $totalMedical,
             'Insurance'        => (float) $totalInsurance,
+            'Recruitment Fee'  => 0.0, // no actual tracking; estimated only
         ];
-
-        // Allowance breakdown is already in USD after the CASE WHEN above.
         foreach ($allowanceBreakdown as $type => $amount) {
-            $chartData["Allowance - " . ucfirst($type)] = (float) $amount;
+            $ytdActuals['Allowance - ' . ucfirst($type)] = (float) $amount;
         }
-        // dd($chartData);
 
         // Monthly buckets — same source as $payrollLiability above (sum of
         // the four component columns across approved + locked payrolls) so
@@ -575,18 +668,22 @@ class LiabilityEstimationController extends Controller
         // → employee distribution), neither part of the budgeted
         // commitment nor a real resort cost, so showing it in this
         // table conflated two different ledgers.
+        // Est-vs-Actual table — Estimated column reads from the annual
+        // budget categorisation ($estimatedByCategory); Actual column
+        // reads from $ytdActuals (YTD spend). $chartData is now the
+        // annual doughnut data and is intentionally not used here.
         $estVsActualRows = [
-            ['label' => 'Salaries',        'estimated' => $estimatedByCategory['Salaries'],        'actual' => $chartData['Salaries']        ?? 0],
-            ['label' => 'Overtime',        'estimated' => $estimatedByCategory['Overtime'],        'actual' => $chartData['OTA']             ?? 0],
-            ['label' => 'Work Permit',     'estimated' => $estimatedByCategory['Work Permit'],     'actual' => $chartData['Work Permit']     ?? 0],
-            ['label' => 'Medical',         'estimated' => $estimatedByCategory['Medical'],         'actual' => $chartData['Medical Permit']  ?? 0],
-            ['label' => 'Insurance',       'estimated' => $estimatedByCategory['Insurance'],       'actual' => $chartData['Insurance']       ?? 0],
-            ['label' => 'Quota',           'estimated' => $estimatedByCategory['Quota'],           'actual' => $chartData['Quota Slot']      ?? 0],
-            ['label' => 'Visa',            'estimated' => $estimatedByCategory['Visa'],            'actual' => $chartData['Visa']            ?? 0],
+            ['label' => 'Salaries',        'estimated' => $estimatedByCategory['Salaries'],        'actual' => $ytdActuals['Salaries']        ?? 0],
+            ['label' => 'Overtime',        'estimated' => $estimatedByCategory['Overtime'],        'actual' => $ytdActuals['OTA']             ?? 0],
+            ['label' => 'Work Permit',     'estimated' => $estimatedByCategory['Work Permit'],     'actual' => $ytdActuals['Work Permit']     ?? 0],
+            ['label' => 'Medical',         'estimated' => $estimatedByCategory['Medical'],         'actual' => $ytdActuals['Medical Permit']  ?? 0],
+            ['label' => 'Insurance',       'estimated' => $estimatedByCategory['Insurance'],       'actual' => $ytdActuals['Insurance']       ?? 0],
+            ['label' => 'Quota',           'estimated' => $estimatedByCategory['Quota'],           'actual' => $ytdActuals['Quota Slot']      ?? 0],
+            ['label' => 'Visa',            'estimated' => $estimatedByCategory['Visa'],            'actual' => $ytdActuals['Visa']            ?? 0],
             // Recruitment Fee has no actual-spend source (no recruitment
             // ledger in this codebase), so actual stays 0 by design — the
             // estimated column still reflects the budget commitment.
-            ['label' => 'Recruitment Fee', 'estimated' => $estimatedByCategory['Recruitment Fee'], 'actual' => $chartData['Recruitment Fee'] ?? 0],
+            ['label' => 'Recruitment Fee', 'estimated' => $estimatedByCategory['Recruitment Fee'], 'actual' => $ytdActuals['Recruitment Fee'] ?? 0],
         ];
         // Case-insensitive lookup: allowanceEstimated is keyed by the cost
         // template's `particulars` field ("Language Allowance"), while
