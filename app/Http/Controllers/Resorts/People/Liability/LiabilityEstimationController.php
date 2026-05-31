@@ -404,27 +404,26 @@ class LiabilityEstimationController extends Controller
         }
 
         // --- Per-employee allowance leg (employees_allowance × 12) ---
-        // These slices come from a SEPARATE table (employees_allowance),
-        // not from cost templates. Surfacing them as their own slices
-        // matches the breakdown modal's "Per-Employee Allowances" leg.
+        // employees_allowance.allowance_id → resort_budget_costs.id, so the
+        // label comes from joining to resort_budget_costs.particulars.
+        // (There is no `allowance_type` column on employees_allowance — an
+        // earlier draft of this code assumed there was one and crashed
+        // the page on live with a SQL error.)
         if (!empty($empIdsForBreakdown ?? [])) {
-            $allowanceByType = DB::table('employees_allowance')
-                ->whereIn('employee_id', $empIdsForBreakdown)
+            $allowanceByType = DB::table('employees_allowance as ea')
+                ->leftJoin('resort_budget_costs as rbc', 'rbc.id', '=', 'ea.allowance_id')
+                ->whereIn('ea.employee_id', $empIdsForBreakdown)
                 ->selectRaw(
-                    "amount_unit, allowance_type, COALESCE(SUM(CASE WHEN amount_unit = 'MVR' "
-                  . "THEN amount * (1.0 / {$dollarToMvr}) ELSE amount END), 0) as total"
+                    "COALESCE(rbc.particulars, 'Allowance') as type_label, "
+                  . "COALESCE(SUM(CASE WHEN ea.amount_unit = 'MVR' "
+                  . "THEN ea.amount * (1.0 / {$dollarToMvr}) ELSE ea.amount END), 0) as monthly_total"
                 )
-                ->groupBy('amount_unit', 'allowance_type')
+                ->groupBy('rbc.particulars')
                 ->get();
-            // Bucket by allowance_type (sum across MVR/USD rows of same name)
-            $allowanceUsdAnnual = [];
             foreach ($allowanceByType as $row) {
-                $key = $row->allowance_type ?: 'Allowance';
-                $allowanceUsdAnnual[$key] = ($allowanceUsdAnnual[$key] ?? 0) + ((float) $row->total * 12);
-            }
-            foreach ($allowanceUsdAnnual as $type => $annualTotal) {
+                $annualTotal = (float) $row->monthly_total * 12;
                 if ($annualTotal > 0) {
-                    $chartData['Allowance - ' . ucfirst($type)] = round($annualTotal, 2);
+                    $chartData['Allowance - ' . ucfirst($row->type_label)] = round($annualTotal, 2);
                 }
             }
         }
