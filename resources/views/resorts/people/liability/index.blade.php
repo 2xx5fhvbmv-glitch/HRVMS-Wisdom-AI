@@ -35,12 +35,12 @@
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight position-relative" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#liabilityBreakdownModal" title="Click for breakdown">
                             <h6>
-                                Liability Reduction
+                                Remaining Liability
                                 <i class="fa-solid fa-circle-info ms-1 text-primary" style="font-size:13px;"></i>
                             </h6>
                             <strong>{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
                             <small class="d-block text-muted mt-1" style="font-size:11px;">
-                                Estimated − Current. Click for breakdown.
+                                Budget still on the books. Click for breakdown.
                             </small>
                         </div>
                     </div>
@@ -57,13 +57,13 @@
                             <div class="modal-header">
                                 <h5 class="modal-title" id="liabilityBreakdownLabel">
                                     <i class="fa-solid fa-calculator me-2"></i>
-                                    Liability Reduction — Breakdown
+                                    Remaining Liability — Breakdown
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
                                 <p class="text-muted small mb-3">
-                                    "Liability Reduction" = Total Estimated − Current Liability. It represents the budget that is <strong>still on the books</strong> for the rest of the year (not what has been "reduced" so far). Early in the year, with few payroll runs and no renewals, this number is naturally close to the full estimated total.
+                                    <strong>Remaining Liability</strong> = Total Estimated − Current Liability. It is what is <strong>still on the books</strong> for the rest of the year, not what has already been paid. With only one payroll run so far, almost the full year's budget is naturally still ahead — that's why this number is close to the full estimated total. Each completed payroll, work-permit renewal, insurance bill, etc. shifts dollars from <em>Remaining</em> into <em>Current Liability</em>, and Remaining shrinks toward zero by year-end.
                                 </p>
 
                                 {{-- Total Estimated leg breakdown --}}
@@ -136,13 +136,13 @@
                                     </div>
                                     <hr class="my-2">
                                     <div class="d-flex justify-content-between">
-                                        <span class="fw-bold">= Liability Reduction (remaining)</span>
+                                        <span class="fw-bold">= Remaining Liability</span>
                                         <strong class="text-primary">{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
                                     </div>
                                 </div>
 
                                 <small class="text-muted d-block mt-3" style="font-size:11px;">
-                                    Tip: cost-template items like Food Cost and Pension are part of the Total Estimated but are not currently tracked as discrete spend events — they stay in the Reduction balance all year until the resort wires in actual-spend tracking.
+                                    Tip: cost-template items like Food Cost and Pension are part of the Total Estimated but are not yet tracked as discrete spend events — they stay in the Remaining balance all year until the resort wires in actual-spend tracking.
                                 </small>
                             </div>
                             <div class="modal-footer">
@@ -208,7 +208,7 @@
                                 <div class="col-lg-6">
                                     <div class="bg-themeGrayLight h-100">
                                         <div class="card-title">
-                                            <h3>Liability Reduction Trend</h3>
+                                            <h3>Remaining Liability Trend</h3>
                                         </div>
                                         <div class="mb-md-4 mb-2"> <canvas id="liabilityTrendChart" width="802"
                                                 height="293"></canvas>
