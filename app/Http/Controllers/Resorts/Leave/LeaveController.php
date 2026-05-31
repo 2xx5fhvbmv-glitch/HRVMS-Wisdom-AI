@@ -890,11 +890,24 @@ class LeaveController extends Controller
         // which dropped the user onto the global Leave Requests list filtered
         // (loosely) by employee — confusing UX, since "see this employee's
         // leave" should open THIS employee's leave page, not a filtered list.
+        //
+        // Resort scope is intentionally loose: we try the current resort
+        // first, then fall back to any resort the employee has leaves in.
+        // Edge case: an employee transferred between resorts may have a
+        // leave row whose `resort_id` differs from the current login's
+        // resort. The strict filter dropped those rows and the user landed
+        // on the empty-state fallback even though leaves exist.
         $latestLeave = EmployeeLeave::where('emp_id', $empIdInt)
             ->where('resort_id', $this->resort->resort_id)
             ->latest('id')
             ->select('id')
             ->first();
+        if (!$latestLeave) {
+            $latestLeave = EmployeeLeave::where('emp_id', $empIdInt)
+                ->latest('id')
+                ->select('id')
+                ->first();
+        }
 
         if ($latestLeave) {
             return redirect()->route('leave.details', [
