@@ -356,6 +356,14 @@ $(document).ready(function(){
                                 toastr.success(response.msg, "Success", {
                                     positionClass: 'toast-bottom-right'
                                 });
+                                // Refresh the brand-logo preview with the
+                                // server-returned URL (already cache-busted
+                                // via ?v=<timestamp>). Without this the
+                                // user sees no visual confirmation that
+                                // the new logo took effect.
+                                if (response.logo_url) {
+                                    $('#Resortimg').attr('src', response.logo_url);
+                                }
                             } else {
                                 toastr.error(response.msg, "Error", {
                                     positionClass: 'toast-bottom-right'

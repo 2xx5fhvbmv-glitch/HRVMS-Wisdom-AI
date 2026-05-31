@@ -1102,15 +1102,18 @@ class Common
 
     public static function GetResortLogo($resortid)
 	{
-        $logo = Resort::find($resortid);
-        if ($logo->logo == null)
-        {
-            $logo = url( config('settings.default_picture'));
+        $resort = Resort::find($resortid);
+        if (!$resort || !$resort->logo) {
+            return url(config('settings.default_picture'));
         }
-        else{
-            $logo = url(config('settings.brand_logo_folder'))."/".$logo->logo;
-        }
-        return $logo;
+        $url = url(config('settings.brand_logo_folder')) . '/' . $resort->logo;
+        // Cache-buster keyed on the row's updated_at. Old DB rows that still
+        // carry the fixed "brand_logo.png" filename get a fresh URL whenever
+        // the resort record is touched, so the browser stops serving the
+        // stale cached image. New uploads (timestamped filenames) already
+        // bypass cache, but the suffix is harmless there.
+        $stamp = optional($resort->updated_at)->getTimestamp();
+        return $stamp ? $url . '?v=' . $stamp : $url;
 	}
 
     public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="")

@@ -116,44 +116,34 @@ class SitesettignsController extends Controller
                     $resort->city = $request->city;
                     $resort->zip  = $request->zip;
 
-                    if (isset($request->profile_picture)) {
-
-                        $fileName = "brand_logo." . $request->profile_picture->getClientOriginalExtension();
-                        Common::uploadFile($request->profile_picture, $fileName, config('settings.brand_logo_folder'));
+                    // Brand logo upload.
+                    //
+                    // - Detection: use hasFile(), not isset(). isset() is true
+                    //   even when the multipart field is present with no actual
+                    //   file, and getClientOriginalExtension() then throws.
+                    // - Unique filename: the previous build wrote
+                    //   "brand_logo.{ext}" every time. Browsers aggressively
+                    //   cached the URL, so users uploaded a new logo and
+                    //   the OLD one kept showing — the "not uploading"
+                    //   symptom. Suffix the filename with a timestamp so
+                    //   each upload has a unique URL and naturally busts
+                    //   the cache.
+                    if ($request->hasFile('profile_picture')) {
+                        $ext = $request->file('profile_picture')->getClientOriginalExtension();
+                        $fileName = 'brand_logo_' . time() . '.' . $ext;
+                        Common::uploadFile($request->file('profile_picture'), $fileName, config('settings.brand_logo_folder'));
                         $resort->logo = $fileName;
-
-                        
                     }
 
                     $resort->save();
 
-                    // if($request->hasFile('header_img'))
-                    // {
-                    //         $header_img = $request->file('header_img');
-
-                    //         $newhimg = $header_img->getClientOriginalName();
-
-                    //         $header_img->move($Path, $newhimg);
-                    //         $collection['header_img']= $newhimg;
-                    // }
-
-
-                    if($request->hasFile('signature_img'))
-                    {
-                            $signature_img = $request->file('signature_img');
-                            $newsimg = $signature_img->getClientOriginalName();
-                            $signature_img->move($Path, $newsimg);
-                            $collection['signature_img']= $newsimg;
-                    }
-
-
-                    if($request->hasFile('footer_img'))
-                    {
-                            $footer_img = $request->file('footer_img');
-                            $newfimg = $footer_img->getClientOriginalName();
-                            $footer_img->move($Path, $newfimg);
-                            $collection['footer_img']= $newfimg;
-                    }
+                    // signature_img / footer_img were previously handled here
+                    // but referenced an undefined $Path variable (would 500 the
+                    // request the moment either field was sent). The matching
+                    // view inputs are commented out, so the dead branches are
+                    // removed rather than left as latent landmines. When/if the
+                    // inputs come back, wire them through Common::uploadFile
+                    // the same way the brand logo above does.
 
 
 
@@ -163,9 +153,14 @@ class SitesettignsController extends Controller
                         ['resort_id' => $resort_id], // Correct key-value array for the condition
                         $collection // The data to be updated or created
                     );
-                $response['success'] = true;
 
-                $response['msg'] ="Site settings Updated successfully";
+                $response['success'] = true;
+                $response['msg']     = 'Site settings Updated successfully';
+                // Returning the fresh logo URL so the AJAX success handler
+                // can swap the preview <img src> without a full page reload.
+                // Already includes the cache-busting ?v=<timestamp> applied
+                // by Common::GetResortLogo.
+                $response['logo_url'] = Common::GetResortLogo($resort_id);
                 return response()->json($response);
             }
                 catch(\Exception $e)
