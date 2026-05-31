@@ -236,6 +236,10 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     /** Budget **/
     Route::get( '/budget/view-manning','BudgetController@ViewManning')->name('resort.budget.manning');
     Route::get( '/budget/view-budget','BudgetController@ViewBudget')->name('resort.budget.viewbudget');
+    // Clone a year's manning + per-employee/vacant overrides into a new
+    // year so HR isn't forced to re-enter every per-month override row
+    // by row when starting cycle N+1. Idempotent — safe to re-run.
+    Route::post('/budget/clone-from-year', 'BudgetController@cloneBudgetFromYear')->name('resort.budget.clone-from-year');
     Route::get('/resort/budget/get', 'BudgetController@ajaxViewBudget')->name('budget.view.ajax');
 
     // Hierarchical Budget API Routes

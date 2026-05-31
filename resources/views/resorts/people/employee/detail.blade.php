@@ -969,10 +969,15 @@
                                                                 <th>TIN:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->tin ?? "N/A"}}</span>
+                                                                    {{-- Maldives MIRA TIN: 10 digits, optionally prefixed
+                                                                         by a single letter. Server-side regex in
+                                                                         EmployeeController@updateEmploymentData enforces
+                                                                         the same rule so an API submit can't bypass. --}}
                                                                     <input type="text" class="form-control edit-mode d-none" name="tin" id="tin-input"
-                                                                           pattern="\d{6,10}" maxlength="10"
+                                                                           pattern="^[A-Za-z]?\d{10}$" maxlength="11"
                                                                            value="{{$employee->tin}}"
-                                                                           placeholder="6–10 digit TIN">
+                                                                           title="10 digits, optionally prefixed by a single letter (e.g. A1234567890)."
+                                                                           placeholder="10-digit Maldives TIN">
                                                                     {{-- Required-TIN notice — appears when EWT Status is
                                                                          toggled on in Salary Details below. JS in
                                                                          `submitEmploymentUpdate` also blocks save if
@@ -2721,9 +2726,15 @@
                     }
                 },
                 error: function (xhr) {
-                    toastr.error('Something went wrong.', "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                    // Surface server-side validation errors (422) verbatim
+                    // so HR sees the actual rule that bit them (e.g.
+                    // "TIN must be 10 digits …", "TIN is required when
+                    // EWT Status is Enrolled."). Falls back to a generic
+                    // message for non-validation errors.
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                        ? xhr.responseJSON.message
+                        : 'Something went wrong.';
+                    toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
                     console.log(xhr.responseText);
                     $confirmBtn.prop('disabled', false).html('Yes, Save Changes');
                 }

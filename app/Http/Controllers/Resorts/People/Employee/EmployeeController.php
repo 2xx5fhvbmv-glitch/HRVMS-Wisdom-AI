@@ -1419,6 +1419,31 @@ class EmployeeController extends Controller
 
     public function updateEmploymentData(Request $request)
     {
+        // TIN format validation. Maldives MIRA TINs are 10 digits, with a
+        // 1-letter prefix (commonly "A" or "B") in some encodings. We
+        // accept either 10 digits, or a single letter followed by 10
+        // digits, and trim whitespace. Empty TIN is allowed (only required
+        // when EWT Status is Enrolled — that gate is already enforced
+        // client-side and on the request below). Server-side validation
+        // exists so the rule still bites if a user submits via API or
+        // bypasses the JS.
+        $tin = trim((string) $request->input('tin', ''));
+        if ($tin !== '' && !preg_match('/^[A-Za-z]?\d{10}$/', $tin)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'TIN must be 10 digits (Maldives MIRA format), optionally prefixed by a single letter.',
+            ], 422);
+        }
+        // EWT enrolled → TIN required. Mirrors the client gate at
+        // detail.blade.php:2700+, so a forged submit that strips the
+        // disabled state is still rejected at the server.
+        if ((string) $request->input('ewt_status') === '1' && $tin === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'TIN is required when EWT Status is Enrolled.',
+            ], 422);
+        }
+
         $formattedJoinDate = $request->joining_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->joining_date)->format('Y-m-d') : null;
         $formattedProbationEndDate = $request->probation_end_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->probation_end_date)->format('Y-m-d') : null;
         $formattedTerminationDate = $request->termination_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->termination_date)->format('Y-m-d') : null;

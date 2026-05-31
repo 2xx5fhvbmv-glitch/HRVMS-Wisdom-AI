@@ -855,6 +855,276 @@ class BudgetController extends Controller
         ));
     }
 
+    /**
+     * Clone all year-keyed budget overrides from a source year into a
+     * target year for the current resort.
+     *
+     * Tables cloned (year-keyed):
+     *   - resort_employee_budget_cost_configurations
+     *   - resort_employee_monthly_salaries
+     *   - resort_vacant_budget_costs            (+ associated configs / monthly salaries)
+     *   - resort_vacant_budget_cost_configurations
+     *   - resort_vacant_monthly_salaries
+     *
+     * Tables NOT cloned (resort-wide / not year-keyed):
+     *   - resort_budget_costs (cost templates apply across all years)
+     *   - employees_allowance (applies across all years)
+     *
+     * Idempotent: skips rows that already exist in the target year for
+     * the same (employee/vacant, cost, month) tuple. So if HR ran the
+     * clone, manually edited a few cells, then re-ran it, their manual
+     * edits stay intact and only the missing rows get added.
+     *
+     * POST {from_year, to_year}. Returns JSON with row counts per table
+     * so the UI toast can confirm "237 employee cost rows + 12 vacant
+     * salary rows copied from 2026 to 2027".
+     */
+    public function cloneBudgetFromYear(Request $request)
+    {
+        if (Common::checkRouteWisePermission('resort.budget.viewbudget', config('settings.resort_permissions.create')) == false) {
+            return response()->json(['success' => false, 'message' => 'You do not have permission to clone a budget.'], 403);
+        }
+
+        $fromYear = (int) $request->input('from_year');
+        $toYear   = (int) $request->input('to_year');
+        $resortId = (int) $this->resort->resort_id;
+
+        if ($fromYear < 2000 || $fromYear > 2100 || $toYear < 2000 || $toYear > 2100 || $fromYear === $toYear) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pick two different valid years.',
+            ], 422);
+        }
+
+        $audit = ['from' => $fromYear, 'to' => $toYear, 'resort_id' => $resortId];
+        $counts = [];
+        $now = now();
+        $userId = auth()->guard('resort-admin')->user()->id ?? 0;
+
+        \DB::beginTransaction();
+        try {
+            // ---- 1. employee_budget_cost_configurations -------------------
+            // Each row is keyed on (employee_id, cost_id, dept, position,
+            // year, month) so the dedupe lookup is straightforward.
+            $srcEmpCosts = \DB::table('resort_employee_budget_cost_configurations')
+                ->where('resort_id', $resortId)
+                ->where('year', $fromYear)
+                ->get();
+            $existingEmpCostKeys = \DB::table('resort_employee_budget_cost_configurations')
+                ->where('resort_id', $resortId)
+                ->where('year', $toYear)
+                ->get(['employee_id', 'resort_budget_cost_id', 'department_id', 'position_id', 'month'])
+                ->map(fn($r) => $r->employee_id . '|' . $r->resort_budget_cost_id . '|' . $r->department_id . '|' . $r->position_id . '|' . $r->month)
+                ->flip();
+            $empCostInserts = [];
+            foreach ($srcEmpCosts as $row) {
+                $key = $row->employee_id . '|' . $row->resort_budget_cost_id . '|' . $row->department_id . '|' . $row->position_id . '|' . $row->month;
+                if (isset($existingEmpCostKeys[$key])) continue;
+                $empCostInserts[] = [
+                    'employee_id'           => $row->employee_id,
+                    'resort_budget_cost_id' => $row->resort_budget_cost_id,
+                    'value'                 => $row->value,
+                    'currency'              => $row->currency,
+                    'department_id'         => $row->department_id,
+                    'position_id'           => $row->position_id,
+                    'resort_id'             => $resortId,
+                    'year'                  => $toYear,
+                    'month'                 => $row->month,
+                    'basic_salary'          => $row->basic_salary,
+                    'current_salary'        => $row->current_salary,
+                    'hours'                 => $row->hours,
+                    'created_by'            => $userId,
+                    'modified_by'           => $userId,
+                    'created_at'            => $now,
+                    'updated_at'            => $now,
+                ];
+            }
+            if (!empty($empCostInserts)) {
+                // Chunked insert so we don't blow MySQL's max packet size on
+                // resorts with hundreds of active employees × dozens of costs.
+                foreach (array_chunk($empCostInserts, 500) as $chunk) {
+                    \DB::table('resort_employee_budget_cost_configurations')->insert($chunk);
+                }
+            }
+            $counts['employee_cost_overrides'] = count($empCostInserts);
+
+            // ---- 2. employee_monthly_salaries -----------------------------
+            $srcEmpSalaries = \DB::table('resort_employee_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('year', $fromYear)
+                ->get();
+            $existingEmpSalKeys = \DB::table('resort_employee_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('year', $toYear)
+                ->get(['employee_id', 'month'])
+                ->map(fn($r) => $r->employee_id . '|' . $r->month)
+                ->flip();
+            $empSalInserts = [];
+            foreach ($srcEmpSalaries as $row) {
+                $key = $row->employee_id . '|' . $row->month;
+                if (isset($existingEmpSalKeys[$key])) continue;
+                $empSalInserts[] = [
+                    'employee_id'     => $row->employee_id,
+                    'resort_id'       => $resortId,
+                    'year'            => $toYear,
+                    'month'           => $row->month,
+                    'current_salary'  => $row->current_salary ?? 0,
+                    'proposed_salary' => $row->proposed_salary ?? 0,
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
+                ];
+            }
+            if (!empty($empSalInserts)) {
+                foreach (array_chunk($empSalInserts, 500) as $chunk) {
+                    \DB::table('resort_employee_monthly_salaries')->insert($chunk);
+                }
+            }
+            $counts['employee_salary_overrides'] = count($empSalInserts);
+
+            // ---- 3. vacant_budget_costs (parent rows) ---------------------
+            $srcVacants = \DB::table('resort_vacant_budget_costs')
+                ->where('resort_id', $resortId)
+                ->where('year', $fromYear)
+                ->get();
+            // Maps old-vacant-id → new-vacant-id so child config / monthly
+            // rows below can be re-pointed correctly.
+            $vacantIdMap = [];
+            $existingVacKeys = \DB::table('resort_vacant_budget_costs')
+                ->where('resort_id', $resortId)
+                ->where('year', $toYear)
+                ->get(['id', 'position_id', 'department_id', 'vacant_index'])
+                ->keyBy(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index);
+            $vacantInserts = 0;
+            foreach ($srcVacants as $row) {
+                $key = $row->position_id . '|' . $row->department_id . '|' . $row->vacant_index;
+                if (isset($existingVacKeys[$key])) {
+                    // Already exists — reuse existing id for the child mapping.
+                    $vacantIdMap[$row->id] = $existingVacKeys[$key]->id;
+                    continue;
+                }
+                $newVacantId = \DB::table('resort_vacant_budget_costs')->insertGetId([
+                    'position_id'    => $row->position_id,
+                    'department_id'  => $row->department_id,
+                    'resort_id'      => $resortId,
+                    'year'           => $toYear,
+                    'vacant_index'   => $row->vacant_index,
+                    'basic_salary'   => $row->basic_salary,
+                    'current_salary' => $row->current_salary,
+                    'created_at'     => $now,
+                    'updated_at'     => $now,
+                ]);
+                $vacantIdMap[$row->id] = $newVacantId;
+                $vacantInserts++;
+            }
+            $counts['vacant_slots'] = $vacantInserts;
+
+            // ---- 4. vacant_budget_cost_configurations (children) ----------
+            if (!empty($vacantIdMap)) {
+                $srcVacConfigs = \DB::table('resort_vacant_budget_cost_configurations')
+                    ->where('resort_id', $resortId)
+                    ->where('year', $fromYear)
+                    ->whereIn('vacant_budget_cost_id', array_keys($vacantIdMap))
+                    ->get();
+                // Dedupe by (new vacant id, cost id, month) — if the target
+                // year already had child rows for this vacant, leave them.
+                $existingVacCfgKeys = \DB::table('resort_vacant_budget_cost_configurations')
+                    ->where('resort_id', $resortId)
+                    ->where('year', $toYear)
+                    ->whereIn('vacant_budget_cost_id', array_values($vacantIdMap))
+                    ->get(['vacant_budget_cost_id', 'resort_budget_cost_id', 'month'])
+                    ->map(fn($r) => $r->vacant_budget_cost_id . '|' . $r->resort_budget_cost_id . '|' . $r->month)
+                    ->flip();
+                $vacCfgInserts = [];
+                foreach ($srcVacConfigs as $row) {
+                    $newVacId = $vacantIdMap[$row->vacant_budget_cost_id] ?? null;
+                    if (!$newVacId) continue;
+                    $key = $newVacId . '|' . $row->resort_budget_cost_id . '|' . $row->month;
+                    if (isset($existingVacCfgKeys[$key])) continue;
+                    $vacCfgInserts[] = [
+                        'vacant_budget_cost_id' => $newVacId,
+                        'resort_budget_cost_id' => $row->resort_budget_cost_id,
+                        'value'                 => $row->value,
+                        'currency'              => $row->currency,
+                        'resort_id'             => $resortId,
+                        'year'                  => $toYear,
+                        'month'                 => $row->month,
+                        'hours'                 => $row->hours ?? 0,
+                        'created_at'            => $now,
+                        'updated_at'            => $now,
+                    ];
+                }
+                if (!empty($vacCfgInserts)) {
+                    foreach (array_chunk($vacCfgInserts, 500) as $chunk) {
+                        \DB::table('resort_vacant_budget_cost_configurations')->insert($chunk);
+                    }
+                }
+                $counts['vacant_cost_overrides'] = count($vacCfgInserts);
+            } else {
+                $counts['vacant_cost_overrides'] = 0;
+            }
+
+            // ---- 5. vacant_monthly_salaries -------------------------------
+            $srcVacSalaries = \DB::table('resort_vacant_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('year', $fromYear)
+                ->get();
+            $existingVacSalKeys = \DB::table('resort_vacant_monthly_salaries')
+                ->where('resort_id', $resortId)
+                ->where('year', $toYear)
+                ->get(['position_id', 'department_id', 'vacant_index', 'month'])
+                ->map(fn($r) => $r->position_id . '|' . $r->department_id . '|' . $r->vacant_index . '|' . $r->month)
+                ->flip();
+            $vacSalInserts = [];
+            foreach ($srcVacSalaries as $row) {
+                $key = $row->position_id . '|' . $row->department_id . '|' . $row->vacant_index . '|' . $row->month;
+                if (isset($existingVacSalKeys[$key])) continue;
+                $vacSalInserts[] = [
+                    'position_id'     => $row->position_id,
+                    'department_id'   => $row->department_id,
+                    'vacant_index'    => $row->vacant_index,
+                    'resort_id'       => $resortId,
+                    'year'            => $toYear,
+                    'month'           => $row->month,
+                    'current_salary'  => $row->current_salary ?? 0,
+                    'proposed_salary' => $row->proposed_salary ?? 0,
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
+                ];
+            }
+            if (!empty($vacSalInserts)) {
+                foreach (array_chunk($vacSalInserts, 500) as $chunk) {
+                    \DB::table('resort_vacant_monthly_salaries')->insert($chunk);
+                }
+            }
+            $counts['vacant_salary_overrides'] = count($vacSalInserts);
+
+            \DB::commit();
+
+            $totalCopied = array_sum($counts);
+            $message = $totalCopied === 0
+                ? "Nothing to copy from {$fromYear} — already up to date in {$toYear}."
+                : "Copied " . number_format($totalCopied) . " rows from {$fromYear} to {$toYear}.";
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'counts'  => $counts,
+            ]);
+        } catch (\Throwable $e) {
+            \DB::rollBack();
+            \Log::error('[cloneBudgetFromYear] failed', array_merge($audit, [
+                'exception' => get_class($e),
+                'message'   => $e->getMessage(),
+                'file'      => $e->getFile(),
+                'line'      => $e->getLine(),
+            ]));
+            return response()->json([
+                'success' => false,
+                'message' => 'Copy failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function ConsolidateBudget(Request $request)
     {
         if(Common::checkRouteWisePermission('resort.budget.consolidatedbudget',config('settings.resort_permissions.view')) == false){
