@@ -219,8 +219,12 @@ class LiabilityEstimationController extends Controller
             ->sum(DB::raw(
                 'COALESCE(payroll_reviews.earned_salary, 0) + '
               . 'COALESCE(payroll_reviews.earnings_overtime, 0) + '
-              . 'COALESCE(payroll_reviews.earnings_allowance, 0) + '
-              . 'COALESCE(payroll_reviews.service_charge, 0)'
+              . 'COALESCE(payroll_reviews.earnings_allowance, 0)'
+              // Service Charge intentionally excluded — it's a pass-
+              // through (guest-paid → employee distribution), not a
+              // resort cost. Including it inflated the reduction by the
+              // SC pool size without representing money the resort
+              // actually spent off its own books.
             ));
 
         $current_liability = $payrollLiability
@@ -282,15 +286,17 @@ class LiabilityEstimationController extends Controller
         // No 'Recruitment Fee' slice — actual recruitment spend isn't
         // tracked in any table; the Est-vs-Actual row shows the budgeted
         // figure (Estimated column) with $0 Actual by design.
+        // Service Charge intentionally absent — it's a pass-through to
+        // employees, not a resort cost, so it neither reduces the
+        // liability nor belongs in the Cost Distribution doughnut.
         $chartData = [
             'Salaries'         => (float) ($payrollReviews->salaries ?? 0),
             'OTA'              => (float) ($payrollReviews->ota ?? 0),
             'Work Permit'      => (float) $totalPermit,
-            'Visa'             => (float) $totalVisa, // present in Current Liability headline; was missing from the doughnut.
+            'Visa'             => (float) $totalVisa,
             'Quota Slot'       => (float) $totalQuota,
             'Medical Permit'   => (float) $totalMedical,
             'Insurance'        => (float) $totalInsurance,
-            'Service Charge'   => (float) ($payrollReviews->service_charge ?? 0),
         ];
 
         // Allowance breakdown is already in USD after the CASE WHEN above.
@@ -313,8 +319,10 @@ class LiabilityEstimationController extends Controller
               . 'SUM('
               . '  COALESCE(payroll_reviews.earned_salary, 0) + '
               . '  COALESCE(payroll_reviews.earnings_overtime, 0) + '
-              . '  COALESCE(payroll_reviews.earnings_allowance, 0) + '
-              . '  COALESCE(payroll_reviews.service_charge, 0)'
+              . '  COALESCE(payroll_reviews.earnings_allowance, 0)'
+              // Service Charge excluded — same reasoning as the
+              // $payrollLiability sum above. Keeps the monthly trend
+              // chart in sync with the headline.
               . ') as total'
             )
             ->groupBy(DB::raw('MONTH(payroll.start_date)'))
@@ -510,10 +518,13 @@ class LiabilityEstimationController extends Controller
             }
         }
 
+        // Service Charge row removed — SC is a pass-through (guest-paid
+        // → employee distribution), neither part of the budgeted
+        // commitment nor a real resort cost, so showing it in this
+        // table conflated two different ledgers.
         $estVsActualRows = [
             ['label' => 'Salaries',        'estimated' => $estimatedByCategory['Salaries'],        'actual' => $chartData['Salaries']        ?? 0],
             ['label' => 'Overtime',        'estimated' => $estimatedByCategory['Overtime'],        'actual' => $chartData['OTA']             ?? 0],
-            ['label' => 'Service Charge',  'estimated' => $estimatedByCategory['Service Charge'],  'actual' => $chartData['Service Charge']  ?? 0],
             ['label' => 'Work Permit',     'estimated' => $estimatedByCategory['Work Permit'],     'actual' => $chartData['Work Permit']     ?? 0],
             ['label' => 'Medical',         'estimated' => $estimatedByCategory['Medical'],         'actual' => $chartData['Medical Permit']  ?? 0],
             ['label' => 'Insurance',       'estimated' => $estimatedByCategory['Insurance'],       'actual' => $chartData['Insurance']       ?? 0],
