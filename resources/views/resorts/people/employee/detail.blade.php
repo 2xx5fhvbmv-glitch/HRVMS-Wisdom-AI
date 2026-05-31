@@ -429,7 +429,15 @@
                                                                      digits, spaces, dashes, brackets. minlength/maxlength
                                                                      reflect real-world phone-number lengths including
                                                                      the +CC prefix. --}}
-                                                                <input type="tel" name="personal_phone" class="form-control edit-mode d-none"
+                                                                {{-- id="personal_phone_contact" disambiguates this input
+                                                                     from the SECOND name="personal_phone" rendered
+                                                                     under Employment Information below. Without a
+                                                                     unique id, the contact save handler's
+                                                                     $('[name="personal_phone"]').val() picked the
+                                                                     first matched element (which is THIS one only if
+                                                                     the user happened to be on the Personal tab) and
+                                                                     silently dropped edits made in the other tab. --}}
+                                                                <input type="tel" name="personal_phone" id="personal_phone_contact" class="form-control edit-mode d-none"
                                                                        value="{{ $employee->resortAdmin->personal_phone }}"
                                                                        required pattern="^\+?[0-9\-\s()]{7,25}$"
                                                                        minlength="7" maxlength="25"
@@ -731,7 +739,9 @@
                                                                     {{-- type=tel + permissive pattern so HR can paste
                                                                          in international numbers like "+91 9098765432".
                                                                          Matches the Personal-Information Mobile field. --}}
-                                                                    <input type="tel" name="personal_phone" class="form-control edit-mode d-none"
+                                                                    {{-- id="personal_phone_employment" — see comment on the
+                                                                         personal_phone_contact input above. --}}
+                                                                    <input type="tel" name="personal_phone" id="personal_phone_employment" class="form-control edit-mode d-none"
                                                                            value="{{$employee->resortAdmin->personal_phone}}"
                                                                            pattern="^\+?[0-9\-\s()]{7,25}$"
                                                                            minlength="7" maxlength="25"
@@ -2460,7 +2470,12 @@
             let formData = {
                 _token: $('meta[name="csrf-token"]').attr('content'), // CSRF token
                 employee_id: '{{ $employee->id }}',
-                personal_phone: $('[name="personal_phone"]').val(),
+                // Scoped to the Personal Details tab's input. Without the
+                // id-suffixed selector, $('[name="personal_phone"]') also
+                // matches the Employment Information tab's input and .val()
+                // returned that one's stale value — so any dial-code prefix
+                // typed in the Personal tab was silently dropped on save.
+                personal_phone: $('#personal_phone_contact').val(),
                 email: $('[name="email"]').val(),
                 address_line_1: $('[name="address_line_1"]').val(),
                 address_line_2: $('[name="address_line_2"]').val(),
@@ -2611,9 +2626,42 @@
                 $notice.addClass('d-none');
                 $tin.removeAttr('required').removeClass('border-danger');
             }
+            updateEwtTinSaveGate();
+        }
+
+        // Hard gate on the Employment save flow:
+        // - Disables BOTH the row-level Save button (#btn-emp-info-save)
+        //   AND the modal's confirmation button (#confirm-emp-info-save)
+        //   whenever EWT=on AND TIN is blank.
+        // - Adds a `title` tooltip so the disabled state isn't silent
+        //   ("Enter the TIN — required when EWT Enrolled").
+        // - Re-runs on EWT toggle and TIN input so the button comes back
+        //   alive the instant the user fills the field, without needing
+        //   a focus/blur or click.
+        function updateEwtTinSaveGate() {
+            var ewtEnabled = $('#ewt_status').is(':checked');
+            var tinVal     = ($('#tin-input').val() || '').trim();
+            var block      = ewtEnabled && !tinVal;
+            var $saveBtns  = $('#btn-emp-info-save, #confirm-emp-info-save');
+            if (block) {
+                $saveBtns.prop('disabled', true)
+                    .addClass('disabled')
+                    .attr('title', 'Enter the TIN — required when EWT Status is Enrolled.');
+            } else {
+                $saveBtns.prop('disabled', false)
+                    .removeClass('disabled')
+                    .removeAttr('title');
+            }
         }
 
         $(document).on('change', '#ewt_status', syncEwtTinRequirement);
+        // Live update as the user types into TIN — disable flips on/off
+        // without needing the user to click anywhere.
+        $(document).on('input change', '#tin-input', updateEwtTinSaveGate);
+        // Run once on DOM-ready so the initial render reflects the
+        // current state (handles the "EWT already on, TIN still blank
+        // from the DB" load case).
+        $(function () { updateEwtTinSaveGate(); });
 
         // Employment data drives payroll, benefit-grid, reporting + tax
         // — surface a sensitive-edit confirmation modal before firing
@@ -2626,7 +2674,9 @@
                 employee_id: '{{ $employee->id }}',
                 Emp_id: $('[name="Emp_id"]').val(),
                 email: $('[name="email"]').val(),
-                personal_phone: $('[name="personal_phone"]').val(),
+                // Scoped to the Employment Information input — see comment
+                // on #btn-contact-save's personal_phone selector above.
+                personal_phone: $('#personal_phone_employment').val(),
                 status: $('[name="status"]').val(),
                 joining_date: $('[name="joining_date"]').val(),
                 benefit_grid_level: $('[name="benefit_grid_level"]').val(),
@@ -3707,20 +3757,38 @@
             });
         });
 
-        // Flash-message → toastr bridge.
-        // Used by LeaveController::employeeLeavePage when the employee has
-        // no leave history — instead of dumping the user onto the global
-        // leave inbox, we redirect back here with session('info_message')
-        // set and surface it as a toast on page load.
+        // URL-param → toastr bridge.
+        // LeaveController::employeeLeavePage redirects here with
+        //   ?leave_empty=1
+        // when the employee has zero leave records. Surface that as a
+        // toast on page load. Switched from session flash to URL param
+        // because flash works on local but is fragile on live —
+        // depending on session driver, middleware order, and view
+        // cache, the value can be consumed or dropped before Blade
+        // renders, so the toast silently never fires. URL params
+        // round-trip through every layer untouched.
+        //
+        // Toastr itself is loaded in resorts/layouts/js.blade.php BEFORE
+        // @yield('import-scripts') runs, so by the time this $(function)
+        // fires it's already defined. The guard is just defensive.
         $(function () {
-            @if (session('info_message'))
-                if (typeof toastr !== 'undefined') {
-                    toastr.info(@json(session('info_message')), 'Info', {
+            try {
+                var params = new URLSearchParams(window.location.search);
+                if (params.get('leave_empty') === '1' && typeof toastr !== 'undefined') {
+                    toastr.info('This employee has no leave history yet.', 'Info', {
                         positionClass: 'toast-bottom-right',
-                        timeOut: 4000
+                        timeOut: 4500
                     });
+                    // Strip the query param so a page refresh doesn't re-fire the toast.
+                    if (window.history && window.history.replaceState) {
+                        params.delete('leave_empty');
+                        var cleaned = window.location.pathname
+                            + (params.toString() ? '?' + params.toString() : '')
+                            + window.location.hash;
+                        window.history.replaceState({}, '', cleaned);
+                    }
                 }
-            @endif
+            } catch (e) { /* URLSearchParams unsupported — silently skip */ }
         });
 </script>
 @endsection

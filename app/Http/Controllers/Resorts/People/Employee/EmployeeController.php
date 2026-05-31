@@ -1311,6 +1311,19 @@ class EmployeeController extends Controller
     {
 
         $employee = Employee::findOrFail($request->employee_id);
+
+        // Snapshot the audit-loggable fields BEFORE save so we can diff
+        // them after. Previously this endpoint silently updated
+        // personal_phone / email with no audit row — so HR saw the
+        // Mobile Number change land in the DB but get no entry in the
+        // Employment Change Log. updateEmploymentData has the same
+        // writer wired in, but the Personal Details tab calls THIS
+        // endpoint, not that one.
+        $oldSnapshot = [
+            'email'          => optional($employee->resortAdmin)->email,
+            'personal_phone' => optional($employee->resortAdmin)->personal_phone,
+        ];
+
         $employee->present_address = $request->present_address;
         $employee->save();
         // Update name and gender in resortAdmin
@@ -1324,6 +1337,11 @@ class EmployeeController extends Controller
         $employee->resortAdmin->zip = $request->zip;
 
         $employee->resortAdmin->save();
+
+        $this->writeEmploymentAuditLog($employee, $oldSnapshot, [
+            'email'          => $request->email,
+            'personal_phone' => $request->personal_phone,
+        ]);
 
         return response()->json(['success' => true ,'message' => "Contacts Details Updated!"]);
     }
