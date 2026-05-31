@@ -76,6 +76,59 @@ class LiabilityEstimationController extends Controller
         // Initial Liability headline AND the People Dashboard Liability
         // Tracker AND Budget → View Budget all agree.
         $estimated_liability = Common::computeYearlyBudgetTotal($resortId, $currentYear);
+
+        // -- Per-leg breakdown of the Total Estimated headline -----------
+        // Built for the "Liability Reduction" detail modal so HR can see
+        // why the headline reads what it does instead of asking why a
+        // single payroll run barely moves the value. Numbers below are
+        // pure aggregations — the headline `$estimated_liability` is
+        // still the source of truth.
+        $estLegEmployeeSalary = 0.0;
+        $estLegCostTemplate   = 0.0;
+        $estLegEmployeeAllowance = 0.0;
+        $estLegVacant         = 0.0;
+        try {
+            $activeForBreakdown = DB::table('employees')
+                ->where('resort_id', $resortId)
+                ->where('status', 'Active')
+                ->get(['id', 'basic_salary', 'proposed_salary', 'nationality', 'religion']);
+            foreach ($activeForBreakdown as $emp) {
+                $shared = (float) (($emp->proposed_salary ?? 0) > 0
+                    ? $emp->proposed_salary
+                    : ($emp->basic_salary ?? 0));
+                $estLegEmployeeSalary += $shared * 12;
+            }
+            $costsForBreakdown = DB::table('resort_budget_costs')
+                ->where('resort_id', $resortId)->where('status', 'active')
+                ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+            foreach ($activeForBreakdown as $emp) {
+                foreach ($costsForBreakdown as $c) {
+                    $estLegCostTemplate += Common::annualCostForEmployee($resortId, $currentYear, $c, $emp);
+                }
+            }
+            $dollarToMvr = (float) (DB::table('resort_site_settings')
+                ->where('resort_id', $resortId)->value('DollertoMVR') ?: 15.42);
+            if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
+            $empIdsForBreakdown = $activeForBreakdown->pluck('id')->all();
+            $allowMonthly = empty($empIdsForBreakdown) ? 0 : (float) DB::table('employees_allowance')
+                ->whereIn('employee_id', $empIdsForBreakdown)
+                ->selectRaw("COALESCE(SUM(CASE WHEN amount_unit = 'MVR' THEN amount * (1.0 / {$dollarToMvr}) ELSE amount END), 0) as t")
+                ->value('t');
+            $estLegEmployeeAllowance = $allowMonthly * 12;
+            foreach (DB::table('resort_vacant_budget_costs')
+                ->where('resort_id', $resortId)->where('year', $currentYear)->get() as $v) {
+                $estLegVacant += Common::annualBudgetForVacantSlot($resortId, $currentYear, $v);
+            }
+        } catch (\Throwable $e) {
+            // Breakdown failures shouldn't break the page render.
+            \Log::warning('[liability-breakdown] '.$e->getMessage());
+        }
+        $estLegs = [
+            ['label' => 'Employee Salaries (active employees × 12 months)', 'value' => $estLegEmployeeSalary],
+            ['label' => 'Cost Templates (Food Cost, Pension, Tickets, …)',  'value' => $estLegCostTemplate],
+            ['label' => 'Per-Employee Allowances (×12)',                    'value' => $estLegEmployeeAllowance],
+            ['label' => 'Vacant Slot Salaries + Cost Configs',              'value' => $estLegVacant],
+        ];
         // Cost-category breakdowns for the Estimation-vs-Actual table use the
         // same particulars-keyword approach as before (cost templates only).
         $budgetByParticular = DB::table('resort_budget_costs')
@@ -570,6 +623,20 @@ class LiabilityEstimationController extends Controller
         );
         $displayCurrencySymbol = Common::GetResortCurrencySymbol();
 
+        // Current Liability per-source breakdown for the detail modal.
+        // Mirrors the actual aggregation done at the top of the method;
+        // Service Charge is intentionally excluded (pass-through).
+        $currentLegs = [
+            ['label' => 'Payroll — Salaries (earned_salary)',     'value' => (float) ($payrollReviews->salaries ?? 0)],
+            ['label' => 'Payroll — Overtime (earnings_overtime)', 'value' => (float) ($payrollReviews->ota ?? 0)],
+            ['label' => 'Payroll — Allowances (earnings_allowance)', 'value' => (float) ($payrollReviews->allowance ?? 0)],
+            ['label' => 'Visa Renewals (start_date in year)',     'value' => (float) $totalVisa],
+            ['label' => 'Insurance (insurance_start_date in year)','value' => (float) $totalInsurance],
+            ['label' => 'Work Permit (Paid, Due_Date in year)',   'value' => (float) $totalPermit],
+            ['label' => 'Medical (start_date in year)',           'value' => (float) $totalMedical],
+            ['label' => 'Quota Slot (Paid, Due_Date in year)',    'value' => (float) $totalQuota],
+        ];
+
         return view('resorts.people.liability.index', compact(
             'page_title',
             'resortId', 'current_liability',
@@ -578,6 +645,7 @@ class LiabilityEstimationController extends Controller
             'chartDataDisplay','reductionDataDisplay','displayCurrencySymbol',
             'labels',
             'reductionData','allowanceTypes',
+            'estLegs','currentLegs',
             'estVsActualRows'
         ));
     }

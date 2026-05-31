@@ -33,8 +33,121 @@
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="bg-themeGrayLight">
-                            <h6>Liability Reduction</h6><strong>{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
+                        <div class="bg-themeGrayLight position-relative" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#liabilityBreakdownModal" title="Click for breakdown">
+                            <h6>
+                                Liability Reduction
+                                <i class="fa-solid fa-circle-info ms-1 text-primary" style="font-size:13px;"></i>
+                            </h6>
+                            <strong>{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
+                            <small class="d-block text-muted mt-1" style="font-size:11px;">
+                                Estimated − Current. Click for breakdown.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Breakdown modal: shows the four legs of Total Estimated
+                     and the per-source components of Current Liability, with
+                     the Reduction arithmetic at the bottom. Helps HR see
+                     why the headline reads what it does instead of asking
+                     why a single payroll run barely moves the value. --}}
+                <div class="modal fade" id="liabilityBreakdownModal" tabindex="-1" aria-labelledby="liabilityBreakdownLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="liabilityBreakdownLabel">
+                                    <i class="fa-solid fa-calculator me-2"></i>
+                                    Liability Reduction — Breakdown
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="text-muted small mb-3">
+                                    "Liability Reduction" = Total Estimated − Current Liability. It represents the budget that is <strong>still on the books</strong> for the rest of the year (not what has been "reduced" so far). Early in the year, with few payroll runs and no renewals, this number is naturally close to the full estimated total.
+                                </p>
+
+                                {{-- Total Estimated leg breakdown --}}
+                                <h6 class="mt-3 mb-2">
+                                    <i class="fa-solid fa-arrow-down me-1 text-success"></i>
+                                    Total Estimated Liability
+                                </h6>
+                                <table class="table table-sm table-bordered mb-3" style="font-size:13px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Source</th>
+                                            <th class="text-end" style="width:160px;">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @php $estTotal = 0; @endphp
+                                        @foreach($estLegs as $leg)
+                                            @php $estTotal += $leg['value']; @endphp
+                                            <tr>
+                                                <td>{{ $leg['label'] }}</td>
+                                                <td class="text-end">{!! Common::formatCurrency($leg['value'], 'USD') !!}</td>
+                                            </tr>
+                                        @endforeach
+                                        <tr class="table-secondary fw-bold">
+                                            <td>Total Estimated Liability</td>
+                                            <td class="text-end">{!! Common::formatCurrency($estimated_liability, 'USD') !!}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                {{-- Current Liability breakdown --}}
+                                <h6 class="mt-3 mb-2">
+                                    <i class="fa-solid fa-minus me-1 text-danger"></i>
+                                    Current Liability (Year-to-Date spend)
+                                </h6>
+                                <table class="table table-sm table-bordered mb-3" style="font-size:13px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Source</th>
+                                            <th class="text-end" style="width:160px;">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($currentLegs as $leg)
+                                            <tr class="{{ $leg['value'] == 0 ? 'text-muted' : '' }}">
+                                                <td>{{ $leg['label'] }}</td>
+                                                <td class="text-end">{!! Common::formatCurrency($leg['value'], 'USD') !!}</td>
+                                            </tr>
+                                        @endforeach
+                                        <tr class="table-secondary fw-bold">
+                                            <td>Current Liability</td>
+                                            <td class="text-end">{!! Common::formatCurrency($current_liability, 'USD') !!}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <small class="text-muted d-block mb-2">
+                                    Note: Service Charge is excluded from Current Liability — it's a guest-paid pass-through to employees, not a resort cost.
+                                </small>
+
+                                {{-- Final arithmetic --}}
+                                <div class="alert alert-info py-2 mb-0" style="font-size:14px;">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Total Estimated</span>
+                                        <strong>{!! Common::formatCurrency($estimated_liability, 'USD') !!}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>− Current Liability</span>
+                                        <strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
+                                    </div>
+                                    <hr class="my-2">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="fw-bold">= Liability Reduction (remaining)</span>
+                                        <strong class="text-primary">{!! Common::formatCurrency($liability_reduction, 'USD') !!}</strong>
+                                    </div>
+                                </div>
+
+                                <small class="text-muted d-block mt-3" style="font-size:11px;">
+                                    Tip: cost-template items like Food Cost and Pension are part of the Total Estimated but are not currently tracked as discrete spend events — they stay in the Reduction balance all year until the resort wires in actual-spend tracking.
+                                </small>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
                         </div>
                     </div>
                 </div>
