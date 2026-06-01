@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  *
  *   payroll_recovery_schedule
  *     • recovery_date         — when the installment was marked Recovered
- *     • recovered_via         — 'final_settlement' / 'payroll_run' / 'manual'
+ *     • recovered_via         — 'final_settlements' / 'payroll_run' / 'manual'
  *     • final_settlement_id   — FK back to final_settlement (NULL for
  *                               installments recovered via normal payroll)
  *
@@ -26,11 +26,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('final_settlement', function (Blueprint $table) {
-            if (!Schema::hasColumn('final_settlement', 'finalized_at')) {
+        Schema::table('final_settlements', function (Blueprint $table) {
+            if (!Schema::hasColumn('final_settlements', 'finalized_at')) {
                 $table->timestamp('finalized_at')->nullable()->after('status');
             }
-            if (!Schema::hasColumn('final_settlement', 'finalized_by')) {
+            if (!Schema::hasColumn('final_settlements', 'finalized_by')) {
                 $table->unsignedInteger('finalized_by')->nullable()->after('finalized_at');
             }
         });
@@ -51,11 +51,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('final_settlement', function (Blueprint $table) {
-            if (Schema::hasColumn('final_settlement', 'finalized_by')) {
+        Schema::table('final_settlements', function (Blueprint $table) {
+            if (Schema::hasColumn('final_settlements', 'finalized_by')) {
                 $table->dropColumn('finalized_by');
             }
-            if (Schema::hasColumn('final_settlement', 'finalized_at')) {
+            if (Schema::hasColumn('final_settlements', 'finalized_at')) {
                 $table->dropColumn('finalized_at');
             }
         });
