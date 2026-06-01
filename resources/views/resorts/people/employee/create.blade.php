@@ -34,32 +34,32 @@
                     </div>
                     <hr>
                     <fieldset data-setp="1">
-                        {{-- ───────────────── Hire against a vacancy (optional) ──────────────────
-                             Collapsible panel at the very top of Step 1. If HR picks a vacancy,
-                             the JS at the bottom of this view pre-fills Department/Position/Division
-                             on Step 2 and locks them. Skipping leaves the form behaving exactly
-                             like before — direct hires don't need to do anything here.
+                        {{-- ───────────────── Hire against a vacancy (REQUIRED) ──────────────────
+                             Sits at the top of Step 1 and is now mandatory — every new hire must
+                             be tied to an open TA-approved vacancy. The picker only shows
+                             vacancies with remaining slots > 0; EmployeeController::store() re-
+                             checks the slot count inside its DB transaction so two HRs can't
+                             both fill the last slot of the same vacancy.
                              Server provides $vacancies from EmployeeController::create using the
                              same TA-final-approval filter as /talent-acquisition/get-offline-interview. --}}
                         <div class="cardBorder-block mb-3" id="vacancyPickerPanel">
                             <div class="card-title px-3 pt-3 d-flex justify-content-between align-items-center"
                                  data-bs-toggle="collapse" data-bs-target="#vacancyPickerCollapse"
-                                 aria-expanded="false" aria-controls="vacancyPickerCollapse"
+                                 aria-expanded="true" aria-controls="vacancyPickerCollapse"
                                  style="cursor: pointer;">
                                 <div>
                                     <h3 class="mb-0">
                                         <i class="fa-solid fa-briefcase me-2 text-primary"></i>
                                         Hire against a vacancy
-                                        <small class="text-muted ms-2" style="font-size: 13px; font-weight: 400;">(optional)</small>
+                                        <span class="text-danger ms-1">*</span>
                                     </h3>
                                     <p class="small text-muted mb-0 mt-1">
-                                        Pick an open vacancy to auto-fill Department, Position and Division on Step 2.
-                                        Skip for direct hires.
+                                        Required. Pick an open vacancy — Department, Position and Division on Step 2 will be pre-filled and locked. Fully-filled vacancies are hidden automatically.
                                     </p>
                                 </div>
                                 <i class="fa-solid fa-chevron-down" id="vacancyPickerChevron"></i>
                             </div>
-                            <div class="collapse" id="vacancyPickerCollapse">
+                            <div class="collapse show" id="vacancyPickerCollapse">
                                 <div class="px-3 pb-3">
                                     <input type="hidden" id="selected_vacancy_id" name="vacancy_id" value="">
                                     <input type="hidden" id="selected_vacancy_position_id" name="vacancy_position_id" value="">
@@ -75,7 +75,7 @@
                                                         <th>Position</th>
                                                         <th>Department</th>
                                                         <th>Division</th>
-                                                        <th>No. of positions</th>
+                                                        <th>Open slots</th>
                                                         <th>Link expiry</th>
                                                     </tr>
                                                 </thead>
@@ -92,11 +92,15 @@
                                                             data-gm-approved-iso="{{ $v->gm_approved_at_iso }}"
                                                             data-gm-approved-label="{{ $v->gm_approved_at_label }}"
                                                             style="cursor: pointer;">
-                                                            <td><input type="radio" name="vacancy_pick" value="{{ $v->vacancy_id }}"></td>
+                                                            <td><input type="radio" name="vacancy_pick" value="{{ $v->vacancy_id }}" required></td>
                                                             <td>{{ $v->position_title }}</td>
                                                             <td>{{ $v->department_name }} <span class="badge bg-light text-dark ms-1">{{ $v->department_code }}</span></td>
                                                             <td>{{ $v->division_name ?? '—' }}</td>
-                                                            <td>{{ $v->no_of_positions }}</td>
+                                                            <td>
+                                                                <span class="badge bg-success-subtle text-success">
+                                                                    {{ $v->remaining_slots }} of {{ $v->no_of_positions }} left
+                                                                </span>
+                                                            </td>
                                                             <td>{{ $v->expiry_date_label }}</td>
                                                         </tr>
                                                     @endforeach
@@ -120,11 +124,12 @@
                                             </div>
                                         </div>
                                     @else
-                                        <div class="alert alert-light text-center text-muted mb-0" role="alert">
-                                            <i class="fa-solid fa-circle-info me-1"></i>
-                                            No open vacancies are ready for hiring right now.
-                                            Continue below for a direct hire, or create a vacancy in
-                                            <strong>Talent Acquisition &rarr; Vacancies</strong> first.
+                                        <div class="alert alert-warning mb-0" role="alert">
+                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                            <strong>No open vacancies available.</strong>
+                                            New hires must be tied to an approved, unfilled vacancy.
+                                            Create one in <strong>Talent Acquisition &rarr; Vacancies</strong>
+                                            and complete the approval flow before returning here.
                                         </div>
                                     @endif
                                 </div>
@@ -351,14 +356,58 @@
                                         data-parsley-pattern-message="Please enter a valid Maldivian NID. It should start with 1-2 uppercase letters followed by 6-9 digits."
                                         data-parsley-trigger="input">
                                 </div>
+                                {{-- PRESENT ADDRESS first (the source). Filling it powers the
+                                     "Same as Present" toggle on the Permanent block below. --}}
                                 <div class="col-12">
                                     <div class="address-block">
-                                        {{-- "Same as Present Address" — copies the Present
-                                             address block into Permanent in one click. Live-
-                                             mirrors edits while checked; unchecking clears
-                                             the Permanent fields so users aren't left with
-                                             stale data. JS lives in syncIdDocRequirements'
-                                             sibling helpers above. --}}
+                                        <div class="row g-md-3 g-2 align-items-end">
+                                            <div class="col-lg-4 col-sm-6">
+                                                <label for="present_addLine1" class="form-label">PRESENT ADDRESS<span
+                                                        class="req_span">*</span></label>
+                                                <input type="text" class="form-control" id="present_addLine1"
+                                                    name="present_addLine1" placeholder="Address Line 1" required>
+                                            </div>
+                                            <div class="col-lg-4 col-sm-6">
+                                                <input type="text" class="form-control" name="present_addLine2"
+                                                    placeholder="Address Line 2">
+                                            </div>
+                                            <div class="col-lg-4 col-sm-6">
+                                                <input type="text" class="form-control" id="present_city"
+                                                    name="present_city" placeholder="Enter City" required>
+                                            </div>
+                                            <div class="col-lg-4 col-sm-6">
+                                                <input type="text" class="form-control" id="present_state"
+                                                    name="present_state" placeholder="Enter State" required>
+                                            </div>
+
+                                            <div class="col-lg-4 col-sm-6">
+                                                <input type="number" class="form-control" placeholder="Postal Code"
+                                                    name="present_postal_code" required
+                                                    data-parsley-required-message="Postal code is required."
+                                                    data-parsley-type="digits"
+                                                    data-parsley-type-message="Please enter a valid 5-digit postal code."
+                                                    data-parsley-pattern="^\d{5}$"
+                                                    data-parsley-pattern-message="Postal code must be exactly 5 digits.">
+                                            </div>
+                                            <div class="col-lg-4 col-sm-6 emp_createion_sel">
+                                                <select class="form-select select2t-none" data-placeholder="Country"
+                                                    name="present_country" required>
+                                                    <option></option>
+                                                    @foreach ($countries as $country)
+                                                        <option value="{{ $country }}">{{ $country }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {{-- PERMANENT ADDRESS second. The "Same as Present" toggle
+                                     above the block copies the Present values down, live-
+                                     mirrors edits while checked, and clears the Permanent
+                                     fields on uncheck. JS: copyPresentToPermanent /
+                                     clearPermanentAddress + the delegated change handler. --}}
+                                <div class="col-12">
+                                    <div class="address-block">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="sameAsPresentAddress">
                                             <label class="form-check-label small text-muted" for="sameAsPresentAddress">
@@ -397,49 +446,6 @@
                                             <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                                 <select class="form-select select2t-none" data-placeholder="Country"
                                                     name="parmanent_country" required>
-                                                    <option></option>
-                                                    @foreach ($countries as $country)
-                                                        <option value="{{ $country }}">{{ $country }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-12">
-                                    <div class="address-block">
-                                        <div class="row g-md-3 g-2 align-items-end">
-                                            <div class="col-lg-4 col-sm-6">
-                                                <label for="present_addLine1" class="form-label">PRESENT ADDRESS<span
-                                                        class="req_span">*</span></label>
-                                                <input type="text" class="form-control" id="present_addLine1"
-                                                    name="present_addLine1" placeholder="Address Line 1" required>
-                                            </div>
-                                            <div class="col-lg-4 col-sm-6">
-                                                <input type="text" class="form-control" name="present_addLine2"
-                                                    placeholder="Address Line 2">
-                                            </div>
-                                            <div class="col-lg-4 col-sm-6">
-                                                <input type="text" class="form-control" id="present_city"
-                                                    name="present_city" placeholder="Enter City" required>
-                                            </div>
-                                            <div class="col-lg-4 col-sm-6">
-                                                <input type="text" class="form-control" id="present_state"
-                                                    name="present_state" placeholder="Enter State" required>
-                                            </div>
-
-                                            <div class="col-lg-4 col-sm-6">
-                                                <input type="number" class="form-control" placeholder="Postal Code"
-                                                    name="present_postal_code" required
-                                                    data-parsley-required-message="Postal code is required."
-                                                    data-parsley-type="digits"
-                                                    data-parsley-type-message="Please enter a valid 5-digit postal code."
-                                                    data-parsley-pattern="^\d{5}$"
-                                                    data-parsley-pattern-message="Postal code must be exactly 5 digits.">
-                                            </div>
-                                            <div class="col-lg-4 col-sm-6 emp_createion_sel">
-                                                <select class="form-select select2t-none" data-placeholder="Country"
-                                                    name="present_country" required>
                                                     <option></option>
                                                     @foreach ($countries as $country)
                                                         <option value="{{ $country }}">{{ $country }}</option>
@@ -1375,10 +1381,23 @@
                 var src = $('[name="' + pair[0] + '"]');
                 var dst = $('[name="' + pair[1] + '"]');
                 if (!src.length || !dst.length) return;
+                var val = src.val();
                 if (dst.is('select')) {
-                    dst.val(src.val()).trigger('change');
+                    // Select2-wrapped selects need both `change` (so Parsley
+                    // sees the new value and clears any "required" error)
+                    // AND `change.select2` (so the visible label updates
+                    // even when triggering via .val()). The country select
+                    // shares the same option list as the Present-country
+                    // select so the value is guaranteed to exist.
+                    dst.val(val).trigger('change').trigger('change.select2');
                 } else {
-                    dst.val(src.val()).trigger('input');
+                    dst.val(val).trigger('input').trigger('change');
+                }
+                // Drop any stale Parsley "required" red state on the dest
+                // — the copy just satisfied it but Parsley won't re-check
+                // until the user types into the field otherwise.
+                if ($.fn.parsley && dst.parsley) {
+                    try { dst.parsley().reset(); } catch (e) {}
                 }
             });
         }
@@ -1387,9 +1406,12 @@
                 var dst = $('[name="' + pair[1] + '"]');
                 if (!dst.length) return;
                 if (dst.is('select')) {
-                    dst.val('').trigger('change');
+                    dst.val('').trigger('change').trigger('change.select2');
                 } else {
-                    dst.val('').trigger('input');
+                    dst.val('').trigger('input').trigger('change');
+                }
+                if ($.fn.parsley && dst.parsley) {
+                    try { dst.parsley().reset(); } catch (e) {}
                 }
             });
         }
@@ -1410,8 +1432,36 @@
             syncIdDocRequirements();
 
             // "Same as Present Address" toggle.
+            //
+            // Direction is one-way: PRESENT → PERMANENT. If the user
+            // checks the toggle while PRESENT is empty (e.g. they filled
+            // PERMANENT first under the old layout where it sat on top),
+            // the naive copy would wipe their PERMANENT entries because
+            // the source is blank. Guard against that: if PRESENT has no
+            // required values, undo the toggle and show a toast pointing
+            // them at the right block.
             $(document).on('change', '#sameAsPresentAddress', function () {
-                if ($(this).is(':checked')) {
+                var $cb = $(this);
+                if ($cb.is(':checked')) {
+                    var requiredPresentKeys = [
+                        'present_addLine1', 'present_city',
+                        'present_state', 'present_postal_code', 'present_country'
+                    ];
+                    var presentEmpty = requiredPresentKeys.every(function (k) {
+                        var v = $('[name="' + k + '"]').val();
+                        return !v || String(v).trim() === '';
+                    });
+                    if (presentEmpty) {
+                        $cb.prop('checked', false);
+                        if (typeof toastr !== 'undefined') {
+                            toastr.warning(
+                                'Fill in the Present Address first — then tick this to copy it into Permanent.',
+                                'Present address is empty',
+                                { positionClass: 'toast-bottom-right' }
+                            );
+                        }
+                        return;
+                    }
                     copyPresentToPermanent();
                 } else {
                     clearPermanentAddress();
@@ -2347,8 +2397,41 @@
                 e.preventDefault();
                 initParsleyValidation();
                 // initSelect2AndValidation();
+
+                // Hard guard: every new hire must be tied to an open vacancy.
+                // The picker on Step 1 hides fully-filled vacancies, but if
+                // the user collapsed the panel and skipped picking, fail loud
+                // here so we don't post an empty vacancy_id to the server.
+                if (!$('#selected_vacancy_id').val()) {
+                    toastr.error(
+                        'You must hire against an open vacancy. Pick one from the "Hire against a vacancy" panel at the top of Step 1.',
+                        'Vacancy required',
+                        { positionClass: 'toast-bottom-right' }
+                    );
+                    $('#vacancyPickerCollapse').collapse('show');
+                    $('html, body').animate({ scrollTop: $('#vacancyPickerPanel').offset().top - 80 }, 300);
+                    return;
+                }
+
+                // ----------------------------------------------------------
+                // CRITICAL: disabled <select> elements are NOT serialized by
+                // the browser, so the vacancy-locked Department/Position/
+                // Division dropdowns (locked via .prop('disabled', true) in
+                // lockStep2Field) would post as empty — and Eloquent crashes
+                // with "Column 'Dept_id' cannot be null" on insert.
+                //
+                // Re-enable every .vacancy-locked field just long enough to
+                // build FormData, then put the lock back. The user-visible
+                // disabled state never flickers because the form was already
+                // posted before the browser repaints.
+                // ----------------------------------------------------------
+                var $lockedFields = $('.vacancy-locked');
+                $lockedFields.prop('disabled', false);
+
                 let formData = new FormData(this);
                 console.log(formData);
+
+                $lockedFields.prop('disabled', true);
 
                 // Pre-flight upload-size check. PHP's post_max_size on this
                 // server is typically 8 MB; if the form is bigger PHP
