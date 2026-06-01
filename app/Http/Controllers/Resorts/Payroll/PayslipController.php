@@ -796,7 +796,7 @@ class PayslipController extends Controller
 
         // Persist the path on the settlement row so the list page can
         // surface a "Download PDF" button without re-rendering.
-        if (\Schema::hasColumn('final_settlement', 'pdf_path')) {
+        if (\Schema::hasColumn('final_settlements', 'pdf_path')) {
             $finalSettlement->update(['pdf_path' => $pdfPath]);
         }
 
