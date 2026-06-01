@@ -1840,6 +1840,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('people/exit-clearance/assignments-submit-employee', 'People\ExitClearance\ExitClearanceController@assignmentSubmitEmployee')->name('people.exit-clearance.assignmentSubmitEmployee');
 
       Route::get('people/exit-clearance/employee-form-assigned-view/{id}', 'People\ExitClearance\ExitClearanceController@employeeFormAssignmentShow')->name('people.exit-clearance.employeeFormAssignmentShow');
+      Route::post('people/exit-clearance/assignment/{id}/update', 'People\ExitClearance\ExitClearanceController@updateAssignment')->name('people.exit-clearance.assignment.update');
       Route::post('people/exit-clearance/employee-departure-arrangment/{id}', 'People\ExitClearance\ExitClearanceController@employeeDepartureArrangement')->name('people.exit-clearance.employeeDepartureArrangement');
       Route::post('people/exit-clearance/mark-as-complete/{id}', 'People\ExitClearance\ExitClearanceController@markAsComplete')->name('people.exit-clearance.markAsComplete');
 

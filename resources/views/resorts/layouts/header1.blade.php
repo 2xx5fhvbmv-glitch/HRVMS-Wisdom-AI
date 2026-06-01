@@ -248,6 +248,7 @@
                                                 <li><a class="dropdown-item" href="{{route('payroll.pension.index')}}">Pension</a></li>
                                                 <li><a class="dropdown-item" href="{{route('payroll.ewt.index')}}">EWT</a></li>
                                                 <li><a class="dropdown-item" href="{{route('payroll.final.settlement')}}">Full & Final Settlement</a></li>
+                                                <li><a class="dropdown-item" href="{{route('final.settlement.list')}}">Final Settlements List</a></li>
                                                 <li><a class="dropdown-item" href="{{route('payroll.configration')}}">Configuration</a></li>
                                             </ul>
                                         </div>

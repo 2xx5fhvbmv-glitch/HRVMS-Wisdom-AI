@@ -73,118 +73,104 @@
                     </div>
                     <hr>
 
+                    {{-- ════════════════════════════════════════════════════════════
+                         Figma layout: two cards side by side.
+                         LEFT  "Earnings"  → Payable Leaves table (per leave category
+                                              + Air Ticket Reimbursement if recorded as
+                                              a F&F earning → Total Earnings)
+                         RIGHT "Deductions" → Settlement Details summary (Basic Salary
+                                              For X Days → Service Charge → Leave Days
+                                              Salary → Allowances → Gross Pay → EWHT →
+                                              custom deductions → Total Deductions)
+
+                         All amounts use the SAME currency the F&F page submitted in
+                         (MVR for resorts that pay in MVR, USD where stored as USD).
+                         Common::formatCurrency just prefixes the symbol — no
+                         conversion happens here. ──────────────────────────────────── --}}
+                    @php
+                        // Display currency for this settlement. The F&F page stores
+                        // values in MVR (the resort's payroll currency); preserved
+                        // as-is on the review page so totals match.
+                        $payCurrency = 'MVR';
+
+                        // Build per-leave-category rows once so both totals on the
+                        // left ("Total Earnings") and the right ("Leave Days Salary"
+                        // line) are derived from the same source — no math drift.
+                        $leaveRows = [];
+                        $leaveDaysSalaryTotal = 0;
+                        if (!empty($leaveBalances['details'])) {
+                            foreach ($leaveBalances['details'] as $b) {
+                                $amount = ($b['available_days'] ?? 0) * ($calculated['daily_salary'] ?? 0);
+                                $leaveDaysSalaryTotal += $amount;
+                                $leaveRows[] = [
+                                    'leave_type' => $b['leave_type'] ?? 'Leave',
+                                    'days'       => $b['available_days'] ?? 0,
+                                    'amount'     => $amount,
+                                ];
+                            }
+                        }
+                    @endphp
+
                     <div class="row g-md-4 g-3 mb-3">
+                        {{-- ─────────── EARNINGS card (left) ─────────── --}}
                         <div class="col-md-6">
                             <div class="paySlip-block p-0">
-                                <div class="table-responsive">
-                                    <div class="paySlip-header">Earning</div>
-                                    <div class="paySlip-body">
+                                <div class="paySlip-header">Earnings</div>
+                                <div class="paySlip-body">
+                                    <div class="table-responsive">
                                         <table class="paySlipBorder-table">
                                             <thead>
                                                 <tr>
                                                     <th>Payable Leaves</th>
-                                                    <th>Days</th>
-                                                    <th>Amount</th>
+                                                    <th class="text-end">Days</th>
+                                                    <th class="text-end">Amount ({{ $payCurrency }})</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                            @php
-                                                $totalLeaveSalary = 0;
-                                                $totalEarnings = 0;
-                                            @endphp
-
-                                            @if($leaveBalances['details'] && count($leaveBalances['details']) > 0)
-                                                @foreach($leaveBalances['details'] as $balance)
-                                                    @php
-                                                        $leaveSalary = $balance['available_days'] * $calculated['daily_salary'];
-                                                        $totalLeaveSalary += $leaveSalary;
-                                                    @endphp
+                                                @php $totalEarnings = 0; @endphp
+                                                @forelse($leaveRows as $row)
                                                     <tr>
-                                                        <td>{{ $balance['leave_type'] }}</td>
-                                                        <td>{{ $balance['available_days'] }}</td>
-                                                        <td>{!! Common::formatCurrency($leaveSalary, 'USD') !!}</td>
+                                                        <td>{{ $row['leave_type'] }}</td>
+                                                        <td class="text-end">{{ number_format($row['days'], 2) }}</td>
+                                                        <td class="text-end">{!! Common::formatCurrency($row['amount'], $payCurrency) !!}</td>
                                                     </tr>
-                                                @endforeach
-                                            @endif
-
-                                            <tr>
-                                                <td>Leave Encashment</td>
-                                                <td>{{ $leaveBalances['total_days'] ?? 0 }} days</td>
-                                                <td>{!! Common::formatCurrency($calculated['leave_encashment'], 'USD') !!}</td>
-                                            </tr>
-
-                                            <tr>
-                                                <td>Basic Salary</td>
-                                                <td>{{ $finalSettlement->total_days }} days</td>
-                                                <td>{!! Common::formatCurrency($finalSettlement->proratedBasic, 'USD') !!}</td>
-                                            </tr>
-
-                                            @php
-    
-                                                $totalEarnings += $calculated['leave_encashment'];
-                                                $totalEarnings += $finalSettlement->proratedBasic;
-                                            @endphp
-
-                                            @if($finalSettlement->earnings)
-                                                @foreach($finalSettlement->earnings as $earnings)
-                                                    @php
-                                                        $totalEarnings += $earnings->amount;
-                                                    @endphp
+                                                    @php $totalEarnings += $row['amount']; @endphp
+                                                @empty
                                                     <tr>
-                                                        <td>{{ $earnings->earning->allowanceName->particulars }}</td>
-                                                        <td>-</td>
-                                                        <td>{!! Common::formatCurrency($earnings->amount, 'USD') !!}</td>
+                                                        <td colspan="3" class="text-center text-muted">No leave entitlements recorded.</td>
                                                     </tr>
-                                                @endforeach
-                                            @endif
+                                                @endforelse
 
-                                            <tr>
-                                                    <td>Regular OT</td>
-                                                    <td>{{ $calculated['regular_ot_hours'] }} hrs</td>
-                                                    <td>{!! Common::formatCurrency($calculated['regular_ot_amount'], 'USD') !!}</td>
-                                                </tr>
-                                                @php $totalEarnings += $calculated['regular_ot_amount']; @endphp
-
-                                                <tr>
-                                                    <td>Holiday OT</td>
-                                                    <td>{{ $calculated['holiday_ot_hours'] }} hrs</td>
-                                                    <td>{!! Common::formatCurrency($calculated['holiday_ot_amount'], 'USD') !!}</td>
-                                                </tr>
-                                                @php $totalEarnings += $calculated['holiday_ot_amount']; @endphp
-
-                                                <tr>
-                                                    <td>Total OT</td>
-                                                    <td>{{ $calculated['holiday_ot_hours'] + $calculated['regular_ot_hours'] }} hrs</td>
-                                                    <td>{!! Common::formatCurrency($calculated['total_ot_amount'], 'USD') !!}</td>
-                                                </tr>
-
-                                                <tr>
-                                                    <td>Ramadan Bonus</td>
-                                                    <td>-</td>
-                                                    <td>{!! Common::formatCurrency($calculated['ramadan_bonus'], 'USD') !!}</td>
-                                                </tr>
-                                                @php $totalEarnings += $calculated['ramadan_bonus']; @endphp
-
-                                                <tr>
-                                                    <td>Service Charge</td>
-                                                    <td>-</td>
-                                                    <td>{!! Common::formatCurrency($finalSettlement->service_charge, 'USD') !!}</td>
-                                                </tr>
-                                                @php $totalEarnings += $finalSettlement->service_charge; @endphp
+                                                {{-- Air Ticket Reimbursement + any other custom
+                                                     earnings the F&F submission attached
+                                                     (relocation ticket, joining bonus, etc.).
+                                                     `$finalSettlement->earnings` is the
+                                                     final_settlement_earnings rows keyed to
+                                                     resort_budget_costs.particulars. --}}
+                                                @if(!empty($finalSettlement->earnings))
+                                                    @foreach($finalSettlement->earnings as $earnings)
+                                                        @php $totalEarnings += $earnings->amount; @endphp
+                                                        <tr>
+                                                            <td>{{ optional(optional($earnings->earning)->allowanceName)->particulars ?? 'Other Earning' }}</td>
+                                                            <td class="text-end">—</td>
+                                                            <td class="text-end">{!! Common::formatCurrency($earnings->amount, $payCurrency) !!}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                @endif
                                             </tbody>
-
                                             <tfoot>
                                                 <tr>
-                                                    <td colspan="2">Total Gross Pay</td>
-                                                    <td>{!! Common::formatCurrency($totalEarnings, 'USD') !!}</td>
+                                                    <th colspan="2">Total Earnings</th>
+                                                    <th class="text-end">{!! Common::formatCurrency($totalEarnings, $payCurrency) !!}</th>
                                                 </tr>
                                             </tfoot>
-
                                         </table>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        {{-- ─────────── DEDUCTIONS / SETTLEMENT DETAILS card (right) ─────────── --}}
                         <div class="col-md-6">
                             <div class="paySlip-block p-0">
                                 <div class="paySlip-header">Deductions</div>
@@ -194,53 +180,101 @@
                                             <thead>
                                                 <tr>
                                                     <th>Settlement Details</th>
-                                                    <th>MVR</th>
+                                                    <th class="text-end">{{ $payCurrency }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
+                                                {{-- Build-up of Gross Pay. Each row mirrors a
+                                                     line on the F&F submit form so HR can
+                                                     reconcile the review against what they
+                                                     entered. --}}
                                                 @php
-                                                    $totalDeductions = 0;
+                                                    $workedDays      = (int) ($calculated['worked_days'] ?? 0);
+                                                    $proratedBasic   = (float) ($finalSettlement->proratedBasic ?? $calculated['proratedBasic'] ?? 0);
+                                                    $serviceCharge   = (float) ($finalSettlement->service_charge ?? 0);
+                                                    $totalAllowance  = (float) ($calculated['total_allowances_mvr'] ?? 0);
+                                                    $grossPay        = $proratedBasic + $serviceCharge + $leaveDaysSalaryTotal + $totalAllowance;
+
+                                                    $ewt             = (float) ($calculated['ewt'] ?? 0);
+                                                    $pension         = (float) ($calculated['pension'] ?? 0);
+                                                    $loanRecovery    = (float) ($calculated['loan_recovery'] ?? 0);
+                                                    $noticeCharge    = (float) ($calculated['notice_period_charge_mvr'] ?? 0);
                                                 @endphp
-                                                
-                                                @if(isset($calculated['ewt']) && $calculated['ewt'] > 0)
-                                                    @php $totalDeductions += $calculated['ewt']; @endphp
+                                                <tr>
+                                                    <td>
+                                                        Basic Salary For
+                                                        <span class="badge bg-light text-dark ms-1">{{ $workedDays }} Days</span>
+                                                    </td>
+                                                    <td class="text-end">{!! Common::formatCurrency($proratedBasic, $payCurrency) !!}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Service Charge Amount</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($serviceCharge, $payCurrency) !!}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Leave Days Salary</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($leaveDaysSalaryTotal, $payCurrency) !!}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Total Allowance Amount</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($totalAllowance, $payCurrency) !!}</td>
+                                                </tr>
+                                                <tr class="fw-600">
+                                                    <td>Gross Pay</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($grossPay, $payCurrency) !!}</td>
+                                                </tr>
+
+                                                {{-- ── Actual deductions ──
+                                                     EWHT, Pension, Loan/Advance recovery,
+                                                     Notice Period charge, and any custom
+                                                     deductions HR added during the F&F submit
+                                                     (Notice Period Charge, Adjustments-Deduction,
+                                                     City Ledger Deduction, etc.). --}}
+                                                @php $totalDeductions = 0; @endphp
+                                                <tr>
+                                                    <td>EWHT - Total Taxable Income</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($ewt, $payCurrency) !!}</td>
+                                                </tr>
+                                                @php $totalDeductions += $ewt; @endphp
+
+                                                @if($pension > 0)
                                                     <tr>
-                                                        <td>Employee Withholding Tax (EWT)</td>
-                                                        <td>{{ number_format($calculated['ewt'], 2) }}</td>
+                                                        <td>MRPS Employee Mandatory Contribution</td>
+                                                        <td class="text-end">{!! Common::formatCurrency($pension, $payCurrency) !!}</td>
                                                     </tr>
+                                                    @php $totalDeductions += $pension; @endphp
                                                 @endif
-                                                
-                                                @if(isset($calculated['pension']) && $calculated['pension'] > 0)
-                                                    @php $totalDeductions += $calculated['pension']; @endphp
+
+                                                @if($loanRecovery > 0)
                                                     <tr>
-                                                        <td>Pension Contribution</td>
-                                                        <td>{{ number_format($calculated['pension'], 2) }}</td>
+                                                        <td>Loan / Salary Advance Recovery</td>
+                                                        <td class="text-end">{!! Common::formatCurrency($loanRecovery, $payCurrency) !!}</td>
                                                     </tr>
+                                                    @php $totalDeductions += $loanRecovery; @endphp
                                                 @endif
-                                                
-                                                @if(isset($calculated['loan_recovery']) && $calculated['loan_recovery'] > 0)
-                                                    @php $totalDeductions += $calculated['loan_recovery']; @endphp
+
+                                                @if($noticeCharge > 0)
                                                     <tr>
-                                                        <td>Loan Recovery</td>
-                                                        <td>{{ number_format($calculated['loan_recovery'], 2) }}</td>
+                                                        <td>Notice Period Charge</td>
+                                                        <td class="text-end">{!! Common::formatCurrency($noticeCharge, $payCurrency) !!}</td>
                                                     </tr>
+                                                    @php $totalDeductions += $noticeCharge; @endphp
                                                 @endif
-                                                
-                                                @if($finalSettlement->deductions)
+
+                                                @if(!empty($finalSettlement->deductions))
                                                     @foreach($finalSettlement->deductions as $deductions)
                                                         @php $totalDeductions += $deductions->amount; @endphp
                                                         <tr>
-                                                            <td>{{ $deductions->deduction->deduction_name }}</td>
-                                                            <td>{{ number_format($deductions->amount, 2) }}</td>
+                                                            <td>{{ optional($deductions->deduction)->deduction_name ?? 'Other Deduction' }}</td>
+                                                            <td class="text-end">{!! Common::formatCurrency($deductions->amount, $payCurrency) !!}</td>
                                                         </tr>
                                                     @endforeach
                                                 @endif
-                                                
                                             </tbody>
                                             <tfoot>
                                                 <tr>
-                                                    <td>Total Deductions</td>
-                                                    <td id="totalDeductions">{!! Common::formatCurrency($totalDeductions, 'USD') !!}</td>  
+                                                    <th>Total Deductions</th>
+                                                    <th class="text-end" id="totalDeductions">{!! Common::formatCurrency($totalDeductions, $payCurrency) !!}</th>
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -254,25 +288,25 @@
                         <div class="table-responsive">
                             <table class="paySlipBorder-table">
                                 <thead>
-                                    <tr><th>Net Pay</th><th>Amount</th></tr>
+                                    <tr><th>Net Pay</th><th class="text-end">Amount</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td>Gross Earning</td>
-                                        <td class="fw-600" id="grossEarnings">{!! Common::formatCurrency($totalEarnings, 'USD') !!}</td>
-                                        <input type="hidden" name="total_earnings" id="totalEarningsInput" value="{{ number_format($totalEarnings, 2) }}">
+                                        <td>Gross Earnings</td>
+                                        <td class="fw-600 text-end" id="grossEarnings">{!! Common::formatCurrency($totalEarnings, $payCurrency) !!}</td>
+                                        <input type="hidden" name="total_earnings" id="totalEarningsInput" value="{{ number_format($totalEarnings, 2, '.', '') }}">
                                     </tr>
                                     <tr>
                                         <td>Total Deductions</td>
-                                        <td class="fw-600" id="totalDeductions1">(-) {!! Common::formatCurrency($totalDeductions, 'USD') !!}</td>
-                                        <input type="hidden" name="total_deductions" id="totalDeductionsInput" value="{{ number_format($totalDeductions, 2) }}">
+                                        <td class="fw-600 text-end" id="totalDeductions1">(-) {!! Common::formatCurrency($totalDeductions, $payCurrency) !!}</td>
+                                        <input type="hidden" name="total_deductions" id="totalDeductionsInput" value="{{ number_format($totalDeductions, 2, '.', '') }}">
                                     </tr>
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td>Total Net Payable</td>
-                                        <td id="netPayable">{!! Common::formatCurrency($totalEarnings - $totalDeductions, 'USD') !!}</td>
-                                        <input type="hidden" name="net_pay" id="netPayInput" value="{{ number_format($totalEarnings - $totalDeductions, 2) }}">
+                                        <th>Total Net Payable</th>
+                                        <th class="text-end" id="netPayable">{!! Common::formatCurrency($totalEarnings - $totalDeductions, $payCurrency) !!}</th>
+                                        <input type="hidden" name="net_pay" id="netPayInput" value="{{ number_format($totalEarnings - $totalDeductions, 2, '.', '') }}">
                                         <input type="hidden" name="final_settlement_id" id="final_settlement_id" value="{{ $finalSettlement->id }}">
                                     </tr>
                                 </tfoot>
@@ -297,19 +331,58 @@
                     @endphp
 
                     <div class="bg-themeGrayLight mb-2">
-                        <span class="fw-600">Total Net payable: </span>&nbsp;    
-                        <span id="netPayWords"> MVR {{ convertToWords($totalEarnings - $totalDeductions) }} Only </span>
+                        <span class="fw-600">Total Net payable: </span>&nbsp;
+                        <span id="netPayWords">{{ $payCurrency }} {{ convertToWords($totalEarnings - $totalDeductions) }} Only</span>
                     </div>
+                    {{-- Bank Name + Account Number come from the employee's
+                         bank_details record (most recent first). Was previously
+                         hardcoded to "Bank Of Maldives / 154210145545" so every
+                         settlement reviewer saw the same placeholder regardless
+                         of the actual payee. Hides when the employee has no
+                         bank record OR is paid in Cash. --}}
                     @if($finalSettlement->employee->payment_mode == 'Bank')
-                        <div class="bg-themeGrayLight d-flex mb-md-4 mb-3">
-                            <div><span class="fw-600">Bank Name:</span> Bank Of Maldives</div>
-                            <div><span class="fw-600">Account Number:</span> 154210145545</div>
-                        </div>
+                        @php
+                            $bank = optional($finalSettlement->employee->bankDetails)->sortByDesc('id')->first();
+                        @endphp
+                        @if($bank)
+                            <div class="bg-themeGrayLight d-flex mb-md-4 mb-3">
+                                <div class="me-4"><span class="fw-600">Bank Name:</span> {{ $bank->bank_name ?? '—' }}</div>
+                                <div><span class="fw-600">Account Number:</span> {{ $bank->account_number ?? '—' }}</div>
+                            </div>
+                        @else
+                            <div class="bg-themeGrayLight d-flex mb-md-4 mb-3 text-warning">
+                                <i class="fa-solid fa-circle-info me-2"></i>
+                                Bank payment selected but no bank account is on file for this employee.
+                            </div>
+                        @endif
                     @endif
 
-                    <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
-                    </div>
+                    {{-- Lock banner once the settlement is finalized. Replaces the
+                         Submit button with a read-only badge, prevents accidental
+                         re-finalize (the controller also rejects POST in that case,
+                         but the UI guard avoids the round-trip). --}}
+                    @if($finalSettlement->status === 'finalized')
+                        <div class="card-footer">
+                            <div class="alert alert-success mb-0 py-2 px-3 d-flex align-items-center" role="alert" style="font-size:13px;">
+                                <i class="fa-solid fa-lock me-2"></i>
+                                <div class="flex-grow-1">
+                                    <strong>Settlement Finalized.</strong>
+                                    Locked from further edits.
+                                    @if(!empty($finalSettlement->finalized_at))
+                                        Finalized on
+                                        <strong>{{ \Carbon\Carbon::parse($finalSettlement->finalized_at)->format('d M Y H:i') }}</strong>.
+                                    @endif
+                                </div>
+                                <a href="{{ route('final.settlement.list') }}" class="btn btn-sm btn-outline-secondary">
+                                    Back to list
+                                </a>
+                            </div>
+                        </div>
+                    @else
+                        <div class="card-footer text-end">
+                            <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        </div>
+                    @endif
                 </div>
             </form>
 

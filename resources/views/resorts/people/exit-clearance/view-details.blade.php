@@ -296,7 +296,11 @@
                         </div>
                     @endif
                     @foreach($exitClearanceFormAssignments as $exitClearanceFormAssignment)
-                        <div class="row g-xxl-4 g-md-3 g-2">
+                        <div class="row g-xxl-4 g-md-3 g-2"
+                             data-assignment-id="{{ $exitClearanceFormAssignment->id }}"
+                             data-assignment-status="{{ $exitClearanceFormAssignment->status }}"
+                             data-assignment-deadline="{{ \Carbon\Carbon::parse($exitClearanceFormAssignment->deadline_date)->format('d/m/Y') }}"
+                             data-assignment-reminder="{{ (int) ($exitClearanceFormAssignment->reminder_frequency ?? 3) }}">
                             <div class="col-lg-6">
                                 <div class="table-responsive">
                                     <table class="table table-lable mb-1">
@@ -305,7 +309,7 @@
                                                 <th>Form Assigned:</th>
                                                 <td>Yes
                                                     @if($is_hr == true )
-                                                    <a href="{{route('people.exit-clearance.employeeFormAssignmentShow',base64_encode($exitClearanceFormAssignment->id))}}" class="btn-lg-icon icon-bg-yellow mx-1"><i
+                                                    <a href="{{route('people.exit-clearance.employeeFormAssignmentShow',base64_encode($exitClearanceFormAssignment->id))}}" class="btn-lg-icon icon-bg-yellow mx-1" title="View response"><i
                                                             class="fa-solid fa-link"></i></a>
                                                     @endif
                                                     <span class="">{{ $exitClearanceFormAssignment->exitClearanceForm->form_name }}</span></td>
@@ -324,11 +328,33 @@
                                         <tbody>
                                             <tr>
                                                 <th>Response Deadline:</th>
-                                                <td> {{ Carbon\Carbon::parse($exitClearanceFormAssignment->deadline_date)->format('d M Y') }} </td>
+                                                <td>
+                                                    <span class="assignment-deadline-label">{{ Carbon\Carbon::parse($exitClearanceFormAssignment->deadline_date)->format('d M Y') }}</span>
+                                                    @if($is_hr && $exitClearanceFormAssignment->status !== 'Completed')
+                                                        <a href="javascript:void(0);"
+                                                           class="btn-lg-icon icon-bg-skyblue mx-1 assignment-edit-trigger"
+                                                           title="Edit deadline / reminder frequency">
+                                                            <i class="fa-solid fa-pen"></i>
+                                                        </a>
+                                                    @endif
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <th>Completion Status:</th>
-                                                <td>{{ $exitClearanceFormAssignment->status }}</td>
+                                                <td>
+                                                    {{ $exitClearanceFormAssignment->status }}
+                                                    @if($exitClearanceFormAssignment->status === 'Completed' && !empty($exitClearanceFormAssignment->completed_via))
+                                                        @if($exitClearanceFormAssignment->completed_via === 'mobile')
+                                                            <span class="badge bg-info-subtle text-info ms-1" title="Submitted by the employee via the mobile app">
+                                                                <i class="fa-solid fa-mobile-screen-button me-1"></i>mobile
+                                                            </span>
+                                                        @else
+                                                            <span class="badge bg-secondary-subtle text-secondary ms-1" title="Marked complete in-browser by HR or HOD">
+                                                                <i class="fa-solid fa-desktop me-1"></i>web
+                                                            </span>
+                                                        @endif
+                                                    @endif
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -423,7 +449,7 @@
                                 <div class="col-auto ms-auto"> <a href="{{route('people.exit-clearance.department-form',base64_encode($exit_clearance->id))}}" class="btn btn-themeSkyblue btn-sm">Clearance Form</a></div>
                             @elseif($is_hr == true && $is_assigned == true)
                                 <div class="col-auto ms-auto"> <a href="{{route('people.exit-clearance.department-form',base64_encode($exit_clearance->id))}}" class="btn btn-themeSkyblue btn-sm">Clearance Form</a></div>
-                                <div class="col-auto"><a href="{{route('payroll.final.settlement')}}" class="btn  btn-themeBlue btn-sm">Full And Final Settlement</a></div>
+                                <div class="col-auto"><a href="{{route('payroll.final.settlement', ['empId' => base64_encode($exit_clearance->employee_id)])}}" class="btn  btn-themeBlue btn-sm">Full And Final Settlement</a></div>
                                 @if($_isCompleted)
                                     <div class="col-auto"><span class="badge badge-themeSuccess px-3 py-2"><i class="fa-solid fa-check me-1"></i> Completed</span></div>
                                 @else
@@ -438,7 +464,7 @@
                                     </div>
                                 @endif
                             @elseif($is_hr == true && $is_assigned == false)
-                                <div class="col-auto ms-auto"><a href="{{route('payroll.final.settlement')}}" class="btn  btn-themeBlue btn-sm">Full And Final Settlement</a></div>
+                                <div class="col-auto ms-auto"><a href="{{route('payroll.final.settlement', ['empId' => base64_encode($exit_clearance->employee_id)])}}" class="btn  btn-themeBlue btn-sm">Full And Final Settlement</a></div>
                                 @if($_isCompleted)
                                     <div class="col-auto"><span class="badge badge-themeSuccess px-3 py-2"><i class="fa-solid fa-check me-1"></i> Completed</span></div>
                                 @else
