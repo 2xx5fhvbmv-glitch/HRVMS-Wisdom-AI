@@ -47,19 +47,19 @@
                                     <tbody>
                                         <tr>
                                             <th>Name:</th>
-                                            <td>{{$exit_clearance->employee->resortAdmin->full_name}}</td>
+                                            <td>{{ optional(optional($exit_clearance->employee)->resortAdmin)->full_name ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Employee ID:</th>
-                                            <td>{{$exit_clearance->employee->Emp_id}}</td>
+                                            <td>{{ optional($exit_clearance->employee)->Emp_id ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Department:</th>
-                                            <td>{{$exit_clearance->employee->department->name}}</td>
+                                            <td>{{ optional(optional($exit_clearance->employee)->department)->name ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Position:</th>
-                                            <td>{{$exit_clearance->employee->position->position_title}}</td>
+                                            <td>{{ optional(optional($exit_clearance->employee)->position)->position_title ?? '—' }}</td>
                                         </tr>
                                        <tr>
                                             <th>Employment Duration:</th>
@@ -114,7 +114,7 @@
                                     <tbody>
                                         <tr>
                                             <th>Reason for Resignation:</th>
-                                            <td>{{$exit_clearance->reason_title->reason}}</td>
+                                            <td>{{ optional($exit_clearance->reason_title)->reason ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Last Working Date:</th>
@@ -234,7 +234,20 @@
                                             </tr>
                                             <tr>
                                                 <th>Completion Status:</th>
-                                                <td>{{ $exitClearanceFormAssignment->status }}</td>
+                                                <td>
+                                                    {{ $exitClearanceFormAssignment->status }}
+                                                    @if($exitClearanceFormAssignment->status === 'Completed' && !empty($exitClearanceFormAssignment->completed_via))
+                                                        @if($exitClearanceFormAssignment->completed_via === 'mobile')
+                                                            <span class="badge bg-info-subtle text-info ms-1" title="Submitted by the employee via the mobile app">
+                                                                <i class="fa-solid fa-mobile-screen-button me-1"></i>mobile
+                                                            </span>
+                                                        @else
+                                                            <span class="badge bg-secondary-subtle text-secondary ms-1" title="Marked complete in-browser by HR or HOD">
+                                                                <i class="fa-solid fa-desktop me-1"></i>web
+                                                            </span>
+                                                        @endif
+                                                    @endif
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -347,7 +360,7 @@
                              approved resignation pending FNF, so the user
                              still picks this employee on the next screen. --}}
                         <div class="col-auto">
-                            <a href="{{route('payroll.final.settlement')}}" class="btn btn-themeBlue btn-sm">Full And Final Settlement</a>
+                            <a href="{{route('payroll.final.settlement', ['empId' => base64_encode($exit_clearance->employee_id)])}}" class="btn btn-themeBlue btn-sm">Full And Final Settlement</a>
                         </div>
 
                         {{-- Mark As Completed — confirms every department

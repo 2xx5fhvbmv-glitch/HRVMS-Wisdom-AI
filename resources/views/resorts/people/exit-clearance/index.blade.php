@@ -63,6 +63,9 @@
                                 <option></option>
                                 <option value="Pending">Pending</option>
                                 <option value="In Progress">In Progress</option>
+                                <option value="On Hold">On Hold</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
                                 <option value="Completed">Completed</option>
                             </select>
                         </div>
@@ -230,10 +233,27 @@
                         _token: '{{ csrf_token() }}'
                     },
                     success: function(response) {
+                        // Three response shapes from the server:
+                        //   • status:'success'      → every dept got a form
+                        //   • status:'partial'      → some did, some skipped
+                        //   • status:'no_template'  → zero forms exist; user
+                        //     needs to create department templates first.
+                        // Toast color tracks intent so partial/no-template
+                        // failures don't masquerade as green checkmarks.
+                        var toastOpts = { positionClass: 'toast-bottom-right', timeOut: 8000, extendedTimeOut: 4000 };
+                        if (response.status === 'no_template') {
+                            toastr.warning(response.message, "Templates missing", toastOpts);
+                            // Keep the modal open so HR can adjust the dept
+                            // selection without re-opening the dialog.
+                            return;
+                        }
+                        if (response.status === 'partial') {
+                            toastr.warning(response.message, "Partially assigned", toastOpts);
+                        } else if (response.success) {
+                            toastr.success(response.message, "Success", toastOpts);
+                        }
+
                         if (response.success) {
-                            toastr.success(response.message, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
                             $('#listDep-modal').modal('hide');
                             $('#select_dep').val('').trigger('change');
                             $('#datapicker_modal').val('');
@@ -244,12 +264,26 @@
                             const f = document.getElementById('exitClearanceAssignForm');
                             if (f) f.reset();
                             getExitClearanceData();
-                        } 
+
+                            // Auto-open the Status modal so HR immediately
+                            // sees the new assignments — was a hidden side
+                            // effect before: assignments were created but
+                            // the user had to click the status badge to
+                            // see them, which read as "nothing happened".
+                            if (resignation_id) {
+                                $(document)
+                                    .find('.status-modal-trigger[data-id="' + resignation_id + '"]')
+                                    .first()
+                                    .trigger('click');
+                            }
+                        }
                     },
-                    error: function(xhr, status, error) {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
+                    error: function(xhr) {
+                        var msg = 'Failed to assign exit clearance.';
+                        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                        toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
                     }
                 });
             });

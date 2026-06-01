@@ -112,6 +112,13 @@ class ExitClearanceController extends Controller
                     // "Pending" filter must include those rows too —
                     // otherwise users see N badges in the table but the
                     // filter shows only the literal-Pending subset.
+                    //
+                    // No default — when the user picks "All" (no status),
+                    // surface every resignation regardless of state so HR
+                    // can see Pending / In Progress / On Hold / Rejected
+                    // clearances alongside Approved ones. Previously this
+                    // branch defaulted to status='Approved', which masked
+                    // every other clearance state on page load.
                     if ($statusVal === 'Pending') {
                         $knownStatuses = ['Completed', 'Approved', 'Rejected', 'On Hold', 'In Progress'];
                         $q->where(function ($qq) use ($knownStatuses) {
@@ -121,8 +128,6 @@ class ExitClearanceController extends Controller
                         });
                     } elseif ($statusVal) {
                         $q->where('status', $statusVal);
-                    } else {
-                        $q->where('status', 'Approved');
                     }
                 })
                 ->when($deptId, function ($q) use ($deptId) {
@@ -254,11 +259,22 @@ class ExitClearanceController extends Controller
             ->firstOrFail();
 
         $user = $this->resort->GetEmployee;
-       
+
         $is_assigned = false;
         $is_hr = false;
 
-        if ($user->rank == 3) {
+        // "HR" used to mean rank == 3 only. That broke on resorts that
+        // run HR through a different rank (GM=8, HOD=2, etc.) — none of
+        // their users matched, so everyone fell through to the HOD
+        // template and the "Assign Employee Form" button was hidden
+        // permanently. Widen the definition: anyone who currently holds
+        // EDIT permission on the people.exit-clearance module is treated
+        // as HR for routing + UI gating. Rank=3 still qualifies as a
+        // back-compat shortcut for resorts that DO use the canonical
+        // HR rank.
+        if ($user && $user->rank == 3) {
+            $is_hr = true;
+        } elseif (Common::checkRouteWisePermission('people.exit-clearance', config('settings.resort_permissions.edit'))) {
             $is_hr = true;
         }
         if($is_hr == true){
@@ -307,9 +323,25 @@ class ExitClearanceController extends Controller
     public function assignmentSubmitDepartment(Request $request){
 
         $resort_id = $this->resort->resort_id;
-        $have_template = false;
-        
+
+        // Track per-department outcomes so the response can tell HR
+        // exactly which departments got assigned vs which need a form
+        // template created first. Previously a single $have_template
+        // bool drove the message — meaning even a partial success
+        // ("3 of 7 departments got assigned, 4 had no template") looked
+        // identical to a full success, and the empty-status modal the
+        // user later saw had no explanation.
+        $assignedDeptNames = [];   // newly created OR existing-updated
+        $missingTemplates  = [];   // dept ids with no department form
+
+        $deadLineDate = Carbon::createFromFormat('d/m/Y', $request->input('deadline_date'))->format('Y-m-d');
+
         foreach ($request->department_id as $department_id) {
+            $department = ResortDepartment::where('resort_id', $resort_id)
+                ->where('id', $department_id)
+                ->first();
+            $deptLabel = $department ? $department->name : ('Department #' . $department_id);
+
             $employee = Employee::where('resort_id', $resort_id)->where('Dept_id',$department_id)
             ->where('rank',2)
             ->first();
@@ -320,76 +352,101 @@ class ExitClearanceController extends Controller
                 ->first();
             }
 
-            $deadLineDate = Carbon::createFromFormat('d/m/Y', $request->input('deadline_date'))->format('Y-m-d');
-
             $template = ExitClearanceForm::where('resort_id', $resort_id)
                 ->where('department_id', $department_id)
                 ->where('form_type', 'department')->first();
 
-
-            if ($template != null) {
-                $have_template = true;
-                $chkExitClearanceFormAssignment = ExitClearanceFormAssignment::where('resort_id', $resort_id)
-                    ->where('department_id', $department_id)
-                    ->where('emp_resignation_id', $request->employee_resignation_id)
-                    ->where('form_id', $template->id)
-                    ->where('assigned_to_type', 'department')
-                    ->first();
-
-                if (!$chkExitClearanceFormAssignment) {
-
-                    $exitClearanceFormAssignment = ExitClearanceFormAssignment::create([
-                        'resort_id' => $resort_id,
-                        'department_id' => $department_id,
-                        'emp_resignation_id' => $request->employee_resignation_id,
-                        'form_id'=> $template->id,
-                        'assigned_to_type' => 'department',
-                        'assigned_to_id' => $employee ? $employee->id : null,
-                        'assigned_by' => Auth::guard('resort-admin')->user()->id,
-                        'assigned_date' => Carbon::now(),
-                        'deadline_date' => $deadLineDate,
-                        'status' => 'Pending',
-                    ]);
-
-                    // Notify the department's HOD (or fallback rank we
-                    // picked above) — they need to know a clearance form
-                    // landed in their queue. Was silently created
-                    // before; HR had to chase by hand.
-                    if ($employee) {
-                        $resignation = EmployeeResignation::with('employee.resortAdmin')
-                            ->find($request->employee_resignation_id);
-                        $empName = $resignation
-                            ? (optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee')
-                            : 'employee';
-                        $this->notifyExit(
-                            $employee->id,
-                            'New Exit Clearance Form Assigned',
-                            "📋 You have been assigned an exit clearance form for {$empName}."
-                            . " Deadline: " . Carbon::parse($deadLineDate)->format('d M Y') . "."
-                        );
-                    }
-
-                }else{
-                    
-                    $chkExitClearanceFormAssignment->update([
-                            'deadline_date' => $deadLineDate,
-                        ]);
-                }
+            if ($template === null) {
+                $missingTemplates[] = $deptLabel;
+                continue;
             }
+
+            $chkExitClearanceFormAssignment = ExitClearanceFormAssignment::where('resort_id', $resort_id)
+                ->where('department_id', $department_id)
+                ->where('emp_resignation_id', $request->employee_resignation_id)
+                ->where('form_id', $template->id)
+                ->where('assigned_to_type', 'department')
+                ->first();
+
+            if (!$chkExitClearanceFormAssignment) {
+
+                ExitClearanceFormAssignment::create([
+                    'resort_id' => $resort_id,
+                    'department_id' => $department_id,
+                    'emp_resignation_id' => $request->employee_resignation_id,
+                    'form_id'=> $template->id,
+                    'assigned_to_type' => 'department',
+                    'assigned_to_id' => $employee ? $employee->id : null,
+                    'assigned_by' => Auth::guard('resort-admin')->user()->id,
+                    'assigned_date' => Carbon::now(),
+                    'deadline_date' => $deadLineDate,
+                    'status' => 'Pending',
+                ]);
+
+                // Notify the department's HOD (or fallback rank we
+                // picked above) — they need to know a clearance form
+                // landed in their queue. Was silently created
+                // before; HR had to chase by hand.
+                if ($employee) {
+                    $resignation = EmployeeResignation::with('employee.resortAdmin')
+                        ->find($request->employee_resignation_id);
+                    $empName = $resignation
+                        ? (optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee')
+                        : 'employee';
+                    $this->notifyExit(
+                        $employee->id,
+                        'New Exit Clearance Form Assigned',
+                        "📋 You have been assigned an exit clearance form for {$empName}."
+                        . " Deadline: " . Carbon::parse($deadLineDate)->format('d M Y') . "."
+                    );
+                }
+
+            } else {
+                $chkExitClearanceFormAssignment->update([
+                    'deadline_date' => $deadLineDate,
+                ]);
+            }
+
+            $assignedDeptNames[] = $deptLabel;
         }
 
-        if($have_template == false){
+        // Three response shapes so the frontend can pick the right
+        // toast (success / warning / error) and surface actionable
+        // detail. `assigned_count` = 0 was previously masked as success.
+        $assignedCount = count($assignedDeptNames);
+        $missingCount  = count($missingTemplates);
+
+        if ($assignedCount === 0 && $missingCount > 0) {
+            return response()->json([
+                'success' => false,
+                'status'  => 'no_template',
+                'message' => 'No exit-clearance form template exists for the selected department'
+                    . ($missingCount === 1 ? '' : 's') . ': ' . implode(', ', $missingTemplates)
+                    . '. Create a department form in Exit Clearance → Configuration and try again.',
+                'missing_departments' => $missingTemplates,
+                'assigned_count'      => 0,
+            ]);
+        }
+
+        if ($missingCount > 0) {
             return response()->json([
                 'success' => true,
-                'status' => 'success',
-                'message' => 'Create Department form and assign.',
+                'status'  => 'partial',
+                'message' => 'Assigned ' . $assignedCount . ' department(s). '
+                    . $missingCount . ' department(s) skipped (no form template): '
+                    . implode(', ', $missingTemplates) . '.',
+                'assigned_departments' => $assignedDeptNames,
+                'missing_departments'  => $missingTemplates,
+                'assigned_count'       => $assignedCount,
             ]);
         }
 
         return response()->json([
             'success' => true,
-            'status' => 'success',
-            'message' => 'Exit clearance form assignment created successfully.',
+            'status'  => 'success',
+            'message' => 'Exit clearance form assigned to ' . $assignedCount . ' department(s) successfully.',
+            'assigned_departments' => $assignedDeptNames,
+            'assigned_count'       => $assignedCount,
         ]);
 
     }
@@ -423,6 +480,62 @@ class ExitClearanceController extends Controller
             'employee_id',
             'departments','exit_clearance_employee_template','employeeResignation','employee'
         ));
+    }
+
+    /**
+     * Inline update for an existing ExitClearanceFormAssignment row from the
+     * view-details page. Lets HR change the deadline + reminder cadence
+     * without recreating the assignment. Returns JSON for the modal save
+     * handler. Pending rows only — a Completed row is immutable; the
+     * employee already submitted, editing the deadline would mislead the
+     * audit trail.
+     */
+    public function updateAssignment(Request $request, $id)
+    {
+        if (Common::checkRouteWisePermission('people.exit-clearance', config('settings.resort_permissions.edit')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+        $resort_id = $this->resort->resort_id;
+        $assignment = ExitClearanceFormAssignment::where('id', $id)
+            ->where('resort_id', $resort_id)
+            ->first();
+        if (!$assignment) {
+            return response()->json(['success' => false, 'message' => 'Assignment not found.'], 404);
+        }
+        if ($assignment->status === 'Completed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This form has already been completed. Edit the form template instead, or revoke + reassign if the deadline truly needs to move.'
+            ], 422);
+        }
+
+        $payload = [];
+        if ($request->filled('deadline_date')) {
+            try {
+                $payload['deadline_date'] = Carbon::createFromFormat('d/m/Y', $request->input('deadline_date'))->format('Y-m-d');
+            } catch (\Throwable $e) {
+                return response()->json(['success' => false, 'message' => 'Deadline must be in dd/mm/yyyy format.'], 422);
+            }
+        }
+        if ($request->filled('reminder_frequency')) {
+            $payload['reminder_frequency'] = (int) $request->input('reminder_frequency');
+        }
+
+        if (empty($payload)) {
+            return response()->json(['success' => false, 'message' => 'Nothing to update.'], 422);
+        }
+
+        $assignment->update($payload);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Assignment updated.',
+            'data' => [
+                'id' => $assignment->id,
+                'deadline_date' => Carbon::parse($assignment->deadline_date)->format('d M Y'),
+                'reminder_frequency' => $assignment->reminder_frequency,
+            ],
+        ]);
     }
 
     public function assignmentSubmitEmployee(Request $request){
@@ -673,11 +786,18 @@ class ExitClearanceController extends Controller
                 ]);
         }
 
-        $exitClearanceFormAssignment->update([
-            'status' => 'Completed',
+        // Stamp web as the completion channel so the view-details page
+        // can show "Completed (web)" vs "Completed (mobile)". hasColumn
+        // guard tolerates environments where the
+        // 2026_06_01_150000 migration hasn't been applied yet.
+        $completedPayload = [
+            'status'         => 'Completed',
             'completed_date' => Carbon::now(),
-
-        ]);
+        ];
+        if (\Schema::hasColumn('exit_clearance_form_assignments', 'completed_via')) {
+            $completedPayload['completed_via'] = 'web';
+        }
+        $exitClearanceFormAssignment->update($completedPayload);
 
         // Notify HR (the resignation's hr_id, or the resort HR fallback)
         // that a department has completed their clearance form so HR can
@@ -771,10 +891,14 @@ class ExitClearanceController extends Controller
             ]);
         }
 
-        $exitClearanceFormAssignment->update([
+        $completedPayload = [
             'status'         => 'Completed',
             'completed_date' => Carbon::now(),
-        ]);
+        ];
+        if (\Schema::hasColumn('exit_clearance_form_assignments', 'completed_via')) {
+            $completedPayload['completed_via'] = 'web';
+        }
+        $exitClearanceFormAssignment->update($completedPayload);
 
         // Notify HR — same shape as the API formSubmit + the department
         // completion notification, so the bell log reads consistently.
@@ -830,6 +954,22 @@ class ExitClearanceController extends Controller
             $employee = Employee::find($employeeResignation->employee_id);
             if ($employee && $employee->status === 'Offboarding') {
                 $employee->update(['status' => 'Terminated']);
+            }
+
+            // Auto-generate the Experience Certificate so HR doesn't
+            // have to chase the "Issue Certificate" button afterwards
+            // for every offboarded employee. Soft-fails: if the
+            // template is missing or PDF rendering crashes, we log and
+            // continue — the certificate can still be issued manually
+            // from the view-details page.
+            try {
+                if ($employeeResignation->certificate_issue !== 'yes') {
+                    $this->experienceCertificate(new Request(), base64_encode($employeeResignation->id));
+                }
+            } catch (\Throwable $certErr) {
+                \Log::warning('Auto-generate experience certificate failed: ' . $certErr->getMessage(), [
+                    'resignation_id' => $employeeResignation->id,
+                ]);
             }
 
             // Notify the employee + HR that offboarding is officially
@@ -890,20 +1030,92 @@ class ExitClearanceController extends Controller
        
         
         $type = $probationLetterTemplate->type;
+
+        // Compute "Duration of Service" — years & months between joining
+        // and last working day. Falls back to '—' when either date is
+        // missing on the employee record. Used to substitute the literal
+        // "[As per employment records]" string the seeded template still
+        // carries (no placeholder token, just raw text).
+        $duration = '—';
+        if ($employee->joining_date && $employeeResignation->last_working_day) {
+            try {
+                $jd = Carbon::parse($employee->joining_date);
+                $lwd = Carbon::parse($employeeResignation->last_working_day);
+                if ($lwd->greaterThanOrEqualTo($jd)) {
+                    $diff = $jd->diff($lwd);
+                    $parts = [];
+                    if ($diff->y > 0) $parts[] = $diff->y . ' year' . ($diff->y === 1 ? '' : 's');
+                    if ($diff->m > 0) $parts[] = $diff->m . ' month' . ($diff->m === 1 ? '' : 's');
+                    if (empty($parts))    $parts[] = max(1, $diff->d) . ' day' . ($diff->d === 1 ? '' : 's');
+                    $duration = implode(' ', $parts);
+                }
+            } catch (\Throwable $e) { /* leave default */ }
+        }
+
+        $issueDate    = now()->format('d M Y');
+        $joiningDate  = $employee->joining_date
+            ? Carbon::parse($employee->joining_date)->format('d M Y')
+            : '—';
+        $separation   = $employeeResignation->last_working_day
+            ? Carbon::parse($employeeResignation->last_working_day)->format('d M Y')
+            : '—';
+
+        // NOTE on `{{date}}` ambiguity: the seeded template uses `{{date}}`
+        // for BOTH "Date of Joining" and "Issued Date", which means the
+        // joining row ends up showing today's date in older builds. We
+        // resolve it by treating `{{date}}` as the joining date (the more
+        // common HR convention) and adding `{{issue_date}}` for the
+        // signed-off date. Templates that prefer the legacy "today"
+        // meaning should switch to `{{issue_date}}`.
         $placeholders = [
-            '{{date}}'                => now()->format('d M Y'),
+            '{{date}}'                => $joiningDate,
+            '{{issue_date}}'          => $issueDate,
             '{{resort_name}}'         => (string) $resort->resort_name,
             '{{employee_name}}'       => (string) optional($employee->resortAdmin)->full_name,
+            '{{employee_code}}'       => (string) $employee->Emp_id,
+            '{{Emp_id}}'              => (string) $employee->Emp_id,
             '{{position_title}}'      => (string) optional($employee->position)->position_title,
-            '{{Department_title}}'   => (string) optional($employee->department)->name,
-            '{{joining_date}}' => (string) Carbon::parse($employee->joining_date)->format('d M Y'),
-            '{{last_working_day}}' => (string) Carbon::parse($employeeResignation->last_working_day)->format('d M Y'),
+            '{{Department_title}}'    => (string) optional($employee->department)->name,
+            '{{department_name}}'     => (string) optional($employee->department)->name,
+            '{{employment_type}}'     => (string) ($employee->employment_type ?? ''),
+            '{{joining_date}}'        => $joiningDate,
+            '{{last_working_day}}'    => $separation,
+            '{{date_of_separation}}'  => $separation,
+            '{{duration_of_service}}' => $duration,
         ];
 
+        // Replace the literal "[As per employment records]" placeholder
+        // text that the seeded template still ships with — no Blade
+        // token, just a stand-in note. Anything HR types between square
+        // brackets won't be touched, only the exact phrase.
+        $letterContent = str_replace(
+            '[As per employment records]',
+            $duration,
+            $probationLetterTemplate->content
+        );
+        $letterContent = strtr($letterContent, $placeholders);
 
-        $letterContent = strtr($probationLetterTemplate->content, $placeholders);
-      
-        $pdf = Pdf::loadHTML($letterContent);
+        // Render the PDF through the shared letterhead wrapper so the
+        // resort's configured Letterhead & E-signature is applied at the
+        // top (header image + address) and bottom (signature block).
+        // The probation module uses the same view, so a single template
+        // change benefits both flows. Falls back to resort logo + name
+        // when no letterhead is configured — letter generation never
+        // breaks for a fresh resort.
+        $letterhead = Common::getLetterheadData($resort_id);
+        $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($resort_id),
+            'signatureImage' => $letterhead['signatureImage'] ?? null,
+            'signatoryName'  => ($letterhead['signatoryName'] ?? null) ?: 'Human Resources Department',
+            'signatoryTitle' => ($letterhead['signatoryTitle'] ?? null)
+                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+        // Allow DomPDF to load the local letterhead image files
+        // (resort-uploaded headers/footers/signatures live on disk).
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
         
         $directory = public_path(config('settings.experienceLetters')).'/' . $this->resort->resort->resort_id.'/'.$employee->Emp_id;
         if (!file_exists($directory)) {

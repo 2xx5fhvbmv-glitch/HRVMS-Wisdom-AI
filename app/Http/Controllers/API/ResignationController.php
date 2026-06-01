@@ -270,12 +270,20 @@ class ResignationController extends Controller
 
             if (!$ExitClearanceFormAssignment) {
                 return response()->json([
-                    'success'                           =>  false, 
+                    'success'                           =>  false,
                     'message'                           =>  'Form assignment not found'
                 ],200);
             }
 
             $ExitClearanceFormAssignment->status        =   'Completed';
+            // Tag the channel that closed the form so HR can tell at a
+            // glance whether the employee submitted on mobile or HR/HOD
+            // marked it in-browser. Guard with hasColumn so this still
+            // works on environments where the 2026_06_01_150000 migration
+            // hasn't been run yet.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('exit_clearance_form_assignments', 'completed_via')) {
+                $ExitClearanceFormAssignment->completed_via = 'mobile';
+            }
             $ExitClearanceFormAssignment->save();
 
             // Notify HR (and the resignation owner) that the employee has

@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Services\FinalSettlementService;
 
 use App\Mail\SharePayslipMail; // Import your Mailable class
+use App\Mail\FinalSettlementMail;
 use Auth;
 use Config;
 use DB;
@@ -384,7 +385,26 @@ class PayslipController extends Controller
         $departments = ResortDepartment::where('status','active')->where('resort_id',$resort_id)->get();
         $deductions = Deduction::where('resort_id',$resort_id)->get();
         $earnings = Earnings::where('resort_id',$resort_id)->get();
-        return view('resorts.payroll.payslip.fullandfinalsettlement',compact('page_title','positions','departments','employees','deductions','earnings'));
+
+        // Optional pre-select when deep-linked from Exit Clearance "Full
+        // And Final Settlement" button — that view passes `?empId=` as a
+        // base64 of the employees.id. Validate the id is actually in the
+        // approved-resignation list for this resort so we don't preselect
+        // an unrelated employee. The blade reads $preselectedEmployeeId
+        // to mark the matching <option selected> and to fire the existing
+        // getEmpDetails() AJAX onload so all the salary/leave/pension
+        // fields auto-populate.
+        $preselectedEmployeeId = null;
+        if ($request->filled('empId')) {
+            $decoded = base64_decode((string) $request->empId, true);
+            if ($decoded !== false && ctype_digit((string) $decoded)) {
+                $candidate = (int) $decoded;
+                if ($employees->contains(fn($r) => optional($r->employee)->id === $candidate)) {
+                    $preselectedEmployeeId = $candidate;
+                }
+            }
+        }
+        return view('resorts.payroll.payslip.fullandfinalsettlement',compact('page_title','positions','departments','employees','deductions','earnings','preselectedEmployeeId'));
     }
 
     public function getEmployeeDetails(Request $request, FinalSettlementService $settlementService)
@@ -460,6 +480,19 @@ class PayslipController extends Controller
 
     public function store(Request $request)
     {
+        // Lock guard: a finalized F&F can't be re-edited. The form on
+        // /resort/final-settlement is normally hidden behind a list-page
+        // click, but a stale tab or a direct POST would otherwise sail
+        // through updateOrCreate() and silently rewrite the row.
+        $existing = FinalSettlement::where('employee_id', $request->input('select_emp'))->first();
+        if ($existing && $existing->status === 'finalized') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This settlement is already finalized and cannot be re-submitted. '
+                    . 'Open it from /resort/final-settlement/list to view the locked record.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'select_emp' => 'required|exists:employees,id',
             'pension' => 'required|numeric|min:0',
@@ -584,7 +617,21 @@ class PayslipController extends Controller
             return abort(403, 'Unauthorized action.');
         }
         $page_title = 'Review Final Settlement';
-        $finalSettlement = FinalSettlement::with(['employee.resortAdmin','employee.division', 'employee.department','employee.position','earnings', 'deductions'])->findOrFail($id);
+        $finalSettlement = FinalSettlement::with([
+            'employee.resortAdmin',
+            'employee.division',
+            'employee.department',
+            'employee.position',
+            // Bank record drives the Bank Name + Account Number block on the
+            // review page (was hardcoded to a single placeholder before).
+            'employee.bankDetails',
+            // Resignation reason header on the review page —
+            // previously a lazy fetch + null deref crashed when reason was
+            // missing; eager-load + optional() in the view handles it.
+            'employee.resignation.reason_title',
+            'earnings',
+            'deductions',
+        ])->findOrFail($id);
         $today = Carbon::now(); 
         // dd($finalSettlement->employee->resignation->reason_title->reason);
         $service = new FinalSettlementService();
@@ -623,9 +670,171 @@ class PayslipController extends Controller
             return response()->json(['success' => false, 'message' => 'No settlement record found.'], 404);
         }
 
-        $finalSettlement->update(['status' => 'finalized']);
+        // Idempotency: once a settlement is finalized it can't be
+        // re-finalized. Without this, hitting Submit twice would re-
+        // mark loan installments and re-fire the F&F email.
+        if ($finalSettlement->status === 'finalized') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This settlement is already finalized and cannot be re-submitted.',
+            ], 422);
+        }
+
+        \DB::beginTransaction();
+        try {
+            $finalSettlement->update([
+                'status'       => 'finalized',
+                'finalized_at' => now(),
+                'finalized_by' => Auth::guard('resort-admin')->user()->id ?? null,
+            ]);
+
+            // ─── Mark outstanding loan / salary-advance installments as
+            // Recovered so the next payroll run doesn't double-deduct
+            // them. We only flip rows whose summed amount was actually
+            // included in the F&F payout (loan_payment > 0). The DB
+            // column update is wrapped in the same transaction as the
+            // finalize, so a partial failure rolls both back.
+            $loanInPayout = (float) ($finalSettlement->loan_payment ?? 0);
+            if ($loanInPayout > 0 && $finalSettlement->employee_id) {
+                $now = now();
+                \DB::table('payroll_recovery_schedule as rs')
+                    ->join('payroll_advance as pa', 'pa.id', '=', 'rs.payroll_advance_id')
+                    ->where('pa.employee_id', $finalSettlement->employee_id)
+                    ->where('rs.status', 'Pending')
+                    ->update([
+                        'rs.status'             => 'Recovered',
+                        'rs.recovery_date'      => $now,
+                        'rs.recovered_via'      => 'final_settlement',
+                        'rs.final_settlement_id'=> $finalSettlement->id,
+                        'rs.updated_at'         => $now,
+                    ]);
+            }
+
+            // Dispatch the F&F PDF email to the employee and Finance.
+            // Wrapped in try/catch so an SMTP outage doesn't roll back
+            // the finalize (the settlement is still valid even if the
+            // email fails — Finance can resend from the list page).
+            try {
+                $this->dispatchFinalSettlementEmail($finalSettlement);
+            } catch (\Throwable $emailErr) {
+                \Log::warning('F&F email dispatch failed: ' . $emailErr->getMessage(), [
+                    'final_settlement_id' => $finalSettlement->id,
+                ]);
+            }
+
+            \DB::commit();
+        } catch (\Throwable $e) {
+            \DB::rollBack();
+            \Log::error('F&F submit failed', [
+                'final_settlement_id' => $finalSettlement->id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to finalize settlement: ' . $e->getMessage(),
+            ], 500);
+        }
 
         return response()->json(['success' => true, 'message' => 'Final settlement submitted successfully.']);
+    }
+
+    /**
+     * Render the F&F PDF, email it to the employee + Finance, save the
+     * path on the FinalSettlement row for re-download from the list
+     * page. Called from submit() inside the finalize transaction.
+     *
+     * Failure modes are deliberately soft: an SMTP outage or missing
+     * Finance email shouldn't roll back the finalize — Finance can
+     * resend from the list page once the issue is fixed. Caller
+     * already wraps this in try/catch + Log::warning.
+     */
+    protected function dispatchFinalSettlementEmail(FinalSettlement $finalSettlement): void
+    {
+        // Render the same review view to a PDF and persist on disk so
+        // Finance can re-download later. Re-use the existing review
+        // template — single source of truth for the layout.
+        $finalSettlement->loadMissing([
+            'employee.resortAdmin',
+            'employee.division',
+            'employee.department',
+            'employee.position',
+            'employee.bankDetails',
+            'employee.resignation.reason_title',
+            'earnings',
+            'deductions',
+        ]);
+
+        $today      = \Carbon\Carbon::now();
+        $service    = new \App\Services\FinalSettlementService();
+        $calculated = $service->calculateFinalMonthData(
+            $finalSettlement->employee,
+            $finalSettlement->employee->resort_id
+        );
+        $leaveBalances = $service->getLeaveBalance(
+            $finalSettlement->employee,
+            $finalSettlement->employee->resort_id
+        );
+
+        $pdf = \PDF::loadView('resorts.payroll.payslip.final_settlement_review', [
+            'finalSettlement' => $finalSettlement,
+            'calculated'      => $calculated,
+            'leaveBalances'   => $leaveBalances,
+            'today'           => $today,
+            'page_title'      => 'Final Pay Settlement',
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        // Storage path: storage/app/final-settlements/<resort>/<emp_id>/<reference>.pdf
+        $dir = storage_path('app/final-settlements/' . $finalSettlement->employee->resort_id
+            . '/' . $finalSettlement->employee->Emp_id);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+        $filename = preg_replace('/[^A-Za-z0-9_-]/', '_', $finalSettlement->reference_no ?? ('FS-' . $finalSettlement->id)) . '.pdf';
+        $pdfPath  = $dir . '/' . $filename;
+        file_put_contents($pdfPath, $pdf->output());
+
+        // Persist the path on the settlement row so the list page can
+        // surface a "Download PDF" button without re-rendering.
+        if (\Schema::hasColumn('final_settlement', 'pdf_path')) {
+            $finalSettlement->update(['pdf_path' => $pdfPath]);
+        }
+
+        // Recipients: the employee's primary email + any Finance addresses
+        // configured for this resort. Falls back to empty CC list when
+        // Finance isn't set — the employee still gets their copy.
+        $to = optional(optional($finalSettlement->employee)->resortAdmin)->email;
+        if (empty($to)) {
+            // Without an employee email there's no one to send to. Log
+            // and bail; Finance can manually download from the list.
+            \Log::info('F&F email skipped — employee has no email on file', [
+                'final_settlement_id' => $finalSettlement->id,
+            ]);
+            return;
+        }
+
+        $financeCc = [];
+        // Pull resort-configured Finance recipients. Two known fields
+        // depending on resort schema age; coalesce gracefully.
+        $resort = optional($finalSettlement->employee)->resort;
+        if ($resort) {
+            $candidate = $resort->finance_email ?? ($resort->finance_contact_email ?? null);
+            if (!empty($candidate)) {
+                foreach (preg_split('/[;,]+/', $candidate) as $addr) {
+                    $addr = trim($addr);
+                    if (filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                        $financeCc[] = $addr;
+                    }
+                }
+            }
+        }
+
+        $mailable = new FinalSettlementMail($finalSettlement, $pdfPath);
+        $pending  = \Mail::to($to);
+        if (!empty($financeCc)) {
+            $pending->cc($financeCc);
+        }
+        $pending->send($mailable);
     }
 
     public function settlementList()

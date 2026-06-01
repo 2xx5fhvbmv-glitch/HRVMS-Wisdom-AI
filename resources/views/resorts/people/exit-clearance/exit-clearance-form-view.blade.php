@@ -199,11 +199,9 @@ $('#submit-form').on('click', function (e) {
                });
           });
 
-        // Use Blade conditional — `$is_submitted` is a PHP variable
-        // (set in employeeFormAssignmentShow) and isn't interpolated
-        // into JS unless wrapped in {{ }} or output via @if. The plain
-        // JS form `if($is_submitted == false)` would throw
-        // ReferenceError at runtime.
+        // Use a Blade conditional below. The literal JS form
+        // `if($is_submitted == false)` would throw ReferenceError at
+        // runtime because Blade variables don't exist on the client.
         @if(empty($is_submitted))
             $('#form-render :input').prop('disabled', true);
         @endif
