@@ -324,7 +324,22 @@ class EmployeeController extends Controller
             && Schema::hasTable('t_anotification_parents')
             && Schema::hasTable('t_anotification_children')
             && Schema::hasTable('application_links')) {
-            $vacancies = DB::table('vacancies as v')
+            // Subquery: how many employees have already been hired against
+            // each vacancy. We left-join this so vacancies with zero hires
+            // (the common case) still appear with filled=0.
+            // Guard the column with Schema::hasColumn — the
+            // 2026_06_01_140000_add_vacancy_id_to_employees migration is
+            // what introduces it. Until the migration runs, treat every
+            // vacancy as having 0 hires (i.e. fully available).
+            $hasVacancyIdCol = Schema::hasColumn('employees', 'vacancy_id');
+            $filledByVacancy = DB::table('employees')
+                ->select('vacancy_id', DB::raw('COUNT(*) as filled'))
+                ->where('resort_id', $resort_id)
+                ->whereNotIn('status', ['Terminated', 'Inactive'])
+                ->whereNotNull('vacancy_id')
+                ->groupBy('vacancy_id');
+
+            $vacanciesQuery = DB::table('vacancies as v')
                 ->join('resort_positions as p', 'p.id', '=', 'v.position')
                 ->join('resort_departments as d', 'd.id', '=', 'v.department')
                 // Division is reached through the department row
@@ -334,7 +349,15 @@ class EmployeeController extends Controller
                 ->leftJoin('resort_divisions as dv', 'dv.id', '=', 'd.division_id')
                 ->join('t_anotification_parents as tap', 'tap.V_id', '=', 'v.id')
                 ->join('t_anotification_children as tac', 'tac.Parent_ta_id', '=', 'tap.id')
-                ->join('application_links as al', 'al.ta_child_id', '=', 'tac.id')
+                ->join('application_links as al', 'al.ta_child_id', '=', 'tac.id');
+
+            if ($hasVacancyIdCol) {
+                $vacanciesQuery->leftJoinSub($filledByVacancy, 'fb', function ($j) {
+                    $j->on('fb.vacancy_id', '=', 'v.id');
+                });
+            }
+
+            $vacancies = $vacanciesQuery
                 ->where('v.Resort_id', $resort_id)
                 ->where('tac.Approved_By', Common::TaFinalApproval($resort_id))
                 ->where('tac.status', 'ForwardedToNext')
@@ -353,6 +376,9 @@ class EmployeeController extends Controller
                     'dv.id as division_id',
                     'dv.name as division_name',
                     'v.Total_position_required as no_of_positions',
+                    $hasVacancyIdCol
+                        ? DB::raw('COALESCE(MAX(fb.filled), 0) as filled_count')
+                        : DB::raw('0 as filled_count'),
                     DB::raw('MAX(al.link_Expiry_date) as link_expiry_date'),
                     // GM (final-approval) timestamp — the row that flipped
                     // the vacancy into the "ready to interview" state. Used
@@ -373,8 +399,19 @@ class EmployeeController extends Controller
                     $v->gm_approved_at_label = $v->gm_approved_at
                         ? \Carbon\Carbon::parse($v->gm_approved_at)->format('d M Y')
                         : null;
+                    // Remaining slots = budgeted − already hired. We expose
+                    // this on the picker UI so HR can see e.g. "1 of 2 left"
+                    // and the row is auto-hidden once it reaches 0.
+                    $total = (int) ($v->no_of_positions ?? 0);
+                    $filled = (int) ($v->filled_count ?? 0);
+                    $v->remaining_slots = max(0, $total - $filled);
                     return $v;
-                });
+                })
+                // A fully-filled vacancy is not vacant — strip it from the
+                // picker. The store() guard re-checks server-side so a
+                // stale tab can't sneak through.
+                ->filter(fn($v) => $v->remaining_slots > 0)
+                ->values();
         }
 
         return view('resorts.people.employee.create',compact('page_title','resort_id','resort_divisions','departments','employee_id','positions','sections','payrollAllowance','nationalitys','countries','vacancies'));
@@ -395,6 +432,48 @@ class EmployeeController extends Controller
                     'message' => 'Email address already exists for another employee. Please use a different email address.'
 
                 ]);
+            }
+
+            // -------------------------------------------------------------
+            // "Hire against a vacancy" is mandatory. Two guards:
+            //   1. vacancy_id must be present on the request
+            //   2. the vacancy must still have at least one remaining slot
+            //      (Total_position_required − COUNT(employees.vacancy_id))
+            // The picker on /create already hides filled vacancies, but a
+            // stale tab or two HRs hiring at once could still post a now-
+            // filled vacancy — this is the concurrency-safe check.
+            // -------------------------------------------------------------
+            $vacancyId = $request->input('vacancy_id');
+            if (!$vacancyId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You must hire against an open vacancy. Please pick one from the "Hire against a vacancy" panel.'
+                ]);
+            }
+            $vacancy = DB::table('vacancies')
+                ->where('id', $vacancyId)
+                ->where('Resort_id', $this->resort->resort_id)
+                ->first();
+            if (!$vacancy) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The selected vacancy no longer exists for this resort.'
+                ]);
+            }
+            $hasVacancyIdCol = \Schema::hasColumn('employees', 'vacancy_id');
+            if ($hasVacancyIdCol) {
+                $alreadyFilled = (int) Employee::where('vacancy_id', $vacancyId)
+                    ->whereNotIn('status', ['Terminated', 'Inactive'])
+                    ->count();
+                $totalRequired = (int) ($vacancy->Total_position_required ?? 0);
+                if ($totalRequired > 0 && $alreadyFilled >= $totalRequired) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'This vacancy has already been fully filled ('
+                            . $alreadyFilled . ' / ' . $totalRequired
+                            . '). Please pick another open vacancy.'
+                    ]);
+                }
             }
 
            DB::beginTransaction();
@@ -447,15 +526,50 @@ class EmployeeController extends Controller
             // moment they're activated.
             $initial_status = 'Onboarding';
 
+            // ----------------------------------------------------------------
+            // Department / Position / Division resolution.
+            //
+            // The create page locks these dropdowns via prop('disabled', true)
+            // when HR picks a vacancy. Browsers SKIP disabled inputs when
+            // serializing forms, so the canonical `department`/`position`/
+            // `division` fields can arrive empty even though the values are
+            // visibly chosen. The view also writes hidden fallbacks
+            // (`vacancy_department_id`, `vacancy_position_id`,
+            // `vacancy_division_id`) — prefer the visible value if present,
+            // otherwise fall back to the vacancy hidden field, otherwise
+            // re-read straight off the vacancy row as a last line of
+            // defence. This is the fix for "Column 'Dept_id' cannot be null"
+            // on vacancy-tied hires.
+            // ----------------------------------------------------------------
+            $deptId = $request->filled('department')
+                ? $request->department
+                : ($request->filled('vacancy_department_id')
+                    ? $request->vacancy_department_id
+                    : ($vacancy->department ?? null));
+            $positionId = $request->filled('position')
+                ? $request->position
+                : ($request->filled('vacancy_position_id')
+                    ? $request->vacancy_position_id
+                    : ($vacancy->position ?? null));
+            $divisionId = $request->filled('division')
+                ? $request->division
+                : ($request->filled('vacancy_division_id')
+                    ? $request->vacancy_division_id
+                    : ($vacancy->division ?? null));
+
             $employee = Employee::create([
                 'resort_id' => $this->resort->resort_id,
                 'Emp_id' => $request->employee_id,
                 'Admin_Parent_id' => $resortAdmin->id,
                 'title' => $request->gender =='male'? 'Mr.' : 'Ms.',
-                'Dept_id'=> $request->department,
+                'Dept_id'=> $deptId,
                 'Section_id' => $request->section,
-                'Position_id' => $request->position,
-                'division_id'=> $request->division,
+                'Position_id' => $positionId,
+                // Link this employee back to the vacancy they were hired
+                // against. Used by /resort/people/employees/create to count
+                // "filled" slots and auto-hide fully-filled vacancies.
+                'vacancy_id' => $hasVacancyIdCol ? $vacancyId : null,
+                'division_id'=> $divisionId,
                 'reporting_to'=> $request->reporting_person,
                 'is_employee' => 1,
                 'rank'=> $request->position_rank,

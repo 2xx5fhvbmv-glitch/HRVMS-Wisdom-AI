@@ -67,8 +67,19 @@ class DashboardController extends Controller
             ->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->count();
+        // "Total New Hires" = employees joined in the last 90 days who are
+        // currently Active. Previously this counted anyone with
+        // probation_status IN ('Active','Extended') with no status or date
+        // filter, which over-counted (inactive/terminated rows leak in, and
+        // probation_status never expires on long-tenured records) — easy to
+        // spot when New Hires > Total Active.
+        // $today is already a date string (see toDateString() above) — use
+        // a fresh Carbon for date arithmetic.
+        $newHireSince = \Carbon\Carbon::today()->subDays(90)->toDateString();
         $total_new_hired = Employee::where('resort_id',$resort_id)
-            ->whereIn('probation_status',['Active','Extended'])
+            ->where('status','Active')
+            ->whereNotNull('joining_date')
+            ->whereDate('joining_date','>=',$newHireSince)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->count();
         // "Expected Employee" = Talent Acquisition candidates who accepted
@@ -422,8 +433,15 @@ class DashboardController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
         $total_inactive_employees = Employee::where('resort_id',$resort_id)->whereIn('status',['Inactive','Terminated','Suspended','On Leave'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
-        $total_new_hired = Employee::where('resort_id',$resort_id)->whereIn('probation_status',['Active','Extended'])
-            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))->count();
+        // New Hires = Active + joined in last 90 days. See HR_Dashobard()
+        // above for the bug history (probation_status filter over-counted).
+        $newHireSince = \Carbon\Carbon::today()->subDays(90)->toDateString();
+        $total_new_hired = Employee::where('resort_id',$resort_id)
+            ->where('status','Active')
+            ->whereNotNull('joining_date')
+            ->whereDate('joining_date','>=',$newHireSince)
+            ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
+            ->count();
         // "Expected Employee" = Talent Acquisition candidates who accepted
         // their contract but have not yet been onboarded as an employee.
         // Mirrors the TA dashboard's "Hired" query (status 'Contract
