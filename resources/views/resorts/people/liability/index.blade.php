@@ -28,10 +28,21 @@
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="bg-themeGrayLight">
-                            <h6>Liability Reduction (YTD)</h6><strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
+                        {{-- Liability Reduction (YTD) — clickable, opens the same
+                             breakdown modal as Remaining Liability since both
+                             share one arithmetic view (Estimated − Reduction =
+                             Remaining). Same hover affordance / info icon as
+                             the Remaining card for visual consistency. --}}
+                        <div class="bg-themeGrayLight position-relative" style="cursor:pointer;"
+                             data-bs-toggle="modal" data-bs-target="#liabilityBreakdownModal"
+                             title="Click for breakdown">
+                            <h6>
+                                Liability Reduction (YTD)
+                                <i class="fa-solid fa-circle-info ms-1 text-primary" style="font-size:13px;"></i>
+                            </h6>
+                            <strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
                             <small class="d-block text-muted mt-1" style="font-size:11px;">
-                                Burned down from the estimate so far this year.
+                                Burned down from the estimate so far this year. Click for breakdown.
                             </small>
                         </div>
                     </div>
