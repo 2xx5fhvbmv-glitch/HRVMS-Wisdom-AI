@@ -324,25 +324,32 @@ class LiabilityEstimationController extends Controller
             ));
 
         // ─── Employee Food Cost (YTD) ────────────────────────────────
-        // Estimated food cost the resort has burned through so far this
-        // year. Food Cost is stored in `resort_budget_costs` as a Daily-
-        // frequency cost template — daily $X per eligible employee.
-        // Most resorts don't log discrete "meal served" rows, so this
-        // is computed FROM the template (rate × eligible employees ×
-        // days) rather than aggregated from spend events. Matches the
-        // user's formula: daily_cost × employees × days_in_month.
+        // Estimated food cost the resort has burned through this year,
+        // computed from the Daily-frequency Food Cost templates in
+        // resort_budget_costs (no discrete spend events are logged).
         //
-        // The canonical helper Common::computeBudgetCostMonthlyValue
-        // returns the monthly value (rate × days_in_month) and already
-        // applies Locals/Xpat/Muslim + benefit-grade filters per
-        // employee — so eligibility is respected without re-doing the
-        // logic here. We loop months 1..currentMonth, prorate the
-        // current month by days-elapsed, sum across templates × emps.
+        // Per-employee day count:
+        //   effective_start = max(joining_date, year_start)
+        //   effective_end   = today  (active employees only — resigned
+        //                              ones aren't in this query)
+        //   eligible_days   = effective_end − effective_start + 1
+        //   contribution    = daily_rate_usd × eligible_days
+        //
+        // Employees who joined this year contribute only the days from
+        // their joining date forward — previously every employee got
+        // full YTD days regardless of when they actually started, which
+        // overstated food cost for mid-year joiners.
+        //
+        // Eligibility filters (Locals/Xpat/Muslim + benefit-grade) are
+        // inlined from Common::computeBudgetCostMonthlyValue so we can
+        // do day-level math without going through its monthly path.
         $foodCostYtd = 0.0;
+        $foodCostPerEmployee = []; // populated for the modal sub-rows
         $today              = Carbon::now();
         $currentMonth       = (int) $today->format('n');
         $daysInCurrentMonth = (int) $today->format('t');
         $dayOfMonth         = (int) $today->format('j');
+        $yearStart          = Carbon::create($currentYear, 1, 1)->startOfDay();
 
         // Match any active template whose particulars or cost_title
         // mentions "Food" — case-insensitive on the collations we use.
@@ -356,41 +363,73 @@ class LiabilityEstimationController extends Controller
             })
             ->get();
 
-        $activeEmpsForFood = Employee::where('resort_id', $resortId)
+        $activeEmpsForFood = Employee::with('resortAdmin:id,first_name,last_name')
+            ->where('resort_id', $resortId)
             ->where('status', 'Active')
-            ->get(['id', 'basic_salary', 'basic_salary_currency', 'nationality', 'religion', 'benefit_grid_level']);
+            ->get(['id', 'Admin_Parent_id', 'Emp_id', 'basic_salary', 'basic_salary_currency', 'nationality', 'religion', 'benefit_grid_level', 'joining_date']);
 
         if ($foodCostTemplates->isNotEmpty() && $activeEmpsForFood->isNotEmpty()) {
             foreach ($foodCostTemplates as $cost) {
-                // MVR-denominated templates convert to USD at the
-                // canonical rate. Pension-style % templates don't apply
-                // here (Food Cost is a flat daily rate), but the helper
-                // tolerates both shapes.
-                $costIsMvr = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
-                $mvrToUsd  = ($costIsMvr && $mvrToUsdRate > 0) ? $mvrToUsdRate : 1.0;
+                // MVR templates convert to USD at the canonical rate.
+                $costIsMvr  = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
+                $mvrToUsd   = ($costIsMvr && $mvrToUsdRate > 0) ? $mvrToUsdRate : 1.0;
+                $rateUsd    = ((float) ($cost->amount ?? 0)) * $mvrToUsd;
+                $details    = trim((string) ($cost->details ?? 'Both'));
+                $gridScope  = trim((string) ($cost->benefit_grid_levels ?? ''));
+                $allowedGrades = $gridScope !== ''
+                    ? array_filter(array_map(fn($v) => (int) trim($v), explode(',', $gridScope)))
+                    : [];
+
+                // Skip non-daily templates so a Monthly "Food Allowance"
+                // doesn't get multiplied as if it were a daily rate.
+                if (stripos((string) ($cost->frequency ?? ''), 'dai') === false) {
+                    continue;
+                }
 
                 foreach ($activeEmpsForFood as $emp) {
                     $isLocal   = strtolower((string) $emp->nationality) === 'maldivian';
                     $isMuslim  = strtolower((string) $emp->religion)    === 'muslim';
-                    $basic     = (float) ($emp->basic_salary ?? 0);
-                    $gridLevel = (int)   ($emp->benefit_grid_level ?? 0);
+                    $gridLevel = (int) ($emp->benefit_grid_level ?? 0);
 
-                    for ($m = 1; $m <= $currentMonth; $m++) {
-                        $monthVal = \App\Helpers\Common::computeBudgetCostMonthlyValue(
-                            $cost, $m, $currentYear, $isLocal, $isMuslim, $basic, $gridLevel
-                        );
-                        // Convert MVR → USD if the template is stored in MVR.
-                        $monthVal *= $mvrToUsd;
-                        // Prorate the current month by days elapsed.
-                        if ($m === $currentMonth && $daysInCurrentMonth > 0) {
-                            $monthVal = $monthVal * $dayOfMonth / $daysInCurrentMonth;
-                        }
-                        $foodCostYtd += $monthVal;
+                    // Eligibility filters — inlined so a 0-day skip
+                    // doesn't get logged as if the employee contributed.
+                    if ($details === 'Locals Only' && !$isLocal)  continue;
+                    if ($details === 'Xpat Only'   &&  $isLocal)  continue;
+                    if ($details === 'Muslim Only' && !$isMuslim) continue;
+                    if (!empty($allowedGrades) && !in_array($gridLevel, $allowedGrades, true)) {
+                        continue;
                     }
+
+                    // Effective YTD window for this employee. Caps the
+                    // start at their joining date so an April joiner
+                    // doesn't get charged for January-March food.
+                    $jd = $emp->joining_date
+                        ? Carbon::parse($emp->joining_date)->startOfDay()
+                        : $yearStart;
+                    $effectiveStart = $jd->greaterThan($yearStart) ? $jd : $yearStart;
+                    if ($effectiveStart->greaterThan($today)) continue; // joined after today
+
+                    $eligibleDays = $effectiveStart->diffInDays($today) + 1;
+                    $contribution = $rateUsd * $eligibleDays;
+                    $foodCostYtd += $contribution;
+
+                    $key = $emp->id;
+                    if (!isset($foodCostPerEmployee[$key])) {
+                        $foodCostPerEmployee[$key] = [
+                            'emp_id'       => $emp->Emp_id,
+                            'name'         => optional($emp->resortAdmin)->first_name . ' ' . optional($emp->resortAdmin)->last_name,
+                            'joining_date' => $jd->format('d M Y'),
+                            'days'         => $eligibleDays,
+                            'amount'       => 0.0,
+                        ];
+                    }
+                    $foodCostPerEmployee[$key]['amount'] += $contribution;
                 }
             }
         }
         $foodCostYtd = round($foodCostYtd, 2);
+        // Sort biggest contributors first so the modal shows them up top.
+        usort($foodCostPerEmployee, fn($a, $b) => $b['amount'] <=> $a['amount']);
 
         // Visa Renewals deliberately EXCLUDED from Liability Reduction —
         // the resort doesn't treat visa renewal events as a workforce
@@ -845,7 +884,7 @@ class LiabilityEstimationController extends Controller
             // The breakdown line shows the formula so HR sees how it's
             // derived rather than treating it as opaque.
             [
-                'label' => 'Employee Food Cost (daily × employees × YTD days)',
+                'label' => 'Employee Food Cost (daily × eligible days since joining)',
                 'value' => (float) $foodCostYtd,
                 'breakdown' => [
                     'templates' => $foodCostTemplates->map(function ($c) {
@@ -858,9 +897,10 @@ class LiabilityEstimationController extends Controller
                         ];
                     })->all(),
                     'active_employees'    => (int) $activeEmpsForFood->count(),
-                    'months_counted'      => $currentMonth,
-                    'day_of_current_month'=> $dayOfMonth,
-                    'days_in_current_month'=> $daysInCurrentMonth,
+                    'eligible_employees'  => count($foodCostPerEmployee),
+                    'year_start'          => $yearStart->format('d M Y'),
+                    'today'               => $today->format('d M Y'),
+                    'per_employee'        => $foodCostPerEmployee,
                 ],
             ],
             ['label' => 'Insurance (insurance_start_date in year)','value' => (float) $totalInsurance],

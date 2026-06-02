@@ -145,10 +145,12 @@
                                                     </tr>
                                                 @endforeach
                                             @endif
-                                            {{-- Food Cost sub-rows: one row per matching template
-                                                 (rate · unit · frequency · eligibility) + one
-                                                 "× N employees · M days YTD" row so HR can
-                                                 verify the formula without leaving the modal. --}}
+                                            {{-- Food Cost sub-rows. Template rates + window
+                                                 header + a collapsible per-employee table so HR
+                                                 can verify "X joined Apr 10, so 53 eligible days,
+                                                 53 × $6 = $318". Days-since-joining is the
+                                                 critical correctness check; the table makes it
+                                                 transparent. --}}
                                             @if(str_contains($leg['label'], 'Food') && !empty($leg['breakdown']))
                                                 @php $fb = $leg['breakdown']; @endphp
                                                 @foreach($fb['templates'] as $t)
@@ -164,12 +166,50 @@
                                                 <tr>
                                                     <td style="padding-left:32px;" class="text-muted small fst-italic">
                                                         <i class="fa-solid fa-calculator me-1"></i>
-                                                        × {{ $fb['active_employees'] }} active employees ·
-                                                        {{ $fb['months_counted'] - 1 }} completed month(s) +
-                                                        {{ $fb['day_of_current_month'] }}/{{ $fb['days_in_current_month'] }} of current
+                                                        {{ $fb['eligible_employees'] }} of {{ $fb['active_employees'] }} active employees eligible ·
+                                                        window {{ $fb['year_start'] }} → {{ $fb['today'] }}
+                                                        @if(!empty($fb['per_employee']))
+                                                            ·
+                                                            <a class="text-primary" data-bs-toggle="collapse"
+                                                               href="#foodCostPerEmpBreakdown" role="button"
+                                                               aria-expanded="false" aria-controls="foodCostPerEmpBreakdown">
+                                                                show per-employee
+                                                            </a>
+                                                        @endif
                                                     </td>
                                                     <td class="text-end small text-muted">—</td>
                                                 </tr>
+                                                @if(!empty($fb['per_employee']))
+                                                    <tr>
+                                                        <td colspan="2" class="p-0" style="border-top:0;">
+                                                            <div class="collapse" id="foodCostPerEmpBreakdown">
+                                                                <table class="table table-sm mb-0" style="font-size:12px; background:#fafafa;">
+                                                                    <thead class="text-muted">
+                                                                        <tr>
+                                                                            <th style="padding-left:32px;">Employee</th>
+                                                                            <th class="text-end">Joined</th>
+                                                                            <th class="text-end">Eligible Days</th>
+                                                                            <th class="text-end">Amount</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach($fb['per_employee'] as $row)
+                                                                            <tr>
+                                                                                <td style="padding-left:32px;">
+                                                                                    <span class="badge bg-light text-dark">{{ $row['emp_id'] }}</span>
+                                                                                    {{ trim($row['name']) ?: '—' }}
+                                                                                </td>
+                                                                                <td class="text-end">{{ $row['joining_date'] }}</td>
+                                                                                <td class="text-end">{{ number_format($row['days']) }}</td>
+                                                                                <td class="text-end">{!! Common::formatCurrency($row['amount'], 'USD') !!}</td>
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @endif
                                             @endif
                                         @endforeach
                                         <tr class="table-secondary fw-bold">
