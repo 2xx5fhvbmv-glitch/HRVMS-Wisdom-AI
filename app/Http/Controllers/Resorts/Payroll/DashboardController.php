@@ -50,10 +50,17 @@ class DashboardController extends Controller
 
         $today = now();
 
-        // Last Payroll = most recent completed/locked payroll, fallback to any status
+        // Last Payroll = most recent payroll whose review rows have
+        // been signed off. Aligned to the Liability Estimation
+        // controller's status set (['approved','locked']) so both
+        // pages reference the SAME population of committed payrolls
+        // — previously the dashboard used ['completed','locked',
+        // 'processed','paid'] (legacy terminology) and the two pages
+        // disagreed on what counted as "real spend".
+        $committedStatuses = ['approved', 'locked'];
         $lastPayroll = Payroll::where('resort_id', $resort_id)
             ->where('end_date', '<', $today)
-            ->whereIn('status', ['completed', 'locked', 'processed', 'paid'])
+            ->whereIn('status', $committedStatuses)
             ->orderBy('end_date', 'desc')
             ->first();
         if (!$lastPayroll) {
@@ -62,6 +69,24 @@ class DashboardController extends Controller
                 ->where('end_date', '<', $today)
                 ->orderBy('end_date', 'desc')
                 ->first();
+        }
+
+        // Override total_payroll with the same component-sum the
+        // Liability page uses, so the dashboard card and the YTD
+        // breakdown can never disagree for the same payroll.
+        // total_payroll was only written by saveSummaryToPayroll → it
+        // could be 0 or stale when the picked payroll isn't 'locked'.
+        // SUM(earned + OT + allowance) excludes Service Charge (pass-
+        // through) to match the Liability Reduction definition.
+        if ($lastPayroll) {
+            $componentTotal = (float) DB::table('payroll_reviews')
+                ->where('payroll_id', $lastPayroll->id)
+                ->sum(DB::raw(
+                    'COALESCE(earned_salary, 0) + '
+                  . 'COALESCE(earnings_overtime, 0) + '
+                  . 'COALESCE(earnings_allowance, 0)'
+                ));
+            $lastPayroll->total_payroll = $componentTotal;
         }
 
         // Calculate upcoming cutoff period
