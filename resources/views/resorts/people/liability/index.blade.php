@@ -126,6 +126,25 @@
                                                 <td>{{ $leg['label'] }}</td>
                                                 <td class="text-end">{!! Common::formatCurrency($leg['value'], 'USD') !!}</td>
                                             </tr>
+                                            {{-- Per-allowance-type breakdown nested under the
+                                                 "Payroll — Allowances" row so HR can see exactly
+                                                 which allowance buckets the YTD number is built
+                                                 from (Service Charge top-up, OT meal, R&R, …)
+                                                 instead of one opaque total. Pulled from
+                                                 payroll_review_allowances grouped by
+                                                 allowance_type; same status filter as the
+                                                 headline so draft payrolls stay out. --}}
+                                            @if(str_contains($leg['label'], 'Allowances') && !empty($allowanceBreakdownForView))
+                                                @foreach($allowanceBreakdownForView as $a)
+                                                    <tr>
+                                                        <td style="padding-left:32px;" class="text-muted small">
+                                                            <i class="fa-solid fa-arrow-turn-up fa-rotate-90 me-1"></i>
+                                                            {{ $a['type'] ?: 'Unlabelled' }}
+                                                        </td>
+                                                        <td class="text-end small text-muted">{!! Common::formatCurrency($a['amount'], 'USD') !!}</td>
+                                                    </tr>
+                                                @endforeach
+                                            @endif
                                         @endforeach
                                         <tr class="table-secondary fw-bold">
                                             <td>Liability Reduction (YTD)</td>

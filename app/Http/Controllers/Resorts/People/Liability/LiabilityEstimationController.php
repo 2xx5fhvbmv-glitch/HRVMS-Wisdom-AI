@@ -766,6 +766,17 @@ class LiabilityEstimationController extends Controller
             ['label' => 'Quota Slot (Paid, Due_Date in year)',    'value' => (float) $totalQuota],
         ];
 
+        // Per-allowance-type breakdown so the modal can show HR exactly
+        // which allowance buckets make up the "Payroll — Allowances"
+        // YTD row (e.g. Service Charge top-up, OT meal, Transport,
+        // R&R, etc.) instead of a single opaque total. Sorted descending
+        // by amount so the biggest spenders show first.
+        $allowanceBreakdownForView = collect($allowanceBreakdown)
+            ->map(fn($amount, $type) => ['type' => $type, 'amount' => (float) $amount])
+            ->sortByDesc('amount')
+            ->values()
+            ->all();
+
         return view('resorts.people.liability.index', compact(
             'page_title',
             'resortId', 'current_liability',
@@ -775,6 +786,7 @@ class LiabilityEstimationController extends Controller
             'labels',
             'reductionData','allowanceTypes',
             'estLegs','currentLegs',
+            'allowanceBreakdownForView',
             'estVsActualRows'
         ));
     }
