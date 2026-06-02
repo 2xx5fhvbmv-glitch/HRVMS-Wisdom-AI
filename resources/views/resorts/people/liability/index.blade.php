@@ -29,7 +29,10 @@
                     </div>
                     <div class="col-md-4">
                         <div class="bg-themeGrayLight">
-                            <h6>Current Liability</h6><strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
+                            <h6>Liability Reduction (YTD)</h6><strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
+                            <small class="d-block text-muted mt-1" style="font-size:11px;">
+                                Burned down from the estimate so far this year.
+                            </small>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -47,8 +50,8 @@
                 </div>
 
                 {{-- Breakdown modal: shows the four legs of Total Estimated
-                     and the per-source components of Current Liability, with
-                     the Reduction arithmetic at the bottom. Helps HR see
+                     and the per-source components of Liability Reduction (YTD),
+                     with the Remaining arithmetic at the bottom. Helps HR see
                      why the headline reads what it does instead of asking
                      why a single payroll run barely moves the value. --}}
                 <div class="modal fade" id="liabilityBreakdownModal" tabindex="-1" aria-labelledby="liabilityBreakdownLabel" aria-hidden="true">
@@ -63,7 +66,7 @@
                             </div>
                             <div class="modal-body">
                                 <p class="text-muted small mb-3">
-                                    <strong>Remaining Liability</strong> = Total Estimated − Current Liability. It is what is <strong>still on the books</strong> for the rest of the year, not what has already been paid. With only one payroll run so far, almost the full year's budget is naturally still ahead — that's why this number is close to the full estimated total. Each completed payroll, work-permit renewal, insurance bill, etc. shifts dollars from <em>Remaining</em> into <em>Current Liability</em>, and Remaining shrinks toward zero by year-end.
+                                    <strong>Remaining Liability</strong> = Total Estimated − Liability Reduction (YTD). It is what is <strong>still on the books</strong> for the rest of the year, not what has already been paid. With only one payroll run so far, almost the full year's budget is naturally still ahead — that's why this number is close to the full estimated total. Each completed payroll, work-permit renewal, insurance bill, etc. shifts dollars from <em>Remaining</em> into <em>Liability Reduction (YTD)</em>, and Remaining shrinks toward zero by year-end.
                                 </p>
 
                                 {{-- Total Estimated leg breakdown --}}
@@ -94,10 +97,10 @@
                                     </tbody>
                                 </table>
 
-                                {{-- Current Liability breakdown --}}
+                                {{-- Liability Reduction (YTD) breakdown --}}
                                 <h6 class="mt-3 mb-2">
                                     <i class="fa-solid fa-minus me-1 text-danger"></i>
-                                    Current Liability (Year-to-Date spend)
+                                    Liability Reduction (Year-to-Date spend)
                                 </h6>
                                 <table class="table table-sm table-bordered mb-3" style="font-size:13px;">
                                     <thead class="table-light">
@@ -114,14 +117,14 @@
                                             </tr>
                                         @endforeach
                                         <tr class="table-secondary fw-bold">
-                                            <td>Current Liability</td>
+                                            <td>Liability Reduction (YTD)</td>
                                             <td class="text-end">{!! Common::formatCurrency($current_liability, 'USD') !!}</td>
                                         </tr>
                                     </tbody>
                                 </table>
 
                                 <small class="text-muted d-block mb-2">
-                                    Note: Service Charge is excluded from Current Liability — it's a guest-paid pass-through to employees, not a resort cost.
+                                    Note: Service Charge is excluded from Liability Reduction (YTD) — it's a guest-paid pass-through to employees, not a resort cost.
                                 </small>
 
                                 {{-- Final arithmetic --}}
@@ -131,7 +134,7 @@
                                         <strong>{!! Common::formatCurrency($estimated_liability, 'USD') !!}</strong>
                                     </div>
                                     <div class="d-flex justify-content-between">
-                                        <span>− Current Liability</span>
+                                        <span>− Liability Reduction (YTD)</span>
                                         <strong>{!! Common::formatCurrency($current_liability, 'USD') !!}</strong>
                                     </div>
                                     <hr class="my-2">
