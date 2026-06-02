@@ -653,33 +653,104 @@ class LiabilityEstimationController extends Controller
             ->groupBy(DB::raw('MONTH(Due_Date)'))
             ->pluck('total', 'month')->toArray();
 
-        $monthlyVisa = DB::table('visa_renewals')
-            ->where('resort_id', $resortId)
-            ->whereYear('start_date', $currentYear)
-            ->selectRaw('MONTH(start_date) as month, SUM(Amt) as total')
-            ->groupBy(DB::raw('MONTH(start_date)'))
-            ->pluck('total', 'month')->toArray();
+        // Visa Renewals deliberately NOT pulled into a monthly bucket —
+        // we removed it from the Liability Reduction headline earlier.
+        // Keeping it in the trend would diverge the line chart from the
+        // headline numbers, which is what HR complained about.
 
-            // Step 3: Build Monthly Data with Reduction Logic
-        $liabilityRemaining = $estimated_liability;
-        $labels = [];
-        $reductionData = [];
+        // ─── Monthly Food Cost buckets ───────────────────────────────
+        // Same eligibility window as the YTD aggregator above, but
+        // grouped by month so the trend chart can subtract real food
+        // spend month-by-month (instead of the headline lump sum).
+        $monthlyFood = array_fill(1, 12, 0.0);
+        if (isset($foodCostTemplates) && $foodCostTemplates->isNotEmpty()
+            && isset($activeEmpsForFood) && $activeEmpsForFood->isNotEmpty()) {
+            foreach ($foodCostTemplates as $cost) {
+                if (stripos((string) ($cost->frequency ?? ''), 'dai') === false) continue;
+                $costIsMvr = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
+                $mvrToUsdLocal = ($costIsMvr && $mvrToUsdRate > 0) ? $mvrToUsdRate : 1.0;
+                $rateUsd = ((float) ($cost->amount ?? 0)) * $mvrToUsdLocal;
+                $details = trim((string) ($cost->details ?? 'Both'));
+                $gridScope = trim((string) ($cost->benefit_grid_levels ?? ''));
+                $allowedGrades = $gridScope !== ''
+                    ? array_filter(array_map(fn($v) => (int) trim($v), explode(',', $gridScope)))
+                    : [];
 
-        for ($m = 1; $m <= 12; $m++) {
-            $monthName = Carbon::create($currentYear, $m)->format('M Y');
+                foreach ($activeEmpsForFood as $emp) {
+                    $isLocal  = strtolower((string) $emp->nationality) === 'maldivian';
+                    $isMuslim = strtolower((string) $emp->religion)    === 'muslim';
+                    $gradeLvl = (int) ($emp->benefit_grid_level ?? 0);
+                    if ($details === 'Locals Only' && !$isLocal)  continue;
+                    if ($details === 'Xpat Only'   &&  $isLocal)  continue;
+                    if ($details === 'Muslim Only' && !$isMuslim) continue;
+                    if (!empty($allowedGrades) && !in_array($gradeLvl, $allowedGrades, true)) continue;
 
-            // Monthly actual paid — every column is USD source (canonical
-            // storage). $liabilityRemaining is USD too (starts at
-            // $estimated_liability). No per-component conversion needed.
-            $monthlyPaid =
+                    $jd = $emp->joining_date
+                        ? Carbon::parse($emp->joining_date)->startOfDay()
+                        : $yearStart;
+
+                    for ($m = 1; $m <= 12; $m++) {
+                        $monthStart = Carbon::create($currentYear, $m, 1)->startOfDay();
+                        $monthEnd   = (clone $monthStart)->endOfMonth();
+                        // Overlap [jd, monthEnd] ∩ [monthStart, monthEnd]
+                        $winStart = $jd->greaterThan($monthStart) ? $jd : $monthStart;
+                        if ($winStart->greaterThan($monthEnd)) continue;
+                        $days = $winStart->diffInDays($monthEnd) + 1;
+                        $monthlyFood[$m] += $rateUsd * $days;
+                    }
+                }
+            }
+        }
+
+        // Step 3: Build the monthly remaining-liability series.
+        //
+        // Past + current months use ACTUAL spend; future months are
+        // projected to burn the residual REMAINING balance evenly
+        // through Dec so the line:
+        //   • matches the Remaining Liability headline exactly at the
+        //     current month's data point (audit consistency)
+        //   • drifts to zero by Dec (visually answers "if we hit the
+        //     budget exactly, what's our trajectory")
+        //   • never goes flat after the current month (the original
+        //     "wrong data" complaint)
+        // Going flat was the bug. Flat-rate-1/12 (the alternative)
+        // would have ended with a residual mismatch at Dec, which read
+        // as a different bug to HR.
+        $today        = Carbon::now();
+        $currentMonth = (int) $today->format('n');
+
+        // Sum every component's per-month actuals for the YTD slice.
+        $actualByMonth = array_fill(1, 12, 0.0);
+        for ($m = 1; $m <= $currentMonth; $m++) {
+            $actualByMonth[$m] =
                 ($monthlyLiability[$m]  ?? 0) +
                 ($monthlyWorkPermit[$m] ?? 0) +
                 ($monthlyMedical[$m]    ?? 0) +
                 ($monthlyInsurance[$m]  ?? 0) +
                 ($monthlyQuota[$m]      ?? 0) +
-                ($monthlyVisa[$m]       ?? 0);
+                ($monthlyFood[$m]       ?? 0);
+        }
+        $actualSpentYtd = array_sum($actualByMonth);
 
-            // Deduct from remaining liability
+        // Remaining-to-burn across the months after the current one.
+        // Negative residual (over-budget) is clamped to 0 so the line
+        // doesn't dip below zero on the chart.
+        $remainingAfterYtd = max(0, $estimated_liability - $actualSpentYtd);
+        $monthsRemaining   = max(0, 12 - $currentMonth);
+        $projectedPerMonth = $monthsRemaining > 0 ? $remainingAfterYtd / $monthsRemaining : 0;
+
+        $liabilityRemaining = $estimated_liability;
+        $labels = [];
+        $reductionData = [];
+        for ($m = 1; $m <= 12; $m++) {
+            // Month abbreviation only — the chart is always the current
+            // year so the year suffix was redundant noise on the x-axis.
+            $monthName = Carbon::create($currentYear, $m)->format('M');
+
+            $monthlyPaid = $m <= $currentMonth
+                ? $actualByMonth[$m]
+                : $projectedPerMonth;
+
             $liabilityRemaining -= $monthlyPaid;
             $liabilityRemaining = max($liabilityRemaining, 0);
 
