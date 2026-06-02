@@ -145,6 +145,32 @@
                                                     </tr>
                                                 @endforeach
                                             @endif
+                                            {{-- Food Cost sub-rows: one row per matching template
+                                                 (rate · unit · frequency · eligibility) + one
+                                                 "× N employees · M days YTD" row so HR can
+                                                 verify the formula without leaving the modal. --}}
+                                            @if(str_contains($leg['label'], 'Food') && !empty($leg['breakdown']))
+                                                @php $fb = $leg['breakdown']; @endphp
+                                                @foreach($fb['templates'] as $t)
+                                                    <tr>
+                                                        <td style="padding-left:32px;" class="text-muted small">
+                                                            <i class="fa-solid fa-arrow-turn-up fa-rotate-90 me-1"></i>
+                                                            {{ $t['particulars'] }}
+                                                            <span class="text-muted">— {{ rtrim(rtrim(number_format($t['rate'], 2), '0'), '.') }} {{ $t['unit'] }} / {{ $t['frequency'] }}, {{ $t['details'] }}</span>
+                                                        </td>
+                                                        <td class="text-end small text-muted">—</td>
+                                                    </tr>
+                                                @endforeach
+                                                <tr>
+                                                    <td style="padding-left:32px;" class="text-muted small fst-italic">
+                                                        <i class="fa-solid fa-calculator me-1"></i>
+                                                        × {{ $fb['active_employees'] }} active employees ·
+                                                        {{ $fb['months_counted'] - 1 }} completed month(s) +
+                                                        {{ $fb['day_of_current_month'] }}/{{ $fb['days_in_current_month'] }} of current
+                                                    </td>
+                                                    <td class="text-end small text-muted">—</td>
+                                                </tr>
+                                            @endif
                                         @endforeach
                                         <tr class="table-secondary fw-bold">
                                             <td>Liability Reduction (YTD)</td>
