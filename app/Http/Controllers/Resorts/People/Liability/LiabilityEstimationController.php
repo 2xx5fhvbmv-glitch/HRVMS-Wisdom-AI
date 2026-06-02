@@ -716,43 +716,36 @@ class LiabilityEstimationController extends Controller
         // Going flat was the bug. Flat-rate-1/12 (the alternative)
         // would have ended with a residual mismatch at Dec, which read
         // as a different bug to HR.
+        // Loop only Jan → current month. We don't speculate about
+        // future months — the line terminates at the most recent month
+        // that has real data. (Earlier versions extrapolated future
+        // months either to zero or to a budgeted average; both gave
+        // the impression of "data" where there was none.)
+        //
+        // The current-month data point still matches the Remaining
+        // Liability headline exactly — same actual-YTD subtraction.
         $today        = Carbon::now();
         $currentMonth = (int) $today->format('n');
 
-        // Sum every component's per-month actuals for the YTD slice.
-        $actualByMonth = array_fill(1, 12, 0.0);
+        $liabilityRemaining = $estimated_liability;
+        $labels = [];
+        $reductionData = [];
         for ($m = 1; $m <= $currentMonth; $m++) {
-            $actualByMonth[$m] =
+            // Month abbreviation only — the chart is always the current
+            // year, so the year suffix was redundant noise on the x-axis.
+            $monthName = Carbon::create($currentYear, $m)->format('M');
+
+            $monthlyPaid =
                 ($monthlyLiability[$m]  ?? 0) +
                 ($monthlyWorkPermit[$m] ?? 0) +
                 ($monthlyMedical[$m]    ?? 0) +
                 ($monthlyInsurance[$m]  ?? 0) +
                 ($monthlyQuota[$m]      ?? 0) +
                 ($monthlyFood[$m]       ?? 0);
-        }
-        $actualSpentYtd = array_sum($actualByMonth);
-
-        // Remaining-to-burn across the months after the current one.
-        // Negative residual (over-budget) is clamped to 0 so the line
-        // doesn't dip below zero on the chart.
-        $remainingAfterYtd = max(0, $estimated_liability - $actualSpentYtd);
-        $monthsRemaining   = max(0, 12 - $currentMonth);
-        $projectedPerMonth = $monthsRemaining > 0 ? $remainingAfterYtd / $monthsRemaining : 0;
-
-        $liabilityRemaining = $estimated_liability;
-        $labels = [];
-        $reductionData = [];
-        for ($m = 1; $m <= 12; $m++) {
-            // Month abbreviation only — the chart is always the current
-            // year so the year suffix was redundant noise on the x-axis.
-            $monthName = Carbon::create($currentYear, $m)->format('M');
-
-            $monthlyPaid = $m <= $currentMonth
-                ? $actualByMonth[$m]
-                : $projectedPerMonth;
 
             $liabilityRemaining -= $monthlyPaid;
-            $liabilityRemaining = max($liabilityRemaining, 0);
+            // No max(0,...) — the line is allowed to cross zero when
+            // reality demands it (over-budget = negative residual).
 
             $labels[] = $monthName;
             $reductionData[] = round($liabilityRemaining, 2);
