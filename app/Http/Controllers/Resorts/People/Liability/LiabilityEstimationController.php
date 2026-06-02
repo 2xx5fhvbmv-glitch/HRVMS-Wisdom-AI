@@ -323,8 +323,85 @@ class LiabilityEstimationController extends Controller
               // actually spent off its own books.
             ));
 
+        // ─── Employee Food Cost (YTD) ────────────────────────────────
+        // Estimated food cost the resort has burned through so far this
+        // year. Food Cost is stored in `resort_budget_costs` as a Daily-
+        // frequency cost template — daily $X per eligible employee.
+        // Most resorts don't log discrete "meal served" rows, so this
+        // is computed FROM the template (rate × eligible employees ×
+        // days) rather than aggregated from spend events. Matches the
+        // user's formula: daily_cost × employees × days_in_month.
+        //
+        // The canonical helper Common::computeBudgetCostMonthlyValue
+        // returns the monthly value (rate × days_in_month) and already
+        // applies Locals/Xpat/Muslim + benefit-grade filters per
+        // employee — so eligibility is respected without re-doing the
+        // logic here. We loop months 1..currentMonth, prorate the
+        // current month by days-elapsed, sum across templates × emps.
+        $foodCostYtd = 0.0;
+        $today              = Carbon::now();
+        $currentMonth       = (int) $today->format('n');
+        $daysInCurrentMonth = (int) $today->format('t');
+        $dayOfMonth         = (int) $today->format('j');
+
+        // Match any active template whose particulars or cost_title
+        // mentions "Food" — case-insensitive on the collations we use.
+        // Multiple matches sum (e.g. separate Local + Xpat food rates).
+        $foodCostTemplates = DB::table('resort_budget_costs')
+            ->where('resort_id', $resortId)
+            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->where('particulars', 'LIKE', '%Food%')
+                  ->orWhere('cost_title', 'LIKE', '%Food%');
+            })
+            ->get();
+
+        $activeEmpsForFood = Employee::where('resort_id', $resortId)
+            ->where('status', 'Active')
+            ->get(['id', 'basic_salary', 'basic_salary_currency', 'nationality', 'religion', 'benefit_grid_level']);
+
+        if ($foodCostTemplates->isNotEmpty() && $activeEmpsForFood->isNotEmpty()) {
+            foreach ($foodCostTemplates as $cost) {
+                // MVR-denominated templates convert to USD at the
+                // canonical rate. Pension-style % templates don't apply
+                // here (Food Cost is a flat daily rate), but the helper
+                // tolerates both shapes.
+                $costIsMvr = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
+                $mvrToUsd  = ($costIsMvr && $mvrToUsdRate > 0) ? $mvrToUsdRate : 1.0;
+
+                foreach ($activeEmpsForFood as $emp) {
+                    $isLocal   = strtolower((string) $emp->nationality) === 'maldivian';
+                    $isMuslim  = strtolower((string) $emp->religion)    === 'muslim';
+                    $basic     = (float) ($emp->basic_salary ?? 0);
+                    $gridLevel = (int)   ($emp->benefit_grid_level ?? 0);
+
+                    for ($m = 1; $m <= $currentMonth; $m++) {
+                        $monthVal = \App\Helpers\Common::computeBudgetCostMonthlyValue(
+                            $cost, $m, $currentYear, $isLocal, $isMuslim, $basic, $gridLevel
+                        );
+                        // Convert MVR → USD if the template is stored in MVR.
+                        $monthVal *= $mvrToUsd;
+                        // Prorate the current month by days elapsed.
+                        if ($m === $currentMonth && $daysInCurrentMonth > 0) {
+                            $monthVal = $monthVal * $dayOfMonth / $daysInCurrentMonth;
+                        }
+                        $foodCostYtd += $monthVal;
+                    }
+                }
+            }
+        }
+        $foodCostYtd = round($foodCostYtd, 2);
+
+        // Visa Renewals deliberately EXCLUDED from Liability Reduction —
+        // the resort doesn't treat visa renewal events as a workforce
+        // cost (fees are bundled into Work Permit at this resort and/or
+        // recovered from the employee). The `visa_renewals` rows are
+        // still read for the People Detail expiry tab and the dashboard
+        // Visa cards, but they don't flow into the Reduction headline
+        // any more. Removing the row from $currentLegs below mirrors
+        // this so the modal and the headline stay consistent.
         $current_liability = $payrollLiability
-                        + $totalVisa
+                        + $foodCostYtd
                         + $totalInsurance
                         + $totalPermit
                         + $totalMedical
@@ -752,14 +829,40 @@ class LiabilityEstimationController extends Controller
         );
         $displayCurrencySymbol = Common::GetResortCurrencySymbol();
 
-        // Current Liability per-source breakdown for the detail modal.
+        // Liability Reduction per-source breakdown for the detail modal.
         // Mirrors the actual aggregation done at the top of the method;
-        // Service Charge is intentionally excluded (pass-through).
+        // Service Charge is intentionally excluded (pass-through). Visa
+        // Renewals row removed — not a resort workforce cost at this
+        // resort (handled via Work Permit and/or recovered from
+        // employee), keeping it in the modal would mislead HR into
+        // expecting it to appear in the reduction headline.
         $currentLegs = [
             ['label' => 'Payroll — Salaries (earned_salary)',     'value' => (float) ($payrollReviews->salaries ?? 0)],
             ['label' => 'Payroll — Overtime (earnings_overtime)', 'value' => (float) ($payrollReviews->ota ?? 0)],
             ['label' => 'Payroll — Allowances (earnings_allowance)', 'value' => (float) ($payrollReviews->allowance ?? 0)],
-            ['label' => 'Visa Renewals (start_date in year)',     'value' => (float) $totalVisa],
+            // Food cost is template-driven (no discrete spend events
+            // logged) — daily rate × eligible employees × YTD days.
+            // The breakdown line shows the formula so HR sees how it's
+            // derived rather than treating it as opaque.
+            [
+                'label' => 'Employee Food Cost (daily × employees × YTD days)',
+                'value' => (float) $foodCostYtd,
+                'breakdown' => [
+                    'templates' => $foodCostTemplates->map(function ($c) {
+                        return [
+                            'particulars' => $c->particulars ?: $c->cost_title,
+                            'rate'        => (float) ($c->amount ?? 0),
+                            'unit'        => $c->amount_unit ?? 'USD',
+                            'frequency'   => $c->frequency ?? '—',
+                            'details'     => $c->details ?? 'Both',
+                        ];
+                    })->all(),
+                    'active_employees'    => (int) $activeEmpsForFood->count(),
+                    'months_counted'      => $currentMonth,
+                    'day_of_current_month'=> $dayOfMonth,
+                    'days_in_current_month'=> $daysInCurrentMonth,
+                ],
+            ],
             ['label' => 'Insurance (insurance_start_date in year)','value' => (float) $totalInsurance],
             ['label' => 'Work Permit (Paid, Due_Date in year)',   'value' => (float) $totalPermit],
             ['label' => 'Medical (start_date in year)',           'value' => (float) $totalMedical],
