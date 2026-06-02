@@ -71,22 +71,24 @@ class DashboardController extends Controller
                 ->first();
         }
 
-        // Override total_payroll with the same component-sum the
-        // Liability page uses, so the dashboard card and the YTD
-        // breakdown can never disagree for the same payroll.
-        // total_payroll was only written by saveSummaryToPayroll → it
-        // could be 0 or stale when the picked payroll isn't 'locked'.
-        // SUM(earned + OT + allowance) excludes Service Charge (pass-
-        // through) to match the Liability Reduction definition.
-        if ($lastPayroll) {
-            $componentTotal = (float) DB::table('payroll_reviews')
+        // total_payroll is `SUM(net_salary)` — what the resort actually
+        // paid out in cheques for that cycle (after pension / EWT /
+        // loan recovery, and INCLUDING the service-charge distribution
+        // back to employees). That's the right "Last Payroll" figure
+        // for a treasury-focused dashboard: cash that left the bank.
+        // Do NOT override with a component sum — that would make the
+        // dashboard show gross-without-SC, which is a different metric
+        // (it lives on the Liability Reduction page instead). The two
+        // numbers naturally differ; "alignment" was the wrong goal.
+        //
+        // Edge case: `total_payroll` is only written by
+        // saveSummaryToPayroll() when status flips to 'locked'. For an
+        // 'approved' payroll the column is still 0 → compute a fallback
+        // from net_salary so the card isn't blank.
+        if ($lastPayroll && (float) $lastPayroll->total_payroll <= 0) {
+            $lastPayroll->total_payroll = (float) DB::table('payroll_reviews')
                 ->where('payroll_id', $lastPayroll->id)
-                ->sum(DB::raw(
-                    'COALESCE(earned_salary, 0) + '
-                  . 'COALESCE(earnings_overtime, 0) + '
-                  . 'COALESCE(earnings_allowance, 0)'
-                ));
-            $lastPayroll->total_payroll = $componentTotal;
+                ->sum('net_salary');
         }
 
         // Calculate upcoming cutoff period
