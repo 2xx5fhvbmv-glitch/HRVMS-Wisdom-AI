@@ -153,6 +153,47 @@
                              Settlement PDF (MRPS Employee Mandatory Contribution
                              = Pension; Notice Period / Adjustments live in the
                              dynamic Deduction block below). ─────────────────── --}}
+                        {{-- ═════════════════════════════════════════════════════════
+                             Card order (per HR layout request):
+                               1. Earnings (above)
+                               2. Allowance Breakdown
+                               3. Deductions (EWT / Pension / Loan / Notice)
+                               4. Deduction repeater (ad-hoc)
+                               5. Leave Balance & Encashment Breakdown
+                               6. Settlement Breakdown (totals, last)
+                             Moving Allowance up and the ad-hoc Deduction up keeps
+                             every settlement input above the Leave Breakdown table
+                             so HR reviews inputs first, then sees the rolled-up
+                             totals at the bottom.
+                             ═════════════════════════════════════════════════════ --}}
+
+                        {{-- ───── Allowance Breakdown (was below — moved up so it
+                             sits next to Earnings, since allowances ARE earnings). --}}
+                        <div class="fullFinal-main mb-md-4 mb-3">
+                            <div class="fullFinal-head">
+                                Allowance Breakdown
+                            </div>
+                            <div class="card-body fullFinal-block">
+                                <table class="table" id="allowance-details">
+                                    <thead>
+                                        <tr>
+                                            <th>Allowance Name</th>
+                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-end" id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
                         <div class="fullFinal-main mb-md-4 mb-3">
                             <div class="fullFinal-head">
                                 <i class="fa-solid fa-arrow-up me-2 text-danger"></i>Deductions
@@ -214,6 +255,37 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {{-- ───── Deduction repeater (was below — moved up so the
+                             ad-hoc rows sit next to the Deductions card and the
+                             Leave Breakdown / Settlement totals follow as the
+                             final summary cards). --}}
+                        <div class="fullFinal-main mb-md-4 mb-3">
+                            <div class="fullFinal-head">Deduction</div>
+                            <div class="fullFinal-block">
+                                <div class="row g-md-4 g-3">
+                                    <!-- Initial deduction row -->
+                                    <div class="col-xl-3 col-sm">
+                                        <select class="form-select select2t-none deduction-select" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
+                                            <option value="">Select Deduction</option>
+                                            @foreach($deductions as $deduction)
+                                                <option value="{{ $deduction->id }}" data-unit="{{ $deduction->currency }}">{{ $deduction->deduction_name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-xl-3 col-sm">
+                                        <input type="number" id="deduction-amount-first" class="form-control deduction-amount" placeholder="Enter Amount" data-parsley-type="number" data-parsley-min="0" data-parsley-trigger="change">
+                                    </div>
+                                    <div class="col-xl-3 col-sm">
+                                        <input type="text" class="form-control amount-unit" placeholder="Amount Unit" readonly>
+                                    </div>
+                                    <div class="col-xl-3 col-auto align-self-end">
+                                        <a href="#" class="btn btn-themeSkyblue btn-sm add-fullFinal add-deduction">Add More</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="deductions-container"></div>
                         </div>
 
                         {{-- ───── Leave Balance & Encashment Breakdown ─────
@@ -309,58 +381,6 @@
                                     </tfoot>
                                 </table>
                             </div>
-                        </div>
-
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">
-                                Allowance Breakdown
-                            </div>
-                            <div class="card-body fullFinal-block">
-                                <table class="table" id="allowance-details">
-                                    <thead>
-                                        <tr>
-                                            <th>Allowance Name</th>
-                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Populated by JS -->
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th class="text-end">Total</th>
-                                            <th class="text-end" id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">Deduction</div>
-                            <div class="fullFinal-block">
-                                <div class="row g-md-4 g-3">
-                                    <!-- Initial deduction row -->
-                                    <div class="col-xl-3 col-sm">
-                                        <select class="form-select select2t-none deduction-select" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
-                                            <option value="">Select Deduction</option>
-                                            @foreach($deductions as $deduction)
-                                                <option value="{{ $deduction->id }}" data-unit="{{ $deduction->currency }}">{{ $deduction->deduction_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-xl-3 col-sm">
-                                        <input type="number" id="deduction-amount-first" class="form-control deduction-amount" placeholder="Enter Amount" data-parsley-type="number" data-parsley-min="0" data-parsley-trigger="change">
-                                    </div>
-                                    <div class="col-xl-3 col-sm">
-                                        <input type="text" class="form-control amount-unit" placeholder="Amount Unit" readonly>
-                                    </div>
-                                    <div class="col-xl-3 col-auto align-self-end">
-                                        <a href="#" class="btn btn-themeSkyblue btn-sm add-fullFinal add-deduction">Add More</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="deductions-container"></div>
                         </div>
                         <input type="hidden" name="last_working_date" id="last_working_date"/>
                         <input type="hidden" name="payroll_start_date" id="payroll_start_date"/>
