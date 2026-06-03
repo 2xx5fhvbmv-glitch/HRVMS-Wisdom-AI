@@ -537,42 +537,96 @@ class PayslipController extends Controller
         $settings = ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first();
         $usdToMvr = $settings->DollertoMVR ?? 15.42; // fallback rate
 
-        $convertedDeductions = [];
+        // Standardise every stored monetary value to the EMPLOYEE'S currency
+        // (basic_salary_currency). The previous store mixed units — custom
+        // deductions converted to MVR, pension/tax/loan left in display
+        // currency, notice_period_charge omitted entirely — producing nonsense
+        // values like the "-531.76 MVR" reported on the list against a
+        // review that read "-60.40 USD". One canonical currency per row,
+        // unit suffix derived from the employee on display.
+        $payCurrency = strtoupper((string) ($employee->basic_salary_currency ?? 'MVR'));
+        // Convert any amount in `mvr|usd` to $payCurrency.
+        $toPayCurrency = function ($amount, $unit) use ($payCurrency, $usdToMvr) {
+            $unit = strtoupper($unit ?? $payCurrency);
+            if ($unit === $payCurrency || $usdToMvr <= 0) return (float) $amount;
+            if ($unit === 'USD' && $payCurrency === 'MVR') return (float) $amount * $usdToMvr;
+            if ($unit === 'MVR' && $payCurrency === 'USD') return (float) $amount / $usdToMvr;
+            return (float) $amount;
+        };
 
+        $convertedDeductions = [];
         foreach ($deductions as $deduction) {
             $amount = floatval($deduction['amount']);
-            $unit = strtolower($deduction['unit'] ?? 'mvr');
-
-            $convertedAmount = $unit === 'usd' ? $amount * $usdToMvr : $amount;
-
+            $unit   = strtolower($deduction['unit'] ?? strtolower($payCurrency));
+            // Store amount IN payCurrency (matches the rest of the row).
+            $converted = $toPayCurrency($amount, $unit);
             $convertedDeductions[] = [
-                'deduction_id' => $deduction['id'],
-                'amount' => round($convertedAmount, 2),
+                'deduction_id'    => $deduction['id'],
+                'amount'          => round($converted, 2),
                 'original_amount' => $amount,
-                'amount_unit' => $unit,
+                'amount_unit'     => $unit,
             ];
         }
 
         DB::beginTransaction();
         try {
-            $totalDeductionAmount = collect($convertedDeductions)->sum('amount');
-            $totalDeductions = $totalDeductionAmount
-                 + $validated['pension']
-                 + $validated['tax']
-                 + $validated['loan_payment'];
+            // Pull notice_period_charge from the F&F service since it's not
+            // submitted as a form field. Service emits MVR; convert.
+            $svc = new FinalSettlementService();
+            $calc = $svc->calculateFinalMonthData($employee, $this->resort->resort_id);
+            $noticeChargeStored = round($toPayCurrency($calc['notice_period_charge_mvr'] ?? 0, 'MVR'), 2);
+
+            // Earnings — all submitted values are already in display currency
+            // (the F&F page posts what HR sees). leave_encashment is the
+            // headline input the per-row breakdown table summed into; same
+            // currency as the rest.
+            $earnedSalary    = (float) $validated['earned_salary'];
+            $serviceCharge   = (float) $validated['service_charge'];
+            $leaveEncashment = (float) $validated['leave_encashment'];
+            $totalEarnings   = round($earnedSalary + $serviceCharge + $leaveEncashment, 2);
+
+            // Deductions — same currency unification. Notice Period Charge is
+            // now included (was silently dropped from the old formula).
+            // Pension/MRPS only applies to Maldivian employees — the F&F
+            // page hides the pension column for foreigners and the review
+            // mirrors that gate. The store endpoint has to honour the same
+            // rule, otherwise the totals on the list page differ from the
+            // review for every foreign employee.
+            $isMaldivian = strtolower((string) ($employee->nationality ?? '')) === 'maldivian';
+            $pensionApplied = $isMaldivian ? (float) $validated['pension'] : 0.0;
+
+            $customDedTotal = collect($convertedDeductions)->sum('amount');
+            $totalDeductions = round(
+                ((float) $validated['tax'])
+                + $pensionApplied
+                + ((float) $validated['loan_payment'])
+                + $noticeChargeStored
+                + $customDedTotal,
+                2
+            );
+
+            $netPay = round($totalEarnings - $totalDeductions, 2);
+
             $reference = 'FS-' . now()->format('Ym') . '-' . str_pad($employee->Emp_id, 4, '0', STR_PAD_LEFT);
 
             // Save or update main final settlement
             $finalSettlement = FinalSettlement::updateOrCreate(
                 ['employee_id' => $validated['select_emp']],
                 [
-                    'pension' => $validated['pension'],
+                    // Zero pension out for foreign employees so the
+                    // review/list rows match the F&F page (which hides
+                    // the pension column for them).
+                    'pension' => $pensionApplied,
                     'tax' => $validated['tax'],
                     'leave_balance' => $validated['leave_balance'],
                     'leave_encashment' => $validated['leave_encashment'],
                     'loan_payment' => $validated['loan_payment'],
                     'basic_salary' => $validated['basic_salary'],
-                    'total_earnings' => $validated['earned_salary'],
+                    // total_earnings is the FULL gross (earned + service +
+                    // leave encashment + custom), not just the basic-for-N-
+                    // days slice. Was misleading before: list page showed
+                    // "Total Earnings = 0" for an employee paid 426.27.
+                    'total_earnings' => $totalEarnings,
                     'service_charge' => $validated['service_charge'],
                     'payment_mode' => $validated['payment_mode'] ?? null,
                     // Both date columns are MySQL `date` typed. Laravel's
@@ -587,7 +641,7 @@ class PayslipController extends Controller
                                             ?? now()->format('Y-m-d'),
                     'reference_no' => $reference,
                     'total_deductions' => $totalDeductions,
-                    'net_pay' => $validated['earned_salary'] - $totalDeductions,
+                    'net_pay' => $netPay,
                     'last_working_date' => $this->normaliseDateForDb($validated['last_working_date'] ?? null),
                     // Persist the per-row leave breakdown HR locked in
                     // on the F&F page. Stored verbatim as-posted (JSON
@@ -990,7 +1044,13 @@ class PayslipController extends Controller
                 return Carbon::parse($settlement->last_working_date)->format('d M Y');
             })
             ->addColumn('net_pay', function ($settlement) {
-                return number_format($settlement->net_pay, 2) . ' MVR';
+                // Currency suffix derived from the employee, not hardcoded
+                // MVR. The store endpoint now persists net_pay in the
+                // employee's basic_salary_currency so the unit on display
+                // matches the stored value (was reporting "MVR" against
+                // values actually computed in USD on USD-payroll resorts).
+                $ccy = optional($settlement->employee)->basic_salary_currency ?: 'MVR';
+                return number_format($settlement->net_pay, 2) . ' ' . $ccy;
             })
             ->addColumn('status', function ($settlement) {
                 $statusClass = [
