@@ -124,7 +124,11 @@
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
                                         <label for="leave_balance" class="form-label">Leave Balance (days)<span class="red-mark">*</span></label>
-                                        <input type="number" name="leave_balance" id="leave_balance" class="form-control" min="0" max="500" placeholder="Leave Balance" readonly data-parsley-required="true" data-parsley-type="number"
+                                        {{-- step="0.01" so HR-edited fractional days (4.60, 5.01, etc.)
+                                             pass HTML5 + Parsley validation. Without it, type="number"
+                                             defaults to step=1 and rejects any decimal as
+                                             "This value seems to be invalid." --}}
+                                        <input type="number" name="leave_balance" id="leave_balance" class="form-control" min="0" max="500" step="0.01" placeholder="Leave Balance" readonly data-parsley-required="true" data-parsley-type="number"
                                             data-parsley-min="0" data-parsley-trigger="change">
                                         <small id="leave-breakdown"
                                                class="form-text d-block text-muted mt-1"
@@ -226,6 +230,15 @@
                                 <small class="text-muted ms-2 flex-grow-1" style="font-size:12px; font-weight:400;">
                                     Days column → Leave Balance · Amount column → Leave Encashment
                                 </small>
+                                {{-- Reset button: re-renders the table from the server-supplied
+                                     breakdown stashed at last render, discarding HR edits + any
+                                     manually-added rows. Disabled until #payable-leaves has a
+                                     stash (i.e. after the first employee fetch). --}}
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                        id="reset-payable-leaves"
+                                        title="Reset rows to the values calculated by the system">
+                                    <i class="fa-solid fa-rotate-left me-1"></i>Reset to original
+                                </button>
                                 {{-- Add-row button: appends a manual entry to the table so HR can
                                      record settlement items that aren't in the leave grid (extra
                                      PH credits, day-off carry, ad-hoc adjustments). The row's
@@ -488,6 +501,53 @@
     const FNF_DOLLAR_TO_MVR    = {{ $dollarToMvr ?? 15.42 }};
 
     // ────────────────────────────────────────────────────────────────
+    // renderPayableLeaveRow(row, opts)
+    // Appends one row to the Leave Breakdown table — same shape for both
+    // server-supplied rows (Annual / Public Holiday / Day Off) and HR-added
+    // manual rows. opts.custom=true → editable type-name input + trash icon.
+    // Server rows render the leave-type as plain text + an Encashable badge.
+    // Reads dailyRate from the table's data-attr so the function can live
+    // at module scope (called from getEmpDetails, reset handler, add-row).
+    // ────────────────────────────────────────────────────────────────
+    function renderPayableLeaveRow(row, opts) {
+        opts = opts || {};
+        var dailyRate  = parseFloat($('#payable-leaves').data('daily-rate') || 0);
+        var encashable = (row.is_encashable !== false);
+        var custom     = !!opts.custom;
+        var days       = parseFloat(row.available_days || 0);
+        var typeCell;
+        if (custom) {
+            typeCell = '<input type="text" class="form-control form-control-sm payable-leave-type"' +
+                ' value="' + $('<i>').text(row.leave_type || '').html() + '"' +
+                ' placeholder="Leave / credit name">';
+        } else {
+            typeCell = (row.leave_type || 'Leave') +
+                ' <span class="badge bg-success-subtle text-success ms-1"' +
+                ' style="font-size:10px;">Encashable</span>';
+        }
+        var $tr = $('<tr>' +
+            '<td>' + typeCell + '</td>' +
+            '<td class="text-end">' +
+                '<input type="number" min="0" step="0.01"' +
+                ' class="form-control form-control-sm text-end payable-leave-days"' +
+                ' value="' + days.toFixed(2) + '">' +
+            '</td>' +
+            '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
+            '<td class="text-end payable-leave-amount">' +
+                formatMoney(mvrToDisplay(days * dailyRate)) +
+            '</td>' +
+            '<td class="text-end">' +
+                (custom
+                    ? '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                      ' title="Remove row"><i class="fa-solid fa-trash"></i></button>'
+                    : '') +
+            '</td>' +
+        '</tr>');
+        $tr.data('encashable', encashable);
+        $('#payable-leaves tbody').append($tr);
+    }
+
+    // ────────────────────────────────────────────────────────────────
     // recalcPayableLeaves()
     // Sums the editable Days inputs in the Leave Breakdown table, rewrites
     // each row's Amount cell + the table totals, and pushes the result
@@ -660,6 +720,26 @@
             : display;
         $('#settlement-details').data('base-earned', mvr);
         recomputeGrossEarning();
+    });
+
+    // Reset → discard HR edits + manually-added rows and rebuild the table
+    // from the server-supplied breakdown stashed during the last employee
+    // fetch. No network round-trip; just replays the original snapshot.
+    $(document).on('click', '#reset-payable-leaves', function () {
+        var original = $('#payable-leaves').data('original-breakdown');
+        var totalDays = parseFloat($('#payable-leaves').data('original-total-days') || 0);
+        if (!original) return; // No employee loaded yet
+        $('#payable-leaves tbody').empty();
+        if (original.length) {
+            original.forEach(function (row) { renderPayableLeaveRow(row); });
+        } else if (totalDays > 0) {
+            renderPayableLeaveRow({
+                leave_type: 'Total Leave Balance',
+                available_days: totalDays,
+                is_encashable: true,
+            });
+        }
+        recalcPayableLeaves();
     });
 
     $(document).on('click', '#add-payable-leave-row', function () {
@@ -864,51 +944,15 @@
 
                     // Stash dailyRate where the row renderer + add-row handler
                     // can both read it without re-parsing the DOM each time.
-                    $('#payable-leaves').data('daily-rate', dailyRate);
-
-                    // Single render path for one row (server-supplied OR HR-added).
-                    // Both get an editable Days input — HR can override the
-                    // server number any time, and added rows start at 0d.
-                    // Custom-added rows are removable via the trash button;
-                    // server rows aren't (delete from the leave grid for that).
-                    function renderPayableLeaveRow(row, opts) {
-                        opts = opts || {};
-                        var encashable = (row.is_encashable !== false);
-                        var custom     = !!opts.custom;
-                        var days       = parseFloat(row.available_days || 0);
-                        var typeCell;
-                        if (custom) {
-                            // Custom row → typeable name input. Defaults to
-                            // "Manual Entry" if HR clears it.
-                            typeCell = '<input type="text" class="form-control form-control-sm payable-leave-type"' +
-                                ' value="' + $('<i>').text(row.leave_type || '').html() + '"' +
-                                ' placeholder="Leave / credit name">';
-                        } else {
-                            typeCell = (row.leave_type || 'Leave') +
-                                ' <span class="badge bg-success-subtle text-success ms-1"' +
-                                ' style="font-size:10px;">Encashable</span>';
-                        }
-                        var $tr = $('<tr>' +
-                            '<td>' + typeCell + '</td>' +
-                            '<td class="text-end">' +
-                                '<input type="number" min="0" step="0.01"' +
-                                ' class="form-control form-control-sm text-end payable-leave-days"' +
-                                ' value="' + days.toFixed(2) + '">' +
-                            '</td>' +
-                            '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
-                            '<td class="text-end payable-leave-amount">' +
-                                formatMoney(mvrToDisplay(days * dailyRate)) +
-                            '</td>' +
-                            '<td class="text-end">' +
-                                (custom
-                                    ? '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
-                                      ' title="Remove row"><i class="fa-solid fa-trash"></i></button>'
-                                    : '') +
-                            '</td>' +
-                        '</tr>');
-                        $tr.data('encashable', encashable);
-                        $leaveTbody.append($tr);
-                    }
+                    // Also stash a deep copy of the server breakdown + the
+                    // server-derived fallback so the Reset button can rebuild
+                    // the table exactly as it first arrived, discarding HR
+                    // edits and any manually-added rows.
+                    $('#payable-leaves')
+                        .data('daily-rate', dailyRate)
+                        .data('original-breakdown', JSON.parse(JSON.stringify(breakdown)))
+                        .data('original-total-days', totalLeaveDaysFromService);
+                    $('#reset-payable-leaves').prop('disabled', false);
 
                     if (breakdown.length) {
                         breakdown.forEach(function (row) {
