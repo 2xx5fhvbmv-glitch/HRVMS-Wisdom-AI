@@ -655,8 +655,11 @@
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="section" class="form-label">Section</label>
+                                    {{-- Starts disabled — Section is gated on Department
+                                         (and on the chosen department actually HAVING sections).
+                                         The cascade JS toggles this back on when there are options. --}}
                                     <select class="form-select select2t-none" id="section" name="section"
-                                        data-placeholder="Section">
+                                        data-placeholder="Section" disabled>
                                         <option></option>
                                         {{-- Options loaded by AJAX --}}
                                     </select>
@@ -1571,19 +1574,32 @@
                     // --- Section ---
                     // Section stays user-editable (not locked) — the
                     // vacancy doesn't have a section, just a department.
+                    // Enable only if the dept actually has sections;
+                    // otherwise keep it disabled like the manual cascade.
                     $.ajax({
                         url: '{{ route('people.getSectionByDepartment') }}',
                         type: 'GET',
                         data: { department_id: deptId },
                         success: function (res) {
                             var $sec = $('#section');
+                            var sections = (res && res.sections) || [];
                             var html = '<option></option>';
-                            $.each((res && res.sections) || [], function (_, section) {
+                            $.each(sections, function (_, section) {
                                 html += '<option value="' + section.id + '">' + section.name + '</option>';
                             });
                             $sec.html(html);
                             if ($sec.data('select2')) {
                                 try { $sec.trigger('change.select2'); } catch (e) {}
+                            }
+                            // Disable when the dept has no sections; never
+                            // override a vacancy-locked Section (the vacancy
+                            // owns it). Mirrors the manual-cascade behaviour.
+                            var sectionDisabled = sections.length === 0;
+                            if (!$sec.hasClass('vacancy-locked')) {
+                                $sec.prop('disabled', sectionDisabled);
+                                if ($sec.data('select2')) {
+                                    try { $sec.select2({ disabled: sectionDisabled }); } catch (e) {}
+                                }
                             }
                         }
                     });
@@ -2902,6 +2918,17 @@
                 return true;
             }
 
+            // Toggle disabled on a select2-backed field. Pure attr() doesn't
+            // grey the Select2 widget — Select2 needs its own .select2({ disabled }).
+            // Never enable a vacancy-locked field — the vacancy lock owns it.
+            function setFieldDisabled($field, isDisabled) {
+                if (!isDisabled && $field.hasClass('vacancy-locked')) return;
+                $field.prop('disabled', !!isDisabled);
+                if ($field.data('select2')) {
+                    try { $field.select2({ disabled: !!isDisabled }); } catch (e) {}
+                }
+            }
+
             // Division -> Department
             $('#division').on('change', function() {
                 // Don't repopulate Department if it's locked to a vacancy —
@@ -2911,6 +2938,8 @@
                 wipeIfNotLocked($('#department'));
                 wipeIfNotLocked($('#section'));
                 wipeIfNotLocked($('#position'));
+                // No department yet → Section has nothing to cascade from.
+                setFieldDisabled($('#section'), true);
                 if (!divisionId) return;
                 $.ajax({
                     url: '{{ route('people.getDepartmentsByDivision') }}',
@@ -2934,6 +2963,9 @@
                 let departmentId = $(this).val();
                 wipeIfNotLocked($('#section'));
                 wipeIfNotLocked($('#position'));
+                // Default Section to disabled — flip back on only if the
+                // chosen department actually has sections defined.
+                setFieldDisabled($('#section'), true);
                 if (!departmentId) return;
                 getReportingPerson(departmentId);
                 $.ajax({
@@ -2950,8 +2982,10 @@
                                     `<option value="${section.id}">${section.name}</option>`;
                             });
                             $('#section').html(html).trigger('change');
+                            setFieldDisabled($('#section'), false);
                         } else {
-                            // No sections, load positions directly
+                            // No sections under this dept — leave Section
+                            // disabled and load positions directly off dept.
                             loadPositions({
                                 department_id: departmentId
                             });

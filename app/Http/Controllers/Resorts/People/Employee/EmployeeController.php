@@ -325,19 +325,42 @@ class EmployeeController extends Controller
             && Schema::hasTable('t_anotification_children')
             && Schema::hasTable('application_links')) {
             // Subquery: how many employees have already been hired against
-            // each vacancy. We left-join this so vacancies with zero hires
-            // (the common case) still appear with filled=0.
-            // Guard the column with Schema::hasColumn — the
-            // 2026_06_01_140000_add_vacancy_id_to_employees migration is
-            // what introduces it. Until the migration runs, treat every
-            // vacancy as having 0 hires (i.e. fully available).
+            // Filled-slot count per vacancy. Two sources combined:
+            //   1. employees.vacancy_id — exact link, set by the new-
+            //      hire form. Requires the 2026_06_01 migration; guarded.
+            //   2. applicant_wise_statuses.status='Contract Accepted' on
+            //      applicant_form_data.Parent_v_id — the TA flow's
+            //      definition of "hired". Captures resorts that haven't
+            //      run the migration yet AND old hires that pre-date
+            //      the vacancy_id column.
+            // Building both as subqueries + UNION ALL so the leftJoinSub
+            // pattern below stays a single read. MAX() in the outer
+            // grouped select picks the higher of the two so neither
+            // path under-counts the slot.
             $hasVacancyIdCol = Schema::hasColumn('employees', 'vacancy_id');
-            $filledByVacancy = DB::table('employees')
-                ->select('vacancy_id', DB::raw('COUNT(*) as filled'))
-                ->where('resort_id', $resort_id)
-                ->whereNotIn('status', ['Terminated', 'Inactive'])
-                ->whereNotNull('vacancy_id')
-                ->groupBy('vacancy_id');
+            if ($hasVacancyIdCol) {
+                $empFilled = DB::table('employees')
+                    ->select('vacancy_id', DB::raw('COUNT(*) as filled'))
+                    ->where('resort_id', $resort_id)
+                    ->whereNotIn('status', ['Terminated', 'Inactive'])
+                    ->whereNotNull('vacancy_id')
+                    ->groupBy('vacancy_id');
+                $taFilled = DB::table('applicant_wise_statuses as aws')
+                    ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
+                    ->where('afd.resort_id', $resort_id)
+                    ->where('aws.status', 'Contract Accepted')
+                    ->groupBy('afd.Parent_v_id')
+                    ->select('afd.Parent_v_id as vacancy_id', DB::raw('COUNT(DISTINCT aws.Applicant_id) as filled'));
+                $filledByVacancy = $empFilled->unionAll($taFilled);
+            } else {
+                // No vacancy_id column → fall back to TA-flow only.
+                $filledByVacancy = DB::table('applicant_wise_statuses as aws')
+                    ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
+                    ->where('afd.resort_id', $resort_id)
+                    ->where('aws.status', 'Contract Accepted')
+                    ->groupBy('afd.Parent_v_id')
+                    ->select('afd.Parent_v_id as vacancy_id', DB::raw('COUNT(DISTINCT aws.Applicant_id) as filled'));
+            }
 
             $vacanciesQuery = DB::table('vacancies as v')
                 ->join('resort_positions as p', 'p.id', '=', 'v.position')
@@ -351,11 +374,12 @@ class EmployeeController extends Controller
                 ->join('t_anotification_children as tac', 'tac.Parent_ta_id', '=', 'tap.id')
                 ->join('application_links as al', 'al.ta_child_id', '=', 'tac.id');
 
-            if ($hasVacancyIdCol) {
-                $vacanciesQuery->leftJoinSub($filledByVacancy, 'fb', function ($j) {
-                    $j->on('fb.vacancy_id', '=', 'v.id');
-                });
-            }
+            // Always join the filled-count sub — even without the
+            // employees.vacancy_id column, the TA-flow ("Contract
+            // Accepted") fallback supplies values for this DB.
+            $vacanciesQuery->leftJoinSub($filledByVacancy, 'fb', function ($j) {
+                $j->on('fb.vacancy_id', '=', 'v.id');
+            });
 
             $vacancies = $vacanciesQuery
                 ->where('v.Resort_id', $resort_id)
@@ -376,9 +400,7 @@ class EmployeeController extends Controller
                     'dv.id as division_id',
                     'dv.name as division_name',
                     'v.Total_position_required as no_of_positions',
-                    $hasVacancyIdCol
-                        ? DB::raw('COALESCE(MAX(fb.filled), 0) as filled_count')
-                        : DB::raw('0 as filled_count'),
+                    DB::raw('COALESCE(MAX(fb.filled), 0) as filled_count'),
                     DB::raw('MAX(al.link_Expiry_date) as link_expiry_date'),
                     // GM (final-approval) timestamp — the row that flipped
                     // the vacancy into the "ready to interview" state. Used
@@ -1211,15 +1233,22 @@ class EmployeeController extends Controller
 
         // Onboarding milestone — every employee has a created_at, so this
         // guarantees Recent Activities is never empty for any employee.
+        // Label reflects the current lifecycle state so it doesn't
+        // contradict the status badge: if HR hasn't clicked "Activate
+        // Employee" yet, the employee is still in 'Onboarding' and the
+        // activity must read as pending, not "Completed". Once activated
+        // (status flips to Active / Probationary), the milestone reads
+        // "Onboarded — Completed" as before.
         if (!empty($employee->created_at)) {
             $joinDate = $employee->joining_date
                 ? Carbon::parse($employee->joining_date)->format('d M Y')
                 : Carbon::parse($employee->getRawOriginal('created_at') ?: $employee->created_at)->format('d M Y');
+            $isOnboarding = $employee->status === 'Onboarding';
             $recentActivities->push((object) [
-                'title'       => 'Onboarded',
-                'subtitle'    => 'Joined on ' . $joinDate,
-                'status'      => 'Completed',
-                'badge_class' => 'badge-themeSuccess',
+                'title'       => $isOnboarding ? 'Onboarding' : 'Onboarded',
+                'subtitle'    => ($isOnboarding ? 'Joining ' : 'Joined on ') . $joinDate,
+                'status'      => $isOnboarding ? 'Pending Activation' : 'Completed',
+                'badge_class' => $isOnboarding ? 'badge-themeWarning' : 'badge-themeSuccess',
                 'when'        => $employee->getRawOriginal('created_at') ?: $employee->created_at,
             ]);
         }

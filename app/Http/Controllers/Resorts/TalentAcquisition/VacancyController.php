@@ -17,6 +17,7 @@ use App\Models\ApplicantInterViewDetails;
 use App\Models\Compliance;
 use Validator;
 use DB;
+use Schema;
 use App\Models\TAnotificationChild;
 use App\Models\TAnotificationParent;
 use App\Models\ServiceProvider;
@@ -1211,6 +1212,49 @@ class VacancyController extends Controller
             $showDeptFilter = false;
             $filterPositions = $employee ? ResortPosition::where('dept_id', $employee->Dept_id)->get() : collect();
         }
+        // Hired-count lookup. Two sources, in order of preference:
+        //   1. employees.vacancy_id — set when a new hire is created
+        //      via /people/employees/create (mandatory vacancy pick).
+        //      The most accurate signal because it ties the actual
+        //      employee record to the vacancy. Requires the 2026_06_01
+        //      migration; guarded with Schema::hasColumn.
+        //   2. applicant_wise_statuses.status='Contract Accepted' on
+        //      applicant_form_data.Parent_v_id — the TA-flow definition
+        //      of "hired" the dashboard already counts. Works on every
+        //      environment, captures historical hires that pre-date the
+        //      vacancy_id column.
+        // The greater of the two per vacancy is reported so neither
+        // path can under-count.
+        $vacancyIds = $NewVacancies->pluck('vacancy_id')->filter()->all();
+        $hiredByVacancy = [];
+        if (!empty($vacancyIds)) {
+            if (Schema::hasColumn('employees', 'vacancy_id')) {
+                $empCounts = DB::table('employees')
+                    ->where('resort_id', $resort_id)
+                    ->whereIn('vacancy_id', $vacancyIds)
+                    ->whereNotIn('status', ['Terminated', 'Inactive'])
+                    ->groupBy('vacancy_id')
+                    ->select('vacancy_id', DB::raw('COUNT(*) as n'))
+                    ->pluck('n', 'vacancy_id')
+                    ->toArray();
+                foreach ($empCounts as $vid => $n) {
+                    $hiredByVacancy[$vid] = max($hiredByVacancy[$vid] ?? 0, (int) $n);
+                }
+            }
+            $taCounts = DB::table('applicant_wise_statuses as aws')
+                ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
+                ->where('afd.resort_id', $resort_id)
+                ->whereIn('afd.Parent_v_id', $vacancyIds)
+                ->where('aws.status', 'Contract Accepted')
+                ->groupBy('afd.Parent_v_id')
+                ->select('afd.Parent_v_id as vacancy_id', DB::raw('COUNT(DISTINCT aws.Applicant_id) as n'))
+                ->pluck('n', 'vacancy_id')
+                ->toArray();
+            foreach ($taCounts as $vid => $n) {
+                $hiredByVacancy[$vid] = max($hiredByVacancy[$vid] ?? 0, (int) $n);
+            }
+        }
+
         foreach($NewVacancies  as $v)
         {
             // $applicationdata =$v->TAnotificationParent[0]->TaNotificationChildren->where("Approved_By",Common::TaFinalApproval($resort_id))->first();
@@ -1225,6 +1269,18 @@ class VacancyController extends Controller
             $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
             $v->ApplicationId= $v->application_id;
             $v->allJobAdImages = json_encode($allJobAdImages);
+
+            // Hired status — drives the new "Hired" column. Three states:
+            //   • filled = required → "1 of 1" green
+            //   • filled < required → "0 of 1" / "1 of 2" amber
+            //   • filled > required (over-hire) → "3 of 2" blue
+            $required = (int) ($v->Total_position_required ?? 0);
+            $hired    = (int) ($hiredByVacancy[$v->vacancy_id] ?? 0);
+            $badgeClass = $hired === 0 ? 'badge-themeWarning'
+                : ($hired >= $required ? 'badge-themeSuccess' : 'badge-themeWarning');
+            $v->HiredCount  = $hired;
+            $v->HiredLabel  = '<span class="badge ' . $badgeClass . '">'
+                . $hired . ' of ' . max($required, 1) . ' hired</span>';
         }
 
         $config = config('settings.Position_Rank');
@@ -1257,8 +1313,15 @@ class VacancyController extends Controller
                         return $row->Department.' '.'<span class="badge badge-themeLight">' . htmlspecialchars($row->DepartmentCode  , ENT_QUOTES, 'UTF-8') . '</span>';
                     })
 
+                    // Hired status — pre-computed above as a coloured
+                    // "X of Y hired" badge. Counted by employees.vacancy_id
+                    // joining back to this vacancy, excluding Terminated
+                    // / Inactive rows so churn doesn't inflate it.
+                    ->addColumn('Hired', function ($row) {
+                        return $row->HiredLabel ?? '';
+                    })
 
-                    ->rawColumns(['Position', 'Department','NoOfVacnacy','NoOfApplication','ApplicationDate','ExpiryDate','action'])
+                    ->rawColumns(['Position', 'Department','NoOfVacnacy','NoOfApplication','ApplicationDate','ExpiryDate','Hired','action'])
                     ->make(true);
 
                     
