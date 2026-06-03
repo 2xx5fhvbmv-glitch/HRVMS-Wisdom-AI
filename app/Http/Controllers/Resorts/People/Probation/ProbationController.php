@@ -536,7 +536,7 @@ class ProbationController extends Controller
 
         return view('resorts.people.probation.detail', compact(
             'page_title', 'employee', 'monthlyCheckins',
-            'joiningLabel', 'probationEndLabel', 'remainingDays', 'progress',
+            'joiningLabel', 'probationEndLabel', 'remainingDays', 'totalDays', 'progress',
             'probationCompleted',
             'onboardingPrograms',
             'finalReviewStatus', 'finalReviewBadge',
