@@ -129,6 +129,20 @@ $('#submit-form').on('click', function (e) {
                 // assignment.status='Completed'.
                 $('#form-render :input').prop('disabled', true);
                 $('#submit-form').prop('disabled', true).hide();
+
+                // Redirect so the user knows the form is finished and lands
+                // somewhere useful (their dashboard, where the now-completed
+                // form will drop off the "To Fill" list). Order of preference:
+                //   1. response.redirect_url if the controller supplied one
+                //   2. the previous page if they came from a dashboard
+                //   3. the HOD dashboard as a safe fallback
+                var fallbackUrl = '{{ route("resort.master.hod_dashboard") }}';
+                var referrer = document.referrer || '';
+                var here = window.location.href;
+                var redirectTo = response.redirect_url
+                    || (referrer && referrer !== here && referrer.indexOf(window.location.host) !== -1 ? referrer : null)
+                    || fallbackUrl;
+                setTimeout(function () { window.location.href = redirectTo; }, 1200);
             } else {
                 toastr.error(response.message || "An error occurred while submitting the form.");
             }

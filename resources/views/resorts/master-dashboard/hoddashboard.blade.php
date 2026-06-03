@@ -1416,6 +1416,105 @@
                                 </div>
                             </div>
                         </div>
+                        {{-- ─────── Pending Exit Clearance Forms ───────
+                             Renders every unfinished `department`-type clearance form
+                             the controller put into $pendingExitClearanceForms. Scope
+                             depends on which dashboard the controller served:
+                                • HOD view  → only forms assigned to this HOD
+                                • XCOM view → every pending form across the resort
+                             We don't decide the scope in Blade — the controller did.
+                             We just add the Department column in XCOM mode so the
+                             oversight view shows where each form lives. Hidden
+                             entirely when nothing's pending. --}}
+                        @php
+                            $isXcomScope = strtoupper((string) request('dashboard_label', 'HOD')) === 'XCOM';
+                        @endphp
+                        @if(!empty($pendingExitClearanceForms) && count($pendingExitClearanceForms) > 0)
+                            <div class="col-xl-12 col-lg-6 order-lg-5 order-xl-0">
+                                <div class="card card-theme h-100">
+                                    <div class="card-title">
+                                        <div class="row g-md-2 g-1 align-items-center">
+                                            <div class="col">
+                                                <h3 class="text-nowrap">
+                                                    @if($isXcomScope)
+                                                        Exit Clearance Forms — Across Departments
+                                                    @else
+                                                        Exit Clearance Forms To Fill
+                                                    @endif
+                                                    <span class="badge bg-warning ms-1">{{ count($pendingExitClearanceForms) }}</span>
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-talentAcqExitClear w-100 mb-1">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Employee</th>
+                                                        @if($isXcomScope) <th>Department</th> @endif
+                                                        <th>Form</th>
+                                                        <th>Last Working Day</th>
+                                                        <th>Deadline</th>
+                                                        <th>Status</th>
+                                                        <th class="text-end">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($pendingExitClearanceForms as $assignment)
+                                                        @php
+                                                            $emp  = optional($assignment->employeeResignation)->employee;
+                                                            $name = optional(optional($emp)->resortAdmin)->full_name ?? '—';
+                                                            $pos  = optional(optional($emp)->position)->position_title;
+                                                            $dept = optional(optional($emp)->department)->name;
+                                                            $lwd  = optional($assignment->employeeResignation)->last_working_day;
+                                                            $dl   = $assignment->deadline_date;
+                                                            $isOverdue = $dl && \Carbon\Carbon::parse($dl)->isPast();
+                                                        @endphp
+                                                        <tr>
+                                                            <td>
+                                                                <div class="tableUser-block">
+                                                                    @if($emp)
+                                                                        <div class="img-circle"><img src="{{ App\Helpers\Common::getResortUserPicture($emp->Admin_Parent_id) }}" alt="user"></div>
+                                                                    @endif
+                                                                    <span class="userApplicants-btn">
+                                                                        {{ $name }}
+                                                                        @if($pos)<br><small class="text-muted">{{ $pos }}</small>@endif
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            @if($isXcomScope) <td>{{ $dept ?? '—' }}</td> @endif
+                                                            <td>{{ optional($assignment->exitClearanceForm)->form_name ?? '—' }}</td>
+                                                            <td>{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('d M Y') : '—' }}</td>
+                                                            <td class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
+                                                                {{ $dl ? \Carbon\Carbon::parse($dl)->format('d M Y') : '—' }}
+                                                                @if($isOverdue) <small>(overdue)</small> @endif
+                                                            </td>
+                                                            <td>
+                                                                @if($assignment->status === 'Pending')
+                                                                    <span class="badge badge-themeWarning">Pending</span>
+                                                                @elseif($assignment->status === 'On Hold')
+                                                                    <span class="badge badge-themeGray">On Hold</span>
+                                                                @else
+                                                                    <span class="badge badge-themeSkyblue">{{ $assignment->status }}</span>
+                                                                @endif
+                                                            </td>
+                                                            <td class="text-end">
+                                                                <a href="{{ route('people.exit-clearance.department-form', base64_encode($assignment->emp_resignation_id)) }}"
+                                                                   class="btn btn-themeSkyblue btn-sm">
+                                                                    Fill Form
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="col-xl-12 col-lg-6 order-lg-5 order-xl-0">
                             <div class="card card-theme  h-100">
                                 <div class="card-title">

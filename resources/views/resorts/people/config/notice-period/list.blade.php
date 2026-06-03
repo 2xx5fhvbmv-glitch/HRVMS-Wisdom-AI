@@ -116,6 +116,11 @@
                 $.ajax({
                     type: "DELETE",
                     url: "{{ route('people.notice-period.destroy', ':id') }}".replace(':id', main_id),
+                    // Missing CSRF token → 419 on strict-CSRF prod.
+                    // Same id-vs-Main_id payload fix as the update handler:
+                    // controller reads $request->id to base64_decode().
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    data: { id: main_id },
                     dataType: "json",
                 }).done(function(result) {
                     if (result.success) {
@@ -201,17 +206,27 @@
         var period = $row.find("input.days").val();
         var immediate_release = $row.find("select.immediate_release").val();
 
+        // BUG FIX:
+        //   1. The controller reads `$request->id` to find the row,
+        //      not `Main_id` — the old payload silently failed
+        //      (base64_decode(null) → "" → find("") → null → no save).
+        //   2. Missing X-CSRF-TOKEN header — would 419 on strict CSRF
+        //      middleware. Added below.
+        //   3. immediate_release='1' must clear period server-side
+        //      (controller already does); we still send the value so
+        //      validation runs.
         $.ajax({
             url: "{{ route('people.notice-period.update', '') }}/" + Main_id,
             type: "POST",
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
             data: {
-                Main_id: Main_id,
+                id: Main_id,
                 title: title,
                 period: period,
                 immediate_release: immediate_release
             },
             success: function(response) {
-                if (response.success == true) { 
+                if (response.success == true) {
                     $('#ReminderTable').DataTable().ajax.reload();
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right'

@@ -40,4 +40,14 @@ class ExitClearanceFormAssignment extends Model
     public function exitClearanceForm(){
         return $this->belongsTo(ExitClearanceForm::class, 'form_id', 'id');
     }
+
+    /**
+     * Parent resignation row this assignment belongs to. Surfaced on
+     * the HOD / XCOM dashboards so the "Pending Exit Clearance Forms"
+     * card can show the resigning employee's name + last-working-day
+     * inline with each pending form.
+     */
+    public function employeeResignation(){
+        return $this->belongsTo(EmployeeResignation::class, 'emp_resignation_id', 'id');
+    }
 }

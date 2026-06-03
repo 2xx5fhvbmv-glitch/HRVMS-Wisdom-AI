@@ -594,6 +594,12 @@ class LiabilityEstimationController extends Controller
             'Medical Permit'   => (float) $totalMedical,
             'Insurance'        => (float) $totalInsurance,
             'Recruitment Fee'  => 0.0, // no actual tracking; estimated only
+            // Food Cost YTD = the same template-driven aggregator that
+            // feeds the Liability Reduction breakdown card. Real spend
+            // events aren't logged, so this is "what we've expensed so
+            // far based on the per-day rate × eligible-days-since-
+            // joining". Reuses $foodCostYtd computed earlier.
+            'Food Cost'        => (float) $foodCostYtd,
         ];
         foreach ($allowanceBreakdown as $type => $amount) {
             $ytdActuals['Allowance - ' . ucfirst($type)] = (float) $amount;
@@ -805,6 +811,12 @@ class LiabilityEstimationController extends Controller
             'Quota'           => 0.0,
             'Visa'            => 0.0,
             'Recruitment Fee' => 0.0,
+            // Food Cost — a Daily-frequency cost template. The
+            // estimator below classifies any cost template whose name
+            // contains "food" into this bucket so it appears as a
+            // dedicated Est-vs-Actual row (was previously lumped
+            // into a generic Allowance row).
+            'Food Cost'       => 0.0,
         ];
         // Allowance buckets — keyed by the same display label used in
         // $allowanceBreakdown / $chartData / $allowanceTypes.
@@ -820,6 +832,7 @@ class LiabilityEstimationController extends Controller
             if (stripos($n, 'insurance') !== false)                     return 'Insurance';
             if (stripos($n, 'quota') !== false)                         return 'Quota';
             if (stripos($n, 'recruitment') !== false)                   return 'Recruitment Fee';
+            if (stripos($n, 'food') !== false)                          return 'Food Cost';
             if (stripos($n, 'salary') !== false || stripos($n, 'payroll') !== false) return 'Salaries';
             return 'Allowance'; // becomes "Allowance - <type>" below
         };
@@ -854,25 +867,21 @@ class LiabilityEstimationController extends Controller
             }
         }
 
-        // Cost leg — for each active employee × each cost template, sum
-        // annualCostForEmployee into the right bucket. Fetch cost
-        // templates locally so this block doesn't depend on a variable
-        // defined later in the controller.
-        $resortCostsForEst = DB::table('resort_budget_costs')
-            ->where('resort_id', $resortId)
-            ->where('status', 'active')
-            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
-        foreach ($activeEmployees as $emp) {
-            foreach ($resortCostsForEst as $cost) {
-                $annual = Common::annualCostForEmployee($resortId, $currentYear, $cost, $emp);
-                if ($annual <= 0) continue;
-                $label = $cost->particulars ?: ($cost->cost_title ?: 'Other');
-                $cat   = $classifyForEstVsActual($label);
-                if ($cat === 'Allowance') {
-                    $allowanceEstimated[$label] = ($allowanceEstimated[$label] ?? 0) + $annual;
-                } else {
-                    $estimatedByCategory[$cat] += $annual;
-                }
+        // Cost-template leg — distribute the SAME per-template annual
+        // totals the headline was built from ($perTemplateAnnual via
+        // self::fastAnnualCostForEmployee) across the named-column /
+        // allowance buckets. The previous loop re-aggregated via
+        // Common::annualCostForEmployee (the slow path), which respects
+        // benefit-grade filters differently than the fast path used by
+        // the modal — that's why the table Total was $10,794 short of
+        // the headline. Same source → identical numbers.
+        foreach (($perTemplateAnnual ?? []) as $label => $annual) {
+            if ($annual <= 0) continue;
+            $cat = $classifyForEstVsActual((string) $label);
+            if ($cat === 'Allowance') {
+                $allowanceEstimated[$label] = ($allowanceEstimated[$label] ?? 0) + $annual;
+            } else {
+                $estimatedByCategory[$cat] = ($estimatedByCategory[$cat] ?? 0) + $annual;
             }
         }
 
@@ -887,6 +896,10 @@ class LiabilityEstimationController extends Controller
         $estVsActualRows = [
             ['label' => 'Salaries',        'estimated' => $estimatedByCategory['Salaries'],        'actual' => $ytdActuals['Salaries']        ?? 0],
             ['label' => 'Overtime',        'estimated' => $estimatedByCategory['Overtime'],        'actual' => $ytdActuals['OTA']             ?? 0],
+            // Food Cost — Daily-frequency cost template, actual = the
+            // per-employee day-window aggregator computed earlier
+            // ($foodCostYtd). Previously hidden in the Allowance rows.
+            ['label' => 'Food Cost',       'estimated' => $estimatedByCategory['Food Cost'],       'actual' => $ytdActuals['Food Cost']       ?? 0],
             ['label' => 'Work Permit',     'estimated' => $estimatedByCategory['Work Permit'],     'actual' => $ytdActuals['Work Permit']     ?? 0],
             ['label' => 'Medical',         'estimated' => $estimatedByCategory['Medical'],         'actual' => $ytdActuals['Medical Permit']  ?? 0],
             ['label' => 'Insurance',       'estimated' => $estimatedByCategory['Insurance'],       'actual' => $ytdActuals['Insurance']       ?? 0],
@@ -896,6 +909,21 @@ class LiabilityEstimationController extends Controller
             // ledger in this codebase), so actual stays 0 by design — the
             // estimated column still reflects the budget commitment.
             ['label' => 'Recruitment Fee', 'estimated' => $estimatedByCategory['Recruitment Fee'], 'actual' => $ytdActuals['Recruitment Fee'] ?? 0],
+            // Vacant Slot — annual basic-salary + cost-config commitment
+            // for unfilled positions. Real spend can't exist until the
+            // slot is filled, so actual stays 0 by design. Was missing
+            // from the table entirely → table Total under-reported by
+            // this amount versus the headline Total Estimated Liability.
+            ['label' => 'Vacant Slots',    'estimated' => (float) $estLegVacant,                    'actual' => 0],
+            // Per-Employee Allowances — the 4th headline leg
+            // (employees_allowance.amount × 12 across active emps).
+            // Carried as its own line so the table Total equals the
+            // headline Total Estimated Liability exactly. Actuals roll
+            // up into the YTD payroll-allowance figures already shown
+            // per allowance type below; aggregating here would double-
+            // count, so this row's actual stays 0 (the per-type rows
+            // carry the actual YTD payroll-allowance spend).
+            ['label' => 'Per-Employee Allowances (×12)', 'estimated' => (float) $estLegEmployeeAllowance, 'actual' => 0],
         ];
         // Case-insensitive lookup: allowanceEstimated is keyed by the cost
         // template's `particulars` field ("Language Allowance"), while
@@ -908,11 +936,39 @@ class LiabilityEstimationController extends Controller
         foreach ($allowanceEstimated as $k => $v) {
             $allowanceEstimatedCI[strtolower($k)] = $v;
         }
+        // Bug fix: iterate the UNION of (allowances with actual spend)
+        // and (allowances with budget commitment). Old loop only walked
+        // $allowanceBreakdown (actuals from payroll_review_allowances),
+        // so any budgeted allowance with $0 YTD spend was silently
+        // dropped from the table — Pension Employer Contribution, Ramadan
+        // Bonus, Tickets, Relocation, Accommodation, etc. all hidden.
+        // That under-reported the table total by ~$103K vs the headline
+        // Total Estimated Liability.
+        //
+        // Casing: $allowanceBreakdown keys are lowercase
+        // (payroll_review_allowances.allowance_type), while
+        // $allowanceEstimated keys come from resort_budget_costs.particulars
+        // and are usually Title Case. Preserve a display label by
+        // remembering the "best" casing seen for each lowercased key.
+        $displayLabelFor = [];
+        $actualByLc      = [];
         foreach ($allowanceBreakdown as $type => $amount) {
+            $lc = strtolower((string) $type);
+            $displayLabelFor[$lc] = ucwords((string) $type);
+            $actualByLc[$lc]      = (float) $amount;
+        }
+        foreach ($allowanceEstimated as $type => $amount) {
+            $lc = strtolower((string) $type);
+            if (!isset($displayLabelFor[$lc])) {
+                $displayLabelFor[$lc] = (string) $type;
+            }
+        }
+        ksort($displayLabelFor);
+        foreach ($displayLabelFor as $lc => $label) {
             $estVsActualRows[] = [
-                'label'     => 'Allowance - ' . ucfirst($type),
-                'estimated' => $allowanceEstimatedCI[strtolower($type)] ?? 0,
-                'actual'    => $amount,
+                'label'     => 'Allowance - ' . $label,
+                'estimated' => $allowanceEstimatedCI[$lc] ?? 0,
+                'actual'    => $actualByLc[$lc] ?? 0,
             ];
         }
 

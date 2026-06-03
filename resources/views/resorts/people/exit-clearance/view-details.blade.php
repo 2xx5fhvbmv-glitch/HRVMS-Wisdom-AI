@@ -32,19 +32,19 @@
                                     <tbody>
                                         <tr>
                                             <th>Name:</th>
-                                            <td>{{$exit_clearance->employee->resortAdmin->full_name}}</td>
+                                            <td>{{ optional(optional($exit_clearance->employee)->resortAdmin)->full_name ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Employee ID:</th>
-                                            <td>{{$exit_clearance->employee->Emp_id}}</td>
+                                            <td>{{ optional($exit_clearance->employee)->Emp_id ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Department:</th>
-                                            <td>{{$exit_clearance->employee->department->name}}</td>
+                                            <td>{{ optional(optional($exit_clearance->employee)->department)->name ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Position:</th>
-                                            <td>{{$exit_clearance->employee->position->position_title}}</td>
+                                            <td>{{ optional(optional($exit_clearance->employee)->position)->position_title ?? '—' }}</td>
                                         </tr>
                                        <tr>
                                             <th>Employment Duration:</th>
@@ -81,7 +81,7 @@
                                     <tbody>
                                         <tr>
                                             <th>Reason for Resignation:</th>
-                                            <td>{{$exit_clearance->reason_title->reason}}</td>
+                                            <td>{{ optional($exit_clearance->reason_title)->reason ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Last Working Date:</th>
@@ -353,6 +353,18 @@
                                                                 <i class="fa-solid fa-desktop me-1"></i>web
                                                             </span>
                                                         @endif
+                                                    @endif
+                                                    {{-- Once the form is completed, HR / XCOM /
+                                                         GM gets a prominent "View Response"
+                                                         button so they can audit what the
+                                                         department submitted. The small chain-
+                                                         link icon next to "Yes" up top still
+                                                         works, but HR repeatedly missed it. --}}
+                                                    @if($is_hr && $exitClearanceFormAssignment->status === 'Completed')
+                                                        <a href="{{ route('people.exit-clearance.employeeFormAssignmentShow', base64_encode($exitClearanceFormAssignment->id)) }}"
+                                                           class="btn btn-themeSkyblue btn-sm ms-2">
+                                                            <i class="fa-solid fa-eye me-1"></i>View Response
+                                                        </a>
                                                     @endif
                                                 </td>
                                             </tr>

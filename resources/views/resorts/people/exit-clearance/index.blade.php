@@ -25,7 +25,7 @@
                     <div class="row g-md-3 g-2 align-items-center">
                         <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
                             <div class="input-group">
-                                <input type="search" class="form-control "
+                                <input type="search" id="searchInput" class="form-control"
                                     placeholder="Search by Employee Name, ID or Manager Name" />
                                 <i class="fa-solid fa-search"></i>
                             </div>
@@ -300,6 +300,18 @@
 
         // Calendar filter (#datapicker) commented out — re-add it here
         // once the spec for date_range is decided.
+        // Debounced free-text search — reloads the table 300ms after
+        // the user stops typing so we don't fire a query per keystroke.
+        // Sends the value as `searchTerm`; controller looks it up
+        // against Emp_id, employee name, and assigned-to name.
+        let searchDebounce;
+        $('#searchInput').on('input search', function () {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(function () {
+                getExitClearanceData();
+            }, 300);
+        });
+
         $('#deptFilter, #positionFilter, #statusFilter').on('change', function () {
             getExitClearanceData();
         });
@@ -333,6 +345,9 @@
                     d.department_id = (dept === 'ALL') ? '' : dept;
                     d.position_id   = (pos  === 'ALL') ? '' : pos;
                     d.status = $('#statusFilter').val();
+                    // Free-text search box — controller LIKE-matches
+                    // against Emp_id, full_name, and assigned-to name.
+                    d.searchTerm = ($('#searchInput').val() || '').trim();
                     // d.date_range = $('#datapicker').val();  // calendar filter disabled
 
                     // Forward ?empId=<base64> from the URL when the page is
