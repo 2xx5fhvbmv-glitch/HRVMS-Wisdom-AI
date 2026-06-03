@@ -744,9 +744,29 @@
 
     $(document).on('click', '#add-payable-leave-row', function () {
         var dailyRate = parseFloat($('#payable-leaves').data('daily-rate') || 0);
+        // Build the leave-type dropdown options. Source: the employee's
+        // eligible leave types stashed at fetch (mirrors the dropdown HR
+        // sees on the employee details page). Falls back to a free-text
+        // input if no employee has been picked yet.
+        var types = $('#payable-leaves').data('eligible-leave-types') || [];
+        if (!Array.isArray(types)) types = [];
+        var typeCell;
+        if (types.length) {
+            var opts = '<option value="" disabled selected>Select leave type…</option>';
+            types.forEach(function (t) {
+                var safe = $('<i>').text(t).html();
+                opts += '<option value="' + safe + '">' + safe + '</option>';
+            });
+            // Keep an "Other" path so HR can still record one-off items
+            // that aren't in the leave grid (eg. a pre-existing comp day).
+            opts += '<option value="__other__">Other…</option>';
+            typeCell = '<select class="form-select form-select-sm payable-leave-type">' + opts + '</select>';
+        } else {
+            typeCell = '<input type="text" class="form-control form-control-sm payable-leave-type"' +
+                ' value="" placeholder="Leave / credit name">';
+        }
         var $tr = $('<tr>' +
-            '<td><input type="text" class="form-control form-control-sm payable-leave-type"' +
-                ' value="Manual Entry" placeholder="Leave / credit name"></td>' +
+            '<td>' + typeCell + '</td>' +
             '<td class="text-end"><input type="number" min="0" step="0.01"' +
                 ' class="form-control form-control-sm text-end payable-leave-days"' +
                 ' value="0.00"></td>' +
@@ -759,7 +779,22 @@
         '</tr>');
         $tr.data('encashable', true);
         $('#payable-leaves tbody').append($tr);
-        $tr.find('.payable-leave-days').trigger('focus').select();
+        $tr.find('.payable-leave-type').trigger('focus');
+        recalcPayableLeaves();
+    });
+
+    // Handle the "Other…" dropdown choice — swap the <select> for a
+    // free-text input so HR can type a custom name. recalcPayableLeaves
+    // re-reads the type for the one-line breakdown summary.
+    $(document).on('change', '#payable-leaves tbody select.payable-leave-type', function () {
+        if ($(this).val() !== '__other__') {
+            recalcPayableLeaves();
+            return;
+        }
+        var $input = $('<input type="text" class="form-control form-control-sm payable-leave-type"' +
+            ' value="" placeholder="Leave / credit name">');
+        $(this).replaceWith($input);
+        $input.trigger('focus');
         recalcPayableLeaves();
     });
 
@@ -948,10 +983,19 @@
                     // server-derived fallback so the Reset button can rebuild
                     // the table exactly as it first arrived, discarding HR
                     // edits and any manually-added rows.
+                    // Eligible leave types — drives the dropdown on manually
+                    // added rows. PHP can deliver an associative array that
+                    // jQuery treats as an object, so normalise to a plain
+                    // string[] for the renderer.
+                    var eligibleTypes = response.data.eligible_leave_types || [];
+                    if (!Array.isArray(eligibleTypes) && typeof eligibleTypes === 'object') {
+                        eligibleTypes = Object.values(eligibleTypes);
+                    }
                     $('#payable-leaves')
                         .data('daily-rate', dailyRate)
                         .data('original-breakdown', JSON.parse(JSON.stringify(breakdown)))
-                        .data('original-total-days', totalLeaveDaysFromService);
+                        .data('original-total-days', totalLeaveDaysFromService)
+                        .data('eligible-leave-types', eligibleTypes);
                     $('#reset-payable-leaves').prop('disabled', false);
 
                     if (breakdown.length) {
