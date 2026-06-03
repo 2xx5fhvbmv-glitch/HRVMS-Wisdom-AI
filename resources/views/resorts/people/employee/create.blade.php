@@ -821,12 +821,12 @@
                                         </div>
                                     </div>
                                     <div class="col-lg-2 col-sm-6">
-                                        <label for="entitle_switch" class="form-label">ENTITLE FOR SERVICE CHARGE</label>
+                                        <label for="entitle_service_charge" class="form-label">ENTITLE FOR SERVICE CHARGE</label>
                                         <div>
                                             <div class="form-check form-switch form-switchTheme switch-blue">
                                                 <input class="form-check-input" type="checkbox" role="switch"
-                                                    id="entitle_switch" name="entitle_switch">
-                                                <label class="form-check-label" for="entitle_switch">Yes</label>
+                                                    id="entitle_service_charge" name="entitle_service_charge">
+                                                <label class="form-check-label" for="entitle_service_charge">Yes</label>
                                             </div>
                                         </div>
                                     </div>
@@ -841,16 +841,16 @@
                                         </div>
                                     </div>
                                     <div class="col-lg-2 col-sm-6">
-                                        <label for="entitle_public_holiday_overtime" class="form-label">ENTITLE FOR PUBLIC
+                                        <label for="entitle_public_holiday" class="form-label">ENTITLE FOR PUBLIC
                                             HOLIDAY
                                             OVERTIME</label>
                                         <div>
                                             <div class="form-check form-switch form-switchTheme switch-blue">
                                                 <input class="form-check-input" type="checkbox" role="switch"
-                                                    id="entitle_public_holiday_overtime"
-                                                    name="entitle_public_holiday_overtime">
+                                                    id="entitle_public_holiday"
+                                                    name="entitle_public_holiday">
                                                 <label class="form-check-label"
-                                                    for="entitle_public_holiday_overtime">Yes</label>
+                                                    for="entitle_public_holiday">Yes</label>
                                             </div>
                                         </div>
                                     </div>
@@ -1677,8 +1677,8 @@
                                 res.emp_grade_name
                             );
                             $('#position_rank').val(res.position_rank || '');
-                            $('#entitle_switch').prop('checked', res.service === 'yes');
-                            $('#entitle_public_holiday_overtime').prop('checked', res.holiday_overtime === 'yes');
+                            $('#entitle_service_charge').prop('checked', res.service === 'yes');
+                            $('#entitle_public_holiday').prop('checked', res.holiday_overtime === 'yes');
                             $('#entitle_overtime').prop('checked', res.overtime === 'yes');
                         }
                     });
@@ -3113,8 +3113,8 @@
                     data: { benefit_grid_level: grade },
                     success: function (res) {
                         if (!res || !res.success) return;
-                        $('#entitle_switch').prop('checked', res.service === 'yes');
-                        $('#entitle_public_holiday_overtime').prop('checked', res.holiday_overtime === 'yes');
+                        $('#entitle_service_charge').prop('checked', res.service === 'yes');
+                        $('#entitle_public_holiday').prop('checked', res.holiday_overtime === 'yes');
                         $('#entitle_overtime').prop('checked', res.overtime === 'yes');
                     }
                 });
@@ -3136,8 +3136,8 @@
                         let html = '<option></option>';
                         html +=
                             `<option value="${res.benfitGrid_emp_id}" selected>${res.emp_grade_name}</option>`;
-                        $('#entitle_switch').prop('checked', res.service === 'yes');
-                        $('#entitle_public_holiday_overtime').prop('checked', res
+                        $('#entitle_service_charge').prop('checked', res.service === 'yes');
+                        $('#entitle_public_holiday').prop('checked', res
                             .holiday_overtime === 'yes');
                         $('#entitle_overtime').prop('checked', res.overtime === 'yes');
                         $('#position_rank').val(res.position_rank);
