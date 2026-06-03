@@ -403,6 +403,14 @@ class FinalSettlementService
             ->where('rbg.emp_grade', $emp_grade)
             ->where('rbgc.rank', $employee->rank)
             ->where('lc.resort_id', $resortId)
+            // Honour leave_categories.eligibility (CSV of ranks allowed for
+            // that leave type). The T&A leave-balance card already uses this
+            // filter; without it, a LINE WORKERS employee sees R&R Leave in
+            // the F&F breakdown even though only HOD/EXCOM/GM are eligible
+            // (reported on resort 26 / DR-24: rank 6 picked up R&R because
+            // its eligibility CSV is "8,1,2"). Matches the lookup in
+            // Leave\ConfigController::getLeaveCategoriesByGrade.
+            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$employee->rank])
             ->select(
                 'lc.id as leave_category_id',
                 'lc.leave_type',
@@ -530,46 +538,63 @@ class FinalSettlementService
             $finalAvailable = round(max(0, $available - $usedDays), 2);
 
             // ─── Encashment-eligibility policy ───────────────────────
-            // Only ANNUAL LEAVE is encashed at settlement, and only
-            // once the employee has completed 1 full year of service.
-            // Event-based leaves (Maternity / Paternity / Birthday /
-            // Emergency / Circumcision / R&R) carry no encashment
-            // value — they only exist if the underlying event happens.
-            // Sick Leave is excluded too at this resort's policy; flip
-            // the rule per-resort by extending the matcher below.
+            // Resort policy (per HR): only ANNUAL LEAVE is shown in the
+            // F&F breakdown. Event-based leaves (Maternity / Paternity /
+            // Birthday / Emergency / Circumcision / R&R / Sick) are not
+            // settled at exit, so they used to clutter the table as
+            // "Not encashable" rows. Filter them out entirely.
             //
-            // Tenure rule: annual leave vests at the 12-month mark.
-            // Anyone with less than 12 months tenure gets 0 encashable
-            // leave even though the per-category breakdown still
-            // surfaces the prorated number for transparency.
+            // 2.5 days/month accrual: 30 days/year ÷ 12 = 2.5 days/month.
+            // The tenure-prorated $finalAvailable above is exactly that —
+            // an employee with 1.8 months served gets 30 × 1.8/12 ≈ 4.50
+            // days encashable, NOT zero. The previous 1-year vesting gate
+            // has been removed per HR policy: leave vests pro-rata from
+            // day 1, no minimum tenure required.
             $isAnnualLeave = (stripos((string) $grid->leave_type, 'annual') !== false);
+            if (!$isAnnualLeave) {
+                continue;
+            }
 
-            $totalEmploymentMonths = $joiningDate
-                ? max(0.0, $joiningDate->floatDiffInMonths($now))
-                : 0.0;
-            $oneYearServed = $totalEmploymentMonths >= 12;
-
-            $encashable    = $isAnnualLeave && $oneYearServed;
-            $encashableDays = $encashable ? $finalAvailable : 0;
+            $encashableDays = $finalAvailable;
 
             $leaveBalances[] = [
                 'leave_category_id'    => $grid->leave_category_id,
                 'leave_type'           => $grid->leave_type,
                 'available_days'       => $finalAvailable,
                 'encashable_days'      => $encashableDays,
-                'is_encashable'        => $encashable,
-                'not_encashable_reason'=> $encashable
-                    ? null
-                    : ($isAnnualLeave
-                        ? 'Annual leave vests after 1 year of service ('
-                            . number_format($totalEmploymentMonths, 1) . ' months served)'
-                        : 'Event-based — no encashment value'),
+                'is_encashable'        => true,
+                'not_encashable_reason'=> null,
             ];
 
-            // Only ENCASHABLE days flow into total_days, which drives
-            // the LEAVE ENCASHMENT input + the headline on the F&F.
             $totalLeaveDays += $encashableDays;
         }
+
+        // Public Holiday + Day Off rows. These live in attendance, not
+        // leave_categories — and there's no automatic tracker for
+        // "worked-on-PH" or "unused day-off credits" on this resort. Per
+        // HR direction these are entered manually at settlement time, so
+        // the rows render with editable Days inputs on the F&F page and
+        // recompute totals client-side. `editable: true` is the marker
+        // the blade's render loop reads to swap the static cell for an
+        // <input>; the initial 0 is a placeholder HR overwrites.
+        $leaveBalances[] = [
+            'leave_category_id'     => null,
+            'leave_type'            => 'Public Holiday',
+            'available_days'        => 0,
+            'encashable_days'       => 0,
+            'is_encashable'         => true,
+            'not_encashable_reason' => null,
+            'editable'              => true,
+        ];
+        $leaveBalances[] = [
+            'leave_category_id'     => null,
+            'leave_type'            => 'Day Off',
+            'available_days'        => 0,
+            'encashable_days'       => 0,
+            'is_encashable'         => true,
+            'not_encashable_reason' => null,
+            'editable'              => true,
+        ];
 
         // Final precision pass at the boundary so callers see clean
         // 2-decimal values regardless of FP accumulation upstream.

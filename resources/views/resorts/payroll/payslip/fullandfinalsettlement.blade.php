@@ -92,7 +92,21 @@
                                             placeholder="Basic salary" data-parsley-required="true" readonly>
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="earned_salary" class="form-label">Earned Salary (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
+                                        <label for="earned_salary" class="form-label d-flex align-items-center">
+                                            <span>Earned Salary (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></span>
+                                            {{-- Manual override toggle. Earned Salary is normally
+                                                 derived from attendance (worked × daily rate); HR
+                                                 can flip this to enter a manual figure when
+                                                 attendance is incomplete. Edit ON: pencil → check
+                                                 icon, input becomes editable, Gross Earning recomputes
+                                                 on blur. Edit OFF: restores the attendance-derived
+                                                 value and re-locks the field. --}}
+                                            <a href="javascript:void(0)" id="earned_salary_edit_toggle"
+                                               class="ms-2 text-themeSkyblue" title="Edit Earned Salary manually"
+                                               style="font-size:12px;">
+                                                <i class="fa-solid fa-pencil"></i>
+                                            </a>
+                                        </label>
                                         <input type="text" id="earned_salary" class="form-control money-field" name="earned_salary"
                                             placeholder="Earned salary" data-parsley-required="true" readonly>
                                         {{-- Attendance-based earning breakdown — populated by
@@ -207,20 +221,29 @@
                              Balance input; the Amount column totals to the LEAVE
                              ENCASHMENT input. Populated by JS in getEmpDetails(). --}}
                         <div class="fullFinal-main mb-md-4 mb-3">
-                            <div class="fullFinal-head">
-                                Leave Balance &amp; Encashment Breakdown
-                                <small class="text-muted ms-2" style="font-size:12px; font-weight:400;">
+                            <div class="fullFinal-head d-flex align-items-center">
+                                <span>Leave Balance &amp; Encashment Breakdown</span>
+                                <small class="text-muted ms-2 flex-grow-1" style="font-size:12px; font-weight:400;">
                                     Days column → Leave Balance · Amount column → Leave Encashment
                                 </small>
+                                {{-- Add-row button: appends a manual entry to the table so HR can
+                                     record settlement items that aren't in the leave grid (extra
+                                     PH credits, day-off carry, ad-hoc adjustments). The row's
+                                     Days field is editable and rolls into the totals. --}}
+                                <button type="button" class="btn btn-sm btn-themeSkyblue ms-2"
+                                        id="add-payable-leave-row">
+                                    <i class="fa-solid fa-plus me-1"></i>Add row
+                                </button>
                             </div>
                             <div class="card-body fullFinal-block">
                                 <table class="table" id="payable-leaves">
                                     <thead>
                                         <tr>
                                             <th>Leave Type</th>
-                                            <th class="text-end">Days</th>
+                                            <th class="text-end" style="width:120px;">Days</th>
                                             <th class="text-end">Daily Rate</th>
                                             <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
+                                            <th style="width:40px;"></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -232,6 +255,7 @@
                                             <th class="text-end" id="payable-leaves-days-total">0.00</th>
                                             <th class="text-end">—</th>
                                             <th class="text-end" id="payable-leaves-amount-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                            <th></th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -463,6 +487,202 @@
     const FNF_DISPLAY_CURRENCY = '{{ $displayCurrencyCode ?? "MVR" }}';
     const FNF_DOLLAR_TO_MVR    = {{ $dollarToMvr ?? 15.42 }};
 
+    // ────────────────────────────────────────────────────────────────
+    // recalcPayableLeaves()
+    // Sums the editable Days inputs in the Leave Breakdown table, rewrites
+    // each row's Amount cell + the table totals, and pushes the result
+    // into the headline #leave_balance / #leave_encashment inputs (which
+    // are what the form actually posts). Then recomputeGrossEarning()
+    // so the Settlement Breakdown stays consistent with the leave edits.
+    // ────────────────────────────────────────────────────────────────
+    function recalcPayableLeaves() {
+        var dailyRate = parseFloat($('#payable-leaves').data('daily-rate') || 0);
+        var daysTotal = 0;
+        var amountTotalMvr = 0;
+        $('#payable-leaves tbody tr').each(function () {
+            var $row  = $(this);
+            var days  = parseFloat($row.find('.payable-leave-days').val() || 0);
+            if (!isFinite(days) || days < 0) days = 0;
+            var amtMvr = days * dailyRate;
+            $row.find('.payable-leave-amount').text(
+                formatMoney(mvrToDisplay(amtMvr))
+            );
+            // Only encashable rows hit the totals — non-encashable rows
+            // (if any sneak in) still render but contribute zero.
+            if ($row.data('encashable') !== false) {
+                daysTotal      += days;
+                amountTotalMvr += amtMvr;
+            }
+        });
+        $('#payable-leaves-days-total').text(daysTotal.toFixed(2));
+        $('#payable-leaves-amount-total')
+            .text(formatMoney(mvrToDisplay(amountTotalMvr), FNF_DISPLAY_CURRENCY))
+            .data('raw-mvr', amountTotalMvr);
+
+        // Headline inputs the form actually submits. #leave_balance is the
+        // total days; #leave_encashment is the amount in the currently-
+        // displayed currency (because the input is shown next to a USD/MVR
+        // label and the user sees that). Use setFieldValueAndResetValidation
+        // when it's available so Parsley re-validates without flashing
+        // "invalid" mid-edit.
+        var displayAmt = mvrToDisplay(amountTotalMvr);
+        if (typeof setFieldValueAndResetValidation === 'function') {
+            setFieldValueAndResetValidation('#leave_balance', daysTotal.toFixed(2));
+            setFieldValueAndResetValidation('#leave_encashment', displayAmt);
+        } else {
+            $('#leave_balance').val(daysTotal.toFixed(2)).trigger('change');
+            $('#leave_encashment').val(displayAmt).trigger('change');
+        }
+
+        // The compact one-liner under the Leave Balance input must reflect
+        // the LIVE rows (server breakdown + HR edits + added rows), not the
+        // frozen response payload.
+        var $leaveBreak = $('#leave-breakdown');
+        var parts = [];
+        $('#payable-leaves tbody tr').each(function () {
+            var $r = $(this);
+            var typeCell = $r.find('.payable-leave-type');
+            var type = typeCell.length ? typeCell.val() : $r.find('td').first().text().replace(/Encashable/, '').trim();
+            var d = parseFloat($r.find('.payable-leave-days').val() || 0).toFixed(2);
+            parts.push((type || 'Leave') + ': ' + d + 'd');
+        });
+        $leaveBreak.html(parts.length
+            ? '<i class="fa-solid fa-list-ul me-1"></i>' + parts.join(' · ')
+            : '');
+
+        // Encashment formula text under the LEAVE ENCASHMENT input — same
+        // numbers, refreshed.
+        $('#leave-encashment-formula').html(
+            '<i class="fa-solid fa-calculator me-1"></i>' +
+            daysTotal.toFixed(2) + ' days × ' + formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day' +
+            ' = ' + formatMoney(displayAmt) + ' ' + FNF_DISPLAY_CURRENCY
+        );
+
+        recomputeGrossEarning();
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // recomputeGrossEarning()
+    // Rebuilds the Settlement Breakdown table from base components stashed
+    // on #settlement-details + the LIVE leave encashment amount. Triggered
+    // by recalcPayableLeaves and by anything else that moves one of the
+    // contributing values (Earned Salary manual override, allowance edits).
+    // ────────────────────────────────────────────────────────────────
+    function recomputeGrossEarning() {
+        var $sd = $('#settlement-details');
+        if (!$sd.length || $sd.data('base-earned') === undefined) return;
+        var dailyRate     = parseFloat($sd.data('base-daily-rate') || 0);
+        var workedDays    = $sd.data('base-earned-days') || 0;
+        var earnedMvr     = parseFloat($sd.data('base-earned') || 0);
+        var allowancesMvr = parseFloat($sd.data('base-allowances') || 0);
+        var serviceMvr    = parseFloat($sd.data('base-service-charge') || 0);
+        // Leave encashment — read from the live table total, NOT the
+        // server response (which is stale once HR has edited a row).
+        var leaveMvr      = parseFloat($('#payable-leaves-amount-total').data('raw-mvr') || 0);
+
+        var rows = [
+            { label: 'Earned Salary <small class="text-muted">(' + workedDays + ' paid day(s) × ' +
+                formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day)</small>',
+              value: earnedMvr },
+            { label: 'Total Allowances',  value: allowancesMvr },
+            { label: 'Service Charge',    value: serviceMvr },
+            { label: 'Leave Encashment',  value: leaveMvr },
+        ];
+
+        var $body = $('#settlement-details-body').empty();
+        var total = 0;
+        rows.forEach(function (r) {
+            total += r.value;
+            $body.append(
+                '<tr><td>' + r.label + '</td>' +
+                '<td class="text-end">' + formatMoney(mvrToDisplay(r.value)) + '</td></tr>'
+            );
+        });
+        $('#settlement-details-total').text(
+            formatMoney(mvrToDisplay(total), FNF_DISPLAY_CURRENCY)
+        );
+    }
+
+    // Delegated event wiring — bound once at DOM ready so renders inside
+    // getEmpDetails() don't stack handlers. Three events cover the table:
+    //   • Days input change → recalc totals + Gross Earning
+    //   • Trash icon → remove a manually-added row + recalc
+    //   • Add row button → append a fresh editable row
+    $(document).on('input change', '#payable-leaves tbody .payable-leave-days', function () {
+        recalcPayableLeaves();
+    });
+    $(document).on('click', '#payable-leaves tbody .payable-leave-remove', function () {
+        $(this).closest('tr').remove();
+        recalcPayableLeaves();
+    });
+    // Earned Salary manual override. Pencil → check, input toggles
+    // readonly, and any HR-entered value rolls into Gross Earning via
+    // recomputeGrossEarning() (which re-reads the base-earned data-attr).
+    // On lock-back, the auto-derived value is restored.
+    $(document).on('click', '#earned_salary_edit_toggle', function () {
+        var $input = $('#earned_salary');
+        var $icon  = $(this).find('i');
+        var nowEditing = !($input.prop('readonly') === false);
+        if (nowEditing) {
+            // Stash the auto-derived display value before HR overwrites
+            // so the lock-back restore is reliable.
+            $input.data('auto-display', $input.val());
+            $input.prop('readonly', false).focus();
+            $icon.removeClass('fa-pencil').addClass('fa-circle-check');
+            $(this).attr('title', 'Lock Earned Salary back to attendance-derived value');
+        } else {
+            $input.prop('readonly', true);
+            var auto = $input.data('auto-display');
+            if (typeof auto !== 'undefined') $input.val(auto);
+            $icon.removeClass('fa-circle-check').addClass('fa-pencil');
+            $(this).attr('title', 'Edit Earned Salary manually');
+            // Reset base-earned back to the attendance-derived MVR so
+            // Gross Earning matches the auto value again.
+            var $sd = $('#settlement-details');
+            var savedMvr = $sd.data('auto-earned-mvr');
+            if (typeof savedMvr !== 'undefined') {
+                $sd.data('base-earned', savedMvr);
+                recomputeGrossEarning();
+            }
+        }
+    });
+    $(document).on('input change blur', '#earned_salary', function () {
+        // Only react when the field is in manual mode — the auto-flow
+        // updates the input via setFieldValueAndResetValidation and would
+        // otherwise loop into recomputeGrossEarning unnecessarily.
+        if ($(this).prop('readonly')) return;
+        var display = stripMoney($(this).val());
+        // Convert back to MVR for the stash + Gross Earning calc (the
+        // base-earned data-attr is always MVR; recomputeGrossEarning
+        // mvrToDisplay()-s it for rendering).
+        var mvr = FNF_DISPLAY_CURRENCY === 'USD' && FNF_DOLLAR_TO_MVR > 0
+            ? display * FNF_DOLLAR_TO_MVR
+            : display;
+        $('#settlement-details').data('base-earned', mvr);
+        recomputeGrossEarning();
+    });
+
+    $(document).on('click', '#add-payable-leave-row', function () {
+        var dailyRate = parseFloat($('#payable-leaves').data('daily-rate') || 0);
+        var $tr = $('<tr>' +
+            '<td><input type="text" class="form-control form-control-sm payable-leave-type"' +
+                ' value="Manual Entry" placeholder="Leave / credit name"></td>' +
+            '<td class="text-end"><input type="number" min="0" step="0.01"' +
+                ' class="form-control form-control-sm text-end payable-leave-days"' +
+                ' value="0.00"></td>' +
+            '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
+            '<td class="text-end payable-leave-amount">' + formatMoney(0) + '</td>' +
+            '<td class="text-end">' +
+                '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                ' title="Remove row"><i class="fa-solid fa-trash"></i></button>' +
+            '</td>' +
+        '</tr>');
+        $tr.data('encashable', true);
+        $('#payable-leaves tbody').append($tr);
+        $tr.find('.payable-leave-days').trigger('focus').select();
+        recalcPayableLeaves();
+    });
+
     function mvrToDisplay(mvrValue) {
         var n = parseFloat(mvrValue);
         if (!isFinite(n)) return 0;
@@ -640,69 +860,77 @@
                         breakdown = Object.values(breakdown);
                     }
                     var $leaveTbody = $('#payable-leaves tbody').empty();
-                    var leaveDaysTotal = 0;
-                    var leaveAmountTotal = 0;
                     var totalLeaveDaysFromService = parseFloat(response.data.leave_balance || 0);
+
+                    // Stash dailyRate where the row renderer + add-row handler
+                    // can both read it without re-parsing the DOM each time.
+                    $('#payable-leaves').data('daily-rate', dailyRate);
+
+                    // Single render path for one row (server-supplied OR HR-added).
+                    // Both get an editable Days input — HR can override the
+                    // server number any time, and added rows start at 0d.
+                    // Custom-added rows are removable via the trash button;
+                    // server rows aren't (delete from the leave grid for that).
+                    function renderPayableLeaveRow(row, opts) {
+                        opts = opts || {};
+                        var encashable = (row.is_encashable !== false);
+                        var custom     = !!opts.custom;
+                        var days       = parseFloat(row.available_days || 0);
+                        var typeCell;
+                        if (custom) {
+                            // Custom row → typeable name input. Defaults to
+                            // "Manual Entry" if HR clears it.
+                            typeCell = '<input type="text" class="form-control form-control-sm payable-leave-type"' +
+                                ' value="' + $('<i>').text(row.leave_type || '').html() + '"' +
+                                ' placeholder="Leave / credit name">';
+                        } else {
+                            typeCell = (row.leave_type || 'Leave') +
+                                ' <span class="badge bg-success-subtle text-success ms-1"' +
+                                ' style="font-size:10px;">Encashable</span>';
+                        }
+                        var $tr = $('<tr>' +
+                            '<td>' + typeCell + '</td>' +
+                            '<td class="text-end">' +
+                                '<input type="number" min="0" step="0.01"' +
+                                ' class="form-control form-control-sm text-end payable-leave-days"' +
+                                ' value="' + days.toFixed(2) + '">' +
+                            '</td>' +
+                            '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
+                            '<td class="text-end payable-leave-amount">' +
+                                formatMoney(mvrToDisplay(days * dailyRate)) +
+                            '</td>' +
+                            '<td class="text-end">' +
+                                (custom
+                                    ? '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                                      ' title="Remove row"><i class="fa-solid fa-trash"></i></button>'
+                                    : '') +
+                            '</td>' +
+                        '</tr>');
+                        $tr.data('encashable', encashable);
+                        $leaveTbody.append($tr);
+                    }
 
                     if (breakdown.length) {
                         breakdown.forEach(function (row) {
-                            var days        = parseFloat(row.available_days || 0);
-                            var amount      = days * dailyRate;
-                            var encashable  = !!row.is_encashable;
-                            var encashDays  = parseFloat(row.encashable_days || 0);
-                            var encashAmt   = encashDays * dailyRate;
-                            leaveDaysTotal   += encashDays;       // only ENCASHABLE
-                            leaveAmountTotal += encashAmt;        // hits the totals
-                            // Non-encashable rows render in muted text + show
-                            // the reason in the Amount cell so HR can see
-                            // why they're not being paid out.
-                            $leaveTbody.append(
-                                '<tr class="' + (encashable ? '' : 'text-muted') + '">' +
-                                    '<td>' + (row.leave_type || 'Leave') +
-                                        (encashable
-                                            ? ' <span class="badge bg-success-subtle text-success ms-1" style="font-size:10px;">Encashable</span>'
-                                            : ' <span class="badge bg-secondary-subtle text-secondary ms-1" style="font-size:10px;" title="' +
-                                              (row.not_encashable_reason || '') + '">Not encashable</span>') +
-                                    '</td>' +
-                                    '<td class="text-end">' + days.toFixed(2) + '</td>' +
-                                    '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
-                                    '<td class="text-end">' + (encashable
-                                        ? formatMoney(mvrToDisplay(amount))
-                                        : '<small class="fst-italic">' + (row.not_encashable_reason || 'Not encashable') + '</small>') +
-                                    '</td>' +
-                                '</tr>'
-                            );
+                            renderPayableLeaveRow(row);
                         });
                     } else if (totalLeaveDaysFromService > 0) {
                         // Service produced a leave-balance total but the
                         // per-category breakdown is missing (data
                         // anomaly: no benefit-grid match for this
                         // employee's rank/grade, or the breakdown was
-                        // dropped server-side). Surface a single fallback
-                        // row so the table can't disagree with the Leave
-                        // Balance / Leave Encashment inputs above.
-                        leaveDaysTotal = totalLeaveDaysFromService;
-                        leaveAmountTotal = totalLeaveDaysFromService * dailyRate;
-                        $leaveTbody.append(
-                            '<tr class="text-muted"><td>Total Leave Balance ' +
-                                '<small>(no per-category breakdown — check benefit grid for this rank)</small>' +
-                                '</td>' +
-                                '<td class="text-end">' + totalLeaveDaysFromService.toFixed(2) + '</td>' +
-                                '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
-                                '<td class="text-end">' + formatMoney(mvrToDisplay(leaveAmountTotal)) + '</td>' +
-                            '</tr>'
-                        );
-                    } else {
-                        // Truly empty — show empty-state row so the
-                        // table isn't a blank box.
-                        $leaveTbody.append(
-                            '<tr><td colspan="4" class="text-center text-muted">' +
-                                'No leave entitlements found for this employee.' +
-                            '</td></tr>'
-                        );
+                        // dropped server-side). Surface a single editable
+                        // fallback row so the table can't disagree with
+                        // the Leave Balance / Leave Encashment inputs above.
+                        renderPayableLeaveRow({
+                            leave_type: 'Total Leave Balance',
+                            available_days: totalLeaveDaysFromService,
+                            is_encashable: true,
+                        });
                     }
-                    $('#payable-leaves-days-total').text(leaveDaysTotal.toFixed(2));
-                    $('#payable-leaves-amount-total').text(formatMoney(mvrToDisplay(leaveAmountTotal), FNF_DISPLAY_CURRENCY));
+                    // Always recompute totals + push to the headline inputs
+                    // (handles the empty-but-add-row case too).
+                    recalcPayableLeaves();
 
                     // ─── Settlement Details (Earning breakdown) table ───
                     // Rebuild from the same numbers populating the input
@@ -716,69 +944,37 @@
                     //   + service_charge
                     //   + leave_encashment (F&F-only — payroll doesn't carry it)
                     //   = Gross Earning
-                    var sdRows = [
-                        {
-                            label: 'Earned Salary <small class="text-muted">(' + (workedDays || 0) + ' paid day(s) × ' +
-                                formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day)</small>',
-                            value: proratedBase
-                        },
-                        {
-                            label: 'Total Allowances',
-                            value: parseFloat(response.data.total_allowances_mvr || 0)
-                        },
-                        {
-                            label: 'Service Charge',
-                            value: parseFloat($('#service_charge').attr('data-raw') || 0)
-                        },
-                        {
-                            label: 'Leave Encashment',
-                            value: parseFloat(response.data.leave_encashment || 0)
-                        },
-                    ];
-                    var sdTotal = 0;
-                    sdRows.forEach(function (r) {
-                        sdTotal += r.value;
-                        $sdBody.append(
-                            '<tr>' +
-                                '<td>' + r.label + '</td>' +
-                                '<td class="text-end">' +
-                                    formatMoney(mvrToDisplay(r.value)) +
-                                '</td>' +
-                            '</tr>'
-                        );
-                    });
-                    $('#settlement-details-total').text(
-                        formatMoney(mvrToDisplay(sdTotal), FNF_DISPLAY_CURRENCY)
-                    );
+                    // Stash the non-leave components on the Settlement Details
+                    // wrapper so recomputeGrossEarning() can rebuild the table
+                    // every time HR edits a row in the Leave Breakdown.
+                    // Earned Salary / Allowances / Service Charge come from
+                    // the employee fetch and don't move; Leave Encashment is
+                    // the only live input.
+                    var $sd = $('#settlement-details');
+                    $sd.data('base-earned',           proratedBase);
+                    // `auto-earned-mvr` is the lock-back restore value for
+                    // the Earned Salary manual-override toggle. base-earned
+                    // can be overwritten by the manual edit handler; this
+                    // copy stays put so the icon's "back to attendance"
+                    // flip can refill the input + Gross Earning row.
+                    $sd.data('auto-earned-mvr',       proratedBase);
+                    $sd.data('base-earned-days',      workedDays || 0);
+                    $sd.data('base-daily-rate',       dailyRate);
+                    $sd.data('base-allowances',       parseFloat(response.data.total_allowances_mvr || 0));
+                    $sd.data('base-service-charge',   parseFloat($('#service_charge').attr('data-raw') || 0));
+                    // Clear any leftover manual-edit state from a previous
+                    // employee selection so the pencil icon shows again.
+                    var $earnedInput = $('#earned_salary').prop('readonly', true);
+                    $earnedInput.removeData('auto-display');
+                    $('#earned_salary_edit_toggle i').removeClass('fa-circle-check').addClass('fa-pencil');
+                    recomputeGrossEarning();
 
-                    // Compact one-liner under the Leave Balance input
-                    // (kept for the at-a-glance read). Hides when there
-                    // are no rows; the table below already shows the
-                    // empty-state message.
-                    var $leaveBreak = $('#leave-breakdown');
-                    if (breakdown.length) {
-                        var parts = breakdown.map(function (row) {
-                            var days = parseFloat(row.available_days || 0).toFixed(2);
-                            return (row.leave_type || 'Leave') + ': ' + days + 'd';
-                        });
-                        $leaveBreak.html('<i class="fa-solid fa-list-ul me-1"></i>' + parts.join(' · '));
-                    } else {
-                        $leaveBreak.text('');
-                    }
-
-                    // ─── Leave Encashment formula explainer ───
-                    // Formula: total unused leave days × daily salary,
-                    // where daily salary = basic_salary_mvr / payroll
-                    // cycle days. Spelled out concretely with the actual
-                    // numbers so HR doesn't have to reverse-engineer it.
-                    var $encFormula = $('#leave-encashment-formula');
-                    var leaveDays = parseFloat(response.data.leave_balance || 0);
-                    var enc       = parseFloat(response.data.leave_encashment || 0);
-                    $encFormula.html(
-                        '<i class="fa-solid fa-calculator me-1"></i>' +
-                        leaveDays.toFixed(2) + ' days × ' + formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day' +
-                        ' = ' + formatMoney(mvrToDisplay(enc)) + ' ' + FNF_DISPLAY_CURRENCY
-                    );
+                    // The compact #leave-breakdown one-liner and the
+                    // #leave-encashment-formula text are now both maintained
+                    // by recalcPayableLeaves(), called above when the table
+                    // renders. Keeping them here would clobber HR edits with
+                    // the frozen server payload, since the dup-update runs
+                    // after the recalc.
 
                     // EWT / TIN compliance warning. Shows when taxable
                     // income is at/above the MIRA EWT threshold but the
