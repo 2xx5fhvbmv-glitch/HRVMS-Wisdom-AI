@@ -421,6 +421,10 @@
                         // of "Minus two hundred eighteen point sixty-seven".
                         // Work with absolute value, then re-attach the sign.
                         if (!function_exists('convertToWords')) {
+                            // "39.60" → "Thirty-nine and sixty cents"
+                            // (not the old "Thirty-nine point sixty" — HR
+                            // wants the conventional cheque-style
+                            // dollars-and-cents wording).
                             function convertToWords($number) {
                                 $formatter = new NumberFormatter('en', NumberFormatter::SPELLOUT);
                                 $sign = $number < 0 ? 'Minus ' : '';
@@ -429,7 +433,8 @@
                                 $fraction = (int) round(($abs - $whole) * 100);
                                 $wholeWords = ucfirst($formatter->format($whole));
                                 if ($fraction > 0) {
-                                    return $sign . $wholeWords . ' point ' . $formatter->format($fraction);
+                                    $unit = $fraction === 1 ? ' cent' : ' cents';
+                                    return $sign . $wholeWords . ' and ' . $formatter->format($fraction) . $unit;
                                 }
                                 return $sign . $wholeWords;
                             }
