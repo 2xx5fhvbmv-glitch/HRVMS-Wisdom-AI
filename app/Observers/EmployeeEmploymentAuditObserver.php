@@ -48,6 +48,31 @@ class EmployeeEmploymentAuditObserver
         'basic_salary'        => 'Basic Salary',
         'basic_salary_currency' => 'Basic Salary Currency',
         'employment_type'     => 'Employment Type',
+        // Salary Details tab — the four entitlement toggles + EWT + pension
+        // + payment mode all live on this Employee row, and the updateSalary
+        // endpoint saves them via Eloquent. Without these in TRACKED, the
+        // observer fired but had nothing to log — so HR's toggle flips were
+        // silent. (Reported symptom: "I turned Service Charge on but it
+        // doesn't show in the Employment Change Log.")
+        'entitled_service_charge'  => 'Entitle for Service Charge',
+        'entitled_overtime'        => 'Entitle for Overtime',
+        'entitled_public_holiday'  => 'Entitle for Public Holiday',
+        'ewt_status'               => 'EWT Status',
+        'ewt'                      => 'EWT',
+        'pension'                  => 'Pension',
+        'payment_mode'             => 'Payment Mode',
+    ];
+
+    /**
+     * Columns whose value is a yes/no flag. Rendered as title-case in the
+     * audit-log UI so the column doesn't read "yes → no" all lowercase.
+     */
+    private const YES_NO_FIELDS = [
+        'entitled_service_charge',
+        'entitled_overtime',
+        'entitled_public_holiday',
+        'ewt_status',
+        'ewt',
     ];
 
     public function updated(Employee $employee): void
@@ -96,6 +121,10 @@ class EmployeeEmploymentAuditObserver
     {
         if ($value === null || $value === '') {
             return null;
+        }
+        if (in_array($field, self::YES_NO_FIELDS, true)) {
+            // Stored as lowercase 'yes'/'no'; title-case for the UI.
+            return ucfirst(strtolower((string) $value));
         }
         switch ($field) {
             case 'Position_id':

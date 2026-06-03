@@ -46,8 +46,13 @@
                         <button onclick="printCard()" class="btn btn-themeBlue btn-sm">Print</button>
                     </div>
                 </div>
-                {{-- $remainingDays and $progress are computed in the controller
-                     (probation_end_date, or joining_date + 3 months). --}}
+                {{-- $totalDays, $remainingDays and $progress all come from
+                     the controller. $totalDays = full probation length in
+                     calendar days (joining_date → probation_end_date) so it
+                     reflects actual month lengths (Jun 30 + Jul 31 + Aug 31
+                     = 92, not a flat 3×30=90). The displayed metric is the
+                     stable total; the progress bar shows what % has elapsed
+                     and $remainingDays drives the "Days Left" sub-label. --}}
                 <div class="bg-themeGrayLight mb-md-4 mb-3">
                     <div class="row g-md-2 g-1 justify-content-between mb-md-3 mb-2">
                         <div class="col-auto">
@@ -55,7 +60,10 @@
                         </div>
                         <div class="col-auto">
                             <h6 class="fw-600">
-                                Days Remaining: {{$remainingDays}}
+                                Total Days: {{$totalDays}}
+                                <span class="text-muted fw-400 small ms-1">
+                                    ({{$remainingDays}} remaining)
+                                </span>
                             </h6>
                         </div>
                     </div>
