@@ -477,13 +477,26 @@ class FinalSettlementService
 
         // Accrual cycle = EMPLOYMENT YEAR, not calendar year.
         //   cycleStart = joining_date + N years where N = completed years
-        //   cycleEnd   = today (capped above to last working day)
+        //   cycleEnd   = min(today, last_working_day)
+        //
+        // Capping at last_working_day matters: without it, an employee who
+        // left on 21 May still picks up additional Annual / Day Off accrual
+        // every week the F&F page is opened in June or later (8 weeks
+        // instead of 6 reported on resort 26 / DR-24). Once they're gone,
+        // they're gone — no more entitlement ticks.
+        //
         // Mirrors the Day Off accrual model below so Annual Leave and Day
         // Off both reset on the joining anniversary. Removes the previous
         // calendar-year carry-forward block: per HR policy, the anniversary
         // is a hard reset — unused annual leave from the prior cycle does
         // NOT carry into the new one.
-        $now = Carbon::now();
+        $today = Carbon::now();
+        $resignationLastDay = $employee->resignation && $employee->resignation->last_working_day
+            ? Carbon::parse($employee->resignation->last_working_day)
+            : null;
+        $now = $resignationLastDay && $resignationLastDay->lessThan($today)
+            ? $resignationLastDay
+            : $today;
         $joiningDate = $employee->joining_date ? Carbon::parse($employee->joining_date) : null;
         $accrualStart = $joiningDate
             ? $joiningDate->copy()->addYears((int) floor($joiningDate->floatDiffInYears($now)))
@@ -672,31 +685,89 @@ class FinalSettlementService
             ->where('leave_type', 'Day Off')
             ->value('id');
 
+        // ─── Day Off = comp days owed (worked on a scheduled off day) ─
+        // Per HR semantics: an employee earns a Day Off credit when they
+        // were rostered OFF but actually came in (attendance = Present
+        // on the day the duty_rosters.DayOfDate weekday for that week's
+        // roster falls). At settlement those unused credits are paid out.
+        //
+        // The previous model (1 day-off accrued per week of service,
+        // minus attendance.Status='DayOff' days) inflated the count for
+        // every employee who didn't have full attendance history on file
+        // — 6 weeks of service with no DayOff rows = 6 "owed" even
+        // though the employee had been taking their scheduled offs all
+        // along. The roster-vs-attendance cross-reference is the
+        // semantically correct read, but it depends on duty_rosters being
+        // populated; without roster rows the count cleanly degrades to
+        // 0 and HR enters the figure manually.
+        $compDaysOwed = 0;
+        $compCandidateCount = 0;
         if ($joiningDate) {
             $completedYears = (int) floor($joiningDate->floatDiffInYears($now));
             $cycleStart = $joiningDate->copy()->addYears($completedYears);
-            // Carbon's addYears handles Feb 29 / month-end correctly, but
-            // a tiny clock-skew safety: never let cycleStart land in the
-            // future.
             if ($cycleStart->greaterThan($now)) {
                 $cycleStart = $joiningDate->copy()->addYears(max(0, $completedYears - 1));
             }
             $cycleStartStr = $cycleStart->format('Y-m-d');
             $cycleEndStr   = $now->format('Y-m-d');
 
-            $weeksInCycle = (int) floor($cycleStart->floatDiffInDays($now) / 7);
-            $dayOffAccrued = max(0, $weeksInCycle);
-
-            if (Schema::hasTable('parent_attendaces')) {
-                $dayOffUsed += (float) DB::table('parent_attendaces')
+            // 1. Pull every roster covering this employee. Each roster
+            //    row carries a ShiftDate range ("11/17/2025 - 11/23/2025")
+            //    and a DayOfDate weekday name ("Sat" = rostered off
+            //    Saturday for that week).
+            // 2. Materialise the calendar dates inside the cycle window
+            //    that match each roster's off-day weekday.
+            // 3. Cross-reference parent_attendaces: candidate dates where
+            //    Status='Present' are comp days owed.
+            $candidateDates = [];
+            if (Schema::hasTable('duty_rosters')) {
+                $rosters = DB::table('duty_rosters')
                     ->where('resort_id', $resortId)
                     ->where('Emp_id', $employee->id)
-                    ->where('Status', 'DayOff')
-                    ->whereBetween('date', [$cycleStartStr, $cycleEndStr])
+                    ->whereNotNull('DayOfDate')
+                    ->where('DayOfDate', '!=', '')
+                    ->get(['ShiftDate', 'DayOfDate']);
+                $weekdayMap = ['Sun'=>0,'Mon'=>1,'Tue'=>2,'Wed'=>3,'Thu'=>4,'Fri'=>5,'Sat'=>6];
+                foreach ($rosters as $r) {
+                    $dayName = ucfirst(strtolower(substr(trim((string) $r->DayOfDate), 0, 3)));
+                    if (!isset($weekdayMap[$dayName])) continue;
+                    $parts = explode(' - ', (string) $r->ShiftDate);
+                    if (count($parts) !== 2) continue;
+                    try {
+                        $start = Carbon::createFromFormat('m/d/Y', trim($parts[0]));
+                        $end   = Carbon::createFromFormat('m/d/Y', trim($parts[1]));
+                    } catch (\Throwable $e) { continue; }
+                    // Constrain to cycle window so we don't pick up
+                    // prior-cycle rosters.
+                    if ($end->lt($cycleStart) || $start->gt($now)) continue;
+                    $cursor = $start->copy();
+                    while ($cursor->lessThanOrEqualTo($end)) {
+                        if ($cursor->dayOfWeek === $weekdayMap[$dayName]
+                            && $cursor->greaterThanOrEqualTo($cycleStart)
+                            && $cursor->lessThanOrEqualTo($now)) {
+                            $candidateDates[$cursor->format('Y-m-d')] = true;
+                        }
+                        $cursor->addDay();
+                    }
+                }
+            }
+            $candidateDates = array_keys($candidateDates);
+            $compCandidateCount = count($candidateDates);
+
+            if ($compCandidateCount > 0 && Schema::hasTable('parent_attendaces')) {
+                $compDaysOwed = (int) DB::table('parent_attendaces')
+                    ->where('resort_id', $resortId)
+                    ->where('Emp_id', $employee->id)
+                    ->where('Status', 'Present')
+                    ->whereIn('date', $candidateDates)
                     ->count();
             }
+
+            // Subtract any approved Day Off comp leaves so a credit HR
+            // already paid out as a day-off-leave isn't double-counted.
+            $compDaysUsed = 0.0;
             if ($dayOffCategoryId) {
-                $dayOffUsed += (float) (DB::table('employees_leaves')
+                $compDaysUsed = (float) (DB::table('employees_leaves')
                     ->where('emp_id', $employee->emp_id)
                     ->where('leave_category_id', $dayOffCategoryId)
                     ->where('status', 'Approved')
@@ -707,7 +778,7 @@ class FinalSettlementService
                     ->sum('total_days') ?? 0);
             }
 
-            $dayOffNetDays = max(0.0, round($dayOffAccrued - $dayOffUsed, 2));
+            $dayOffNetDays = max(0.0, round($compDaysOwed - $compDaysUsed, 2));
         }
 
         $leaveBalances[] = [
@@ -718,10 +789,10 @@ class FinalSettlementService
             'is_encashable'         => true,
             'not_encashable_reason' => null,
             'editable'              => true,
-            // Same shape as PH: expose components so HR can see how
-            // (accrued − used = net) was built.
-            'day_off_accrued_days'  => $dayOffAccrued,
-            'day_off_used_days'     => round($dayOffUsed, 2),
+            // Component breakdown for HR transparency.
+            'day_off_worked_days'    => $compDaysOwed,
+            'day_off_used_days'      => round($compDaysUsed ?? 0, 2),
+            'day_off_candidate_days' => $compCandidateCount,
         ];
         $totalLeaveDays += $dayOffNetDays;
 
