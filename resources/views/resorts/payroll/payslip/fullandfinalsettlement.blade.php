@@ -1364,6 +1364,26 @@
         });
     }
 
+    // Keep .money-field `data-raw` in lock-step with the visible value
+    // for editable inputs. The submit handler reads `data-raw` to know
+    // what to POST — without this listener, anything HR types stays in
+    // the input but is dropped on submit because `data-raw` still
+    // holds the page-load value. Symptom reported: typing Service
+    // Charge = 300, submitting, review then shows 0.
+    //
+    // Bound via delegation so it covers fields that are added later
+    // (currently only the two top-of-form editable money inputs:
+    // #service_charge and #notice_period_charge — basic_salary,
+    // earned_salary, pension, tax, loan_payment, leave_encashment are
+    // readonly and rely on their initial setFieldValueAndResetValidation).
+    $(document).on('input change',
+        '#service_charge, #notice_period_charge',
+        function () {
+            var stripped = stripMoney($(this).val());
+            $(this).attr('data-raw', stripped === '' ? 0 : stripped);
+        }
+    );
+
     // Helper function to set value and reset validation
     function setFieldValueAndResetValidation(selector, value) {
         const field = $(selector);
