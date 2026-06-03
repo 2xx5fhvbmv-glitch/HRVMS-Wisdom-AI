@@ -303,8 +303,8 @@
                                     </tbody>
                                     <tfoot>
                                         <tr class="fw-bold">
-                                            <th>Net Settlement</th>
-                                            <th class="text-end" id="settlement-details-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                            <th class="fw-bold">Net Settlement</th>
+                                            <th class="text-end fw-bold" id="settlement-details-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -320,8 +320,7 @@
                                     <thead>
                                         <tr>
                                             <th>Allowance Name</th>
-                                            <th>Amount</th>
-                                            <th>Converted Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
+                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -329,8 +328,8 @@
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <th colspan="2" class="text-end">Total</th>
-                                            <th id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-end" id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -703,10 +702,16 @@
         });
         // Gross Earning subtotal (carries the same role the old footer
         // played; sits above the deduction rows so HR sees the
-        // pre-deduction figure clearly).
+        // pre-deduction figure clearly). Use <th> for both cells so the
+        // bold weight applies to the AMOUNT too — Bootstrap's
+        // `fw-bold table-light` on <tr> didn't always inherit through
+        // to the cell text on some themes (reported as "amount should
+        // be bold" by HR).
         $body.append(
-            '<tr class="fw-bold table-light"><td>Gross Earning</td>' +
-            '<td class="text-end">' + formatMoney(mvrToDisplay(grossMvr)) + '</td></tr>'
+            '<tr class="table-light fw-bold">' +
+                '<th class="fw-bold">Gross Earning</th>' +
+                '<th class="text-end fw-bold">' + formatMoney(mvrToDisplay(grossMvr)) + '</th>' +
+            '</tr>'
         );
 
         var deductionsMvr = 0;
@@ -720,8 +725,10 @@
             );
         });
         $body.append(
-            '<tr class="fw-bold table-light"><td>Total Deductions</td>' +
-            '<td class="text-end text-danger">− ' + formatMoney(mvrToDisplay(deductionsMvr)) + '</td></tr>'
+            '<tr class="table-light fw-bold">' +
+                '<th class="fw-bold">Total Deductions</th>' +
+                '<th class="text-end text-danger fw-bold">− ' + formatMoney(mvrToDisplay(deductionsMvr)) + '</th>' +
+            '</tr>'
         );
 
         var netMvr = grossMvr - deductionsMvr;
@@ -1258,11 +1265,15 @@
                     // raw `100` before, hiding whether it was USD/MVR.
                     let tbody = $("#allowance-details tbody");
                     tbody.empty();
+                    // Two columns now (Name + Amount in display currency).
+                    // The earlier "Converted Amount" column duplicated info
+                    // already in the Amount cell and added noise — HR only
+                    // needs to see the per-allowance value in the active
+                    // display currency.
                     allowanceData.forEach(a => {
                         tbody.append(`<tr>
                             <td>${a.name}</td>
-                            <td>${formatMoney(a.original_amount, a.unit)}</td>
-                            <td>${formatMoney(mvrToDisplay(a.converted_amount), FNF_DISPLAY_CURRENCY)}</td>
+                            <td class="text-end">${formatMoney(mvrToDisplay(a.converted_amount), FNF_DISPLAY_CURRENCY)}</td>
                         </tr>`);
                     });
                     $("#total-allowances").text(formatMoney(mvrToDisplay(totalAllowances), FNF_DISPLAY_CURRENCY));
