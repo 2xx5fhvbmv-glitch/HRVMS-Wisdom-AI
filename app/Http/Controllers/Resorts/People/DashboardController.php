@@ -68,16 +68,19 @@ class DashboardController extends Controller
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->count();
         // "Total New Hires" = employees joined in the last 90 days who are
-        // currently Active. Previously this counted anyone with
+        // in any live hire state. Previously this counted anyone with
         // probation_status IN ('Active','Extended') with no status or date
         // filter, which over-counted (inactive/terminated rows leak in, and
         // probation_status never expires on long-tenured records) — easy to
         // spot when New Hires > Total Active.
-        // $today is already a date string (see toDateString() above) — use
-        // a fresh Carbon for date arithmetic.
+        // Status whitelist (instead of "= Active") so that fresh hires still
+        // sitting in 'Onboarding' (waiting for HR to click Activate) or in
+        // 'Probationary' are counted. Excluding them caused the dashboard to
+        // skip newly-created employees until HR activated them — the exact
+        // "hired but still shows 9 not 10" symptom.
         $newHireSince = \Carbon\Carbon::today()->subDays(90)->toDateString();
         $total_new_hired = Employee::where('resort_id',$resort_id)
-            ->where('status','Active')
+            ->whereIn('status',['Active','Onboarding','Probationary'])
             ->whereNotNull('joining_date')
             ->whereDate('joining_date','>=',$newHireSince)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))

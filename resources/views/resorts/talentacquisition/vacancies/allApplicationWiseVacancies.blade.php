@@ -85,6 +85,7 @@
                                     <th>Department</th>
                                     <th>No. of position</th>
                                     <th>Applicant</th>
+                                    <th>Hired</th>
                                     <th>Application Date</th>
                                     <th>Expiry Date</th>
                                     <th>Action</th>
@@ -431,6 +432,7 @@ $(document).ready(function() {
                     { data: 'Department', name: 'Department', className: 'text-nowrap' },
                     {data:'NoOfVacnacy',name:'EmployeeType',className:'text-nowrap'},
                     { data: 'NoOfApplication', name: 'Question', className: 'text-nowrap' },
+                    { data: 'Hired', name: 'Hired', orderable: false, searchable: false, className: 'text-nowrap' },
                     { data: 'ApplicationDate', name: 'action', className: 'text-nowrap'},
                     { data: 'ExpiryDate', name: 'ReportingTo', className: 'text-nowrap'},
                     { data: 'action', name: 'action', orderable: false, searchable: false },
