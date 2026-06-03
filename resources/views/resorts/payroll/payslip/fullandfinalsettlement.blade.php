@@ -87,24 +87,24 @@
                             <div class="card-body fullFinal-block">
                                 <div class="row g-md-4 g-3">
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="basic_salary" class="form-label">Basic Salary (MVR)<span class="red-mark">*</span></label>
+                                        <label for="basic_salary" class="form-label">Basic Salary (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="basic_salary" class="form-control money-field" name="basic_salary"
                                             placeholder="Basic salary" data-parsley-required="true" readonly>
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="earned_salary" class="form-label">Earning Salary (MVR)<span class="red-mark">*</span></label>
+                                        <label for="earned_salary" class="form-label">Earned Salary (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="earned_salary" class="form-control money-field" name="earned_salary"
-                                            placeholder="Earning salary" data-parsley-required="true" readonly>
+                                            placeholder="Earned salary" data-parsley-required="true" readonly>
                                         {{-- Attendance-based earning breakdown — populated by
                                              getEmpDetails() with worked/expected days, daily
-                                             rate, prorated basic. Red banner when attendance
-                                             gap is detected. --}}
+                                             rate. Same formula payroll uses (basic ÷ days_in_period)
+                                             × (present + day_off). Red banner if attendance gap. --}}
                                         <small id="earning-breakdown"
                                                class="form-text d-block text-muted mt-1"
                                                style="font-size:11px;"></small>
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="service_charge" class="form-label">Service Charge (MVR)<span class="red-mark">*</span></label>
+                                        <label for="service_charge" class="form-label">Service Charge (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="service_charge" class="form-control money-field"
                                             name="service_charge" placeholder="Service Charge" data-parsley-required="true">
                                     </div>
@@ -117,7 +117,7 @@
                                                style="font-size:11px;"></small>
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="leave_encashment" class="form-label">LEAVE ENCASHMENT (MVR)<span class="red-mark">*</span></label>
+                                        <label for="leave_encashment" class="form-label">LEAVE ENCASHMENT (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="leave_encashment" name="leave_encashment" class="form-control money-field"
                                             placeholder="Leave Encashment" data-parsley-required="true" readonly>
                                         <small id="leave-encashment-formula"
@@ -142,7 +142,7 @@
                             <div class="card-body fullFinal-block">
                                 <div class="row g-md-4 g-3">
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="tax" class="form-label">EWT (MVR)<span class="red-mark">*</span></label>
+                                        <label for="tax" class="form-label">EWT (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="tax" class="form-control money-field" name="tax"
                                             placeholder="EWT" data-parsley-required="true" readonly>
                                         {{-- Surfaced when taxable income clears the MIRA EWT
@@ -163,12 +163,12 @@
                                          data-parsley-required stripped so Parsley doesn't
                                          block submit on an invisible field. --}}
                                     <div class="col-xl-4 col-sm-6" id="pension-col">
-                                        <label for="pension" class="form-label">PENSION / MRPS (MVR)<span class="red-mark">*</span></label>
+                                        <label for="pension" class="form-label">PENSION / MRPS (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="pension" class="form-control money-field" name="pension"
                                             placeholder="Pension" data-parsley-required="true" readonly>
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="loan_payment" class="form-label">LOAN OR ADVANCE PAYMENT? (MVR)<span class="red-mark">*</span></label>
+                                        <label for="loan_payment" class="form-label">LOAN OR ADVANCE PAYMENT? (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="loan_payment" name="loan_payment" class="form-control money-field"
                                             placeholder="Enter Amount" data-parsley-required="true" readonly>
                                         {{-- Loan vs Salary Advance bucket breakdown — built
@@ -186,7 +186,7 @@
                                          (e.g. management waived part of it) but the
                                          breakdown below shows the computed reference value. --}}
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="notice_period_charge" class="form-label">Notice Period Charge (MVR)<span class="red-mark">*</span></label>
+                                        <label for="notice_period_charge" class="form-label">Notice Period Charge (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="notice_period_charge" name="notice_period_charge"
                                             class="form-control money-field" placeholder="Notice Period Charge"
                                             data-parsley-required="true">
@@ -198,19 +198,20 @@
                             </div>
                         </div>
 
-                        {{-- ───── Payable Leaves Breakdown ─────
-                             Per-category leave breakdown modelled on the standard Final
-                             Pay Settlement layout (Annual / Sick / Day Off / Public
-                             Holiday / Other). Days column = unused balance from
-                             getLeaveBalance(); Amount column = days × daily salary in
-                             MVR. Total row sums to the same value the LEAVE
-                             ENCASHMENT field shows above so HR / auditor can verify
-                             where the encashment figure came from. Rows are
-                             populated by JS in getEmpDetails() from
-                             response.data.leave_breakdown. --}}
+                        {{-- ───── Leave Balance & Encashment Breakdown ─────
+                             ONE table that backs BOTH the "Leave Balance (days)" and
+                             "LEAVE ENCASHMENT" inputs above. Each row shows the per-
+                             category leave name (Annual / Sick / Day Off / Public Holiday
+                             / Other), the unused days carried forward, and the days ×
+                             daily_salary value. The Days column totals to the Leave
+                             Balance input; the Amount column totals to the LEAVE
+                             ENCASHMENT input. Populated by JS in getEmpDetails(). --}}
                         <div class="fullFinal-main mb-md-4 mb-3">
                             <div class="fullFinal-head">
-                                Payable Leaves Breakdown
+                                Leave Balance &amp; Encashment Breakdown
+                                <small class="text-muted ms-2" style="font-size:12px; font-weight:400;">
+                                    Days column → Leave Balance · Amount column → Leave Encashment
+                                </small>
                             </div>
                             <div class="card-body fullFinal-block">
                                 <table class="table" id="payable-leaves">
@@ -218,7 +219,8 @@
                                         <tr>
                                             <th>Leave Type</th>
                                             <th class="text-end">Days</th>
-                                            <th class="text-end">Amount (MVR)</th>
+                                            <th class="text-end">Daily Rate</th>
+                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -226,9 +228,46 @@
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <th>Leave Days Salary Total</th>
+                                            <th>Total</th>
                                             <th class="text-end" id="payable-leaves-days-total">0.00</th>
-                                            <th class="text-end" id="payable-leaves-amount-total">0.00 MVR</th>
+                                            <th class="text-end">—</th>
+                                            <th class="text-end" id="payable-leaves-amount-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        {{-- ───── Settlement Details Breakdown ─────
+                             Same shape as the review page: per-source row
+                             (Basic Salary for N worked days, Service Charge,
+                             Leave Days Salary, Allowance) → Gross Earning at
+                             the bottom. Lets HR see how the Earning Salary
+                             figure is built without leaving the page. All
+                             cells are converted to the display currency
+                             through mvrToDisplay() in the JS below. --}}
+                        <div class="fullFinal-main mb-md-4 mb-3">
+                            <div class="fullFinal-head">
+                                Settlement Breakdown
+                                <small class="text-muted ms-2" style="font-size:12px; font-weight:400;">
+                                    Earned Salary + Allowances + Leave Encashment + Service Charge → Gross Earning
+                                </small>
+                            </div>
+                            <div class="card-body fullFinal-block">
+                                <table class="table" id="settlement-details">
+                                    <thead>
+                                        <tr>
+                                            <th>Source</th>
+                                            <th class="text-end">Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="settlement-details-body">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="fw-bold">
+                                            <th>Gross Earning</th>
+                                            <th class="text-end" id="settlement-details-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -245,7 +284,7 @@
                                         <tr>
                                             <th>Allowance Name</th>
                                             <th>Amount</th>
-                                            <th>Converted Amount (MVR)</th>
+                                            <th>Converted Amount (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -254,7 +293,7 @@
                                     <tfoot>
                                         <tr>
                                             <th colspan="2" class="text-end">Total</th>
-                                            <th id="total-allowances">0.00 MVR</th>
+                                            <th id="total-allowances">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -415,6 +454,25 @@
     });
 
     // ────────────────────────────────────────────────────────────────
+    // Display-currency wiring. The resort's currency setting (toggled
+    // via the top-right currency switcher) decides whether amounts
+    // render in MVR or USD. The service computes everything in MVR
+    // (canonical); we convert on display only. Raw MVR is kept on
+    // `data-raw` per money-field so the submit handler can post raw
+    // values back to the server without round-trip conversion error.
+    const FNF_DISPLAY_CURRENCY = '{{ $displayCurrencyCode ?? "MVR" }}';
+    const FNF_DOLLAR_TO_MVR    = {{ $dollarToMvr ?? 15.42 }};
+
+    function mvrToDisplay(mvrValue) {
+        var n = parseFloat(mvrValue);
+        if (!isFinite(n)) return 0;
+        if (FNF_DISPLAY_CURRENCY === 'USD' && FNF_DOLLAR_TO_MVR > 0) {
+            return n / FNF_DOLLAR_TO_MVR;
+        }
+        return n;
+    }
+
+    // ────────────────────────────────────────────────────────────────
     // formatMoney(amount, currency)
     // Project-wide money display: thousands-separated, 2-decimal, with
     // optional currency suffix. Used by both the allowance table cells
@@ -518,12 +576,14 @@
                     setFieldValueAndResetValidation('#pension', response.data.pension || 0);
                     setFieldValueAndResetValidation('#tax', response.data.ewt || 0);
 
-                    // ─── Earning Salary breakdown (attendance-based) ───
-                    // Shows the period window, days worked vs expected,
-                    // daily rate and prorated basic so HR can audit how
-                    // the Earning Salary figure was derived. When
-                    // attendance is incomplete (worked < expected) the
-                    // muted text flips to a red warning so HR fixes
+                    // ─── Earned Salary breakdown (attendance-based) ───
+                    // Same definition as payroll's earned_salary column:
+                    //   earned = (basic ÷ days_in_period) × (present + day_off)
+                    // Shows the period window, paid days vs expected,
+                    // daily rate so HR can audit how the Earned Salary
+                    // figure was derived. When attendance is incomplete
+                    // (paid < expected) the muted text flips to a red
+                    // warning so HR fixes
                     // attendance before issuing the payout.
                     var $earnBreak = $('#earning-breakdown');
                     var workedDays   = parseInt(response.data.worked_days || 0, 10);
@@ -550,8 +610,8 @@
                     } else {
                         var earnLine = (periodLabel ? 'Period ' + periodLabel + ' · ' : '') +
                             'worked ' + workedDays + ' / ' + expectedDays + ' days' +
-                            ' · daily rate ' + formatMoney(dailyRate) + ' MVR' +
-                            ' · prorated basic ' + formatMoney(proratedBase) + ' MVR';
+                            ' · daily rate ' + formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY +
+                            ' · prorated basic ' + formatMoney(mvrToDisplay(proratedBase)) + ' ' + FNF_DISPLAY_CURRENCY;
                         if (response.data.attendance_gap) {
                             $earnBreak.removeClass('text-muted').addClass('text-danger')
                                 .html('<i class="fa-solid fa-triangle-exclamation me-1"></i>' +
@@ -586,15 +646,30 @@
 
                     if (breakdown.length) {
                         breakdown.forEach(function (row) {
-                            var days = parseFloat(row.available_days || 0);
-                            var amount = days * dailyRate;
-                            leaveDaysTotal += days;
-                            leaveAmountTotal += amount;
+                            var days        = parseFloat(row.available_days || 0);
+                            var amount      = days * dailyRate;
+                            var encashable  = !!row.is_encashable;
+                            var encashDays  = parseFloat(row.encashable_days || 0);
+                            var encashAmt   = encashDays * dailyRate;
+                            leaveDaysTotal   += encashDays;       // only ENCASHABLE
+                            leaveAmountTotal += encashAmt;        // hits the totals
+                            // Non-encashable rows render in muted text + show
+                            // the reason in the Amount cell so HR can see
+                            // why they're not being paid out.
                             $leaveTbody.append(
-                                '<tr>' +
-                                    '<td>' + (row.leave_type || 'Leave') + '</td>' +
+                                '<tr class="' + (encashable ? '' : 'text-muted') + '">' +
+                                    '<td>' + (row.leave_type || 'Leave') +
+                                        (encashable
+                                            ? ' <span class="badge bg-success-subtle text-success ms-1" style="font-size:10px;">Encashable</span>'
+                                            : ' <span class="badge bg-secondary-subtle text-secondary ms-1" style="font-size:10px;" title="' +
+                                              (row.not_encashable_reason || '') + '">Not encashable</span>') +
+                                    '</td>' +
                                     '<td class="text-end">' + days.toFixed(2) + '</td>' +
-                                    '<td class="text-end">' + formatMoney(amount) + '</td>' +
+                                    '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
+                                    '<td class="text-end">' + (encashable
+                                        ? formatMoney(mvrToDisplay(amount))
+                                        : '<small class="fst-italic">' + (row.not_encashable_reason || 'Not encashable') + '</small>') +
+                                    '</td>' +
                                 '</tr>'
                             );
                         });
@@ -613,20 +688,68 @@
                                 '<small>(no per-category breakdown — check benefit grid for this rank)</small>' +
                                 '</td>' +
                                 '<td class="text-end">' + totalLeaveDaysFromService.toFixed(2) + '</td>' +
-                                '<td class="text-end">' + formatMoney(leaveAmountTotal) + '</td>' +
+                                '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
+                                '<td class="text-end">' + formatMoney(mvrToDisplay(leaveAmountTotal)) + '</td>' +
                             '</tr>'
                         );
                     } else {
                         // Truly empty — show empty-state row so the
                         // table isn't a blank box.
                         $leaveTbody.append(
-                            '<tr><td colspan="3" class="text-center text-muted">' +
+                            '<tr><td colspan="4" class="text-center text-muted">' +
                                 'No leave entitlements found for this employee.' +
                             '</td></tr>'
                         );
                     }
                     $('#payable-leaves-days-total').text(leaveDaysTotal.toFixed(2));
-                    $('#payable-leaves-amount-total').text(formatMoney(leaveAmountTotal, 'MVR'));
+                    $('#payable-leaves-amount-total').text(formatMoney(mvrToDisplay(leaveAmountTotal), FNF_DISPLAY_CURRENCY));
+
+                    // ─── Settlement Details (Earning breakdown) table ───
+                    // Rebuild from the same numbers populating the input
+                    // fields above so the table can NEVER disagree with
+                    // the Earning Salary input. Same idea as the review
+                    // page's Settlement Details card.
+                    var $sdBody = $('#settlement-details-body').empty();
+                    // Mirrors the payroll review's component shape:
+                    //   earned_salary  → (basic ÷ days) × paid_days
+                    //   + allowances   → SUM of EmployeeAllowance rows
+                    //   + service_charge
+                    //   + leave_encashment (F&F-only — payroll doesn't carry it)
+                    //   = Gross Earning
+                    var sdRows = [
+                        {
+                            label: 'Earned Salary <small class="text-muted">(' + (workedDays || 0) + ' paid day(s) × ' +
+                                formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day)</small>',
+                            value: proratedBase
+                        },
+                        {
+                            label: 'Total Allowances',
+                            value: parseFloat(response.data.total_allowances_mvr || 0)
+                        },
+                        {
+                            label: 'Service Charge',
+                            value: parseFloat($('#service_charge').attr('data-raw') || 0)
+                        },
+                        {
+                            label: 'Leave Encashment',
+                            value: parseFloat(response.data.leave_encashment || 0)
+                        },
+                    ];
+                    var sdTotal = 0;
+                    sdRows.forEach(function (r) {
+                        sdTotal += r.value;
+                        $sdBody.append(
+                            '<tr>' +
+                                '<td>' + r.label + '</td>' +
+                                '<td class="text-end">' +
+                                    formatMoney(mvrToDisplay(r.value)) +
+                                '</td>' +
+                            '</tr>'
+                        );
+                    });
+                    $('#settlement-details-total').text(
+                        formatMoney(mvrToDisplay(sdTotal), FNF_DISPLAY_CURRENCY)
+                    );
 
                     // Compact one-liner under the Leave Balance input
                     // (kept for the at-a-glance read). Hides when there
@@ -653,8 +776,8 @@
                     var enc       = parseFloat(response.data.leave_encashment || 0);
                     $encFormula.html(
                         '<i class="fa-solid fa-calculator me-1"></i>' +
-                        leaveDays.toFixed(2) + ' days × ' + formatMoney(dailyRate) + ' MVR/day' +
-                        ' = ' + formatMoney(enc) + ' MVR'
+                        leaveDays.toFixed(2) + ' days × ' + formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day' +
+                        ' = ' + formatMoney(mvrToDisplay(enc)) + ' ' + FNF_DISPLAY_CURRENCY
                     );
 
                     // EWT / TIN compliance warning. Shows when taxable
@@ -669,7 +792,8 @@
                         if (!response.data.ewt_enrolled) bits.push('not enrolled for EWT');
                         if (!response.data.tin_present)  bits.push('no TIN on file');
                         $ewtText.text(
-                            'Taxable income MVR ' + formatMoney(response.data.taxable_income || 0) +
+                            'Taxable income ' + FNF_DISPLAY_CURRENCY + ' ' +
+                            formatMoney(mvrToDisplay(response.data.taxable_income || 0)) +
                             ' clears the EWT threshold — employee is ' + bits.join(' & ') +
                             '. Verify before issuing the settlement.'
                         );
@@ -705,8 +829,8 @@
                             '<i class="fa-solid fa-calculator me-1"></i>' +
                             (noticeRule ? '(' + noticeRule + ') ' : '') +
                             'required ' + noticeReq + 'd · served ' + noticeServed + 'd · ' +
-                            'shortfall ' + noticeShort + 'd × ' + formatMoney(dailyRate) + ' MVR/day = ' +
-                            formatMoney(noticeCharge) + ' MVR'
+                            'shortfall ' + noticeShort + 'd × ' + formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day = ' +
+                            formatMoney(mvrToDisplay(noticeCharge)) + ' ' + FNF_DISPLAY_CURRENCY
                         );
                     } else {
                         $noticeBreak.removeClass('text-warning').addClass('text-muted').html(
@@ -731,11 +855,11 @@
                     } else {
                         var loanParts = [];
                         if (loanMvr > 0) {
-                            loanParts.push('Loan: ' + formatMoney(loanMvr, 'MVR') +
+                            loanParts.push('Loan: ' + formatMoney(mvrToDisplay(loanMvr), FNF_DISPLAY_CURRENCY) +
                                 ' (' + loanN + ' installment' + (loanN === 1 ? '' : 's') + ')');
                         }
                         if (advanceMvr > 0) {
-                            loanParts.push('Salary Advance: ' + formatMoney(advanceMvr, 'MVR') +
+                            loanParts.push('Salary Advance: ' + formatMoney(mvrToDisplay(advanceMvr), FNF_DISPLAY_CURRENCY) +
                                 ' (' + advanceN + ' installment' + (advanceN === 1 ? '' : 's') + ')');
                         }
                         $loanBreak.html('<i class="fa-solid fa-money-bill-transfer me-1"></i>' +
@@ -764,10 +888,10 @@
                         tbody.append(`<tr>
                             <td>${a.name}</td>
                             <td>${formatMoney(a.original_amount, a.unit)}</td>
-                            <td>${formatMoney(a.converted_amount, 'MVR')}</td>
+                            <td>${formatMoney(mvrToDisplay(a.converted_amount), FNF_DISPLAY_CURRENCY)}</td>
                         </tr>`);
                     });
-                    $("#total-allowances").text(formatMoney(totalAllowances, 'MVR'));
+                    $("#total-allowances").text(formatMoney(mvrToDisplay(totalAllowances), FNF_DISPLAY_CURRENCY));
 
                     // Store allowances as hidden input
                     if ($("#allowances_json").length) {
@@ -793,11 +917,16 @@
         const field = $(selector);
         // Money fields get thousands-separated display ("144,331.20"); the
         // raw numeric is preserved on `data-raw` so the submit handler can
-        // restore it before POST (Laravel rejects commas). Non-money
-        // fields (leave_balance) get the value as-is.
+        // restore it before POST (Laravel rejects commas). The raw value
+        // is ALWAYS the canonical MVR amount — submit posts MVR. The
+        // VISIBLE value is converted to the display currency (USD ÷
+        // 15.42 when in USD mode) so the page reflects the top-right
+        // currency switcher. Non-money fields (leave_balance) get the
+        // value as-is.
         if (field.hasClass('money-field')) {
-            field.attr('data-raw', value == null ? 0 : value);
-            field.val(formatMoney(value));
+            var rawMvr = value == null ? 0 : value;
+            field.attr('data-raw', rawMvr);
+            field.val(formatMoney(mvrToDisplay(rawMvr)));
         } else {
             field.val(value);
         }

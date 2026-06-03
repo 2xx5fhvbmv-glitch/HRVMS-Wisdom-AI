@@ -136,6 +136,24 @@ class ExitClearanceController extends Controller
                 ->when($positionId, function ($q) use ($positionId) {
                     $q->whereHas('employee', fn($eq) => $eq->where('Position_id', $positionId));
                 })
+                // Free-text search across employee Emp_id, full name
+                // (first + last on resortAdmin), and department / position
+                // label. Matches the "Search by Employee Name, ID or
+                // Manager Name" placeholder on the page.
+                ->when($request->filled('searchTerm'), function ($q) use ($request) {
+                    $term = trim((string) $request->input('searchTerm'));
+                    $like = '%' . $term . '%';
+                    $q->whereHas('employee', function ($eq) use ($like) {
+                        $eq->where('Emp_id', 'LIKE', $like)
+                           ->orWhereHas('resortAdmin', function ($aq) use ($like) {
+                               $aq->where('first_name', 'LIKE', $like)
+                                  ->orWhere('last_name', 'LIKE', $like)
+                                  ->orWhereRaw("CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,'')) LIKE ?", [$like]);
+                           })
+                           ->orWhereHas('department', fn($dq) => $dq->where('name', 'LIKE', $like))
+                           ->orWhereHas('position',   fn($pq) => $pq->where('position_title', 'LIKE', $like));
+                    });
+                })
                 ->get();
 
             $edit_class = '';
@@ -230,6 +248,36 @@ class ExitClearanceController extends Controller
     public function viewDetails($id)
     {
         if(Common::checkRouteWisePermission('people.exit-clearance',config('settings.resort_permissions.view')) == false){
+            // Graceful path for users without `view` permission on
+            // the module: if a department clearance form for THIS
+            // resignation is assigned to ANY employee in the same
+            // department as the current user, send them to the form-
+            // fill page instead of 403. The form is conceptually
+            // for the whole department to fill, not just the
+            // HOD record stored in assigned_to_id — line workers
+            // (e.g. an Accounts assistant chasing receivables on
+            // behalf of the HOD) need access too.
+            $resort_id = $this->resort->resort_id;
+            $decodedId = base64_decode($id);
+            $user      = $this->resort->GetEmployee;
+            if ($user) {
+                $matches = ExitClearanceFormAssignment::where('emp_resignation_id', $decodedId)
+                    ->where('resort_id', $resort_id)
+                    ->where('assigned_to_type', 'department')
+                    ->where(function ($q) use ($user) {
+                        $q->where('assigned_to_id', $user->id);
+                        if (!empty($user->Dept_id)) {
+                            $q->orWhere('department_id', $user->Dept_id);
+                        }
+                    })
+                    ->exists();
+                if ($matches) {
+                    return redirect()->route(
+                        'people.exit-clearance.department-form',
+                        base64_encode($decodedId)
+                    );
+                }
+            }
             return abort(403, 'Unauthorized access');
         }
            
@@ -673,14 +721,41 @@ class ExitClearanceController extends Controller
             return redirect()->route('people.exit-clearance')->with('error', 'Employee resignation not found.');
         }
 
-        $user = $this->resort->GetEmployee; 
-        
-        
-        $exitClearanceFormAssignment = ExitClearanceFormAssignment::where('emp_resignation_id', $id)
-        ->where('resort_id', $resort_id)
-        ->where('assigned_to_id', $user->id)
-        ->where('assigned_to_type', 'department')
-        ->first();
+        $user = $this->resort->GetEmployee;
+
+        // Permission model — three legitimate accessors, anyone else
+        // is bounced with "you are not assigned to this form":
+        //   1. The assignee (assigned_to_id = $user->id) — the HOD
+        //      HR picked when assigning. Always allowed.
+        //   2. Anyone in the SAME department as the assignment
+        //      (department_id = $user->Dept_id). The form is for the
+        //      whole department to complete, not strictly the HOD —
+        //      line workers / managers chasing on the HOD's behalf
+        //      need access too. (Was the user's complaint: an
+        //      Accounting line worker got 403 even though Accounting
+        //      had been assigned the form.)
+        //   3. Anyone with EDIT permission on people.exit-clearance —
+        //      XCOM / GM / HR oversight, step-in when a dept is
+        //      unreachable.
+        $hasEditPermission = Common::checkRouteWisePermission(
+            'people.exit-clearance',
+            config('settings.resort_permissions.edit')
+        );
+
+        $query = ExitClearanceFormAssignment::where('emp_resignation_id', $id)
+            ->where('resort_id', $resort_id)
+            ->where('assigned_to_type', 'department');
+
+        if (!$hasEditPermission && $user) {
+            $query->where(function ($q) use ($user) {
+                $q->where('assigned_to_id', $user->id);
+                if (!empty($user->Dept_id)) {
+                    $q->orWhere('department_id', $user->Dept_id);
+                }
+            });
+        }
+
+        $exitClearanceFormAssignment = $query->first();
 
         if (!$exitClearanceFormAssignment) {
             return redirect()->route('people.exit-clearance.viewDetails', base64_encode($id))
@@ -699,7 +774,12 @@ class ExitClearanceController extends Controller
 
         $exitClearanceFormResponse = ExitClearanceFormResponse::where('assignment_id', $exitClearanceFormAssignment->id)->first();
         $formStructure = json_decode($exitClearanceForm->form_structure, true);
-        $responses = json_decode($exitClearanceFormResponse->response_data, true);
+        // First-time openers have no saved response yet — fall back to
+        // an empty array so the form renders blank instead of crashing
+        // with "Attempt to read property response_data on null".
+        $responses = $exitClearanceFormResponse
+            ? (json_decode($exitClearanceFormResponse->response_data, true) ?: [])
+            : [];
 
         
         return view('resorts.people.exit-clearance.exit-clearance-form-view', compact(
@@ -818,10 +898,22 @@ class ExitClearanceController extends Controller
             );
         }
 
+        // Suggest where to send the user after the success toast. The JS
+        // falls back to the HOD dashboard if this isn't set, but for
+        // users who DO have edit permission on the module (HR / XCOM /
+        // GM filling on a HOD's behalf) the resignation's view-details
+        // page is more useful so they can see the now-Completed badge
+        // and any other pending forms on the same resignation.
+        $redirectUrl = null;
+        if (Common::checkRouteWisePermission('people.exit-clearance', config('settings.resort_permissions.view'))) {
+            $redirectUrl = route('people.exit-clearance.viewDetails', base64_encode($exitClearanceFormAssignment->emp_resignation_id));
+        }
+
         return response()->json([
             'success' => true,
             'status' => 'success',
             'message' => 'Form response stored successfully.',
+            'redirect_url' => $redirectUrl,
             'data' => $responseData,
         ]);
     }

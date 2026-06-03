@@ -73,15 +73,28 @@ class FinalSettlementService
             ->whereBetween('date', [$effectiveStart, $effectiveEnd])
             ->get();
 
-        // Present = has check-in; count unique days (multiple shifts same day count once)
+        // Paid days = Present (with valid check-in) + Day Off — same
+        // definition used by PayrollController::generateReview() at
+        // line 2173, where `earnedSalary = perDay × (presentCount +
+        // dayOffCount)`. Approved paid leaves also count toward paid
+        // days because the resort treats them as worked-equivalent
+        // for salary purposes. Matching this formula keeps the F&F's
+        // Earned Salary number consistent with what would appear in a
+        // payroll run for the same period.
         $presentWithCheckIn = $attendance->filter(function ($r) {
             $t = $r->CheckingTime ?? '';
             $t = is_object($t) ? (string) $t : trim((string) $t);
             return $r->Status === 'Present' && $t !== '' && !in_array($t, ['00:00', '00:00:00']);
         });
-        $daysWorked = $presentWithCheckIn->pluck('date')->map(function ($d) {
+        $daysPresent = $presentWithCheckIn->pluck('date')->map(function ($d) {
             return is_object($d) ? $d->format('Y-m-d') : $d;
         })->unique()->count();
+        $daysOff = $attendance->filter(fn($r) => $r->Status === 'Day Off')
+            ->pluck('date')->map(fn($d) => is_object($d) ? $d->format('Y-m-d') : $d)
+            ->unique()->count();
+        // Total paid days for the worked-salary line. Encashment-side
+        // leave is a separate calc and isn't included here.
+        $daysWorked = $daysPresent + $daysOff;
         // totalDays remains the full payroll-cycle span — it's the
         // denominator MIRA/payroll uses to derive the daily rate from
         // the monthly basic. proratedBasic then = dailySalary * daysWorked
@@ -206,19 +219,32 @@ class FinalSettlementService
             $lastWorkingDay = $employee->resignation->last_working_day
                 ? Carbon::parse($employee->resignation->last_working_day)
                 : null;
-            $resignationImmediate = strtolower((string) ($employee->resignation->immediate_release ?? '')) === 'yes';
 
-            $noticeQuery = \App\Models\EmployeeNoticePeriod::where('resort_id', $resortId);
-            // Prefer the matching immediate-release rule when the
-            // resignation requested it (config row tagged
-            // immediate_release=1); otherwise prefer the standard rule
-            // (immediate_release=0). Both pickers fall through to "any
-            // first row" so we still produce a number when only one
-            // config exists.
-            $noticeRule = (clone $noticeQuery)
-                ->where('immediate_release', $resignationImmediate ? 1 : 0)
-                ->first()
-                ?? $noticeQuery->first();
+            // Match the notice rule by employee GRADE (HOD / MGR / GM /
+            // EXCOM / LINE WORKERS), not by the immediate_release flag.
+            // The `immediate_release` column on the config marks which
+            // grades are allowed to skip notice (e.g. LINE WORKERS); it
+            // is NOT the rule selector. Earlier logic that picked by
+            // immediate_release silently grabbed LINE WORKERS for every
+            // immediate-release resignation, and LINE WORKERS often has
+            // period=NULL → notice charge collapsed to 0 even for HODs
+            // with a configured 45-day rule.
+            $gradeTitle = config('settings.Position_Rank.' . (int) ($employee->rank ?? 0));
+            $noticeRule = null;
+            if ($gradeTitle) {
+                $noticeRule = \App\Models\EmployeeNoticePeriod::where('resort_id', $resortId)
+                    ->whereRaw('LOWER(TRIM(title)) = ?', [strtolower(trim((string) $gradeTitle))])
+                    ->first();
+            }
+            // Fallback to the first rule that actually has a period
+            // configured — avoids picking a NULL-period row that would
+            // collapse the charge to 0 with no actionable error.
+            if (!$noticeRule) {
+                $noticeRule = \App\Models\EmployeeNoticePeriod::where('resort_id', $resortId)
+                    ->whereNotNull('period')
+                    ->where('period', '!=', '')
+                    ->first();
+            }
 
             if ($noticeRule && $resignationDate && $lastWorkingDay) {
                 // `period` column is a string like "30" or "60". Cast
@@ -349,7 +375,17 @@ class FinalSettlementService
             'notice_rule_title'        => $noticeRuleTitle,
             'total_allowances_mvr' => round($totalAllowance, 2),
             'allowances' => $allowanceDetails,
-            'earned_salary' => round($earnedSalary, 2),
+            // ── Earnings ──
+            // `earned_salary` mirrors the payroll_reviews column of the
+            // same name → just basic-salary-for-paid-days, matching
+            // PayrollController::generateReview() at line 2173. Other
+            // components (OT, allowance, leave encashment, service
+            // charge, ramadan bonus) stay as their own line items in
+            // the F&F so the UI table can add them up to a Gross
+            // Earning total. `gross_earning` is the bundled sum for
+            // convenience.
+            'earned_salary' => round($proratedBasic, 2),
+            'gross_earning' => round($earnedSalary, 2),
             'payment_mode' => $payment_mode,
             'payroll_start' => $payrollStart->format('d M Y'),
 
@@ -380,6 +416,21 @@ class FinalSettlementService
                 'rbgc.allocated_days'
             )
             ->get();
+
+        // Gender filter — gender-specific leave categories should drop
+        // out of the breakdown entirely for the wrong gender so HR
+        // doesn't see "Maternity Leave: 8.40 days" against a male
+        // employee. Maternity → female only; Paternity → male only;
+        // Circumcision → male only (cultural context). Gender lives
+        // on resortAdmin via Admin_Parent_id.
+        $empGender = strtolower((string) optional($employee->resortAdmin)->gender);
+        $benefit_grids = $benefit_grids->reject(function ($g) use ($empGender) {
+            $type = strtolower((string) $g->leave_type);
+            if (str_contains($type, 'maternity'))   return $empGender !== 'female';
+            if (str_contains($type, 'paternity'))   return $empGender !== 'male';
+            if (str_contains($type, 'circumcision')) return $empGender !== 'male';
+            return false;
+        })->values();
 
         $currentYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
         $currentYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
@@ -478,13 +529,46 @@ class FinalSettlementService
             // as "This value seems to be invalid" on the F&F page.
             $finalAvailable = round(max(0, $available - $usedDays), 2);
 
+            // ─── Encashment-eligibility policy ───────────────────────
+            // Only ANNUAL LEAVE is encashed at settlement, and only
+            // once the employee has completed 1 full year of service.
+            // Event-based leaves (Maternity / Paternity / Birthday /
+            // Emergency / Circumcision / R&R) carry no encashment
+            // value — they only exist if the underlying event happens.
+            // Sick Leave is excluded too at this resort's policy; flip
+            // the rule per-resort by extending the matcher below.
+            //
+            // Tenure rule: annual leave vests at the 12-month mark.
+            // Anyone with less than 12 months tenure gets 0 encashable
+            // leave even though the per-category breakdown still
+            // surfaces the prorated number for transparency.
+            $isAnnualLeave = (stripos((string) $grid->leave_type, 'annual') !== false);
+
+            $totalEmploymentMonths = $joiningDate
+                ? max(0.0, $joiningDate->floatDiffInMonths($now))
+                : 0.0;
+            $oneYearServed = $totalEmploymentMonths >= 12;
+
+            $encashable    = $isAnnualLeave && $oneYearServed;
+            $encashableDays = $encashable ? $finalAvailable : 0;
+
             $leaveBalances[] = [
-                'leave_category_id' => $grid->leave_category_id,
-                'leave_type' => $grid->leave_type,
-                'available_days' => $finalAvailable,
+                'leave_category_id'    => $grid->leave_category_id,
+                'leave_type'           => $grid->leave_type,
+                'available_days'       => $finalAvailable,
+                'encashable_days'      => $encashableDays,
+                'is_encashable'        => $encashable,
+                'not_encashable_reason'=> $encashable
+                    ? null
+                    : ($isAnnualLeave
+                        ? 'Annual leave vests after 1 year of service ('
+                            . number_format($totalEmploymentMonths, 1) . ' months served)'
+                        : 'Event-based — no encashment value'),
             ];
 
-            $totalLeaveDays += $finalAvailable;
+            // Only ENCASHABLE days flow into total_days, which drives
+            // the LEAVE ENCASHMENT input + the headline on the F&F.
+            $totalLeaveDays += $encashableDays;
         }
 
         // Final precision pass at the boundary so callers see clean

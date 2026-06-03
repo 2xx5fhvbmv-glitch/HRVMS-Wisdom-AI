@@ -404,7 +404,19 @@ class PayslipController extends Controller
                 }
             }
         }
-        return view('resorts.payroll.payslip.fullandfinalsettlement',compact('page_title','positions','departments','employees','deductions','earnings','preselectedEmployeeId'));
+        // Display currency — driven by the resort's site setting,
+        // which is the same value the top-right currency switcher
+        // toggles. The view renders all (XXX) labels and the JS
+        // converts the canonical MVR values to USD when the resort
+        // is configured for USD display.
+        $displayCurrency   = Common::GetResortCurrencySymbol();          // '$' or 'MVR'
+        $displayCurrencyCode = $displayCurrency === '$' ? 'USD' : 'MVR';
+        $dollarToMvr       = (float) (\App\Models\ResortSiteSettings::where('resort_id', $resort_id)->value('DollertoMVR') ?: 15.42);
+
+        return view('resorts.payroll.payslip.fullandfinalsettlement',compact(
+            'page_title','positions','departments','employees','deductions','earnings','preselectedEmployeeId',
+            'displayCurrency','displayCurrencyCode','dollarToMvr'
+        ));
     }
 
     public function getEmployeeDetails(Request $request, FinalSettlementService $settlementService)
@@ -435,46 +447,47 @@ class PayslipController extends Controller
         $formattedLastPromotionDate = ($last_promotion && $last_promotion->effective_date)
             ? Carbon::parse($last_promotion->effective_date)->format('d M Y')
             : null;
+        // Spread the entire service payload so EVERY field the service
+        // exposes flows through to the JS — notice-period rule data,
+        // EWT/TIN compliance flags, leave breakdown, attendance window,
+        // loan/advance buckets, etc. The previous hand-picked list
+        // silently dropped half the fields the F&F view depends on,
+        // making them all read as 0 / "not configured" / empty on the
+        // page even when the service computed them correctly.
+        //
+        // Fields that aren't from the service (employee profile,
+        // promotion date, route URLs) layered on top via array_merge.
+        $employeeMeta = [
+            "emp_id"             => $employee->Emp_id,
+            "full_name"          => $employee->resortAdmin->full_name,
+            "profile_picture"    => Common::getResortUserPicture($employee->resortAdmin->id),
+            "position"           => $employee->position->position_title ?? "N/A",
+            "department"         => $employee->department->name ?? "N/A",
+            "resignation_date"   => $employee->resignation->resignation_date ?? "N/A",
+            "last_working_day"   => $employee->resignation->last_working_day ?? "N/A",
+            "dept_id"            => $employee->department->id ?? 'N/A',
+            "pos_id"             => $employee->position->id ?? 'N/A',
+            "section"            => $employee->section->name ?? null,
+            "section_id"         => $employee->section->id ?? null,
+            "hired_date"         => $formattedHireddate ?? "N/A",
+            "basic_salary"       => $employee->basic_salary ?? "N/A",
+            "benefit_grid_level" => $employee->benefit_grid_level ?? "N/A",
+            "benefit_grid_url"   => $employee->benefit_grid_level ? route("benefit.grid.view", ['level' => $employee->benefit_grid_level]) : null,
+            "job_desc_url"       => $employee->position->id ? route("job.description.by.position", ['posId' => $employee->position->id]) : null,
+            "last_promotion_date"=> $formattedLastPromotionDate,
+            "payment_mode"       => $employee->payment_mode ?? 'Cash',
+            // Back-compat alias: the JS reads `allowances_mvr` in the
+            // allowance-breakdown table (the service emits the same
+            // value as `total_allowances_mvr`). Keep both keys so the
+            // alias isn't a regression while new code uses the
+            // canonical name.
+            'allowances_mvr'     => $payrollData['total_allowances_mvr'] ?? 0,
+            'final_month_days'   => $payrollData['total_days'] ?? 0,
+        ];
+
         return response()->json([
             "success" => true,
-            "data" => [
-                "emp_id" => $employee->Emp_id,
-                "full_name" => $employee->resortAdmin->full_name,
-                "profile_picture" => Common::getResortUserPicture($employee->resortAdmin->id),
-                "position" => $employee->position->position_title ?? "N/A",
-                "department" => $employee->department->name ?? "N/A",
-                "resignation_date" => $employee->resignation->resignation_date ?? "N/A",
-                "last_working_day" => $employee->resignation->last_working_day ?? "N/A",
-                "dept_id" => $employee->department->id ?? 'N/A',
-                "pos_id" => $employee->position->id ?? 'N/A',
-                "section" => $employee->section->name ?? null,
-                "section_id" => $employee->section->id ?? null,
-                "hired_date" => $formattedHireddate ?? "N/A",
-                "basic_salary" => $employee->basic_salary ?? "N/A",
-                'proratedBasic' => $payrollData['proratedBasic'] ?? 0,
-                "benefit_grid_level" => $employee->benefit_grid_level ?? "N/A",
-                "benefit_grid_url" => $employee->benefit_grid_level ? route("benefit.grid.view", ['level' => $employee->benefit_grid_level]) : null ,
-                "job_desc_url" => $employee->position->id ? route("job.description.by.position", ['posId' => $employee->position->id]) : null ,         
-                "last_promotion_date" => $formattedLastPromotionDate,
-                'leave_balance' => $payrollData['leave_balance'],
-                'leave_encashment' => $payrollData['leave_encashment'],
-                'pension' => $payrollData['pension'],
-                'ewt' => $payrollData['ewt'],
-                'daily_salary' => $payrollData['daily_salary'],
-                'final_month_days' => $payrollData['total_days'],
-                'worked_days' => $payrollData['worked_days'],
-                'loan_recovery' => $payrollData['loan_recovery'],
-                'basic_salary_mvr' => $payrollData['basic_salary_mvr'],
-                'allowances_mvr' => $payrollData['total_allowances_mvr'],
-                'allowances' => $payrollData['allowances'],
-                'regular_ot_amount' => $payrollData['regular_ot_amount'],
-                'holiday_ot_amount' => $payrollData['holiday_ot_amount'],
-                'total_ot_amount' => $payrollData['total_ot_amount'],
-                'ramadan_bonus' => $payrollData['ramadan_bonus'] ?? 0,
-                'earned_salary' => $payrollData['earned_salary'],
-                'payment_mode' => $employee->payment_mode ?? 'Cash',
-                'payroll_start' => $payrollData['payroll_start'] ?? Carbon::now()->format('d M Y'),
-            ]
+            "data"    => array_merge($payrollData, $employeeMeta),
         ]);
     }
 

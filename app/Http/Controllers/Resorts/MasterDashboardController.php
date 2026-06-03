@@ -46,6 +46,7 @@ use App\Models\EmployeeInfoUpdateRequest;
 use App\Models\SOSHistoryModel;
 use App\Models\BuildingModel;
 use App\Models\ExitClearanceForm;
+use App\Models\ExitClearanceFormAssignment;
 use App\Models\BulidngAndFloorAndRoom;
 use App\Models\MonthlyCheckingModel;
 use URL;
@@ -1091,6 +1092,44 @@ class MasterDashboardController extends Controller
                 ->with('assignedForm')
                 ->get();
 
+            // ─── Pending Exit-clearance department forms ──────────────
+            // Scope depends on which dashboard this controller is
+            // serving:
+            //   • HOD view   → forms assigned to this HOD specifically
+            //                   (assigned_to_id = $myEmpId)
+            //   • XCOM/GM view → every pending form across the resort
+            //                   (resort-wide oversight; XCOM steps in
+            //                   when a HOD is unavailable)
+            // excom_dashboard() at the bottom of this file just calls
+            // hod_dashboard() with dashboard_label='XCOM', so detect
+            // that label here to pick the right scope.
+            $myEmpId = optional($this->globalUser->GetEmployee)->id;
+            $isXcomScope = strtoupper((string) request('dashboard_label', 'HOD')) === 'XCOM';
+
+            $pendingFormsQuery = ExitClearanceFormAssignment::with([
+                    'exitClearanceForm:id,form_name',
+                    'employeeResignation:id,employee_id,last_working_day',
+                    'employeeResignation.employee:id,Admin_Parent_id,Position_id,Dept_id',
+                    'employeeResignation.employee.resortAdmin:id,first_name,last_name',
+                    'employeeResignation.employee.position:id,position_title',
+                    'employeeResignation.employee.department:id,name',
+                ])
+                ->where('resort_id', $resort_id)
+                ->where('assigned_to_type', 'department')
+                ->whereIn('status', ['Pending', 'In Progress', 'On Hold'])
+                ->orderByRaw("CASE WHEN deadline_date IS NULL THEN 1 ELSE 0 END, deadline_date ASC");
+
+            if (!$isXcomScope) {
+                // HOD view — clamp to forms assigned to me.
+                if ($myEmpId) {
+                    $pendingFormsQuery->where('assigned_to_id', $myEmpId);
+                } else {
+                    // No employee record → nothing to fill.
+                    $pendingFormsQuery->whereRaw('0 = 1');
+                }
+            }
+            $pendingExitClearanceForms = $pendingFormsQuery->get();
+
             $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('created_by',$this->globalUser->GetEmployee->Admin_Parent_id)->get();
 
             $monthly = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
@@ -1388,7 +1427,7 @@ class MasterDashboardController extends Controller
                 'page_header','resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
-                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning','pendingPayrollApprovals'
+                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pendingExitClearanceForms','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning','pendingPayrollApprovals'
             ));
 
         // } catch (\Exception $e) {
@@ -1689,6 +1728,26 @@ class MasterDashboardController extends Controller
                 })->with('assignedForm')
                 ->get();
 
+            // ─── Resort-wide pending exit-clearance forms ──────────────
+            // XCOM oversight: every unfinished department clearance
+            // form across the resort, regardless of which HOD it's
+            // assigned to. Shows "X forms outstanding" with one-click
+            // path into the form (XCOM members have edit permission
+            // on the exit-clearance module by default).
+            $pendingExitClearanceForms = ExitClearanceFormAssignment::with([
+                    'exitClearanceForm:id,form_name',
+                    'employeeResignation:id,employee_id,last_working_day',
+                    'employeeResignation.employee:id,Admin_Parent_id,Position_id,Dept_id',
+                    'employeeResignation.employee.resortAdmin:id,first_name,last_name',
+                    'employeeResignation.employee.position:id,position_title',
+                    'employeeResignation.employee.department:id,name',
+                ])
+                ->where('resort_id', $resort_id)
+                ->where('assigned_to_type', 'department')
+                ->whereIn('status', ['Pending', 'In Progress', 'On Hold'])
+                ->orderByRaw("CASE WHEN deadline_date IS NULL THEN 1 ELSE 0 END, deadline_date ASC")
+                ->get();
+
 
 
             //write a query to get the total number of employees in each department with their department name total no employee vecant position and today leave count
@@ -1798,7 +1857,7 @@ class MasterDashboardController extends Controller
                 'resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
-                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','grivance_data','disiplinary_data','EmployeeResignation','departmentEmployeeCounts','serviceChargesData','ongoing_tranning','pendingPayrollApprovals'
+                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','grivance_data','disiplinary_data','EmployeeResignation','pendingExitClearanceForms','departmentEmployeeCounts','serviceChargesData','ongoing_tranning','pendingPayrollApprovals'
             ));
     }
 

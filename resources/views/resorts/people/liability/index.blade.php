@@ -419,11 +419,24 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
+                                                    @php
+                                                        $totalEstimated = 0;
+                                                        $totalActual    = 0;
+                                                    @endphp
                                                     @foreach($estVsActualRows as $row)
                                                         @php
                                                             $estimated = (float) ($row['estimated'] ?? 0);
                                                             $actual    = (float) ($row['actual']    ?? 0);
+                                                            // Per-row Remaining is clamped to 0 so individual cells
+                                                            // never show "negative remaining" (visually misleading).
+                                                            // The OVER-spend on a row gets surfaced in the footer's
+                                                            // Total Remaining instead, which is computed from the
+                                                            // totals (Est − Actual) — that's what the headline
+                                                            // Remaining Liability card shows and HR expects them to
+                                                            // match.
                                                             $remaining = max($estimated - $actual, 0);
+                                                            $totalEstimated += $estimated;
+                                                            $totalActual    += $actual;
                                                         @endphp
                                                         <tr>
                                                             <td>{{ $row['label'] }}</td>
@@ -434,6 +447,21 @@
                                                         </tr>
                                                     @endforeach
                                                 </tbody>
+                                                <tfoot>
+                                                    {{-- Footer total — Total Remaining uses (Estimated − Actual)
+                                                         from the totals so it matches the Remaining Liability
+                                                         headline card exactly. Sum of per-row max(0, ...) values
+                                                         would over-state Remaining when any actual exceeded its
+                                                         estimate (e.g. Overtime YTD ran over budget); this
+                                                         portfolio view nets the over-spend instead. --}}
+                                                    @php $totalRemaining = $totalEstimated - $totalActual; @endphp
+                                                    <tr class="fw-bold table-light">
+                                                        <td>Total</td>
+                                                        <td>{!! Common::formatCurrency($totalEstimated, 'USD') !!}</td>
+                                                        <td>{!! Common::formatCurrency($totalActual,    'USD') !!}</td>
+                                                        <td>{!! Common::formatCurrency($totalRemaining, 'USD') !!}</td>
+                                                    </tr>
+                                                </tfoot>
                                             </table>
                                         </div>
                                     </div>
