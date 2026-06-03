@@ -522,6 +522,12 @@ class PayslipController extends Controller
             'allowances' => 'nullable|string', // JSON string
             'deductions' => 'nullable|string', // JSON string
             'last_working_date' => 'nullable|date',
+            // Per-row leave breakdown HR locked in on the F&F page. JSON
+            // array of {leave_type, available_days, encashable_days,
+            // amount_mvr, is_encashable}. Stored as a frozen snapshot so
+            // the review page renders HR's signed-off values instead of
+            // re-running the live accrual calc each visit.
+            'leave_breakdown_json' => 'nullable|string',
         ]);
 
         $deductions = json_decode($request->input('deductions'), true) ?? [];
@@ -583,6 +589,15 @@ class PayslipController extends Controller
                     'total_deductions' => $totalDeductions,
                     'net_pay' => $validated['earned_salary'] - $totalDeductions,
                     'last_working_date' => $this->normaliseDateForDb($validated['last_working_date'] ?? null),
+                    // Persist the per-row leave breakdown HR locked in
+                    // on the F&F page. Stored verbatim as-posted (JSON
+                    // string in display currency); the review page
+                    // prefers this snapshot over a fresh getLeaveBalance
+                    // call so Day Off / Annual values don't shift between
+                    // submit and review due to live accrual.
+                    'leave_breakdown_json' => $this->normaliseLeaveBreakdownJson(
+                        $validated['leave_breakdown_json'] ?? null
+                    ),
                     'status' => 'review'
                 ]
             );
@@ -693,6 +708,24 @@ class PayslipController extends Controller
                 return null;
             }
         }
+    }
+
+    /**
+     * Defensive sanitiser for the leave_breakdown_json payload posted
+     * from the F&F page. Drops anything that doesn't parse as a JSON
+     * array so a malformed body lands as NULL (review then falls back
+     * to live getLeaveBalance) instead of breaking the JSON column.
+     */
+    private function normaliseLeaveBreakdownJson($raw): ?string
+    {
+        if (empty($raw)) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        return json_encode(array_values($decoded));
     }
 
     public function getDaysOffForEmployee($employeeId, $month, $year)
