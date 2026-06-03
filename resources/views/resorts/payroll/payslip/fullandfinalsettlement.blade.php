@@ -264,7 +264,12 @@
                         <div class="fullFinal-main mb-md-4 mb-3">
                             <div class="fullFinal-head">Deduction</div>
                             <div class="fullFinal-block">
-                                <div class="row g-md-4 g-3">
+                                {{-- IMPORTANT: this initial row must carry the .deduction-row
+                                     class so the submit JS picks it up. Without it the JS only
+                                     iterated rows appended by "Add More" and silently dropped
+                                     anything HR typed into the first slot (reported as
+                                     "Uniform Damage 100 USD didn't reach the review page"). --}}
+                                <div class="row g-md-4 g-3 deduction-row">
                                     <!-- Initial deduction row -->
                                     <div class="col-xl-3 col-sm">
                                         <select class="form-select select2t-none deduction-select" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
