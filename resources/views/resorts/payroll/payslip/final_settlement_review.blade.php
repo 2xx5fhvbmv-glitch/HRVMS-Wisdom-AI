@@ -260,13 +260,11 @@
                                                 </tr>
                                                 @php $totalEarnings += $serviceCharge; @endphp
 
-                                                {{-- Allowances (total). --}}
-                                                <tr>
-                                                    <td>Total Allowances</td>
-                                                    <td class="text-end">—</td>
-                                                    <td class="text-end">{!! Common::formatCurrency($totalAllowance, $payCurrency) !!}</td>
-                                                </tr>
-                                                @php $totalEarnings += $totalAllowance; @endphp
+                                                {{-- Allowances are shown one-per-row below via
+                                                     $finalSettlement->earnings, so the aggregate
+                                                     "Total Allowances" line that used to sit here
+                                                     was double-counting the same amounts. Removed
+                                                     per HR's review-page cleanup. --}}
 
                                                 {{-- Per-leave-category breakdown (Annual / PH / Day Off). --}}
                                                 @forelse($leaveRows as $row)
