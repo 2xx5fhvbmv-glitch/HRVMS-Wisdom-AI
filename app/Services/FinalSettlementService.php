@@ -188,10 +188,28 @@ class FinalSettlementService
         }
 
         $pension = round($basicMVR * 0.07, 2);
-        $taxableIncome = $basicMVR + $totalOtAmount + $totalAllowance + $ramadanBonus - $pension;
+
+        // Allowances prorate by worked days the same way basic salary does.
+        // Per HR policy: allowances are monthly entitlements — if the
+        // employee worked 12 of 27 days in the period, they receive
+        // 12/27 of the monthly allowance, not the full amount. Both the
+        // settlement total AND the per-row Allowance Breakdown reflect
+        // the prorated amount so the two tables can't disagree.
+        $allowanceProrateRatio    = $totalDays > 0 ? ($daysWorked / $totalDays) : 0;
+        $totalAllowanceProrated   = round($totalAllowance * $allowanceProrateRatio, 2);
+        // Stamp the prorated value back onto each per-row detail so the
+        // Allowance Breakdown table renders the actual paid figure
+        // (Language Allowance 50 USD × 0/27 = 0.00 USD instead of 50.00).
+        foreach ($allowanceDetails as &$_row) {
+            $_row['converted_amount'] = round($_row['converted_amount'] * $allowanceProrateRatio, 2);
+            $_row['original_amount']  = round($_row['original_amount']  * $allowanceProrateRatio, 2);
+        }
+        unset($_row);
+
+        $taxableIncome = $basicMVR + $totalOtAmount + $totalAllowanceProrated + $ramadanBonus - $pension;
 
         $proratedBasic = round($dailySalary * $daysWorked, 2);
-        $earnedSalary = $proratedBasic + $totalOtAmount + $totalAllowance + $ramadanBonus + $leaveEncashment;
+        $earnedSalary = $proratedBasic + $totalOtAmount + $totalAllowanceProrated + $ramadanBonus + $leaveEncashment;
 
         // ─── Notice Period Charge ──────────────────────────────────
         // Pulled from the Notice Period module config
@@ -383,7 +401,14 @@ class FinalSettlementService
             'notice_served_days'       => $noticeServedDays,
             'notice_shortfall_days'    => $noticeShortfallDays,
             'notice_rule_title'        => $noticeRuleTitle,
-            'total_allowances_mvr' => round($totalAllowance, 2),
+            // Settlement-facing total is the prorated value (allowances
+            // prorate by worked days, same as basic salary). The gross
+            // configured total and the prorate ratio go out alongside
+            // so the F&F page can render a "50.00 × 0/27 = 0.00"
+            // formula line under the Total Allowances row.
+            'total_allowances_mvr'         => $totalAllowanceProrated,
+            'total_allowances_full_mvr'    => round($totalAllowance, 2),
+            'allowance_prorate_ratio'      => $allowanceProrateRatio,
             'allowances' => $allowanceDetails,
             // ── Earnings ──
             // `earned_salary` mirrors the payroll_reviews column of the
