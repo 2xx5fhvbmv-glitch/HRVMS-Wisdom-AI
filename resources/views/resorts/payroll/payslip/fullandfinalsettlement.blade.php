@@ -654,7 +654,20 @@
         var workedDays    = $sd.data('base-earned-days') || 0;
         var earnedMvr     = parseFloat($sd.data('base-earned') || 0);
         var allowancesMvr = parseFloat($sd.data('base-allowances') || 0);
-        var serviceMvr    = parseFloat($sd.data('base-service-charge') || 0);
+        // Local helper: display-currency input → MVR for the math layer.
+        // Used for Service Charge (editable, currency = display) and the
+        // three top-of-form deduction inputs below.
+        function displayToMvr(displayVal) {
+            var n = parseFloat(displayVal);
+            if (!isFinite(n)) return 0;
+            return FNF_DISPLAY_CURRENCY === 'USD' && FNF_DOLLAR_TO_MVR > 0
+                ? n * FNF_DOLLAR_TO_MVR
+                : n;
+        }
+        // Service Charge — read LIVE from the input so HR edits ripple
+        // straight into Gross Earning, instead of using the stashed
+        // data-raw which only updates on employee-fetch.
+        var serviceMvr    = displayToMvr(stripMoney($('#service_charge').val()));
         // Leave encashment — read from the live table total, NOT the
         // server response (which is stale once HR has edited a row).
         var leaveMvr      = parseFloat($('#payable-leaves-amount-total').data('raw-mvr') || 0);
@@ -674,15 +687,9 @@
         // Period Charge) are in the DISPLAY currency. The dynamic
         // Deduction repeater rows below the table are also user-entered
         // and may be USD or MVR — read the unit alongside the amount.
-        // Convert everything back to MVR before subtracting so the
-        // arithmetic stays in the same currency as earnings.
-        function displayToMvr(displayVal) {
-            var n = parseFloat(displayVal);
-            if (!isFinite(n)) return 0;
-            return FNF_DISPLAY_CURRENCY === 'USD' && FNF_DOLLAR_TO_MVR > 0
-                ? n * FNF_DOLLAR_TO_MVR
-                : n;
-        }
+        // Convert everything back to MVR via the displayToMvr() helper
+        // declared at the top of this function so the arithmetic stays
+        // in MVR.
         var ewtDisplay   = stripMoney($('#tax').val());
         var loanDisplay  = stripMoney($('#loan_payment').val());
         var noticeDisplay = stripMoney($('#notice_period_charge').val());
@@ -777,7 +784,14 @@
     // in their existing handlers; this listener catches the resulting
     // .deduction-amount edits).
     $(document).on('input change',
+        // Earnings card inputs that aren't covered by the leave-table
+        // listener or the Earned-Salary toggle: Service Charge is the
+        // only editable money field here, but include it so HR edits
+        // ripple straight into Gross Earning + Net Settlement.
+        '#service_charge, ' +
+        // Deductions card top inputs (EWT / Loan / Notice).
         '#tax, #loan_payment, #notice_period_charge, ' +
+        // Dynamic Deduction repeater rows (amount / select / unit).
         '.deduction-amount, .deduction-select, .amount-unit, ' +
         'select[name="deductionFor[]"], input[name="deduction_amount[]"]',
         function () {
