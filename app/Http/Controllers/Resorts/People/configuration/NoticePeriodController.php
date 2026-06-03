@@ -116,18 +116,33 @@ class NoticePeriodController extends Controller
         $id = base64_decode($request->id);
 
         $emp_notice_period = EmployeeNoticePeriod::find($id);
-        
-        if($emp_notice_period){
-            $emp_notice_period->title = $request->title;
-            if($request->immediate_release == '1'){
-                $emp_notice_period->period = null;
-            }else{
-                $emp_notice_period->period = $request->period;
-            }
-            $emp_notice_period->immediate_release = $request->immediate_release ?? 0;
-            $emp_notice_period->save();
+
+        if(!$emp_notice_period){
+            return response()->json([
+                'success' => false,
+                'message' => 'Notice Period rule not found.',
+            ], 404);
         }
-         return response()->json([
+
+        $emp_notice_period->title = $request->title;
+        // Save period AS POSTED by HR. The previous logic forced period
+        // to null whenever immediate_release was ticked — silently lossy
+        // because Eloquent then saw no change vs the prior row and
+        // skipped the UPDATE entirely (visible as a stale `updated_at`).
+        // The two fields aren't mutually exclusive at the data layer:
+        // `immediate_release` is just a flag on the grade ("this grade
+        // is allowed to skip notice"), while `period` is the configured
+        // notice length for grades that DO serve it. F&F's notice-period
+        // charge calculation (FinalSettlementService:233-261) reads only
+        // `period` and ignores immediate_release entirely, so respecting
+        // both fields matches the downstream consumer.
+        $emp_notice_period->period            = ($request->period === '' || $request->period === null)
+            ? null
+            : $request->period;
+        $emp_notice_period->immediate_release = $request->immediate_release ?? 0;
+        $emp_notice_period->save();
+
+        return response()->json([
             'success' => true,
             'message' => 'Notice Period updated successfully.',
         ]);
