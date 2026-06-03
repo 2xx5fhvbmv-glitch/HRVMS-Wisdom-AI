@@ -110,19 +110,42 @@
                          Common::formatCurrency just prefixes the symbol — no
                          conversion happens here. ──────────────────────────────────── --}}
                     @php
-                        // Display currency for this settlement. The F&F page stores
-                        // values in MVR (the resort's payroll currency); preserved
-                        // as-is on the review page so totals match.
-                        $payCurrency = 'MVR';
+                        // Display currency = the employee's basic_salary_currency.
+                        // Previously hardcoded to MVR which broke USD-payroll
+                        // employees (their figures show as raw MVR alongside a
+                        // page header that says USD). The F&F service exposes
+                        // values in MVR internally, so MVR rows are converted to
+                        // display currency at render time via $toDisplay below.
+                        $payCurrency = $finalSettlement->employee->basic_salary_currency ?? 'MVR';
+                        $dollarToMvr = \App\Models\ResortSiteSettings::where('resort_id', $finalSettlement->employee->resort_id)->value('DollertoMVR') ?: 15.42;
+                        // MVR-stored amounts → render currency.
+                        $toDisplay = function ($mvr) use ($payCurrency, $dollarToMvr) {
+                            $n = (float) $mvr;
+                            if ($payCurrency === 'USD' && $dollarToMvr > 0) return $n / $dollarToMvr;
+                            return $n;
+                        };
+                        // F&F-stored amounts (final_settlements columns) → render
+                        // currency. The F&F page posts whatever was visible on
+                        // screen at submit, which means values land in the
+                        // EMPLOYEE'S basic_salary_currency. No conversion needed
+                        // when the stored unit already matches payCurrency.
+                        $storedToDisplay = function ($val) {
+                            return (float) $val;
+                        };
+                        $isMaldivian = strtolower((string) $finalSettlement->employee->nationality) === 'maldivian';
 
                         // Build per-leave-category rows once so both totals on the
                         // left ("Total Earnings") and the right ("Leave Days Salary"
                         // line) are derived from the same source — no math drift.
+                        // daily_salary from the service is MVR — convert when the
+                        // employee is on USD payroll so the row amount column
+                        // matches the page's pay currency.
                         $leaveRows = [];
                         $leaveDaysSalaryTotal = 0;
+                        $dailySalaryDisplay = $toDisplay($calculated['daily_salary'] ?? 0);
                         if (!empty($leaveBalances['details'])) {
                             foreach ($leaveBalances['details'] as $b) {
-                                $amount = ($b['available_days'] ?? 0) * ($calculated['daily_salary'] ?? 0);
+                                $amount = ($b['available_days'] ?? 0) * $dailySalaryDisplay;
                                 $leaveDaysSalaryTotal += $amount;
                                 $leaveRows[] = [
                                     'leave_type' => $b['leave_type'] ?? 'Leave',
@@ -131,6 +154,53 @@
                                 ];
                             }
                         }
+                    @endphp
+
+                    {{-- Build the row sets up front so the Earnings table on the
+                         left and the Net Pay summary at the bottom both pull
+                         from the same numbers — no drift between the two cards.
+
+                         Sources of truth:
+                           • $finalSettlement columns: what HR submitted on the
+                             F&F page (basic_salary, service_charge, total_earnings,
+                             tax, pension, loan_payment). These reach the page in
+                             the employee's basic_salary_currency, so no conversion
+                             is needed at render time.
+                           • $calculated (from FinalSettlementService): MVR-internal
+                             values used as fallbacks when the saved column is
+                             empty (older settlements pre-dating the column).
+                             These DO need MVR → payCurrency conversion via
+                             $toDisplay.
+                           • $leaveBalances: leave breakdown for the per-row
+                             Payable Leaves table; the daily_salary multiplier
+                             also runs through $toDisplay. --}}
+                    @php
+                        $workedDays = (int) ($calculated['worked_days'] ?? 0);
+
+                        // Earned Salary (Basic Salary For N Days). Prefer the
+                        // HR-submitted value (final_settlements.total_earnings —
+                        // this is what HR called "Earned Salary" on the F&F
+                        // page); fall back to the service's prorated MVR figure
+                        // converted to display currency. Was missing entirely
+                        // on the old layout (reported as "earned salary is
+                        // missing").
+                        $proratedBasic = isset($finalSettlement->total_earnings) && $finalSettlement->total_earnings > 0
+                            ? (float) $finalSettlement->total_earnings
+                            : $toDisplay($calculated['proratedBasic'] ?? 0);
+
+                        // Service Charge — HR submitted via the Earnings card on
+                        // the F&F page; was rendered on the wrong side of the
+                        // review (under Deductions) and read 0 because the
+                        // column lookup path was right but the layout was
+                        // wrong. Moved here so it sits where HR submitted it.
+                        $serviceCharge = $storedToDisplay($finalSettlement->service_charge ?? 0);
+
+                        $totalAllowance = $toDisplay($calculated['total_allowances_mvr'] ?? 0);
+
+                        $ewt          = $storedToDisplay($finalSettlement->tax ?? 0);
+                        $pension      = $storedToDisplay($finalSettlement->pension ?? 0);
+                        $loanRecovery = $storedToDisplay($finalSettlement->loan_payment ?? 0);
+                        $noticeCharge = $toDisplay($calculated['notice_period_charge_mvr'] ?? 0);
                     @endphp
 
                     <div class="row g-md-4 g-3 mb-3">
@@ -143,13 +213,42 @@
                                         <table class="paySlipBorder-table">
                                             <thead>
                                                 <tr>
-                                                    <th>Payable Leaves</th>
+                                                    <th>Particulars</th>
                                                     <th class="text-end">Days</th>
                                                     <th class="text-end">Amount ({{ $payCurrency }})</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 @php $totalEarnings = 0; @endphp
+
+                                                {{-- Earned Salary (basic-for-N-days). --}}
+                                                <tr>
+                                                    <td>
+                                                        Earned Salary
+                                                        <small class="text-muted">(Basic Salary for {{ $workedDays }} day(s))</small>
+                                                    </td>
+                                                    <td class="text-end">{{ $workedDays }}</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($proratedBasic, $payCurrency) !!}</td>
+                                                </tr>
+                                                @php $totalEarnings += $proratedBasic; @endphp
+
+                                                {{-- Service Charge. --}}
+                                                <tr>
+                                                    <td>Service Charge</td>
+                                                    <td class="text-end">—</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($serviceCharge, $payCurrency) !!}</td>
+                                                </tr>
+                                                @php $totalEarnings += $serviceCharge; @endphp
+
+                                                {{-- Allowances (total). --}}
+                                                <tr>
+                                                    <td>Total Allowances</td>
+                                                    <td class="text-end">—</td>
+                                                    <td class="text-end">{!! Common::formatCurrency($totalAllowance, $payCurrency) !!}</td>
+                                                </tr>
+                                                @php $totalEarnings += $totalAllowance; @endphp
+
+                                                {{-- Per-leave-category breakdown (Annual / PH / Day Off). --}}
                                                 @forelse($leaveRows as $row)
                                                     <tr>
                                                         <td>{{ $row['leave_type'] }}</td>
@@ -163,12 +262,7 @@
                                                     </tr>
                                                 @endforelse
 
-                                                {{-- Air Ticket Reimbursement + any other custom
-                                                     earnings the F&F submission attached
-                                                     (relocation ticket, joining bonus, etc.).
-                                                     `$finalSettlement->earnings` is the
-                                                     final_settlement_earnings rows keyed to
-                                                     resort_budget_costs.particulars. --}}
+                                                {{-- Custom earnings (Air Ticket, joining bonus, etc.). --}}
                                                 @if(!empty($finalSettlement->earnings))
                                                     @foreach($finalSettlement->earnings as $earnings)
                                                         @php $totalEarnings += $earnings->amount; @endphp
@@ -192,7 +286,10 @@
                             </div>
                         </div>
 
-                        {{-- ─────────── DEDUCTIONS / SETTLEMENT DETAILS card (right) ─────────── --}}
+                        {{-- ─────────── DEDUCTIONS card (right) ───────────
+                             Strictly the actual deductions HR posted (EWHT, MRPS,
+                             Loan, Notice, custom). Basic / Service / Allowance
+                             now live in the Earnings card where they belong. --}}
                         <div class="col-md-6">
                             <div class="paySlip-block p-0">
                                 <div class="paySlip-header">Deductions</div>
@@ -201,65 +298,25 @@
                                         <table class="paySlipBorder-table">
                                             <thead>
                                                 <tr>
-                                                    <th>Settlement Details</th>
+                                                    <th>Particulars</th>
                                                     <th class="text-end">{{ $payCurrency }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {{-- Build-up of Gross Pay. Each row mirrors a
-                                                     line on the F&F submit form so HR can
-                                                     reconcile the review against what they
-                                                     entered. --}}
-                                                @php
-                                                    $workedDays      = (int) ($calculated['worked_days'] ?? 0);
-                                                    $proratedBasic   = (float) ($finalSettlement->proratedBasic ?? $calculated['proratedBasic'] ?? 0);
-                                                    $serviceCharge   = (float) ($finalSettlement->service_charge ?? 0);
-                                                    $totalAllowance  = (float) ($calculated['total_allowances_mvr'] ?? 0);
-                                                    $grossPay        = $proratedBasic + $serviceCharge + $leaveDaysSalaryTotal + $totalAllowance;
-
-                                                    $ewt             = (float) ($calculated['ewt'] ?? 0);
-                                                    $pension         = (float) ($calculated['pension'] ?? 0);
-                                                    $loanRecovery    = (float) ($calculated['loan_recovery'] ?? 0);
-                                                    $noticeCharge    = (float) ($calculated['notice_period_charge_mvr'] ?? 0);
-                                                @endphp
-                                                <tr>
-                                                    <td>
-                                                        Basic Salary For
-                                                        <span class="badge bg-light text-dark ms-1">{{ $workedDays }} Days</span>
-                                                    </td>
-                                                    <td class="text-end">{!! Common::formatCurrency($proratedBasic, $payCurrency) !!}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Service Charge Amount</td>
-                                                    <td class="text-end">{!! Common::formatCurrency($serviceCharge, $payCurrency) !!}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Leave Days Salary</td>
-                                                    <td class="text-end">{!! Common::formatCurrency($leaveDaysSalaryTotal, $payCurrency) !!}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Total Allowance Amount</td>
-                                                    <td class="text-end">{!! Common::formatCurrency($totalAllowance, $payCurrency) !!}</td>
-                                                </tr>
-                                                <tr class="fw-600">
-                                                    <td>Gross Pay</td>
-                                                    <td class="text-end">{!! Common::formatCurrency($grossPay, $payCurrency) !!}</td>
-                                                </tr>
-
-                                                {{-- ── Actual deductions ──
-                                                     EWHT, Pension, Loan/Advance recovery,
-                                                     Notice Period charge, and any custom
-                                                     deductions HR added during the F&F submit
-                                                     (Notice Period Charge, Adjustments-Deduction,
-                                                     City Ledger Deduction, etc.). --}}
                                                 @php $totalDeductions = 0; @endphp
+
                                                 <tr>
                                                     <td>EWHT - Total Taxable Income</td>
                                                     <td class="text-end">{!! Common::formatCurrency($ewt, $payCurrency) !!}</td>
                                                 </tr>
                                                 @php $totalDeductions += $ewt; @endphp
 
-                                                @if($pension > 0)
+                                                {{-- MRPS / Pension applies only to Maldivian
+                                                     employees (the F&F page hides the column
+                                                     for foreigners; mirror that gate here so a
+                                                     stray non-zero pension value can't show up
+                                                     on a foreign employee's settlement). --}}
+                                                @if($isMaldivian && $pension > 0)
                                                     <tr>
                                                         <td>MRPS Employee Mandatory Contribution</td>
                                                         <td class="text-end">{!! Common::formatCurrency($pension, $payCurrency) !!}</td>
