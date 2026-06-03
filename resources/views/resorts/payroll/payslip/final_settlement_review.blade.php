@@ -134,16 +134,36 @@
                         };
                         $isMaldivian = strtolower((string) $finalSettlement->employee->nationality) === 'maldivian';
 
-                        // Build per-leave-category rows once so both totals on the
-                        // left ("Total Earnings") and the right ("Leave Days Salary"
-                        // line) are derived from the same source — no math drift.
-                        // daily_salary from the service is MVR — convert when the
-                        // employee is on USD payroll so the row amount column
-                        // matches the page's pay currency.
+                        // Build per-leave-category rows. Source priority:
+                        //   1. final_settlements.leave_breakdown_json (frozen
+                        //      snapshot HR signed off on at submit — locks in
+                        //      manual edits like trimming Day Off 8→7 so it
+                        //      doesn't re-accrue back to 8 on the review page).
+                        //   2. Fresh getLeaveBalance() call as a fallback for
+                        //      older settlements pre-dating the snapshot column.
+                        //
+                        // daily_salary from the service is MVR — convert when
+                        // the employee is on USD payroll so the row amount
+                        // column matches the page's pay currency.
                         $leaveRows = [];
                         $leaveDaysSalaryTotal = 0;
                         $dailySalaryDisplay = $toDisplay($calculated['daily_salary'] ?? 0);
-                        if (!empty($leaveBalances['details'])) {
+
+                        $snapshot = !empty($finalSettlement->leave_breakdown_json)
+                            ? json_decode($finalSettlement->leave_breakdown_json, true)
+                            : null;
+                        if (is_array($snapshot) && count($snapshot) > 0) {
+                            foreach ($snapshot as $b) {
+                                $days = (float) ($b['available_days'] ?? 0);
+                                $amount = $days * $dailySalaryDisplay;
+                                $leaveDaysSalaryTotal += $amount;
+                                $leaveRows[] = [
+                                    'leave_type' => $b['leave_type'] ?? 'Leave',
+                                    'days'       => $days,
+                                    'amount'     => $amount,
+                                ];
+                            }
+                        } elseif (!empty($leaveBalances['details'])) {
                             foreach ($leaveBalances['details'] as $b) {
                                 $amount = ($b['available_days'] ?? 0) * $dailySalaryDisplay;
                                 $leaveDaysSalaryTotal += $amount;
@@ -394,17 +414,24 @@
                     </div>
 
                     @php
-                        function convertToWords($number) {
-                            $formatter = new NumberFormatter('en', NumberFormatter::SPELLOUT);
-                            $whole = floor($number);
-                            $fraction = round(($number - $whole) * 100);
-                            
-                            $wholeWords = ucfirst($formatter->format($whole));
-                            
-                            if ($fraction > 0) {
-                                return $wholeWords . ' point ' . $formatter->format($fraction);
-                            } else {
-                                return $wholeWords;
+                        // Split sign + whole + fraction BEFORE flooring. Previously
+                        // floor(-218.67) returned -219 (Carbon-of-the-flooring-world:
+                        // toward negative infinity), so the converter spoke
+                        // "Minus two hundred nineteen point thirty-three" instead
+                        // of "Minus two hundred eighteen point sixty-seven".
+                        // Work with absolute value, then re-attach the sign.
+                        if (!function_exists('convertToWords')) {
+                            function convertToWords($number) {
+                                $formatter = new NumberFormatter('en', NumberFormatter::SPELLOUT);
+                                $sign = $number < 0 ? 'Minus ' : '';
+                                $abs = abs((float) $number);
+                                $whole = (int) floor($abs);
+                                $fraction = (int) round(($abs - $whole) * 100);
+                                $wholeWords = ucfirst($formatter->format($whole));
+                                if ($fraction > 0) {
+                                    return $sign . $wholeWords . ' point ' . $formatter->format($fraction);
+                                }
+                                return $sign . $wholeWords;
                             }
                         }
                     @endphp

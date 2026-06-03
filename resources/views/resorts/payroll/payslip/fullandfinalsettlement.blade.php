@@ -613,6 +613,39 @@
             $('#leave_encashment').val(displayAmt).trigger('change');
         }
 
+        // Persisted snapshot of the per-row breakdown — every row's
+        // current type + days + per-row amount as HR left it. Posted
+        // alongside the headline totals so the review page can render
+        // the SAME numbers HR signed off on, rather than re-running
+        // FinalSettlementService::getLeaveBalance() and showing tomorrow's
+        // freshly-accrued Day Off count instead of yesterday's signed value.
+        var breakdownSnapshot = [];
+        $('#payable-leaves tbody tr').each(function () {
+            var $r = $(this);
+            var $typeCell = $r.find('.payable-leave-type');
+            var typeName = $typeCell.length
+                ? ($typeCell.val() || '').trim()
+                : $r.find('td').first().text().replace(/Encashable/, '').trim();
+            if (!typeName) return;
+            var days = parseFloat($r.find('.payable-leave-days').val() || 0);
+            if (!isFinite(days) || days < 0) days = 0;
+            breakdownSnapshot.push({
+                leave_type: typeName,
+                available_days: days,
+                encashable_days: $r.data('encashable') === false ? 0 : days,
+                amount_mvr: days * dailyRate,
+                is_encashable: $r.data('encashable') !== false,
+            });
+        });
+        // Hidden input on the F&F form; created lazily so older renders
+        // of the page still post the field if HR edits anything.
+        if ($('#leave_breakdown_json').length === 0) {
+            $('#final-settlement-form').append(
+                '<input type="hidden" name="leave_breakdown_json" id="leave_breakdown_json">'
+            );
+        }
+        $('#leave_breakdown_json').val(JSON.stringify(breakdownSnapshot));
+
         // The compact one-liner under the Leave Balance input must reflect
         // the LIVE rows (server breakdown + HR edits + added rows), not the
         // frozen response payload.
