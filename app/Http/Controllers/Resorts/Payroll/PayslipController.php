@@ -569,11 +569,20 @@ class PayslipController extends Controller
                     'total_earnings' => $validated['earned_salary'],
                     'service_charge' => $validated['service_charge'],
                     'payment_mode' => $validated['payment_mode'] ?? null,
-                    'doc_date' => $validated['doc_date'] ?? now(),
+                    // Both date columns are MySQL `date` typed. Laravel's
+                    // `nullable|date` validation accepts human-readable
+                    // strings like "21 May 2026" (strtotime parses them),
+                    // but MySQL doesn't — they land as NULL, which is
+                    // exactly why the review page rendered the famous
+                    // "30 Nov -0001" Carbon default. Normalise via a
+                    // local helper so whatever format the form ships
+                    // (ISO, d/m/Y, human-readable) reaches MySQL as Y-m-d.
+                    'doc_date'          => $this->normaliseDateForDb($validated['doc_date'] ?? null)
+                                            ?? now()->format('Y-m-d'),
                     'reference_no' => $reference,
                     'total_deductions' => $totalDeductions,
                     'net_pay' => $validated['earned_salary'] - $totalDeductions,
-                    'last_working_date' => $validated['last_working_date'] ?? null,
+                    'last_working_date' => $this->normaliseDateForDb($validated['last_working_date'] ?? null),
                     'status' => 'review'
                 ]
             );
@@ -658,6 +667,32 @@ class PayslipController extends Controller
             'today', // ✅ Pass the $today variable
             'page_title',
         ));
+    }
+
+    /**
+     * Coerce a date string from the F&F form (which posts whatever
+     * formatBackendDate produced — ISO, "d M Y", or d/m/Y) into the
+     * Y-m-d shape MySQL's `date` columns accept. Returns null when the
+     * value is empty or unparseable (so a busted input lands as NULL
+     * instead of the "30 Nov -0001" Carbon default that previously
+     * leaked onto the review page).
+     */
+    private function normaliseDateForDb($raw): ?string
+    {
+        if (empty($raw)) {
+            return null;
+        }
+        try {
+            return Carbon::parse($raw)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            // Fallback: try d/m/Y explicitly before giving up — Carbon
+            // can't auto-parse the slash-form in non-US locales.
+            try {
+                return Carbon::createFromFormat('d/m/Y', $raw)->format('Y-m-d');
+            } catch (\Throwable $e2) {
+                return null;
+            }
+        }
     }
 
     public function getDaysOffForEmployee($employeeId, $month, $year)

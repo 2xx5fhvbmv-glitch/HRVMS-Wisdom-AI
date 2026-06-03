@@ -33,13 +33,20 @@
                                     <img src="{{ Common::getResortUserPicture($finalSettlement->employee->Admin_Parent_id)}}" alt="image">
                                 </div>
                                 <div>
-                                    <h4>{{$finalSettlement->employee->resortAdmin->full_name}} <span class="badge badge-themeLight">{{$finalSettlement->Emp_id}}</span></h4>
+                                    {{-- Employee ID was reading $finalSettlement->Emp_id, which
+                                         doesn't exist on the final_settlements table — the value
+                                         lives on the related employee row. --}}
+                                    <h4>{{$finalSettlement->employee->resortAdmin->full_name}} <span class="badge badge-themeLight">{{$finalSettlement->employee->Emp_id}}</span></h4>
                                     <div class="table-responsive">
                                         <table class="paySlip-table">
                                             <tr><th>Position:</th><td>{{$finalSettlement->employee->position->position_title}}</td></tr>
                                             <tr><th>Department:</th><td>{{$finalSettlement->employee->department->name}}</td></tr>
                                             <tr><th>Division:</th><td>{{$finalSettlement->employee->division->name}}</td></tr>
-                                            <tr><th>Basic Salary:</th><td>{{$finalSettlement->basic_salary}} MVR</td></tr>
+                                            {{-- Basic Salary currency was hardcoded MVR even though
+                                                 employees on USD payroll have their basic stored in
+                                                 USD on the employee row. Show the employee's actual
+                                                 stored basic + their basic_salary_currency. --}}
+                                            <tr><th>Basic Salary:</th><td>{{ number_format((float) ($finalSettlement->employee->basic_salary ?? 0), 2) }} {{ $finalSettlement->employee->basic_salary_currency ?? 'MVR' }}</td></tr>
                                             <tr><th>Payroll Start Date:</th><td>{{$calculated['payroll_start']}}</td></tr>
                                             <tr><th>Remarks:</th><td></td></tr>
                                         </table>
@@ -56,8 +63,23 @@
                                         <tr><th>Reference No.</th><td>{{$finalSettlement->reference_no}}</td></tr>
                                         <tr><th>Pay Mode:</th><td>{{$finalSettlement->employee->payment_mode}}</td></tr>
                                         <tr><th>Hire Date:</th><td>{{ \Carbon\Carbon::parse($finalSettlement->employee->joining_date)->format('d M Y') }}</td></tr>
-                                        <tr><th>Last Working Date:</th><td>{{ \Carbon\Carbon::parse($finalSettlement->last_working_date)->format('d M Y') }}</td></tr>
-                                        <tr><th>Payroll Month:</th><td>{{ \Carbon\Carbon::parse($calculated['payroll_start'])->format('F') }}</td></tr>
+                                        {{-- final_settlements.last_working_date is nullable and
+                                             reaches the page as NULL when the F&F store didn't
+                                             receive a parseable value (Carbon::parse(null) then
+                                             renders as "30 Nov -0001"). Fall back to the
+                                             employee's resignation last_working_day, which is
+                                             always present at this point in the lifecycle. --}}
+                                        @php
+                                            $lwd = $finalSettlement->last_working_date
+                                                ?: optional($finalSettlement->employee->resignation)->last_working_day;
+                                        @endphp
+                                        <tr><th>Last Working Date:</th><td>{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('d M Y') : '—' }}</td></tr>
+                                        {{-- Payroll Month was the month the payroll WINDOW starts
+                                             (Apr for a 25-Apr → 24-May cycle). HR reads "Payroll
+                                             Month" as the month of the last working day (when the
+                                             employee actually left), which matches the payslip
+                                             convention. Fall back to payroll_start if no LWD. --}}
+                                        <tr><th>Payroll Month:</th><td>{{ $lwd ? \Carbon\Carbon::parse($lwd)->format('F') : \Carbon\Carbon::parse($calculated['payroll_start'])->format('F') }}</td></tr>
                                         <tr><th>Reason:</th><td>{{$finalSettlement->employee->resignation->reason_title->reason}}</td></tr>
                                     </table>
                                 </div>
