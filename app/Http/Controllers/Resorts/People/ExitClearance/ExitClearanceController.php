@@ -879,35 +879,65 @@ class ExitClearanceController extends Controller
         }
         $exitClearanceFormAssignment->update($completedPayload);
 
-        // Notify HR (the resignation's hr_id, or the resort HR fallback)
-        // that a department has completed their clearance form so HR can
-        // verify and progress the offboarding.
-        $resignation = EmployeeResignation::with('employee.resortAdmin')
-            ->find($exitClearanceFormAssignment->emp_resignation_id);
+        // Notify HR that a department has completed their clearance form so
+        // HR can verify and progress the offboarding. Two reasons the prior
+        // single-recipient call missed people:
+        //   • $resignation->hr_id is only populated when HR explicitly took
+        //     ownership of the resignation; otherwise the fallback (one HR
+        //     HOD/EXCOM via FindResortHR) silently pings a single person who
+        //     may not be the one tracking exits.
+        //   • Rank-3 HR staff — the people who actually drive clearance
+        //     day-to-day — were never on the receiving end of the fallback.
+        // Fan the bell out to every active HR-department employee (ranks 1-3
+        // covers EXCOM + HOD + HR staff) so at least one of them sees it.
+        // The submitter's name + department are included in the message
+        // body so HR knows who completed it and for which step.
+        $resignation = EmployeeResignation::with([
+            'employee.resortAdmin',
+            'employee.department',
+        ])->find($exitClearanceFormAssignment->emp_resignation_id);
+        $submitter = Auth::guard('resort-admin')->user();
+        $submitterName = optional($submitter)->full_name
+            ?: trim((optional($submitter)->first_name ?? '') . ' ' . (optional($submitter)->last_name ?? ''));
+        $submitterName = $submitterName !== '' ? $submitterName : 'A user';
+        $submitterDeptName = null;
+        if ($submitter && !empty($submitter->Dept_id)) {
+            $submitterDeptName = \App\Models\ResortDepartment::whereKey($submitter->Dept_id)->value('name');
+        }
+        $deptSuffix = $submitterDeptName ? " ({$submitterDeptName})" : '';
         if ($resignation) {
-            $hrId = $resignation->hr_id;
-            if (empty($hrId)) {
-                $hrFallback = \App\Helpers\Common::FindResortHR($this->resort);
-                $hrId = optional($hrFallback)->id;
+            $empName = optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'an employee';
+            $message = "✅ {$submitterName}{$deptSuffix} submitted the exit clearance form for {$empName}.";
+
+            // Recipient set:
+            //   1. The resignation's tracked HR (hr_id) if set — they own it.
+            //   2. PLUS every active HR-dept employee at rank 1-3 so the
+            //      whole HR team sees it, not just one assigned coordinator.
+            $recipientIds = \App\Models\Employee::where('resort_id', $this->resort->resort_id)
+                ->whereHas('department', function ($q) {
+                    $q->whereIn(DB::raw('LOWER(name)'), ['human resources', 'hr']);
+                })
+                ->whereIn('rank', [1, 2, 3])
+                ->whereNotIn('status', ['Terminated', 'Inactive'])
+                ->pluck('id')
+                ->all();
+            if (!empty($resignation->hr_id)) {
+                $recipientIds[] = $resignation->hr_id;
             }
-            $empName = optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee';
-            $this->notifyExit(
-                $hrId,
-                'Exit Clearance Form Completed',
-                "✅ A department clearance form has been completed for {$empName}."
-            );
+            $recipientIds = array_values(array_unique(array_filter($recipientIds)));
+
+            foreach ($recipientIds as $rid) {
+                $this->notifyExit($rid, 'Exit Clearance Form Submitted', $message);
+            }
         }
 
-        // Suggest where to send the user after the success toast. The JS
-        // falls back to the HOD dashboard if this isn't set, but for
-        // users who DO have edit permission on the module (HR / XCOM /
-        // GM filling on a HOD's behalf) the resignation's view-details
-        // page is more useful so they can see the now-Completed badge
-        // and any other pending forms on the same resignation.
-        $redirectUrl = null;
-        if (Common::checkRouteWisePermission('people.exit-clearance', config('settings.resort_permissions.view'))) {
-            $redirectUrl = route('people.exit-clearance.viewDetails', base64_encode($exitClearanceFormAssignment->emp_resignation_id));
-        }
+        // Per product decision: ALL submitters (HR, HOD, XCOM, dept members)
+        // land on the People dashboard after submitting. Previously HR/edit-
+        // permission users were sent to view-details and everyone else to
+        // the HOD dashboard fallback in the JS — both routes are now bypassed
+        // in favour of one consistent destination so the JS condition tree
+        // below has nothing to disambiguate.
+        $redirectUrl = route('people.hr.dashboard');
 
         return response()->json([
             'success' => true,
