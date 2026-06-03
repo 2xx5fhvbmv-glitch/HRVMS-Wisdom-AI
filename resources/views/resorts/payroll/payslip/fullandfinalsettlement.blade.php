@@ -287,7 +287,7 @@
                             <div class="fullFinal-head">
                                 Settlement Breakdown
                                 <small class="text-muted ms-2" style="font-size:12px; font-weight:400;">
-                                    Earned Salary + Allowances + Leave Encashment + Service Charge → Gross Earning
+                                    Earnings − Deductions → Net Settlement
                                 </small>
                             </div>
                             <div class="card-body fullFinal-block">
@@ -299,11 +299,11 @@
                                         </tr>
                                     </thead>
                                     <tbody id="settlement-details-body">
-                                        <!-- Populated by JS -->
+                                        <!-- Populated by JS: earnings → Gross Earning subtotal → deductions → Total Deductions subtotal -->
                                     </tbody>
                                     <tfoot>
                                         <tr class="fw-bold">
-                                            <th>Gross Earning</th>
+                                            <th>Net Settlement</th>
                                             <th class="text-end" id="settlement-details-total">0.00 {{ $displayCurrencyCode ?? 'MVR' }}</th>
                                         </tr>
                                     </tfoot>
@@ -640,7 +640,8 @@
         // server response (which is stale once HR has edited a row).
         var leaveMvr      = parseFloat($('#payable-leaves-amount-total').data('raw-mvr') || 0);
 
-        var rows = [
+        // ─── Earnings ──────────────────────────────────────────────
+        var earningRows = [
             { label: 'Earned Salary <small class="text-muted">(' + workedDays + ' paid day(s) × ' +
                 formatMoney(mvrToDisplay(dailyRate)) + ' ' + FNF_DISPLAY_CURRENCY + '/day)</small>',
               value: earnedMvr },
@@ -649,17 +650,83 @@
             { label: 'Leave Encashment',  value: leaveMvr },
         ];
 
+        // ─── Deductions ────────────────────────────────────────────
+        // All three top-of-form deduction inputs (EWT / Loan / Notice
+        // Period Charge) are in the DISPLAY currency. The dynamic
+        // Deduction repeater rows below the table are also user-entered
+        // and may be USD or MVR — read the unit alongside the amount.
+        // Convert everything back to MVR before subtracting so the
+        // arithmetic stays in the same currency as earnings.
+        function displayToMvr(displayVal) {
+            var n = parseFloat(displayVal);
+            if (!isFinite(n)) return 0;
+            return FNF_DISPLAY_CURRENCY === 'USD' && FNF_DOLLAR_TO_MVR > 0
+                ? n * FNF_DOLLAR_TO_MVR
+                : n;
+        }
+        var ewtDisplay   = stripMoney($('#tax').val());
+        var loanDisplay  = stripMoney($('#loan_payment').val());
+        var noticeDisplay = stripMoney($('#notice_period_charge').val());
+
+        var deductionRows = [
+            { label: 'EWT',                   value: displayToMvr(ewtDisplay) },
+            { label: 'Loan / Advance Payment', value: displayToMvr(loanDisplay) },
+            { label: 'Notice Period Charge',  value: displayToMvr(noticeDisplay) },
+        ];
+
+        // Dynamic Deduction repeater rows (Select Deduction + Amount + Unit).
+        // Each row contributes one labelled line. Unit determines whether
+        // we convert to MVR before subtracting.
+        $('#settlement-details').data('base-earned'); // no-op (keep $sd hot)
+        $('.deduction-select, select[name="deductionFor[]"]').each(function () {
+            var $row = $(this).closest('.row');
+            var name = $.trim($(this).find('option:selected').text());
+            if (!name || name === 'Select Deduction') return;
+            var amountVal = parseFloat($row.find('.deduction-amount').val() || 0);
+            if (!isFinite(amountVal) || amountVal <= 0) return;
+            var unit = ($row.find('.amount-unit').val() || 'MVR').toUpperCase();
+            var amtMvr = unit === 'USD' && FNF_DOLLAR_TO_MVR > 0
+                ? amountVal * FNF_DOLLAR_TO_MVR
+                : amountVal;
+            deductionRows.push({ label: name, value: amtMvr });
+        });
+
+        // ─── Render ───────────────────────────────────────────────
         var $body = $('#settlement-details-body').empty();
-        var total = 0;
-        rows.forEach(function (r) {
-            total += r.value;
+        var grossMvr = 0;
+        earningRows.forEach(function (r) {
+            grossMvr += r.value;
             $body.append(
                 '<tr><td>' + r.label + '</td>' +
                 '<td class="text-end">' + formatMoney(mvrToDisplay(r.value)) + '</td></tr>'
             );
         });
+        // Gross Earning subtotal (carries the same role the old footer
+        // played; sits above the deduction rows so HR sees the
+        // pre-deduction figure clearly).
+        $body.append(
+            '<tr class="fw-bold table-light"><td>Gross Earning</td>' +
+            '<td class="text-end">' + formatMoney(mvrToDisplay(grossMvr)) + '</td></tr>'
+        );
+
+        var deductionsMvr = 0;
+        deductionRows.forEach(function (d) {
+            deductionsMvr += d.value;
+            // Negative-styling cue: red text + leading minus so the
+            // direction reads clearly even at a glance.
+            $body.append(
+                '<tr class="text-danger"><td>' + d.label + '</td>' +
+                '<td class="text-end">− ' + formatMoney(mvrToDisplay(d.value)) + '</td></tr>'
+            );
+        });
+        $body.append(
+            '<tr class="fw-bold table-light"><td>Total Deductions</td>' +
+            '<td class="text-end text-danger">− ' + formatMoney(mvrToDisplay(deductionsMvr)) + '</td></tr>'
+        );
+
+        var netMvr = grossMvr - deductionsMvr;
         $('#settlement-details-total').text(
-            formatMoney(mvrToDisplay(total), FNF_DISPLAY_CURRENCY)
+            formatMoney(mvrToDisplay(netMvr), FNF_DISPLAY_CURRENCY)
         );
     }
 
@@ -674,6 +741,29 @@
     $(document).on('click', '#payable-leaves tbody .payable-leave-remove', function () {
         $(this).closest('tr').remove();
         recalcPayableLeaves();
+    });
+    // Any deduction input change → rebuild the Settlement Breakdown so
+    // the Total Deductions + Net Settlement rows reflect the new value.
+    // Covers all three top-of-form inputs + every dynamic Deduction
+    // repeater row (select + amount + unit), plus row add/remove via
+    // the .add-deduction / .remove-deduction buttons (handled separately
+    // in their existing handlers; this listener catches the resulting
+    // .deduction-amount edits).
+    $(document).on('input change',
+        '#tax, #loan_payment, #notice_period_charge, ' +
+        '.deduction-amount, .deduction-select, .amount-unit, ' +
+        'select[name="deductionFor[]"], input[name="deduction_amount[]"]',
+        function () {
+            recomputeGrossEarning();
+        }
+    );
+    // Removing a repeater row → recompute (the row is gone before our
+    // change listener fires, so a separate click handler is cleaner).
+    $(document).on('click', '.remove-deduction', function () {
+        // The existing remove-deduction handler removes the .row; queue
+        // recompute after the DOM mutation so the deleted row is out
+        // of consideration when we sum.
+        setTimeout(recomputeGrossEarning, 0);
     });
     // Earned Salary manual override. Pencil → check, input toggles
     // readonly, and any HR-entered value rolls into Gross Earning via
