@@ -331,13 +331,45 @@
                      Schedule Confirm' which silently hid the buttons whenever
                      the meeting flow had been skipped. --}}
                 @php
-                    $canHodAct = ($is_hod ?? false) && $employeeResignation->hod_status === 'Pending';
-                    $canHrAct  = ($is_hr ?? false) && $employeeResignation->hr_status === 'Pending'
-                                && $employeeResignation->hod_status === 'Approved';
-                    $canAct = ($canHodAct || $canHrAct) && $employeeResignation->status !== 'Approved'
-                              && $employeeResignation->status !== 'Rejected'
-                              && $employeeResignation->status !== 'Withdraw';
+                    // Treat NULL/empty hod_status/hr_status as 'Pending' —
+                    // legacy resignations created before the dual-status
+                    // workflow have these columns NULL, which made the
+                    // strict `=== 'Pending'` comparison miss and the
+                    // buttons silently hide.
+                    $hodStatusEff = $employeeResignation->hod_status ?: 'Pending';
+                    $hrStatusEff  = $employeeResignation->hr_status  ?: 'Pending';
+
+                    $canHodAct = ($is_hod ?? false) && $hodStatusEff === 'Pending';
+                    $canHrAct  = ($is_hr ?? false) && $hrStatusEff === 'Pending'
+                                && $hodStatusEff === 'Approved';
+                    $isTerminal = in_array($employeeResignation->status, ['Approved','Rejected','Withdraw'], true);
+                    $canAct = ($canHodAct || $canHrAct) && !$isTerminal;
+
+                    // Diagnostic — when the row CAN still receive a
+                    // decision (not terminal) but THIS user isn't
+                    // authorised, show a one-liner so HR doesn't think
+                    // the page is broken. Hidden in terminal states.
+                    $hasEditPerm = Common::checkRouteWisePermission(
+                        'people.employee-resignation.index',
+                        config('settings.resort_permissions.edit')
+                    );
                 @endphp
+
+                @if(!$canAct && !$isTerminal && $hasEditPerm)
+                    <div class="alert alert-info mb-3">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        @if(!($is_hod ?? false) && !($is_hr ?? false))
+                            You don't have approval authority for this resignation.
+                            HOD: <strong>{{ optional(optional($employeeResignation->hod)->resortAdmin)->full_name ?? '—' }}</strong>
+                            · HR: <strong>{{ optional(optional($employeeResignation->hr)->resortAdmin)->full_name ?? '—' }}</strong>
+                            · Status: HOD = <strong>{{ $hodStatusEff }}</strong>, HR = <strong>{{ $hrStatusEff }}</strong>.
+                        @elseif(($is_hr ?? false) && $hodStatusEff !== 'Approved')
+                            HOD approval is required before HR can take action.
+                            HOD status: <strong>{{ $hodStatusEff }}</strong>.
+                        @endif
+                    </div>
+                @endif
+
                 @if($canAct)
                     <div class="row mb-3">
                         <div class="col-12">
