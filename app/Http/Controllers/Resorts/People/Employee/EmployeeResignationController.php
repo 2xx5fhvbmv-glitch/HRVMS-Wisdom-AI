@@ -275,23 +275,31 @@ class EmployeeResignationController extends Controller
         $is_hr = false;
 
         if ($user) {
-            $rank = (int) ($user->rank ?? 0);
-            $userId = $user->id;
+            $rank   = (int) ($user->rank ?? 0);
+            $userId = (int) ($user->id ?? 0);
             $hodId  = (int) ($employeeResignation->hod_id ?? 0);
             $hrId   = (int) ($employeeResignation->hr_id ?? 0);
+            // NULL/empty hod_status or hr_status → treat as Pending so
+            // legacy resignations created before the dual-status flow
+            // don't fall through every gate and end up button-less.
+            $hodStatus = $employeeResignation->hod_status ?: 'Pending';
+            $hrStatus  = $employeeResignation->hr_status  ?: 'Pending';
 
-            if ($rank === 2 && $userId === $hodId) {
+            // Loose equality on ids — both sides are numeric employees.id
+            // values but the DB driver returns them as strings on some
+            // hosts. === would silently miss those cases.
+            if ($rank === 2 && $userId == $hodId) {
                 $is_hod = true;
             }
-            if ($rank === 3 && $userId === $hrId) {
+            if ($rank === 3 && $userId == $hrId) {
                 $is_hr = true;
             }
             // GM (rank 8) / EXCOM (rank 1) — senior override.
             if (in_array($rank, [1, 8], true)) {
-                if ($employeeResignation->hod_status === 'Pending') {
+                if ($hodStatus === 'Pending') {
                     $is_hod = true;
                 }
-                if ($employeeResignation->hr_status === 'Pending' && $employeeResignation->hod_status === 'Approved') {
+                if ($hrStatus === 'Pending' && $hodStatus === 'Approved') {
                     $is_hr = true;
                 }
             }
@@ -321,6 +329,13 @@ class EmployeeResignationController extends Controller
         $is_hod = false;
         $is_hr = false;
 
+        // Treat NULL hod_status/hr_status as 'Pending' so legacy rows
+        // can still be approved (the strict comparison missed them
+        // before, the server returned 403, and the show page's
+        // diagnostic banner couldn't explain why).
+        $hodStatus = $employeeResignation->hod_status ?: 'Pending';
+        $hrStatus  = $employeeResignation->hr_status  ?: 'Pending';
+
         if ($user->rank == 3 && $employeeResignation->hr_id == $user->id) {
             $is_hr = true;
         }
@@ -335,10 +350,10 @@ class EmployeeResignationController extends Controller
         // page renders the buttons (per its own override rule) but the
         // server rejects the click as 403.
         if (in_array((int) $user->rank, [1, 8], true)) {
-            if ($employeeResignation->hod_status === 'Pending') {
+            if ($hodStatus === 'Pending') {
                 $is_hod = true;
             }
-            if ($employeeResignation->hr_status === 'Pending' && $employeeResignation->hod_status === 'Approved') {
+            if ($hrStatus === 'Pending' && $hodStatus === 'Approved') {
                 $is_hr = true;
             }
         }
@@ -358,7 +373,7 @@ class EmployeeResignationController extends Controller
         // the new `hold_reason` column and renders on the show page.
         $isOnHold = $status === 'On Hold';
 
-        if($employeeResignation->hod_status === 'Pending' && $is_hod == true) {
+        if($hodStatus === 'Pending' && $is_hod == true) {
             if ($isOnHold) {
                 $employeeResignation->status = 'On Hold';
                 $employeeResignation->hold_reason = $request->hold_reason ?? $request->reject_reason;
@@ -409,8 +424,8 @@ class EmployeeResignationController extends Controller
                 );
                 event(new \App\Events\ResortNotificationEvent($notificationHtml));
             }
-        }elseif($employeeResignation->hr_status === 'Pending' && $is_hr == true) {
-            if($employeeResignation->hod_status == 'Approved'){
+        }elseif($hrStatus === 'Pending' && $is_hr == true) {
+            if($hodStatus == 'Approved'){
                 if ($isOnHold) {
                     $employeeResignation->status = 'On Hold';
                     $employeeResignation->hold_reason = $request->hold_reason ?? $request->reject_reason;
