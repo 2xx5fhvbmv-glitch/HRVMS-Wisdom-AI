@@ -165,9 +165,48 @@ class ResignationController extends Controller
                                                             ],                                             
             ]);
             DB::commit();
-            
-            $hrEmployee                                 =   Common::FindResortHR($this->user);
 
+            // Two-stage approval flow → HOD approves first, then HR.
+            // Notify HOD primarily (they're the gate); notify HR too
+            // so they know it's coming (HR's actionable bell fires
+            // again the moment HOD signs off — see
+            // EmployeeResignationController::updateStatus). Prior code
+            // only pinged HR, leaving HOD to discover the request via
+            // the resignation list page.
+            $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')) ?: 'an employee';
+
+            if ($hodEmployee) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Resignation',
+                    "📝 {$empName} has submitted a resignation request. Please review and approve to forward it to HR.",
+                    'Resignation',
+                    [$hodEmployee->id],
+                    null,
+                );
+                // Bell notification for the web dashboard (matches the
+                // pattern used by EmployeeResignationController when HOD
+                // → HR handoff fires).
+                try {
+                    $notificationHtml = Common::nofitication(
+                        $this->resort_id,
+                        10,
+                        'New Resignation Request',
+                        "📝 {$empName} has submitted a resignation request. Please review.",
+                        0,
+                        $hodEmployee->id,
+                        'People'
+                    );
+                    event(new \App\Events\ResortNotificationEvent($notificationHtml));
+                } catch (\Throwable $e) {
+                    \Log::warning('Resignation HOD bell notification failed: ' . $e->getMessage());
+                }
+            }
+
+            $hrEmployee = Common::FindResortHR($this->user);
             if ($hrEmployee) {
                 Common::sendMobileNotification(
                     $this->resort_id,
@@ -175,7 +214,7 @@ class ResignationController extends Controller
                     null,
                     null,
                     'Resignation',
-                    'A resignation request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                    "📝 {$empName} has submitted a resignation request. It will reach you for final approval once HOD signs off.",
                     'Resignation',
                     [$hrEmployee->id],
                     null,

@@ -1130,6 +1130,30 @@ class MasterDashboardController extends Controller
             }
             $pendingExitClearanceForms = $pendingFormsQuery->get();
 
+            // ─── Pending resignations awaiting THIS HOD's approval ────
+            // Two-stage workflow: HOD approves first, then HR. This card
+            // is the HOD's action queue — rows where they're the assigned
+            // HOD AND they haven't signed off yet. XCOM/GM see all such
+            // rows for resort-wide oversight (same scoping convention
+            // the exit-clearance card above uses).
+            $pendingResignationsForHodQuery = \App\Models\EmployeeResignation::with([
+                    'employee.resortAdmin',
+                    'employee.department',
+                    'employee.position',
+                ])
+                ->where('resort_id', $resort_id)
+                ->where('hod_status', 'Pending')
+                ->orderByDesc('created_at');
+            if (!$isXcomScope) {
+                if ($myEmpId) {
+                    $pendingResignationsForHodQuery->where('hod_id', $myEmpId);
+                } else {
+                    $pendingResignationsForHodQuery->whereRaw('0 = 1');
+                }
+            }
+            $pendingResignationsForHod = $pendingResignationsForHodQuery->get();
+            $pendingResignationsForHodCount = $pendingResignationsForHod->count();
+
             $pending_learning_request = LearningRequest::with('learning')->where('status','Pending')->where('resort_id',$resort_id)->where('created_by',$this->globalUser->GetEmployee->Admin_Parent_id)->get();
 
             $monthly = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
@@ -1427,7 +1451,7 @@ class MasterDashboardController extends Controller
                 'page_header','resort_id','resort_divisions','resort_departments','resort_positions',
                 'hiring_request','vacancies','TotalApplicants','TotalApplicantCounts','Interviews','Hired','UpcomingApplicants',
                 'total_employees','present_employee_counts','absent_employee_counts','leave_employee_counts','resort_positions',
-                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pendingExitClearanceForms','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning','pendingPayrollApprovals'
+                'expatriate_employees_count','local_employees_count','male_emp_percentage','female_emp_percentage','manning_response','InProgressApplicants','todayleaveUsers','upcomingLeaveUsers','accommodationData','totalIncidentCounts','underInvestigationIncidentCounts','incidentData','SOSHistory','probationEmployees','AnnouncementData','grivanceSubmissionModel','disciplinarySubmissionModel','EmployeeResignation','pendingExitClearanceForms','pendingResignationsForHod','pendingResignationsForHodCount','pending_learning_request','monthlyCheckinPerformance','attendanceDataTodoList','rosterData','totalOverallWorkingHours','totalNormalWorkingHours','totalHolidayWorkingHours','totalEmployees','UplcomingApplicants','ongoing_tranning','pendingPayrollApprovals'
             ));
 
         // } catch (\Exception $e) {

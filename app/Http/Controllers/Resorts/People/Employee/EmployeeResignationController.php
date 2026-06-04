@@ -304,10 +304,42 @@ class EmployeeResignationController extends Controller
             $is_hr = true;
         }
 
+        // "On Hold" is a non-terminal pause. Either approver can flip
+        // the overall row into On Hold while keeping their own
+        // hod_status / hr_status as 'Pending' (so they can come back
+        // and Approve or Reject later). The required reason lands in
+        // the new `hold_reason` column and renders on the show page.
+        $isOnHold = $status === 'On Hold';
+
         if($employeeResignation->hod_status === 'Pending' && $is_hod == true) {
-            $employeeResignation->hod_status = $status;
-            $employeeResignation->hod_meeting_status = 'Completed';
-            $employeeResignation->hod_comments = $request->meeting_comment;
+            if ($isOnHold) {
+                $employeeResignation->status = 'On Hold';
+                $employeeResignation->hold_reason = $request->hold_reason ?? $request->reject_reason;
+                // Persist the optional reviewer note alongside the reason
+                // so the show page's "comments" trail doesn't lose context
+                // when a reviewer types something in the textarea before
+                // hitting On Hold.
+                if ($request->filled('meeting_comment')) {
+                    $employeeResignation->hod_comments = $request->meeting_comment;
+                }
+                // hod_status stays 'Pending' — HR isn't unblocked until
+                // HOD actually approves. The pause is visible via the
+                // overall status.
+            } else {
+                $employeeResignation->hod_status = $status;
+                $employeeResignation->hod_meeting_status = 'Completed';
+                $employeeResignation->hod_comments = $request->meeting_comment;
+                // Clear any prior On Hold state on a fresh decision.
+                // Approve unfreezes the row back to 'Pending' so HR can
+                // take over; Reject is handled below by the terminal
+                // status block and also clears the stale hold_reason.
+                if ($employeeResignation->status === 'On Hold') {
+                    if ($status === 'Approved') {
+                        $employeeResignation->status = 'Pending';
+                    }
+                    $employeeResignation->hold_reason = null;
+                }
+            }
             $employeeResignation->save();
 
             // Notify HR — they're the next stage in the chain. Without
@@ -332,16 +364,55 @@ class EmployeeResignationController extends Controller
             }
         }elseif($employeeResignation->hr_status === 'Pending' && $is_hr == true) {
             if($employeeResignation->hod_status == 'Approved'){
-                $employeeResignation->hr_status = $status;
-                $employeeResignation->hr_meeting_status = 'Completed';
-                $employeeResignation->hr_comments = $request->meeting_comment;
-                $employeeResignation->status = $status;
+                if ($isOnHold) {
+                    $employeeResignation->status = 'On Hold';
+                    $employeeResignation->hold_reason = $request->hold_reason ?? $request->reject_reason;
+                    // Same pattern as the HOD branch — persist the
+                    // reviewer's optional note alongside the reason.
+                    if ($request->filled('meeting_comment')) {
+                        $employeeResignation->hr_comments = $request->meeting_comment;
+                    }
+                } else {
+                    $employeeResignation->hr_status = $status;
+                    $employeeResignation->hr_meeting_status = 'Completed';
+                    $employeeResignation->hr_comments = $request->meeting_comment;
+                    $employeeResignation->status = $status;
+                    // Approve or Reject is a terminal decision — clear
+                    // any lingering On Hold reason so the row reads
+                    // consistently if queried later.
+                    $employeeResignation->hold_reason = null;
+                }
                 $employeeResignation->save();
             }else{
                 return response()->json(['success' => false, 'message' => 'HOD approval is required before HR can approve.'], 403);
             }
         }else{
             return response()->json(['success' => false, 'message' => 'You are not authorized to update this resignation status.'], 403);
+        }
+
+        // On Hold short-circuits the downstream notification block (it
+        // isn't a final disposition — the employee shouldn't get an
+        // "approved/rejected" ping yet). Notify the OTHER approver
+        // instead so they know the row is paused.
+        if ($isOnHold) {
+            $empName = optional(optional($employeeResignation->employee)->resortAdmin)->full_name ?: 'an employee';
+            $actorName = $user->resortAdmin ? $user->resortAdmin->full_name : 'A reviewer';
+            $notifyTarget = $is_hod ? $employeeResignation->hr_id : $employeeResignation->hod_id;
+            if ($notifyTarget) {
+                try {
+                    $notificationHtml = Common::nofitication(
+                        $this->resort->resort_id,
+                        10,
+                        'Resignation Put On Hold',
+                        "⏸ {$actorName} put the resignation for {$empName} on hold. Reason: " . ($employeeResignation->hold_reason ?: '—'),
+                        0,
+                        $notifyTarget,
+                        'People'
+                    );
+                    event(new \App\Events\ResortNotificationEvent($notificationHtml));
+                } catch (\Throwable $e) { \Log::warning('On Hold notify failed: '.$e->getMessage()); }
+            }
+            return response()->json(['success' => true, 'message' => 'Resignation put on hold.']);
         }
 
         $employee = $employeeResignation->employee;

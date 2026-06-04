@@ -296,31 +296,78 @@
                 </div>
 
 
-                @if($is_hod == true && $employeeResignation->hod_status == 'Pending' && $employeeResignation->hod_meeting_status == 'Employee Schedule Confirm' || $is_hr == true && $employeeResignation->hr_status == 'Pending' && $employeeResignation->hr_meeting_status == 'Employee Schedule Confirm' && $employeeResignation->hod_meeting_status == 'Completed')
-                    <div class="row mb-4">
+                {{-- ─────── Reason banners for terminal/paused states ───────
+                     If the resignation has been Rejected → show why so HR and
+                     HOD can see at a glance which side raised the issue. Same
+                     idea for On Hold — surface the reason so a follow-up
+                     decision has context. Always rendered above the action
+                     row so reviewers see the prior decision context first. --}}
+                @if($employeeResignation->status === 'Rejected' && !empty($employeeResignation->rejected_reason))
+                    <div class="alert alert-danger mb-3">
+                        <i class="fa-solid fa-circle-xmark me-1"></i>
+                        <strong>Rejected — Reason:</strong>
+                        {{ $employeeResignation->rejected_reason }}
+                    </div>
+                @endif
+                @if($employeeResignation->status === 'On Hold' && !empty($employeeResignation->hold_reason))
+                    <div class="alert alert-warning mb-3">
+                        <i class="fa-solid fa-pause me-1"></i>
+                        <strong>On Hold — Reason:</strong>
+                        {{ $employeeResignation->hold_reason }}
+                    </div>
+                @endif
+
+                {{-- ─────── Action row (Approve / Reject / On Hold) ───────
+                     Shown at the BOTTOM of the page so the reviewer reads the
+                     full details first, then acts. Visibility rule:
+                         • Current user is the assigned HOD AND hod_status='Pending'
+                         • OR current user is the assigned HR AND hr_status='Pending'
+                                 (and HOD has already approved — HR can't act first)
+                         • OR the row is currently On Hold and the user has rights
+                                 to flip it back to Pending / Approved / Rejected.
+                     The previous gate required hod_meeting_status='Employee
+                     Schedule Confirm' which silently hid the buttons whenever
+                     the meeting flow had been skipped. --}}
+                @php
+                    $canHodAct = ($is_hod ?? false) && $employeeResignation->hod_status === 'Pending';
+                    $canHrAct  = ($is_hr ?? false) && $employeeResignation->hr_status === 'Pending'
+                                && $employeeResignation->hod_status === 'Approved';
+                    $canAct = ($canHodAct || $canHrAct) && $employeeResignation->status !== 'Approved'
+                              && $employeeResignation->status !== 'Rejected'
+                              && $employeeResignation->status !== 'Withdraw';
+                @endphp
+                @if($canAct)
+                    <div class="row mb-3">
                         <div class="col-12">
-                            <label for="statusComment" class="form-label">Enter Meeting Conclusion <span class="text-danger">*</span></label>
+                            <label for="statusComment" class="form-label">Comments / Meeting Conclusion <span class="text-muted">(optional)</span></label>
                             <textarea id="statusComment" class="form-control" rows="3" placeholder="Write your notes here"></textarea>
                         </div>
                     </div>
-                
+
                     <div class="card-footer">
                         <div class="row align-items-center g-2 @if(Common::checkRouteWisePermission('people.employee-resignation.index',config('settings.resort_permissions.edit')) == false) d-none @endif">
-                        
                             <div class="col-auto ms-auto">
-                                <a href="javascript:void(0);" 
-                                   class="btn btn-themeDanger btn-sm update-status" 
+                                <a href="javascript:void(0);"
+                                   class="btn btn-themeDanger btn-sm update-status"
                                    data-status="Rejected"
                                    data-id="{{ base64_encode($employeeResignation->id) }}">
-                                   Reject
+                                   <i class="fa-solid fa-circle-xmark me-1"></i>Reject
                                 </a>
                             </div>
                             <div class="col-auto">
-                                <a href="javascript:void(0);" 
-                                   class="btn btn-themeGreenNew btn-sm update-status" 
+                                <a href="javascript:void(0);"
+                                   class="btn btn-themeWarning btn-sm update-status"
+                                   data-status="On Hold"
+                                   data-id="{{ base64_encode($employeeResignation->id) }}">
+                                   <i class="fa-solid fa-pause me-1"></i>On Hold
+                                </a>
+                            </div>
+                            <div class="col-auto">
+                                <a href="javascript:void(0);"
+                                   class="btn btn-themeGreenNew btn-sm update-status"
                                    data-status="Approved"
                                    data-id="{{ base64_encode($employeeResignation->id) }}">
-                                   Approve
+                                   <i class="fa-solid fa-circle-check me-1"></i>Approve
                                 </a>
                             </div>
                         </div>
@@ -354,6 +401,34 @@
             </div>
         </div>
     </div>
+
+    {{-- On Hold modal — required reason, mirrors the reject modal shape so
+         the existing styling carries over. Submit posts to the same
+         status-update endpoint with status='On Hold' + hold_reason. --}}
+    <div class="modal fade" id="holdStatusModal" tabindex="-1" aria-labelledby="holdStatusModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">On Hold — Reason</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="holdStatusForm">
+                    @csrf
+                    <div class="modal-body">
+                        <input type="hidden" name="resignation_id" id="holdResignation_id">
+                        <input type="hidden" name="status" value="On Hold">
+                        <input type="hidden" name="meeting_comment" id="holdMeetingComment" value="">
+                        <textarea id="holdComment" class="form-control" name="comment" rows="3"
+                                  placeholder="Why is this resignation being put on hold? (required)" required></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" id="holdSubmitBtn" class="btn btn-themeWarning">Put On Hold</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
 @endsection
 
@@ -370,20 +445,18 @@
             statusComment = $(this).val();
         });
 
-        // Approve or Reject button click
+        // Approve / Reject / On Hold button click.
+        // Approve fires the AJAX directly (no extra reason needed).
+        // Reject opens the existing reject modal (mandatory reason).
+        // On Hold opens the new hold modal (mandatory reason).
+        // Comments in #statusComment are OPTIONAL — the old version blocked
+        // submit when this was empty, which made approval impossible without
+        // a typed line even when there was nothing to add.
         $('.update-status').off('click').on('click', function(e) {
             e.preventDefault();
             var status = $(this).data('status');
             var resignationId = $(this).data('id');
-            statusComment = $('#statusComment').val();
-
-            if (!statusComment.trim()) {
-                toastr.error('Please enter a comment before proceeding.', 'Error', {
-                    positionClass: 'toast-bottom-right',
-                    timeOut: 2000,
-                });
-                return;
-            }
+            statusComment = $('#statusComment').val() || '';
 
             if (status === 'Approved') {
                 $.ajax({
@@ -399,7 +472,7 @@
                         location.reload();
                     },
                     error: function(xhr) {
-                        toastr.error('Something went wrong', 'Error', {
+                        toastr.error(xhr.responseJSON?.message || 'Something went wrong', 'Error', {
                             positionClass: 'toast-bottom-right',
                             timeOut: 2000,
                         });
@@ -410,12 +483,52 @@
                 $('#rejectComment').val('');
                 $('#meetingComment').val(statusComment);
                 $('#rejectStatusModal').modal('show');
+            } else if (status === 'On Hold') {
+                $('#holdResignation_id').val(resignationId);
+                $('#holdComment').val('');
+                $('#holdMeetingComment').val(statusComment);
+                $('#holdStatusModal').modal('show');
             }
         });
 
         // When modal is closed, clear comment in modal
         $('#rejectStatusModal').on('hidden.bs.modal', function () {
             $('#rejectComment').val('');
+        });
+        $('#holdStatusModal').on('hidden.bs.modal', function () {
+            $('#holdComment').val('');
+        });
+
+        // On Hold modal submit — posts the hold_reason alongside the
+        // meeting comment. Endpoint accepts either `hold_reason` or
+        // `reject_reason` as the stored reason (covers a stale tab
+        // that doesn't include the new field).
+        $('#holdStatusForm').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            var reason = $('#holdComment').val().trim();
+            if (!reason) {
+                toastr.error('Please provide a reason for putting this on hold.', 'Error', {
+                    positionClass: 'toast-bottom-right', timeOut: 2000,
+                });
+                return;
+            }
+            $.ajax({
+                url: "{{ route('people.employee-resignation.status-update') }}",
+                type: "POST",
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    status: 'On Hold',
+                    resignation_id: $('#holdResignation_id').val(),
+                    hold_reason: reason,
+                    meeting_comment: $('#holdMeetingComment').val(),
+                },
+                success: function() { location.reload(); },
+                error: function(xhr) {
+                    toastr.error(xhr.responseJSON?.message || 'Something went wrong', 'Error', {
+                        positionClass: 'toast-bottom-right', timeOut: 2000,
+                    });
+                }
+            });
         });
 
         // On modal submit, pass both meeting comment and rejection reason

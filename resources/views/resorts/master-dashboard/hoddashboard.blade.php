@@ -1416,6 +1416,84 @@
                                 </div>
                             </div>
                         </div>
+                        {{-- ─────── Pending Resignations — Awaiting My Approval ───────
+                             Two-stage approval flow: HOD approves first, then HR. This
+                             card lists rows where the current user is the assigned HOD
+                             and hod_status is still 'Pending'. XCOM/GM sees the
+                             resort-wide queue (matches the scoping convention used by
+                             the exit-clearance card below). Each name links straight
+                             to the show page where the approve/reject controls live. --}}
+                        @php
+                            $isXcomScope = strtoupper((string) request('dashboard_label', 'HOD')) === 'XCOM';
+                        @endphp
+                        @if(!empty($pendingResignationsForHod) && count($pendingResignationsForHod) > 0)
+                            <div class="col-xl-6 col-lg-6 order-lg-4 order-xl-0">
+                                <div class="card card-theme h-100">
+                                    <div class="card-title">
+                                        <div class="row g-md-2 g-1 align-items-center">
+                                            <div class="col">
+                                                <h3 class="text-nowrap">
+                                                    @if($isXcomScope)
+                                                        Resignations Awaiting Approval — Across Departments
+                                                    @else
+                                                        Resignations Awaiting Your Approval
+                                                    @endif
+                                                    <span class="badge bg-danger ms-1">{{ $pendingResignationsForHodCount }}</span>
+                                                </h3>
+                                            </div>
+                                            <div class="col-auto">
+                                                <a href="{{ route('people.employee-resignation') }}" class="a-link">View all</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-theme">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Employee</th>
+                                                        <th>Position</th>
+                                                        @if($isXcomScope)
+                                                            <th>Department</th>
+                                                        @endif
+                                                        <th>Resignation Date</th>
+                                                        <th>Last Working Day</th>
+                                                        <th class="text-end">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($pendingResignationsForHod->take(8) as $r)
+                                                        <tr>
+                                                            <td>{{ optional(optional($r->employee)->resortAdmin)->full_name ?? '—' }}</td>
+                                                            <td>{{ optional(optional($r->employee)->position)->position_title ?? '—' }}</td>
+                                                            @if($isXcomScope)
+                                                                <td>{{ optional(optional($r->employee)->department)->name ?? '—' }}</td>
+                                                            @endif
+                                                            <td>{{ $r->resignation_date ? \Carbon\Carbon::parse($r->resignation_date)->format('d M Y') : '—' }}</td>
+                                                            <td>{{ $r->last_working_day ? \Carbon\Carbon::parse($r->last_working_day)->format('d M Y') : 'N/A' }}</td>
+                                                            <td class="text-end">
+                                                                <a href="{{ route('people.employee-resignation.show', ['id' => base64_encode($r->id)]) }}"
+                                                                   class="btn btn-themeSkyblue btn-sm">
+                                                                    Review &amp; Approve
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                            @if($pendingResignationsForHodCount > 8)
+                                                <div class="text-center mt-2">
+                                                    <a href="{{ route('people.employee-resignation') }}" class="a-link small">
+                                                        + {{ $pendingResignationsForHodCount - 8 }} more
+                                                    </a>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         {{-- ─────── Pending Exit Clearance Forms ───────
                              Renders every unfinished `department`-type clearance form
                              the controller put into $pendingExitClearanceForms. Scope
@@ -1426,9 +1504,6 @@
                              We just add the Department column in XCOM mode so the
                              oversight view shows where each form lives. Hidden
                              entirely when nothing's pending. --}}
-                        @php
-                            $isXcomScope = strtoupper((string) request('dashboard_label', 'HOD')) === 'XCOM';
-                        @endphp
                         @if(!empty($pendingExitClearanceForms) && count($pendingExitClearanceForms) > 0)
                             <div class="col-xl-12 col-lg-6 order-lg-5 order-xl-0">
                                 <div class="card card-theme h-100">
