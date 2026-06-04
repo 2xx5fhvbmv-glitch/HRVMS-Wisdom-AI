@@ -1427,18 +1427,24 @@
                             $isXcomScope = strtoupper((string) request('dashboard_label', 'HOD')) === 'XCOM';
                         @endphp
                         @if(!empty($pendingResignationsForHod) && count($pendingResignationsForHod) > 0)
-                            <div class="col-xl-6 col-lg-6 order-lg-4 order-xl-0">
+                            {{-- Full-width like the Exit Clearance card below; same
+                                 card-theme + table-talentAcqExitClear classes so the
+                                 visual treatment matches and the table styles render
+                                 (header bar, row spacing, etc.). Earlier version
+                                 used col-xl-6 + plain "table table-theme" which left
+                                 the rows unstyled and crammed against the heading. --}}
+                            <div class="col-xl-12 col-lg-6 order-lg-4 order-xl-0">
                                 <div class="card card-theme h-100">
                                     <div class="card-title">
                                         <div class="row g-md-2 g-1 align-items-center">
                                             <div class="col">
                                                 <h3 class="text-nowrap">
                                                     @if($isXcomScope)
-                                                        Resignations Awaiting Approval — Across Departments
+                                                        RESIGNATIONS AWAITING APPROVAL — ACROSS DEPARTMENTS
                                                     @else
-                                                        Resignations Awaiting Your Approval
+                                                        RESIGNATIONS AWAITING YOUR APPROVAL
                                                     @endif
-                                                    <span class="badge bg-danger ms-1">{{ $pendingResignationsForHodCount }}</span>
+                                                    <span class="badge badge-themeDanger ms-1">{{ $pendingResignationsForHodCount }}</span>
                                                 </h3>
                                             </div>
                                             <div class="col-auto">
@@ -1448,7 +1454,7 @@
                                     </div>
                                     <div class="card-body">
                                         <div class="table-responsive">
-                                            <table class="table table-theme">
+                                            <table class="table table-talentAcqExitClear w-100 mb-1">
                                                 <thead>
                                                     <tr>
                                                         <th>Employee</th>
@@ -1458,19 +1464,40 @@
                                                         @endif
                                                         <th>Resignation Date</th>
                                                         <th>Last Working Day</th>
+                                                        <th>Status</th>
                                                         <th class="text-end">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     @foreach($pendingResignationsForHod->take(8) as $r)
+                                                        @php
+                                                            $emp  = $r->employee;
+                                                            $name = optional(optional($emp)->resortAdmin)->full_name ?? '—';
+                                                            $pos  = optional(optional($emp)->position)->position_title;
+                                                            $dept = optional(optional($emp)->department)->name;
+                                                        @endphp
                                                         <tr>
-                                                            <td>{{ optional(optional($r->employee)->resortAdmin)->full_name ?? '—' }}</td>
-                                                            <td>{{ optional(optional($r->employee)->position)->position_title ?? '—' }}</td>
+                                                            <td>
+                                                                <div class="tableUser-block">
+                                                                    @if($emp)
+                                                                        <div class="img-circle"><img src="{{ App\Helpers\Common::getResortUserPicture($emp->Admin_Parent_id) }}" alt="user"></div>
+                                                                    @endif
+                                                                    <span class="userApplicants-btn">{{ $name }}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td>{{ $pos ?? '—' }}</td>
                                                             @if($isXcomScope)
-                                                                <td>{{ optional(optional($r->employee)->department)->name ?? '—' }}</td>
+                                                                <td>{{ $dept ?? '—' }}</td>
                                                             @endif
                                                             <td>{{ $r->resignation_date ? \Carbon\Carbon::parse($r->resignation_date)->format('d M Y') : '—' }}</td>
                                                             <td>{{ $r->last_working_day ? \Carbon\Carbon::parse($r->last_working_day)->format('d M Y') : 'N/A' }}</td>
+                                                            <td>
+                                                                @if($r->status === 'On Hold')
+                                                                    <span class="badge badge-themeGray">On Hold</span>
+                                                                @else
+                                                                    <span class="badge badge-themeWarning">Pending</span>
+                                                                @endif
+                                                            </td>
                                                             <td class="text-end">
                                                                 <a href="{{ route('people.employee-resignation.show', ['id' => base64_encode($r->id)]) }}"
                                                                    class="btn btn-themeSkyblue btn-sm">
