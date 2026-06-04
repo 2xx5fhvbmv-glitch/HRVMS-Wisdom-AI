@@ -206,8 +206,11 @@ class ExitClearanceController extends Controller
                         'Rejected' => '<span class="badge badge-themeDanger">Rejected</span>',
                         'On Hold'  => '<span class="badge badge-themeSkyblue">On Hold</span>',
                         'In Progress' => '<span class="badge badge-themePrimary">In Progress</span>',
+                        // badge-themeGray is the actual neutral class in
+                        // this theme. badge-themeSecondary doesn't exist
+                        // and rendered as invisible white-on-white.
                         'Withdraw', 'Withdrawn'
-                                   => '<span class="badge badge-themeSecondary">Withdrawn</span>',
+                                   => '<span class="badge badge-themeGray">Withdrawn</span>',
                         default    => '<span class="badge badge-themeWarning">Pending</span>',
                     };
 

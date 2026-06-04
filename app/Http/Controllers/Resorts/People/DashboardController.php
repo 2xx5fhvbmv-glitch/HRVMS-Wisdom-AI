@@ -283,6 +283,25 @@ class DashboardController extends Controller
         // Withdrawn resignations were never excluded and inflated the count.
         $totalExitInitiated = EmployeeResignation::where('resort_id', $this->resort->resort_id)->whereNotIn('status',['Approved','Rejected','Withdraw'])->count();
 
+        // ─── Pending resignations awaiting THIS HR's approval ─────────
+        // Two-stage workflow: HOD approves first, then HR. HR's action
+        // queue = rows where HOD has signed off but HR hasn't. The bell
+        // already notifies HR when HOD approves; this card surfaces a
+        // persistent reminder on the dashboard so HR can't miss it.
+        $currentEmpId = optional(optional($this->resort)->GetEmployee)->id;
+        $pendingResignationsForHr = collect();
+        $pendingResignationsForHrCount = 0;
+        if ($currentEmpId) {
+            $pendingResignationsForHr = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
+                ->where('resort_id', $this->resort->resort_id)
+                ->where('hr_id', $currentEmpId)
+                ->where('hod_status', 'Approved')
+                ->where('hr_status', 'Pending')
+                ->orderByDesc('created_at')
+                ->get();
+            $pendingResignationsForHrCount = $pendingResignationsForHr->count();
+        }
+
         $ExitClearanceFormAssignments = ExitClearanceFormAssignment::where('resort_id', $this->resort->resort_id)
             ->get();
         
@@ -412,7 +431,7 @@ class DashboardController extends Controller
         $liabilityMonthlyTrend      = $liability['monthly_trend'];
         $liabilityCostComparison    = $liability['cost_comparison'];
 
-        return view('resorts.people.employee.hrdashboard',compact('page_title','resort','totalExitInitiated','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison','resortLocationCount','maleLocationCount','trainingCompletionRate'));
+        return view('resorts.people.employee.hrdashboard',compact('page_title','resort','totalExitInitiated','pendingResignationsForHr','pendingResignationsForHrCount','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison','resortLocationCount','maleLocationCount','trainingCompletionRate'));
     }
 
     public function admin_dashboard()
@@ -637,6 +656,25 @@ class DashboardController extends Controller
         // Withdrawn resignations were never excluded and inflated the count.
         $totalExitInitiated = EmployeeResignation::where('resort_id', $this->resort->resort_id)->whereNotIn('status',['Approved','Rejected','Withdraw'])->count();
 
+        // ─── Pending resignations awaiting THIS HR's approval ─────────
+        // Two-stage workflow: HOD approves first, then HR. HR's action
+        // queue = rows where HOD has signed off but HR hasn't. The bell
+        // already notifies HR when HOD approves; this card surfaces a
+        // persistent reminder on the dashboard so HR can't miss it.
+        $currentEmpId = optional(optional($this->resort)->GetEmployee)->id;
+        $pendingResignationsForHr = collect();
+        $pendingResignationsForHrCount = 0;
+        if ($currentEmpId) {
+            $pendingResignationsForHr = EmployeeResignation::with(['employee.resortAdmin', 'employee.department', 'employee.position'])
+                ->where('resort_id', $this->resort->resort_id)
+                ->where('hr_id', $currentEmpId)
+                ->where('hod_status', 'Approved')
+                ->where('hr_status', 'Pending')
+                ->orderByDesc('created_at')
+                ->get();
+            $pendingResignationsForHrCount = $pendingResignationsForHr->count();
+        }
+
         $ExitClearanceFormAssignments = ExitClearanceFormAssignment::where('resort_id', $this->resort->resort_id)
             ->get();
         
@@ -766,7 +804,7 @@ class DashboardController extends Controller
         $liabilityMonthlyTrend      = $liability['monthly_trend'];
         $liabilityCostComparison    = $liability['cost_comparison'];
 
-        return view('resorts.people.employee.admindashboard',compact('page_title','resort','totalExitInitiated','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison','resortLocationCount','maleLocationCount','trainingCompletionRate'));
+        return view('resorts.people.employee.admindashboard',compact('page_title','resort','totalExitInitiated','pendingResignationsForHr','pendingResignationsForHrCount','average_salary_increase','total_active_employees','total_inactive_employees','total_new_hired','expected_employees','male_emp','female_emp','resort_divisions','localEmployees','expatEmployees','announcements','totalPublished','categoryCounts','probationalEmployees','activeProbationCount','failedProbationCount','completedProbationCount','total_promotions','recent_promotions','employeeInfoUpdateRequest','advanceSalary','guarantorCount','advanceSalaryRescheduleAmount','totalLoanRequests','totalAdvanceRequests','totalSalaryIncrementShortListedEmp','SLE_basic_salary','totalProposedIncrementAmount','averageIncrementPercentage','pandingIncrement','approvedIncrement','rejectedIncrement','onHoldIncrement','totalRepayment','exitClearances','ExitClearanceFormAssignments','exit_interviews','reasonLabels','reasonCounts','attritionLabels','attritionCounts','exit_interview_form','lineData','lineLabels','departments','total_resignations','withdraw_resignations','resignationCounts','count30','count15','count7','approvalPending','approvalApproved','approvalHeld','approvalRejected','oldestPendingApproval','liabilityYear','liabilityEstimated','liabilityActualPaid','liabilityPaidPercent','liabilityMonthlyTrend','liabilityCostComparison','resortLocationCount','maleLocationCount','trainingCompletionRate'));
     }
 
     /**

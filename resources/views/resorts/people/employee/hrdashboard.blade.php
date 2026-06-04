@@ -734,6 +734,39 @@
                                     <h6>Pending Departmental Clearances</h6>
                                     <strong>{{$ExitClearanceFormAssignments->where('assigned_to_type','department')->where('status','Pending')->count()}}</strong>
                                 </div>
+                                {{-- Pending Resignations — Awaiting MY Approval.
+                                     Shown only when there's at least one row so the
+                                     dashboard doesn't carry a permanent "0" block.
+                                     Each name links straight to the show page where
+                                     HR can click Approve / Reject. --}}
+                                @if(($pendingResignationsForHrCount ?? 0) > 0)
+                                    <div class="leaveUser-bgBlock border-danger">
+                                        <h6>Resignations Awaiting Your Approval</h6>
+                                        <strong class="text-danger">{{ $pendingResignationsForHrCount }}</strong>
+                                        <ul class="list-unstyled mt-2 mb-0" style="font-size:12px;">
+                                            @foreach($pendingResignationsForHr->take(5) as $r)
+                                                <li class="mb-1">
+                                                    <a href="{{ route('people.employee-resignation.show', ['id' => base64_encode($r->id)]) }}"
+                                                       class="text-decoration-none">
+                                                        <i class="fa-solid fa-arrow-right me-1"></i>
+                                                        {{ optional(optional($r->employee)->resortAdmin)->full_name ?? 'Employee' }}
+                                                        <span class="text-muted">
+                                                            ({{ optional(optional($r->employee)->department)->name ?? '—' }})
+                                                        </span>
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                            @if($pendingResignationsForHrCount > 5)
+                                                <li class="mt-1">
+                                                    <a href="{{ route('people.employee-resignation') }}"
+                                                       class="text-decoration-none small">
+                                                        + {{ $pendingResignationsForHrCount - 5 }} more — view all
+                                                    </a>
+                                                </li>
+                                            @endif
+                                        </ul>
+                                    </div>
+                                @endif
                                 <h6 class="fw-600 mb-2">Exit Interview Completion Rate</h6>
                                 @php
                                     // Only count exit interviews that are not 'Completed' (case-insensitive)
