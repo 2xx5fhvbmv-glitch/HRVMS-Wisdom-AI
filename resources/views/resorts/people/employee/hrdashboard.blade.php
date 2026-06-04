@@ -758,7 +758,7 @@
                                             @endforeach
                                             @if($pendingResignationsForHrCount > 5)
                                                 <li class="mt-1">
-                                                    <a href="{{ route('people.employee-resignation') }}"
+                                                    <a href="{{ route('people.employee-resignation.index') }}"
                                                        class="text-decoration-none small">
                                                         + {{ $pendingResignationsForHrCount - 5 }} more — view all
                                                     </a>

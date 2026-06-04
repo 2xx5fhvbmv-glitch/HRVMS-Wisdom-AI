@@ -1442,7 +1442,7 @@
                                                 </h3>
                                             </div>
                                             <div class="col-auto">
-                                                <a href="{{ route('people.employee-resignation') }}" class="a-link">View all</a>
+                                                <a href="{{ route('people.employee-resignation.index') }}" class="a-link">View all</a>
                                             </div>
                                         </div>
                                     </div>
@@ -1483,7 +1483,7 @@
                                             </table>
                                             @if($pendingResignationsForHodCount > 8)
                                                 <div class="text-center mt-2">
-                                                    <a href="{{ route('people.employee-resignation') }}" class="a-link small">
+                                                    <a href="{{ route('people.employee-resignation.index') }}" class="a-link small">
                                                         + {{ $pendingResignationsForHodCount - 8 }} more
                                                     </a>
                                                 </div>
