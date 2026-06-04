@@ -297,6 +297,9 @@ class DashboardController extends Controller
                 ->where('hr_id', $currentEmpId)
                 ->where('hod_status', 'Approved')
                 ->where('hr_status', 'Pending')
+                // Withdrawn / already-finalised rows don't belong in the
+                // queue. Same defensive guard as the HOD dashboard.
+                ->whereNotIn('status', ['Withdraw', 'Approved', 'Rejected'])
                 ->orderByDesc('created_at')
                 ->get();
             $pendingResignationsForHrCount = $pendingResignationsForHr->count();
@@ -670,6 +673,9 @@ class DashboardController extends Controller
                 ->where('hr_id', $currentEmpId)
                 ->where('hod_status', 'Approved')
                 ->where('hr_status', 'Pending')
+                // Withdrawn / already-finalised rows don't belong in the
+                // queue. Same defensive guard as the HOD dashboard.
+                ->whereNotIn('status', ['Withdraw', 'Approved', 'Rejected'])
                 ->orderByDesc('created_at')
                 ->get();
             $pendingResignationsForHrCount = $pendingResignationsForHr->count();

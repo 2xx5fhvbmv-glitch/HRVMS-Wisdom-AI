@@ -1143,6 +1143,12 @@ class MasterDashboardController extends Controller
                 ])
                 ->where('resort_id', $resort_id)
                 ->where('hod_status', 'Pending')
+                // Exclude terminal overall statuses. A resignation can be
+                // Withdrawn by the employee while hod_status is still
+                // 'Pending' (the column never gets touched on withdraw),
+                // which would otherwise leak it into HOD's action queue
+                // with no approve/reject buttons available on the show page.
+                ->whereNotIn('status', ['Withdraw', 'Approved', 'Rejected'])
                 ->orderByDesc('created_at');
             if (!$isXcomScope) {
                 if ($myEmpId) {
