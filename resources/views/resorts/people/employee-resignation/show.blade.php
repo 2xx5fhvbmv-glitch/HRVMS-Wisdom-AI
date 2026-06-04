@@ -107,7 +107,9 @@
                                     <tbody>
                                         <tr>
                                             <th>Reason for Resignation:</th>
-                                            <td>{{$employeeResignation->reason_title->reason}}</td>
+                                            {{-- optional() so a missing reason_title row (legacy resignations
+                                                 without a FK to the reasons table) doesn't crash the page. --}}
+                                            <td>{{ optional($employeeResignation->reason_title)->reason ?? '—' }}</td>
                                         </tr>
                                         <tr>
                                             <th>Last Working Date:</th>

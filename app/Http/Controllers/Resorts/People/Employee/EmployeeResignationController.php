@@ -260,15 +260,48 @@ class EmployeeResignationController extends Controller
         }
 
         $user = $this->resort->GetEmployee;
-       
+
+        // Authority resolution — mirror what updateStatus actually accepts
+        // so the show page can't render Approve/Reject/On Hold buttons
+        // that the server would then reject. Three accepted paths:
+        //   1. User IS the assigned HOD (rank 2 + id matches hod_id)
+        //   2. User IS the assigned HR  (rank 3 + id matches hr_id)
+        //   3. User is GM/XCOM (rank 8/1) — senior override; can act as
+        //      either HOD or HR. Common pattern across this codebase
+        //      where senior leadership unblocks stuck approvals.
+        //   4. Delegation authority — covered by updateStatus's
+        //      Common::hasDelegationAuthority() check; mirrored here.
         $is_hod = false;
         $is_hr = false;
 
-        if ($user->rank == 3) {
-            $is_hr = true;
-        }
-        if ($user->rank == 2) {
-            $is_hod = true;
+        if ($user) {
+            $rank = (int) ($user->rank ?? 0);
+            $userId = $user->id;
+            $hodId  = (int) ($employeeResignation->hod_id ?? 0);
+            $hrId   = (int) ($employeeResignation->hr_id ?? 0);
+
+            if ($rank === 2 && $userId === $hodId) {
+                $is_hod = true;
+            }
+            if ($rank === 3 && $userId === $hrId) {
+                $is_hr = true;
+            }
+            // GM (rank 8) / EXCOM (rank 1) — senior override.
+            if (in_array($rank, [1, 8], true)) {
+                if ($employeeResignation->hod_status === 'Pending') {
+                    $is_hod = true;
+                }
+                if ($employeeResignation->hr_status === 'Pending' && $employeeResignation->hod_status === 'Approved') {
+                    $is_hr = true;
+                }
+            }
+            // Delegation authority — same check updateStatus does.
+            if (!$is_hod && $hodId && \App\Helpers\Common::hasDelegationAuthority($userId, $hodId, $this->resort->resort_id)) {
+                $is_hod = true;
+            }
+            if (!$is_hr && $hrId && \App\Helpers\Common::hasDelegationAuthority($userId, $hrId, $this->resort->resort_id)) {
+                $is_hr = true;
+            }
         }
 
         $page_title = 'Employee Resignation Details';
@@ -294,6 +327,20 @@ class EmployeeResignationController extends Controller
 
         if ($user->rank == 2 && $employeeResignation->hod_id == $user->id) {
             $is_hod = true;
+        }
+
+        // GM (rank 8) / EXCOM (rank 1) senior override — mirrors the
+        // show() controller. Lets leadership unblock a resignation when
+        // the assigned HOD/HR is unavailable. Without this, the show
+        // page renders the buttons (per its own override rule) but the
+        // server rejects the click as 403.
+        if (in_array((int) $user->rank, [1, 8], true)) {
+            if ($employeeResignation->hod_status === 'Pending') {
+                $is_hod = true;
+            }
+            if ($employeeResignation->hr_status === 'Pending' && $employeeResignation->hod_status === 'Approved') {
+                $is_hr = true;
+            }
         }
 
         // Delegation authority: if current user is not the HOD/HR but is their delegate
