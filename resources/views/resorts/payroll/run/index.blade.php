@@ -3914,20 +3914,25 @@
             columns: [
                 { data: 'id', orderable: false, searchable: false, defaultContent: '' },
                 { data: 'Emp_id'},
-                { 
-                    data: 'employee', 
+                {
+                    data: 'employee',
                     render: function(data, type, row) {
-                        return `<div class="tableUser-block"><div class="img-circle"><img src="${data.profile_picture}"></div><span> ${data.first_name} ${data.last_name}</span></div>`;
+                        // F&F-settled marker: red badge next to the name so HR
+                        // sees "this employee was already settled, don't re-pay"
+                        // at-a-glance. The full-row red highlight is applied in
+                        // createdRow below.
+                        var ffBadge = row.ff_settled_label || '';
+                        return `<div class="tableUser-block"><div class="img-circle"><img src="${data.profile_picture}"></div><span> ${data.first_name} ${data.last_name} ${ffBadge}</span></div>`;
                     }
                 },
-                { 
-                    data: 'position', 
+                {
+                    data: 'position',
                     render: function(data, type, row) {
                         return ` ${data.postion_title}`;
                     }
                 },
-                { 
-                    data: 'department', 
+                {
+                    data: 'department',
                     render: function(data, type, row) {
                         return ` ${data.department_name}`;
                     }
@@ -3935,6 +3940,21 @@
                 { data: 'section', defaultContent: 'N/A' },
                 { data: 'payment_method', defaultContent: 'Cash' }
             ],
+            // Row-level red highlight for F&F-settled employees. The
+            // backend stamps is_ff_settled=true when LWD falls inside
+            // this payroll period; rendering once on row create keeps
+            // the cue persistent through pagination/sort.
+            createdRow: function (row, data) {
+                if (data && data.is_ff_settled) {
+                    $(row).addClass('table-danger').attr('title', 'Resignation · F&F settlement done — Service Charge excluded');
+                    // Disable the selection checkbox so HR can't tick
+                    // this employee into the payroll inadvertently. The
+                    // controller already filters out settled employees
+                    // on the SC eligibility check, but this is the
+                    // first guard the user sees.
+                    $(row).find('input[type="checkbox"]').prop('disabled', true);
+                }
+            },
             drawCallback: function(settings) {
                 // Restore checkbox state from persistent Set after each page draw
                 $('#payroll-employees tbody input[type="checkbox"]').each(function(){
