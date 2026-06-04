@@ -304,6 +304,24 @@
                      idea for On Hold — surface the reason so a follow-up
                      decision has context. Always rendered above the action
                      row so reviewers see the prior decision context first. --}}
+                @if(in_array($employeeResignation->status, ['Withdraw', 'Withdrawn'], true))
+                    <div class="alert alert-secondary mb-3">
+                        <i class="fa-solid fa-undo me-1"></i>
+                        <strong>Withdrawn.</strong>
+                        The employee pulled this resignation back. No approval action is needed.
+                        @if(!empty($employeeResignation->withdraw_reason))
+                            <br><small class="text-muted">Withdrawal reason: {{ $employeeResignation->withdraw_reason }}</small>
+                        @endif
+                    </div>
+                @endif
+                @if($employeeResignation->status === 'Approved')
+                    <div class="alert alert-success mb-3">
+                        <i class="fa-solid fa-circle-check me-1"></i>
+                        <strong>Approved.</strong>
+                        The resignation has been fully approved. The employee now appears in
+                        <a href="{{ route('people.exit-clearance') }}" class="alert-link">Exit Clearance</a>.
+                    </div>
+                @endif
                 @if($employeeResignation->status === 'Rejected' && !empty($employeeResignation->rejected_reason))
                     <div class="alert alert-danger mb-3">
                         <i class="fa-solid fa-circle-xmark me-1"></i>
