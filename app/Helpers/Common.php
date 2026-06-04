@@ -3775,6 +3775,66 @@ class Common
      * Transfer / Promotion / Approval flows — not only Director of
      * Finance + Finance Manager + rank=Finance(7).
      */
+    /**
+     * F&F-settled employee classifier used across the Payroll module.
+     *
+     * An employee is "settled for a payroll period" when a final_settlements
+     * row with status='finalized' exists AND the employee's effective
+     * last_working_day falls inside the period.
+     *
+     * Effective LWD lookup priority (matches the F&F review page):
+     *   1. final_settlements.last_working_date (HR-confirmed)
+     *   2. employee_resignation.last_working_day (resignation record)
+     *
+     * Returns one of:
+     *   'settled_in_period' — LWD inside the period → include + flag + lock SC + drop from cash/bank
+     *   'settled_before'    — finalized but LWD < period start → exclude entirely
+     *   null                 — no finalized F&F → treat normally
+     *
+     * Implementation note: callers typically batch this via the bulk
+     * variant getFFSettlementStateMap() below to avoid an N+1 lookup
+     * against final_settlements + employee_resignation.
+     */
+    public static function getFFSettlementState(int $employeeId, string $periodStart, string $periodEnd): ?string
+    {
+        $map = self::getFFSettlementStateMap([$employeeId], $periodStart, $periodEnd);
+        return $map[$employeeId] ?? null;
+    }
+
+    /**
+     * Bulk variant of getFFSettlementState — single query batch over a
+     * list of employees. Returns [employeeId => 'settled_in_period' |
+     * 'settled_before']. Employees with no finalized F&F are absent
+     * from the map.
+     */
+    public static function getFFSettlementStateMap(array $employeeIds, string $periodStart, string $periodEnd): array
+    {
+        if (empty($employeeIds)) return [];
+
+        $rows = \DB::table('final_settlements as fs')
+            ->leftJoin('employee_resignation as er', 'er.employee_id', '=', 'fs.employee_id')
+            ->whereIn('fs.employee_id', $employeeIds)
+            ->where('fs.status', 'finalized')
+            ->select(
+                'fs.employee_id',
+                \DB::raw('COALESCE(fs.last_working_date, er.last_working_day) as effective_lwd')
+            )
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (empty($r->effective_lwd)) continue;
+            $lwd = (string) $r->effective_lwd;
+            if ($lwd >= $periodStart && $lwd <= $periodEnd) {
+                $out[(int) $r->employee_id] = 'settled_in_period';
+            } elseif ($lwd < $periodStart) {
+                $out[(int) $r->employee_id] = 'settled_before';
+            }
+            // LWD > periodEnd → not yet settled vs. this period → leave unset
+        }
+        return $out;
+    }
+
     public static function isFinanceDepartment($deptId)
     {
         if (!$deptId) return false;

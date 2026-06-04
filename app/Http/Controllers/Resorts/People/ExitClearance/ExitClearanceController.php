@@ -195,12 +195,19 @@ class ExitClearanceController extends Controller
                         : 'N/A';
                 })
                 ->addColumn('status', function ($employeeResignation) {
+                    // `Withdraw` is an explicit terminal state — the employee
+                    // pulled their resignation back, so no forms need filling.
+                    // Was rendering as "Pending" via the default branch and
+                    // misleading HR into chasing approvers who no longer
+                    // exist for this resignation.
                     $statusBadge = match ($employeeResignation->status) {
                         'Completed' => '<span class="badge badge-themeSuccess">Completed</span>',
                         'Approved' => '<span class="badge badge-themeSuccess">Approved</span>',
                         'Rejected' => '<span class="badge badge-themeDanger">Rejected</span>',
                         'On Hold'  => '<span class="badge badge-themeSkyblue">On Hold</span>',
                         'In Progress' => '<span class="badge badge-themePrimary">In Progress</span>',
+                        'Withdraw', 'Withdrawn'
+                                   => '<span class="badge badge-themeSecondary">Withdrawn</span>',
                         default    => '<span class="badge badge-themeWarning">Pending</span>',
                     };
 

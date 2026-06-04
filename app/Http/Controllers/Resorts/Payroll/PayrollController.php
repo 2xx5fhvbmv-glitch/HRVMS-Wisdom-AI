@@ -250,13 +250,38 @@ class PayrollController extends Controller
             $query->where('Section_id', $request->section);
         }
 
-        $query = $query->get()
-        ->map(function($i) use($isChecked){
-    
-            
+        $rawEmployees = $query->get();
+
+        // F&F-settled employee handling. Two states a finalized F&F can
+        // produce relative to this payroll period:
+        //   • settled_in_period — LWD inside [start, end]. Keep the row
+        //     (their final-month payroll), mark is_ff_settled=true so
+        //     the UI paints it red, locks Service Charge at 0, and
+        //     drops them from the cash/bank sheet.
+        //   • settled_before   — LWD < start. Drop entirely; they were
+        //     settled in a prior period and shouldn't reappear.
+        //
+        // Both signals come from Common::getFFSettlementStateMap to
+        // avoid an N+1 (one batched query covers every employee in
+        // the result set).
+        $settlementStates = [];
+        if ($startDate && $endDate) {
+            $settlementStates = \App\Helpers\Common::getFFSettlementStateMap(
+                $rawEmployees->pluck('id')->all(),
+                $startDate,
+                $endDate
+            );
+        }
+        $query = $rawEmployees
+            ->reject(function ($emp) use ($settlementStates) {
+                return ($settlementStates[$emp->id] ?? null) === 'settled_before';
+            })
+            ->map(function ($i) use ($isChecked, $settlementStates) {
                 $i->isChecked = $isChecked;
-            return $i;
-        });
+                $i->is_ff_settled = ($settlementStates[$i->id] ?? null) === 'settled_in_period';
+                return $i;
+            })
+            ->values();
         // dd($query);
         $totalChecked = 0; // Initialize counter before processing rows
 
@@ -298,7 +323,21 @@ class PayrollController extends Controller
         ->addColumn('payment_method', function ($employee) {
             return $employee->payment_mode; // Adjust based on actual logic
         })
-        ->rawColumns(['id', 'employee', 'position', 'department', 'section', 'payment_method'])
+        // F&F-settled marker for the row. Frontend reads this to:
+        //   • paint the row red
+        //   • show a "Resignation · F&F Done" badge
+        //   • lock the Service Charge input at 0 (HR already paid SC
+        //     via the F&F flow, so it can't be redistributed here)
+        //   • drop this employee from the cash/bank export
+        ->addColumn('is_ff_settled', function ($employee) {
+            return (bool) ($employee->is_ff_settled ?? false);
+        })
+        ->addColumn('ff_settled_label', function ($employee) {
+            return ($employee->is_ff_settled ?? false)
+                ? '<span class="badge badge-themeDanger">Resignation · F&F Done</span>'
+                : '';
+        })
+        ->rawColumns(['id', 'employee', 'position', 'department', 'section', 'payment_method', 'ff_settled_label'])
         ->make(true);
 
         // ✅ Inject totalChecked into the JSON response
@@ -408,7 +447,10 @@ class PayrollController extends Controller
 
                 // Fallback: try by Emp_id if not found by primary key
                 if (!$emp_detail) {
-                    $emp_detail = Employee::with(['position', 'department', 'section'])->where('Emp_id', $empId)->first();
+                    $emp_detail = Employee::with(['position', 'department', 'section'])
+                        ->where('Emp_id', $empId)
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->first();
                 }
 
                 if (!$emp_detail) {
@@ -457,9 +499,11 @@ class PayrollController extends Controller
             $activityLog = []; // ✅ Array to track changes
 
             foreach ($request->attendance as $attendance) {
-                // ✅ Fetch Employee details
+                // ✅ Fetch Employee details — resort_id scoped to prevent
+                // cross-resort leakage when Emp_id codes collide.
                 $emp_detail = Employee::with(['position', 'department'])
                     ->where('Emp_id', $attendance['id'])
+                    ->where('resort_id', $this->resort->resort_id)
                     ->first();
 
                 if (!$emp_detail) {
@@ -602,9 +646,32 @@ class PayrollController extends Controller
 
         $eligibleEmployeeIds = [];
         // dd($ids);
-        $employees = Employee::whereIn('Emp_id', $ids)->get();
+        // resort_id MUST be filtered here — Emp_id (the human "DR-24"
+        // code) is unique per-resort, not globally. Without the scope,
+        // a Resort A request that includes "DR-24" would pull Resort B's
+        // DR-24 into the eligible pool. Reported as cross-resort
+        // leakage during a live payroll run.
+        $employees = Employee::whereIn('Emp_id', $ids)
+            ->where('resort_id', $resortId)
+            ->get();
+
+        // F&F-settled employees are NEVER eligible for further SC
+        // distribution from payroll — their SC was already paid out
+        // in the F&F settlement. Pre-pull the set of employees with a
+        // finalized FS row so the loop below drops them regardless of
+        // their benefit-grid eligibility.
+        $settledIds = \DB::table('final_settlements')
+            ->whereIn('employee_id', $employees->pluck('id')->all())
+            ->where('status', 'finalized')
+            ->pluck('employee_id')
+            ->flip()
+            ->all();
 
         foreach ($employees as $employee) {
+            if (isset($settledIds[$employee->id])) {
+                // Already settled via F&F — exclude from SC pool.
+                continue;
+            }
             // Check employee's emp_grade and find matching benefit grid
             $grid = ResortBenifitGrid::where('resort_id', $resortId)
                 ->where('emp_grade', $employee->benefit_grid_level)
@@ -646,9 +713,10 @@ class PayrollController extends Controller
                         'service_charge' => $serviceCharge['totalServiceCharge'],
                     ]
                 );
-                // ✅ Fetch Employee details
+                // ✅ Fetch Employee details — resort_id scoped.
                 $emp_detail = Employee::with(['position', 'department'])
                     ->where('Emp_id', $serviceCharge['id'])
+                    ->where('resort_id', $this->resort->resort_id)
                     ->first();
 
                 if (!$emp_detail) {
@@ -740,9 +808,10 @@ class PayrollController extends Controller
         // dd($request->all());
         try {
             foreach ($request->DeductionData as $deduction) {
-                // ✅ Fetch Employee details
+                // ✅ Fetch Employee details — resort_id scoped.
                 $emp_detail = Employee::with(['position', 'department'])
                     ->where('Emp_id', $deduction['id'])
+                    ->where('resort_id', $this->resort->resort_id)
                     ->first();
 
                 if (!$emp_detail) {
@@ -847,6 +916,7 @@ class PayrollController extends Controller
                 // ✅ Fetch Employee details
                 $emp_detail = Employee::with(['position', 'department'])
                     ->where('Emp_id', $review['id'])
+                    ->where('resort_id', $this->resort->resort_id)
                     ->first();
 
                 if (!$emp_detail) {
@@ -1134,7 +1204,12 @@ class PayrollController extends Controller
             'approved_at' => now(),
         ]);
 
-        $payroll = Payroll::find($payrollId);
+        // resort_id scope: Payroll::find by primary key alone would let
+        // a user of one resort read another's payroll metadata if the
+        // id is known.
+        $payroll = Payroll::where('id', $payrollId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
         $period = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
         $approverName = $currentUser->first_name . ' ' . $currentUser->last_name;
 
@@ -1218,7 +1293,11 @@ class PayrollController extends Controller
             ->orderBy('step_order')
             ->get();
 
-        $payroll = Payroll::find($payrollId);
+        // resort_id scope so an authorised user can't read another
+        // resort's payroll by guessing the id.
+        $payroll = Payroll::where('id', $payrollId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
 
         // Determine current user's role
         $currentUser = \Auth::guard('resort-admin')->user();
@@ -1266,7 +1345,13 @@ class PayrollController extends Controller
      */
     private function notifyApprover($payrollId, $resortId, $stepOrder)
     {
-        $payroll = Payroll::find($payrollId);
+        // resort_id is already passed in by the caller; use it to
+        // scope the lookup so a cross-resort id can't surface here
+        // either.
+        $payroll = Payroll::where('id', $payrollId)
+            ->where('resort_id', $resortId)
+            ->first();
+        if (!$payroll) return;
         $period = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
 
         $stepTitles = [1 => 'Finance EXCOM', 2 => 'HR EXCOM', 3 => 'GM'];
@@ -3282,7 +3367,11 @@ class PayrollController extends Controller
         $page_title = 'Payroll Activity Log';
         $payroll_id = base64_decode($encoded_payroll_id);
 
-        $payroll = Payroll::find($payroll_id);
+        // resort_id scope so viewing the activity log can't reach
+        // another resort's payroll via a guessable id.
+        $payroll = Payroll::where('id', $payroll_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
         $approvals = PayrollApproval::where('payroll_id', $payroll_id)
             ->orderBy('step_order')
             ->get();
@@ -3595,8 +3684,26 @@ class PayrollController extends Controller
 
             $spreadsheet = new Spreadsheet();
 
-            // Split employees by payment mode
+            // Split employees by payment mode, but FIRST drop anyone
+            // whose F&F settlement is finalized AND covers this payroll
+            // period. Their final pay went through the F&F flow, not
+            // payroll, so they must not appear on either the cash or
+            // bank sheet (would otherwise be double-paid).
             $employees = $payroll->employees;
+            $periodStart = optional($payroll->start_date)->format('Y-m-d') ?? $payroll->start_date;
+            $periodEnd   = optional($payroll->end_date)->format('Y-m-d')   ?? $payroll->end_date;
+            $settlementStates = \App\Helpers\Common::getFFSettlementStateMap(
+                $employees->pluck('employee.id')->filter()->all(),
+                (string) $periodStart,
+                (string) $periodEnd
+            );
+            $employees = $employees->reject(function ($emp) use ($settlementStates) {
+                $state = $settlementStates[optional($emp->employee)->id ?? 0] ?? null;
+                // Drop both "settled in this period" and "settled before" —
+                // either way they don't belong on the sheet.
+                return $state !== null;
+            });
+
             $cashEmployees = $employees->filter(fn($emp) => $emp->employee->payment_mode === 'Cash');
             $bankEmployees = $employees->filter(fn($emp) => $emp->employee->payment_mode === 'Bank');
 
