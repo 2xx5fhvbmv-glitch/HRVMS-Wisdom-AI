@@ -66,7 +66,10 @@ class PayslipController extends Controller
 
     public function getEmployees(Request $request)
     {
-        $resort_id = auth()->user()->resort_id;
+        // Use the controller's resolved resort context, not auth()->user()
+        // which uses the default guard and can return a master/cross-resort
+        // user whose resort_id leaks the wrong resort's employees.
+        $resort_id = $this->resort->resort_id;
         $query = Employee::with(['resortAdmin', 'position', 'department'])
             ->where('resort_id', $resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned']);
