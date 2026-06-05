@@ -130,7 +130,18 @@
                                             New hires must be tied to an approved, unfilled vacancy.
                                             Create one in <strong>Talent Acquisition &rarr; Vacancies</strong>
                                             and complete the approval flow before returning here.
+                                            <div class="mt-2">
+                                                <a href="{{ route('resort.vacancies.create') }}" class="btn btn-sm btn-themeBlue">
+                                                    <i class="fa-solid fa-plus me-1"></i>Create a Vacancy
+                                                </a>
+                                            </div>
                                         </div>
+                                        {{-- Flag for the page-load JS at the bottom of the file:
+                                             when this is present we disable every input, file picker,
+                                             select, textarea and Next/Submit button OUTSIDE the
+                                             vacancy panel so HR can't fill out a hire that has no
+                                             vacancy to attach to. The alert above tells them why. --}}
+                                        <input type="hidden" id="no-vacancies-flag" value="1">
                                     @endif
                                 </div>
                             </div>
@@ -3257,6 +3268,57 @@
 
             updateEducationButtons();
             updateEducationFieldNames();
+        });
+    </script>
+
+    {{-- ────────────────────────────────────────────────────────────────────
+         "No vacancies" form lock-down. When the server-rendered hidden
+         flag is present, disable every editable control OUTSIDE the
+         vacancy picker panel so HR can't fill in a hire that has no
+         vacancy to attach to. The alert at the top + the "Create a
+         Vacancy" CTA still work normally because they live INSIDE the
+         vacancy panel (or are anchor tags, which we leave alone).
+
+         Done in JS rather than as a Blade @if wrap because the form
+         is multi-step (4 fieldsets + Parsley + Select2 + drag-drop
+         uploader); short-circuiting the markup would have meant deleting
+         every step's HTML, which is brittle. Lock-down is purely
+         defensive — the EmployeeController::store() validation already
+         requires `vacancy_id`, so even a tampered submit would 422.
+         ──────────────────────────────────────────────────────────────── --}}
+    <script>
+        $(function () {
+            if (!document.getElementById('no-vacancies-flag')) return;
+
+            var $form = $('#msform');
+            if (!$form.length) return;
+            var $vacancyPanel = $('#vacancyPickerPanel');
+
+            // Disable every editable element NOT inside the vacancy panel.
+            $form.find('input, select, textarea, button').each(function () {
+                if ($vacancyPanel.has(this).length) return;       // leave the picker alone
+                if ($(this).attr('type') === 'hidden') return;     // hidden inputs stay
+                $(this).prop('disabled', true);
+            });
+            // Bootstrap step-nav buttons + the upload "Browse" links.
+            // .action-button is the Next/Submit; .add-fullFinal/.btn are
+            // the repeater "Add More" / "Upload Photo" anchor buttons.
+            $form.find('.action-button, .next-step, .previous-step, .btn').each(function () {
+                if ($vacancyPanel.has(this).length) return;
+                $(this).addClass('disabled').attr('aria-disabled', 'true').css('pointer-events', 'none');
+            });
+            // Grey out every fieldset that isn't the vacancy panel so it
+            // reads visually as locked.
+            $form.find('fieldset').each(function () {
+                if ($vacancyPanel.has(this).length || $(this).has($vacancyPanel).length) return;
+                $(this).css({ opacity: 0.45, 'pointer-events': 'none' });
+            });
+            // Step 1 contains BOTH the vacancy panel and the locked
+            // content. Grey only the post-vacancy children.
+            $form.find('fieldset[data-setp="1"] > *').each(function () {
+                if ($vacancyPanel.is(this) || $vacancyPanel.has(this).length) return;
+                $(this).css({ opacity: 0.45, 'pointer-events': 'none' });
+            });
         });
     </script>
 @endsection

@@ -65,12 +65,20 @@ class PromotionLetterMail extends Mailable
             '{{effective_date}}' => (string) Carbon::parse($this->promotion->effective_date)->format('d M Y'),
         ];
 
-        // Replace placeholders with actual values
-        $letterContent = strtr($template->content, $placeholders);
+        // Email body = template->email_body (the short notification HR
+        // configured). PDF content is already baked into $pdfPath and
+        // attached below. Falls back to a generated boilerplate when the
+        // template predates the email_body column (legacy rows still
+        // need to send) — placeholders still get substituted so
+        // {{employee_name}} resolves correctly in the fallback too.
+        $defaultEmailBody = '<p>Dear {{employee_name}},</p>'
+            . '<p>Please find your ' . e($subject) . ' attached.</p>'
+            . '<p>Regards,<br>{{resort_name}} HR</p>';
+        $emailBodyTemplate = !empty($template->email_body) ? $template->email_body : $defaultEmailBody;
+        $emailBody = strtr($emailBodyTemplate, $placeholders);
 
-        // Now, pass the processed content into the common email view
         return $this->view('emails.commonEmail')
-            ->with(['mainbody' => $letterContent]) // Pass the dynamic letter content
+            ->with(['mainbody' => $emailBody])
             ->subject($subject)
             ->attach(Storage::path($this->pdfPath), [
                 'as' => 'Promotion_Letter_' . ($this->promotion->resortAdmin->full_name ?? 'Employee') . '.pdf',

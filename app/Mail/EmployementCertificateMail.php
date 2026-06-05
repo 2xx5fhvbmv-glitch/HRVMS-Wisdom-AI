@@ -67,12 +67,19 @@ class EmployementCertificateMail extends Mailable
             '{{last_working_day}}' => (string) Carbon::parse($employeeResignation->last_working_day)->format('d M Y'),
     ];
 
-    // Replace placeholders with actual values
-    $letterContent = strtr($template->content, $placeholders);
-   
+    // Email body = template->email_body (short HR notification). PDF
+    // content (template->content) stays inside the attachment, NOT the
+    // email body. Legacy templates without email_body fall back to a
+    // generated boilerplate so the mail still sends.
+    $defaultEmailBody = '<p>Dear {{employee_name}},</p>'
+        . '<p>Please find your ' . e($subject) . ' attached.</p>'
+        . '<p>Regards,<br>{{resort_name}} HR</p>';
+    $emailBodyTemplate = !empty($template->email_body) ? $template->email_body : $defaultEmailBody;
+    $emailBody = strtr($emailBodyTemplate, $placeholders);
+
      // Return email with PDF attachment
     return $this->view('emails.commonEmail')
-        ->with(['mainbody' => $letterContent])
+        ->with(['mainbody' => $emailBody])
         ->subject($subject)
         ->attach($pdfPath, [
             'as' => 'Experience_Certificate_' . ($this->employee->Emp_id ?? 'Employee') . '.pdf',

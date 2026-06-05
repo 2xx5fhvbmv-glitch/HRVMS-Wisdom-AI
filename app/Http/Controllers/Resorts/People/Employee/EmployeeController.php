@@ -1395,6 +1395,72 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Update an existing employee's profile picture (and optionally the
+     * full-length / selfie image). Before this existed, the only write
+     * path was the create flow — once an employee was created, the
+     * profile photo was effectively immutable. Reported on live for
+     * DR-485 where HR couldn't replace a wrongly-uploaded PDF without
+     * re-creating the employee. MIME validation matches the create flow.
+     */
+    public function updateProfilePicture(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'employee_id'      => 'required|exists:employees,id',
+            'profile_picture'  => 'nullable|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif',
+            'full_length_photo'=> 'nullable|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif',
+        ], [
+            'profile_picture.mimes'   => 'Profile picture must be an image (JPG, PNG, GIF, WebP, HEIC).',
+            'full_length_photo.mimes' => 'Full-length photo must be an image (JPG, PNG, GIF, WebP, HEIC).',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+        if (!$request->hasFile('profile_picture') && !$request->hasFile('full_length_photo')) {
+            return response()->json(['success' => false, 'message' => 'Pick at least one file to upload.'], 422);
+        }
+
+        $employee = Employee::with('resortAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($request->employee_id);
+
+        // Use the employee's existing categorised folder so the new file
+        // lands alongside their other documents (matches the create flow).
+        $fileManagement = FilemangementSystem::where('resort_id', $this->resort->resort_id)
+            ->where('Folder_Name', $employee->Emp_id)
+            ->where('Folder_Type', 'categorized')
+            ->first();
+        if (!$fileManagement) {
+            $fileManagement = Common::createFolderByName($this->resort->resort_id, $employee->Emp_id, 'categorized');
+        }
+        $folder_name = $fileManagement->Folder_Name;
+
+        if ($request->hasFile('profile_picture') && $employee->resortAdmin) {
+            $upload = Common::AWSEmployeeFileUpload($this->resort->resort_id, $request->file('profile_picture'), $folder_name);
+            if (($upload['status'] ?? '') === 'success') {
+                $employee->resortAdmin->profile_picture = $upload['path'];
+                $employee->resortAdmin->save();
+            } else {
+                return response()->json(['success' => false, 'message' => 'Profile picture upload failed.'], 500);
+            }
+        }
+        if ($request->hasFile('full_length_photo')) {
+            $upload = Common::AWSEmployeeFileUpload($this->resort->resort_id, $request->file('full_length_photo'), $folder_name);
+            if (($upload['status'] ?? '') === 'success') {
+                $employee->selfie_image = $upload['path'];
+                $employee->save();
+            } else {
+                return response()->json(['success' => false, 'message' => 'Full-length photo upload failed.'], 500);
+            }
+        }
+
+        return response()->json([
+            'success'         => true,
+            'message'         => 'Profile picture updated.',
+            'profile_picture' => Common::getResortUserPicture($employee->Admin_Parent_id),
+        ]);
+    }
+
+    /**
      * Activate an employee who is in the pre-joining 'Onboarding' state.
      *
      * Called from the "Activate Employee" action on the profile once HR has

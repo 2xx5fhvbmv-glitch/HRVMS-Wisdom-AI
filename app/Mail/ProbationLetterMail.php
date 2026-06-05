@@ -21,11 +21,16 @@ class ProbationLetterMail extends Mailable
     /**
      * Create a new message instance.
      *
-     * $letterContent must already have every {{placeholder}} substituted by
-     * the caller (ProbationController@sendProbationLetter). Re-rendering here
-     * would duplicate the placeholder list and silently leak literal tokens
-     * (e.g. {{employee_code}}, {{Department_title}}) into the email body
-     * whenever the two lists drift.
+     * The 6th arg lands inside the email body — historically this was the
+     * fully substituted letter content (same as the PDF), but since the
+     * email-body / PDF-content split it should be the short notification
+     * substituted from template->email_body (with a generated fallback
+     * when the template predates the column). The PDF attachment is
+     * passed separately via $pdfPath. The caller (ProbationController
+     * @sendProbationLetter) must run {{placeholder}} substitution before
+     * passing — re-rendering here would duplicate the placeholder list
+     * and silently leak literal tokens like {{employee_code}} into the
+     * email whenever the two lists drift.
      */
     public function __construct(Employee $employee, $pdfPath, $type, Resort $resort, $fileName, $letterContent)
     {

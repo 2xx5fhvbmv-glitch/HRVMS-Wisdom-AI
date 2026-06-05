@@ -387,14 +387,43 @@
                         </div>
                         <br>
                         <div class="row">
-                            <!-- Email Content -->
+                            <!-- Email Body — short notification message sent
+                                 inside the email. The longer formal letter
+                                 lives in the PDF attachment below. -->
                             <div class="col-md-12">
-                                <textarea 
-                                    class="form-control MailTemplete" 
-                                    name="MailTemplete" 
-                                    rows="15"  
-                                    id="editor" 
-                                    placeholder="Enter the email content here..."></textarea>
+                                <label class="form-label fw-600 mb-1">
+                                    Email Body
+                                    <small class="text-muted fw-normal">— short notification, sent as the email body</small>
+                                </label>
+                                {{-- CKEditor (initialised in the JS block below)
+                                     so HR gets a rich editor for the email body
+                                     too — same UX as the PDF content editor and
+                                     produces real HTML so line breaks render
+                                     correctly in the sent email. --}}
+                                <textarea
+                                    class="form-control"
+                                    name="email_body"
+                                    rows="6"
+                                    id="emailBodyEditor"></textarea>
+                            </div>
+                            <div id="div-emailBody"></div>
+                        </div>
+                        <br>
+                        <div class="row">
+                            <!-- PDF Attachment Content — formal letter that
+                                 ends up inside the attached PDF. Was the
+                                 ONLY editor before the email/PDF split. -->
+                            <div class="col-md-12">
+                                <label class="form-label fw-600 mb-1">
+                                    PDF Attachment Content
+                                    <small class="text-muted fw-normal">— full formal letter, rendered into the PDF attachment</small>
+                                </label>
+                                <textarea
+                                    class="form-control MailTemplete"
+                                    name="MailTemplete"
+                                    rows="15"
+                                    id="editor"
+                                    placeholder="Enter the full letter content here..."></textarea>
                             </div>
                             <div id="div-MailTemplete"></div>
                         </div>
@@ -520,6 +549,24 @@
                 } else {
                     CKEDITOR.replace("editor"); // Initialize CKEditor
                 }
+                // Email Body CKEditor — smaller toolbar than the PDF editor
+                // since the email is just a short notification. Reuse the
+                // same init pattern so a "Create New" click leaves a clean
+                // empty body for HR to type into.
+                if (CKEDITOR.instances["emailBodyEditor"]) {
+                    CKEDITOR.instances["emailBodyEditor"].setData("");
+                } else {
+                    CKEDITOR.replace("emailBodyEditor", {
+                        height: 150,
+                        toolbar: [
+                            { name: 'basicstyles', items: ['Bold','Italic','Underline'] },
+                            { name: 'paragraph',  items: ['NumberedList','BulletedList','-','Blockquote'] },
+                            { name: 'links',      items: ['Link','Unlink'] },
+                            { name: 'tools',      items: ['Maximize'] },
+                            { name: 'document',   items: ['Source'] }
+                        ]
+                    });
+                }
             });
 
             ProbationEmailTempleteIndex();
@@ -548,7 +595,13 @@
                     }
                 },
                 submitHandler: function(form) {
-                    const content = CKEDITOR.instances['editor'].getData(); // Get content from CKEditor
+                    const content = CKEDITOR.instances['editor'].getData(); // PDF content from CKEditor
+                    // Email Body uses its own CKEditor instance so HR can
+                    // format the email (bold, lists, line breaks) and the
+                    // output is real HTML the email view can render.
+                    const emailBody = CKEDITOR.instances['emailBodyEditor']
+                        ? CKEDITOR.instances['emailBodyEditor'].getData()
+                        : $('#emailBodyEditor').val();
                     let type = $("#type").val();
                     let MailSubject = $("#MailSubject").val();
                     let id = $("#TemplateId").val();
@@ -562,6 +615,7 @@
                             "type":type,
                             "subject": MailSubject,
                             "content": content,
+                            "email_body": emailBody,
                             "TemplateId":TemplateId,
                             "Mode":Mode,
                             "_token": "{{ csrf_token() }}"
@@ -598,6 +652,9 @@
                             if (CKEDITOR.instances['editor']) {
                                 CKEDITOR.instances['editor'].setData('');
                             }
+                            if (CKEDITOR.instances['emailBodyEditor']) {
+                                CKEDITOR.instances['emailBodyEditor'].setData('');
+                            }
                         }
                     });
                 },
@@ -624,14 +681,13 @@
                     type: 'POST',
                     data: {"_token":"{{csrf_token()}}","id":id},
                     success: function(response) {
-                        if (response.success) 
-                        {            
+                        if (response.success)
+                        {
                             var data= response.data;
                             $("#type").val(data.type).trigger('change');
                             $("#MailSubject").val(data.subject);
                             $("#Mode").val("edit");
                             $("#TemplateId").val(data.id);
-
                             if (CKEDITOR.instances["editor"]) {
                                 CKEDITOR.instances["editor"].destroy(true);
                             }
@@ -639,7 +695,29 @@
                             CKEDITOR.instances["editor"].on('instanceReady', function () {
                                 CKEDITOR.instances["editor"].setData(data.content);
                             });
-                        } 
+
+                            // Email Body editor — destroy + recreate so
+                            // toggling between templates loads the right
+                            // saved body. Legacy rows have email_body=null,
+                            // which lands as an empty editor — the
+                            // send-side falls back to a generated boilerplate.
+                            if (CKEDITOR.instances["emailBodyEditor"]) {
+                                CKEDITOR.instances["emailBodyEditor"].destroy(true);
+                            }
+                            CKEDITOR.replace("emailBodyEditor", {
+                                height: 150,
+                                toolbar: [
+                                    { name: 'basicstyles', items: ['Bold','Italic','Underline'] },
+                                    { name: 'paragraph',  items: ['NumberedList','BulletedList','-','Blockquote'] },
+                                    { name: 'links',      items: ['Link','Unlink'] },
+                                    { name: 'tools',      items: ['Maximize'] },
+                                    { name: 'document',   items: ['Source'] }
+                                ]
+                            });
+                            CKEDITOR.instances["emailBodyEditor"].on('instanceReady', function () {
+                                CKEDITOR.instances["emailBodyEditor"].setData(data.email_body || '');
+                            });
+                        }
                         else
                         {
                             toastr.error(response.message, "Error",
