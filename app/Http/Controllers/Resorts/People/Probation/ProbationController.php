@@ -655,9 +655,16 @@ class ProbationController extends Controller
         // dd($request->all());
         $MailTemplete  = $request->content;
         $MailSubject  = $request->subject;
+        $MailEmailBody = $request->input('email_body');
         $type  = $request->type;
         $id  = $request->MailTemplete;
-        $placeholders = ProbationLetterTemplate::extractPlaceholders($request->content) ?? [];
+        // Placeholders are extracted from BOTH the PDF content and the
+        // email body so the editor surfaces them in one combined chip
+        // list (downstream consumers honour {{...}} in either field).
+        $placeholders = array_values(array_unique(array_merge(
+            ProbationLetterTemplate::extractPlaceholders($request->content) ?? [],
+            $MailEmailBody ? (ProbationLetterTemplate::extractPlaceholders($MailEmailBody) ?? []) : []
+        )));
         $resort_id = $this->resort->resort_id;
 
         DB::beginTransaction();
@@ -697,6 +704,7 @@ class ProbationController extends Controller
                     'type'=>$type,
                     'subject'=>$MailSubject,
                     'content'=>$MailTemplete,
+                    'email_body'=>$MailEmailBody,
                     'placeholers'=>$placeholders,
                 ]);
                 $msg = 'Probation Letter Template Created Successfully';
@@ -738,6 +746,7 @@ class ProbationController extends Controller
                         'type'=>$type,
                         'subject'=>$MailSubject,
                         'content'=>$MailTemplete,
+                        'email_body'=>$MailEmailBody,
                         'placeholers'=>$placeholders,
                     ]);
                 $msg = 'Probation Letter Template Updated Successfully';
@@ -799,7 +808,11 @@ class ProbationController extends Controller
             'id'=>$probation_letter->id,
             'flag'=>"edit",
             "subject"=>$probation_letter->subject,
-            'content'=>$probation_letter->content
+            'content'=>$probation_letter->content,
+            // Needed for the new "Email Body" editor on the config modal —
+            // without this the load returned empty and the editor cleared
+            // whatever HR had previously saved.
+            'email_body'=>$probation_letter->email_body,
         ];
         
          return response()->json([
@@ -849,7 +862,17 @@ class ProbationController extends Controller
             '{{employment_type}}'     => (string) $employee->employment_type,
         ];
 
+        // $letterContent → PDF body (template->content).
+        // $emailBody     → message inside the email itself (template->email_body).
+        // Legacy templates that pre-date the email_body column fall back
+        // to a short generated boilerplate so the email still sends.
         $letterContent = strtr($template->content, $placeholders);
+
+        $defaultEmailBody = '<p>Dear {{employee_name}},</p>'
+            . '<p>Please find your ' . e($template->subject ?? 'letter') . ' attached.</p>'
+            . '<p>Regards,<br>{{resort_name}} HR</p>';
+        $emailBodyTemplate = !empty($template->email_body) ? $template->email_body : $defaultEmailBody;
+        $emailBody = strtr($emailBodyTemplate, $placeholders);
 
         // Render the PDF through the letterhead wrapper so the configured
         // Letterhead & E-signature (People > Configuration > Letterhead)
@@ -896,9 +919,12 @@ class ProbationController extends Controller
             $this->ensureExitClearanceRecord($employee, $request->input('remarks'));
         }
 
-        // Send email
+        // Send email — the 6th arg is what lands inside the email body;
+        // PDF content is the attachment ($pdfPath). Passing $emailBody
+        // (the short notification) instead of $letterContent (the full
+        // formal letter) per HR's separation request.
         if (file_exists($pdfPath)) {
-            Mail::to($employee->resortAdmin->email)->send(new ProbationLetterMail($employee, $pdfPath, $type, $resort, $fileName, $letterContent));
+            Mail::to($employee->resortAdmin->email)->send(new ProbationLetterMail($employee, $pdfPath, $type, $resort, $fileName, $emailBody));
             return response()->json(['success' => true, 'message' => 'Letter sent successfully.']);
         } else {
             // Log or return error
