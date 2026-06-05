@@ -110,6 +110,13 @@ class ResignationController extends Controller
             'reason_type'                           => 'required',
             'resignation_letter'                    => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif',
             'comments'                              => 'required',
+            // last_working_day is optional (immediate-release path leaves it
+            // blank) but if supplied it must be a real date the downstream
+            // F&F / probation / leave-cycle calcs can parse. Without this
+            // a typo like "2026-13-45" silently lands in the DB and the
+            // F&F end-date math throws on parse.
+            'last_working_day'                      => 'nullable|date',
+            'immediate_release'                     => 'nullable|in:Yes,No',
         ]);
 
         if ($validator->fails()) {
@@ -143,7 +150,29 @@ class ResignationController extends Controller
             $hodEmployee                                =   Common::FindResortHODDepartment($this->resort_id, $this->user->GetEmployee->Dept_id);
             $hrEmployee                                 =   Common::FindResortHR($this->user);
 
-            
+            // Guard against missing approver assignments. The previous code
+            // dereferenced $hodEmployee->id / $hrEmployee->id directly, which
+            // threw a generic "Server error" 500 when the employee's
+            // department had no HOD configured or the resort had no HR
+            // employee in the People → Configuration → HR list. Surface a
+            // specific message so the mobile app can route the user back to
+            // HR for setup instead of leaving them staring at a generic
+            // failure toast.
+            if (!$hodEmployee) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No HOD is configured for your department. Please ask HR to assign a Head of Department before resigning.',
+                ], 422);
+            }
+            if (!$hrEmployee) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No HR contact is configured for this resort. Please contact HR directly to submit your resignation.',
+                ], 422);
+            }
+
             $resignation                                =   EmployeeResignation::create([
                 'resort_id'                             =>  $this->resort_id,
                 'employee_id'                           =>  $this->user->GetEmployee->id,
@@ -153,7 +182,18 @@ class ResignationController extends Controller
                 'immediate_release'                     =>  $request->input('immediate_release')?? 'No',
                 'resignation_letter'                    =>  $filePath ? json_encode($filePath) : null,
                 'comments'                              =>  $request->input('comments'),
-                'status'                                =>  'pending',
+                // Capital 'Pending' matches the convention used by the
+                // web-side EmployeeResignationController (and PHP's ===
+                // comparisons throughout the People module). The old
+                // lowercase 'pending' worked for SQL WHERE thanks to
+                // case-insensitive collation but silently missed strict
+                // PHP comparisons (dashboard counts, status badge match).
+                'status'                                =>  'Pending',
+                // Explicit defaults rather than relying on the MySQL
+                // enum default — column-default behaviour shifts between
+                // MySQL/MariaDB versions and migrations.
+                'hod_status'                            =>  'Pending',
+                'hr_status'                             =>  'Pending',
                 'hod_id'                                =>  $hodEmployee->id,
                 'hr_id'                                 =>  $hrEmployee->id,
                 'departure_arrangements'                =>  [
@@ -162,7 +202,7 @@ class ResignationController extends Controller
                                                                 "international_flight" => "0",
                                                                 "accommodation_arranged" => "0",
                                                                 "transportation_arranged" => "0"
-                                                            ],                                             
+                                                            ],
             ]);
             DB::commit();
 
@@ -206,7 +246,8 @@ class ResignationController extends Controller
                 }
             }
 
-            $hrEmployee = Common::FindResortHR($this->user);
+            // $hrEmployee was already resolved above and guarded — reuse it
+            // instead of hitting FindResortHR a second time per submit.
             if ($hrEmployee) {
                 Common::sendMobileNotification(
                     $this->resort_id,
