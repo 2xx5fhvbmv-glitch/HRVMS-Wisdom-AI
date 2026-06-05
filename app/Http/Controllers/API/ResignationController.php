@@ -129,6 +129,28 @@ class ResignationController extends Controller
             }
         }
 
+        // Normalize immediate_release to the canonical 'Yes' / 'No'
+        // strings the DB column expects. The mobile app currently sends
+        // booleans / lowercase strings / numerics — `in:Yes,No` rejected
+        // all of them and surfaced "The selected immediate release is
+        // invalid" on the resignation form (Deepika Iyer screenshot).
+        // Accept the common truthy/falsy variants and coerce to a
+        // canonical value; absent / null falls through to the 'No'
+        // default applied at insert time.
+        $irRaw = $request->input('immediate_release');
+        if ($irRaw !== null && $irRaw !== '') {
+            $truthy = ['Yes','yes','YES','true','True','TRUE','1', 1, true];
+            $falsy  = ['No','no','NO','false','False','FALSE','0', 0, false];
+            if (in_array($irRaw, $truthy, true)) {
+                $request->merge(['immediate_release' => 'Yes']);
+            } elseif (in_array($irRaw, $falsy, true)) {
+                $request->merge(['immediate_release' => 'No']);
+            }
+            // Anything else still hits the `in:Yes,No` rule below and
+            // returns a validation error — that's the desired behaviour
+            // for genuinely unknown payloads.
+        }
+
         $validator = Validator::make($request->all(), [
             'reason_type'                           => 'required',
             'resignation_letter'                    => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif',
