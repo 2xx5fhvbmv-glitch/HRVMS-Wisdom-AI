@@ -207,7 +207,12 @@ class PayrollController extends Controller
 
     public function getEmployees(Request $request)
     {
-        $resort_id = auth()->user()->resort_id;
+        // Use the resolved resort context (set by the controller constructor)
+        // rather than auth()->user()->resort_id. The default guard isn't
+        // always the resort-admin one; if a master/cross-resort guard is
+        // active, auth()->user()->resort_id can resolve to a different
+        // resort and leak its employees into the payroll list.
+        $resort_id = $this->resort->resort_id;
         $isChecked = $request->isChecked;
         // Only show employees who have attendance data in the payroll period
         $startDate = $request->startDate;
@@ -2001,7 +2006,7 @@ class PayrollController extends Controller
 
         if ($invalidOTs->isNotEmpty()) {
             $employeeIds = $invalidOTs->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2019,7 +2024,7 @@ class PayrollController extends Controller
 
         if ($missingStatus->isNotEmpty()) {
             $employeeIds = $missingStatus->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2043,7 +2048,7 @@ class PayrollController extends Controller
 
         if ($invalidAttendance->isNotEmpty()) {
             $employeeIds = $invalidAttendance->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
