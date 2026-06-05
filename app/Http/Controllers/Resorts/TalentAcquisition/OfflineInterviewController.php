@@ -129,6 +129,41 @@ class OfflineInterviewController extends Controller
         // Picking a row hydrates department / position / division / salary
         // / etc. on the offline interview shell, so the user goes straight
         // to Step 2 without re-typing data that already lives on the vacancy.
+        // Filled-slot count per vacancy — UNION of two sources, max() taken
+        // in the outer select so neither path can under-count. Mirrors
+        // the same logic used by /resort/people/employees/create's
+        // vacancy picker so the two pages agree on what's "still open":
+        //   1. employees.vacancy_id — exact, set by the new-hire form
+        //      after the 2026_06_01 migration. Schema-guarded for
+        //      environments that haven't applied it yet.
+        //   2. applicant_wise_statuses.status='Contract Accepted' on
+        //      applicant_form_data.Parent_v_id — the TA-flow definition
+        //      of "hired", works on every environment.
+        $hasVacancyIdCol = \Schema::hasColumn('employees', 'vacancy_id');
+        if ($hasVacancyIdCol) {
+            $empFilled = \DB::table('employees')
+                ->select('vacancy_id', \DB::raw('COUNT(*) as filled'))
+                ->where('resort_id', $resort_id)
+                ->whereNotIn('status', ['Terminated', 'Inactive'])
+                ->whereNotNull('vacancy_id')
+                ->groupBy('vacancy_id');
+            $taFilled = \DB::table('applicant_wise_statuses as aws')
+                ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
+                ->where('afd.resort_id', $resort_id)
+                ->where('aws.status', 'Contract Accepted')
+                ->groupBy('afd.Parent_v_id')
+                ->select('afd.Parent_v_id as vacancy_id', \DB::raw('COUNT(DISTINCT aws.Applicant_id) as filled'));
+            $filledByVacancy = $empFilled->unionAll($taFilled);
+        } else {
+            // No vacancy_id column → TA-flow only.
+            $filledByVacancy = \DB::table('applicant_wise_statuses as aws')
+                ->join('applicant_form_data as afd', 'afd.id', '=', 'aws.Applicant_id')
+                ->where('afd.resort_id', $resort_id)
+                ->where('aws.status', 'Contract Accepted')
+                ->groupBy('afd.Parent_v_id')
+                ->select('afd.Parent_v_id as vacancy_id', \DB::raw('COUNT(DISTINCT aws.Applicant_id) as filled'));
+        }
+
         $vacancies = \DB::table('vacancies as v')
             ->join('resort_positions as p', 'p.id', '=', 'v.position')
             ->join('resort_departments as d', 'd.id', '=', 'v.department')
@@ -147,6 +182,9 @@ class OfflineInterviewController extends Controller
                             ->where('check_aws.status', 'Rejected');
                     });
             })
+            ->leftJoinSub($filledByVacancy, 'fb', function ($j) {
+                $j->on('fb.vacancy_id', '=', 'v.id');
+            })
             ->where('v.Resort_id', $resort_id)
             ->where('tac.Approved_By', \App\Helpers\Common::TaFinalApproval($resort_id))
             ->where('tac.status', 'ForwardedToNext')
@@ -157,6 +195,7 @@ class OfflineInterviewController extends Controller
                 'd.name as department_name',
                 'd.code as department_code',
                 'v.Total_position_required as no_of_positions',
+                \DB::raw('COALESCE(MAX(fb.filled), 0) as filled_count'),
                 \DB::raw('COUNT(DISTINCT a.id) as application_count'),
                 \DB::raw('MAX(a.Application_date) as application_date'),
                 \DB::raw('MAX(al.link_Expiry_date) as link_expiry_date')
@@ -168,8 +207,13 @@ class OfflineInterviewController extends Controller
                     ? \Carbon\Carbon::parse($v->application_date)->format('d M Y') : '—';
                 $v->expiry_date_label = $v->link_expiry_date
                     ? \Carbon\Carbon::parse($v->link_expiry_date)->format('d M Y') : '—';
+                $v->remaining_slots = max(0, (int) $v->no_of_positions - (int) $v->filled_count);
                 return $v;
-            });
+            })
+            // Hide fully-filled vacancies — mirrors the employee-create
+            // page's auto-hide. New hires must tie to an UNFILLED slot.
+            ->filter(fn($v) => $v->remaining_slots > 0)
+            ->values();
 
         // Selected vacancy details for the preview card when continuing a
         // draft — pulls position + department names so the preview can be

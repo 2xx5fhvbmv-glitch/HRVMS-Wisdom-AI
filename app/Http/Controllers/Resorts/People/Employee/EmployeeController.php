@@ -665,8 +665,26 @@ class EmployeeController extends Controller
                     ]);
                 }
             }
+            // MIME-type allowlist for both image fields. Without this, HR
+            // could pick a PDF in the file dialog and the upload would land
+            // silently — the column stored a .pdf path and the <img> tag
+            // resolved to the default avatar (reported on live for DR-485).
+            // Same allowlist the OnBoarding API uses for selfie_image.
+            $imageMimeAllow = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'heic', 'heif'];
+            $isImageFile = function ($uploaded) use ($imageMimeAllow) {
+                if (!$uploaded) return false;
+                $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+                return in_array($ext, $imageMimeAllow, true);
+            };
+
             if($request->hasFile('full_length_photo')){
                 $file_full_length = $request->file('full_length_photo');
+                if (!$isImageFile($file_full_length)) {
+                    return back()->withErrors([
+                        'full_length_photo' => 'Full-length photo must be an image (JPG, PNG, GIF, WebP, HEIC). Got: '
+                            . strtoupper((string) $file_full_length->getClientOriginalExtension()),
+                    ])->withInput();
+                }
                 $picture = Common::AWSEmployeeFileUpload($this->resort->resort_id,$file_full_length,$folder_name);
 
                 if($picture['status'] == 'success'){
@@ -676,6 +694,12 @@ class EmployeeController extends Controller
             }
             if($request->hasFile('profile_picture')){
                 $file = $request->file('profile_picture');
+                if (!$isImageFile($file)) {
+                    return back()->withErrors([
+                        'profile_picture' => 'Profile picture must be an image (JPG, PNG, GIF, WebP, HEIC). Got: '
+                            . strtoupper((string) $file->getClientOriginalExtension()),
+                    ])->withInput();
+                }
                 $profilePicture = Common::AWSEmployeeFileUpload($this->resort->resort_id,$file,$folder_name);
 
                 if($profilePicture['status'] == 'success'){

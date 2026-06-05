@@ -83,6 +83,7 @@
                                         <th>Department</th>
                                         <th>No. of position</th>
                                         <th>Applicant</th>
+                                        <th>Open Slots</th>
                                         <th>Application Date</th>
                                         <th>Expiry Date</th>
                                     </tr>
@@ -95,11 +96,35 @@
                                             <td>{{ $v->department_name }} <span class="badge badge-themeGrayLight ms-1">{{ $v->department_code }}</span></td>
                                             <td>{{ $v->no_of_positions }}</td>
                                             <td>{{ $v->application_count }}</td>
+                                            {{-- Filled / Open slot indicator. Mirrors the employee-create
+                                                 vacancy picker so HR sees consistent numbers across both
+                                                 pages. Fully-filled vacancies are filtered out by the
+                                                 controller before they ever reach this loop. --}}
+                                            <td>
+                                                <span class="badge badge-themeSuccess">{{ $v->remaining_slots }} of {{ $v->no_of_positions }} left</span>
+                                                @if(($v->filled_count ?? 0) > 0)
+                                                    <small class="text-muted d-block">({{ $v->filled_count }} already hired)</small>
+                                                @endif
+                                            </td>
                                             <td>{{ $v->application_date_label }}</td>
                                             <td>{{ $v->expiry_date_label }}</td>
                                         </tr>
                                     @empty
-                                        <tr><td colspan="7" class="text-center text-muted">No active vacancies. Create one in Talent Acquisition &rarr; Vacancies first.</td></tr>
+                                        {{-- Full explanation matches the employee-create page's
+                                             validation copy so HR sees consistent wording across both
+                                             flows. Shown when EITHER no vacancies exist OR every
+                                             posted vacancy is already fully filled (the controller
+                                             auto-hides those). --}}
+                                        <tr>
+                                            <td colspan="8" class="text-center">
+                                                <div class="alert alert-warning mb-0">
+                                                    <strong>No open vacancies available.</strong>
+                                                    New offline interviews must be tied to an approved, unfilled vacancy.
+                                                    Create one in <em>Talent Acquisition &rarr; Vacancies</em> and complete the
+                                                    approval flow before returning here. Fully-filled vacancies are hidden automatically.
+                                                </div>
+                                            </td>
+                                        </tr>
                                     @endforelse
                                 </tbody>
                             </table>

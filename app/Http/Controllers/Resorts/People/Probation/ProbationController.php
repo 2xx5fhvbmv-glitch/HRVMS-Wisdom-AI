@@ -419,7 +419,16 @@ class ProbationController extends Controller
         }
 
         $joiningLabel      = $joiningDate ? $joiningDate->format('d M Y') : 'Not set';
-        $probationEndLabel = $probationEnd ? $probationEnd->format('d M Y') : 'Not set';
+        // probation_end_date is stored as joining + 3 months (e.g. Jun 1 →
+        // Sep 1), which is the calendar end-exclusive boundary — Sep 1 is
+        // actually the FIRST day AFTER probation. HR reads "End Date" as
+        // the LAST day the employee is still on probation, so subtract
+        // one day for display. The stored column stays untouched (every
+        // downstream query that does `whereDate(probation_end_date >=
+        // today)` already works correctly with the Sep-1 convention).
+        $probationEndLabel = $probationEnd
+            ? $probationEnd->copy()->subDay()->format('d M Y')
+            : 'Not set';
 
         // --- Onboarding training: one timeline row per probationary program ---
         // The resort's probationary_learning_programs config defines which
