@@ -106,15 +106,36 @@ class ResignationController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
         
+        // Normalize last_working_day BEFORE validation. The mobile app
+        // sends it in local d/m/Y or d/m/Y H:i format (seen in the live
+        // log: "31/05/2026 23:15", "25/05/2026 15:09" — both rejected by
+        // Laravel's `date` rule because strtotime can't disambiguate
+        // d/m/Y when day > 12, and downstream Carbon::parse() throws
+        // "Unexpected character"). Try the common formats in order, fall
+        // back to whatever the client sent so validation still surfaces
+        // a clear error for genuinely malformed input.
+        $lwdRaw = $request->input('last_working_day');
+        if (is_string($lwdRaw) && $lwdRaw !== '') {
+            foreach (['d/m/Y H:i', 'd/m/Y H:i:s', 'd/m/Y', 'Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'] as $fmt) {
+                try {
+                    $parsed = \Carbon\Carbon::createFromFormat($fmt, $lwdRaw);
+                    if ($parsed && $parsed->format($fmt) === $lwdRaw) {
+                        $request->merge(['last_working_day' => $parsed->format('Y-m-d')]);
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                    // Try the next format.
+                }
+            }
+        }
+
         $validator = Validator::make($request->all(), [
             'reason_type'                           => 'required',
             'resignation_letter'                    => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,heic,heif',
             'comments'                              => 'required',
-            // last_working_day is optional (immediate-release path leaves it
-            // blank) but if supplied it must be a real date the downstream
-            // F&F / probation / leave-cycle calcs can parse. Without this
-            // a typo like "2026-13-45" silently lands in the DB and the
-            // F&F end-date math throws on parse.
+            // After normalization above, last_working_day is in Y-m-d.
+            // Keep the date rule as a final guard against truly bogus
+            // input the format loop couldn't make sense of.
             'last_working_day'                      => 'nullable|date',
             'immediate_release'                     => 'nullable|in:Yes,No',
         ]);
