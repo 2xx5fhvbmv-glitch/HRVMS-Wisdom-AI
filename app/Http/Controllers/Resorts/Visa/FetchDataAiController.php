@@ -77,10 +77,33 @@ class FetchDataAiController extends Controller
                 ], 422);
             } 
             $response1= $response;
-            $AI_Data = json_decode($response, true); 
-            
-            $passport_number = preg_replace('/[^A-Za-z0-9]/', '',$AI_Data['extracted_fields']["Employee's Passport Number"]) ?? '';
-            $employee    = Employee::with(['resortAdmin'])->where('resort_id',$this->resort->resort_id)->where("passport_number",'z6979971')->first();
+            $AI_Data = json_decode($response, true);
+
+            // Null-safe access — AI service can return invalid JSON
+            // (timeout, partial response) which leaves $AI_Data as null,
+            // or it can return the envelope without an extracted_fields
+            // sub-array, or with the passport key missing. The previous
+            // code accessed $AI_Data['extracted_fields'][...] directly
+            // and threw "Trying to access array offset on value of type
+            // null" (live 500 on POST /resort/visa/store).
+            $passportRaw = $AI_Data['extracted_fields']["Employee's Passport Number"] ?? null;
+            if (empty($passportRaw)) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => ['message' => 'Could not read passport number from the document. Please upload a clearer scan.'],
+                ], 422);
+            }
+            $passport_number = preg_replace('/[^A-Za-z0-9]/', '', (string) $passportRaw);
+
+            // Look up the employee by the OCR-extracted passport number
+            // (not a hardcoded value — the previous query passed the
+            // literal 'z6979971' and matched the same person on every
+            // submission, leaking data and completing visa renewals
+            // against the wrong employee).
+            $employee    = Employee::with(['resortAdmin'])
+                ->where('resort_id', $this->resort->resort_id)
+                ->where('passport_number', $passport_number)
+                ->first();
             
             if (!$employee) 
             {
