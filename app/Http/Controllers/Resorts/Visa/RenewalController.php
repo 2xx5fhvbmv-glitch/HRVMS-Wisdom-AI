@@ -1072,17 +1072,45 @@ class RenewalController extends Controller
             {
                 return response()->json(['status' => false, 'message' =>  $err]);
             } 
-            $AI_Data = json_decode($response, true); 
+            $AI_Data = json_decode($response, true);
             $expiryDateRaw = $AI_Data['extracted_fields']['Date of Expiry'] ?? "Not Exit";
             $issue_date = $AI_Data['extracted_fields']['Date of Issue'] ?? "Not Exit";
-            if($expiryDateRaw !="Unavailable") 
+
+            // Treat every sentinel + null + empty as "no date extracted"
+            // so we don't feed Carbon a non-date string. The previous
+            // guard only matched "Unavailable", which let the default
+            // "Not Exit" fall through and throw
+            //   "A two digit day could not be found"
+            // on every OCR result that missed the expiry field
+            // (live 500 on POST /resort/visa/passport-expiry).
+            $missingDateSentinels = ['Not Exit', 'Unavailable', 'N/A', 'NA', 'null', null, ''];
+            $hasUsableExpiry = $expiryDateRaw !== null
+                && !in_array(trim((string) $expiryDateRaw), $missingDateSentinels, true);
+
+            if ($hasUsableExpiry)
             {
-                $expiryDateRaw = Carbon::createFromFormat('d/m/Y', $expiryDateRaw)->format('Y-m-d');
-                if ($expiryDateRaw) 
+                // Wrap the format parse — even with the sentinel guard,
+                // the OCR may return a date in a different layout
+                // (e.g. Y-m-d, d-m-Y). createFromFormat throws on any
+                // mismatch, so try the most common ones in order and
+                // fall back to "could not parse" if none stick.
+                $parsedExpiry = null;
+                foreach (['d/m/Y', 'd-m-Y', 'Y-m-d', 'd M Y', 'd-M-Y'] as $fmt) {
+                    try {
+                        $candidate = Carbon::createFromFormat($fmt, (string) $expiryDateRaw);
+                        if ($candidate && $candidate->format($fmt) === (string) $expiryDateRaw) {
+                            $parsedExpiry = $candidate;
+                            break;
+                        }
+                    } catch (\Throwable $e) { /* try next */ }
+                }
+
+                if ($parsedExpiry)
                 {
                     try {
+                        $expiryDateRaw = $parsedExpiry->format('Y-m-d');
                         $passportno =  $AI_Data['extracted_fields']['passport no.'] ?? "Not Exit";
-                        $expiryDate = Carbon::parse($expiryDateRaw)->endOfDay(); 
+                        $expiryDate = $parsedExpiry->copy()->endOfDay();
                         $today = Carbon::now();
                         $minValidDate = $today->copy()->addMonths(6);
 
@@ -1092,13 +1120,13 @@ class RenewalController extends Controller
                             $status = "VALID";
                         }
 
-                    } 
-                    catch (Exception $e) 
+                    }
+                    catch (\Throwable $e)
                     {
                         $passportno = "Not Exit";
                         $status = "NOT VALID"; // If parsing fails, treat as invalid
                     }
-                } 
+                }
                 else
                 {
                     $passportno = "Not Exit";
