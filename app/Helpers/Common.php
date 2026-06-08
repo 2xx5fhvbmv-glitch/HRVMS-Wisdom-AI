@@ -8733,6 +8733,44 @@ class Common
      *   contactEmail: ?string, website: ?string
      * }
      */
+    /**
+     * Safely parse a date string returned by the AI extraction service.
+     *
+     * The OCR pipeline returns sentinel strings ("Unavailable",
+     * "Not Exit", "N/A") when it can't read a field, or a real date in
+     * one of several formats (d/m/Y, d-m-Y, Y-m-d, etc.). Calling
+     * Carbon::parse() on a sentinel throws
+     *   "A two digit day could not be found"
+     * and bubbles a 500 to the user (live: /visa/passport-expiry,
+     * /visa/store, RenewalController insurance/medical/visa flows).
+     *
+     * Returns a Carbon instance when the input is a real date, or null
+     * when the input is a sentinel / empty / unparseable.
+     *
+     * Use it everywhere the AI response is read into a date field:
+     *   $end = Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date']);
+     *   if ($end) { ...store $end->format('Y-m-d')... }
+     */
+    public static function safeAiDate($raw)
+    {
+        $sentinels = ['', 'Unavailable', 'Not Exit', 'N/A', 'NA', 'null', 'None', '-', '—'];
+        if ($raw === null) return null;
+        $raw = trim((string) $raw);
+        if (in_array($raw, $sentinels, true)) return null;
+        foreach (['d/m/Y H:i', 'd/m/Y H:i:s', 'd/m/Y', 'd-m-Y H:i', 'd-m-Y', 'Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', 'd M Y', 'd-M-Y'] as $fmt) {
+            try {
+                $c = \Carbon\Carbon::createFromFormat($fmt, $raw);
+                if ($c && $c->format($fmt) === $raw) return $c;
+            } catch (\Throwable $e) { /* try next format */ }
+        }
+        // Last resort: let Carbon try (it succeeds for ISO-ish strings).
+        try {
+            return \Carbon\Carbon::parse($raw);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public static function getLetterheadData($resortId)
     {
         $setting = \App\Models\LetterheadSetting::where('resort_id', $resortId)->first();
