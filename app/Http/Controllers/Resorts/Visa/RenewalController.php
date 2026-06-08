@@ -380,8 +380,11 @@ class RenewalController extends Controller
                                                         'Premium'    => $Insurance_data['amount'] ?? 0.00,
                                                         "Currency"   => $Insurance_data['unit'] ?? null,
                                                         'insurance_file'=> $aws['Chil_file_id'] ?? null,
-                                                        'insurance_start_date' => Carbon::parse($AI_Data['extracted_fields']['Insurance Expiry Date'])->format('Y-m-d'),
-                                                        'insurance_end_date' => Carbon::parse($AI_Data['extracted_fields']['Insurance Expiry Date'])->format('Y-m-d'),
+                                                        // safeAiDate tolerates OCR sentinels ("Unavailable", "Not Exit", "")
+                                                        // and multiple date formats. Was: Carbon::parse(... ) which threw
+                                                        // "A two digit day could not be found" and produced a 500.
+                                                        'insurance_start_date' => optional(\App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null))->format('Y-m-d'),
+                                                        'insurance_end_date'   => optional(\App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null))->format('Y-m-d'),
                                                     ]);
 
                             $TotalExpensessSinceJoing->Total_insurance_Payment += $Insurance_data['amount'] ?? 0.00;
@@ -448,8 +451,12 @@ class RenewalController extends Controller
                                                                 'medical_file' => $last_work_permit_insurance->medical_file
                                                             ]);
                                 $medical_data =  $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'] ?? null;
-                                $start_date   =  Carbon::parse($AI_Data['extracted_fields']['Last Medical Test Date(Mentioned in Certification of Doctor)'])->format('Y-m-d');
-                                $end_date     =   Carbon::parse($AI_Data['extracted_fields']['Last Medical Test Date(Mentioned in Certification of Doctor)'])->copy()->addYear();  
+                                // safeAiDate tolerates the OCR sentinels & format variants the
+                                // AI service returns. When the date is unreadable both
+                                // start/end_date fall back to today rather than throwing.
+                                $medParsed = \App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Last Medical Test Date(Mentioned in Certification of Doctor)'] ?? null);
+                                $start_date = ($medParsed ?: \Carbon\Carbon::now())->format('Y-m-d');
+                                $end_date   = ($medParsed ? $medParsed->copy() : \Carbon\Carbon::now())->addYear();
                                 WorkPermitMedicalRenewal::where('resort_id', $this->resort->resort_id)
                                                        ->where('employee_id', $emp_id)
                                                        ->update([
