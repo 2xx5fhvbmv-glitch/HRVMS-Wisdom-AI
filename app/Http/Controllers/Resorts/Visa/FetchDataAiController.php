@@ -53,7 +53,7 @@ class FetchDataAiController extends Controller
 
         if(isset($Xpatfile))
         {
-            $xpat_sync = env('AI_extract_work_details_URL').'xpat_sync';   
+            $xpat_sync = env('AI_extract_work_details_URL').'xpat_sync';
             $curl = curl_init();
 
             $postFields = ['file' => new \CURLFile($Xpatfile->getRealPath(), $Xpatfile->getMimeType(), $Xpatfile->getClientOriginalName()),'doc_type' => "xpat_sync",];
@@ -65,17 +65,42 @@ class FetchDataAiController extends Controller
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                 ],
+                // Explicit timeouts. Without these, cURL waits forever
+                // and Hostinger's reverse proxy kills the request at
+                // ~60 s, returning its own "Request Timeout" HTML page
+                // that the user can't parse. 50 s is well under that
+                // limit so we always fail inside PHP and can return a
+                // clean JSON error. CONNECTTIMEOUT covers the case
+                // where the AI host is unreachable.
+                CURLOPT_TIMEOUT => 50,
+                CURLOPT_CONNECTTIMEOUT => 10,
             ]);
             $response = curl_exec($curl);
             $err = curl_error($curl);
+            $errno = curl_errno($curl);
             curl_close($curl);
-            if ($err) 
+            if ($err)
             {
-                 return response()->json([
+                // Distinguish timeout from generic curl errors so the
+                // user sees an actionable message ("try again" / "AI
+                // service unreachable") instead of raw libcurl text.
+                if ($errno === CURLE_OPERATION_TIMEDOUT) {
+                    return response()->json([
+                        'success' => false,
+                        'errors'  => ['message' => 'The AI extraction service did not respond within 50 seconds. The document may be very large or the service may be busy — please try again in a moment.'],
+                    ], 504);
+                }
+                if (in_array($errno, [CURLE_COULDNT_CONNECT, CURLE_COULDNT_RESOLVE_HOST], true)) {
+                    return response()->json([
+                        'success' => false,
+                        'errors'  => ['message' => 'Could not reach the AI extraction service. Please contact support if this persists.'],
+                    ], 502);
+                }
+                return response()->json([
                     'success' => false,
                     'errors' => ['message' => $err]
                 ], 422);
-            } 
+            }
             $response1= $response;
             $AI_Data = json_decode($response, true);
 
@@ -275,6 +300,12 @@ dd($Work_permit_cost);
                                     CURLOPT_POST => true,
                                     CURLOPT_POSTFIELDS => $postFields,
                                     CURLOPT_HTTPHEADER => ['Accept: application/json',],
+                                    // Without timeouts, cURL waits forever and Hostinger's
+                                    // reverse proxy kills the request at ~60 s with its own
+                                    // HTML 500. 50 s sits well under that so we always
+                                    // fail inside PHP and return a clean JSON error.
+                                    CURLOPT_TIMEOUT => 50,
+                                    CURLOPT_CONNECTTIMEOUT => 10,
                                 ]);
                                 $responseQuotaSlot = curl_exec($curl);
                                 $err = curl_error($curl);
