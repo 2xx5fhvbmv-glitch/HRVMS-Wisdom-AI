@@ -670,11 +670,17 @@ class XpactEmployeeController extends Controller
                     CURLOPT_HTTPHEADER => [
                         'Accept: application/json',
                     ],
+                    // Hostinger reverse proxy kills the request at ~60 s.
+                    // 50 s timeout here keeps the failure inside PHP so
+                    // the user sees a clean JSON error instead of a
+                    // generic HTML "Request Timeout" page.
+                    CURLOPT_TIMEOUT => 50,
+                    CURLOPT_CONNECTTIMEOUT => 10,
                 ]);
                 $response = curl_exec($curl);
                 $err = curl_error($curl);
                 curl_close($curl);
-                if($err) 
+                if($err)
                 {
                     return response()->json(['status' => false, 'message' =>  $err]);
                 } 

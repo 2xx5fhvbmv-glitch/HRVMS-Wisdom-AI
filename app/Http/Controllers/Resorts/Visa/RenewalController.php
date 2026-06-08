@@ -307,6 +307,11 @@ class RenewalController extends Controller
                     CURLOPT_HTTPHEADER => [
                         'Accept: application/json',
                     ],
+                    // Hostinger reverse proxy kills requests at ~60 s with
+                    // its own HTML "Request Timeout" 500. 50 s here keeps
+                    // failures inside PHP so the response is structured.
+                    CURLOPT_TIMEOUT => 50,
+                    CURLOPT_CONNECTTIMEOUT => 10,
                 ]);
                 $response = curl_exec($curl);
                 $err = curl_error($curl);
@@ -1071,6 +1076,10 @@ class RenewalController extends Controller
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                 ],
+                // Hostinger proxy kills the request at ~60 s — explicit
+                // 50 s timeout means PHP returns a clean JSON error first.
+                CURLOPT_TIMEOUT => 50,
+                CURLOPT_CONNECTTIMEOUT => 10,
             ]);
             $response = curl_exec($curl);
             $err = curl_error($curl);
@@ -1177,6 +1186,10 @@ class RenewalController extends Controller
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                 ],
+                // Hostinger proxy kills the request at ~60 s — explicit
+                // 50 s timeout means PHP returns a clean JSON error first.
+                CURLOPT_TIMEOUT => 50,
+                CURLOPT_CONNECTTIMEOUT => 10,
             ]);
             $response = curl_exec($curl);
             $err = curl_error($curl);
@@ -1226,6 +1239,10 @@ class RenewalController extends Controller
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                 ],
+                // Hostinger proxy kills the request at ~60 s — explicit
+                // 50 s timeout means PHP returns a clean JSON error first.
+                CURLOPT_TIMEOUT => 50,
+                CURLOPT_CONNECTTIMEOUT => 10,
             ]);
             $response = curl_exec($curl);
             $err = curl_error($curl);
@@ -1279,6 +1296,10 @@ class RenewalController extends Controller
                 CURLOPT_HTTPHEADER => [
                     'Accept: application/json',
                 ],
+                // Hostinger proxy kills the request at ~60 s — explicit
+                // 50 s timeout means PHP returns a clean JSON error first.
+                CURLOPT_TIMEOUT => 50,
+                CURLOPT_CONNECTTIMEOUT => 10,
             ]);
             $response = curl_exec($curl);
             $err = curl_error($curl);

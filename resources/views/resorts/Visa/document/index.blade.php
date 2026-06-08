@@ -1358,7 +1358,11 @@
                             if (!docTypeValid) return false;
 
                                
-                            // Run all async checks in parallel
+                            // Run all async checks in parallel.
+                            // NOTE: there are 6 promises but the destructure
+                            // below only consumes 4 — EducationCheck() and
+                            // ExperienceCheck() are still resolved/rejected
+                            // (their rejections will still bubble to .catch).
                             Promise.all([
                                 verifyPassportDPI(),
                                 verifyPhotoBackground(),
@@ -1368,9 +1372,23 @@
                                 ExperienceCheck(),
 
                             ])
-                            .then(([dpiResult, photoResult, expiryResult, cv]) => 
+                            .then(([dpiResult, photoResult, expiryResult, cv]) =>
                             {
-                                if (!dpiResult.success || !photoResult.success) return;
+                                if (!dpiResult.success || !photoResult.success) {
+                                    // Before: silent return — button stayed disabled and
+                                    // the user clicked Next forever with no feedback.
+                                    // Now: re-enable the button and toast the specific
+                                    // failure reason so they know what to fix.
+                                    $(".next").removeAttr("disabled");
+                                    var failures = [];
+                                    if (!dpiResult.success) failures.push("Passport quality: " + (dpiResult.message || "check failed"));
+                                    if (!photoResult.success) failures.push("Photo: " + (photoResult.message || "check failed"));
+                                    toastr.error(failures.join(" | ") || "Document checks failed.", "Cannot proceed to next step", {
+                                        positionClass: 'toast-bottom-right',
+                                        timeOut: 8000
+                                    });
+                                    return;
+                                }
                                 // Fill CV extracted data
                                 if (cv.status && cv.data) {
                                     if (cv.data.first_name && cv.data.first_name !== "Unavailable")
@@ -1460,10 +1478,31 @@
                             })
                             .catch((err) => {
                                 // A real failure in one of the checks — re-enable
-                                // the button so the user can retry; don't leave it
-                                // disabled or surface an uncaught rejection.
+                                // the button so the user can retry AND tell them
+                                // what went wrong via a toast. Before this, the
+                                // catch only logged to console and the user kept
+                                // clicking Next thinking it was broken (live:
+                                // "user is unable to go to the 3rd step").
                                 console.error("Document Segregation check failed:", err);
                                 $(".next").removeAttr("disabled");
+
+                                // err can arrive as a string ("No passport file
+                                // selected"), an XHR error object, the server
+                                // response object {message,...}, or even the
+                                // literal value `false` (Cvcheck rejects with
+                                // reject(false)). Pull whatever is readable.
+                                var msg = "One of the document checks failed. Please verify the uploaded files and try again.";
+                                if (typeof err === "string" && err) {
+                                    msg = err;
+                                } else if (err && typeof err === "object") {
+                                    if (err.message) msg = err.message;
+                                    else if (err.responseJSON && err.responseJSON.message) msg = err.responseJSON.message;
+                                    else if (err.responseJSON && err.responseJSON.errors && err.responseJSON.errors.message) msg = err.responseJSON.errors.message;
+                                }
+                                toastr.error(msg, "Could not proceed to next step", {
+                                    positionClass: 'toast-bottom-right',
+                                    timeOut: 10000
+                                });
                             });
                             return false;
                         }
