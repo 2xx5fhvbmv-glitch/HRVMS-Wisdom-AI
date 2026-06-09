@@ -196,10 +196,7 @@
                                                                     <td class="w-120 month-{{$i}}">
                                                                         <div class="inputValue">
                                                                             {{number_format($totalMothwisecost,2)}}
-                                                                            {{-- Salary Increment Details flow disabled per request.
-                                                                                 The trigger icon is hidden here; the modal markup
-                                                                                 further below is wrapped in {{--   --}} too so it
-                                                                                 doesn't render. Re-enable by uncommenting both. --}}
+                                                                            {{-- Salary Increment Details flow disabled per request. The trigger icon is hidden here; the modal markup further below is also wrapped in a Blade comment so it does not render. Re-enable by uncommenting both. --}}
                                                                             {{-- <a href="#incrementView-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-skyblue">
                                                                                 <img src="{{ URL::asset('resorts_assets/images/increment.svg') }}"/>
                                                                             </a> --}}
@@ -329,14 +326,7 @@
     </div>
 </div>
 
-{{-- ─────────────────────────────────────────────────────────────────────
-     Salary Increment Details modal — DISABLED per request alongside the
-     icon trigger above. Left intact (just wrapped in a Blade comment) so
-     the field set, JS handlers (#incrementForm / #incrementSubmit) and
-     route wiring don't need re-implementation when restored. To bring it
-     back, remove the `{{--` and `--}}` wrapping below AND uncomment the
-     trigger icon in the table cell earlier in this file.
-     ───────────────────────────────────────────────────────────────────── --}}
+{{-- Salary Increment Details modal disabled per request alongside the icon trigger above. Left intact (just wrapped in a Blade comment block) so the field set, JS handlers and route wiring stay in place for restoration. To bring it back, remove the wrapping comment below AND uncomment the trigger icon in the table cell earlier in this file. --}}
 {{--
 <div class="modal fade" id="incrementView-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small">
