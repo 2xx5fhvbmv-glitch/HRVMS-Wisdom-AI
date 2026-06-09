@@ -46,6 +46,328 @@ class ComplianceController extends Controller
         if(!$this->resort) return;
     }
 
+    /**
+     * Call the AI service to enrich a freshly-created compliance row with
+     * a severity assessment, plain-language explanation, and concrete
+     * remediation. Writes the three columns back onto the row and stamps
+     * ai_status / ai_generated_at.
+     *
+     * Defensive: any failure (timeout, parse error, unreachable host)
+     * marks the row ai_status='failed' but leaves the original
+     * description intact, so the view always has SOMETHING to show.
+     * The 25 s timeout is the controller-level cap; the FastAPI client
+     * has its own 90 s LLM cap (BedrockAsync) but the resort-side rules
+     * engine runs through ~15 categories so we keep the per-call ceiling
+     * tight to avoid letting a single hung call stall the whole run.
+     */
+    /**
+     * Bulk re-enrich the last N compliance rows for this resort with AI.
+     * Triggered from the "Regenerate AI" button on /people/compliance.
+     *
+     * Defaults to the 50 most-recent breached rows so users get a quick
+     * "everything I'm staring at gets refreshed" without a full table
+     * walk. The body cap (max 200) keeps the response size sane and
+     * stops a hung AI call from holding the worker for too long.
+     */
+    public function regenerateAi(Request $request)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (Common::checkRouteWisePermission('people.compliance.index', config('settings.resort_permissions.edit')) == false) {
+            return response()->json(['success' => false, 'message' => 'Not permitted to regenerate AI insights'], 403);
+        }
+
+        $limit = (int) $request->input('limit', 50);
+        $limit = max(1, min(200, $limit));
+
+        $rows = Compliance::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'Breached')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        $okCount = 0;
+        $failCount = 0;
+        foreach ($rows as $r) {
+            // Reconstruct a minimal but useful context. Per-row context
+            // (the rich employee snapshot the rules engine passes) only
+            // exists at create-time; for the bulk case we hydrate what
+            // we can from the row + its employee relation. The model
+            // still gets the original `description` text in the prompt,
+            // so the explanation stays anchored even when context is thin.
+            $emp = $r->employee_id ? Employee::with('resortAdmin', 'position', 'department')->find($r->employee_id) : null;
+            $ctx = [];
+            if ($emp) {
+                $ctx = [
+                    'employee_name' => optional($emp->resortAdmin)->full_name,
+                    'employee_id'   => $emp->id,
+                    'emp_code'      => $emp->Emp_id ?? null,
+                    'position'      => optional($emp->position)->position_title,
+                    'department'    => optional($emp->department)->name,
+                    'rank'          => $emp->rank,
+                    'nationality'   => $emp->nationality,
+                    'basic_salary'  => $emp->basic_salary,
+                ];
+            }
+            $before = $r->ai_status;
+            $this->enrichComplianceWithAi($r, $ctx);
+            $r->refresh();
+            if ($r->ai_status === 'ready') {
+                $okCount++;
+            } else {
+                $failCount++;
+            }
+        }
+
+        return response()->json([
+            'success'  => true,
+            'message'  => "Regenerated AI for {$okCount} rows" . ($failCount ? " ({$failCount} failed — see logs)" : ''),
+            'enriched' => $okCount,
+            'failed'   => $failCount,
+            'total'    => $rows->count(),
+        ]);
+    }
+
+    /**
+     * Layer-2 AI anomaly scan — sends a resort-level snapshot to the
+     * FastAPI /compliance_scan endpoint and files each returned anomaly
+     * as a new Compliance row with module_name = 'AI Anomaly Detection'.
+     *
+     * Distinct from the rules engine (checkCompliance) which applies
+     * hard thresholds. This one catches outliers/patterns the engine
+     * can't encode statically. Capped at 20 new rows per call so a
+     * runaway LLM can't flood the compliance list.
+     */
+    public function runAnomalyScan(Request $request)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (Common::checkRouteWisePermission('people.compliance.index', config('settings.resort_permissions.create')) == false) {
+            return response()->json(['success' => false, 'message' => 'Not permitted to run anomaly scan'], 403);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $resort = \App\Models\Resort::find($resort_id);
+
+        // Build the snapshot. Keep it dense — the LLM has a context cap.
+        // - Per-position salary distribution (median/min/max + count).
+        // - Per-department employee mix (count + expat ratio + avg salary).
+        // - Active probationary cohort.
+        $positionStats = Employee::with('position')
+            ->where('resort_id', $resort_id)
+            ->where('status', 'Active')
+            ->whereNotNull('Position_id')
+            ->get()
+            ->groupBy('Position_id')
+            ->map(function ($emps, $positionId) {
+                $sals = $emps->pluck('basic_salary')->filter()->sort()->values();
+                $count = $sals->count();
+                if ($count === 0) return null;
+                $median = $count % 2 === 1
+                    ? $sals[intdiv($count, 2)]
+                    : (($sals[$count / 2 - 1] + $sals[$count / 2]) / 2);
+                return [
+                    'position_id'    => (int) $positionId,
+                    'position_title' => optional($emps->first()->position)->position_title,
+                    'headcount'      => $count,
+                    'salary_median'  => (float) $median,
+                    'salary_min'     => (float) $sals->first(),
+                    'salary_max'     => (float) $sals->last(),
+                    // Top earners surface salary outliers vs the median.
+                    'top_earners'    => $emps->sortByDesc('basic_salary')->take(3)->map(fn($e) => [
+                        'employee_id' => $e->id,
+                        'name'        => optional($e->resortAdmin)->full_name,
+                        'salary'      => (float) $e->basic_salary,
+                        'rank'        => $e->rank,
+                    ])->values()->all(),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $departmentStats = Employee::with('department', 'resortAdmin')
+            ->where('resort_id', $resort_id)
+            ->where('status', 'Active')
+            ->whereNotNull('Dept_id')
+            ->get()
+            ->groupBy('Dept_id')
+            ->map(function ($emps, $deptId) {
+                $count    = $emps->count();
+                $expats   = $emps->where('nationality', '!=', 'Maldivian')->count();
+                $avgSal   = $emps->pluck('basic_salary')->filter()->avg() ?: 0;
+                return [
+                    'dept_id'        => (int) $deptId,
+                    'dept_name'      => optional($emps->first()->department)->name,
+                    'headcount'      => $count,
+                    'expat_count'    => $expats,
+                    'expat_ratio'    => $count > 0 ? round(($expats / $count) * 100, 1) : 0,
+                    'avg_salary'     => round($avgSal, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $probationStats = [
+            'active_count'  => Employee::where('resort_id', $resort_id)->where('status', 'Active')->whereIn('probation_status', ['Active', 'Extended'])->count(),
+            'extended_count'=> Employee::where('resort_id', $resort_id)->where('status', 'Active')->where('probation_status', 'Extended')->count(),
+        ];
+
+        $payload = [
+            'resort_id'      => $resort_id,
+            'resort_name'    => $resort ? $resort->resort_name : null,
+            'resort_country' => 'Maldives',
+            'currency'       => 'USD',
+            'max_anomalies'  => 20,
+            'snapshot'       => [
+                'positions'   => $positionStats,
+                'departments' => $departmentStats,
+                'probation'   => $probationStats,
+                'totals'      => [
+                    'active_employees' => Employee::where('resort_id', $resort_id)->where('status', 'Active')->count(),
+                    'departments'      => count($departmentStats),
+                    'positions'        => count($positionStats),
+                ],
+            ],
+        ];
+
+        $url = rtrim((string) env('AI_BASE_URL', 'http://localhost:8001'), '/') . '/compliance_scan';
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            // Longer than the per-row enrichment because this is a single
+            // big-context LLM call. Still under Hostinger's ~60 s wall by
+            // having the FE button confirm with the user first.
+            CURLOPT_TIMEOUT        => 80,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        curl_close($curl);
+
+        if ($errno !== 0 || !$response) {
+            $msg = $errno === CURLE_OPERATION_TIMEDOUT
+                ? 'AI anomaly scan timed out. Try again in a moment.'
+                : 'AI anomaly scan failed. Check that the AI service is reachable.';
+            \Log::warning("compliance anomaly scan failed: " . ($err ?: 'no response'));
+            return response()->json(['success' => false, 'message' => $msg], $errno === CURLE_OPERATION_TIMEDOUT ? 504 : 502);
+        }
+
+        $decoded = json_decode($response, true);
+        $anomalies = is_array($decoded) ? ($decoded['anomalies'] ?? []) : [];
+        if (!is_array($anomalies)) {
+            return response()->json(['success' => false, 'message' => 'AI returned an unexpected response shape.'], 502);
+        }
+
+        $created = 0;
+        foreach ($anomalies as $a) {
+            $type = trim((string) ($a['anomaly_type'] ?? 'Unknown Anomaly'));
+            $sev  = trim((string) ($a['severity'] ?? 'Medium'));
+            $desc = trim((string) ($a['description'] ?? ''));
+            $rem  = trim((string) ($a['remediation'] ?? ''));
+            if ($desc === '') continue;  // skip empties
+
+            // Validate employee_id if supplied — anomaly scan can name an
+            // employee that's been terminated since the snapshot was built.
+            $empId = $a['employee_id'] ?? null;
+            if ($empId !== null) {
+                $exists = Employee::where('id', $empId)->where('resort_id', $resort_id)->exists();
+                if (!$exists) $empId = null;
+            }
+
+            Compliance::create([
+                'resort_id'                => $resort_id,
+                'employee_id'              => $empId,
+                'module_name'              => 'AI Anomaly Detection',
+                'compliance_breached_name' => $type,
+                // Use the AI text as the canonical description AND
+                // populate the AI columns so the list view styles it
+                // with the severity badge.
+                'description'              => $desc,
+                'description_ai'           => $desc,
+                'remediation_ai'           => $rem,
+                'severity_ai'              => in_array($sev, ['Critical','High','Medium','Low','Info'], true) ? $sev : 'Medium',
+                'ai_status'                => 'ready',
+                'ai_generated_at'          => now(),
+                'reported_on'              => Carbon::now(),
+                'status'                   => 'Breached',
+            ]);
+            $created++;
+        }
+
+        return response()->json([
+            'success'  => true,
+            'message'  => "AI scan complete — {$created} new anomal" . ($created === 1 ? 'y' : 'ies') . " filed.",
+            'created'  => $created,
+            'returned' => count($anomalies),
+        ]);
+    }
+
+    private function enrichComplianceWithAi($compliance, array $context = []): void
+    {
+        if (!$compliance) return;
+
+        $url = rtrim((string) env('AI_BASE_URL', 'http://localhost:8001'), '/') . '/compliance_explain';
+        $payload = [
+            'rule_name'             => (string) $compliance->compliance_breached_name,
+            'rule_module'           => (string) $compliance->module_name,
+            'hardcoded_description' => (string) $compliance->description,
+            'resort_country'        => 'Maldives',
+            'currency'              => 'USD',
+            // Empty PHP array json-encodes to [] which the FastAPI
+            // Pydantic Dict[str, Any] rejects. Cast to object so it
+            // serialises as {} when the caller didn't supply context.
+            'context'               => empty($context) ? (object) [] : $context,
+        ];
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_TIMEOUT        => 25,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        curl_close($curl);
+
+        if ($errno !== 0 || !$response) {
+            $compliance->ai_status        = $errno === CURLE_OPERATION_TIMEDOUT ? 'timeout' : 'failed';
+            $compliance->ai_generated_at  = now();
+            $compliance->save();
+            \Log::warning("compliance AI enrichment failed (compliance #{$compliance->id}): " . ($err ?: 'no response'));
+            return;
+        }
+
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded) || empty($decoded['description'])) {
+            $compliance->ai_status        = 'failed';
+            $compliance->ai_generated_at  = now();
+            $compliance->save();
+            \Log::warning("compliance AI returned unparseable body (compliance #{$compliance->id}): " . substr((string) $response, 0, 300));
+            return;
+        }
+
+        $compliance->severity_ai     = (string) ($decoded['severity']    ?? 'Medium');
+        $compliance->description_ai  = (string) ($decoded['description'] ?? '');
+        $compliance->remediation_ai  = (string) ($decoded['remediation'] ?? '');
+        $compliance->ai_status       = 'ready';
+        $compliance->ai_generated_at = now();
+        $compliance->save();
+    }
+
      public function index(Request $request){
           $page_title = 'Compliance';
         $resort = $this->resort;
@@ -117,6 +439,40 @@ class ComplianceController extends Controller
                     ->addColumn('reported_on', function ($compliance) {
                          return $compliance->reported_on ? Carbon::parse($compliance->reported_on)->format('Y-m-d H:i:s') : 'N/A';
                     })
+                    // Render the description column with the AI enrichment
+                    // when present: severity badge + AI explanation + the
+                    // suggested remediation. Falls back to the original
+                    // hardcoded `description` whenever the AI field is
+                    // empty (rule fired but enrichment failed, or the row
+                    // pre-dates the migration). Same column, richer
+                    // payload — the existing DataTables binding doesn't
+                    // need to change.
+                    ->editColumn('description', function ($compliance) {
+                         $aiDesc = trim((string) ($compliance->description_ai ?? ''));
+                         $hard   = (string) $compliance->description;
+                         if ($aiDesc === '') {
+                              return e($hard);
+                         }
+
+                         // Severity → badge class. Unknown values fall to "secondary".
+                         $sev   = trim((string) ($compliance->severity_ai ?? 'Medium'));
+                         $color = [
+                              'Critical' => 'danger',
+                              'High'     => 'warning',
+                              'Medium'   => 'info',
+                              'Low'      => 'secondary',
+                              'Info'     => 'secondary',
+                         ][$sev] ?? 'secondary';
+
+                         $html  = '<div class="compliance-ai-cell">';
+                         $html .= '<div class="mb-1"><span class="badge badge-themeGrayLight me-1">AI</span><span class="badge badge-' . $color . '">' . e($sev) . '</span></div>';
+                         $html .= '<div class="mb-1">' . e($aiDesc) . '</div>';
+                         $rem   = trim((string) ($compliance->remediation_ai ?? ''));
+                         if ($rem !== '') {
+                              $html .= '<div class="text-muted small"><strong>Suggested fix:</strong> ' . e($rem) . '</div>';
+                         }
+                         return $html;
+                    })
                     ->addColumn('status', function ($compliance) {
                          if($compliance->status =="")
                          {
@@ -150,7 +506,11 @@ class ComplianceController extends Controller
                          $actions .= '</div>';
                          return $actions;
                     })
-                    ->rawColumns(['employee_name','status', 'action'])  // Updated to match columns that contain HTML
+                    // Allow the AI-enriched description HTML (badge + remediation
+                    // block) through unescaped. The data we inject is already
+                    // run through e() inside editColumn('description'), so the
+                    // HTML the DataTable sees is safe.
+                    ->rawColumns(['employee_name','status', 'action', 'description'])
                     ->make(true);
           }    
           
@@ -195,7 +555,7 @@ class ComplianceController extends Controller
                          if($resortBenifitsGrid && $payroll->service_charge_amount > 0) 
                          {
                              
-                                   Compliance::create([
+                                   $row = Compliance::create([
                                         'resort_id' => $resort->resort_id,
                                         'employee_id' => $employee->id,
                                         'module_name' => 'Payroll Compliance',
@@ -203,6 +563,14 @@ class ComplianceController extends Controller
                                         'description' => "Employee " . $employee->resortAdmin->full_name . " is eligible for service charge but receiving less than the required amount. Expected: " . $resortBenifitsGrid->service_charge_amount . ", Received: " . $payroll->service_charge_amount,
                                         'reported_on' => Carbon::now(),
                                         'status' => 'Breached'
+                                   ]);
+                                   $this->enrichComplianceWithAi($row, [
+                                        'employee_name'   => $employee->resortAdmin->full_name ?? null,
+                                        'employee_id'     => $employee->id,
+                                        'grade'           => $grade,
+                                        'expected_amount' => (float) $resortBenifitsGrid->service_charge_amount,
+                                        'received_amount' => (float) $payroll->service_charge_amount,
+                                        'payroll_period'  => $startOfLastMonth . ' to ' . $endOfLastMonth,
                                    ]);
                                    event(new ResortNotificationEvent(Common::nofitication(
                                         $this->resort->resort_id,
@@ -244,7 +612,7 @@ class ComplianceController extends Controller
 
                          // Check if probation period is more than 3 months
                          if ($probationMonths > 3 && $probation->probation_status == 'Active') {
-                              Compliance::create([
+                              $row = Compliance::create([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $probation->id,
                                    'module_name' => 'Probation',
@@ -252,6 +620,15 @@ class ComplianceController extends Controller
                                    'description' => "Probation period for " . $probation->resortAdmin->full_name . "(" . $probation->position->position_title . ') is set to ' . $probationMonths . ' months. Reduce to comply with the 3-month maximum',
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
+                              ]);
+                              $this->enrichComplianceWithAi($row, [
+                                   'employee_name'      => $probation->resortAdmin->full_name ?? null,
+                                   'employee_id'        => $probation->id,
+                                   'position'           => optional($probation->position)->position_title,
+                                   'joining_date'       => optional($probation->joining_date)->format('Y-m-d') ?? $probation->joining_date,
+                                   'probation_end_date' => optional($probation->probation_end_date)->format('Y-m-d') ?? $probation->probation_end_date,
+                                   'probation_months'   => (int) $probationMonths,
+                                   'probation_status'   => $probation->probation_status,
                               ]);
 
                               event(new ResortNotificationEvent(Common::nofitication(
@@ -291,7 +668,7 @@ class ComplianceController extends Controller
                               ->first();
 
                          if ($resortBenifitsGrid && $attendance) {
-                              Compliance::create([
+                              $row = Compliance::create([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $overtime->id,
                                    'module_name' => ' Overtime  Agreement',
@@ -299,6 +676,13 @@ class ComplianceController extends Controller
                                    'description' => "Overtime logged for " . $overtime->resortAdmin->full_name . "(" . $overtime->position->position_title . ') but employment agreement lacks overtime terms. Update contract or adjust hours',
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
+                              ]);
+                              $this->enrichComplianceWithAi($row, [
+                                   'employee_name'      => $overtime->resortAdmin->full_name ?? null,
+                                   'employee_id'        => $overtime->id,
+                                   'position'           => optional($overtime->position)->position_title,
+                                   'grade'              => $grade,
+                                   'overtime_logged_at' => $today,
                               ]);
 
                               event(new ResortNotificationEvent(Common::nofitication(
@@ -326,7 +710,7 @@ class ComplianceController extends Controller
                          $seniorHR = Employee::where('resort_id', $resort->resort_id)->where('rank', '3')->first();
                         
                          if ($seniorHR && $seniorHR->nationality != 'Maldivian') {
-                              Compliance::create([
+                              $row = Compliance::create([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $seniorHR->id,
                                    'module_name' => 'Senior HR and Management ',
@@ -334,6 +718,15 @@ class ComplianceController extends Controller
                                    'description' => "Senior HR and Management position at " . $resort->resort_name . " should be held by a Maldivian. Current  holder is " . $seniorHR->resortAdmin->full_name . "(" . $seniorHR->position->position_title . ')',
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
+                              ]);
+                              $this->enrichComplianceWithAi($row, [
+                                   'employee_name'  => $seniorHR->resortAdmin->full_name ?? null,
+                                   'employee_id'    => $seniorHR->id,
+                                   'position'       => optional($seniorHR->position)->position_title,
+                                   'nationality'    => $seniorHR->nationality,
+                                   'rank'           => $seniorHR->rank,
+                                   'resort_name'    => $resort->resort_name,
+                                   'total_employees'=> $total_employees_count,
                               ]);
 
                               event(new ResortNotificationEvent(Common::nofitication(
@@ -359,13 +752,20 @@ class ComplianceController extends Controller
                          $NonMaldivian = $managementEmployees->where('nationality', '!=', 'Maldivian')->whereIn('rank', ['3','1'])->get();
 
                          if ($maldivianCount < ($managementCount * 0.6)) {
-                              Compliance::create([
+                              $row = Compliance::create([
                                    'resort_id' => $resort->resort_id,
                                    'module_name' => 'Senior HR and Management',
                                    'compliance_breached_name' => 'Management Non-Maldivian',
                                    'description' => "Management positions at " . $resort->resort_name . " should have at least 60% Maldivian representation. Current ratio is " . $maldivianCount . "/" . $managementCount,
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
+                              ]);
+                              $this->enrichComplianceWithAi($row, [
+                                   'resort_name'        => $resort->resort_name,
+                                   'management_count'   => $managementCount,
+                                   'maldivian_count'    => $maldivianCount,
+                                   'required_ratio_pct' => 60,
+                                   'current_ratio_pct'  => $managementCount > 0 ? round(($maldivianCount / $managementCount) * 100, 1) : 0,
                               ]);
 
                               event(new ResortNotificationEvent(Common::nofitication(
@@ -380,7 +780,7 @@ class ComplianceController extends Controller
                          }
 
                          foreach ($NonMaldivian as $nonMaldivian) {
-                              Compliance::create([
+                              $row = Compliance::create([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $nonMaldivian->id,
                                    'module_name' => 'Senior HR and Management',
@@ -389,6 +789,14 @@ class ComplianceController extends Controller
                                    " should be held by a Maldivian. Current holder is " . $nonMaldivian->resortAdmin->full_name . "(" . $nonMaldivian->position->position_title . ')',
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
+                              ]);
+                              $this->enrichComplianceWithAi($row, [
+                                   'employee_name' => $nonMaldivian->resortAdmin->full_name ?? null,
+                                   'employee_id'   => $nonMaldivian->id,
+                                   'position'      => optional($nonMaldivian->position)->position_title,
+                                   'nationality'   => $nonMaldivian->nationality,
+                                   'rank'          => $nonMaldivian->rank,
+                                   'resort_name'   => $resort->resort_name,
                               ]);
 
                               event(new ResortNotificationEvent(Common::nofitication(
@@ -436,7 +844,7 @@ class ComplianceController extends Controller
                                              $sevenPercentOfSalary = $basicSalary * 0.07;
                                              
                                              if ($deduction->pension < $sevenPercentOfSalary) {
-                                                  Compliance::create([
+                                                  $row = Compliance::create([
                                                        'resort_id' => $resort->resort_id,
                                                        'employee_id' => $employee->id,
                                                        'module_name' => 'Pension Compliance',
@@ -444,6 +852,15 @@ class ComplianceController extends Controller
                                                        'description' => "Employee " . $employee->resortAdmin->full_name . " is eligible for pension (age " . $age . " years). Pension deduction is below the required 7% of basic salary (" . $basicSalary . ").",
                                                        'reported_on' => Carbon::now(),
                                                        'status' => 'Breached'
+                                                  ]);
+                                                  $this->enrichComplianceWithAi($row, [
+                                                       'employee_name'      => $employee->resortAdmin->full_name ?? null,
+                                                       'employee_id'        => $employee->id,
+                                                       'age'                => $age,
+                                                       'basic_salary'       => (float) $basicSalary,
+                                                       'required_pension'   => (float) round($sevenPercentOfSalary, 2),
+                                                       'actual_pension'     => (float) $deduction->pension,
+                                                       'payroll_period'     => $startOfLastMonth . ' to ' . $endOfLastMonth,
                                                   ]);
                                                   
                                                   event(new ResortNotificationEvent(Common::nofitication(

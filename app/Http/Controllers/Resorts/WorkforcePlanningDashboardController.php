@@ -97,8 +97,22 @@ class WorkforcePlanningDashboardController extends Controller
             $male_percentage = round($male_percentage, 2);
             $female_percentage = round($female_percentage, 2);
 
-            $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)->count();
-            $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)->count();
+            // Compliance Tracking shows CURRENT local/expat headcount —
+            // not "anyone who ever worked here". Before the status filter
+            // was added, the count silently included Terminated, Resigned,
+            // Inactive and Offboarding employees, which inflated the
+            // numbers (live report: "12/15" on a resort with far fewer
+            // active staff). 'Active' and 'Probationary' cover everyone
+            // currently on payroll.
+            $currentStatuses = ['Active', 'Probationary'];
+            $localEmployees = Employee::where('nationality', 'Maldivian')
+                ->where('resort_id', $resort_id)
+                ->whereIn('status', $currentStatuses)
+                ->count();
+            $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')
+                ->where('resort_id', $resort_id)
+                ->whereIn('status', $currentStatuses)
+                ->count();
 
             $ManningPendingRequestCount = ResortsParentNotifications::where('resort_id',$resort_id)->orderBy('created_at', 'desc')->first();
             $PendingDepartmentResoponse=array();
@@ -189,19 +203,48 @@ class WorkforcePlanningDashboardController extends Controller
             'manning_year'                 => $manningYear,
             'using_manning_data'           => $usingManningData,
         ];
+        // Min-wage breach count. Three fixes vs the previous version:
+        //  1. status filter now matches the schema standard ('Active' /
+        //     'Probationary' — capital A). The old 'active' lowercase
+        //     value only worked thanks to case-insensitive collation and
+        //     dropped to 0 on case-sensitive deployments. Probationary
+        //     employees are clearly on payroll and need the check too.
+        //  2. NULL / missing salary or currency now counts as a breach
+        //     because "no salary configured" is the worst possible
+        //     min-wage violation — used to be silently ignored.
+        //  3. Per-currency counts subtract the overlap (NULL-everything
+        //     rows) so total doesn't double-count when both branches
+        //     match the same row.
+        $current = ['Active', 'Probationary'];
+
         $employee_under_min_wage_usd = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
             ->where('basic_salary_currency', 'USD')
-            ->where('basic_salary', '<', '520')
-            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->where('basic_salary', '<', 520)
+                  ->orWhereNull('basic_salary');
+            })
             ->count();
 
         $employee_under_min_wage_mvr = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
             ->where('basic_salary_currency', 'MVR')
-            ->where('basic_salary', '<', '8021')
-            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->where('basic_salary', '<', 8021)
+                  ->orWhereNull('basic_salary');
+            })
             ->count();
 
-        $employee_under_min_wage = $employee_under_min_wage_usd + $employee_under_min_wage_mvr;
+        // Configuration breach: active employee with no currency set at
+        // all. Previously slipped through both branches.
+        $employee_under_min_wage_unconfigured = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->whereNull('basic_salary_currency')
+            ->count();
+
+        $employee_under_min_wage = $employee_under_min_wage_usd
+            + $employee_under_min_wage_mvr
+            + $employee_under_min_wage_unconfigured;
 
             $currency = $this->currencylogo; // Assuming this is set correctly
 
@@ -290,8 +333,22 @@ class WorkforcePlanningDashboardController extends Controller
             $male_percentage = round($male_percentage, 2);
             $female_percentage = round($female_percentage, 2);
 
-            $localEmployees = Employee::where('nationality', 'Maldivian')->where('resort_id',$resort_id)->count();
-            $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')->where('resort_id',$resort_id)->count();
+            // Compliance Tracking shows CURRENT local/expat headcount —
+            // not "anyone who ever worked here". Before the status filter
+            // was added, the count silently included Terminated, Resigned,
+            // Inactive and Offboarding employees, which inflated the
+            // numbers (live report: "12/15" on a resort with far fewer
+            // active staff). 'Active' and 'Probationary' cover everyone
+            // currently on payroll.
+            $currentStatuses = ['Active', 'Probationary'];
+            $localEmployees = Employee::where('nationality', 'Maldivian')
+                ->where('resort_id', $resort_id)
+                ->whereIn('status', $currentStatuses)
+                ->count();
+            $expatEmployees = Employee::where('nationality', '!=', 'Maldivian')
+                ->where('resort_id', $resort_id)
+                ->whereIn('status', $currentStatuses)
+                ->count();
 
             $ManningPendingRequestCount = ResortsParentNotifications::where('resort_id',$resort_id)->orderBy('created_at', 'desc')->first();
             $PendingDepartmentResoponse=array();
@@ -385,19 +442,48 @@ class WorkforcePlanningDashboardController extends Controller
             'manning_year'                 => $manningYear,
             'using_manning_data'           => $usingManningData,
         ];
+        // Min-wage breach count. Three fixes vs the previous version:
+        //  1. status filter now matches the schema standard ('Active' /
+        //     'Probationary' — capital A). The old 'active' lowercase
+        //     value only worked thanks to case-insensitive collation and
+        //     dropped to 0 on case-sensitive deployments. Probationary
+        //     employees are clearly on payroll and need the check too.
+        //  2. NULL / missing salary or currency now counts as a breach
+        //     because "no salary configured" is the worst possible
+        //     min-wage violation — used to be silently ignored.
+        //  3. Per-currency counts subtract the overlap (NULL-everything
+        //     rows) so total doesn't double-count when both branches
+        //     match the same row.
+        $current = ['Active', 'Probationary'];
+
         $employee_under_min_wage_usd = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
             ->where('basic_salary_currency', 'USD')
-            ->where('basic_salary', '<', '520')
-            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->where('basic_salary', '<', 520)
+                  ->orWhereNull('basic_salary');
+            })
             ->count();
 
         $employee_under_min_wage_mvr = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
             ->where('basic_salary_currency', 'MVR')
-            ->where('basic_salary', '<', '8021')
-            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->where('basic_salary', '<', 8021)
+                  ->orWhereNull('basic_salary');
+            })
             ->count();
 
-        $employee_under_min_wage = $employee_under_min_wage_usd + $employee_under_min_wage_mvr;
+        // Configuration breach: active employee with no currency set at
+        // all. Previously slipped through both branches.
+        $employee_under_min_wage_unconfigured = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->whereNull('basic_salary_currency')
+            ->count();
+
+        $employee_under_min_wage = $employee_under_min_wage_usd
+            + $employee_under_min_wage_mvr
+            + $employee_under_min_wage_unconfigured;
 
             $currency = $this->currencylogo; // Assuming this is set correctly
 

@@ -414,90 +414,207 @@ class BudgetController extends Controller
             ));
     }
 
-    public function CompareBudget($deptID, $budgetId)
+    public function CompareBudget($deptID, $budgetId, ?Request $request = null)
     {
-        if(Common::checkRouteWisePermission('resort.budget.comparebudget,{id}',config('settings.resort_permissions.view')) == false){
+        if (Common::checkRouteWisePermission('resort.budget.comparebudget,{id}', config('settings.resort_permissions.view')) == false) {
             return abort(403, 'Unauthorized access');
         }
 
-        $page_title = 'Compare Budget';
-        $rank = config('settings.Position_Rank');
-        $current_rank = $this->resort->getEmployee->rank ?? null;
+        $page_title     = 'Compare Budget';
+        $rank           = config('settings.Position_Rank');
+        $current_rank   = $this->resort->getEmployee->rank ?? null;
         $available_rank = $rank[$current_rank] ?? '';
-        if ($deptID) {
 
-                // $positionMonthlyDataIds = $data['position_monthly_data_id'];
-                // $Budget_id = $data['manning_response_id'];
-                // $Message_id = $data['Message_id'];
-                // $year
-                $getPositions = DB::table('resort_positions as p')
-                    ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
-                    ->leftJoin('manning_responses as mr', function($join) use ( $deptID,$budgetId) {
-                        $join->on('pmd.manning_response_id', '=', 'mr.id')
-                        // ->where('mr.year', '=', $year)
+        // Always pre-populate to safe empties so the view never sees undefined.
+        $positions       = collect();
+        $department      = null;
+        $manningResponse = null;
+        $aiSuggestions   = [];
+        $aiStatus        = null;
+        $aiGeneratedAt   = null;
+        $totalHodHeadcount  = 0;
+        $totalHodBudget     = 0.0;
+        $totalAiHeadcount   = 0;
+        $totalAiBudget      = 0.0;
+        $currencySymbol     = Common::GetResortCurrencySymbol();
+
+        if ($deptID && $budgetId) {
+            $department      = ResortDepartment::where('id', $deptID)->where('resort_id', $this->resort->resort_id)->first();
+            $manningResponse = ManningResponse::where('id', $budgetId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->where('dept_id', $deptID)
+                ->first();
+
+            // Positions for this department with head/vacant counts. The two
+            // leftJoins keep the row even when no position_monthly_data /
+            // manning_responses entry exists yet — useful for new depts.
+            $positions = DB::table('resort_positions as p')
+                ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
+                ->leftJoin('manning_responses as mr', function ($join) use ($deptID, $budgetId) {
+                    $join->on('pmd.manning_response_id', '=', 'mr.id')
                         ->where('mr.resort_id', '=', $this->resort->resort_id)
-
                         ->where('mr.dept_id', '=', $deptID)
                         ->where('mr.id', '=', $budgetId);
-                    })
-
-                            ->where('p.dept_id', '=', $deptID)
-                    ->select(
-                       'p.id',
-                                'mr.id as Budget_id',
-                                'p.position_title',
-                                'p.dept_id',
-                                DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
-                                DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
-                    )
-                    ->groupBy('p.id', 'p.position_title')
-                    ->get();
-
-
-                foreach ($getPositions as $position)
-                {
-                    $position->employees = DB::table('employees as e') // Assuming you have an employees table
-                        ->leftJoin('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
-                        ->where('position_id', $position->id)
-                        // ->where('rank','others')
-                        ->get(['e.id as Empid','ra.first_name', 'ra.last_name','e.Admin_Parent_id','e.rank','e.Dept_id','e.nationality','e.basic_salary','e.incremented_date']); // Adjust according to your employee table fields
-                }
-                $vacant_positions = DB::table('store_manning_response_parents as t1')
-                ->join("store_manning_response_children as t2","t2.Parent_SMRP_id","=","t1.id")
-                ->join('employees as t3','t3.id',"=","t2.Emp_id")
-                ->join('resort_positions as t4','t4.id',"=","t3.Position_id")
-                ->leftJoin('position_monthly_data as pmd', 't4.id', '=', 'pmd.position_id')
-                ->leftJoin('manning_responses as mr', function($join) use ( $deptID, $budgetId) {
-                        $join->on('pmd.manning_response_id', '=', 'mr.id')
-                        ->where('mr.id', '=', $budgetId);
                 })
-                ->where('t1.resort_id', '=', $this->resort->resort_id)
-                ->where('t1.Department_id', '=',  $deptID)
+                ->where('p.dept_id', '=', $deptID)
                 ->select(
-                    't1.id as smrp_id',
-                    't2.id as smrp_child_id',
-                    't2.Current_Basic_salary as basic_salary',
-                    't4.id',
+                    'p.id',
+                    'p.position_title',
+                    'p.dept_id',
                     'mr.id as Budget_id',
-                    't4.position_title',
-                    't4.dept_id',
-                    't2.Proposed_Basic_salary',
                     DB::raw('COALESCE(MAX(pmd.vacantcount), 0) as vacantcount'),
-                    DB::raw('COALESCE(MAX(pmd.headcount), 0) as headcount')
+                    DB::raw('COALESCE(MAX(pmd.headcount),  0) as headcount')
                 )
-                ->groupBy('t4.id', 't4.position_title')
-                ->get(['t1.*' ]);
+                ->groupBy('p.id', 'p.position_title', 'p.dept_id')
+                ->get();
 
-                foreach ($vacant_positions as $position)
-                {
-                    $position->employees = DB::table('employees as e') // Assuming you have an employees table
-                        ->leftJoin('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
-                        ->where('position_id', $position->id)
-                        // ->where('rank','others')
-                        ->get(['e.resort_id','e.id as Empid','ra.first_name', 'ra.last_name','e.Admin_Parent_id','e.rank','e.Dept_id','e.nationality','e.basic_salary','e.incremented_date']); // Adjust according to your employee table fields
+            // Hydrate the active-employee list (and the per-position current
+            // total basic salary) for each position. This drives the HOD-side
+            // numbers in the table and the input the AI sees.
+            foreach ($positions as $p) {
+                $emps = DB::table('employees as e')
+                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                    ->where('e.position_id', $p->id)
+                    ->where('e.resort_id', $this->resort->resort_id)
+                    ->whereNotIn('e.status', ['Terminated', 'Inactive', 'Offboarding'])
+                    ->select('e.id as Empid', 'ra.first_name', 'ra.last_name', 'e.Admin_Parent_id',
+                             'e.rank', 'e.Dept_id', 'e.nationality', 'e.basic_salary', 'e.incremented_date')
+                    ->get();
+                $p->employees = $emps;
+                // Headcount: pmd-derived value if present, else fall back to
+                // the count of active employees — gives a sensible HOD figure
+                // even before manning is filled.
+                $p->headcount       = (int) ($p->headcount > 0 ? $p->headcount : $emps->count());
+                $p->current_budget  = (float) $emps->sum('basic_salary');
+                $totalHodHeadcount += $p->headcount;
+                $totalHodBudget    += $p->current_budget;
+            }
+
+            // Try to use the cached AI recommendation. If none — or the user
+            // clicked Regenerate via ?regenerate=1 — call the FastAPI service.
+            $regenerate = $request && $request->query('regenerate') === '1';
+            if ($manningResponse && (empty($manningResponse->ai_suggestions) || $regenerate)) {
+                $cached = $this->fetchAiBudgetRecommendations($manningResponse, $positions, $department);
+                $aiSuggestions = $cached['recommendations'] ?? [];
+                $aiStatus      = $cached['status'] ?? null;
+                $aiGeneratedAt = $cached['generated_at'] ?? null;
+            } elseif ($manningResponse) {
+                $aiSuggestions = json_decode($manningResponse->ai_suggestions, true) ?: [];
+                $aiStatus      = $manningResponse->ai_suggestions_status;
+                $aiGeneratedAt = $manningResponse->ai_suggestions_at;
+            }
+
+            // Roll AI totals up for the table footer.
+            foreach ($positions as $p) {
+                $rec = $aiSuggestions[(string) $p->id] ?? null;
+                if ($rec) {
+                    $p->ai_headcount    = (int) ($rec['suggested_headcount'] ?? 0);
+                    $p->ai_budget       = (float) ($rec['suggested_budget']  ?? 0);
+                    $p->ai_justification = (string) ($rec['justification']    ?? '');
+                    $totalAiHeadcount += $p->ai_headcount;
+                    $totalAiBudget    += $p->ai_budget;
+                } else {
+                    $p->ai_headcount    = null;
+                    $p->ai_budget       = null;
+                    $p->ai_justification = '';
                 }
             }
-            return view('resorts.budget.compare',compact('page_title','vacant_positions','available_rank'));
+        }
+
+        return view('resorts.budget.compare', compact(
+            'page_title', 'available_rank',
+            'positions', 'department', 'manningResponse',
+            'aiSuggestions', 'aiStatus', 'aiGeneratedAt',
+            'totalHodHeadcount', 'totalHodBudget',
+            'totalAiHeadcount', 'totalAiBudget',
+            'currencySymbol'
+        ));
+    }
+
+    /**
+     * Hit the FastAPI service for per-position headcount + budget
+     * recommendations. Cached on the manning_responses row so subsequent
+     * page loads return instantly. Failures are stored too (with a
+     * `failed` status) so we can show a sensible UI without re-calling.
+     */
+    private function fetchAiBudgetRecommendations($manningResponse, $positions, $department): array
+    {
+        // Stamp 'pending' so a concurrent view doesn't re-call the AI.
+        $manningResponse->ai_suggestions_status = 'pending';
+        $manningResponse->save();
+
+        $payloadPositions = [];
+        foreach ($positions as $p) {
+            $payloadPositions[] = [
+                'position_id'                 => (int) $p->id,
+                'position_title'              => (string) $p->position_title,
+                'current_headcount'           => (int) $p->headcount,
+                'current_total_basic_salary'  => (float) $p->current_budget,
+            ];
+        }
+        $payload = [
+            'department_name' => optional($department)->name ?: 'Department',
+            'currency'        => 'USD',
+            'positions'       => $payloadPositions,
+        ];
+
+        $url = rtrim((string) env('AI_BASE_URL', 'http://localhost:8001'), '/') . '/budget_recommendations';
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            // Same Hostinger-proxy guardrails as the visa AI calls — 90 s
+            // upper bound (the page intentionally has a longer budget than
+            // the OCR endpoints because this is a one-shot text-only LLM
+            // call, not an image OCR pipeline).
+            CURLOPT_TIMEOUT        => 90,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        curl_close($curl);
+
+        if ($errno !== 0 || !$response) {
+            $manningResponse->ai_suggestions_status = $errno === CURLE_OPERATION_TIMEDOUT ? 'timeout' : 'failed';
+            $manningResponse->ai_suggestions_at     = now();
+            $manningResponse->save();
+            \Log::warning('budget AI call failed: ' . ($err ?: 'no response'));
+            return [
+                'recommendations' => json_decode($manningResponse->ai_suggestions, true) ?: [],
+                'status'          => $manningResponse->ai_suggestions_status,
+                'generated_at'    => $manningResponse->ai_suggestions_at,
+            ];
+        }
+
+        $decoded = json_decode($response, true);
+        $recs    = is_array($decoded) ? ($decoded['recommendations'] ?? null) : null;
+        if (!is_array($recs)) {
+            $manningResponse->ai_suggestions_status = 'failed';
+            $manningResponse->ai_suggestions_at     = now();
+            $manningResponse->save();
+            \Log::warning('budget AI returned unparseable body: ' . substr((string) $response, 0, 500));
+            return [
+                'recommendations' => json_decode($manningResponse->ai_suggestions, true) ?: [],
+                'status'          => 'failed',
+                'generated_at'    => $manningResponse->ai_suggestions_at,
+            ];
+        }
+
+        $manningResponse->ai_suggestions        = json_encode($recs);
+        $manningResponse->ai_suggestions_status = 'ready';
+        $manningResponse->ai_suggestions_at     = now();
+        $manningResponse->save();
+
+        return [
+            'recommendations' => $recs,
+            'status'          => 'ready',
+            'generated_at'    => $manningResponse->ai_suggestions_at,
+        ];
     }
 
     public function ViewBudget(Request $request)

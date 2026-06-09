@@ -18,7 +18,18 @@
                               <h1>{{ $page_title }}</h1>
                          </div>
                          </div>
-                         <div class="col-auto  ms-auto"><a class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('people.compliance.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a></div>
+                         {{-- Action bar: Run rules engine + AI anomaly scan + bulk re-enrich.
+                              The two AI buttons are gated behind the same permission as
+                              the rules-engine run since they all create/modify rows. --}}
+                         <div class="col-auto ms-auto d-flex gap-2 flex-wrap @if(App\Helpers\Common::checkRouteWisePermission('people.compliance.index',config('settings.resort_permissions.create')) == false) d-none @endif">
+                              <a class="btn btn-theme" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a>
+                              <button type="button" class="btn btn-themeBlue" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
+                                  <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Run AI Anomaly Scan
+                              </button>
+                              <button type="button" class="btn btn-themeGray" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the 50 most recent compliance rows. Use this after updating the AI prompt or when AI failed for some rows.">
+                                  <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
+                              </button>
+                         </div>
                     </div>
                </div>
 
@@ -58,6 +69,29 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    {{-- Shared confirm modal for the two AI action buttons. The JS fills
+         in the title + body + confirm-button label/colour and stamps a
+         data-action onto #ai-confirm-modal-confirm so a single handler
+         can fan out to either runAiRegenerate() or runAiAnomalyScan().
+         Sizing matches the existing Dismiss/Revise modals on this page. --}}
+    <div class="modal fade" id="ai-confirm-modal" tabindex="-1" aria-labelledby="ai-confirm-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ai-confirm-modal-title">Confirm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="ai-confirm-modal-body">
+                    Are you sure?
+                </div>
+                <div class="modal-footer justify-content-end">
+                    <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-themeBlue" id="ai-confirm-modal-confirm">Confirm</button>
+                </div>
+            </div>
         </div>
     </div>
     @endsection
@@ -163,5 +197,104 @@
                ]
           });
      }
+
+    // ─── AI action buttons ──────────────────────────────────────────────
+    // Regenerate AI on the last 50 rows. Disables the button mid-call so
+    // double-clicks don't queue a second batch.
+    // Run the bulk-regenerate AJAX (called after modal confirmation).
+    function runAiRegenerate() {
+        var $b = $('#ai-regenerate-btn');
+        var orig = $b.html();
+        $b.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Regenerating…');
+        $.ajax({
+            url: '{{ route("people.compliance.regenerateAi") }}',
+            type: 'POST',
+            data: { _token: '{{ csrf_token() }}', limit: 50 },
+            success: function (resp) {
+                if (resp && resp.success) {
+                    toastr.success(resp.message, 'AI regeneration complete', { positionClass: 'toast-bottom-right' });
+                    var $tbl = $('#table-exitclearance-form').DataTable();
+                    if ($tbl) $tbl.ajax.reload(null, false);
+                } else {
+                    toastr.error((resp && resp.message) || 'AI regeneration failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'AI regeneration failed.';
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            },
+            complete: function () { $b.prop('disabled', false).html(orig); }
+        });
+    }
+
+    // Run the AI-only anomaly scan (called after modal confirmation).
+    function runAiAnomalyScan() {
+        var $b = $('#ai-anomaly-scan-btn');
+        var orig = $b.html();
+        $b.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Scanning… (~60s)');
+        $.ajax({
+            url: '{{ route("people.compliance.anomalyScan") }}',
+            type: 'POST',
+            data: { _token: '{{ csrf_token() }}' },
+            success: function (resp) {
+                if (resp && resp.success) {
+                    toastr.success(resp.message, 'AI scan complete', { positionClass: 'toast-bottom-right', timeOut: 8000 });
+                    var $tbl = $('#table-exitclearance-form').DataTable();
+                    if ($tbl) $tbl.ajax.reload(null, false);
+                } else {
+                    toastr.error((resp && resp.message) || 'AI scan failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'AI scan failed.';
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            },
+            complete: function () { $b.prop('disabled', false).html(orig); }
+        });
+    }
+
+    // Open the shared confirm modal with the right title/body and stamp
+    // the action onto the Confirm button. The modal stays inside the
+    // page (markup below the table) so styling matches the existing
+    // Revise-Budget / Dismiss modals.
+    $(document).on('click', '#ai-regenerate-btn', function () {
+        $('#ai-confirm-modal-title').text('Regenerate AI insights?');
+        $('#ai-confirm-modal-body').html(
+            'This will re-run the AI explanation and remediation on the <strong>50 most recent</strong> compliance rows.<br><br>' +
+            'Existing AI text on those rows will be overwritten. The original deterministic description (and severity) is unaffected. ' +
+            'Typical run time: 10–20 seconds.'
+        );
+        $('#ai-confirm-modal-confirm').text('Yes, regenerate')
+            .removeClass('btn-themeBlue').addClass('btn-themeGray')
+            .data('action', 'regenerate');
+        var modal = new bootstrap.Modal(document.getElementById('ai-confirm-modal'));
+        modal.show();
+    });
+
+    $(document).on('click', '#ai-anomaly-scan-btn', function () {
+        $('#ai-confirm-modal-title').text('Run AI anomaly scan?');
+        $('#ai-confirm-modal-body').html(
+            'This sends a resort-level snapshot (per-position salary distribution, per-department headcount + expat ratio, probation cohort) to the AI service ' +
+            'and files each returned anomaly as a new compliance row under <strong>"AI Anomaly Detection"</strong>.<br><br>' +
+            'Typical run time: <strong>up to 60 seconds</strong>. Maximum 20 anomalies created per scan. Existing rows are NOT modified.'
+        );
+        $('#ai-confirm-modal-confirm').text('Yes, run scan')
+            .removeClass('btn-themeGray').addClass('btn-themeBlue')
+            .data('action', 'scan');
+        var modal = new bootstrap.Modal(document.getElementById('ai-confirm-modal'));
+        modal.show();
+    });
+
+    // Fan out the modal's Confirm button to the right function based on
+    // the data-action stamped during open. Modal closes first so the
+    // page returns focus to the triggering button before the AJAX fires.
+    $(document).on('click', '#ai-confirm-modal-confirm', function () {
+        var action = $(this).data('action');
+        var modalEl = document.getElementById('ai-confirm-modal');
+        var modal   = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        if (action === 'regenerate')   runAiRegenerate();
+        else if (action === 'scan')    runAiAnomalyScan();
+    });
     </script>
     @endsection

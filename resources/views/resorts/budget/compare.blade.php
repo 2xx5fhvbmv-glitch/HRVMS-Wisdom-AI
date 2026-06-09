@@ -3,238 +3,162 @@
 
 @if ($message = Session::get('success'))
 <div class="alert alert-success">
-	<p>{{ $message }}</p>
+    <p>{{ $message }}</p>
 </div>
 @endif
 
 @section('content')
 
 <div class="body-wrapper pb-5">
-        <div class="container-fluid">
-            <div class="page-hedding">
-                <div class="row justify-content-between g-3">
-                    <div class="col-auto">
-                        <div class="page-title">
-                            <span>WORKFORCE PLANNING</span>
-                            <h1>{{ $page_title }}</h1>
-                        </div>
+    <div class="container-fluid">
+        <div class="page-hedding">
+            <div class="row justify-content-between g-3">
+                <div class="col-auto">
+                    <div class="page-title">
+                        <span>WORKFORCE PLANNING</span>
+                        <h1>{{ $page_title }}</h1>
                     </div>
-                    @if($available_rank == "HR")
-                        <div class="col-auto">
-                            <div class="d-flex justify-content-end">
-                                <a href="#" class="btn btn-theme">Sent To Finance</a>
-                                <a href="#revise-budgetmodal" data-bs-toggle="modal" class="btn btn-white ms-3">Revise
-                                    Budget</a>
-                            </div>
-                        </div>
-                    @endif
                 </div>
+                @if($available_rank == "HR")
+                    <div class="col-auto">
+                        <div class="d-flex justify-content-end">
+                            <a href="#" class="btn btn-theme">Sent To Finance</a>
+                            <a href="#revise-budgetmodal" data-bs-toggle="modal" class="btn btn-white ms-3">Revise Budget</a>
+                        </div>
+                    </div>
+                @endif
             </div>
+        </div>
 
-            <div>
-                <div class="card">
-                    <div class="card-title">
-                        <div class="row g-3">
-                            <div class="col-sm-6">
-                                <div class="d-flex justify-content-start align-items-center">
-                                    <a href="#" class="me-3">
-                                        <img src="{{ URL::asset('resorts_assets/images/arrow-left.svg')}}" alt="" class="img-fluid" />
-                                    </a>
-                                    <h3>Management</h3>
-                                </div>
+        <div>
+            <div class="card">
+                <div class="card-title">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-start align-items-center">
+                                <a href="{{ url()->previous() }}" class="me-3" title="Back">
+                                    <img src="{{ URL::asset('resorts_assets/images/arrow-left.svg') }}" alt="back" class="img-fluid" />
+                                </a>
+                                {{-- Department name now sourced from the resort_departments
+                                     row matching the route's $deptID, not hardcoded. --}}
+                                <h3>{{ $department->name ?? 'Department' }}</h3>
                             </div>
-                            <div class="col-sm-6">
-                                <div class="d-flex justify-content-sm-end align-items-center">
-
-                                    <span class="badge badge-dark me-3">
-                                        Budget: $12,241
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-sm-end align-items-center flex-wrap gap-2">
+                                {{-- Budget totals computed from the live data instead
+                                     of hardcoded "$12,241" / "$11,985" placeholders. --}}
+                                <span class="badge badge-dark">
+                                    HOD Budget: {{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }}
+                                </span>
+                                <span class="badge badge-themeWarning">
+                                    Wisdom Suggested: {{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }}
+                                </span>
+                                {{-- Status chip + Regenerate button. The chip
+                                     reflects the cached AI state on manning_responses;
+                                     the button re-calls the FastAPI endpoint. --}}
+                                @if($aiStatus === 'ready')
+                                    <span class="badge badge-themeSuccess" title="AI suggestions generated {{ optional($aiGeneratedAt)->diffForHumans() }}">
+                                        AI ready
                                     </span>
-                                    <a href="#" class="text-lightblue  fw-500 fs-13">WSB : $11,985</a>
-
-                                </div>
+                                @elseif($aiStatus === 'pending')
+                                    <span class="badge badge-themeGrayLight">AI generating…</span>
+                                @elseif(in_array($aiStatus, ['failed', 'timeout'], true))
+                                    <span class="badge badge-themeDanger" title="Click Regenerate to retry">
+                                        AI {{ $aiStatus }}
+                                    </span>
+                                @endif
+                                <a href="?regenerate=1" class="btn btn-sm btn-themeBlue" title="Re-run the AI workforce-planning analysis for this department/budget">
+                                    <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
+                                </a>
                             </div>
                         </div>
                     </div>
-                    <div class="table-responsive">
-                        <table id="compare-budgettable" class="table table-compareBudget  w-100">
-                            <thead>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="compare-budgettable" class="table table-compareBudget w-100">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th colspan="2" class="text-nowrap text-center bg-theme text-white">HOD Budget</th>
+                                <th colspan="2" class="text-nowrap text-center bg-yellow">Wisdom Suggested Budget</th>
+                                <th></th>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">Position</th>
+                                <th class="text-nowrap text-center">Headcount</th>
+                                <th class="text-nowrap text-center">Total Budget</th>
+                                <th class="text-nowrap text-center">Headcount</th>
+                                <th class="text-nowrap text-center">Total Budget</th>
+                                <th class="text-nowrap">Justified Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{-- Each row is one position in this department. Numbers come
+                                 from the SQL queries in the controller; the "Wisdom Suggested"
+                                 columns come from the cached AI recommendation (or empty when
+                                 the AI hasn't been called yet). --}}
+                            @forelse($positions as $p)
+                                @php
+                                    $aiSet         = $p->ai_headcount !== null;
+                                    $diffHeadcount = $aiSet ? ($p->ai_headcount - $p->headcount) : 0;
+                                    $diffBudget    = $aiSet ? ($p->ai_budget    - $p->current_budget) : 0;
+                                    $aiHeadClass   = $diffHeadcount > 0 ? 'text-success' : ($diffHeadcount < 0 ? 'text-danger' : '');
+                                    $aiBudgetClass = $diffBudget    > 0 ? 'text-success' : ($diffBudget    < 0 ? 'text-danger' : '');
+                                @endphp
                                 <tr>
-                                    <th colspan="3" class="text-nowrap text-center bg-theme text-white">HOD Budget</th>
-                                    <th colspan="3" class="text-nowrap text-center bg-yellow">Wisdom Suggested Budget
-                                    </th>
+                                    <td>{{ $p->position_title }}</td>
+                                    <td class="text-nowrap text-center">{{ str_pad($p->headcount, 2, '0', STR_PAD_LEFT) }}</td>
+                                    <td class="text-nowrap text-center">{{ $currencySymbol }} {{ number_format($p->current_budget, 0) }}</td>
+                                    @if($aiSet)
+                                        <td class="text-nowrap text-center {{ $aiHeadClass }}">{{ str_pad($p->ai_headcount, 2, '0', STR_PAD_LEFT) }}</td>
+                                        <td class="text-nowrap text-center {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($p->ai_budget, 0) }}</td>
+                                        <td>
+                                            @if(!empty($p->ai_justification))
+                                                <div class="d-flex align-items-end">
+                                                    <p class="m-0">{{ $p->ai_justification }}</p>
+                                                </div>
+                                            @endif
+                                        </td>
+                                    @else
+                                        <td class="text-nowrap text-center text-muted">—</td>
+                                        <td class="text-nowrap text-center text-muted">—</td>
+                                        <td class="text-muted">
+                                            {{ $aiStatus === 'ready' ? '' : 'Click Regenerate AI to populate.' }}
+                                        </td>
+                                    @endif
                                 </tr>
+                            @empty
                                 <tr>
-                                    <th class="text-nowrap">Positions</th>
-                                    <th class="text-nowrap text-center">Headcount</th>
-                                    <th class="text-nowrap text-center">Total Budget</th>
-                                    <th class="text-nowrap text-center">Headcount</th>
-                                    <th class="text-nowrap text-center">Total Budget</th>
-                                    <th class="text-nowrap">Justified Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Consultant (Owners Representative)</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,526</td>
-                                    <td class="text-nowrap text-center">01</td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,526</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Company Secretary</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">02</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,100</td>
-                                    <td class="text-nowrap text-center">02</td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,100</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Office Assistant</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td class="text-nowrap text-center">01</td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Purchasing executive</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td class="text-nowrap text-center text-success">02</td>
-                                    <td class="text-nowrap text-center text-success">{{ Common::GetResortCurrencySymbol() }} 1,500</td>
-                                    <td>
-                                        <div class="d-flex align-items-end">
-                                            <p class="m-0">HOD requested 03 Safety & Security Managers, but Wisdom AI
-                                                suggests 01 based on the past 3 years’ historical data showing
-                                                consistent
-                                                staffing of 2 managers. </p>
-                                            <a href="javascript:void(0)" class="compareBudget-more">More</a>
-                                            <a href="javascript:void(0)" class="compareBudget-Less d-none">Less</a>
-                                        </div>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        No positions configured for this department yet.
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td>Logistics Executive</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td class="text-nowrap text-center ">01</td>
-                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Customs Coordinator</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">03</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,500</td>
-                                    <td class="text-nowrap text-center text-danger">02</td>
-                                    <td class="text-nowrap text-center text-danger">{{ Common::GetResortCurrencySymbol() }} 2,000</td>
-                                    <td>
-                                        <div class="d-flex align-items-end">
-                                            <p class="m-0">HOD requested 03 Safety & Security Managers, but Wisdom AI
-                                                suggests 01 based on the past 3 years’ historical data showing
-                                                consistent
-                                                staffing of 2 managers. </p>
-                                            <a href="javascript:void(0)" class="compareBudget-more">More</a>
-                                            <a href="javascript:void(0)" class="compareBudget-Less d-none">Less</a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Male' Office Administrator</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td class="text-nowrap  text-center">01</td>
-                                    <td class="text-nowrap  text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Assistant Accountant/Accountant</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 3,100</td>
-                                    <td class="text-nowrap text-center ">01</td>
-                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 3,100</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>General Manager</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">02</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 2,100</td>
-                                    <td class="text-nowrap text-center text-danger">01</td>
-                                    <td class="text-nowrap text-center text-danger">{{ Common::GetResortCurrencySymbol() }} 1,400</td>
-                                    <td>
-                                        <div class="d-flex align-items-end">
-                                            <p class="m-0">Due to forecasted low occupancy, we may not need a Safety &
-                                                Security Manager in
-                                                June, July, and August</p>
-                                            <a href="javascript:void(0)" class="compareBudget-more">More</a>
-                                            <a href="javascript:void(0)" class="compareBudget-Less d-none">Less</a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Island Manager</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td class="text-nowrap  text-center">01</td>
-                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td>Safety and Security Manager</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">02</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,500</td>
-                                    <td class="text-nowrap text-center text-danger">01</td>
-                                    <td class="text-nowrap text-center text-danger">{{ Common::GetResortCurrencySymbol() }} 900</td>
-                                    <td>
-                                        <div class="d-flex align-items-end">
-                                            <p class="m-0">Due to forecasted low occupancy, we may not need a Safety &
-                                                Security Manager in
-                                                June, July, and August</p>
-                                            <a href="javascript:void(0)" class="compareBudget-more">More</a>
-                                            <a href="javascript:void(0)" class="compareBudget-Less d-none">Less</a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Island Manager</td>
-                                    <td class="text-nowrap text-center"><a href="#"
-                                            class="text-theme text-underline">01</a></td>
-                                    <td class="text-nowrap text-center">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td class="text-nowrap text-center ">01</td>
-                                    <td class="text-nowrap text-center ">{{ Common::GetResortCurrencySymbol() }} 1,100</td>
-                                    <td></td>
-                                </tr>
-                            </tbody>
+                            @endforelse
+                        </tbody>
+                        @if($positions->isNotEmpty())
                             <tfoot>
                                 <tr>
                                     <th>Total:</th>
-                                    <th class="text-center">17</th>
-                                    <th class="text-center">{{ Common::GetResortCurrencySymbol() }} 12,241</th>
-                                    <th class="text-lightblue text-center">15</th>
-                                    <th class="text-lightblue text-center">{{ Common::GetResortCurrencySymbol() }} 11,985</th>
+                                    <th class="text-center">{{ $totalHodHeadcount }}</th>
+                                    <th class="text-center">{{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }}</th>
+                                    <th class="text-lightblue text-center">{{ $totalAiHeadcount }}</th>
+                                    <th class="text-lightblue text-center">{{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }}</th>
                                     <th></th>
                                 </tr>
                             </tfoot>
-                        </table>
-                    </div>
+                        @endif
+                    </table>
                 </div>
             </div>
         </div>
     </div>
- <!-- modal -->
- <div class="modal fade" id="revise-budgetmodal" tabindex="-1" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
+</div>
+
+<!-- Revise Budget modal — unchanged from the original mockup; wiring it up
+     to actually persist a revision is a separate piece of work. -->
+<div class="modal fade" id="revise-budgetmodal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small">
         <div class="modal-content">
             <div class="modal-header">
@@ -242,9 +166,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-
                 <div class="form-group mb-20">
-
                     <textarea class="form-control" rows="7" placeholder="Add Comment Regarding Revision"></textarea>
                 </div>
             </div>
@@ -252,11 +174,9 @@
                 <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
                 <a href="#" class="btn btn-sm btn-theme">Submit</a>
             </div>
-
         </div>
     </div>
 </div>
-
 
 @endsection
 
@@ -264,17 +184,4 @@
 @endsection
 
 @section('import-scripts')
-
-<script>
-   $(".compareBudget-more").click(function () {
-        $(this).addClass("d-none");
-        $(this).siblings(".compareBudget-Less").removeClass("d-none");
-        $(this).siblings("p").addClass("d-block");
-    });
-    $(".compareBudget-Less").click(function () {
-        $(this).addClass("d-none");
-        $(this).siblings(".compareBudget-more").removeClass("d-none");
-        $(this).siblings("p").removeClass("d-block");
-    });
-</script>
 @endsection
