@@ -456,6 +456,10 @@ class BudgetController extends Controller
                         ->where('mr.dept_id', '=', $deptID)
                         ->where('mr.id', '=', $budgetId);
                 })
+                // Belt-and-braces: even if the $deptID URL parameter is
+                // a department from another resort, p.resort_id stops
+                // that resort's positions from rendering on our page.
+                ->where('p.resort_id', '=', $this->resort->resort_id)
                 ->where('p.dept_id', '=', $deptID)
                 ->select(
                     'p.id',
@@ -498,6 +502,26 @@ class BudgetController extends Controller
                 $aiSuggestions = $cached['recommendations'] ?? [];
                 $aiStatus      = $cached['status'] ?? null;
                 $aiGeneratedAt = $cached['generated_at'] ?? null;
+
+                // When the user clicked Regenerate, redirect back to the
+                // canonical URL so a refresh doesn't auto-fire another
+                // (potentially expensive) AI call AND so the user sees a
+                // flash toast confirming what happened. Without this the
+                // page just renders with the old cached suggestions and
+                // a small "AI failed" chip — easy to miss.
+                if ($regenerate) {
+                    $flashKind = $aiStatus === 'ready' ? 'success'
+                              : ($aiStatus === 'timeout' ? 'warning' : 'error');
+                    $flashMsg  = $aiStatus === 'ready'
+                        ? 'AI workforce-planning analysis regenerated.'
+                        : ($aiStatus === 'timeout'
+                            ? 'The AI service did not respond in time. Showing the previously cached suggestions.'
+                            : 'AI workforce-planning analysis failed — check that the AI service is reachable. Showing the previously cached suggestions.');
+                    return redirect()
+                        ->route('resort.budget.comparebudget', ['id' => $deptID, 'budgetid' => $budgetId])
+                        ->with('ai_flash_kind', $flashKind)
+                        ->with('ai_flash_msg', $flashMsg);
+                }
             } elseif ($manningResponse) {
                 $aiSuggestions = json_decode($manningResponse->ai_suggestions, true) ?: [];
                 $aiStatus      = $manningResponse->ai_suggestions_status;
