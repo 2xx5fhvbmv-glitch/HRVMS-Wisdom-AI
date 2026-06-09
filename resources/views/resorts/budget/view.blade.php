@@ -80,14 +80,14 @@
                                     <th class="text-nowrap">Employee Name</th>
                                     <th class="text-nowrap w-120">Rank</th>
                                     <th class="text-nowrap">Nation</th>
-                                    {{-- Both salary headers wrapped onto two lines because they
-                                         lacked text-nowrap (every other header has it). On narrow
-                                         layouts the wrapped text overlapped the Jan-{year} column —
-                                         hence the "Proposed Basic Salary 2027" / "Jan-2027" mash-up
-                                         in the screenshot. text-nowrap + w-160 keeps them on one
-                                         line and gives the cell enough room for the full label. --}}
-                                    <th class="text-nowrap w-160">Current Basic salary</th>
-                                    <th class="text-nowrap w-160">Proposed Basic Salary {{$nextYear}}</th>
+                                    {{-- Both salary headers overflowed the Jan-{year} column
+                                         because they had no width. The earlier "w-160" attempt
+                                         did nothing — that class isn't defined in this CSS.
+                                         Inline min-width is the only reliable fix here since the
+                                         table layout is auto and the column wouldn't otherwise
+                                         claim enough horizontal space for the full label. --}}
+                                    <th class="text-nowrap" style="min-width:170px;">Current Basic salary</th>
+                                    <th class="text-nowrap" style="min-width:200px;">Proposed Basic Salary {{$nextYear}}</th>
                                     @for ($i = 1; $i <= 12; $i++)
                                         @php
                                             // Get the current year and increment it to get the next year
