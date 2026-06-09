@@ -1943,6 +1943,11 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('/people/compliance', 'People\Compliances\ComplianceController@index')->name('people.compliance.index');
     Route::get('/people/compliance/list', 'People\Compliances\ComplianceController@list')->name('people.compliance.list');
     Route::get('/people/compliance/run','People\Compliances\ComplianceController@checkCompliance')->name('people.compliance.run');
+    // Bulk re-enrich the last N compliance rows via the AI helper.
+    // Used by the "Regenerate AI" button on the list page.
+    Route::post('/people/compliance/regenerate-ai','People\Compliances\ComplianceController@regenerateAi')->name('people.compliance.regenerateAi');
+    // Run the AI-only anomaly scan (Layer 2) — separate from the rules engine.
+    Route::post('/people/compliance/anomaly-scan','People\Compliances\ComplianceController@runAnomalyScan')->name('people.compliance.anomalyScan');
     Route::get('/people/compliance/dismiss/{id}','People\Compliances\ComplianceController@DismissCompliance')->name('people.compliances.dismiss');
     Route::get('/people/compliance/download','People\Compliances\ComplianceController@download')->name('people.compliance.download');
     Route::get('/people/compliance/test','People\Compliances\ComplianceController@test')->name('people.compliance.test');

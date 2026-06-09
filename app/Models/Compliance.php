@@ -19,7 +19,11 @@ class Compliance extends Model
     
     public $fillable = [
         'resort_id',
-        'employee_id ',
+        // Was 'employee_id ' (with trailing space). The space made every
+        // Compliance::create([..., 'employee_id' => $x, ...]) silently
+        // drop the FK — explains the historical "row created but
+        // employee_id is NULL" rows on live.
+        'employee_id',
         'module_name',
         'compliance_breached_name',
         'description',
@@ -27,7 +31,14 @@ class Compliance extends Model
         'status',
         'Dismissal_status',
         'assigned_to',
-       
+        // AI-generated context fields populated by ComplianceController
+        // after each rule fires. Nullable everywhere — view falls back
+        // to the hardcoded `description` when these are empty.
+        'description_ai',
+        'remediation_ai',
+        'severity_ai',
+        'ai_status',
+        'ai_generated_at',
     ];
 
     public function getCreatedAtAttribute($value): ?string {
