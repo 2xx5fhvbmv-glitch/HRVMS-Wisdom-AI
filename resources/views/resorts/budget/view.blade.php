@@ -54,7 +54,9 @@
                                          every resort into thinking it was their actual Wisdom Suggested
                                          Budget. Removed until the dynamic value is wired through
                                          (the real WSB lives on /resort/budget/compare-budget/{dept}/{budget}). --}}
-                                    <a href="#bulk-incrementView-modal" data-bs-toggle="modal" class="btn btn-xs btn-themeBlue mx-2">Bulk Increment</a>
+                                    {{-- Bulk Increment button commented out per request — the bulk-incrementView-modal
+                                         still exists below but is unreachable from the UI until this is restored. --}}
+                                    {{-- <a href="#bulk-incrementView-modal" data-bs-toggle="modal" class="btn btn-xs btn-themeBlue mx-2">Bulk Increment</a> --}}
                                      <a href="{{ route('resort.budget.comparebudget', ['id' => $department->id,'budgetid'=>$Budget_id]) }}" class="btn btn-xs btn-coolblue order-sm-last me-sm-0 me-3" @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.comparebudget',config('settings.resort_permissions.view')) == false) d-none @endif>
                                         Compare
                                     </a> 
@@ -78,8 +80,14 @@
                                     <th class="text-nowrap">Employee Name</th>
                                     <th class="text-nowrap w-120">Rank</th>
                                     <th class="text-nowrap">Nation</th>
-                                    <th>Current Basic salary</th>
-                                    <th>Proposed Basic Salary {{$nextYear}}</th>
+                                    {{-- Both salary headers wrapped onto two lines because they
+                                         lacked text-nowrap (every other header has it). On narrow
+                                         layouts the wrapped text overlapped the Jan-{year} column —
+                                         hence the "Proposed Basic Salary 2027" / "Jan-2027" mash-up
+                                         in the screenshot. text-nowrap + w-160 keeps them on one
+                                         line and gives the cell enough room for the full label. --}}
+                                    <th class="text-nowrap w-160">Current Basic salary</th>
+                                    <th class="text-nowrap w-160">Proposed Basic Salary {{$nextYear}}</th>
                                     @for ($i = 1; $i <= 12; $i++)
                                         @php
                                             // Get the current year and increment it to get the next year
@@ -188,9 +196,13 @@
                                                                     <td class="w-120 month-{{$i}}">
                                                                         <div class="inputValue">
                                                                             {{number_format($totalMothwisecost,2)}}
-                                                                            <a href="#incrementView-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-skyblue">
+                                                                            {{-- Salary Increment Details flow disabled per request.
+                                                                                 The trigger icon is hidden here; the modal markup
+                                                                                 further below is wrapped in {{--   --}} too so it
+                                                                                 doesn't render. Re-enable by uncommenting both. --}}
+                                                                            {{-- <a href="#incrementView-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-skyblue">
                                                                                 <img src="{{ URL::asset('resorts_assets/images/increment.svg') }}"/>
-                                                                            </a>
+                                                                            </a> --}}
                                                                         </div>
                                                                         <input type="number" name= "manning_child[{{ $pos->Position_id}}][{{ $employee->vacantData->smrp_child_id }}][]"class="form-control" value="{{ $totalMothwisecost }}" min="0" step="0.01" max="9999999999.99">
                                                                     </td>
@@ -317,6 +329,15 @@
     </div>
 </div>
 
+{{-- ─────────────────────────────────────────────────────────────────────
+     Salary Increment Details modal — DISABLED per request alongside the
+     icon trigger above. Left intact (just wrapped in a Blade comment) so
+     the field set, JS handlers (#incrementForm / #incrementSubmit) and
+     route wiring don't need re-implementation when restored. To bring it
+     back, remove the `{{--` and `--}}` wrapping below AND uncomment the
+     trigger icon in the table cell earlier in this file.
+     ───────────────────────────────────────────────────────────────────── --}}
+{{--
 <div class="modal fade" id="incrementView-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small">
         <div class="modal-content">
@@ -375,6 +396,7 @@
         </div>
     </div>
 </div>
+--}}
 
 <div class="modal fade" id="bulk-incrementView-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-small">
