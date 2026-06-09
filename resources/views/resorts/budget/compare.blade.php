@@ -9,6 +9,28 @@
 
 @section('content')
 
+{{-- Page-top banner for the Regenerate-AI action. Renders inline so the
+     user can't miss it even if toastr is slow to load. Disappears on
+     the next page load (single-use Laravel flash). --}}
+@if(session('ai_flash_msg'))
+    @php
+        $aiAlertCls = ['success' => 'alert-success', 'warning' => 'alert-warning', 'error' => 'alert-danger'][session('ai_flash_kind', 'info')] ?? 'alert-info';
+    @endphp
+    <div class="container-fluid pt-3">
+        <div class="alert {{ $aiAlertCls }} alert-dismissible fade show mb-0" role="alert">
+            <strong>
+                @switch(session('ai_flash_kind'))
+                    @case('success') ✓ AI ready @break
+                    @case('warning') ⚠ AI slow @break
+                    @default ✗ AI unreachable
+                @endswitch
+            </strong>
+            — {{ session('ai_flash_msg') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+@endif
+
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
