@@ -68,7 +68,11 @@
                                         AI {{ $aiStatus }}
                                     </span>
                                 @endif
-                                <a href="?regenerate=1" class="btn btn-sm btn-themeBlue" title="Re-run the AI workforce-planning analysis for this department/budget">
+                                <a href="?regenerate=1"
+                                   id="ai-regenerate-link"
+                                   class="btn btn-sm btn-themeBlue"
+                                   title="Re-run the AI workforce-planning analysis for this department/budget"
+                                   onclick="this.innerHTML='<i class=&quot;fa-solid fa-spinner fa-spin me-1&quot;></i>Regenerating…'; this.classList.add('disabled');">
                                     <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
                                 </a>
                             </div>
@@ -184,4 +188,25 @@
 @endsection
 
 @section('import-scripts')
+{{-- Flash toast for the Regenerate-AI action. The controller redirects
+     back here after a Regenerate click so the user sees one of three
+     toasts: AI ready (green), AI timeout (yellow), AI failed (red).
+     Without this, a failed AI call left the page visually unchanged
+     and HR thought the button was broken. --}}
+@if(session('ai_flash_msg'))
+<script>
+    $(function () {
+        var kind = @json(session('ai_flash_kind', 'info'));
+        var msg  = @json(session('ai_flash_msg'));
+        if (typeof toastr !== 'undefined' && toastr[kind]) {
+            toastr[kind](msg, kind === 'success' ? 'Done' : (kind === 'warning' ? 'Slow AI service' : 'AI service unreachable'), {
+                positionClass: 'toast-bottom-right',
+                timeOut: 8000
+            });
+        } else {
+            alert(msg);
+        }
+    });
+</script>
+@endif
 @endsection

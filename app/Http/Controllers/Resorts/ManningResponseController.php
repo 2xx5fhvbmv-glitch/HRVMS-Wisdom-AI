@@ -364,11 +364,24 @@ class ManningResponseController extends Controller
             // dd($available_rank);
 
             $getPositions = DB::table('resort_positions as p')
-                ->leftJoin('employees as e', 'p.id', '=', 'e.Position_id')
+                // Employees join now scopes to THIS resort. Without it
+                // the downstream HAVING COUNT(e.id) > 0 could fire on the
+                // back of an employee from another resort that happens
+                // to share the same Position_id, surfacing that resort's
+                // headcount as ours. (Reported live data-difference
+                // between the WP HR dashboard and this view.)
+                ->leftJoin('employees as e', function ($j) use ($resortId) {
+                    $j->on('p.id', '=', 'e.Position_id')
+                      ->where('e.resort_id', '=', $resortId);
+                })
                 ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
-                ->leftJoin('manning_responses as mr', function($join) use ($resortId, $dept_id, $year) {
-                    $join->on('pmd.manning_response_id', '=', 'mr.id');
-                        // ->where('mr.year', '=', $year);
+                // manning_responses also scoped to THIS resort. The
+                // outer `use ($resortId, ...)` was importing $resortId
+                // into the closure but never applying it, so any other
+                // resort's manning_response sharing a pmd row leaked in.
+                ->leftJoin('manning_responses as mr', function ($join) use ($resortId) {
+                    $join->on('pmd.manning_response_id', '=', 'mr.id')
+                         ->where('mr.resort_id', '=', $resortId);
                 })
                 ->leftJoin('budget_statuses as bs', function($join) {
                     $join->on('mr.id', '=', 'bs.Budget_id')
@@ -399,8 +412,15 @@ class ManningResponseController extends Controller
 
                         foreach ($getPositions as $position)
                         {
+                            // CRITICAL: scope employees by resort_id. Without
+                            // this, the foreach loop hydrates each position
+                            // with employees from ANY resort that shares the
+                            // same Position_id + Dept_id — directly the
+                            // "data difference vs WP HR dashboard" the user
+                            // reported.
                             $employees = DB::table('employees as e')
                             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                            ->where('e.resort_id', $resortId)
                             ->where('position_id', $position->Position_id)
                             ->where('Dept_id', $position->dept_id)
                             ->get([
@@ -454,9 +474,15 @@ class ManningResponseController extends Controller
                                     ->join('employees as t3', 't3.id', "=", "t2.Emp_id")
                                     ->join('resort_positions as t4', 't4.id', "=", "t3.Position_id")
                                     ->leftJoin('position_monthly_data as pmd', 't4.id', '=', 'pmd.position_id')
-                                    ->leftJoin('manning_responses as mr', function($join) use ($resortId, $year) {
-                                        $join->on('pmd.manning_response_id', '=', 'mr.id');
-                                            // ->where('mr.year', '=', $year);
+                                    // manning_responses join now applies the $resortId
+                                    // captured by the closure — previously the
+                                    // outer `use ($resortId, $year)` imported it
+                                    // but the join body never used it, letting
+                                    // another resort's manning_response leak in
+                                    // alongside ours via the same pmd row.
+                                    ->leftJoin('manning_responses as mr', function ($join) use ($resortId) {
+                                        $join->on('pmd.manning_response_id', '=', 'mr.id')
+                                             ->where('mr.resort_id', '=', $resortId);
                                     })
                                     ->where('t1.resort_id', '=', $resortId)
                                     ->where('t1.Department_id', '=',  $position->dept_id)

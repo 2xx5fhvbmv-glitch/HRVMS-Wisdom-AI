@@ -602,6 +602,16 @@ class TalentAcquisitionDashboardController extends Controller
             // dd($UpcomingApplicants);
 
 
+            // Build the "Hire Requests Pending YOUR Approval" feed —
+            // previously only the HR dashboard had this list (and its
+            // Respond → Approve/Reject modals), which meant HOD (rank 2),
+            // EXCOM (rank 1) and Finance (rank 7) users on the HOD
+            // dashboard saw the status timeline but had no way to ACT.
+            // GetTheFreshVacancies returns only the rows where the
+            // supplied rank still needs to approve, so the count drops
+            // to zero naturally once the user signs off.
+            $Vacancies = Common::GetTheFreshVacancies($resort_id, 'Active', $effectiveRank);
+
             return view('resorts.talentacquisition.dashboard.hoddashboard', compact(
                 'page_header',
                 'resort_id',
@@ -609,7 +619,8 @@ class TalentAcquisitionDashboardController extends Controller
                 'resort_departments',
                 'resort_positions',
                 'hiring_request',
-                'vacancies','TotalApplicants','Interviews','Hired','UpcomingApplicants','drafts'
+                'vacancies','TotalApplicants','Interviews','Hired','UpcomingApplicants','drafts',
+                'Vacancies'
 
             ));
         } catch (\Exception $e) {
@@ -621,7 +632,7 @@ class TalentAcquisitionDashboardController extends Controller
             // Default empty collections in case of failure
             $resort_id = optional($this->globalUser)->resort_id;
             $resort_divisions = $resort_departments = $resort_positions = collect();
-            $hiring_request = $vacancies = $UpcomingApplicants = $drafts = collect();
+            $hiring_request = $vacancies = $UpcomingApplicants = $drafts = $Vacancies = collect();
             $TotalApplicants = 0;
             $Interviews = 0;
             $Hired = 0;
@@ -638,7 +649,8 @@ class TalentAcquisitionDashboardController extends Controller
                 'Interviews',
                 'Hired',
                 'UpcomingApplicants',
-                'drafts'
+                'drafts',
+                'Vacancies'
             ));
         }
     }

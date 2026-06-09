@@ -155,6 +155,61 @@
                     </div>
                     @endif
 
+                    {{-- ─────────────────────────────────────────────────────────────
+                         Hire Requests Pending YOUR Approval.
+
+                         $Vacancies comes from Common::GetTheFreshVacancies()
+                         filtered by the logged-in user's effective rank, so the
+                         card only shows the requests where this user is the
+                         next approver. Was previously rendered only on the HR
+                         dashboard — leaving HOD (rank 2), EXCOM (rank 1) and
+                         Finance (rank 7) users with no Approve / Reject /
+                         Hold button to action requests they were assigned.
+                         ───────────────────────────────────────────────────────────── --}}
+                    @if(isset($Vacancies) && $Vacancies->count() > 0)
+                    <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant', config('settings.resort_permissions.view')) == false) d-none @endif">
+                        <div class="card h-auto">
+                            <div class="card-title">
+                                <div class="row justify-content-between align-items-center g-3">
+                                    <div class="col">
+                                        <h3>Hire Requests Pending Your Approval</h3>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="{{ route('resort.ta.ViewVacancies') }}" class="a-link">View all</a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="hireReq-main" id="FreshHiringRequest">
+                                @foreach ($Vacancies->take(5) as $vacancy)
+                                    <div class="hireReq-block">
+                                        <div class="img-circle">
+                                            <img src="{{ Common::getResortUserPicture($vacancy->resort_id) }}" alt="image">
+                                        </div>
+                                        <div>
+                                            <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})</h6>
+                                            <p><strong>{{ $vacancy->created_by_name }} ({{ $vacancy->creator_rank_name }})</strong> Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
+                                        </div>
+                                        <div class="icon">
+                                            <a href="javascript:void(0)" class="respondOfFreshmodal"
+                                                    data-images="{{ Common::getResortUserPicture($vacancy->resort_id) }}"
+                                                    data-ta_id="{{ $vacancy->ta_id }}"
+                                                    data-departmentName="{{ $vacancy->Department }}"
+                                                    data-rank="{{ $vacancy->rank_name }}"
+                                                    data-position="{{ $vacancy->Position }}"
+                                                    data-NoOfVacnacy="{{ $vacancy->NoOfVacnacy }}"
+                                                    data-Child_ta_id="{{ $vacancy->Child_ta_id }}"
+                                                    data-createdby="{{ $vacancy->created_by_name }}"
+                                                    data-creatorrank="{{ $vacancy->creator_rank_name }}">
+                                                    Respond
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
                     <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card h-auto" id="card-vac">
                             <div class="card-title">
@@ -493,6 +548,15 @@
         </div>
     </div>
 </div>
+
+{{-- Vacancy approval modals + JS — shared partial mounted only when the
+     current user has at least one pending row, so the modal DOM is
+     absent for users with nothing to action. Same partial is safe to
+     mount on the HR dashboard later when we extract the duplicate from
+     hrdashboard.blade.php. --}}
+@if(isset($Vacancies) && $Vacancies->count() > 0)
+    @include('resorts.talentacquisition.dashboard._partials.vacancy_approval_modals')
+@endif
 @endsection
 
 @section('import-css')
