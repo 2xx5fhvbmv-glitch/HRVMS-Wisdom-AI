@@ -50,7 +50,10 @@
 
                             <div class="col-sm-6">
                                 <div class="d-flex justify-content-sm-end align-items-center">
-                                    <a href="#" class="text-lightblue me-sm-3  fw-500 fs-13">WSB : $11,985</a>
+                                    {{-- "WSB : $11,985" was a hardcoded mockup leftover that confused
+                                         every resort into thinking it was their actual Wisdom Suggested
+                                         Budget. Removed until the dynamic value is wired through
+                                         (the real WSB lives on /resort/budget/compare-budget/{dept}/{budget}). --}}
                                     <a href="#bulk-incrementView-modal" data-bs-toggle="modal" class="btn btn-xs btn-themeBlue mx-2">Bulk Increment</a>
                                      <a href="{{ route('resort.budget.comparebudget', ['id' => $department->id,'budgetid'=>$Budget_id]) }}" class="btn btn-xs btn-coolblue order-sm-last me-sm-0 me-3" @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.comparebudget',config('settings.resort_permissions.view')) == false) d-none @endif>
                                         Compare
@@ -469,30 +472,24 @@
             $('#total-positions').text(totalPositions);
             totalCurrentBasicSalary = Math.round(totalCurrentBasicSalary);
             totalProposedBasicSalary = Math.round(totalProposedBasicSalary);
-            $('#total-current-basic-salary').text(formatAmount(totalCurrentBasicSalary, 'USD'))
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }));
-            $('#total-proposed-basic-salary').text(formatAmount(totalProposedBasicSalary, 'USD'))
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }));
+            // formatAmount() already returns a fully formatted string with
+            // currency + 2 decimal places (see layouts/js.blade.php). The
+            // orphaned `minimumFractionDigits` option blocks here are
+            // leftovers from a half-finished refactor away from
+            // `toLocaleString()` — they made the whole function throw a
+            // SyntaxError, so calculateTotals() silently never ran and
+            // the badge stayed at the placeholder "Budget: 00.00".
+            $('#total-current-basic-salary').text(formatAmount(totalCurrentBasicSalary, 'USD'));
+            $('#total-proposed-basic-salary').text(formatAmount(totalProposedBasicSalary, 'USD'));
 
             // Update monthly totals in the footer
             const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
             months.forEach((month, index) => {
-                $(`#total-${month}-2024`).text(formatAmount(monthlyTotals[index], 'USD'))
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }));
+                $(`#total-${month}-2024`).text(formatAmount(monthlyTotals[index], 'USD'));
             });
 
-            $('.grand_total').val( grandTotal);
-
-            $('#grand_total').text(formatAmount(grandTotal, 'USD'))
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }));
+            $('.grand_total').val(grandTotal);
+            $('#grand_total').text('Budget: ' + formatAmount(grandTotal, 'USD'));
             $('#hdn_grand_total').val(grandTotal);
 
             // Update the parent table with the grand total
