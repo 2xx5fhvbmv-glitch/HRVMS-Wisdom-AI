@@ -176,11 +176,34 @@
                             <h3>Compliance Tracking</h3>
                         </div>
                         <div>
+                            @php
+                                // Derive the Maldivian/Expat split for the
+                                // Compliance Tracking panel. 60% Maldivian
+                                // is the convention used by the rules
+                                // engine (App\Http\Controllers\Resorts\
+                                // People\Compliances\ComplianceController
+                                // — "Management Non-Maldivian" rule).
+                                $totalEmpForRatio = ($localEmployees ?? 0) + ($expatEmployees ?? 0);
+                                $localPct = $totalEmpForRatio > 0 ? round(($localEmployees / $totalEmpForRatio) * 100, 1) : 0;
+                                $expatPct = $totalEmpForRatio > 0 ? round(($expatEmployees / $totalEmpForRatio) * 100, 1) : 0;
+                                $localPctClass = $localPct >= 60 ? 'text-success' : 'text-danger';
+                            @endphp
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
                                     Number of Local/Xpat:
                                 </p>
                                 <span class="d-inline-block w-25 text-end">{{$localEmployees}}/{{$expatEmployees}}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                                <p class="mb-0">
+                                    Local / Xpat Ratio:
+                                    <small class="text-muted d-block" style="font-size:10px;">60% Maldivian target</small>
+                                </p>
+                                <span class="d-inline-block text-end">
+                                    <span class="fw-bold {{ $localPctClass }}">{{ $localPct }}%</span>
+                                    <span class="text-muted">/</span>
+                                    <span class="fw-bold">{{ $expatPct }}%</span>
+                                </span>
                             </div>
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
