@@ -582,7 +582,13 @@ class BudgetController extends Controller
             'positions'       => $payloadPositions,
         ];
 
-        $url = rtrim((string) env('AI_BASE_URL', 'http://localhost:8001'), '/') . '/budget_recommendations';
+        // Resolve the AI host. Prefer AI_BASE_URL (added for the new
+        // budget / compliance endpoints) then fall back to the existing
+        // AI_URL the rest of the codebase already uses — that's the var
+        // the live .env actually defines, so without this fallback the
+        // controller silently hit localhost:8001 on prod and Regenerate
+        // AI looked like a no-op.
+        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/budget_recommendations';
 
         $curl = curl_init();
         curl_setopt_array($curl, [

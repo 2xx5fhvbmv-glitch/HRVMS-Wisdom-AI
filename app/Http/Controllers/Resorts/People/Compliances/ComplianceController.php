@@ -233,7 +233,9 @@ class ComplianceController extends Controller
             ],
         ];
 
-        $url = rtrim((string) env('AI_BASE_URL', 'http://localhost:8001'), '/') . '/compliance_scan';
+        // Resolve the AI host — prefer AI_BASE_URL but fall back to
+        // the existing AI_URL the live .env defines.
+        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/compliance_scan';
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -315,7 +317,9 @@ class ComplianceController extends Controller
     {
         if (!$compliance) return;
 
-        $url = rtrim((string) env('AI_BASE_URL', 'http://localhost:8001'), '/') . '/compliance_explain';
+        // Resolve the AI host — prefer AI_BASE_URL but fall back to
+        // the existing AI_URL the live .env defines.
+        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/compliance_explain';
         $payload = [
             'rule_name'             => (string) $compliance->compliance_breached_name,
             'rule_module'           => (string) $compliance->module_name,
