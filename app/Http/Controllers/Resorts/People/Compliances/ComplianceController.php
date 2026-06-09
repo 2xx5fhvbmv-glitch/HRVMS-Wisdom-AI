@@ -380,10 +380,20 @@ class ComplianceController extends Controller
      // List Page
      public function list(Request $request){
           $resort = $this->resort;
-          $positions = ResortPosition::where('resort_id', $resort->resort_id)->where('status', 'active')->get();
-          $departments = ResortDepartment::where('resort_id', $resort->resort_id)->where('status', 'active')->get();
-          $query = Compliance::where('resort_id', $resort->resort_id)->with([
-               'employee.resortAdmin',
+          $resortId = $resort->resort_id;
+          $positions = ResortPosition::where('resort_id', $resortId)->where('status', 'active')->get();
+          $departments = ResortDepartment::where('resort_id', $resortId)->where('status', 'active')->get();
+          // Constrain the eager-loaded employee to the SAME resort so that
+          // even if a compliance row was created with an employee_id from
+          // another resort (data bug), the relationship returns null and
+          // the row gets filtered out by the whereHas() guard below.
+          // Without this, the employee_name / profile picture / Emp_id
+          // shown for the compliance row could come from a DIFFERENT
+          // resort's employee — the reported "other resort data" leak.
+          $query = Compliance::where('resort_id', $resortId)->with([
+               'employee' => function ($q) use ($resortId) {
+                    $q->where('resort_id', $resortId)->with('resortAdmin');
+               },
           ]);
           if ($request->searchTerm != null) {
                $searchTerm = $request->searchTerm;
@@ -408,7 +418,17 @@ class ComplianceController extends Controller
           if ($request->compliance_breached_name != null) {
                $query->where('compliance_breached_name', $request->compliance_breached_name);
           }
-          $compliances = $query->whereHas('employee.resortAdmin')->where("Dismissal_status","Pending")->get();
+          // whereHas restricts the result to rows whose employee belongs to
+          // THIS resort. Belt-and-braces with the eager-load constraint
+          // above — together they ensure rows with cross-resort
+          // employee_id don't appear AND no cross-resort employee data is
+          // hydrated.
+          $compliances = $query
+               ->whereHas('employee', function ($q) use ($resortId) {
+                    $q->where('resort_id', $resortId)->whereHas('resortAdmin');
+               })
+               ->where("Dismissal_status", "Pending")
+               ->get();
 
           if ($request->ajax()) 
           {
@@ -1620,10 +1640,16 @@ class ComplianceController extends Controller
      }
      public function download(Request $request)
      {
-          $resort = $this->resort;
-          
-          $query = Compliance::where('resort_id', $resort->resort_id)->with([
-               'employee.resortAdmin',
+          $resort   = $this->resort;
+          $resortId = $resort->resort_id;
+
+          // Same scoping as list(): constrain the eager-loaded employee
+          // to the current resort so a cross-resort employee_id can't
+          // leak another resort's name/picture into the downloaded file.
+          $query = Compliance::where('resort_id', $resortId)->with([
+               'employee' => function ($q) use ($resortId) {
+                    $q->where('resort_id', $resortId)->with('resortAdmin');
+               },
           ]);
           
           if ($request->searchTerm != null) {
@@ -1650,7 +1676,13 @@ class ComplianceController extends Controller
                $query->where('compliance_breached_name', $request->compliance_breached_name);
           }
           
-          $compliances = $query->whereHas('employee.resortAdmin')->get();
+          // Filter out rows whose employee isn't in this resort (cross-resort
+          // data corruption guard — see list() for the rationale).
+          $compliances = $query
+               ->whereHas('employee', function ($q) use ($resortId) {
+                    $q->where('resort_id', $resortId)->whereHas('resortAdmin');
+               })
+               ->get();
           
           // Transform data similar to how the DataTable displays it
           $formattedData = [];
@@ -1851,11 +1883,19 @@ class ComplianceController extends Controller
 
      public function DismissCompliance($id)
      {
-          $compliance = Compliance::find(base64_decode($id));
+          // Scope by resort_id. Without it any logged-in user could
+          // dismiss a compliance row belonging to ANOTHER resort just by
+          // knowing the base64-encoded id (which is enumerable). The list
+          // page only shows the current resort's rows, but the dismiss
+          // endpoint is callable directly.
+          $decoded = base64_decode($id);
+          $compliance = Compliance::where('id', $decoded)
+              ->where('resort_id', $this->resort->resort_id)
+              ->first();
           if ($compliance) {
               $compliance->Dismissal_status = 'Rejected';
               $compliance->save();
- 
+
                return response()->json([
                    'success' => true,
                    'message' => 'Compliance dismissed successfully.'
