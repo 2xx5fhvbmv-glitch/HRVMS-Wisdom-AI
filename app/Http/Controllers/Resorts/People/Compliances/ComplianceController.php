@@ -78,17 +78,43 @@ class ComplianceController extends Controller
             return response()->json(['success' => false, 'message' => 'Not permitted to regenerate AI insights'], 403);
         }
 
-        $limit = (int) $request->input('limit', 50);
-        $limit = max(1, min(200, $limit));
+        // ONE batch of 15 per click. Previously a Regenerate click
+        // processed up to 50 rows in one HTTP request and routinely blew
+        // Hostinger's ~60 s reverse-proxy timeout. Then I auto-paged in
+        // groups of 10, which worked but meant every click ran ALL rows
+        // — HR wanted explicit, per-click batches instead.
+        //
+        // Selection order — natural rotation, no client-side cursor:
+        //   1. Rows never AI-enriched (ai_generated_at IS NULL) come
+        //      FIRST so brand-new breaches always surface fastest.
+        //   2. Then by oldest ai_generated_at, so the same row never gets
+        //      re-processed until everything else has had its turn.
+        // This means consecutive clicks naturally process different rows
+        // without the front-end having to track offsets.
+        $limit = (int) ($request->input('limit', 15) ?: 15);
+        $limit = max(1, min(20, $limit));
 
-        $rows = Compliance::where('resort_id', $this->resort->resort_id)
-            ->where('status', 'Breached')
+        $baseQuery = Compliance::where('resort_id', $this->resort->resort_id)
+            ->where('status', 'Breached');
+        $totalEligible = (clone $baseQuery)->count();
+
+        $rows = (clone $baseQuery)
+            // NULLs first (never-enriched), then oldest ai_generated_at.
+            // MySQL: NULLs already sort first under ASC, so a single
+            // orderBy gives the right rotation behaviour.
+            ->orderByRaw('ai_generated_at IS NULL DESC')
+            ->orderBy('ai_generated_at', 'asc')
             ->orderByDesc('id')
             ->limit($limit)
             ->get();
 
-        $okCount = 0;
+        $okCount   = 0;
         $failCount = 0;
+        // Track distinct failure reasons so the user-facing message is
+        // actionable. Without this they see "AI generation failed" with no
+        // hint whether the AI host was unreachable, the LLM timed out, or
+        // the response body was malformed.
+        $failReasons = [];
         foreach ($rows as $r) {
             // Reconstruct a minimal but useful context. Per-row context
             // (the rich employee snapshot the rules engine passes) only
@@ -101,8 +127,12 @@ class ComplianceController extends Controller
             if ($emp) {
                 $ctx = [
                     'employee_name' => optional($emp->resortAdmin)->full_name,
-                    'employee_id'   => $emp->id,
-                    'emp_code'      => $emp->Emp_id ?? null,
+                    // Was 'employee_id' => $emp->id (the numeric DB primary
+                    // key). The LLM was citing that number in the generated
+                    // remediation text — HR called it "Technical employee
+                    // id". Now we only send the readable code (Emp_id),
+                    // so the AI says "DR-485" not "#485".
+                    'employee_code' => $emp->Emp_id ?? null,
                     'position'      => optional($emp->position)->position_title,
                     'department'    => optional($emp->department)->name,
                     'rank'          => $emp->rank,
@@ -110,22 +140,53 @@ class ComplianceController extends Controller
                     'basic_salary'  => $emp->basic_salary,
                 ];
             }
-            $before = $r->ai_status;
             $this->enrichComplianceWithAi($r, $ctx);
             $r->refresh();
             if ($r->ai_status === 'ready') {
                 $okCount++;
             } else {
                 $failCount++;
+                // 'timeout' / 'failed' are the only two statuses the
+                // helper writes on a non-success path.
+                $reason = $r->ai_status ?: 'failed';
+                $failReasons[$reason] = ($failReasons[$reason] ?? 0) + 1;
             }
         }
 
+        // Build a single human sentence: "5 timed out, 1 failed". Easier
+        // for HR than a JSON breakdown.
+        $reasonText = '';
+        if (!empty($failReasons)) {
+            $parts = [];
+            foreach ($failReasons as $reason => $n) {
+                $label = $reason === 'timeout' ? 'timed out' : 'failed';
+                $parts[] = "{$n} {$label}";
+            }
+            $reasonText = ' (' . implode(', ', $parts) . ' — see logs)';
+        }
+
+        $processed = $rows->count();
+
+        // How many breached rows have NOT been AI-enriched OR are older
+        // than this batch. The JS surfaces this as "X more eligible" so
+        // HR knows when to click again. Since selection order is
+        // (never-enriched first, then oldest first), this is also the
+        // count that would still be eligible on the NEXT click — the
+        // rows we just processed are now the freshest and won't be
+        // picked again until everything else has rotated.
+        $remainingEligible = max(0, $totalEligible - $processed);
+
         return response()->json([
-            'success'  => true,
-            'message'  => "Regenerated AI for {$okCount} rows" . ($failCount ? " ({$failCount} failed — see logs)" : ''),
-            'enriched' => $okCount,
-            'failed'   => $failCount,
-            'total'    => $rows->count(),
+            'success'            => true,
+            'message'            => "Regenerated AI for {$okCount} rows" . $reasonText,
+            'enriched'           => $okCount,
+            'failed'             => $failCount,
+            'fail_reasons'       => $failReasons,
+            'processed'          => $processed,
+            'total_breached'     => $totalEligible,
+            'remaining_eligible' => $remainingEligible,
+            // Legacy alias for any caller that already reads `.total`.
+            'total'              => $processed,
         ]);
     }
 
@@ -177,7 +238,11 @@ class ComplianceController extends Controller
                     'salary_max'     => (float) $sals->last(),
                     // Top earners surface salary outliers vs the median.
                     'top_earners'    => $emps->sortByDesc('basic_salary')->take(3)->map(fn($e) => [
-                        'employee_id' => $e->id,
+                        // Emp_id is the readable employee code (e.g. "DR-485").
+                        // The numeric primary key used to be sent here; the AI
+                        // then cited "#485" in its anomaly description which HR
+                        // experienced as "technical id" noise.
+                        'employee_code' => $e->Emp_id ?? null,
                         'name'        => optional($e->resortAdmin)->full_name,
                         'salary'      => (float) $e->basic_salary,
                         'rank'        => $e->rank,
@@ -332,26 +397,47 @@ class ComplianceController extends Controller
             'context'               => empty($context) ? (object) [] : $context,
         ];
 
-        $curl = curl_init();
-        curl_setopt_array($curl, [
-            CURLOPT_URL            => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
-            CURLOPT_TIMEOUT        => 25,
-            CURLOPT_CONNECTTIMEOUT => 5,
-        ]);
-        $response = curl_exec($curl);
-        $errno    = curl_errno($curl);
-        $err      = curl_error($curl);
-        curl_close($curl);
+        // Two attempts: a flaky DeepSeek node or a transient TLS handshake
+        // would previously fail the row on first try and leave HR clicking
+        // Regenerate repeatedly. One retry catches that without ballooning
+        // wall-clock — the per-row budget is still inside the 60 s wall.
+        $maxAttempts = 2;
+        $response    = false;
+        $errno       = 0;
+        $err         = '';
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $curl = curl_init();
+            curl_setopt_array($curl, [
+                CURLOPT_URL            => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+                // 45 s leaves enough room for one retry inside Hostinger's
+                // ~60 s reverse-proxy wall when this helper is called from
+                // a non-batched code path. The batched (regenerateAi) caller
+                // pages in groups of 10 so the wall isn't a concern there.
+                CURLOPT_TIMEOUT        => 45,
+                CURLOPT_CONNECTTIMEOUT => 5,
+            ]);
+            $response = curl_exec($curl);
+            $errno    = curl_errno($curl);
+            $err      = curl_error($curl);
+            curl_close($curl);
+            if ($errno === 0 && $response) {
+                break; // success → exit retry loop
+            }
+            // Don't retry on timeouts — they'd just blow the wall budget.
+            if ($errno === CURLE_OPERATION_TIMEDOUT) {
+                break;
+            }
+        }
 
         if ($errno !== 0 || !$response) {
             $compliance->ai_status        = $errno === CURLE_OPERATION_TIMEDOUT ? 'timeout' : 'failed';
             $compliance->ai_generated_at  = now();
             $compliance->save();
-            \Log::warning("compliance AI enrichment failed (compliance #{$compliance->id}): " . ($err ?: 'no response'));
+            \Log::warning("compliance AI enrichment failed (compliance #{$compliance->id}, url={$url}): " . ($err ?: 'no response'));
             return;
         }
 
@@ -364,7 +450,14 @@ class ComplianceController extends Controller
             return;
         }
 
-        $compliance->severity_ai     = (string) ($decoded['severity']    ?? 'Medium');
+        // Validate severity against the badge set the view knows how to
+        // render. An unexpected value (e.g. the LLM emitting "Severe" or
+        // sentence-case noise) used to leak straight into the column and
+        // showed up as a malformed badge.
+        $rawSev = (string) ($decoded['severity'] ?? 'Medium');
+        $sev    = in_array($rawSev, ['Critical', 'High', 'Medium', 'Low', 'Info'], true) ? $rawSev : 'Medium';
+
+        $compliance->severity_ai     = $sev;
         $compliance->description_ai  = (string) ($decoded['description'] ?? '');
         $compliance->remediation_ai  = (string) ($decoded['remediation'] ?? '');
         $compliance->ai_status       = 'ready';
@@ -461,7 +554,10 @@ class ComplianceController extends Controller
                          </div>';
                     })
                     ->addColumn('reported_on', function ($compliance) {
-                         return $compliance->reported_on ? Carbon::parse($compliance->reported_on)->format('Y-m-d H:i:s') : 'N/A';
+                         // Human-readable: "09 Jun 2026 14:32". Drops seconds
+                         // (no operational value on this screen) and uses a
+                         // 3-letter month so the column never wraps.
+                         return $compliance->reported_on ? Carbon::parse($compliance->reported_on)->format('d M Y H:i') : 'N/A';
                     })
                     // Render the description column with the AI enrichment
                     // when present: severity badge + AI explanation + the
@@ -590,7 +686,7 @@ class ComplianceController extends Controller
                                    ]);
                                    $this->enrichComplianceWithAi($row, [
                                         'employee_name'   => $employee->resortAdmin->full_name ?? null,
-                                        'employee_id'     => $employee->id,
+                                        'employee_code'   => $employee->Emp_id ?? null,
                                         'grade'           => $grade,
                                         'expected_amount' => (float) $resortBenifitsGrid->service_charge_amount,
                                         'received_amount' => (float) $payroll->service_charge_amount,
@@ -647,7 +743,7 @@ class ComplianceController extends Controller
                               ]);
                               $this->enrichComplianceWithAi($row, [
                                    'employee_name'      => $probation->resortAdmin->full_name ?? null,
-                                   'employee_id'        => $probation->id,
+                                   'employee_code'      => $probation->Emp_id ?? null,
                                    'position'           => optional($probation->position)->position_title,
                                    'joining_date'       => optional($probation->joining_date)->format('Y-m-d') ?? $probation->joining_date,
                                    'probation_end_date' => optional($probation->probation_end_date)->format('Y-m-d') ?? $probation->probation_end_date,
@@ -703,7 +799,7 @@ class ComplianceController extends Controller
                               ]);
                               $this->enrichComplianceWithAi($row, [
                                    'employee_name'      => $overtime->resortAdmin->full_name ?? null,
-                                   'employee_id'        => $overtime->id,
+                                   'employee_code'      => $overtime->Emp_id ?? null,
                                    'position'           => optional($overtime->position)->position_title,
                                    'grade'              => $grade,
                                    'overtime_logged_at' => $today,
@@ -745,7 +841,7 @@ class ComplianceController extends Controller
                               ]);
                               $this->enrichComplianceWithAi($row, [
                                    'employee_name'  => $seniorHR->resortAdmin->full_name ?? null,
-                                   'employee_id'    => $seniorHR->id,
+                                   'employee_code'  => $seniorHR->Emp_id ?? null,
                                    'position'       => optional($seniorHR->position)->position_title,
                                    'nationality'    => $seniorHR->nationality,
                                    'rank'           => $seniorHR->rank,
@@ -764,23 +860,33 @@ class ComplianceController extends Controller
                               )));
                          }
 
-                         // Add condition here for Management Position where its should be Maldivian of 60% of the total employees
+                         // Management positions should be at least N% Maldivian.
+                         // Threshold sourced from Common::getResortLocalRatioTarget,
+                         // which prefers the PER-RESORT value from
+                         // manningandbudgeting_configfiles.local (set on
+                         // /resort/budget/config) and falls back to the
+                         // system-wide config. Same helper as the WP
+                         // dashboard chip — guaranteed to agree.
+                         $localRatioMin = (float) Common::getResortLocalRatioTarget($resort->resort_id);
+                         $localRatioFraction = $localRatioMin / 100;
+                         $localRatioLabel    = rtrim(rtrim(number_format($localRatioMin, 1), '0'), '.');
 
                          $managementEmployees = Employee::where('resort_id', $resort->resort_id)
                               ->where('rank',1)
                               ->where('status', 'Active')
                               ->get();
-                         
+
                          $managementCount = $managementEmployees->count();
                          $maldivianCount = $managementEmployees->where('nationality', 'Maldivian')->count();
                          $NonMaldivian = $managementEmployees->where('nationality', '!=', 'Maldivian')->whereIn('rank', ['3','1'])->get();
 
-                         if ($maldivianCount < ($managementCount * 0.6)) {
+                         if ($maldivianCount < ($managementCount * $localRatioFraction)) {
+                              $breachDesc = "Management positions at " . $resort->resort_name . " should have at least {$localRatioLabel}% Maldivian representation. Current ratio is " . $maldivianCount . "/" . $managementCount;
                               $row = Compliance::create([
                                    'resort_id' => $resort->resort_id,
                                    'module_name' => 'Senior HR and Management',
                                    'compliance_breached_name' => 'Management Non-Maldivian',
-                                   'description' => "Management positions at " . $resort->resort_name . " should have at least 60% Maldivian representation. Current ratio is " . $maldivianCount . "/" . $managementCount,
+                                   'description' => $breachDesc,
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
@@ -788,7 +894,7 @@ class ComplianceController extends Controller
                                    'resort_name'        => $resort->resort_name,
                                    'management_count'   => $managementCount,
                                    'maldivian_count'    => $maldivianCount,
-                                   'required_ratio_pct' => 60,
+                                   'required_ratio_pct' => $localRatioMin,
                                    'current_ratio_pct'  => $managementCount > 0 ? round(($maldivianCount / $managementCount) * 100, 1) : 0,
                               ]);
 
@@ -796,11 +902,11 @@ class ComplianceController extends Controller
                                    $this->resort->resort_id,
                                    10,
                                    'Management Non-Maldivian',
-                                   "Management positions at " . $resort->resort_name . " should have at least 60% Maldivian representation. Current ratio is " . $maldivianCount . "/" . $managementCount,
+                                   $breachDesc,
                                    0,
                                    $notify_person->id,
                                    'Senior HR and Management'
-                              )));    
+                              )));
                          }
 
                          foreach ($NonMaldivian as $nonMaldivian) {
@@ -816,7 +922,7 @@ class ComplianceController extends Controller
                               ]);
                               $this->enrichComplianceWithAi($row, [
                                    'employee_name' => $nonMaldivian->resortAdmin->full_name ?? null,
-                                   'employee_id'   => $nonMaldivian->id,
+                                   'employee_code' => $nonMaldivian->Emp_id ?? null,
                                    'position'      => optional($nonMaldivian->position)->position_title,
                                    'nationality'   => $nonMaldivian->nationality,
                                    'rank'          => $nonMaldivian->rank,
@@ -879,7 +985,7 @@ class ComplianceController extends Controller
                                                   ]);
                                                   $this->enrichComplianceWithAi($row, [
                                                        'employee_name'      => $employee->resortAdmin->full_name ?? null,
-                                                       'employee_id'        => $employee->id,
+                                                       'employee_code'      => $employee->Emp_id ?? null,
                                                        'age'                => $age,
                                                        'basic_salary'       => (float) $basicSalary,
                                                        'required_pension'   => (float) round($sevenPercentOfSalary, 2),

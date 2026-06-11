@@ -69,12 +69,16 @@
                         <div class="col-sm-6">
                             <div class="d-flex justify-content-sm-end align-items-center flex-wrap gap-2">
                                 {{-- Budget totals computed from the live data instead
-                                     of hardcoded "$12,241" / "$11,985" placeholders. --}}
-                                <span class="badge badge-dark">
-                                    HOD Budget: {{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }}
+                                     of hardcoded "$12,241" / "$11,985" placeholders.
+                                     Show monthly + annual together since the AI returns
+                                     monthly and HR plans yearly. --}}
+                                <span class="badge badge-dark" title="Monthly basic-salary spend">
+                                    HOD: {{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }} / mo
+                                    <span class="ms-1 opacity-75">({{ $currencySymbol }} {{ number_format($totalHodBudget * 12, 0) }} / yr)</span>
                                 </span>
-                                <span class="badge badge-themeWarning">
-                                    Wisdom Suggested: {{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }}
+                                <span class="badge badge-themeWarning" title="Wisdom AI's monthly recommendation">
+                                    Wisdom: {{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }} / mo
+                                    <span class="ms-1 opacity-75">({{ $currencySymbol }} {{ number_format($totalAiBudget * 12, 0) }} / yr)</span>
                                 </span>
                                 {{-- Status chip + Regenerate button. The chip
                                      reflects the cached AI state on manning_responses;
@@ -103,21 +107,28 @@
                 </div>
 
                 <div class="table-responsive">
+                    {{-- BudgetController computes current_budget/ai_budget as ONE
+                         month of basic salary × headcount (the FastAPI service
+                         is also documented to return monthly budgets). HR asked
+                         for the full year view too, so we keep the monthly
+                         columns and add an Annual column that's just ×12. --}}
                     <table id="compare-budgettable" class="table table-compareBudget w-100">
                         <thead>
                             <tr>
                                 <th></th>
-                                <th colspan="2" class="text-nowrap text-center bg-theme text-white">HOD Budget</th>
-                                <th colspan="2" class="text-nowrap text-center bg-yellow">Wisdom Suggested Budget</th>
+                                <th colspan="3" class="text-nowrap text-center bg-theme text-white">HOD Budget</th>
+                                <th colspan="3" class="text-nowrap text-center bg-yellow">Wisdom Suggested Budget</th>
                                 <th></th>
                             </tr>
                             <tr>
                                 <th class="text-nowrap">Position</th>
                                 <th class="text-nowrap text-center">Headcount</th>
-                                <th class="text-nowrap text-center">Total Budget</th>
+                                <th class="text-nowrap text-center">Monthly</th>
+                                <th class="text-nowrap text-center">Annual</th>
                                 <th class="text-nowrap text-center">Headcount</th>
-                                <th class="text-nowrap text-center">Total Budget</th>
-                                <th class="text-nowrap">Justified Reason</th>
+                                <th class="text-nowrap text-center">Monthly</th>
+                                <th class="text-nowrap text-center">Annual</th>
+                                <th class="text-nowrap" style="min-width:420px;">Justified Reason</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -127,50 +138,64 @@
                                  the AI hasn't been called yet). --}}
                             @forelse($positions as $p)
                                 @php
-                                    $aiSet         = $p->ai_headcount !== null;
-                                    $diffHeadcount = $aiSet ? ($p->ai_headcount - $p->headcount) : 0;
-                                    $diffBudget    = $aiSet ? ($p->ai_budget    - $p->current_budget) : 0;
-                                    $aiHeadClass   = $diffHeadcount > 0 ? 'text-success' : ($diffHeadcount < 0 ? 'text-danger' : '');
-                                    $aiBudgetClass = $diffBudget    > 0 ? 'text-success' : ($diffBudget    < 0 ? 'text-danger' : '');
+                                    $aiSet            = $p->ai_headcount !== null;
+                                    $diffHeadcount    = $aiSet ? ($p->ai_headcount - $p->headcount) : 0;
+                                    $diffBudget       = $aiSet ? ($p->ai_budget    - $p->current_budget) : 0;
+                                    $aiHeadClass      = $diffHeadcount > 0 ? 'text-success' : ($diffHeadcount < 0 ? 'text-danger' : '');
+                                    $aiBudgetClass    = $diffBudget    > 0 ? 'text-success' : ($diffBudget    < 0 ? 'text-danger' : '');
+                                    $currentAnnual    = $p->current_budget * 12;
+                                    $aiAnnual         = $aiSet ? ($p->ai_budget * 12) : null;
                                 @endphp
                                 <tr>
                                     <td>{{ $p->position_title }}</td>
                                     <td class="text-nowrap text-center">{{ str_pad($p->headcount, 2, '0', STR_PAD_LEFT) }}</td>
                                     <td class="text-nowrap text-center">{{ $currencySymbol }} {{ number_format($p->current_budget, 0) }}</td>
+                                    <td class="text-nowrap text-center fw-bold">{{ $currencySymbol }} {{ number_format($currentAnnual, 0) }}</td>
                                     @if($aiSet)
                                         <td class="text-nowrap text-center {{ $aiHeadClass }}">{{ str_pad($p->ai_headcount, 2, '0', STR_PAD_LEFT) }}</td>
                                         <td class="text-nowrap text-center {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($p->ai_budget, 0) }}</td>
-                                        <td>
+                                        <td class="text-nowrap text-center fw-bold {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($aiAnnual, 0) }}</td>
+                                        <td style="min-width:420px; max-width:520px; white-space:normal; vertical-align:top;">
                                             @if(!empty($p->ai_justification))
-                                                <div class="d-flex align-items-end">
-                                                    <p class="m-0">{{ $p->ai_justification }}</p>
-                                                </div>
+                                                {{-- Larger, paragraph-shaped justification so the
+                                                     multi-sentence rationale from the AI is legible.
+                                                     Word-wraps naturally. --}}
+                                                <p class="m-0" style="font-size:14.5px; line-height:1.55; color:#1f2937;">
+                                                    {{ $p->ai_justification }}
+                                                </p>
                                             @endif
                                         </td>
                                     @else
                                         <td class="text-nowrap text-center text-muted">—</td>
                                         <td class="text-nowrap text-center text-muted">—</td>
-                                        <td class="text-muted">
+                                        <td class="text-nowrap text-center text-muted">—</td>
+                                        <td class="text-muted" style="min-width:420px; max-width:520px; white-space:normal; font-size:14px; vertical-align:top;">
                                             {{ $aiStatus === 'ready' ? '' : 'Click Regenerate AI to populate.' }}
                                         </td>
                                     @endif
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
+                                    <td colspan="8" class="text-center text-muted py-4">
                                         No positions configured for this department yet.
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
                         @if($positions->isNotEmpty())
+                            @php
+                                $totalHodAnnual = $totalHodBudget * 12;
+                                $totalAiAnnual  = $totalAiBudget  * 12;
+                            @endphp
                             <tfoot>
                                 <tr>
                                     <th>Total:</th>
                                     <th class="text-center">{{ $totalHodHeadcount }}</th>
                                     <th class="text-center">{{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }}</th>
+                                    <th class="text-center">{{ $currencySymbol }} {{ number_format($totalHodAnnual, 0) }}</th>
                                     <th class="text-lightblue text-center">{{ $totalAiHeadcount }}</th>
                                     <th class="text-lightblue text-center">{{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }}</th>
+                                    <th class="text-lightblue text-center">{{ $currencySymbol }} {{ number_format($totalAiAnnual, 0) }}</th>
                                     <th></th>
                                 </tr>
                             </tfoot>

@@ -68,21 +68,21 @@ class WorkforcePlanningDashboardController extends Controller
             $resort_divisions_count = $resort_divisions->count();
             $resort_departments_count = $resort_departments->count();
 
-            $startDate = Carbon::now()->subDays(5)->toDateString(); // Five days before
-
-            for ($i = 0; $i <= 5; $i++) {
-                $nextDate[] = Carbon::now()->addDays($i)->toDateString();
+            // Build the ±5 day window in chronological order so the
+            // slider scrolls intuitively (oldest → newest). The previous
+            // implementation merged a forward loop with a backward loop
+            // and produced [today, +1..+5, -5..-1, today] — future first,
+            // past second, with today duplicated. The slider rendered the
+            // wrong day under each pie because the order didn't match
+            // what the eye expected.
+            $dateWindow = [];
+            for ($i = -5; $i <= 5; $i++) {
+                $dateWindow[] = Carbon::now()->addDays($i)->toDateString();
             }
 
-            for ($i = 5; $i >= 0; $i--) {
-                $previousDate[] = Carbon::now()->subDay($i)->toDateString();
-            }
-
-            $newArray = array_merge($nextDate, $previousDate);
-
-            // Query for occupancy data on previous, current, and next day
             $occupancies = Occuplany::where('resort_id', $resort_id)
-                ->whereIn('occupancydate', $newArray)
+                ->whereIn('occupancydate', $dateWindow)
+                ->orderBy('occupancydate', 'asc')
                 ->get(['occupancyinPer', 'occupancydate', 'occupancytotalRooms', 'occupancyOccupiedRooms']);
             $male_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','male')->count();
             $female_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','female')->count();
@@ -246,6 +246,76 @@ class WorkforcePlanningDashboardController extends Controller
             + $employee_under_min_wage_mvr
             + $employee_under_min_wage_unconfigured;
 
+        // List of min-wage breach employees for the dashboard popover.
+        // Mirrors the count logic above so the names exactly match the
+        // 'Employees Under Minimum Wage' figure shown next to it.
+        $employeeMinWageList = Employee::with('resortAdmin')
+            ->where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->where(function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('basic_salary_currency', 'USD')
+                        ->where(function ($inner) {
+                            $inner->where('basic_salary', '<', 520)
+                                  ->orWhereNull('basic_salary');
+                        });
+                })->orWhere(function ($sub) {
+                    $sub->where('basic_salary_currency', 'MVR')
+                        ->where(function ($inner) {
+                            $inner->where('basic_salary', '<', 8021)
+                                  ->orWhereNull('basic_salary');
+                        });
+                })->orWhereNull('basic_salary_currency');
+            })
+            ->orderBy('id', 'desc')
+            ->limit(50) // cap so the popover doesn't get unwieldy
+            ->get(['id', 'resort_id', 'Emp_id', 'Admin_Parent_id', 'basic_salary', 'basic_salary_currency'])
+            ->map(function ($e) {
+                $name     = optional($e->resortAdmin)->full_name ?: 'Unknown';
+                $salary   = $e->basic_salary !== null ? number_format((float) $e->basic_salary, 2) : '—';
+                $currency = $e->basic_salary_currency ?: 'n/a';
+                return [
+                    'code'     => $e->Emp_id ?? '—',
+                    'name'     => $name,
+                    'salary'   => $salary,
+                    'currency' => $currency,
+                ];
+            });
+
+        // Budget chart data: replaces the previously hardcoded
+        // [1800, 2300, 2400, 1800] mockup. Uses the manning_responses
+        // table (the source of truth for HOD-submitted headcount/budget
+        // per year) for the last 4 years. Multiplies by an org-wide avg
+        // basic-salary so the bars are in $USD rather than headcount.
+        $thisYearForBudget = (int) date('Y');
+        $budgetYears = [
+            $thisYearForBudget - 3,
+            $thisYearForBudget - 2,
+            $thisYearForBudget - 1,
+            $thisYearForBudget,
+        ];
+        $avgBasicSalary = (float) Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->whereNotNull('basic_salary')
+            ->avg('basic_salary');
+        if ($avgBasicSalary <= 0) {
+            $avgBasicSalary = 1500; // sane fallback so the chart still draws
+        }
+        $budgetChart = ['labels' => [], 'budgeted' => [], 'actual' => []];
+        foreach ($budgetYears as $y) {
+            $manningForYear = ManningResponse::where('resort_id', $resort_id)
+                ->where('year', $y)
+                ->get(['total_headcount', 'total_filled_positions']);
+
+            $headcountBudgeted = (int) $manningForYear->sum('total_headcount');
+            $headcountFilled   = (int) $manningForYear->sum('total_filled_positions');
+
+            $budgetChart['labels'][]   = (string) $y;
+            // Annual figures (×12 for the year of monthly salary).
+            $budgetChart['budgeted'][] = round($headcountBudgeted * $avgBasicSalary * 12);
+            $budgetChart['actual'][]   = round($headcountFilled   * $avgBasicSalary * 12);
+        }
+
             $currency = $this->currencylogo; // Assuming this is set correctly
 
                 return view('resorts.workforce_planning.dashboard',
@@ -268,7 +338,9 @@ class WorkforcePlanningDashboardController extends Controller
                     'resort_departments',
                     'resort_positions',
                     'manning_response',
-                    'employee_under_min_wage'
+                    'employee_under_min_wage',
+                    'employeeMinWageList',
+                    'budgetChart'
                 )
             );
         } catch( \Exception $e ) {
@@ -280,7 +352,11 @@ class WorkforcePlanningDashboardController extends Controller
             $total_emp=0;
             $localEmployees=0;
             $expatEmployees=0;
-            return view('resorts.workforce_planning.dashboard',compact('occupancies','resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','male_percentage','female_percentage','total_emp','localEmployees','expatEmployees','employee_under_min_wage'));
+            // Empty defaults so the view doesn't error on the new vars
+            // when this catch-block path runs.
+            $employeeMinWageList = collect();
+            $budgetChart = ['labels' => [], 'budgeted' => [], 'actual' => []];
+            return view('resorts.workforce_planning.dashboard',compact('occupancies','resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','male_percentage','female_percentage','total_emp','localEmployees','expatEmployees','employee_under_min_wage','employeeMinWageList','budgetChart'));
         }
     }
     public function hr_dashboard()
@@ -304,21 +380,21 @@ class WorkforcePlanningDashboardController extends Controller
             $ResortData = Resort::find($resort_id);
             $sitesettings = ResortSiteSettings::where('resort_id', $resort_id)->first(['resort_id','header_img','footer_img','Footer']);
 
-            $startDate = Carbon::now()->subDays(5)->toDateString(); // Five days before
-
-            for ($i = 0; $i <= 5; $i++) {
-                $nextDate[] = Carbon::now()->addDays($i)->toDateString();
+            // Build the ±5 day window in chronological order so the
+            // slider scrolls intuitively (oldest → newest). The previous
+            // implementation merged a forward loop with a backward loop
+            // and produced [today, +1..+5, -5..-1, today] — future first,
+            // past second, with today duplicated. The slider rendered the
+            // wrong day under each pie because the order didn't match
+            // what the eye expected.
+            $dateWindow = [];
+            for ($i = -5; $i <= 5; $i++) {
+                $dateWindow[] = Carbon::now()->addDays($i)->toDateString();
             }
 
-            for ($i = 5; $i >= 0; $i--) {
-                $previousDate[] = Carbon::now()->subDay($i)->toDateString();
-            }
-
-            $newArray = array_merge($nextDate, $previousDate);
-
-            // Query for occupancy data on previous, current, and next day
             $occupancies = Occuplany::where('resort_id', $resort_id)
-                ->whereIn('occupancydate', $newArray)
+                ->whereIn('occupancydate', $dateWindow)
+                ->orderBy('occupancydate', 'asc')
                 ->get(['occupancyinPer', 'occupancydate', 'occupancytotalRooms', 'occupancyOccupiedRooms']);
             $male_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','male')->count();
             $female_emp = ResortAdmin::with('EmployeeDetails')->where('resort_id', $resort_id)->where('gender','female')->count();
@@ -1454,7 +1530,14 @@ class WorkforcePlanningDashboardController extends Controller
         try {
             $resort_id = $this->globalUser->resort_id;
             $months = $request->input('months', []);
-            $url = env('AI_URL') . 'predict_staff';
+            // /predict_staff_batch — single HTTP roundtrip for the whole
+            // 12-month window. Was /predict_staff called 12 times in
+            // parallel via curl_multi; the batched endpoint cuts HTTP
+            // overhead by ~12× and gives the AI service a single point
+            // to short-circuit / cache / fail.
+            $aiBase   = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/');
+            $batchUrl = $aiBase . '/predict_staff_batch';
+            $url      = $aiBase . '/predict_staff'; // legacy fallback if batch is 404 (older AI deploy)
 
             // Cache key per (resort, monthYear) so repeat dashboard loads
             // don't slam the external AI server. 30-min TTL — short enough
@@ -1469,13 +1552,31 @@ class WorkforcePlanningDashboardController extends Controller
                 $month = date('m', strtotime($monthYearParts[0]));
                 $year = $monthYearParts[1] ?? date('Y');
 
-                $occupancy = (float) round(
-                    Occuplany::where('resort_id', $resort_id)
-                        ->whereYear('occupancydate', $year)
+                // First try this year. For future months HR hasn't filled
+                // occupancy data for yet, that returns NULL → cast to 0 →
+                // AI gets occupancy=0 and predicts 0 staff. That used to
+                // make the line chart drop to zero for everything past
+                // "today" and HR thought the AI was broken.
+                //
+                // Fallback chain: same month, this year → same month,
+                // last year → same month, two years ago. Seasonality at
+                // a resort is the dominant signal for staffing demand;
+                // last-year-same-month is a far better baseline than 0.
+                $occupancy = null;
+                foreach ([0, 1, 2] as $yearsBack) {
+                    $lookupYear = (int) $year - $yearsBack;
+                    $avg = Occuplany::where('resort_id', $resort_id)
+                        ->whereYear('occupancydate', $lookupYear)
                         ->whereMonth('occupancydate', $month)
-                        ->avg('occupancyinPer') ?? 0,
-                    2
-                );
+                        ->avg('occupancyinPer');
+                    if ($avg !== null) {
+                        $occupancy = (float) round($avg, 2);
+                        break;
+                    }
+                }
+                if ($occupancy === null) {
+                    $occupancy = 0.0; // No history at all — accept the zero.
+                }
 
                 $cacheKey = sprintf('ai_insights:%d:%s:%.2f', $resort_id, $monthYear, $occupancy);
                 $cached = \Cache::get($cacheKey);
@@ -1495,60 +1596,109 @@ class WorkforcePlanningDashboardController extends Controller
                 }
             }
 
-            // Parallelise the missing ones via curl_multi instead of looping
-            // synchronously. Combined with hard timeouts, the worst case for
-            // an unreachable AI server is the timeout window once — not
-            // (timeout × N months) as before.
+            // ONE batched HTTP call for the whole month set. Was N
+            // parallel calls via curl_multi — same wall-clock when the
+            // service is healthy but 12× HTTP overhead, 12× connection
+            // setup, 12× chances for a transient TLS failure.
+            //
+            // If the batched endpoint isn't available (older AI deploy
+            // that hasn't been pulled yet), fall back to curl_multi so a
+            // partial deploy doesn't break the dashboard.
             if (!empty($missing)) {
-                $multi = curl_multi_init();
-                $handles = [];
-                foreach ($missing as $i => $m) {
-                    $ch = curl_init();
-                    curl_setopt_array($ch, [
-                        CURLOPT_URL            => $url,
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_POST           => true,
-                        CURLOPT_POSTFIELDS     => json_encode([
-                            'month'             => $m['month_name'],
-                            'occupancy_percent' => $m['occupancy'],
-                        ]),
-                        CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
-                        CURLOPT_CONNECTTIMEOUT => 3,   // bail fast if AI host is down
-                        CURLOPT_TIMEOUT        => 8,   // total per-call cap
-                    ]);
-                    curl_multi_add_handle($multi, $ch);
-                    $handles[$i] = $ch;
+                $batchItems = array_map(fn($m) => [
+                    'month'             => $m['month_name'],
+                    'occupancy_percent' => $m['occupancy'],
+                ], $missing);
+
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL            => $batchUrl,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => json_encode(['items' => $batchItems]),
+                    CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
+                    CURLOPT_CONNECTTIMEOUT => 3,
+                    // Tighter cap than per-call × N: the AI service does
+                    // a pure-Python loop for each item, so the whole
+                    // batch should finish in low single-digit seconds.
+                    CURLOPT_TIMEOUT        => 15,
+                ]);
+                $body     = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $err      = curl_error($ch);
+                curl_close($ch);
+
+                $batchOk = false;
+                if ($body && $httpCode >= 200 && $httpCode < 300) {
+                    $decoded = json_decode($body, true);
+                    $preds   = is_array($decoded) ? ($decoded['predictions'] ?? null) : null;
+                    if (is_array($preds) && count($preds) === count($missing)) {
+                        $batchOk = true;
+                        foreach ($missing as $i => $m) {
+                            $required = (int) ($preds[$i]['required_staff'] ?? 0);
+                            \Cache::put($m['cacheKey'], $required, $cacheTtl);
+                            $aiInsights[$m['monthYear']] = [
+                                'month'         => $m['monthYear'],
+                                'occupancyRate' => $m['occupancy'],
+                                'hiringData'    => $required,
+                            ];
+                        }
+                    }
                 }
 
-                $running = null;
-                do {
-                    curl_multi_exec($multi, $running);
-                    if ($running) curl_multi_select($multi, 0.5);
-                } while ($running > 0);
+                if (!$batchOk) {
+                    \Log::warning("AI predict_staff_batch failed (http={$httpCode}, err='{$err}') — falling back to per-month calls");
 
-                foreach ($missing as $i => $m) {
-                    $ch = $handles[$i];
-                    $body = curl_multi_getcontent($ch);
-                    $err  = curl_error($ch);
-                    curl_multi_remove_handle($multi, $ch);
-                    curl_close($ch);
-
-                    $required = 0;
-                    if (!$err && $body) {
-                        $decoded = json_decode($body, true);
-                        $required = (int) ($decoded['required_staff'] ?? 0);
-                        \Cache::put($m['cacheKey'], $required, $cacheTtl);
-                    } else {
-                        \Log::warning('AI insights call failed for ' . $m['monthYear'] . ': ' . $err);
+                    $multi = curl_multi_init();
+                    $handles = [];
+                    foreach ($missing as $i => $m) {
+                        $ch = curl_init();
+                        curl_setopt_array($ch, [
+                            CURLOPT_URL            => $url,
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_POST           => true,
+                            CURLOPT_POSTFIELDS     => json_encode([
+                                'month'             => $m['month_name'],
+                                'occupancy_percent' => $m['occupancy'],
+                            ]),
+                            CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Content-Type: application/json'],
+                            CURLOPT_CONNECTTIMEOUT => 3,
+                            CURLOPT_TIMEOUT        => 8,
+                        ]);
+                        curl_multi_add_handle($multi, $ch);
+                        $handles[$i] = $ch;
                     }
 
-                    $aiInsights[$m['monthYear']] = [
-                        'month'         => $m['monthYear'],
-                        'occupancyRate' => $m['occupancy'],
-                        'hiringData'    => $required,
-                    ];
+                    $running = null;
+                    do {
+                        curl_multi_exec($multi, $running);
+                        if ($running) curl_multi_select($multi, 0.5);
+                    } while ($running > 0);
+
+                    foreach ($missing as $i => $m) {
+                        $ch = $handles[$i];
+                        $perBody = curl_multi_getcontent($ch);
+                        $perErr  = curl_error($ch);
+                        curl_multi_remove_handle($multi, $ch);
+                        curl_close($ch);
+
+                        $required = 0;
+                        if (!$perErr && $perBody) {
+                            $perDecoded = json_decode($perBody, true);
+                            $required = (int) ($perDecoded['required_staff'] ?? 0);
+                            \Cache::put($m['cacheKey'], $required, $cacheTtl);
+                        } else {
+                            \Log::warning('AI insights call failed for ' . $m['monthYear'] . ': ' . $perErr);
+                        }
+
+                        $aiInsights[$m['monthYear']] = [
+                            'month'         => $m['monthYear'],
+                            'occupancyRate' => $m['occupancy'],
+                            'hiringData'    => $required,
+                        ];
+                    }
+                    curl_multi_close($multi);
                 }
-                curl_multi_close($multi);
             }
 
             // Preserve the requested month ordering when emitting the chart arrays.

@@ -397,6 +397,62 @@
 
 @section('import-scripts')
 <script>
+// ─── AI CV auto-fill (offline interview) ─────────────────────────────
+//
+// Mirrors the applicant-form behavior: when HR uploads the CV here,
+// parse it via the AI proxy and pre-fill the visible applicant fields.
+// Same Laravel endpoint as the public applicant form — proxy returns
+// fields keyed by name= so this JS is a thin wrapper.
+function aiAutofillFromCv(file) {
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('cv', file);
+    fd.append('_token', $('meta[name="csrf-token"]').attr('content') || '{{ csrf_token() }}');
+
+    var $banner = $('#ai-cv-banner');
+    if ($banner.length === 0) {
+        $banner = $('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;">&nbsp;</div>');
+        $('input[name="curriculum_file"]').closest('.col-md-3').after($banner);
+    }
+    $banner.html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Reading the CV…').show();
+
+    $.ajax({
+        url: @json(route('resort.applicant.cvExtract')),
+        type: 'POST',
+        data: fd,
+        processData: false,
+        contentType: false,
+        success: function (resp) {
+            if (!resp || !resp.success || !resp.fields) {
+                $banner.removeClass('alert-info').addClass('alert-warning')
+                    .text('Could not read the CV — fill the fields manually.');
+                return;
+            }
+            var filled = 0;
+            Object.keys(resp.fields).forEach(function (k) {
+                var v = resp.fields[k];
+                if (v === null || v === '') return;
+                var $input = $('[name="' + k + '"]').first();
+                if ($input.length && !$input.val()) {
+                    $input.val(v).trigger('change');
+                    filled++;
+                }
+            });
+            $banner.removeClass('alert-info').addClass(filled > 0 ? 'alert-success' : 'alert-warning')
+                .text(filled > 0
+                    ? 'Pre-filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' from the CV.'
+                    : 'Read the CV but found nothing new to pre-fill.');
+        },
+        error: function () {
+            $banner.removeClass('alert-info').addClass('alert-warning')
+                .text('AI service unavailable — fill the fields manually.');
+        }
+    });
+}
+$(document).on('change', 'input[name="curriculum_file"]', function () {
+    if (this.files && this.files[0]) aiAutofillFromCv(this.files[0]);
+});
+
 $(document).ready(function () {
     $('.select2t-none').select2();
 

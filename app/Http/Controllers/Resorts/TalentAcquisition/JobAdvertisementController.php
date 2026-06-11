@@ -33,7 +33,6 @@ class JobAdvertisementController extends Controller
     public function getList(Request $request)
     {
         $resort_id = $this->resort->resort_id;
-        $storagePath = config('settings.Resort_JobAdvertisement');
 
         $jobAds = JobAdvertisement::select([
                 'job_advertisements.id',
@@ -47,8 +46,10 @@ class JobAdvertisementController extends Controller
             ->orderBy('job_advertisements.id', 'DESC');
 
         return datatables()->of($jobAds)
-            ->addColumn('Preview', function ($row) use ($storagePath) {
-                $imgUrl = URL::asset($storagePath.'/'.$row->Resort_id.'/'.$row->Jobadvimg);
+            ->addColumn('Preview', function ($row) {
+                // Driver-aware URL — was URL::asset() which 404'd on
+                // every page load when STORAGE_DRIVER=wasabi (live).
+                $imgUrl = \App\Helpers\Common::GetJobAdvertisementImage($row->Resort_id, $row->Jobadvimg);
                 return '<a href="'.$imgUrl.'" target="_blank"><img src="'.$imgUrl.'" alt="Template" style="max-height:60px; max-width:100px;" class="img-fluid rounded"></a>';
             })
             ->addColumn('FileName', function ($row) {
@@ -66,7 +67,7 @@ class JobAdvertisementController extends Controller
             })
             ->addColumn('action', function ($row) {
                 $deleteUrl = asset('resorts_assets/images/trash-red.svg');
-                $imgUrl = URL::asset(config('settings.Resort_JobAdvertisement').'/'.$row->Resort_id.'/'.$row->Jobadvimg);
+                $imgUrl = \App\Helpers\Common::GetJobAdvertisementImage($row->Resort_id, $row->Jobadvimg);
                 return '
                     <a href="'.$imgUrl.'" target="_blank" class="btn-tableIcon btnIcon-skyblue"><i class="fa-regular fa-eye"></i></a>
                     <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn"

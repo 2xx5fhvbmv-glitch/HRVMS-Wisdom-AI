@@ -178,15 +178,21 @@
                         <div>
                             @php
                                 // Derive the Maldivian/Expat split for the
-                                // Compliance Tracking panel. 60% Maldivian
-                                // is the convention used by the rules
-                                // engine (App\Http\Controllers\Resorts\
-                                // People\Compliances\ComplianceController
-                                // — "Management Non-Maldivian" rule).
+                                // Compliance Tracking panel.
+                                //
+                                // Target % is resolved through Common::
+                                // getResortLocalRatioTarget — uses the
+                                // PER-RESORT value set on /resort/budget/
+                                // config (manningandbudgeting_configfiles.
+                                // local) if present, else falls back to
+                                // the system-wide setting. Same helper is
+                                // used by the rules engine, so the chip
+                                // and the breach text always agree.
+                                $localRatioMin    = (float) \App\Helpers\Common::getResortLocalRatioTarget($resort_id ?? null);
                                 $totalEmpForRatio = ($localEmployees ?? 0) + ($expatEmployees ?? 0);
-                                $localPct = $totalEmpForRatio > 0 ? round(($localEmployees / $totalEmpForRatio) * 100, 1) : 0;
-                                $expatPct = $totalEmpForRatio > 0 ? round(($expatEmployees / $totalEmpForRatio) * 100, 1) : 0;
-                                $localPctClass = $localPct >= 60 ? 'text-success' : 'text-danger';
+                                $localPct         = $totalEmpForRatio > 0 ? round(($localEmployees / $totalEmpForRatio) * 100, 1) : 0;
+                                $expatPct         = $totalEmpForRatio > 0 ? round(($expatEmployees / $totalEmpForRatio) * 100, 1) : 0;
+                                $localPctClass    = $localPct >= $localRatioMin ? 'text-success' : 'text-danger';
                             @endphp
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
@@ -197,7 +203,7 @@
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
                                     Local / Xpat Ratio:
-                                    <small class="text-muted d-block" style="font-size:10px;">60% Maldivian target</small>
+                                    <small class="text-muted d-block" style="font-size:10px;">{{ rtrim(rtrim(number_format($localRatioMin, 1), '0'), '.') }}% Maldivian target</small>
                                 </p>
                                 <span class="d-inline-block text-end">
                                     <span class="fw-bold {{ $localPctClass }}">{{ $localPct }}%</span>
@@ -205,11 +211,25 @@
                                     <span class="fw-bold">{{ $expatPct }}%</span>
                                 </span>
                             </div>
+                            {{-- Min-wage row: the count stays where it was, but
+                                 we now reveal the names on click so HR can act
+                                 on the breach directly instead of having to dig
+                                 through Payroll. List sourced from $employeeMinWageList
+                                 in the controller — mirrors the SAME count logic
+                                 so the names and the number are guaranteed in sync. --}}
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
                                     Employees Under Minimum Wage:
                                 </p>
-                                <span class="d-inline-block w-25 text-end text-danger">{{$employee_under_min_wage}}</span>
+                                @if(($employeeMinWageList ?? collect())->isNotEmpty())
+                                    <a href="#minWageEmployeesModal" data-bs-toggle="modal"
+                                       class="d-inline-block w-25 text-end text-danger text-decoration-underline"
+                                       title="Click to see who">
+                                        {{ $employee_under_min_wage }}
+                                    </a>
+                                @else
+                                    <span class="d-inline-block w-25 text-end text-danger">{{ $employee_under_min_wage }}</span>
+                                @endif
                             </div>
                             <!-- <div class="d-flex justify-content-between mb-3  pb-2">
                                 <p class="mb-0">
@@ -465,14 +485,14 @@
                     <div class="card  mb-30 @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.consolidatebudget', config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card-title d-flex justify-content-between">
                             <h3>Budget</h3>
-
+                            {{-- Label tracks the dynamic budget range now driven by
+                                 $budgetChart.labels (last 4 years through today). --}}
+                            @php
+                                $bcLabels = $budgetChart['labels'] ?? [];
+                                $bcRange  = !empty($bcLabels) ? ($bcLabels[0] . '-' . end($bcLabels)) : '';
+                            @endphp
                             <div class="form-group">
-                                <select class="form-select form-select-sm " aria-label="Default select example">
-                                    <option value="1">2009-2012</option>
-                                    <option value="2">2013-2016</option>
-                                    <option value="3">2017-2020</option>
-                                    <option value="4" selected>2021-2024</option>
-                                </select>
+                                <span class="text-muted small">{{ $bcRange }}</span>
                             </div>
                         </div>
                         <div>
@@ -525,6 +545,52 @@
     $msg = config('settings.manning_request');
 
 @endphp
+{{-- Modal: list of employees flagged as under minimum wage. Triggered
+     from the Compliance Tracking panel. The list is computed in the
+     controller using the same predicate as the count so the two cannot
+     drift. Currency column flags which threshold each row breached. --}}
+<div class="modal fade" id="minWageEmployeesModal" tabindex="-1" aria-labelledby="minWageEmployeesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="minWageEmployeesModalLabel">
+                    Employees Under Minimum Wage
+                    <small class="text-muted ms-2" style="font-size:13px;">
+                        USD &lt; 520 · MVR &lt; 8,021 · NULL currency
+                    </small>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                @if(($employeeMinWageList ?? collect())->isEmpty())
+                    <p class="text-muted text-center py-4 m-0">No employees currently flagged.</p>
+                @else
+                    <table class="table table-sm table-striped m-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Emp ID</th>
+                                <th>Name</th>
+                                <th class="text-end">Basic Salary</th>
+                                <th class="pe-3">Currency</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($employeeMinWageList as $row)
+                                <tr>
+                                    <td class="ps-3">{{ $row['code'] }}</td>
+                                    <td>{{ $row['name'] }}</td>
+                                    <td class="text-end">{{ $row['salary'] }}</td>
+                                    <td class="pe-3">{{ $row['currency'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="add-occupancymodal" tabindex="-1" aria-labelledby="exampleModalLabel"
         aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered modal-small">
@@ -897,24 +963,29 @@
 </script>
 <script type="module">
     const cty = document.getElementById('myBarChart').getContext('2d');
+    // Budget chart data comes from the controller's $budgetChart payload —
+    // budgeted/actual derived from manning_responses headcount * org avg
+    // basic salary * 12, over the last 4 years. Replaces the hardcoded
+    // [1800,2300,...] mockup that used to ship for every resort.
+    const budgetChartPayload = @json($budgetChart ?? ['labels' => [], 'budgeted' => [], 'actual' => []]);
     const myBarChart = new Chart(cty, {
-        type: 'bar', // Type of chart
+        type: 'bar',
         data: {
-            labels: ['2021', '2022', '2023', '2024'], // X-axis labels
+            labels: budgetChartPayload.labels,
             datasets: [
                 {
-                    label: 'Budgeted', // Label for the first dataset
-                    data: [1800, 2300, 2400, 1800], // Data for the first dataset
+                    label: 'Budgeted',
+                    data: budgetChartPayload.budgeted,
                     backgroundColor: '#014653',
-                    borderRadius: 3, // Set the border radius for bars
-                    barThickness: 14 // Set the width of the bars
+                    borderRadius: 3,
+                    barThickness: 14
                 },
                 {
-                    label: 'Actual', // Label for the second dataset
-                    data: [2000, 2200, 2000, 2400], // Data for the second dataset
+                    label: 'Actual',
+                    data: budgetChartPayload.actual,
                     backgroundColor: '#2EACB3',
-                    borderRadius: 3, // Set the border radius for bars
-                    barThickness: 14 // Set the width of the bars
+                    borderRadius: 3,
+                    barThickness: 14
                 }
             ]
         },
@@ -975,10 +1046,14 @@
     var ctz = document.getElementById('myLineChart').getContext('2d');
   
     // Function to fetch data dynamically via AJAX
+    //
+    // Bumped from 5 → 12 months so the line chart shows a full calendar
+    // year of forecasted demand. Five months was leaving HR squinting at
+    // a sparkline; with 12 months they can see seasonality at a glance.
     function fetchAIInsightsData() {
         const upcomingMonths = [];
         const currentDate = new Date();
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 12; i++) {
             const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
             const monthYear = nextMonth.toLocaleString('default', { month: 'short', year: 'numeric' });
             upcomingMonths.push(monthYear);
