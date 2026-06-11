@@ -166,8 +166,16 @@
                          Finance (rank 7) users with no Approve / Reject /
                          Hold button to action requests they were assigned.
                          ───────────────────────────────────────────────────────────── --}}
+                    {{-- No d-none permission gate here. The previous gate
+                         hid this card from Finance/HOD/EXCOM because
+                         `resort.vacancies.FreshApplicant` is an HR-only
+                         permission. The outer @if already guarantees we
+                         only render when this user has vacancies waiting
+                         on THEIR approval (rank-filtered server-side by
+                         Common::GetTheFreshVacancies), so the permission
+                         check is both redundant and wrong. --}}
                     @if(isset($Vacancies) && $Vacancies->count() > 0)
-                    <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant', config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="col-lg-12">
                         <div class="card h-auto">
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-3">

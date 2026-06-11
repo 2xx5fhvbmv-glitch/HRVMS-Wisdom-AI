@@ -401,7 +401,16 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    {{-- No d-none gate here. Finance (rank 7) and GM
+                         (rank 8) land on this dashboard via the middleware
+                         (RedirectIfNotCorrectDashboard) but DON'T hold the
+                         HR-only `resort.vacancies.FreshApplicant` view
+                         permission, so the gate used to hide the approval
+                         card for them entirely — they'd see the dashboard
+                         minus the column. Rank filtering on the controller
+                         already ensures each user sees only the vacancies
+                         that need THEIR action (Common::GetTheFreshVacancies). --}}
+                    <div class="col-md-6">
                         <div class="card">
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-3">
