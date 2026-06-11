@@ -158,6 +158,104 @@ class ApplicantController extends Controller
         return response()->json(['success' => false, 'message' => 'No data found for this step.']);
     }
 
+    /**
+     * Parse an uploaded CV via the FastAPI /extract_job_info endpoint
+     * and return structured fields the front-end can use to pre-fill
+     * the applicant form. Saves the applicant a few minutes of typing
+     * and reduces transcription errors on name/email/phone.
+     *
+     * Accepts a single `cv` file (pdf | doc | docx, <= 5 MB). Returns
+     * a normalised payload keyed by the form's `name=` attributes so
+     * the JS layer can dumb-fill without per-field special-casing.
+     */
+    public function extractCv(Request $request)
+    {
+        $request->validate([
+            'cv' => 'required|file|mimes:pdf,doc,docx|max:5120',
+        ]);
+
+        $file = $request->file('cv');
+        // /extract_cv (CV-tuned prompt + structured Pydantic response).
+        // Previously this called /extract_job_info, which was tuned for
+        // JDs — the LLM emitted loose keys we had to normalise here.
+        // The new endpoint returns the form-field schema directly.
+        $url  = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/extract_cv';
+
+        $cFile = curl_file_create(
+            $file->getRealPath(),
+            $file->getClientMimeType(),
+            $file->getClientOriginalName()
+        );
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => ['pdf_file' => $cFile],
+            // Long-ish timeout: OCR-fallback path on a scanned PDF can
+            // take 30+ s. Caller is the applicant on their phone, so the
+            // UX cost of a slow response is the spinner, not a 502.
+            CURLOPT_TIMEOUT        => 50,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        curl_close($curl);
+
+        if ($errno !== 0 || !$response) {
+            \Log::warning("CV extract failed (url={$url}): " . ($err ?: 'no response'));
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not parse the CV. You can fill the form manually.',
+            ], 502);
+        }
+
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI returned an unexpected response. Fill the form manually.',
+            ], 502);
+        }
+
+        // The new /extract_cv response is already keyed by the form's
+        // `name=` attributes — first_name, last_name, email,
+        // mobile_number, dob, gender, etc. Plus structured arrays for
+        // work_experience, education, languages, skills.
+        //
+        // We only need to filter out nulls and pass through. No key
+        // mapping needed.
+        $scalarKeys = [
+            'first_name', 'last_name', 'email', 'mobile_number', 'dob',
+            'gender', 'nationality', 'country', 'address_line_one',
+            'city', 'state', 'pin_code', 'passport_no',
+        ];
+
+        $fields = [];
+        foreach ($scalarKeys as $k) {
+            $v = $decoded[$k] ?? null;
+            if ($v !== null && $v !== '') {
+                $fields[$k] = trim((string) $v);
+            }
+        }
+
+        return response()->json([
+            'success'         => true,
+            'message'         => 'CV parsed.',
+            'fields'          => $fields,
+            // Structured arrays surfaced separately for future UI
+            // (work-experience block, education block) — current JS
+            // pre-fill ignores these for now.
+            'work_experience' => is_array($decoded['work_experience'] ?? null) ? $decoded['work_experience'] : [],
+            'education'       => is_array($decoded['education']       ?? null) ? $decoded['education']       : [],
+            'languages'       => is_array($decoded['languages']       ?? null) ? $decoded['languages']       : [],
+            'skills'          => is_array($decoded['skills']          ?? null) ? $decoded['skills']          : [],
+            'raw'             => $decoded,
+        ]);
+    }
+
     public function applicant_formStore(Request $request)
     {
 

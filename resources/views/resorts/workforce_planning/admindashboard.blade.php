@@ -177,13 +177,16 @@
                         </div>
                         <div>
                             @php
-                                // Mirrors the WP HR dashboard compliance panel.
-                                // 60% Maldivian target comes from the rules
-                                // engine's "Management Non-Maldivian" rule.
+                                // Mirrors the WP HR dashboard panel.
+                                // Per-resort target from manningandbudgeting_
+                                // configfiles.local (set on /resort/budget/
+                                // config), with system-wide config as the
+                                // fallback. Same helper as the rules engine.
+                                $localRatioMin    = (float) \App\Helpers\Common::getResortLocalRatioTarget($resort_id ?? null);
                                 $totalEmpForRatio = ($localEmployees ?? 0) + ($expatEmployees ?? 0);
-                                $localPct = $totalEmpForRatio > 0 ? round(($localEmployees / $totalEmpForRatio) * 100, 1) : 0;
-                                $expatPct = $totalEmpForRatio > 0 ? round(($expatEmployees / $totalEmpForRatio) * 100, 1) : 0;
-                                $localPctClass = $localPct >= 60 ? 'text-success' : 'text-danger';
+                                $localPct         = $totalEmpForRatio > 0 ? round(($localEmployees / $totalEmpForRatio) * 100, 1) : 0;
+                                $expatPct         = $totalEmpForRatio > 0 ? round(($expatEmployees / $totalEmpForRatio) * 100, 1) : 0;
+                                $localPctClass    = $localPct >= $localRatioMin ? 'text-success' : 'text-danger';
                             @endphp
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
@@ -194,7 +197,7 @@
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
                                     Local / Xpat Ratio:
-                                    <small class="text-muted d-block" style="font-size:10px;">60% Maldivian target</small>
+                                    <small class="text-muted d-block" style="font-size:10px;">{{ rtrim(rtrim(number_format($localRatioMin, 1), '0'), '.') }}% Maldivian target</small>
                                 </p>
                                 <span class="d-inline-block text-end">
                                     <span class="fw-bold {{ $localPctClass }}">{{ $localPct }}%</span>

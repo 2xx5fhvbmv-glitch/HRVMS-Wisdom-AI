@@ -1041,7 +1041,7 @@ class VacancyController extends Controller
                 $vacancy->Required = Carbon::createFromFormat('Y-m-d', $vacancy->required_starting_date)->format('Y-m-d');
                 $vacancy->ReportingTo =  ucfirst($vacancy->first_name.'  ' .$vacancy->last_name);
                 $vacancy->applicationUrlshow = substr($applicant_link, 0, 30).'...';
-                $vacancy->JobAdvertisement= URL::asset(config('settings.Resort_JobAdvertisement').'/'.$resort_id."/".$vacancy->Jobadvimg);
+                $vacancy->JobAdvertisement = Common::GetJobAdvertisementImage($resort_id, $vacancy->Jobadvimg);
                 return $vacancy;
         });
         $page_title = 'View All To Do';
@@ -1120,9 +1120,11 @@ class VacancyController extends Controller
             $isGM = (int)$employeeRank === 8;
             $canSeeAllDepts = $isHrUser || $isGM;
 
-            // Fetch all job ad images for this resort (for carousel)
+            // Fetch all job ad images for this resort (for carousel).
+            // Use the driver-aware helper so Wasabi/S3 storage URLs work
+            // on live, not just local dev.
             $allJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
-                return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
+                return Common::GetJobAdvertisementImage($resort_id, $ad->Jobadvimg);
             })->values()->toArray();
 
             $NewVacancies = Vacancies::join("resort_departments as t1", "t1.id", "=", "vacancies.department")
@@ -1457,9 +1459,11 @@ class VacancyController extends Controller
                                 )->paginate(10);
 
 
-                    // Fetch all job ad images for this resort
+                    // Fetch all job ad images for this resort. Driver-aware
+                    // helper handles local/wasabi/s3 — URL::asset() only
+                    // worked for local.
                     $gridAllJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
-                        return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
+                        return Common::GetJobAdvertisementImage($resort_id, $ad->Jobadvimg);
                     })->values()->toArray();
 
                     $NewVacancies->getCollection()->transform(function ($vacancy) use ($gridAllJobAdImages, $resort_id) {

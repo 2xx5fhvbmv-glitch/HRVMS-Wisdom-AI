@@ -1996,11 +1996,67 @@
 
     {{-- New --}}
     <script>
+        // ─── AI CV auto-fill (Add Employee) ────────────────────────────
+        //
+        // Same proxy + field-map pattern as the applicant form / offline
+        // interview. HR uploads the candidate's CV → AI parses it → form
+        // fields get pre-populated by `name=`. The values are still
+        // editable; this just skips retyping content already on the CV.
+        function aiAutofillFromCv(file) {
+            if (!file) return;
+            var fd = new FormData();
+            fd.append('cv', file);
+            fd.append('_token', $('meta[name="csrf-token"]').attr('content') || '{{ csrf_token() }}');
+
+            var $banner = $('#ai-cv-banner');
+            if ($banner.length === 0) {
+                $banner = $('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;">&nbsp;</div>');
+                $('#cv-file-name').after($banner);
+            }
+            $banner.html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Reading the CV…').show();
+
+            $.ajax({
+                url: @json(route('resort.applicant.cvExtract')),
+                type: 'POST',
+                data: fd,
+                processData: false,
+                contentType: false,
+                success: function (resp) {
+                    if (!resp || !resp.success || !resp.fields) {
+                        $banner.removeClass('alert-info').addClass('alert-warning')
+                            .text('Could not read the CV — fill the fields manually.');
+                        return;
+                    }
+                    var filled = 0;
+                    Object.keys(resp.fields).forEach(function (k) {
+                        var v = resp.fields[k];
+                        if (v === null || v === '') return;
+                        var $input = $('[name="' + k + '"]').first();
+                        if ($input.length && !$input.val()) {
+                            $input.val(v).trigger('change');
+                            filled++;
+                        }
+                    });
+                    $banner.removeClass('alert-info').addClass(filled > 0 ? 'alert-success' : 'alert-warning')
+                        .text(filled > 0
+                            ? 'Pre-filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' from the CV.'
+                            : 'Read the CV but found nothing new to pre-fill.');
+                },
+                error: function () {
+                    $banner.removeClass('alert-info').addClass('alert-warning')
+                        .text('AI service unavailable — fill the fields manually.');
+                }
+            });
+        }
+
         $(document).ready(function() {
             $('#fileInput').on('change', function(e) {
                 var file = e.target.files[0];
                 if (file) {
                     $('#cv-file-name').text(file.name);
+                    // Kick off the AI parse alongside the existing file
+                    // name display — adds zero perceived latency.
+                    aiAutofillFromCv(file);
                 } else {
                     $('#cv-file-name').text('');
                 }

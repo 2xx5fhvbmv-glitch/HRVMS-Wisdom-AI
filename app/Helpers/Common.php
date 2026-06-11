@@ -1181,6 +1181,94 @@ class Common
         return $stamp ? $url . '?v=' . $stamp : $url;
 	}
 
+    /**
+     * Minimum Maldivian (local) employee % the resort wants enforced.
+     *
+     * Source-of-truth chain:
+     *   1. manningandbudgeting_configfiles.local for THIS resort (set
+     *      by HR on /resort/budget/config — the Xpat/Local Ratio block).
+     *   2. config('settings.workforce_planning.local_ratio_min_pct') —
+     *      system-wide default for resorts that haven't configured yet.
+     *
+     * Returns a float in [0, 100]. Used by the WP Compliance Tracking
+     * panel AND the rules engine ("Management Non-Maldivian" rule) so
+     * the dashboard chip and the breach text are always consistent.
+     *
+     * @param  int|null  $resortId
+     * @return float
+     */
+    public static function getResortLocalRatioTarget($resortId = null)
+    {
+        $fallback = (float) config('settings.workforce_planning.local_ratio_min_pct', 60);
+
+        if (!$resortId) return $fallback;
+
+        $cfg = ManningandbudgetingConfigfiles::where('resort_id', $resortId)
+            ->orderByDesc('id')
+            ->first(['local']);
+
+        if (!$cfg || $cfg->local === null || $cfg->local === '') {
+            return $fallback;
+        }
+
+        $val = (float) $cfg->local;
+        // Clamp defensively — HR has historically typed values like
+        // "120" or "-5" into the config screen and the column is just
+        // an integer with no DB-side range check.
+        if ($val < 0)   $val = 0.0;
+        if ($val > 100) $val = 100.0;
+        return $val;
+    }
+
+    /**
+     * Resolve a Job Advertisement image URL the same way GetResortLogo
+     * resolves the brand logo — driver-aware (local | wasabi | s3).
+     *
+     * The previous implementation used URL::asset($path) everywhere,
+     * which only works for the 'local' driver. When STORAGE_DRIVER=wasabi
+     * (which production does), the upload landed in Wasabi but the
+     * read URL pointed at thewisdom.io/public/uploads/JobAdvertisement/...
+     * — a path the web server has no file for, so the <img> rendered
+     * broken in the templates list.
+     *
+     * @param int    $resortId
+     * @param string $fileName   filename stored in job_advertisements.Jobadvimg
+     * @return string  fully-qualified, browser-renderable URL
+     */
+    public static function GetJobAdvertisementImage($resortId, $fileName)
+    {
+        if (empty($fileName)) {
+            return url(config('settings.default_picture2'));
+        }
+        $basePath = config('settings.Resort_JobAdvertisement');
+        $driver   = config('settings.storage_driver');
+        $relPath  = $basePath . '/' . $resortId . '/' . $fileName;
+
+        if ($driver === 'local') {
+            $urlPath = preg_replace('#^public/#', '', $relPath);
+            return url($urlPath);
+        }
+
+        try {
+            $expiresAt = \Carbon\Carbon::now()->addDay();
+            return \Storage::disk($driver)->temporaryUrl($relPath, $expiresAt);
+        } catch (\Throwable $e) {
+            \Log::warning('[GetJobAdvertisementImage] temporaryUrl() failed', [
+                'driver'    => $driver,
+                'rel_path'  => $relPath,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
+        // Same manual fallback as GetResortLogo.
+        $diskCfg = config('filesystems.disks.' . $driver);
+        $explicitUrl = $diskCfg['url'] ?? null;
+        if ($explicitUrl) {
+            return rtrim($explicitUrl, '/') . '/' . ltrim($relPath, '/');
+        }
+        return \Storage::disk($driver)->url($relPath);
+    }
+
     public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="")
     {
         if($type==1)

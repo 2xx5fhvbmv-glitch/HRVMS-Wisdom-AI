@@ -704,6 +704,83 @@
 
 @section('import-scripts')
 <script type="text/javascript">
+    // ─── AI CV auto-fill ──────────────────────────────────────────────
+    //
+    // When the applicant picks a CV file, immediately POST it to the AI
+    // proxy and use the parsed fields to pre-fill the form. The user
+    // can still override anything by typing — this just gets them past
+    // the first 60% of the form without retyping content already on
+    // their CV.
+    //
+    // The Laravel endpoint normalises whatever loose keys the LLM emits
+    // ("full_name" vs "candidate_name" vs "name") down to the input
+    // `name=` attributes used by this form, so the map below is a flat
+    // one-to-one assignment.
+    function aiAutofillFromCv(file) {
+        if (!file) return;
+        // Avoid blocking the upload if the AI is slow/down: this is
+        // purely additive — failure mode is "user types it themselves".
+        var fd = new FormData();
+        fd.append('cv', file);
+        fd.append('_token', $('meta[name="csrf-token"]').attr('content') || '{{ csrf_token() }}');
+
+        var $banner = $('#ai-cv-banner');
+        if ($banner.length === 0) {
+            $banner = $('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;"></div>')
+                .insertAfter('#fileInput').closest('.upload-area');
+            // Fallback: insert near the CV input wrapper.
+            if ($('#ai-cv-banner').length === 0) {
+                $('input[name="curriculum_file"]').closest('.upload-area').after('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;"></div>');
+                $banner = $('#ai-cv-banner');
+            }
+        }
+        $banner.html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Reading your CV…').show();
+
+        $.ajax({
+            url: @json(route('resort.applicant.cvExtract')),
+            type: 'POST',
+            data: fd,
+            processData: false,
+            contentType: false,
+            success: function (resp) {
+                if (!resp || !resp.success || !resp.fields) {
+                    $banner.removeClass('alert-info').addClass('alert-warning')
+                        .text('Could not read the CV automatically — please fill the form manually.');
+                    return;
+                }
+                var filled = 0;
+                Object.keys(resp.fields).forEach(function (k) {
+                    var v = resp.fields[k];
+                    if (v === null || v === '') return;
+                    // Set by `name=` so the same JS works regardless of
+                    // id naming convention.
+                    var $input = $('[name="' + k + '"]').first();
+                    if ($input.length && !$input.val()) {
+                        $input.val(v).trigger('change');
+                        filled++;
+                    }
+                });
+                if (filled > 0) {
+                    $banner.removeClass('alert-info').addClass('alert-success')
+                        .text('Pre-filled ' + filled + ' field' + (filled === 1 ? '' : 's') + ' from your CV. Please review and complete the rest.');
+                } else {
+                    $banner.removeClass('alert-info').addClass('alert-warning')
+                        .text('Read the CV but found nothing new to pre-fill.');
+                }
+            },
+            error: function () {
+                $banner.removeClass('alert-info').addClass('alert-warning')
+                    .text('AI service unavailable — please fill the form manually.');
+            }
+        });
+    }
+    // Bind directly on the CV file input. Using `name=` rather than the
+    // (re-used) id="fileInput" so it doesn't accidentally also fire for
+    // the Passport or other file inputs sharing that id.
+    $(document).on('change', 'input[name="curriculum_file"]', function () {
+        if (this.files && this.files[0]) aiAutofillFromCv(this.files[0]);
+    });
+
     $(document).ready(function () {
         // Ensure Parsley is loaded
         if (typeof $.fn.parsley !== 'function') {

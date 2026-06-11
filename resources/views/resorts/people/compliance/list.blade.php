@@ -26,7 +26,7 @@
                               <button type="button" class="btn btn-themeBlue" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
                                   <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Run AI Anomaly Scan
                               </button>
-                              <button type="button" class="btn btn-themeGray" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the 50 most recent compliance rows. Use this after updating the AI prompt or when AI failed for some rows.">
+                              <button type="button" class="btn btn-themeGray" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the next batch of 15 breached compliance rows. Picks never-enriched rows first, then the oldest enrichments. Click again for the next batch.">
                                   <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
                               </button>
                          </div>
@@ -199,25 +199,41 @@
      }
 
     // ─── AI action buttons ──────────────────────────────────────────────
-    // Regenerate AI on the last 50 rows. Disables the button mid-call so
-    // double-clicks don't queue a second batch.
-    // Run the bulk-regenerate AJAX (called after modal confirmation).
+    // ONE batch of 15 rows per click. Picks never-enriched rows first,
+    // then the oldest enrichments (rotation), so the same row never
+    // gets re-processed until everything else has had its turn. Each
+    // click is a single round-trip (~15-25s) — no recursive auto-paging.
     function runAiRegenerate() {
-        var $b = $('#ai-regenerate-btn');
+        var $b   = $('#ai-regenerate-btn');
+        var $tbl = $('#table-exitclearance-form').DataTable
+            ? $('#table-exitclearance-form').DataTable()
+            : null;
         var orig = $b.html();
-        $b.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Regenerating…');
+        $b.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Regenerating 15…');
+
         $.ajax({
             url: '{{ route("people.compliance.regenerateAi") }}',
             type: 'POST',
-            data: { _token: '{{ csrf_token() }}', limit: 50 },
+            data: { _token: '{{ csrf_token() }}', limit: 15 },
             success: function (resp) {
-                if (resp && resp.success) {
-                    toastr.success(resp.message, 'AI regeneration complete', { positionClass: 'toast-bottom-right' });
-                    var $tbl = $('#table-exitclearance-form').DataTable();
-                    if ($tbl) $tbl.ajax.reload(null, false);
-                } else {
+                if (!resp || !resp.success) {
                     toastr.error((resp && resp.message) || 'AI regeneration failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                    return;
                 }
+                if ($tbl) $tbl.ajax.reload(null, false);
+
+                var enriched = resp.enriched      || 0;
+                var failed   = resp.failed        || 0;
+                var remain   = resp.remaining_eligible;
+
+                var summary = 'Regenerated AI for ' + enriched + ' row' + (enriched === 1 ? '' : 's');
+                if (failed)            summary += ' (' + failed + ' failed — see logs)';
+                if (typeof remain === 'number' && remain > 0) {
+                    summary += '. ' + remain + ' more row' + (remain === 1 ? '' : 's') + ' eligible — click Regenerate again for the next batch.';
+                } else if (typeof remain === 'number' && remain === 0) {
+                    summary += '. All breached rows have fresh AI insights.';
+                }
+                toastr.success(summary, 'AI regeneration complete', { positionClass: 'toast-bottom-right', timeOut: 8000 });
             },
             error: function (xhr) {
                 var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'AI regeneration failed.';
@@ -260,11 +276,13 @@
     $(document).on('click', '#ai-regenerate-btn', function () {
         $('#ai-confirm-modal-title').text('Regenerate AI insights?');
         $('#ai-confirm-modal-body').html(
-            'This will re-run the AI explanation and remediation on the <strong>50 most recent</strong> compliance rows.<br><br>' +
-            'Existing AI text on those rows will be overwritten. The original deterministic description (and severity) is unaffected. ' +
-            'Typical run time: 10–20 seconds.'
+            'This will re-run the AI explanation and remediation on the <strong>next batch of 15 compliance rows</strong>.<br><br>' +
+            'Rows that have never been AI-enriched are picked first, then the oldest AI-enriched rows. ' +
+            'Click again to process the next batch — there is no auto-paging.<br><br>' +
+            'Existing AI text on the processed rows is overwritten. The original deterministic description (and severity) is unaffected. ' +
+            'Typical run time: 15–25 seconds.'
         );
-        $('#ai-confirm-modal-confirm').text('Yes, regenerate')
+        $('#ai-confirm-modal-confirm').text('Yes, regenerate next 15')
             .removeClass('btn-themeBlue').addClass('btn-themeGray')
             .data('action', 'regenerate');
         var modal = new bootstrap.Modal(document.getElementById('ai-confirm-modal'));

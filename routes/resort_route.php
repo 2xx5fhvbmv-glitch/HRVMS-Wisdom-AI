@@ -23,6 +23,13 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
 
   Route::post('/applicant_form/store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_formStore'])->name('resort.applicantFormstore');
 
+  // AI CV auto-fill: applicant uploads their CV → we parse it via the
+  // FastAPI service and return structured fields the front-end can
+  // pre-populate (first/last name, email, phone, dob, country, work +
+  // education arrays). Public route — same auth posture as the form
+  // itself (applicant fills it without logging in).
+  Route::post('/applicant-form/cv-extract', ['App\Http\Controllers\Resorts\ApplicantController','extractCv'])->name('resort.applicant.cvExtract');
+
   Route::post('/applicant_temp/video-remove', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoremove'])->name('resort.applicant_tempVideoremove');
 
   Route::post('/applicant_temp/video-store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoStore'])->name('resort.applicant_tempVideoStore');

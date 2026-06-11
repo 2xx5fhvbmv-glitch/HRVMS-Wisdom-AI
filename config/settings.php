@@ -713,6 +713,26 @@ return [
         ['upto' => null,   'rate' => 0.15],   // 15% on everything above 200k
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Workforce-Planning compliance thresholds
+    |--------------------------------------------------------------------------
+    |
+    | Surfaced in BOTH the Compliance Tracking panel (WP dashboard) and the
+    | rules engine in ComplianceController. Having one source of truth means
+    | bumping the Maldivian quota from 60% to 65% updates the dashboard
+    | colour-coding AND the breach text consistently — no risk of the panel
+    | reading green while the engine logs a breach (or vice versa).
+    |
+    | Override via .env: WP_LOCAL_RATIO_MIN_PCT=65
+    */
+    'workforce_planning' => [
+        // Minimum % of management positions that must be Maldivian
+        // nationals. Below this triggers a "Management Non-Maldivian"
+        // compliance breach AND turns the dashboard ratio chip red.
+        'local_ratio_min_pct' => (float) env('WP_LOCAL_RATIO_MIN_PCT', 60),
+    ],
+
 	'eligibilty' => [
 		'8' => 'GM',
 		'1' => 'EXCOM',
