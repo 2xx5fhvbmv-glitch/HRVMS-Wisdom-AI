@@ -193,15 +193,19 @@ class ApplicantController extends Controller
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => ['pdf_file' => $cFile],
-            // Long-ish timeout: OCR-fallback path on a scanned PDF can
-            // take 30+ s. Caller is the applicant on their phone, so the
-            // UX cost of a slow response is the spinner, not a 502.
-            CURLOPT_TIMEOUT        => 50,
+            // Scanned PDFs hit the OCR fallback which adds 30-60s on top
+            // of the 5-15s LLM inference — verified ~74s on the user's
+            // actual labour-document PDF. 120s covers worst-case while
+            // text-layer PDFs still complete in <20s. The applicant is
+            // staring at a spinner; the UX cost of a slow response is
+            // patience, not a 502.
+            CURLOPT_TIMEOUT        => 120,
             CURLOPT_CONNECTTIMEOUT => 5,
         ]);
         $response = curl_exec($curl);
         $errno    = curl_errno($curl);
         $err      = curl_error($curl);
+        $httpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
 
         if ($errno !== 0 || !$response) {
@@ -218,6 +222,24 @@ class ApplicantController extends Controller
                 'success' => false,
                 'message' => 'AI returned an unexpected response. Fill the form manually.',
             ], 502);
+        }
+
+        // FastAPI HTTPException emits {"detail": {...}} with a non-2xx
+        // status. Previously we ignored the HTTP code, decoded the error
+        // body, and reported success with empty fields[] — so applicants
+        // who uploaded a scanned PDF saw "Read the CV but found nothing
+        // new to pre-fill" instead of the actual "we couldn't OCR this
+        // PDF" message.
+        if ($httpCode >= 400) {
+            $detail = $decoded['detail'] ?? null;
+            $msg    = is_array($detail) ? (string) ($detail['message'] ?? 'CV could not be parsed.') : 'CV could not be parsed.';
+            $stage  = is_array($detail) ? (string) ($detail['stage'] ?? '') : '';
+            \Log::info("CV extract returned {$httpCode} (stage={$stage}): {$msg}");
+            return response()->json([
+                'success' => false,
+                'stage'   => $stage,
+                'message' => $msg . ' You can fill the form manually.',
+            ], 422);
         }
 
         // The new /extract_cv response is already keyed by the form's

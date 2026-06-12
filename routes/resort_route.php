@@ -256,6 +256,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::get( '/budget/consolidated-budget','BudgetController@ConsolidateBudget')->name('resort.budget.consolidatebudget');
     Route::get( '/budget/compare-budget/{id}/{budgetid}','BudgetController@CompareBudget')->name('resort.budget.comparebudget');
+    // AJAX-only Regenerate AI for Compare Budget — replaces the old
+    // `?regenerate=1` full-page-refresh flow with an in-place table swap.
+    Route::post('/budget/compare-budget/{id}/{budgetid}/regenerate-ai', 'BudgetController@CompareBudgetRegenerateAi')->name('resort.budget.comparebudget.regenerateAi');
     Route::get( '/budget/config','BudgetController@config')->name('resort.budget.config');
 
     Route::post( '/budget/upload/config-files','BudgetController@UploadconfigFiles')->name('resort.budget.UploadconfigFiles');

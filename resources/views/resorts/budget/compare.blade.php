@@ -76,13 +76,14 @@
                                     HOD: {{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }} / mo
                                     <span class="ms-1 opacity-75">({{ $currencySymbol }} {{ number_format($totalHodBudget * 12, 0) }} / yr)</span>
                                 </span>
-                                <span class="badge badge-themeWarning" title="Wisdom AI's monthly recommendation">
-                                    Wisdom: {{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }} / mo
-                                    <span class="ms-1 opacity-75">({{ $currencySymbol }} {{ number_format($totalAiBudget * 12, 0) }} / yr)</span>
+                                <span class="badge badge-themeWarning" title="Wisdom AI's monthly recommendation" id="wisdom-badge">
+                                    Wisdom: {{ $currencySymbol }} <span id="wisdom-monthly-val">{{ number_format($totalAiBudget, 0) }}</span> / mo
+                                    <span class="ms-1 opacity-75">({{ $currencySymbol }} <span id="wisdom-annual-val">{{ number_format($totalAiBudget * 12, 0) }}</span> / yr)</span>
                                 </span>
                                 {{-- Status chip + Regenerate button. The chip
                                      reflects the cached AI state on manning_responses;
                                      the button re-calls the FastAPI endpoint. --}}
+                                <span id="ai-status-chip-wrapper">
                                 @if($aiStatus === 'ready')
                                     <span class="badge badge-themeSuccess" title="AI suggestions generated {{ optional($aiGeneratedAt)->diffForHumans() }}">
                                         AI ready
@@ -94,13 +95,20 @@
                                         AI {{ $aiStatus }}
                                     </span>
                                 @endif
-                                <a href="?regenerate=1"
-                                   id="ai-regenerate-link"
-                                   class="btn btn-sm btn-themeBlue"
-                                   title="Re-run the AI workforce-planning analysis for this department/budget"
-                                   onclick="this.innerHTML='<i class=&quot;fa-solid fa-spinner fa-spin me-1&quot;></i>Regenerating…'; this.classList.add('disabled');">
+                                </span>
+                                {{-- AJAX-only Regenerate AI. Replaces the
+                                     previous full-page redirect to ?regenerate=1
+                                     so the page no longer flashes / scrolls
+                                     when HR clicks the button. JS handler
+                                     below POSTs to the new endpoint and
+                                     swaps the AI columns in place. --}}
+                                <button type="button"
+                                        id="ai-regenerate-btn"
+                                        class="btn btn-sm btn-themeBlue"
+                                        title="Re-run the AI workforce-planning analysis (in-place; no page reload)"
+                                        data-route="{{ route('resort.budget.comparebudget.regenerateAi', ['id' => request()->route('id'), 'budgetid' => request()->route('budgetid')]) }}">
                                     <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
-                                </a>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -146,30 +154,35 @@
                                     $currentAnnual    = $p->current_budget * 12;
                                     $aiAnnual         = $aiSet ? ($p->ai_budget * 12) : null;
                                 @endphp
-                                <tr>
+                                {{-- data-position-id stamps the position
+                                     id on the <tr> so the JS Regenerate
+                                     handler can find each row and swap
+                                     ONLY the AI cells (cols 5-8) without
+                                     touching HOD numbers or the title. --}}
+                                <tr data-position-id="{{ $p->id }}">
                                     <td>{{ $p->position_title }}</td>
                                     <td class="text-nowrap text-center">{{ str_pad($p->headcount, 2, '0', STR_PAD_LEFT) }}</td>
                                     <td class="text-nowrap text-center">{{ $currencySymbol }} {{ number_format($p->current_budget, 0) }}</td>
                                     <td class="text-nowrap text-center fw-bold">{{ $currencySymbol }} {{ number_format($currentAnnual, 0) }}</td>
                                     @if($aiSet)
-                                        <td class="text-nowrap text-center {{ $aiHeadClass }}">{{ str_pad($p->ai_headcount, 2, '0', STR_PAD_LEFT) }}</td>
-                                        <td class="text-nowrap text-center {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($p->ai_budget, 0) }}</td>
-                                        <td class="text-nowrap text-center fw-bold {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($aiAnnual, 0) }}</td>
-                                        <td style="min-width:420px; max-width:520px; white-space:normal; vertical-align:top;">
+                                        <td class="ai-cell-headcount text-nowrap text-center {{ $aiHeadClass }}">{{ str_pad($p->ai_headcount, 2, '0', STR_PAD_LEFT) }}</td>
+                                        <td class="ai-cell-monthly text-nowrap text-center {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($p->ai_budget, 0) }}</td>
+                                        <td class="ai-cell-annual text-nowrap text-center fw-bold {{ $aiBudgetClass }}">{{ $currencySymbol }} {{ number_format($aiAnnual, 0) }}</td>
+                                        <td class="ai-cell-justification" style="min-width:420px; max-width:520px; white-space:normal; vertical-align:top;">
                                             @if(!empty($p->ai_justification))
                                                 {{-- Larger, paragraph-shaped justification so the
                                                      multi-sentence rationale from the AI is legible.
                                                      Word-wraps naturally. --}}
-                                                <p class="m-0" style="font-size:14.5px; line-height:1.55; color:#1f2937;">
+                                                <p class="m-0 ai-justification-text" style="font-size:14.5px; line-height:1.55; color:#1f2937;">
                                                     {{ $p->ai_justification }}
                                                 </p>
                                             @endif
                                         </td>
                                     @else
-                                        <td class="text-nowrap text-center text-muted">—</td>
-                                        <td class="text-nowrap text-center text-muted">—</td>
-                                        <td class="text-nowrap text-center text-muted">—</td>
-                                        <td class="text-muted" style="min-width:420px; max-width:520px; white-space:normal; font-size:14px; vertical-align:top;">
+                                        <td class="ai-cell-headcount text-nowrap text-center text-muted">—</td>
+                                        <td class="ai-cell-monthly text-nowrap text-center text-muted">—</td>
+                                        <td class="ai-cell-annual text-nowrap text-center text-muted">—</td>
+                                        <td class="ai-cell-justification text-muted" style="min-width:420px; max-width:520px; white-space:normal; font-size:14px; vertical-align:top;">
                                             {{ $aiStatus === 'ready' ? '' : 'Click Regenerate AI to populate.' }}
                                         </td>
                                     @endif
@@ -193,9 +206,9 @@
                                     <th class="text-center">{{ $totalHodHeadcount }}</th>
                                     <th class="text-center">{{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }}</th>
                                     <th class="text-center">{{ $currencySymbol }} {{ number_format($totalHodAnnual, 0) }}</th>
-                                    <th class="text-lightblue text-center">{{ $totalAiHeadcount }}</th>
-                                    <th class="text-lightblue text-center">{{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }}</th>
-                                    <th class="text-lightblue text-center">{{ $currencySymbol }} {{ number_format($totalAiAnnual, 0) }}</th>
+                                    <th class="text-lightblue text-center" id="total-ai-headcount">{{ $totalAiHeadcount }}</th>
+                                    <th class="text-lightblue text-center" id="total-ai-monthly">{{ $currencySymbol }} {{ number_format($totalAiBudget, 0) }}</th>
+                                    <th class="text-lightblue text-center" id="total-ai-annual">{{ $currencySymbol }} {{ number_format($totalAiAnnual, 0) }}</th>
                                     <th></th>
                                 </tr>
                             </tfoot>
@@ -232,14 +245,27 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* Escape hatch for the global `.table-compareBudget p` rule in
+       default.css line ~4506 which clamps every <p> in this table to
+       2 lines with -webkit-line-clamp. We need the full AI justification
+       (180-400 chars, often 3-4 sentences) visible. Selector specificity
+       beats `.table-compareBudget p` so this wins regardless of load
+       order. */
+    .table-compareBudget p.ai-justification-text {
+        display: block !important;
+        -webkit-line-clamp: unset !important;
+        -webkit-box-orient: initial !important;
+        overflow: visible !important;
+        white-space: normal !important;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
-{{-- Flash toast for the Regenerate-AI action. The controller redirects
-     back here after a Regenerate click so the user sees one of three
-     toasts: AI ready (green), AI timeout (yellow), AI failed (red).
-     Without this, a failed AI call left the page visually unchanged
-     and HR thought the button was broken. --}}
+{{-- Flash toast for the legacy ?regenerate=1 path. Kept as a fallback
+     in case anything still navigates with the query param — the new
+     AJAX flow below doesn't trigger this. --}}
 @if(session('ai_flash_msg'))
 <script>
     $(function () {
@@ -256,4 +282,115 @@
     });
 </script>
 @endif
+
+{{-- ─── AJAX Regenerate AI ───────────────────────────────────────────
+     Button click → POST to the new regenerateAi endpoint → server hits
+     the FastAPI service, persists new suggestions, returns the per-row
+     payload → JS swaps the AI cells in place. No page reload. --}}
+<script>
+$(function () {
+    var $btn = $('#ai-regenerate-btn');
+    if (!$btn.length) return;
+
+    var currencySymbol = @json($currencySymbol);
+
+    function fmtMoney(n) {
+        return currencySymbol + ' ' + Math.round(Number(n) || 0).toLocaleString();
+    }
+    function pad2(n) { n = String(n); return n.length < 2 ? '0' + n : n; }
+
+    $btn.on('click', function () {
+        if ($btn.hasClass('disabled')) return;
+        var url = $btn.data('route');
+        var origHtml = $btn.html();
+
+        $btn.addClass('disabled').prop('disabled', true)
+            .html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Regenerating…');
+
+        // Set the status chip to "generating…" while the call is in flight.
+        $('#ai-status-chip-wrapper').html('<span class="badge badge-themeGrayLight">AI generating…</span>');
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: { _token: '{{ csrf_token() }}' },
+            // Per-row LLM cost + network: comfortably below the
+            // Hostinger 60 s proxy wall but allows a real LLM round-trip.
+            timeout: 90000,
+        })
+        .done(function (resp) {
+            if (!resp || !resp.rows) {
+                toastr.error((resp && resp.message) || 'AI regeneration failed.',
+                    'Error', { positionClass: 'toast-bottom-right' });
+                $('#ai-status-chip-wrapper').html('<span class="badge badge-themeDanger">AI failed</span>');
+                return;
+            }
+
+            // Swap each row's AI cells. Position id ties rows together
+            // so the JS doesn't care about row order.
+            resp.rows.forEach(function (r) {
+                var $row = $('tr[data-position-id="' + r.position_id + '"]');
+                if (!$row.length) return;
+
+                var hasAi = r.ai_headcount !== null && r.ai_headcount !== undefined;
+                if (hasAi) {
+                    $row.find('.ai-cell-headcount')
+                        .removeClass('text-muted')
+                        .text(pad2(r.ai_headcount));
+                    $row.find('.ai-cell-monthly')
+                        .removeClass('text-muted')
+                        .text(fmtMoney(r.ai_budget));
+                    $row.find('.ai-cell-annual')
+                        .removeClass('text-muted')
+                        .addClass('fw-bold')
+                        .text(fmtMoney(r.ai_annual));
+                    $row.find('.ai-cell-justification')
+                        .removeClass('text-muted')
+                        .html(r.ai_justification
+                            ? '<p class="m-0 ai-justification-text" style="font-size:14.5px; line-height:1.55; color:#1f2937;">' + $('<div>').text(r.ai_justification).html() + '</p>'
+                            : '');
+                } else {
+                    $row.find('.ai-cell-headcount').addClass('text-muted').text('—');
+                    $row.find('.ai-cell-monthly').addClass('text-muted').text('—');
+                    $row.find('.ai-cell-annual').addClass('text-muted').text('—');
+                    $row.find('.ai-cell-justification').addClass('text-muted')
+                        .html('<span style="font-size:14px;">No AI recommendation.</span>');
+                }
+            });
+
+            // Footer totals.
+            $('#total-ai-headcount').text(resp.total_headcount || 0);
+            $('#total-ai-monthly').text(fmtMoney(resp.total_budget));
+            $('#total-ai-annual').text(fmtMoney(resp.total_annual));
+
+            // Header badges + status chip.
+            $('#wisdom-monthly-val').text(Math.round(Number(resp.total_budget) || 0).toLocaleString());
+            $('#wisdom-annual-val').text(Math.round(Number(resp.total_annual) || 0).toLocaleString());
+
+            if (resp.status === 'ready') {
+                $('#ai-status-chip-wrapper').html('<span class="badge badge-themeSuccess" title="Just regenerated">AI ready</span>');
+                toastr.success(resp.message || 'AI workforce-planning analysis regenerated.',
+                    'Done', { positionClass: 'toast-bottom-right', timeOut: 6000 });
+            } else if (resp.status === 'timeout') {
+                $('#ai-status-chip-wrapper').html('<span class="badge badge-themeDanger">AI timeout</span>');
+                toastr.warning(resp.message || 'AI did not respond in time.',
+                    'Slow AI service', { positionClass: 'toast-bottom-right', timeOut: 8000 });
+            } else {
+                $('#ai-status-chip-wrapper').html('<span class="badge badge-themeDanger">AI ' + (resp.status || 'failed') + '</span>');
+                toastr.error(resp.message || 'AI workforce-planning analysis failed.',
+                    'AI service unreachable', { positionClass: 'toast-bottom-right', timeOut: 8000 });
+            }
+        })
+        .fail(function (xhr, textStatus) {
+            var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                || (textStatus === 'timeout' ? 'AI request timed out after 90 s.' : 'Network error contacting the AI service.');
+            toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right', timeOut: 8000 });
+            $('#ai-status-chip-wrapper').html('<span class="badge badge-themeDanger">AI failed</span>');
+        })
+        .always(function () {
+            $btn.removeClass('disabled').prop('disabled', false).html(origHtml);
+        });
+    });
+});
+</script>
 @endsection

@@ -274,9 +274,13 @@ class WorkforcePlanningDashboardController extends Controller
                 $name     = optional($e->resortAdmin)->full_name ?: 'Unknown';
                 $salary   = $e->basic_salary !== null ? number_format((float) $e->basic_salary, 2) : '—';
                 $currency = $e->basic_salary_currency ?: 'n/a';
+                // Profile image for the dashboard scroller — falls back
+                // to the default avatar when the employee has no upload.
+                $picture  = Common::getResortUserPicture($e->Admin_Parent_id);
                 return [
                     'code'     => $e->Emp_id ?? '—',
                     'name'     => $name,
+                    'picture'  => $picture,
                     'salary'   => $salary,
                     'currency' => $currency,
                 ];
@@ -288,12 +292,14 @@ class WorkforcePlanningDashboardController extends Controller
         // per year) for the last 4 years. Multiplies by an org-wide avg
         // basic-salary so the bars are in $USD rather than headcount.
         $thisYearForBudget = (int) date('Y');
-        $budgetYears = [
-            $thisYearForBudget - 3,
-            $thisYearForBudget - 2,
-            $thisYearForBudget - 1,
-            $thisYearForBudget,
-        ];
+        // Discover which years actually have manning data for this
+        // resort. Previously we hardcoded a 4-year window which left
+        // most resorts with 3 empty bars (manning rows only exist for
+        // the current year on resorts that recently came online).
+        // Take the years that DO have data and union with the current
+        // year — for the current year, derive headcount from LIVE
+        // employees when manning hasn't been submitted yet so the bar
+        // is never empty.
         $avgBasicSalary = (float) Employee::where('resort_id', $resort_id)
             ->whereIn('status', $current)
             ->whereNotNull('basic_salary')
@@ -301,14 +307,42 @@ class WorkforcePlanningDashboardController extends Controller
         if ($avgBasicSalary <= 0) {
             $avgBasicSalary = 1500; // sane fallback so the chart still draws
         }
-        $budgetChart = ['labels' => [], 'budgeted' => [], 'actual' => []];
-        foreach ($budgetYears as $y) {
-            $manningForYear = ManningResponse::where('resort_id', $resort_id)
-                ->where('year', $y)
-                ->get(['total_headcount', 'total_filled_positions']);
 
-            $headcountBudgeted = (int) $manningForYear->sum('total_headcount');
-            $headcountFilled   = (int) $manningForYear->sum('total_filled_positions');
+        $manningByYear = ManningResponse::where('resort_id', $resort_id)
+            ->whereBetween('year', [$thisYearForBudget - 4, $thisYearForBudget])
+            ->get(['year', 'total_headcount', 'total_filled_positions'])
+            ->groupBy('year');
+
+        $yearsWithData = $manningByYear->keys()->map(fn ($y) => (int) $y)->all();
+        // Always include the current year — if it's missing from
+        // manning, we'll fall back to live employee count below.
+        $yearsWithData[] = $thisYearForBudget;
+        $yearsWithData   = collect($yearsWithData)->unique()->sort()->values()->all();
+
+        // Take the last 4 years that have data so the chart stays
+        // readable (max 4 bars; otherwise resorts with 6+ years would
+        // produce a cramped chart).
+        $yearsWithData = array_slice($yearsWithData, -4);
+
+        // Live snapshot for the current-year fallback.
+        $liveActiveHeadcount = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->count();
+
+        $budgetChart = ['labels' => [], 'budgeted' => [], 'actual' => []];
+        foreach ($yearsWithData as $y) {
+            $rows = $manningByYear->get((string) $y) ?? collect();
+            $headcountBudgeted = (int) $rows->sum('total_headcount');
+            $headcountFilled   = (int) $rows->sum('total_filled_positions');
+
+            // Current year fallback: if HR hasn't submitted manning yet
+            // for the current year, use the LIVE active headcount so the
+            // bar shows the resort's current payroll commitment — better
+            // than rendering an empty bar that HR reads as "broken".
+            if ($y === $thisYearForBudget && $headcountBudgeted === 0 && $headcountFilled === 0) {
+                $headcountBudgeted = $liveActiveHeadcount;
+                $headcountFilled   = $liveActiveHeadcount;
+            }
 
             $budgetChart['labels'][]   = (string) $y;
             // Annual figures (×12 for the year of monthly salary).
@@ -561,6 +595,86 @@ class WorkforcePlanningDashboardController extends Controller
             + $employee_under_min_wage_mvr
             + $employee_under_min_wage_unconfigured;
 
+        // Build the same min-wage employee scroller list + budget chart
+        // data that admin_dashboard() builds — without these two, the
+        // HR dashboard view falls back to empty collections and the
+        // Compliance Tracking scroller + Budget chart render blank.
+        $employeeMinWageList = Employee::with('resortAdmin')
+            ->where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->where(function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('basic_salary_currency', 'USD')
+                        ->where(function ($inner) {
+                            $inner->where('basic_salary', '<', 520)
+                                  ->orWhereNull('basic_salary');
+                        });
+                })->orWhere(function ($sub) {
+                    $sub->where('basic_salary_currency', 'MVR')
+                        ->where(function ($inner) {
+                            $inner->where('basic_salary', '<', 8021)
+                                  ->orWhereNull('basic_salary');
+                        });
+                })->orWhereNull('basic_salary_currency');
+            })
+            ->orderBy('id', 'desc')
+            ->limit(50)
+            ->get(['id', 'resort_id', 'Emp_id', 'Admin_Parent_id', 'basic_salary', 'basic_salary_currency'])
+            ->map(function ($e) {
+                $name     = optional($e->resortAdmin)->full_name ?: 'Unknown';
+                $salary   = $e->basic_salary !== null ? number_format((float) $e->basic_salary, 2) : '—';
+                $currency = $e->basic_salary_currency ?: 'n/a';
+                $picture  = Common::getResortUserPicture($e->Admin_Parent_id);
+                return [
+                    'code'     => $e->Emp_id ?? '—',
+                    'name'     => $name,
+                    'picture'  => $picture,
+                    'salary'   => $salary,
+                    'currency' => $currency,
+                ];
+            });
+
+        // Budget chart payload — mirrors admin_dashboard(). Take only
+        // years that have manning data, always include the current year,
+        // fall back to live employee count if current-year manning hasn't
+        // been submitted.
+        $thisYearForBudget = (int) date('Y');
+        $avgBasicSalary = (float) Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->whereNotNull('basic_salary')
+            ->avg('basic_salary');
+        if ($avgBasicSalary <= 0) {
+            $avgBasicSalary = 1500;
+        }
+
+        $manningByYear = ManningResponse::where('resort_id', $resort_id)
+            ->whereBetween('year', [$thisYearForBudget - 4, $thisYearForBudget])
+            ->get(['year', 'total_headcount', 'total_filled_positions'])
+            ->groupBy('year');
+
+        $yearsWithData = $manningByYear->keys()->map(fn ($y) => (int) $y)->all();
+        $yearsWithData[] = $thisYearForBudget;
+        $yearsWithData   = collect($yearsWithData)->unique()->sort()->values()->all();
+        $yearsWithData   = array_slice($yearsWithData, -4);
+
+        $liveActiveHeadcount = Employee::where('resort_id', $resort_id)
+            ->whereIn('status', $current)
+            ->count();
+
+        $budgetChart = ['labels' => [], 'budgeted' => [], 'actual' => []];
+        foreach ($yearsWithData as $y) {
+            $rows = $manningByYear->get((string) $y) ?? collect();
+            $headcountBudgeted = (int) $rows->sum('total_headcount');
+            $headcountFilled   = (int) $rows->sum('total_filled_positions');
+            if ($y === $thisYearForBudget && $headcountBudgeted === 0 && $headcountFilled === 0) {
+                $headcountBudgeted = $liveActiveHeadcount;
+                $headcountFilled   = $liveActiveHeadcount;
+            }
+            $budgetChart['labels'][]   = (string) $y;
+            $budgetChart['budgeted'][] = round($headcountBudgeted * $avgBasicSalary * 12);
+            $budgetChart['actual'][]   = round($headcountFilled   * $avgBasicSalary * 12);
+        }
+
             $currency = $this->currencylogo; // Assuming this is set correctly
 
                 return view('resorts.workforce_planning.dashboard',
@@ -584,6 +698,8 @@ class WorkforcePlanningDashboardController extends Controller
                     'resort_positions',
                     'manning_response',
                     'employee_under_min_wage',
+                    'employeeMinWageList',
+                    'budgetChart',
                     'ResortData','sitesettings'
                 )
             );
@@ -598,7 +714,11 @@ class WorkforcePlanningDashboardController extends Controller
             $expatEmployees=0;
             $employee_under_min_wage=0;
             $occupancies=0;
-            return view('resorts.workforce_planning.dashboard',compact('resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','male_percentage','female_percentage','total_emp','localEmployees','expatEmployees','employee_under_min_wage','occupancies'));
+            // Defensive defaults for the new view variables so the
+            // dashboard view doesn't error in the exception path.
+            $employeeMinWageList = collect();
+            $budgetChart = ['labels' => [], 'budgeted' => [], 'actual' => []];
+            return view('resorts.workforce_planning.dashboard',compact('resort_id','resort_divisions_count','resort_departments_count','resort_positions_count','male_percentage','female_percentage','total_emp','localEmployees','expatEmployees','employee_under_min_wage','employeeMinWageList','budgetChart','occupancies'));
         }
     }
 
@@ -1312,6 +1432,25 @@ class WorkforcePlanningDashboardController extends Controller
 
                             $totalMothwiseOldEmployeecost = 0;
                             $totalVacantCostMontwise = [];
+                            // GROUND TRUTH for this department: sum of
+                            // basic_salary across every active employee
+                            // whose Dept_id matches. The position-driven
+                            // loop below misses employees whose position
+                            // isn't in the manning_response (e.g.
+                            // Payroll Supervisor was sitting on resort 26
+                            // HR's payroll for $800/mo but the manning
+                            // form never listed that position, so the
+                            // dashboard showed $7,750 while Compare Budget
+                            // correctly showed $8,550). We overwrite the
+                            // position-loop accumulator with this true
+                            // sum after the loop completes — Compare
+                            // Budget uses the same logic so the two pages
+                            // will agree.
+                            $trueDeptSalarySum = (float) Employee::where('resort_id', $this->globalUser->resort_id)
+                                ->where('Dept_id', $d->id)
+                                ->whereIn('status', ['Active', 'Probationary'])
+                                ->whereNotNull('basic_salary')
+                                ->sum('basic_salary');
                             foreach ($getPositions as $position)
                             {
                                 $employees = DB::table('employees as e')
@@ -1462,6 +1601,15 @@ class WorkforcePlanningDashboardController extends Controller
                             $d->BudgetPageLink =1;
                             $d->Message_id = isset($BudgetStatus) ? $BudgetStatus->message_id : '';
 
+                            // Use the ground-truth department salary
+                            // sum (computed above from employees table)
+                            // instead of the position-loop value, which
+                            // silently drops employees whose position
+                            // isn't in the manning_response. The +$sum
+                            // term still adds the vacant-position cost
+                            // so the dashboard reflects the FULL budget
+                            // commitment (live payroll + planned hires).
+                            $totalMothwiseOldEmployeecost = $trueDeptSalarySum;
                             $departmenet_total[$d->division_id]= ceil($totalMothwiseOldEmployeecost+$sum );
                             $d->OldEmployeesBudgetValue =   ceil( $totalMothwiseOldEmployeecost+$sum);
 
@@ -1581,10 +1729,20 @@ class WorkforcePlanningDashboardController extends Controller
                 $cacheKey = sprintf('ai_insights:%d:%s:%.2f', $resort_id, $monthYear, $occupancy);
                 $cached = \Cache::get($cacheKey);
                 if ($cached !== null) {
+                    // Backwards-compat: pre-reason caches stored a bare
+                    // int. Newer caches store ['required' => N, 'reason' => '...'].
+                    if (is_array($cached)) {
+                        $required = (int) ($cached['required'] ?? 0);
+                        $reason   = (string) ($cached['reason'] ?? '');
+                    } else {
+                        $required = (int) $cached;
+                        $reason   = '';
+                    }
                     $aiInsights[$monthYear] = [
                         'month'         => $monthYear,
                         'occupancyRate' => $occupancy,
-                        'hiringData'    => (int) $cached,
+                        'hiringData'    => $required,
+                        'reason'        => $reason,
                     ];
                 } else {
                     $missing[] = [
@@ -1636,11 +1794,19 @@ class WorkforcePlanningDashboardController extends Controller
                         $batchOk = true;
                         foreach ($missing as $i => $m) {
                             $required = (int) ($preds[$i]['required_staff'] ?? 0);
-                            \Cache::put($m['cacheKey'], $required, $cacheTtl);
+                            $reason   = (string) ($preds[$i]['reason'] ?? '');
+                            // Cache as an array now (was a bare int) so
+                            // the reason text survives the 30-min cache
+                            // hit on the next page load.
+                            \Cache::put($m['cacheKey'], [
+                                'required' => $required,
+                                'reason'   => $reason,
+                            ], $cacheTtl);
                             $aiInsights[$m['monthYear']] = [
                                 'month'         => $m['monthYear'],
                                 'occupancyRate' => $m['occupancy'],
                                 'hiringData'    => $required,
+                                'reason'        => $reason,
                             ];
                         }
                     }
@@ -1704,10 +1870,12 @@ class WorkforcePlanningDashboardController extends Controller
             // Preserve the requested month ordering when emitting the chart arrays.
             $occupancyRates = [];
             $hiringData     = [];
+            $reasons        = [];
             foreach ($months as $monthYear) {
-                $row = $aiInsights[$monthYear] ?? ['occupancyRate' => 0, 'hiringData' => 0];
+                $row = $aiInsights[$monthYear] ?? ['occupancyRate' => 0, 'hiringData' => 0, 'reason' => ''];
                 $occupancyRates[] = $row['occupancyRate'];
                 $hiringData[]     = $row['hiringData'];
+                $reasons[]        = $row['reason'] ?? '';
             }
 
             return response()->json([
@@ -1715,6 +1883,10 @@ class WorkforcePlanningDashboardController extends Controller
                 'message'        => 'AI Insights fetched successfully',
                 'occupancyRates' => $occupancyRates,
                 'hiringData'     => $hiringData,
+                // Parallel array — reasons[i] explains the staffing
+                // recommendation for months[i]. Rendered in the chart
+                // tooltip and the "Why" panel below the chart.
+                'reasons'        => $reasons,
             ]);
 
         } catch (\Exception $e) {

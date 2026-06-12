@@ -13,6 +13,7 @@ use App\Models\StoreConsolidateBudgetChild;
 use App\Models\StoreManningResponseParent;
 use App\Models\StoreManningResponseChild;
 use App\Models\ResortDivision;
+use App\Models\Employee;
 use App\Models\ResortDepartment;
 use App\Models\ResortPosition;
 use App\Models\ResortBudgetCost;
@@ -553,6 +554,93 @@ class BudgetController extends Controller
             'totalAiHeadcount', 'totalAiBudget',
             'currencySymbol'
         ));
+    }
+
+    /**
+     * AJAX-only Regenerate AI: fires the FastAPI call, persists the
+     * new suggestions on manning_responses, and returns JSON the
+     * compare-budget table can use to re-render in place.
+     *
+     * Previously the page used a hard-link to `?regenerate=1` which
+     * caused a FULL page navigation (visible flash, scroll position
+     * lost, slow on mobile). The new flow: button click → AJAX POST →
+     * JS swaps the AI columns in the existing table.
+     */
+    public function CompareBudgetRegenerateAi($deptID, $budgetId, Request $request)
+    {
+        // Same auth/permission posture as CompareBudget.
+        $manningResponse = ManningResponse::find($budgetId);
+        if (!$manningResponse || (int) $manningResponse->resort_id !== (int) $this->resort->resort_id) {
+            return response()->json(['success' => false, 'message' => 'Not found'], 404);
+        }
+        $department = ResortDepartment::where('id', $deptID)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$department) {
+            return response()->json(['success' => false, 'message' => 'Department not found'], 404);
+        }
+
+        // Replicate the position + employee fetch used by CompareBudget
+        // so the AI sees the same context.
+        $positions = ResortPosition::where('dept_id', $deptID)
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('status', 'active')
+            ->get();
+
+        foreach ($positions as $p) {
+            $emps = Employee::where('Position_id', $p->id)
+                ->where('Dept_id', $deptID)
+                ->whereIn('status', ['Active', 'Probationary'])
+                ->get(['id', 'basic_salary']);
+            $p->headcount      = $emps->count();
+            $p->current_budget = (float) $emps->sum('basic_salary');
+        }
+
+        $cached = $this->fetchAiBudgetRecommendations($manningResponse, $positions, $department);
+        $aiSuggestions = $cached['recommendations'] ?? [];
+        $aiStatus      = $cached['status'] ?? null;
+        $aiGeneratedAt = $cached['generated_at'] ?? null;
+
+        // Flatten the per-position recommendations + roll totals so the
+        // JS can swap the table in one pass.
+        $rows = [];
+        $totalAiHc = 0;
+        $totalAiBudget = 0.0;
+        foreach ($positions as $p) {
+            $rec = $aiSuggestions[(string) $p->id] ?? null;
+            $row = [
+                'position_id'    => (int) $p->id,
+                'position_title' => $p->position_title,
+                'ai_headcount'   => null,
+                'ai_budget'      => null,
+                'ai_annual'      => null,
+                'ai_justification' => '',
+            ];
+            if ($rec) {
+                $row['ai_headcount']     = (int) ($rec['suggested_headcount'] ?? 0);
+                $row['ai_budget']        = (float) ($rec['suggested_budget'] ?? 0);
+                $row['ai_annual']        = $row['ai_budget'] * 12;
+                $row['ai_justification'] = (string) ($rec['justification'] ?? '');
+                $totalAiHc     += $row['ai_headcount'];
+                $totalAiBudget += $row['ai_budget'];
+            }
+            $rows[] = $row;
+        }
+
+        return response()->json([
+            'success'         => $aiStatus === 'ready',
+            'status'          => $aiStatus,
+            'generated_at'    => $aiGeneratedAt ? (string) $aiGeneratedAt : null,
+            'message'         => $aiStatus === 'ready'
+                ? 'AI workforce-planning analysis regenerated.'
+                : ($aiStatus === 'timeout'
+                    ? 'The AI service did not respond in time. Try again in a moment.'
+                    : 'AI workforce-planning analysis failed — check that the AI service is reachable.'),
+            'rows'            => $rows,
+            'total_headcount' => $totalAiHc,
+            'total_budget'    => $totalAiBudget,
+            'total_annual'    => $totalAiBudget * 12,
+        ]);
     }
 
     /**

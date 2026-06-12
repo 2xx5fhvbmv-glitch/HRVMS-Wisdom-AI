@@ -367,25 +367,50 @@ class ComplianceController extends Controller
             return response()->json(['success' => false, 'message' => 'AI returned an unexpected response shape.'], 502);
         }
 
-        $created = 0;
+        $created       = 0;
+        $droppedNoEmp  = 0;   // resort-level findings or invalid employee refs
+        $droppedEmpty  = 0;   // empty description
+        $createdIds    = [];  // for the highlight-after-reload flash (same as regenerate)
+
         foreach ($anomalies as $a) {
             $type = trim((string) ($a['anomaly_type'] ?? 'Unknown Anomaly'));
             $sev  = trim((string) ($a['severity'] ?? 'Medium'));
             $desc = trim((string) ($a['description'] ?? ''));
             $rem  = trim((string) ($a['remediation'] ?? ''));
-            if ($desc === '') continue;  // skip empties
+            if ($desc === '') { $droppedEmpty++; continue; }
 
-            // Validate employee_id if supplied — anomaly scan can name an
-            // employee that's been terminated since the snapshot was built.
+            // For the row to be visible on the dashboard list, the
+            // employee_id must reference an employee in THIS resort that
+            // has an attached resortAdmin (same filter as list() and
+            // regenerateAi). Resort-level anomalies (employee_id NULL)
+            // or references to deleted/foreign employees won't surface
+            // on the dashboard — filing them is wasted work and confuses
+            // HR who expects 20 anomalies and sees 14.
             $empId = $a['employee_id'] ?? null;
+            $emp   = null;
             if ($empId !== null) {
-                $exists = Employee::where('id', $empId)->where('resort_id', $resort_id)->exists();
-                if (!$exists) $empId = null;
+                $emp = Employee::where('id', $empId)
+                    ->where('resort_id', $resort_id)
+                    ->whereHas('resortAdmin')
+                    ->first();
+            }
+            if (!$emp) {
+                // Either the AI returned a resort-wide finding (no
+                // specific employee) or the employee was terminated /
+                // belongs to another resort. Log for HR's awareness but
+                // don't create a row that would never be seen.
+                $droppedNoEmp++;
+                \Log::info('anomaly_scan: dropping unvisible anomaly', [
+                    'resort_id'    => $resort_id,
+                    'anomaly_type' => $type,
+                    'employee_id'  => $empId,
+                ]);
+                continue;
             }
 
-            Compliance::create([
+            $row = Compliance::create([
                 'resort_id'                => $resort_id,
-                'employee_id'              => $empId,
+                'employee_id'              => $emp->id,
                 'module_name'              => 'AI Anomaly Detection',
                 'compliance_breached_name' => $type,
                 // Use the AI text as the canonical description AND
@@ -399,15 +424,28 @@ class ComplianceController extends Controller
                 'ai_generated_at'          => now(),
                 'reported_on'              => Carbon::now(),
                 'status'                   => 'Breached',
+                // Dismissal_status defaults to 'Pending' (see migration
+                // 2025_07_25_124643_add_fieldsincompliances) so the row
+                // surfaces on the dashboard without an explicit set.
             ]);
             $created++;
+            $createdIds[] = (int) $row->id;
+        }
+
+        $msg = "AI scan complete — {$created} new anomal" . ($created === 1 ? 'y' : 'ies') . ' filed';
+        if ($droppedNoEmp > 0) {
+            $msg .= " ({$droppedNoEmp} resort-level/orphan finding" . ($droppedNoEmp === 1 ? '' : 's') . ' dropped — see logs)';
         }
 
         return response()->json([
-            'success'  => true,
-            'message'  => "AI scan complete — {$created} new anomal" . ($created === 1 ? 'y' : 'ies') . " filed.",
-            'created'  => $created,
-            'returned' => count($anomalies),
+            'success'        => true,
+            'message'        => $msg,
+            'created'        => $created,
+            'created_ids'    => $createdIds,   // matches regenerate.processed_ids shape
+            'processed_ids'  => $createdIds,   // alias so JS can reuse the same highlight helper
+            'dropped_no_employee' => $droppedNoEmp,
+            'dropped_empty'  => $droppedEmpty,
+            'returned'       => count($anomalies),
         ]);
     }
 
