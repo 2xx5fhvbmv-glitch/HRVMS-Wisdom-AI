@@ -734,7 +734,7 @@
                 $banner = $('#ai-cv-banner');
             }
         }
-        $banner.html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Reading your CV…').show();
+        $banner.html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Reading your CV… (scanned PDFs may take up to 90 s)').show();
 
         $.ajax({
             url: @json(route('resort.applicant.cvExtract')),
@@ -768,9 +768,16 @@
                         .text('Read the CV but found nothing new to pre-fill.');
                 }
             },
-            error: function () {
-                $banner.removeClass('alert-info').addClass('alert-warning')
-                    .text('AI service unavailable — please fill the form manually.');
+            error: function (xhr) {
+                // 422 from our endpoint means the AI rejected the PDF
+                // (scanned, encrypted, password-locked, etc.) — surface
+                // the actual reason from the server so the applicant
+                // knows whether to retry with a different file.
+                var resp = xhr.responseJSON || {};
+                var msg = resp.message
+                    || (xhr.status === 0 ? 'AI service unavailable — please fill the form manually.'
+                                         : 'Could not read the CV — please fill the form manually.');
+                $banner.removeClass('alert-info alert-success').addClass('alert-warning').text(msg);
             }
         });
     }

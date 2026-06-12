@@ -177,9 +177,6 @@
                         </div>
                         <div>
                             @php
-                                // Derive the Maldivian/Expat split for the
-                                // Compliance Tracking panel.
-                                //
                                 // Target % is resolved through Common::
                                 // getResortLocalRatioTarget — uses the
                                 // PER-RESORT value set on /resort/budget/
@@ -193,6 +190,26 @@
                                 $localPct         = $totalEmpForRatio > 0 ? round(($localEmployees / $totalEmpForRatio) * 100, 1) : 0;
                                 $expatPct         = $totalEmpForRatio > 0 ? round(($expatEmployees / $totalEmpForRatio) * 100, 1) : 0;
                                 $localPctClass    = $localPct >= $localRatioMin ? 'text-success' : 'text-danger';
+
+                                // Gap vs target — used to render either the
+                                // "+X pp above target" celebratory message
+                                // OR the actionable "need N more local
+                                // hires to comply" line.
+                                $localGap = $localPct - $localRatioMin;
+                                // How many additional Maldivian employees
+                                // would close the gap if no expat is
+                                // simultaneously offboarded? Pure arithmetic:
+                                //  required_local / total_after = target/100
+                                //  → required_local = ceil((target * expats) / (100 - target))
+                                //                          - currentLocal      // sanity bound
+                                // Use the simpler "to reach target % of
+                                // CURRENT total" formula which is what HR
+                                // intuitively expects.
+                                $shortNeeded = 0;
+                                if ($localGap < 0 && $totalEmpForRatio > 0) {
+                                    $shortNeeded = max(0, (int) ceil(($localRatioMin * $totalEmpForRatio / 100) - $localEmployees));
+                                }
+                                $targetLabel = rtrim(rtrim(number_format($localRatioMin, 1), '0'), '.');
                             @endphp
                             <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                                 <p class="mb-0">
@@ -200,35 +217,80 @@
                                 </p>
                                 <span class="d-inline-block w-25 text-end">{{$localEmployees}}/{{$expatEmployees}}</span>
                             </div>
-                            <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                                <p class="mb-0">
-                                    Local / Xpat Ratio:
-                                    <small class="text-muted d-block" style="font-size:10px;">{{ rtrim(rtrim(number_format($localRatioMin, 1), '0'), '.') }}% Maldivian target</small>
-                                </p>
-                                <span class="d-inline-block text-end">
-                                    <span class="fw-bold {{ $localPctClass }}">{{ $localPct }}%</span>
-                                    <span class="text-muted">/</span>
-                                    <span class="fw-bold">{{ $expatPct }}%</span>
-                                </span>
+
+                            {{-- Ratio block: shows current vs target, plus
+                                 an explicit "gap to target" line so HR sees
+                                 immediately whether they're compliant and,
+                                 if not, how many more Maldivian hires would
+                                 close the gap. --}}
+                            <div class="mb-3 border-bottom pb-2">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <p class="mb-0">
+                                        Local / Xpat Ratio:
+                                        <small class="text-muted d-block" style="font-size:10px;">{{ $targetLabel }}% Maldivian target</small>
+                                    </p>
+                                    <span class="text-end">
+                                        <span class="fw-bold {{ $localPctClass }}">{{ $localPct }}%</span>
+                                        <span class="text-muted">/</span>
+                                        <span class="fw-bold">{{ $expatPct }}%</span>
+                                    </span>
+                                </div>
+                                @if($totalEmpForRatio > 0)
+                                    @if($localGap >= 0)
+                                        <div class="text-success" style="font-size:11px;">
+                                            <i class="fa-solid fa-circle-check me-1"></i>
+                                            Target met &mdash; <strong>{{ number_format(abs($localGap), 1) }} percentage point{{ abs($localGap) === 1.0 ? '' : 's' }}</strong> above the {{ $targetLabel }}% floor.
+                                        </div>
+                                    @else
+                                        <div class="text-danger" style="font-size:11px;">
+                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                            <strong>{{ number_format(abs($localGap), 1) }} percentage point{{ abs($localGap) === 1.0 ? '' : 's' }}</strong> below target.
+                                            Hire <strong>{{ $shortNeeded }}</strong> more Maldivian employee{{ $shortNeeded === 1 ? '' : 's' }} to reach {{ $targetLabel }}%.
+                                        </div>
+                                    @endif
+                                @endif
                             </div>
-                            {{-- Min-wage row: the count stays where it was, but
-                                 we now reveal the names on click so HR can act
-                                 on the breach directly instead of having to dig
-                                 through Payroll. List sourced from $employeeMinWageList
-                                 in the controller — mirrors the SAME count logic
-                                 so the names and the number are guaranteed in sync. --}}
-                            <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                                <p class="mb-0">
-                                    Employees Under Minimum Wage:
-                                </p>
+
+                            {{-- Min-wage block: name + image scroller so HR
+                                 can act on the breach at a glance instead
+                                 of opening a modal. Horizontal flex with
+                                 overflow-auto means any count fits without
+                                 wrapping the panel. Modal remains as a
+                                 detail-view fallback. --}}
+                            <div class="mb-3 border-bottom pb-2">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <p class="mb-0">
+                                        Employees Under Minimum Wage:
+                                    </p>
+                                    @if(($employeeMinWageList ?? collect())->isNotEmpty())
+                                        <a href="#minWageEmployeesModal" data-bs-toggle="modal"
+                                           class="text-danger fw-bold text-decoration-underline"
+                                           title="Click to view full list with salaries">
+                                            {{ $employee_under_min_wage }}
+                                        </a>
+                                    @else
+                                        <span class="text-success fw-bold">{{ $employee_under_min_wage }}</span>
+                                    @endif
+                                </div>
                                 @if(($employeeMinWageList ?? collect())->isNotEmpty())
-                                    <a href="#minWageEmployeesModal" data-bs-toggle="modal"
-                                       class="d-inline-block w-25 text-end text-danger text-decoration-underline"
-                                       title="Click to see who">
-                                        {{ $employee_under_min_wage }}
-                                    </a>
-                                @else
-                                    <span class="d-inline-block w-25 text-end text-danger">{{ $employee_under_min_wage }}</span>
+                                    <div class="d-flex flex-nowrap overflow-auto pb-2" style="gap:8px; scrollbar-width:thin;">
+                                        @foreach($employeeMinWageList as $row)
+                                            <div class="d-flex flex-column align-items-center text-center"
+                                                 style="min-width:64px; max-width:64px;"
+                                                 title="{{ $row['name'] }} &mdash; {{ $row['code'] }} &mdash; {{ $row['salary'] }} {{ $row['currency'] }}">
+                                                <img src="{{ $row['picture'] }}"
+                                                     alt="{{ $row['name'] }}"
+                                                     style="width:42px; height:42px; object-fit:cover; border-radius:50%; border:2px solid #fecaca;">
+                                                <small class="d-block text-truncate w-100 mt-1"
+                                                       style="font-size:10px; line-height:1.1;">
+                                                    {{ \Illuminate\Support\Str::limit($row['name'], 14) }}
+                                                </small>
+                                                <small class="text-muted d-block" style="font-size:9px;">
+                                                    {{ $row['code'] }}
+                                                </small>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 @endif
                             </div>
                             <!-- <div class="d-flex justify-content-between mb-3  pb-2">
@@ -523,15 +585,28 @@
                                     <span class="bg-theme"></span>Occupancy Rates
                                 </div>
                             </div>
-                            {{-- <div class="col-auto">
-                                <div class="doughnut-label">
-                                    <span class="bg-themeLightBlue"></span>Seasonal Data
-                                </div>
-                            </div> --}}
                             <div class="col-auto">
                                 <div class="doughnut-label">
                                     <span class="bg-themeNeon"></span>Hiring Data
                                 </div>
+                            </div>
+                        </div>
+                        {{-- Reasoning panel: shows the AI's plain-language
+                             "why" for each month's staffing prediction.
+                             The chart on its own only shows NUMBERS; HR
+                             needs the context (peak vs trough, seasonal
+                             pressure, what to do with the headcount) to
+                             defend the recommendation to Finance. --}}
+                        <div class="mt-3 pt-3 border-top">
+                            <p class="mb-2" style="font-size:12px; font-weight:600; color:#374151;">
+                                <i class="fa-solid fa-lightbulb me-1 text-warning"></i>
+                                Why these numbers?
+                                <small class="text-muted fw-normal d-block" style="font-size:10px;">
+                                    Hover or tap any month in the chart for the AI's reasoning.
+                                </small>
+                            </p>
+                            <div id="aiInsightsReasoning" style="max-height:180px; overflow-y:auto;">
+                                <p class="text-muted m-0" style="font-size:11px;">Loading reasoning…</p>
                             </div>
                         </div>
                     </div>
@@ -1067,10 +1142,41 @@
                 myLineChart.data.labels = upcomingMonths;
                 myLineChart.data.datasets[0].data = response.occupancyRates;
                 myLineChart.data.datasets[1].data = response.hiringData;
+                // Stash reasons array on the chart so the tooltip can
+                // reach them by index without leaking globals.
+                myLineChart._aiReasons = Array.isArray(response.reasons) ? response.reasons : [];
+                myLineChart._aiMonths  = upcomingMonths;
                 myLineChart.update();
+
+                // Render the "Why these numbers?" panel beside the
+                // chart with the reasoning for the next 6 months —
+                // chronological so HR reads top → bottom as time goes
+                // forward. (Showing 12 swamps the panel; first 6 are
+                // the actionable ones.)
+                var $panel = $('#aiInsightsReasoning');
+                if ($panel.length) {
+                    var rows = [];
+                    var reasons = myLineChart._aiReasons;
+                    for (var i = 0; i < Math.min(6, upcomingMonths.length); i++) {
+                        var why = reasons[i] || 'No reasoning returned.';
+                        var occ = (response.occupancyRates[i] != null) ? response.occupancyRates[i] : 0;
+                        var staff = (response.hiringData[i] != null) ? response.hiringData[i] : 0;
+                        rows.push(
+                            '<div class="mb-2 pb-2 border-bottom">' +
+                            '  <div class="d-flex justify-content-between align-items-baseline mb-1">' +
+                            '    <strong style="font-size:11px; color:#014653;">' + upcomingMonths[i] + '</strong>' +
+                            '    <span style="font-size:10px; color:#6b7280;">' + occ + '% occ · ' + staff + ' staff</span>' +
+                            '  </div>' +
+                            '  <p class="m-0" style="font-size:11px; line-height:1.45; color:#374151;">' + $('<div>').text(why).html() + '</p>' +
+                            '</div>'
+                        );
+                    }
+                    $panel.html(rows.length ? rows.join('') : '<p class="text-muted m-0" style="font-size:11px;">No reasoning available.</p>');
+                }
             },
             error: function (error) {
                 console.error('Error fetching AI Insights data:', error);
+                $('#aiInsightsReasoning').html('<p class="text-danger m-0" style="font-size:11px;">Failed to load reasoning — check the AI service.</p>');
             }
         });
     }
@@ -1106,6 +1212,23 @@
             plugins: {
                 legend: {
                     display: false
+                },
+                // Tooltip surfaces the AI reasoning (stored on the chart
+                // as _aiReasons[i] by fetchAIInsightsData). HR hovers a
+                // point and sees the short "Why this number" line.
+                tooltip: {
+                    enabled: true,
+                    callbacks: {
+                        afterBody: function (tooltipItems) {
+                            var i = tooltipItems[0].dataIndex;
+                            var reasons = myLineChart._aiReasons || [];
+                            var reason = reasons[i];
+                            if (!reason) return '';
+                            // Wrap the reason at ~70 chars per line so
+                            // the tooltip box doesn't stretch off-screen.
+                            return reason.match(/.{1,70}(\s|$)/g).map(function (s) { return s.trim(); });
+                        }
+                    }
                 }
             },
             layout: {

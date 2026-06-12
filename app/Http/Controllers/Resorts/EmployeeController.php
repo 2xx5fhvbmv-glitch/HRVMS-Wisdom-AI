@@ -103,16 +103,28 @@ class EmployeeController extends Controller
 
     public function getEmployeeNationalityData()
     {
-        // Count employees where nationality is Maldivian (local)
-        $localEmployees = Employee::where('resort_id',  $this->globalUser->resort_id)->where('nationality', 'Maldivian')->count();
+        // CRITICAL: only count Active + Probationary employees. The
+        // previous version counted ALL employees including Terminated,
+        // Resigned, Retired, etc. — which made the Employee Type
+        // doughnut disagree with every other count on the dashboard
+        // (Compliance Tracking, Number of Local/Xpat, etc.) that
+        // correctly filter by status.
+        $current  = ['Active', 'Probationary'];
+        $resortId = $this->globalUser->resort_id;
 
-        // Count employees where nationality is not Maldivian (expat)
-        $expatEmployees = Employee::where('resort_id',  $this->globalUser->resort_id)->where('nationality', '!=', 'Maldivian')->count();
+        $localEmployees = Employee::where('resort_id', $resortId)
+            ->whereIn('status', $current)
+            ->where('nationality', 'Maldivian')
+            ->count();
 
-        // Return the counts as JSON
+        $expatEmployees = Employee::where('resort_id', $resortId)
+            ->whereIn('status', $current)
+            ->where('nationality', '!=', 'Maldivian')
+            ->count();
+
         return response()->json([
             'local' => $localEmployees,
-            'expat' => $expatEmployees
+            'expat' => $expatEmployees,
         ]);
     }
 

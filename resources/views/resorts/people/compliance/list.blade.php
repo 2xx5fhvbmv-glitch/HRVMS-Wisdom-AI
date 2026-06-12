@@ -329,6 +329,11 @@
     }
 
     // Run the AI-only anomaly scan (called after modal confirmation).
+    // Mirrors the Regenerate flow: the API returns processed_ids of the
+    // newly-filed anomaly rows; we reset to page 1, reload the table,
+    // and the rows show up at the top with the NEW AI pill (server-side
+    // ai_generated_at = NOW() puts them inside the 30-min freshness
+    // window automatically).
     function runAiAnomalyScan() {
         var $b = $('#ai-anomaly-scan-btn');
         var orig = $b.html();
@@ -340,8 +345,21 @@
             success: function (resp) {
                 if (resp && resp.success) {
                     toastr.success(resp.message, 'AI scan complete', { positionClass: 'toast-bottom-right', timeOut: 8000 });
+                    // Stash IDs for the optional JS-side immediate flash
+                    // (server-side setRowClass keeps the NEW AI pill on
+                    // for 30 min regardless, but this gives instant
+                    // feedback before the AJAX reload completes).
+                    window._aiFreshlyProcessedIds = Array.isArray(resp.processed_ids) ? resp.processed_ids.slice() : [];
                     var $tbl = $('#table-exitclearance-form').DataTable();
-                    if ($tbl) $tbl.ajax.reload(null, false);
+                    if ($tbl) {
+                        // Jump to page 1 so the new rows (ordered
+                        // ai_generated_at DESC server-side) are visible.
+                        $tbl.page(0);
+                        $tbl.ajax.reload(null, false);
+                    }
+                    // Clear the JS-side ID list after 12 s — the server-side
+                    // setRowClass takes over with the 30-min window.
+                    setTimeout(function () { window._aiFreshlyProcessedIds = []; }, 12000);
                 } else {
                     toastr.error((resp && resp.message) || 'AI scan failed.', 'Error', { positionClass: 'toast-bottom-right' });
                 }
@@ -378,8 +396,10 @@
         $('#ai-confirm-modal-title').text('Run AI anomaly scan?');
         $('#ai-confirm-modal-body').html(
             'This sends a resort-level snapshot (per-position salary distribution, per-department headcount + expat ratio, probation cohort) to the AI service ' +
-            'and files each returned anomaly as a new compliance row under <strong>"AI Anomaly Detection"</strong>.<br><br>' +
-            'Typical run time: <strong>up to 60 seconds</strong>. Maximum 20 anomalies created per scan. Existing rows are NOT modified.'
+            'and files each employee-specific anomaly as a new compliance row under <strong>"AI Anomaly Detection"</strong>.<br><br>' +
+            'New rows appear at the <strong>top of the list with the green NEW AI pill</strong> (same as Regenerate). ' +
+            'Resort-level findings (department-wide patterns) are logged separately but not filed as rows — they have no specific employee to display.<br><br>' +
+            'Typical run time: <strong>up to 60 seconds</strong>. Up to 20 anomalies per scan. Existing rows are NOT modified.'
         );
         $('#ai-confirm-modal-confirm').text('Yes, run scan')
             .removeClass('btn-themeGray').addClass('btn-themeBlue')
