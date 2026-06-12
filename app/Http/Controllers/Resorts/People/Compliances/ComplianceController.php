@@ -94,8 +94,24 @@ class ComplianceController extends Controller
         $limit = (int) ($request->input('limit', 15) ?: 15);
         $limit = max(1, min(20, $limit));
 
-        $baseQuery = Compliance::where('resort_id', $this->resort->resort_id)
-            ->where('status', 'Breached');
+        // CRITICAL: this filter chain MUST match the one in list() below.
+        // The list view does NOT require status='Breached' — older
+        // compliance rules (e.g. Time and Attendance / Over Time Not
+        // Eligible) created rows with status='' (empty string). Those
+        // rows DO surface on the dashboard but used to be skipped by
+        // Regenerate, leaving HR with rows they could see but couldn't
+        // enrich — the "NEW AI" badge count would mysteriously cap.
+        //
+        // Match list()'s filter exactly:
+        //   - Dismissal_status = 'Pending'   (not dismissed)
+        //   - whereHas employee + valid resortAdmin  (visible employee)
+        // No status filter — any visible row is eligible.
+        $resortId = $this->resort->resort_id;
+        $baseQuery = Compliance::where('resort_id', $resortId)
+            ->where('Dismissal_status', 'Pending')
+            ->whereHas('employee', function ($q) use ($resortId) {
+                $q->where('resort_id', $resortId)->whereHas('resortAdmin');
+            });
         $totalEligible = (clone $baseQuery)->count();
 
         $rows = (clone $baseQuery)
@@ -115,6 +131,10 @@ class ComplianceController extends Controller
         // hint whether the AI host was unreachable, the LLM timed out, or
         // the response body was malformed.
         $failReasons = [];
+        // IDs of rows that completed successfully this batch — sent back
+        // to the JS so it can flash them green for ~10 s after the table
+        // reloads. Lets HR see at a glance which 15 rows were just done.
+        $processedIds = [];
         foreach ($rows as $r) {
             // Reconstruct a minimal but useful context. Per-row context
             // (the rich employee snapshot the rules engine passes) only
@@ -125,14 +145,15 @@ class ComplianceController extends Controller
             $emp = $r->employee_id ? Employee::with('resortAdmin', 'position', 'department')->find($r->employee_id) : null;
             $ctx = [];
             if ($emp) {
+                // No employee_name / employee_code / employee_id keys —
+                // the latest prompt forbids naming the employee in the
+                // prose, and the LLM was leaking these field names
+                // directly into output ("(employee_code: the affected
+                // employee)"). The compliance row already shows the
+                // employee in dedicated columns, so the AI only needs
+                // the structural context (position, department, rank,
+                // nationality, salary) to reason about the breach.
                 $ctx = [
-                    'employee_name' => optional($emp->resortAdmin)->full_name,
-                    // Was 'employee_id' => $emp->id (the numeric DB primary
-                    // key). The LLM was citing that number in the generated
-                    // remediation text — HR called it "Technical employee
-                    // id". Now we only send the readable code (Emp_id),
-                    // so the AI says "DR-485" not "#485".
-                    'employee_code' => $emp->Emp_id ?? null,
                     'position'      => optional($emp->position)->position_title,
                     'department'    => optional($emp->department)->name,
                     'rank'          => $emp->rank,
@@ -144,6 +165,7 @@ class ComplianceController extends Controller
             $r->refresh();
             if ($r->ai_status === 'ready') {
                 $okCount++;
+                $processedIds[] = (int) $r->id;
             } else {
                 $failCount++;
                 // 'timeout' / 'failed' are the only two statuses the
@@ -167,14 +189,24 @@ class ComplianceController extends Controller
 
         $processed = $rows->count();
 
-        // How many breached rows have NOT been AI-enriched OR are older
-        // than this batch. The JS surfaces this as "X more eligible" so
-        // HR knows when to click again. Since selection order is
-        // (never-enriched first, then oldest first), this is also the
-        // count that would still be eligible on the NEXT click — the
-        // rows we just processed are now the freshest and won't be
-        // picked again until everything else has rotated.
-        $remainingEligible = max(0, $totalEligible - $processed);
+        // How many breached rows still have NO AI insight at all
+        // (ai_generated_at IS NULL), counted AFTER this batch saved.
+        //
+        // This MUST be a fresh count, not `totalEligible - processed`.
+        // The old subtraction was wrong once total > one batch: it
+        // subtracted only the current batch from the grand total every
+        // click, so for 27 rows it oscillated 12 → 15 → 12 forever and
+        // never reached 0 — the user saw "12 more eligible" indefinitely
+        // and the same rows got re-processed instead of completing.
+        //
+        // Because selection is never-enriched-first AND every processed
+        // row (success, timeout, or fail) stamps ai_generated_at, this
+        // NULL count drops by exactly `processed` each click and counts
+        // down cleanly to 0. The JS treats 0 as "complete". Re-running a
+        // full fresh sweep later (e.g. after a prompt change) would show
+        // 0 immediately since every row is already stamped — clicking
+        // still rotates the oldest rows, it just won't show a countdown.
+        $remainingEligible = (clone $baseQuery)->whereNull('ai_generated_at')->count();
 
         return response()->json([
             'success'            => true,
@@ -183,6 +215,7 @@ class ComplianceController extends Controller
             'failed'             => $failCount,
             'fail_reasons'       => $failReasons,
             'processed'          => $processed,
+            'processed_ids'      => $processedIds,  // for the highlight-after-reload flash
             'total_breached'     => $totalEligible,
             'remaining_eligible' => $remainingEligible,
             // Legacy alias for any caller that already reads `.total`.
@@ -237,13 +270,13 @@ class ComplianceController extends Controller
                     'salary_min'     => (float) $sals->first(),
                     'salary_max'     => (float) $sals->last(),
                     // Top earners surface salary outliers vs the median.
+                    // No employee_code / name keys here either — the AI is
+                    // forbidden from referencing the employee by ID, code,
+                    // or name in description/remediation prose (the row
+                    // displays the employee in dedicated columns). Salary
+                    // and rank are what the model needs to reason about
+                    // the anomaly.
                     'top_earners'    => $emps->sortByDesc('basic_salary')->take(3)->map(fn($e) => [
-                        // Emp_id is the readable employee code (e.g. "DR-485").
-                        // The numeric primary key used to be sent here; the AI
-                        // then cited "#485" in its anomaly description which HR
-                        // experienced as "technical id" noise.
-                        'employee_code' => $e->Emp_id ?? null,
-                        'name'        => optional($e->resortAdmin)->full_name,
                         'salary'      => (float) $e->basic_salary,
                         'rank'        => $e->rank,
                     ])->values()->all(),
@@ -525,6 +558,15 @@ class ComplianceController extends Controller
                     $q->where('resort_id', $resortId)->whereHas('resortAdmin');
                })
                ->where("Dismissal_status", "Pending")
+               // Order so the most recently AI-regenerated rows surface
+               // at the top. HR clicks "Regenerate AI" → the 15 rows
+               // just processed now sit at positions 1-15 in the list,
+               // making the batch trivially visible. Rows never enriched
+               // (ai_generated_at NULL) drop to the bottom — they don't
+               // outrank a freshly regenerated row in the list.
+               ->orderByRaw('ai_generated_at IS NULL ASC')
+               ->orderByDesc('ai_generated_at')
+               ->orderByDesc('id')
                ->get();
 
           if ($request->ajax()) 
@@ -631,6 +673,30 @@ class ComplianceController extends Controller
                     // run through e() inside editColumn('description'), so the
                     // HTML the DataTable sees is safe.
                     ->rawColumns(['employee_name','status', 'action', 'description'])
+                    // Stamp the compliance row id onto the <tr> as
+                    // data-compliance-id so the post-regenerate JS can
+                    // flash newly-processed rows green.
+                    ->setRowAttr([
+                        'data-compliance-id' => fn ($c) => (int) $c->id,
+                    ])
+                    // SERVER-SIDE freshness flag: any row whose AI was
+                    // (re)generated in the last 30 minutes gets the
+                    // ai-fresh-row class. This keeps the "NEW" pill +
+                    // green left border visible across pagination, page
+                    // refreshes, and pure DataTables redraws — the
+                    // JS-only flash dies on the first redraw, this
+                    // doesn't. Window is 30 min because HR who clicks
+                    // Regenerate and steps away for coffee should still
+                    // see what they processed when they come back.
+                    ->setRowClass(function ($c) {
+                        if (!$c->ai_generated_at) return '';
+                        try {
+                            $age = Carbon::parse($c->ai_generated_at);
+                            return $age->gte(now()->subMinutes(30)) ? 'ai-fresh-row' : '';
+                        } catch (\Throwable $e) {
+                            return '';
+                        }
+                    })
                     ->make(true);
           }    
           
@@ -685,8 +751,6 @@ class ComplianceController extends Controller
                                         'status' => 'Breached'
                                    ]);
                                    $this->enrichComplianceWithAi($row, [
-                                        'employee_name'   => $employee->resortAdmin->full_name ?? null,
-                                        'employee_code'   => $employee->Emp_id ?? null,
                                         'grade'           => $grade,
                                         'expected_amount' => (float) $resortBenifitsGrid->service_charge_amount,
                                         'received_amount' => (float) $payroll->service_charge_amount,
@@ -742,8 +806,6 @@ class ComplianceController extends Controller
                                    'status' => 'Breached'
                               ]);
                               $this->enrichComplianceWithAi($row, [
-                                   'employee_name'      => $probation->resortAdmin->full_name ?? null,
-                                   'employee_code'      => $probation->Emp_id ?? null,
                                    'position'           => optional($probation->position)->position_title,
                                    'joining_date'       => optional($probation->joining_date)->format('Y-m-d') ?? $probation->joining_date,
                                    'probation_end_date' => optional($probation->probation_end_date)->format('Y-m-d') ?? $probation->probation_end_date,
@@ -798,8 +860,6 @@ class ComplianceController extends Controller
                                    'status' => 'Breached'
                               ]);
                               $this->enrichComplianceWithAi($row, [
-                                   'employee_name'      => $overtime->resortAdmin->full_name ?? null,
-                                   'employee_code'      => $overtime->Emp_id ?? null,
                                    'position'           => optional($overtime->position)->position_title,
                                    'grade'              => $grade,
                                    'overtime_logged_at' => $today,
@@ -840,8 +900,6 @@ class ComplianceController extends Controller
                                    'status' => 'Breached'
                               ]);
                               $this->enrichComplianceWithAi($row, [
-                                   'employee_name'  => $seniorHR->resortAdmin->full_name ?? null,
-                                   'employee_code'  => $seniorHR->Emp_id ?? null,
                                    'position'       => optional($seniorHR->position)->position_title,
                                    'nationality'    => $seniorHR->nationality,
                                    'rank'           => $seniorHR->rank,
@@ -921,8 +979,6 @@ class ComplianceController extends Controller
                                    'status' => 'Breached'
                               ]);
                               $this->enrichComplianceWithAi($row, [
-                                   'employee_name' => $nonMaldivian->resortAdmin->full_name ?? null,
-                                   'employee_code' => $nonMaldivian->Emp_id ?? null,
                                    'position'      => optional($nonMaldivian->position)->position_title,
                                    'nationality'   => $nonMaldivian->nationality,
                                    'rank'          => $nonMaldivian->rank,
@@ -984,8 +1040,6 @@ class ComplianceController extends Controller
                                                        'status' => 'Breached'
                                                   ]);
                                                   $this->enrichComplianceWithAi($row, [
-                                                       'employee_name'      => $employee->resortAdmin->full_name ?? null,
-                                                       'employee_code'      => $employee->Emp_id ?? null,
                                                        'age'                => $age,
                                                        'basic_salary'       => (float) $basicSalary,
                                                        'required_pension'   => (float) round($sevenPercentOfSalary, 2),
