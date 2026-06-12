@@ -97,6 +97,28 @@
     @endsection
 
     @section('import-css')
+    <style>
+        /* Single visual marker for freshly AI-regenerated rows: a small
+           "NEW AI" pill in the first cell. Class `ai-fresh-row` is set
+           by the backend on any row whose ai_generated_at is < 30 min
+           old (see ComplianceController::list setRowClass) so the pill
+           persists across pagination, refresh, and search-induced
+           redraws — not just the first render. */
+        #table-exitclearance-form tbody tr.ai-fresh-row > td:first-child::before {
+            content: "NEW AI";
+            display: inline-block;
+            background-color: #16a34a;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-right: 8px;
+            vertical-align: middle;
+            box-shadow: 0 1px 3px rgba(22, 163, 74, 0.35);
+        }
+    </style>
     @endsection
 
     @section('import-scripts')
@@ -174,7 +196,20 @@
                iDisplayLength: 10,
                processing: true,
                serverSide: true,
-               order:[[9, 'desc']],
+               // NO client-side initial order. The backend's `list()`
+               // already orders by `ai_generated_at DESC NULLS LAST,
+               // id DESC` so freshly AI-regenerated rows surface at the
+               // top after each Regenerate click.
+               //
+               // The previous `order:[[9, 'desc']]` was sorting by
+               // `created_at` desc — that's the row's creation date,
+               // which never changes when AI regeneration runs, so the
+               // newly-enriched rows stayed wherever they were in the
+               // list and HR couldn't see they'd been processed.
+               //
+               // Columns are still individually sortable when the user
+               // clicks a header — this only disables the DEFAULT sort.
+               order: [],
                ajax: {
                     url: '{{ route("people.compliance.list") }}',
                     type: 'GET',
@@ -194,9 +229,41 @@
                     { data: 'status', name: 'status' },
                     { data: 'action', name: 'action', orderable: false, searchable: false },
                     {data:'created_at',visible:false,searchable:false},
-               ]
+               ],
+               // Flash newly AI-regenerated rows green after each batch.
+               // The ids come from the Regenerate API response and get
+               // stashed in window._aiFreshlyProcessedIds; cleared after
+               // 12 s so non-regenerate redraws don't re-trigger the flash.
+               drawCallback: function () { applyFreshRowHighlight(); }
           });
      }
+
+    // IDs of compliance rows freshly AI-regenerated in the most recent
+    // batch. Set in the AJAX success handler, consumed by the DataTable
+    // drawCallback below to flash the rows green for ~10 s after the
+    // table reload. Cleared after the flash so a refresh later doesn't
+    // re-highlight stale rows.
+    window._aiFreshlyProcessedIds = window._aiFreshlyProcessedIds || [];
+
+    // Apply / clear the "just-regenerated" CSS class on rows by id.
+    // Called from the DataTable drawCallback so it fires every time the
+    // table re-renders, including the post-regenerate reload.
+    function applyFreshRowHighlight() {
+        if (!window._aiFreshlyProcessedIds.length) return;
+        var ids = window._aiFreshlyProcessedIds;
+        var hit = 0;
+        ids.forEach(function (id) {
+            var $row = $('#table-exitclearance-form tbody tr[data-compliance-id="' + id + '"]');
+            if ($row.length) {
+                $row.addClass('ai-fresh-row');
+                hit++;
+            }
+        });
+        // If the freshly-processed rows aren't visible on the current
+        // DataTables page, the highlight won't appear — but the toast
+        // already told the user "X rows regenerated", so it's not lost.
+        // The next reload will still find them if they paginate back.
+    }
 
     // ─── AI action buttons ──────────────────────────────────────────────
     // ONE batch of 15 rows per click. Picks never-enriched rows first,
@@ -220,7 +287,19 @@
                     toastr.error((resp && resp.message) || 'AI regeneration failed.', 'Error', { positionClass: 'toast-bottom-right' });
                     return;
                 }
-                if ($tbl) $tbl.ajax.reload(null, false);
+                // Store the freshly-processed ids BEFORE reloading. The
+                // drawCallback runs synchronously after ajax.reload's
+                // success, so the ids will be available when it fires.
+                window._aiFreshlyProcessedIds = Array.isArray(resp.processed_ids) ? resp.processed_ids.slice() : [];
+
+                if ($tbl) {
+                    // Reset to the first page so the freshly regenerated
+                    // rows (now ordered ai_generated_at DESC server-side)
+                    // are actually visible — otherwise HR who was on
+                    // page 3 wouldn't see them.
+                    $tbl.page(0);
+                    $tbl.ajax.reload(null, false);
+                }
 
                 var enriched = resp.enriched      || 0;
                 var failed   = resp.failed        || 0;
@@ -234,6 +313,12 @@
                     summary += '. All breached rows have fresh AI insights.';
                 }
                 toastr.success(summary, 'AI regeneration complete', { positionClass: 'toast-bottom-right', timeOut: 8000 });
+
+                // Clear the highlight list after 12 s so the green flash
+                // doesn't get re-applied on the NEXT table reload (which
+                // can be triggered by anything — search, filter change,
+                // pagination). The CSS animation itself fades after ~10 s.
+                setTimeout(function () { window._aiFreshlyProcessedIds = []; }, 12000);
             },
             error: function (xhr) {
                 var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'AI regeneration failed.';
