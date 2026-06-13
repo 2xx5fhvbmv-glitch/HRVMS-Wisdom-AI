@@ -743,7 +743,12 @@ class ComplianceController extends Controller
 
      public function checkCompliance(Request $request){
           $resort = $this->resort;
-            
+
+          // Reset the per-run active-breach tracker. Every breach re-detected
+          // below records its key; resolveStaleBreaches() at the end closes any
+          // auto-resolvable breach NOT re-detected (i.e. now fixed).
+          $this->activeBreachKeys = [];
+
           $today = Carbon::today()->format('Y-m-d');
 
           $minWageMVR = 8021; // Minimum wage in MVR
@@ -1190,8 +1195,14 @@ class ComplianceController extends Controller
                     ->get();
                $employeesBelowMinWage = $employeesBelowMinWageInMVR->merge($employeesBelowMinWageInUSD);
                if ($employeesBelowMinWage->isNotEmpty()) {
-                    foreach ($employeesBelowMinWage as $employee) 
+                    foreach ($employeesBelowMinWage as $employee)
                     {
+                         $this->markBreachActive([
+                              'resort_id' => $resort->resort_id,
+                              'employee_id' => $employee->id,
+                              'module_name' => 'Workforce Planning',
+                              'compliance_breached_name' => 'Minimum Wage',
+                         ]);
                          $compliance = Compliance::firstOrCreate(
                               [
                                    'resort_id' => $resort->resort_id,
@@ -1691,6 +1702,12 @@ class ComplianceController extends Controller
                               $notify_person->id,
                               'People Management (TIN Requirement)'
                          )));
+                         $this->markBreachActive([
+                              'resort_id' => $this->resort->resort_id,
+                              'employee_id' => $employee->id,
+                              'module_name' => 'People Management',
+                              'compliance_breached_name' => 'TIN Requirement',
+                         ]);
                          Compliance::firstOrCreate(
                               [
                                    'resort_id' => $this->resort->resort_id,
@@ -1733,6 +1750,12 @@ class ComplianceController extends Controller
                          ->contains(fn ($attendance) => $attendance->OTStatus == "Approved");
 
                     if ($hasApprovedOvertime && $employee->entitled_overtime == "no") {
+                         $this->markBreachActive([
+                              'resort_id' => $this->resort->resort_id,
+                              'employee_id' => $employee->id,
+                              'module_name' => 'Time and Attendance',
+                              'compliance_breached_name' => 'Over Time Not Eligibile',
+                         ]);
                          Compliance::firstOrCreate(
                               [
                                    'resort_id' => $this->resort->resort_id,
@@ -1839,7 +1862,86 @@ class ComplianceController extends Controller
                                              return $employee;
                                         });
 
+          // Auto-close breaches that were NOT re-detected this run (now fixed).
+          $this->resolveStaleBreaches($resort->resort_id);
+
           return redirect()->route('people.compliance.index')->with('success', 'Compliance checks completed successfully.');
+     }
+
+     // Keys (resort|employee|module|breach) of every breach re-detected during
+     // the current checkCompliance() run. Used by resolveStaleBreaches() to
+     // auto-close breaches that no longer fire. Reset at the start of each run.
+     private $activeBreachKeys = [];
+
+     // Breach types that are safe to auto-resolve: evaluated on EVERY compliance
+     // run and driven by employee attributes, so non-detection reliably means
+     // the underlying issue was fixed. Payroll-gated breaches (Service Charge,
+     // Pension) are intentionally excluded — they only run when last month's
+     // payroll row exists, so their absence does NOT prove the breach is fixed.
+     // NOTE: only breaches generated INSIDE checkCompliance() may be listed
+     // here. 'Medical certificates Required' is deliberately omitted — it is
+     // produced by the separate test() method, not the production run, so the
+     // sweep would never mark it active and would wrongly resolve it.
+     private const AUTO_RESOLVABLE_BREACHES = [
+          'TIN Requirement',
+          'Minimum Wage',
+          'Extended Probation Period',
+          'Over Time Not Eligibile',
+          'Overtime Agreement Lacked',
+          'Job Description Not Received',
+          'Without Mandatory Break',
+          'Weekly Working Hours Limit',
+     ];
+
+     /**
+      * Build the canonical active-breach key for an employee-keyed breach.
+      * Null-employee breaches are skipped — they never surface on the compliance
+      * list (list() requires whereHas('employee')) so they are out of scope for
+      * auto-resolve. Accepts either an attributes array or explicit parts.
+      */
+     private function markBreachActive(array $row): void
+     {
+          $employeeId = $row['employee_id'] ?? null;
+          if ($employeeId === null) {
+               return;
+          }
+          $this->activeBreachKeys[implode('|', [
+               $row['resort_id'] ?? '',
+               $employeeId,
+               trim((string) ($row['module_name'] ?? '')),
+               trim((string) ($row['compliance_breached_name'] ?? '')),
+          ])] = true;
+     }
+
+     /**
+      * Auto-close employee-keyed breaches that were NOT re-detected during this
+      * run — i.e. the underlying issue was fixed (e.g. a TIN was entered). Only
+      * breach types in AUTO_RESOLVABLE_BREACHES are touched, and only rows still
+      * Pending (manually dismissed rows are left as-is). Resolved rows get
+      * Dismissal_status='Resolved' (distinct from manual 'Rejected') so they
+      * drop off the list while staying auditable.
+      */
+     private function resolveStaleBreaches($resortId): void
+     {
+          $open = Compliance::where('resort_id', $resortId)
+               ->whereNotNull('employee_id')
+               ->where('Dismissal_status', 'Pending')
+               ->whereIn('compliance_breached_name', self::AUTO_RESOLVABLE_BREACHES)
+               ->get();
+
+          foreach ($open as $row) {
+               $key = implode('|', [
+                    $row->resort_id,
+                    $row->employee_id,
+                    trim((string) $row->module_name),
+                    trim((string) $row->compliance_breached_name),
+               ]);
+               if (!isset($this->activeBreachKeys[$key])) {
+                    $row->status           = 'Resolved';
+                    $row->Dismissal_status = 'Resolved';
+                    $row->save();
+               }
+          }
      }
 
      /**
@@ -1882,6 +1984,9 @@ class ComplianceController extends Controller
       */
      private function createComplianceOncePerDay(array $attributes)
      {
+          // Record that this breach is still active this run (drives auto-resolve).
+          $this->markBreachActive($attributes);
+
           if ($this->complianceReportedToday($attributes)) {
                return null;
           }
@@ -1898,6 +2003,9 @@ class ComplianceController extends Controller
           $fresh = [];
           $seen = [];
           foreach ($rows as $row) {
+               // Record that this breach is still active this run (drives auto-resolve).
+               $this->markBreachActive($row);
+
                // Skip rows already queued in this same batch (the DB check below
                // can't catch those, as they are not persisted yet).
                $key = implode('|', [
