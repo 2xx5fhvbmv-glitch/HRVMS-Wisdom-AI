@@ -489,8 +489,20 @@ class BudgetController extends Controller
                 // Headcount: pmd-derived value if present, else fall back to
                 // the count of active employees — gives a sensible HOD figure
                 // even before manning is filled.
-                $p->headcount       = (int) ($p->headcount > 0 ? $p->headcount : $emps->count());
-                $p->current_budget  = (float) $emps->sum('basic_salary');
+                $p->headcount = (int) ($p->headcount > 0 ? $p->headcount : $emps->count());
+
+                // HOD budget = planned headcount × per-head salary. A position
+                // with 2 planned heads but only 1 filled used to show just the
+                // single filled salary (e.g. $550) next to a headcount of 2,
+                // which under-read the HOD total and made the comparison
+                // against the (headcount-based) AI budget inaccurate. Cost the
+                // full planned headcount at the filled average so vacant
+                // budgeted slots are priced in (e.g. 2 × $550 = $1,100).
+                $filledCount = $emps->count();
+                $filledSum   = (float) $emps->sum('basic_salary');
+                $perHead     = $filledCount > 0 ? ($filledSum / $filledCount) : 0.0;
+                $p->current_budget = (float) (max($p->headcount, $filledCount) * $perHead);
+
                 $totalHodHeadcount += $p->headcount;
                 $totalHodBudget    += $p->current_budget;
             }
