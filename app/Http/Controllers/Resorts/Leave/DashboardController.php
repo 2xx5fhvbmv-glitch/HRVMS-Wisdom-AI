@@ -259,7 +259,111 @@ class DashboardController extends Controller
             return substr($employee->dob, 5, 5) === $tomorrowMd;
         });
 
-        return view('resorts.leaves.dashboard.hrdashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves','show_department_filter'));
+        // ── AI Insights (computed from live leave + occupancy data) ──────
+        // Replaces the previously-hardcoded placeholder cards. Wrapped so any
+        // data hiccup degrades to a sensible default instead of breaking the
+        // dashboard.
+        $leaveInsights = [
+            'occupancy' => ['title' => 'Occupancy & Leave Window', 'body' => "Occupancy data for the next 3 months isn't available yet."],
+            'peak'      => ['title' => 'AI Forecasted Peak Leave Periods', 'body' => 'Not enough leave history to forecast peak periods yet.'],
+            'behavior'  => ['title' => 'Employee Leave Behavior Analysis', 'body' => 'No leave history yet to analyse.'],
+        ];
+        try {
+            $resortId = $this->resort->resort_id;
+            $now      = Carbon::now();
+
+            // Card 1 — next-3-months occupancy outlook + annual-leave backlog.
+            $avgOcc = (float) (\App\Models\Occuplany::where('resort_id', $resortId)
+                ->whereBetween('occupancydate', [$now->copy()->startOfDay()->toDateString(), $now->copy()->addMonths(3)->endOfDay()->toDateString()])
+                ->avg('occupancyinPer') ?? 0);
+
+            $annualCat = \App\Models\LeaveCategory::where('resort_id', $resortId)
+                ->where('leave_type', 'Annual Leave')->first();
+            $backlog = 0;
+            if ($annualCat) {
+                $entitlement = (float) ($annualCat->number_of_days ?? 0);
+                $takenByEmp  = DB::table('employees_leaves')
+                    ->where('resort_id', $resortId)
+                    ->where('leave_category_id', $annualCat->id)
+                    ->where('status', 'Approved')
+                    ->whereYear('from_date', $now->year)
+                    ->groupBy('emp_id')
+                    ->select('emp_id', DB::raw('SUM(total_days) as days'))
+                    ->pluck('days', 'emp_id');
+                $activeEmpIds = DB::table('employees')
+                    ->where('resort_id', $resortId)
+                    ->whereNotIn('status', ['Terminated', 'Inactive', 'Offboarding'])
+                    ->pluck('id');
+                foreach ($activeEmpIds as $eid) {
+                    if ((float) ($takenByEmp[$eid] ?? 0) < $entitlement) {
+                        $backlog++;
+                    }
+                }
+            }
+            $backlogNote = $backlog > 0 ? " {$backlog} employees still have unused annual leave." : '';
+
+            if ($avgOcc > 0 && $avgOcc < 50) {
+                $leaveInsights['occupancy'] = ['title' => 'Low occupancy for the upcoming 3 months',
+                    'body' => 'Average occupancy is forecast at ' . round($avgOcc, 1) . '% over the next 3 months — a good window to clear annual-leave backlog.' . $backlogNote];
+            } elseif ($avgOcc >= 50 && $avgOcc < 75) {
+                $leaveInsights['occupancy'] = ['title' => 'Moderate occupancy for the upcoming 3 months',
+                    'body' => 'Average occupancy is forecast at ' . round($avgOcc, 1) . '% over the next 3 months — schedule leave selectively to keep coverage.' . $backlogNote];
+            } elseif ($avgOcc >= 75) {
+                $leaveInsights['occupancy'] = ['title' => 'High occupancy for the upcoming 3 months',
+                    'body' => 'Average occupancy is forecast at ' . round($avgOcc, 1) . '% over the next 3 months — peak demand, avoid non-essential leave in this period.'];
+            } elseif ($backlog > 0) {
+                $leaveInsights['occupancy']['body'] = "Occupancy data for the next 3 months isn't available yet." . $backlogNote;
+            }
+
+            // Card 2 — peak leave period (best 3-consecutive-month window).
+            $byMonth = array_fill(1, 12, 0.0);
+            $monthRows = DB::table('employees_leaves')
+                ->where('resort_id', $resortId)
+                ->whereNotNull('from_date')
+                ->groupBy(DB::raw('MONTH(from_date)'))
+                ->select(DB::raw('MONTH(from_date) as m'), DB::raw('SUM(total_days) as d'))
+                ->pluck('d', 'm');
+            foreach ($monthRows as $m => $d) {
+                $byMonth[(int) $m] = (float) $d;
+            }
+            $totalLeaveDays = array_sum($byMonth);
+            if ($totalLeaveDays > 0) {
+                $bestStart = 1; $bestSum = -1;
+                for ($s = 1; $s <= 12; $s++) {
+                    $sum = 0;
+                    for ($k = 0; $k < 3; $k++) {
+                        $sum += $byMonth[(($s - 1 + $k) % 12) + 1];
+                    }
+                    if ($sum > $bestSum) { $bestSum = $sum; $bestStart = $s; }
+                }
+                $endMonth  = (($bestStart - 1 + 2) % 12) + 1;
+                $startName = Carbon::create(null, $bestStart, 1)->format('F');
+                $endName   = Carbon::create(null, $endMonth, 1)->format('F');
+                $sharePct  = (int) round(($bestSum / max(1, $totalLeaveDays)) * 100);
+                $leaveInsights['peak']['body'] = "{$startName} to {$endName} is the peak leave period — {$sharePct}% of all leave days fall in this window.";
+            }
+
+            // Card 3 — leave behaviour (top category, avg duration, approval rate).
+            $totalReq = (int) DB::table('employees_leaves')->where('resort_id', $resortId)->count();
+            if ($totalReq > 0) {
+                $approved = (int) DB::table('employees_leaves')->where('resort_id', $resortId)->where('status', 'Approved')->count();
+                $avgDays  = round((float) DB::table('employees_leaves')->where('resort_id', $resortId)->avg('total_days'), 1);
+                $topCat   = DB::table('employees_leaves as el')
+                    ->leftJoin('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
+                    ->where('el.resort_id', $resortId)
+                    ->groupBy('lc.leave_type')
+                    ->select('lc.leave_type', DB::raw('count(*) as c'))
+                    ->orderByDesc('c')->first();
+                $catName = ($topCat && $topCat->leave_type) ? $topCat->leave_type : 'Leave';
+                $catPct  = $topCat ? (int) round(($topCat->c / $totalReq) * 100) : 0;
+                $approvalRate = (int) round(($approved / $totalReq) * 100);
+                $leaveInsights['behavior']['body'] = "{$catName} is the most-requested leave ({$catPct}% of {$totalReq} requests). Average duration is {$avgDays} days, with a {$approvalRate}% approval rate.";
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Leave dashboard AI insights failed: ' . $e->getMessage());
+        }
+
+        return view('resorts.leaves.dashboard.hrdashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves','show_department_filter','leaveInsights'));
     }
 
     public function hod_dashboard()
