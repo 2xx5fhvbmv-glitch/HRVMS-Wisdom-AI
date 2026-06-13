@@ -235,43 +235,39 @@
             </div>
             <div class="col-xl-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card card-wiINsightPayroll" id="card-wiINsightPayroll" >
+                    @php $meta = $payrollInsights['_meta'] ?? null; @endphp
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">WI Insight's</h3>
+                                <h3 class="text-nowrap">WAI Insight's</h3>
                             </div>
-                            <div class="col-auto">
-                                <a href="#" class="a-link">View All</a>
+                            <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                @if($meta)
+                                    <div class="text-muted">Updated {{ $meta['generated_at']->diffForHumans() }}</div>
+                                    @if($meta['can_regenerate'])
+                                        <a href="?regenerate_insights=1" class="a-linkTheme">Regenerate</a>
+                                    @else
+                                        <span class="text-muted" title="{{ $meta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $meta['next_available']->diffForHumans() }}</span>
+                                    @endif
+                                @endif
                             </div>
                         </div>
                     </div>
                     <div class="leaveUser-main">
+                        @foreach([['key'=>'trend','modal'=>'payrollInsightTrendModal'],['key'=>'overtime','modal'=>'payrollInsightOvertimeModal'],['key'=>'expat','modal'=>'payrollInsightExpatModal'],['key'=>'allowance','modal'=>'payrollInsightAllowanceModal']] as $pc)
                         <div class="leaveUser-block">
                             <div class="img">
                                 <img src="assets/images/wisdom-ai-small.svg" alt="image">
                             </div>
                             <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                </p>
+                                <h6>{{ $payrollInsights[$pc['key']]['title'] ?? '' }}</h6>
+                                <p>{{ $payrollInsights[$pc['key']]['body'] ?? '' }}</p>
                                 <div>
-                                    <a href="#" class="a-linkTheme">View Details</a>
+                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $pc['modal'] }}" class="a-linkTheme">View Details</a>
                                 </div>
                             </div>
                         </div>
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                            </div>
-                            <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                </p>
-                                <div>
-                                    <a href="#" class="a-linkTheme">View Details</a>
-                                </div>
-                            </div>
-                        </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -661,6 +657,8 @@
         </div>
     </div>
 </div>
+
+@include('resorts.payroll.dashboard._insight_modals')
 @endsection
 
 @section('import-css')

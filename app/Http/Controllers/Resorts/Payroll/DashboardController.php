@@ -194,12 +194,231 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        // AI Insights (cached, 2-day refresh) — resort-wide.
+        $payrollInsights = $this->getCachedPayrollInsights($resort_id);
+
         return view('resorts.payroll.dashboard.dashboard', compact(
             'page_title', 'total_employees', 'total_paid_employees',
             'lastPayroll', 'upcomingPayroll', 'upcomingEstimated', 'isEstimated',
-            'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls', 'lockedPayrolls'
+            'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls', 'lockedPayrolls',
+            'payrollInsights'
         ));
     }
+
+    /**
+     * Cached wrapper around buildPayrollInsights() with a manual 2-day refresh,
+     * mirroring the leave dashboard. Cached per resort; the "Regenerate" button
+     * loads ?regenerate_insights=1 and recomputes only once the 48h cooldown has
+     * elapsed. Returned array carries a '_meta' key for the card header.
+     */
+    private function getCachedPayrollInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'payroll_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildPayrollInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the four payroll AI-insight cards from the latest finalized
+     * (locked/completed) payroll: cost trend (MoM), overtime hotspots, expat vs
+     * local split, and top allowances. Each card is wrapped so one failing query
+     * degrades just that card, not the whole set.
+     */
+    private function buildPayrollInsights($resortId): array
+    {
+        $sym = '$';
+        try { $sym = Common::GetResortCurrencySymbol() ?: '$'; } catch (\Throwable $e) {}
+        $money = function ($n) use ($sym) { return $sym . ' ' . number_format((float) $n, 0); };
+        $monthNames = [1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'May',6=>'Jun',7=>'Jul',8=>'Aug',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dec'];
+
+        $insights = [
+            'trend'     => ['title' => 'Payroll Cost Trend',        'body' => 'Not enough payroll history to compare months.'],
+            'overtime'  => ['title' => 'Overtime Spend & Hotspots', 'body' => 'No finalized payroll yet to analyse.'],
+            'expat'     => ['title' => 'Expat vs Local Cost',       'body' => 'No finalized payroll yet to analyse.'],
+            'allowance' => ['title' => 'Allowance Spend',           'body' => 'No finalized payroll yet to analyse.'],
+        ];
+
+        $finalStatuses = ['locked', 'completed'];
+        $now = \Carbon\Carbon::now();
+
+        $latest = DB::table('payroll')->where('resort_id', $resortId)
+            ->whereIn('status', $finalStatuses)->orderByDesc('end_date')->first();
+
+        if (!$latest) {
+            return $insights;
+        }
+
+        $totalNet = (float) DB::table('payroll_reviews')->where('payroll_id', $latest->id)->sum('net_salary');
+        $denom = $totalNet > 0 ? $totalNet : 1;
+        $topOtDept = null;
+
+        // Card: Overtime spend & hotspots
+        try {
+            $totalOT = (float) DB::table('payroll_reviews')->where('payroll_id', $latest->id)->sum('earnings_overtime');
+            $otByDept = DB::table('payroll_reviews as pr')
+                ->join('employees as e', 'e.id', '=', 'pr.employee_id')
+                ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+                ->where('pr.payroll_id', $latest->id)
+                ->groupBy('d.id', 'd.name')
+                ->select(DB::raw("COALESCE(d.name,'Unassigned') as dept"), DB::raw('SUM(pr.earnings_overtime) as ot'))
+                ->havingRaw('SUM(pr.earnings_overtime) > 0')
+                ->orderByDesc('ot')->get();
+            $otPct = round($totalOT / $denom * 100, 1);
+            if ($totalOT > 0 && $otByDept->isNotEmpty()) {
+                $topOtDept = $otByDept->first();
+                $share = (int) round($topOtDept->ot / max(1, $totalOT) * 100);
+                $insights['overtime']['body'] = 'Overtime is ' . $money($totalOT) . " ({$otPct}% of payroll); {$topOtDept->dept} accounts for {$share}% of it.";
+            } elseif ($totalOT > 0) {
+                $insights['overtime']['body'] = 'Overtime is ' . $money($totalOT) . " ({$otPct}% of payroll).";
+            } else {
+                $insights['overtime']['body'] = 'No overtime in the latest payroll.';
+            }
+            $topEmps = DB::table('payroll_reviews as pr')
+                ->join('employees as e', 'e.id', '=', 'pr.employee_id')
+                ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+                ->where('pr.payroll_id', $latest->id)
+                ->where('pr.earnings_overtime', '>', 0)
+                ->select(DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name"),
+                         DB::raw("COALESCE(d.name,'—') as dept"), 'pr.earnings_overtime as ot')
+                ->orderByDesc('pr.earnings_overtime')->limit(10)->get();
+            $insights['overtime']['details'] = [
+                'total'    => $totalOT,
+                'by_dept'  => $otByDept->map(fn ($r) => ['dept' => $r->dept, 'ot' => (float) $r->ot])->all(),
+                'top_emps' => $topEmps->map(fn ($r) => ['name' => trim((string) $r->name) ?: 'Employee', 'dept' => $r->dept, 'ot' => (float) $r->ot])->all(),
+            ];
+        } catch (\Throwable $e) { \Log::warning('Payroll insight overtime failed: ' . $e->getMessage()); }
+
+        // Card: Expat vs local cost
+        try {
+            $natRows = DB::table('payroll_reviews as pr')
+                ->join('employees as e', 'e.id', '=', 'pr.employee_id')
+                ->where('pr.payroll_id', $latest->id)
+                ->select(DB::raw("CASE WHEN e.nationality='Maldivian' THEN 'local' ELSE 'expat' END as grp"),
+                         DB::raw('SUM(pr.net_salary) as salary'), DB::raw('COUNT(*) as cnt'))
+                ->groupBy('grp')->get()->keyBy('grp');
+            $expatSalary = (float) (optional($natRows->get('expat'))->salary ?? 0);
+            $localSalary = (float) (optional($natRows->get('local'))->salary ?? 0);
+            $expatCnt = (int) (optional($natRows->get('expat'))->cnt ?? 0);
+            $localCnt = (int) (optional($natRows->get('local'))->cnt ?? 0);
+            $expatPct = round($expatSalary / $denom * 100, 1);
+            $perHeadOp = 0.0;
+            try { $perHeadOp = (float) Common::CheckemployeeBudgetCost('expat', $resortId, 0); } catch (\Throwable $e) {}
+            $expatOp = $perHeadOp * $expatCnt;
+            $body = 'Expat staff are ' . $expatPct . '% of payroll (' . $money($expatSalary) . ' of ' . $money($totalNet) . '), '
+                . $expatCnt . ' of ' . ($expatCnt + $localCnt) . ' staff.';
+            if ($expatOp > 0) {
+                $body .= ' Work-permit/visa/insurance add ~' . $money($expatOp) . '/mo on top.';
+            }
+            $insights['expat']['body'] = $body;
+            $insights['expat']['details'] = [
+                'expat_salary' => $expatSalary, 'local_salary' => $localSalary,
+                'expat_count' => $expatCnt, 'local_count' => $localCnt,
+                'operational' => $expatOp, 'total' => $totalNet,
+            ];
+        } catch (\Throwable $e) { \Log::warning('Payroll insight expat failed: ' . $e->getMessage()); }
+
+        // Card: Allowance spend (top types)
+        try {
+            $allowRows = DB::table('payroll_review_allowances as pra')
+                ->join('payroll_reviews as pr', 'pr.id', '=', 'pra.payroll_review_id')
+                ->where('pr.payroll_id', $latest->id)
+                ->groupBy('pra.allowance_type')
+                ->select('pra.allowance_type', DB::raw('SUM(pra.amount) as amt'))
+                ->orderByDesc('amt')->get();
+            $allowTotal = (float) $allowRows->sum('amt');
+            if ($allowRows->isNotEmpty() && $allowTotal > 0) {
+                $top3 = $allowRows->take(3)
+                    ->map(fn ($r) => (($r->allowance_type ?: 'Other')) . ' (' . $money($r->amt) . ')')
+                    ->implode(', ');
+                $insights['allowance']['body'] = 'Top allowances: ' . $top3 . '. Total ' . $money($allowTotal) . '/mo.';
+            } else {
+                $insights['allowance']['body'] = 'No allowances paid in the latest payroll.';
+            }
+            $insights['allowance']['details'] = [
+                'total' => $allowTotal,
+                'types' => $allowRows->map(fn ($r) => [
+                    'type'   => $r->allowance_type ?: 'Other',
+                    'amount' => (float) $r->amt,
+                    'pct'    => $allowTotal > 0 ? (int) round($r->amt / $allowTotal * 100) : 0,
+                ])->all(),
+            ];
+        } catch (\Throwable $e) { \Log::warning('Payroll insight allowance failed: ' . $e->getMessage()); }
+
+        // Card: Payroll cost trend (month-over-month)
+        try {
+            $monthly = DB::table('payroll as p')
+                ->join('payroll_reviews as pr', 'pr.payroll_id', '=', 'p.id')
+                ->where('p.resort_id', $resortId)
+                ->whereIn('p.status', $finalStatuses)
+                ->whereYear('p.end_date', $now->year)
+                ->groupBy(DB::raw('MONTH(p.end_date)'))
+                ->select(DB::raw('MONTH(p.end_date) as m'), DB::raw('SUM(pr.net_salary) as total'))
+                ->orderBy('m')->pluck('total', 'm');
+            if ($monthly->isNotEmpty()) {
+                $keys = array_map('intval', $monthly->keys()->all());
+                $lastM = max($keys);
+                $lastTotal = (float) $monthly[$lastM];
+                $prevTotal = null;
+                foreach (array_reverse($keys) as $mm) {
+                    if ($mm < $lastM) { $prevTotal = (float) $monthly[$mm]; break; }
+                }
+                $lastName = $monthNames[$lastM] ?? $lastM;
+                if ($prevTotal !== null && $prevTotal > 0) {
+                    $chg = round(($lastTotal - $prevTotal) / $prevTotal * 100, 1);
+                    $dir = $chg >= 0 ? '+' : '';
+                    $driver = $topOtDept ? " — driven mainly by {$topOtDept->dept} overtime" : '';
+                    $insights['trend']['body'] = 'Payroll is ' . $money($lastTotal) . " in {$lastName}, {$dir}{$chg}% vs the previous month{$driver}.";
+                } else {
+                    $insights['trend']['body'] = 'Payroll is ' . $money($lastTotal) . " in {$lastName}.";
+                }
+                $deptTotals = DB::table('payroll_reviews as pr')
+                    ->join('employees as e', 'e.id', '=', 'pr.employee_id')
+                    ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+                    ->where('pr.payroll_id', $latest->id)
+                    ->groupBy('d.id', 'd.name')
+                    ->select(DB::raw("COALESCE(d.name,'Unassigned') as dept"), DB::raw('SUM(pr.net_salary) as total'))
+                    ->orderByDesc('total')->get();
+                $insights['trend']['details'] = [
+                    'months'      => $monthly->mapWithKeys(fn ($v, $k) => [(int) $k => (float) $v])->all(),
+                    'month_names' => $monthNames,
+                    'by_dept'     => $deptTotals->map(fn ($r) => ['dept' => $r->dept, 'total' => (float) $r->total])->all(),
+                ];
+            }
+        } catch (\Throwable $e) { \Log::warning('Payroll insight trend failed: ' . $e->getMessage()); }
+
+        return $insights;
+    }
+
     public function draftsList()
     {
         $page_title = 'Draft Payrolls';
