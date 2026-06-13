@@ -132,7 +132,7 @@ class DashboardController extends Controller
         });
 
         $show_department_filter = $isFromHRDepartment;
-        $leaveInsights = $this->buildLeaveInsights($this->resort->resort_id, $isFromHRDepartment ? null : $userDeptId);
+        $leaveInsights = $this->getCachedLeaveInsights($this->resort->resort_id, $isFromHRDepartment ? null : $userDeptId);
         return view('resorts.leaves.dashboard.admin-dashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves','show_department_filter','leaveInsights'));
     }
 
@@ -260,8 +260,8 @@ class DashboardController extends Controller
             return substr($employee->dob, 5, 5) === $tomorrowMd;
         });
 
-        // AI Insights computed from live leave + occupancy data (resort-wide for HR).
-        $leaveInsights = $this->buildLeaveInsights($this->resort->resort_id);
+        // AI Insights (cached, 2-day refresh) — resort-wide for HR.
+        $leaveInsights = $this->getCachedLeaveInsights($this->resort->resort_id);
 
         return view('resorts.leaves.dashboard.hrdashboard',compact('page_title','upcomingHolidays','todayBirthdays','tomorrowBirthdays','total_applied_leaves','resort_departments','total_approved_leaves','total_pending_leaves','total_rejected_leaves','show_department_filter','leaveInsights'));
     }
@@ -303,9 +303,9 @@ class DashboardController extends Controller
 
             $annualCat = \App\Models\LeaveCategory::where('resort_id', $resortId)
                 ->where('leave_type', 'Annual Leave')->first();
-            $backlog = 0;
+            $backlogEmployees = [];
+            $entitlement = $annualCat ? (float) ($annualCat->number_of_days ?? 0) : 0.0;
             if ($annualCat) {
-                $entitlement = (float) ($annualCat->number_of_days ?? 0);
                 $takenQ = DB::table('employees_leaves')
                     ->where('resort_id', $resortId)
                     ->where('leave_category_id', $annualCat->id)
@@ -316,18 +316,27 @@ class DashboardController extends Controller
                     ->select('emp_id', DB::raw('SUM(total_days) as days'))
                     ->pluck('days', 'emp_id');
 
-                $activeQ = DB::table('employees')
-                    ->where('resort_id', $resortId)
-                    ->whereNotIn('status', ['Terminated', 'Inactive', 'Offboarding']);
-                if ($deptId) { $activeQ->where('Dept_id', $deptId); }
-                $activeEmpIds = $activeQ->pluck('id');
-
-                foreach ($activeEmpIds as $eid) {
-                    if ((float) ($takenByEmp[$eid] ?? 0) < $entitlement) {
-                        $backlog++;
+                $activeQ = DB::table('employees as e')
+                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                    ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+                    ->where('e.resort_id', $resortId)
+                    ->whereNotIn('e.status', ['Terminated', 'Inactive', 'Offboarding'])
+                    ->select('e.id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name"), 'd.name as dept');
+                if ($deptId) { $activeQ->where('e.Dept_id', $deptId); }
+                foreach ($activeQ->get() as $emp) {
+                    $used = (float) ($takenByEmp[$emp->id] ?? 0);
+                    $remaining = $entitlement - $used;
+                    if ($remaining > 0) {
+                        $backlogEmployees[] = [
+                            'name'      => trim((string) $emp->name) !== '' ? $emp->name : ('Employee #' . $emp->id),
+                            'dept'      => $emp->dept ?: '—',
+                            'used'      => $used,
+                            'remaining' => $remaining,
+                        ];
                     }
                 }
             }
+            $backlog = count($backlogEmployees);
             $backlogNote = $backlog > 0 ? " {$backlog} employees still have unused annual leave." : '';
 
             if ($avgOcc > 0 && $avgOcc < 50) {
@@ -342,6 +351,8 @@ class DashboardController extends Controller
             } elseif ($backlog > 0) {
                 $leaveInsights['occupancy']['body'] = "Occupancy data for the next 3 months isn't available yet." . $backlogNote;
             }
+            // Attach detail data AFTER the band branches above (they replace the array).
+            $leaveInsights['occupancy']['details'] = ['entitlement' => $entitlement, 'employees' => $backlogEmployees];
 
             // Card 2 — peak leave period (best 3-consecutive-month window).
             $byMonth = array_fill(1, 12, 0.0);
@@ -371,11 +382,13 @@ class DashboardController extends Controller
                 $sharePct  = (int) round(($bestSum / max(1, $totalLeaveDays)) * 100);
                 $leaveInsights['peak']['body'] = "{$startName} to {$endName} is the peak leave period — {$sharePct}% of all leave days fall in this window.";
             }
+            $leaveInsights['peak']['details'] = ['months' => $byMonth, 'total' => $totalLeaveDays];
 
             // Card 3 — leave behaviour (top category, avg duration, approval rate).
             $reqQ = DB::table('employees_leaves')->where('resort_id', $resortId);
             if ($deptEmpIds !== null) { $reqQ->whereIn('emp_id', $deptEmpIds); }
             $totalReq = (int) (clone $reqQ)->count();
+            $catBreakdown = [];
             if ($totalReq > 0) {
                 $approved = (int) (clone $reqQ)->where('status', 'Approved')->count();
                 $avgDays  = round((float) (clone $reqQ)->avg('total_days'), 1);
@@ -383,26 +396,77 @@ class DashboardController extends Controller
                     ->leftJoin('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
                     ->where('el.resort_id', $resortId);
                 if ($deptEmpIds !== null) { $catQ->whereIn('el.emp_id', $deptEmpIds); }
-                $topCat = $catQ->groupBy('lc.leave_type')
-                    ->select('lc.leave_type', DB::raw('count(*) as c'))
-                    ->orderByDesc('c')->first();
+                $catRows = $catQ->groupBy('lc.leave_type')
+                    ->select('lc.leave_type',
+                        DB::raw('count(*) as c'),
+                        DB::raw('ROUND(AVG(el.total_days),1) as avg_days'),
+                        DB::raw("SUM(CASE WHEN el.status='Approved' THEN 1 ELSE 0 END) as approved"))
+                    ->orderByDesc('c')->get();
+                foreach ($catRows as $r) {
+                    $catBreakdown[] = [
+                        'category' => $r->leave_type ?: 'Uncategorised',
+                        'count'    => (int) $r->c,
+                        'pct'      => (int) round(($r->c / $totalReq) * 100),
+                        'avg_days' => (float) $r->avg_days,
+                        'approval' => (int) round((((int) ($r->approved ?? 0)) / max(1, (int) $r->c)) * 100),
+                    ];
+                }
+                $topCat  = $catRows->first();
                 $catName = ($topCat && $topCat->leave_type) ? $topCat->leave_type : 'Leave';
                 $catPct  = $topCat ? (int) round(($topCat->c / $totalReq) * 100) : 0;
                 $approvalRate = (int) round(($approved / $totalReq) * 100);
                 $leaveInsights['behavior']['body'] = "{$catName} is the most-requested leave ({$catPct}% of {$totalReq} requests). Average duration is {$avgDays} days, with a {$approvalRate}% approval rate.";
             }
+            $leaveInsights['behavior']['details'] = ['total' => $totalReq, 'categories' => $catBreakdown];
         } catch (\Throwable $e) {
             \Log::warning('Leave dashboard AI insights failed: ' . $e->getMessage());
         }
 
-        // "View Details" destinations — set after computation so they survive
-        // whichever branches ran. Occupancy/peak open the leave calendar (plan
-        // around the window / see the peak); behaviour opens the leave history.
-        $leaveInsights['occupancy']['link'] = route('leave.calendar');
-        $leaveInsights['peak']['link']      = route('leave.calendar');
-        $leaveInsights['behavior']['link']  = route('leave.history');
-
         return $leaveInsights;
+    }
+
+    /**
+     * Cached wrapper around buildLeaveInsights() with a manual 2-day refresh.
+     * The card shows the cached insights + when they were generated; the
+     * "Regenerate" button loads ?regenerate_insights=1, which recomputes them
+     * but only once the 2-day (48h) cooldown has elapsed. The returned array
+     * carries a '_meta' key with the generated_at timestamp and cooldown state.
+     */
+    private function getCachedLeaveInsights($resortId, $deptId = null): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'leave_insights:' . $resortId . ':' . ($deptId ?: 'all');
+        $now = Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = Carbon::parse($cached['generated_at']);
+            // Only honour an explicit regenerate once the cooldown has elapsed.
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildLeaveInsights($resortId, $deptId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
     }
 
     public function hod_dashboard()
@@ -475,7 +539,7 @@ class DashboardController extends Controller
             return substr($employee->dob, 5, 5) === $tomorrowMd;
         });
 
-        $leaveInsights = $this->buildLeaveInsights($this->resort->resort_id, $isFromHRDepartment ? null : $hodDeptId);
+        $leaveInsights = $this->getCachedLeaveInsights($this->resort->resort_id, $isFromHRDepartment ? null : $hodDeptId);
         return view('resorts.leaves.dashboard.hoddashboard', compact('page_header','page_title', 'upcomingHolidays', 'todayBirthdays', 'tomorrowBirthdays', 'resort_departments', 'total_applied_leaves', 'total_approved_leaves', 'total_pending_leaves', 'total_rejected_leaves', 'show_department_filter','leaveInsights'));
     }
 

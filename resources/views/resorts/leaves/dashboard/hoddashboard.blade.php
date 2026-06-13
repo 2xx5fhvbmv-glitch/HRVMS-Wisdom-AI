@@ -203,8 +203,19 @@
 
                     <div class="col-lg-4" style="max-height: 450px;">
                         <div class="card card-wiINsight">
-                            <div class="card-title">
-                                <h3>AI Insight's</h3>
+                            <div class="card-title d-flex justify-content-between align-items-start">
+                                <h3>W AI Insight's</h3>
+                                @php $meta = $leaveInsights['_meta'] ?? null; @endphp
+                                @if($meta)
+                                    <div class="text-end" style="font-size:12px;line-height:1.4;">
+                                        <div class="text-muted">Updated {{ $meta['generated_at']->diffForHumans() }}</div>
+                                        @if($meta['can_regenerate'])
+                                            <a href="?regenerate_insights=1" class="a-linkTheme">Regenerate</a>
+                                        @else
+                                            <span class="text-muted" title="{{ $meta['next_available']->format('d M Y, H:i') }}">Regenerate available {{ $meta['next_available']->diffForHumans() }}</span>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
                             <div class="leaveUser-main">
                                 <div class="leaveUser-block">
@@ -216,7 +227,7 @@
                                         <p>{{ $leaveInsights['occupancy']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="{{ $leaveInsights['occupancy']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
+                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightOccupancyModal" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -228,7 +239,7 @@
                                         <p>{{ $leaveInsights['peak']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="{{ $leaveInsights['peak']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
+                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightPeakModal" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -240,7 +251,7 @@
                                         <p>{{ $leaveInsights['behavior']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="{{ $leaveInsights['behavior']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
+                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightBehaviorModal" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                             </div>
@@ -332,6 +343,8 @@
             </div>
         </div>
     </div>
+
+@include('resorts.leaves.dashboard._insight_modals')
 
 <!-- Modal HTML -->
 <div id="rejectionModal" class="modal fade" tabindex="-1" role="dialog">
