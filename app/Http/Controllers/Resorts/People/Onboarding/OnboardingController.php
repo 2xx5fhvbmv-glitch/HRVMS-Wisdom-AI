@@ -388,6 +388,10 @@ class OnboardingController extends Controller
             // Note: the Employee::created model hook provisions the
             // categorized file-management folder, so we do not create it here.
 
+            // Best-effort: file the applicant's offer letter + contract into
+            // the new employee's folder (idempotent; never throws).
+            \App\Helpers\EmployeeDocumentFiler::fileApplicantOnboardingDocs($employee, $applicant->id);
+
             return response()->json([
                 'success'     => true,
                 'employee_id' => $employee->id,

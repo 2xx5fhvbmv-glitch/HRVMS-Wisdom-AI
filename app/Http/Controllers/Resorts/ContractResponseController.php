@@ -11,6 +11,7 @@ use App\Models\Resort;
 use App\Models\ResortAdmin;
 use App\Models\Employee;
 use App\Helpers\Common;
+use App\Helpers\EmployeeDocumentFiler;
 use App\Jobs\TaEmailSent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -83,12 +84,20 @@ class ContractResponseController extends Controller
                 ->update(['status' => 'Contract Accepted']);
 
             // Auto-create employee
-            $this->createEmployeeFromApplicant($contract);
+            $employee = $this->createEmployeeFromApplicant($contract);
 
             // Send contract email with download link
             $this->sendContractEmail($contract);
 
             DB::commit();
+
+            // After commit (best-effort, non-transactional): file the offer
+            // letter and contract into the new employee's File Management folder.
+            // Done post-commit so a storage/S3 hiccup can never roll back the
+            // employee creation above.
+            if ($employee) {
+                EmployeeDocumentFiler::fileApplicantOnboardingDocs($employee, $contract->applicant_id);
+            }
 
             return redirect()->route('resort.contract.show', $token)
                 ->with('success', 'Contract accepted successfully! Welcome aboard! You will receive your login credentials shortly.');
@@ -139,7 +148,7 @@ class ContractResponseController extends Controller
         $applicant = Applicant_form_data::find($contract->applicant_id);
         $resort = Resort::find($contract->resort_id);
 
-        if (!$applicant || !$resort) return;
+        if (!$applicant || !$resort) return null;
 
         $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
             ->leftJoin('resort_departments as t2', 't2.id', '=', 't1.dept_id')
@@ -203,7 +212,7 @@ class ContractResponseController extends Controller
             $existingEmployee = Employee::withTrashed()->where('Admin_Parent_id', $existingAdmin->id)->first();
             if ($existingEmployee && !$existingEmployee->trashed()) {
                 // Active employee already exists — skip
-                return;
+                return null;
             }
             // If soft-deleted employee exists, remove it so we can create fresh
             if ($existingEmployee && $existingEmployee->trashed()) {
@@ -411,6 +420,8 @@ class ContractResponseController extends Controller
 
         // Send welcome email with credentials
         $this->sendWelcomeEmail($applicant, $resort, $plainPassword);
+
+        return $employee;
     }
 
     private function sendContractEmail($contract)
