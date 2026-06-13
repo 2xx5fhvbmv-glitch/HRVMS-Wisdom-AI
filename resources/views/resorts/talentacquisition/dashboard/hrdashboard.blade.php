@@ -857,11 +857,18 @@
 @section('import-css')
 <style>
     /* WAI Insight's — third column alongside Talent Pool & New Hire Requests.
-       Let it size to its content so all five insights are visible (overrides the
-       inherited .card-wiINsight 415px cap). */
+       Fixed height (aligns with the 450px Talent Pool card) with the insight
+       list scrolling inside its own space rather than stretching the row. */
     .card-wiINsightTa {
-        height: auto !important;
-        max-height: none !important;
+        height: 450px !important;
+        max-height: 450px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .card-wiINsightTa .leaveUser-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
     }
 </style>
 @endsection

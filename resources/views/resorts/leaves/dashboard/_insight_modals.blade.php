@@ -1,6 +1,19 @@
 {{-- AI-insight detail modals (occupancy / peak / behaviour).
      Included by the HR, Admin and HOD leave dashboards; reads $leaveInsights.
      Opened by the "View Details" links via data-bs-toggle="modal". --}}
+<style>
+    /* Keep the WAI Insight's card at its fixed height and let the insight
+       list scroll inside it (the AI body + recommendation can overflow). */
+    .card-wiINsight {
+        display: flex;
+        flex-direction: column;
+    }
+    .card-wiINsight .leaveUser-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+</style>
 @php
     $occDetails  = $leaveInsights['occupancy']['details'] ?? [];
     $peakDetails = $leaveInsights['peak']['details'] ?? [];
@@ -19,6 +32,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $leaveInsights['occupancy']['body'] ?? '' }}</p>
+                @if(!empty($leaveInsights["occupancy"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["occupancy"]["recommendation"] }}</p>@endif
                 @if(!empty($occDetails['employees']))
                     <p class="mb-2">Employees with unused annual leave
                         @if(!empty($occDetails['entitlement'])) (entitlement {{ $fmt($occDetails['entitlement']) }} days) @endif:</p>
@@ -58,6 +72,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $leaveInsights['peak']['body'] ?? '' }}</p>
+                @if(!empty($leaveInsights["peak"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["peak"]["recommendation"] }}</p>@endif
                 @if(!empty($peakDetails['total']) && $peakDetails['total'] > 0)
                     <p class="mb-2">Leave days by month (total {{ $fmt($peakDetails['total']) }}):</p>
                     <div class="table-responsive">
@@ -92,6 +107,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $leaveInsights['behavior']['body'] ?? '' }}</p>
+                @if(!empty($leaveInsights["behavior"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["behavior"]["recommendation"] }}</p>@endif
                 @if(!empty($behDetails['categories']))
                     <p class="mb-2">Breakdown by leave type ({{ (int) ($behDetails['total'] ?? 0) }} requests):</p>
                     <div class="table-responsive">

@@ -5092,6 +5092,81 @@ class Common
     }
 
     /**
+     * Overlay AI-written body + recommendation onto pre-computed dashboard
+     * insight cards via the FastAPI /dashboard_insights endpoint. Numbers stay
+     * authoritative (computed by the caller); the LLM only narrates them.
+     * Best-effort — any failure (service down, timeout, bad JSON) leaves the
+     * computed bodies untouched. Returns the (possibly modified) insights array.
+     *
+     * @param array  $insights  keyed by card key; each ['title','body','details'?]
+     * @param string $domain    analyst persona, e.g. 'leave management', 'payroll'
+     * @param array  $cardKeys  which keys to enrich
+     */
+    public static function enrichDashboardInsights(array $insights, string $domain, array $cardKeys): array
+    {
+        $cards = [];
+        foreach ($cardKeys as $k) {
+            if (!isset($insights[$k])) continue;
+            $cards[] = [
+                'key'     => $k,
+                'title'   => $insights[$k]['title'] ?? '',
+                'body'    => $insights[$k]['body'] ?? '',
+                'details' => $insights[$k]['details'] ?? (object) [],
+            ];
+        }
+        if (empty($cards)) return $insights;
+
+        // USD by default (figures stored in USD); MVR when the resort switched.
+        $currency = 'USD';
+        try { $currency = self::getDisplayCurrency() ?: 'USD'; } catch (\Throwable $e) {}
+
+        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/dashboard_insights';
+        $payload = [
+            'domain'         => $domain,
+            'resort_country' => 'Maldives',
+            'currency'       => $currency,
+            'cards'          => $cards,
+        ];
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_TIMEOUT        => 45,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        curl_close($curl);
+
+        if ($errno !== 0 || !$response) {
+            \Log::warning("dashboard insights AI enrichment failed (domain={$domain}, url={$url}): " . ($err ?: 'no response'));
+            return $insights;
+        }
+
+        $decoded = json_decode($response, true);
+        $aiCards = $decoded['cards'] ?? null;
+        if (!is_array($aiCards)) {
+            \Log::warning("dashboard insights AI enrichment returned unexpected payload (domain={$domain})");
+            return $insights;
+        }
+
+        foreach ($cardKeys as $k) {
+            if (!isset($insights[$k]) || empty($aiCards[$k]) || !is_array($aiCards[$k])) continue;
+            $body = trim((string) ($aiCards[$k]['body'] ?? ''));
+            $rec  = trim((string) ($aiCards[$k]['recommendation'] ?? ''));
+            if ($body !== '') $insights[$k]['body'] = $body;
+            if ($rec !== '')  $insights[$k]['recommendation'] = $rec;
+            $insights[$k]['ai'] = ($body !== '' || $rec !== '');
+        }
+        return $insights;
+    }
+
+    /**
      * Compute the Employee Withholding Tax (EWT) deduction for a single
      * month, given the employee's monthly gross remuneration in MVR.
      *

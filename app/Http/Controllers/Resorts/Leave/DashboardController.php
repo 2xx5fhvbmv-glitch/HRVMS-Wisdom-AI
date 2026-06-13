@@ -422,6 +422,13 @@ class DashboardController extends Controller
             \Log::warning('Leave dashboard AI insights failed: ' . $e->getMessage());
         }
 
+        // Layer the FastAPI LLM on top of the deterministic numbers: richer
+        // body + a recommendation per card. Numbers stay authoritative; if the
+        // AI service is unreachable the computed one-liners are kept as-is.
+        $leaveInsights = \App\Helpers\Common::enrichDashboardInsights(
+            $leaveInsights, 'leave management', ['occupancy', 'peak', 'behavior']
+        );
+
         return $leaveInsights;
     }
 
