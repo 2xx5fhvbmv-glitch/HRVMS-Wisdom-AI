@@ -257,7 +257,7 @@
                         @foreach([['key'=>'trend','modal'=>'payrollInsightTrendModal'],['key'=>'overtime','modal'=>'payrollInsightOvertimeModal'],['key'=>'expat','modal'=>'payrollInsightExpatModal'],['key'=>'allowance','modal'=>'payrollInsightAllowanceModal']] as $pc)
                         <div class="leaveUser-block">
                             <div class="img">
-                                <img src="assets/images/wisdom-ai-small.svg" alt="image">
+                                <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
                             </div>
                             <div>
                                 <h6>{{ $payrollInsights[$pc['key']]['title'] ?? '' }}</h6>
@@ -294,6 +294,13 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {{-- Payroll Comparison — moved up to fill the space beside Payroll Distributions --}}
+            <div class="col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="comparison-wrapper">
+                    @include('resorts.renderfiles.payroll_comparison_card', ['payrollData' => $payrollData])
                 </div>
             </div>
 
@@ -498,11 +505,6 @@
             </div> -->
 
 
-            <div class="col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">                
-                <div class="comparison-wrapper">
-                    @include('resorts.renderfiles.payroll_comparison_card', ['payrollData' => $payrollData])
-                </div>
-            </div>
             
 
           
