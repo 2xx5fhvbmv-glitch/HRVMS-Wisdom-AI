@@ -26,7 +26,7 @@
             </div>
         </div>
         <div class="row g-3 g-xxl-4 recHR-main ">
-            <div class="col-xl-8 col-lg-12 ">
+            <div class="@if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) col-xl-12 @else col-xl-8 @endif col-lg-12 ">
                 <div class="row g-3 g-xxl-4 ">
                     <div class="col-md-4 @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.shortlistedapplicants',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card card-hod ">
@@ -509,7 +509,7 @@
                             </div>
                         </div>
                     </div>
-                    <div id="upinterviews">
+                    <div id="upinterviews" style="max-height: 320px; overflow-y: auto;">
                     </div>
                 </div>
             </div>
