@@ -212,13 +212,11 @@
                                         <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg')}}" alt="image">
                                     </div>
                                     <div>
-                                        <h6>Low occupancy for upcoming 3 months</h6>
-                                        <P>You can send 55 Employees on vacation leave this time so Resort can save
-                                            around
-                                            $1000</P>
+                                        <h6>{{ $leaveInsights['occupancy']['title'] ?? 'Occupancy & Leave Window' }}</h6>
+                                        <p>{{ $leaveInsights['occupancy']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
+                                        <a href="{{ $leaveInsights['occupancy']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -226,11 +224,11 @@
                                         <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg')}}" alt="image">
                                     </div>
                                     <div>
-                                        <h6>AI Forecasted Peak Leave Periods</h6>
-                                        <P>01 Jan to 30 March is peak leave period</P>
+                                        <h6>{{ $leaveInsights['peak']['title'] ?? 'AI Forecasted Peak Leave Periods' }}</h6>
+                                        <p>{{ $leaveInsights['peak']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
+                                        <a href="{{ $leaveInsights['peak']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -238,13 +236,11 @@
                                         <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg')}}" alt="image">
                                     </div>
                                     <div>
-                                        <h6>Employee Leave Behavior Analysis</h6>
-                                        <p>Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-                                            Lorem
-                                            Ipsum has been the industry.</p>
+                                        <h6>{{ $leaveInsights['behavior']['title'] ?? 'Employee Leave Behavior Analysis' }}</h6>
+                                        <p>{{ $leaveInsights['behavior']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
+                                        <a href="{{ $leaveInsights['behavior']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                             </div>
