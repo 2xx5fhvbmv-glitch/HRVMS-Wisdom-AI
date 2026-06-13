@@ -411,7 +411,7 @@
                          already ensures each user sees only the vacancies
                          that need THEIR action (Common::GetTheFreshVacancies). --}}
                     <div class="col-md-6">
-                        <div class="card" style="height:auto;">
+                        <div class="card">
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-3">
                                     <div class="col">
@@ -455,7 +455,9 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="card card-wiINsight mt-4" id="card-wiINsightTa" style="height:auto !important;max-height:none !important;">
+                    </div>
+                    <div class="col-12">
+                        <div class="card card-wiINsight card-wiINsightTa" id="card-wiINsightTa">
                             @php $taMeta = $taInsights['_meta'] ?? null; @endphp
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-md-3 g-1">
@@ -475,20 +477,24 @@
                                 </div>
                             </div>
                             <div class="leaveUser-main">
-                                @foreach([['key'=>'rejection','modal'=>'taInsightRejectionModal'],['key'=>'funnel','modal'=>'taInsightFunnelModal'],['key'=>'acceptance','modal'=>'taInsightAcceptanceModal'],['key'=>'tth','modal'=>'taInsightTthModal'],['key'=>'demand','modal'=>'taInsightDemandModal']] as $tc)
-                                <div class="leaveUser-block">
-                                    <div class="img">
-                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
-                                    </div>
-                                    <div>
-                                        <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
-                                        <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
-                                        <div>
-                                            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
+                                <div class="row g-3">
+                                    @foreach([['key'=>'rejection','modal'=>'taInsightRejectionModal'],['key'=>'funnel','modal'=>'taInsightFunnelModal'],['key'=>'acceptance','modal'=>'taInsightAcceptanceModal'],['key'=>'tth','modal'=>'taInsightTthModal'],['key'=>'demand','modal'=>'taInsightDemandModal']] as $tc)
+                                    <div class="col-xl-4 col-md-6">
+                                        <div class="leaveUser-block h-100">
+                                            <div class="img">
+                                                <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                            </div>
+                                            <div>
+                                                <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
+                                                <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
+                                                <div>
+                                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
+                                    @endforeach
                                 </div>
-                                @endforeach
                             </div>
                         </div>
                     </div>
@@ -850,6 +856,38 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* WAI Insight's — full-width card with insights laid out as equal columns */
+    .card-wiINsightTa {
+        height: auto !important;
+        max-height: none !important;
+    }
+    .card-wiINsightTa .leaveUser-main .row > [class*="col-"] {
+        display: flex;
+    }
+    .card-wiINsightTa .leaveUser-block {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        width: 100%;
+        border: 1px solid #E6ECEC;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 0;
+    }
+    .card-wiINsightTa .leaveUser-block .img {
+        flex: 0 0 auto;
+    }
+    .card-wiINsightTa .leaveUser-block > div:last-child {
+        min-width: 0;
+    }
+    .card-wiINsightTa .leaveUser-block h6 {
+        margin-bottom: 6px;
+    }
+    .card-wiINsightTa .leaveUser-block p {
+        margin-bottom: 10px;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
