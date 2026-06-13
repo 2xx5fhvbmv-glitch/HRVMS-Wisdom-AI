@@ -294,7 +294,7 @@
                                         <p>{{ $leaveInsights['occupancy']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
+                                        <a href="{{ $leaveInsights['occupancy']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -306,7 +306,7 @@
                                         <p>{{ $leaveInsights['peak']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
+                                        <a href="{{ $leaveInsights['peak']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                                 <div class="leaveUser-block">
@@ -318,7 +318,7 @@
                                         <p>{{ $leaveInsights['behavior']['body'] ?? '' }}</p>
                                     </div>
                                     <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
+                                        <a href="{{ $leaveInsights['behavior']['link'] ?? '#' }}" class="a-linkTheme">View Details</a>
                                     </div>
                                 </div>
                             </div>
