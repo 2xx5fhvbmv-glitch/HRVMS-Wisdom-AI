@@ -383,8 +383,11 @@ class TalentAcquisitionDashboardController extends Controller
                     return $item;
                 });
 
+            $taInsights = $this->getCachedTaInsights($resort_id);
+
             return view('resorts.talentacquisition.dashboard.hrdashboard',
                 compact(
+                    'taInsights',
                     'applicationUrlshow',
                     'applicant_link',
                     'Hired',
@@ -413,6 +416,232 @@ class TalentAcquisitionDashboardController extends Controller
         //     return view('resorts.talentacquisition.dashboard.hrdashboard',compact('resort_id'));
         // }
     }
+
+    /**
+     * Cached wrapper around buildTaInsights() with a manual 2-day refresh,
+     * mirroring the leave/payroll dashboards. Cached per resort; the "Regenerate"
+     * link loads ?regenerate_insights=1 and recomputes only once the 48h cooldown
+     * has elapsed. Returned array carries a '_meta' key for the card header.
+     */
+    private function getCachedTaInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'ta_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildTaInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the five Talent-Acquisition AI-insight cards for a resort:
+     *   1. Top rejection reasons       (screening Comments + offer/contract rejection_reason)
+     *   2. Hiring funnel & conversion  (applied -> shortlisted -> interviewed -> offer -> hired)
+     *   3. Offer/contract acceptance   (acceptance rate per document type)
+     *   4. Time-to-hire                (application date -> contract Accepted)
+     *   5. Hiring demand by department (unfilled vacancy positions per department)
+     * Each card is wrapped so one failing query degrades just that card.
+     */
+    private function buildTaInsights($resortId): array
+    {
+        $insights = [
+            'rejection'  => ['title' => 'Top Rejection Reasons',       'body' => 'No rejections recorded yet.'],
+            'funnel'     => ['title' => 'Hiring Funnel & Conversion',   'body' => 'No applicants recorded yet.'],
+            'acceptance' => ['title' => 'Offer / Contract Acceptance',  'body' => 'No offers or contracts sent yet.'],
+            'tth'        => ['title' => 'Time to Hire',                 'body' => 'No completed hires yet to measure.'],
+            'demand'     => ['title' => 'Hiring Demand by Department',  'body' => 'No open vacancies right now.'],
+        ];
+
+        // --- Card 1: Top rejection reasons -------------------------------------
+        try {
+            $reasons = [];
+            $screen = \DB::table('applicant_wise_statuses as s')
+                ->join('applicant_form_data as a', 'a.id', '=', 's.Applicant_id')
+                ->where('a.resort_id', $resortId)
+                ->whereIn('s.status', ['Rejected', 'Rejected By Wisdom AI'])
+                ->whereNotNull('s.Comments')->where('s.Comments', '!=', '')
+                ->select('s.Comments as reason', \DB::raw('COUNT(*) as c'))
+                ->groupBy('s.Comments')->get();
+            $oc = \DB::table('applicant_offer_contracts')
+                ->where('resort_id', $resortId)->where('status', 'Rejected')
+                ->whereNotNull('rejection_reason')->where('rejection_reason', '!=', '')
+                ->select('rejection_reason as reason', \DB::raw('COUNT(*) as c'))
+                ->groupBy('rejection_reason')->get();
+            foreach ([$screen, $oc] as $set) {
+                foreach ($set as $r) {
+                    $key = trim(mb_strimwidth((string) $r->reason, 0, 120, '…'));
+                    if ($key === '') continue;
+                    $reasons[$key] = ($reasons[$key] ?? 0) + (int) $r->c;
+                }
+            }
+            arsort($reasons);
+            $total = array_sum($reasons);
+            if ($total > 0) {
+                $rows = [];
+                foreach ($reasons as $reason => $c) {
+                    $rows[] = ['reason' => $reason, 'count' => $c, 'pct' => round($c / $total * 100, 1)];
+                }
+                $top = $rows[0];
+                $insights['rejection']['body'] = $total . ' rejection' . ($total == 1 ? '' : 's') . ' logged; the top reason is "' . $top['reason'] . '" (' . $top['count'] . ', ' . $top['pct'] . '%).';
+                $insights['rejection']['details'] = ['total' => $total, 'rows' => array_slice($rows, 0, 15)];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: Hiring funnel & conversion --------------------------------
+        try {
+            // distinct applicants who ever reached each milestone status, resort-scoped
+            $stageCount = function (array $statuses) use ($resortId) {
+                return (int) \DB::table('applicant_wise_statuses as s')
+                    ->join('applicant_form_data as a', 'a.id', '=', 's.Applicant_id')
+                    ->where('a.resort_id', $resortId)
+                    ->whereIn('s.status', $statuses)
+                    ->distinct()->count('s.Applicant_id');
+            };
+            $applied = (int) \DB::table('applicant_form_data')->where('resort_id', $resortId)->count();
+            $shortlisted = $stageCount(['Sortlisted', 'Sortlisted By Wisdom AI', 'Round', 'Selected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']);
+            $interviewed = $stageCount(['Round', 'Selected', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']);
+            $offered = $stageCount(['Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']);
+            $hired = $stageCount(['Contract Accepted']);
+            if ($applied > 0) {
+                $conv = round($hired / $applied * 100, 1);
+                $insights['funnel']['body'] = $applied . ' applied → ' . $hired . ' hired (' . $conv . '% conversion).';
+                $insights['funnel']['details'] = [
+                    'stages' => [
+                        ['stage' => 'Applied',      'count' => $applied,     'pct' => 100.0],
+                        ['stage' => 'Shortlisted',  'count' => $shortlisted, 'pct' => round($shortlisted / $applied * 100, 1)],
+                        ['stage' => 'Interviewed',  'count' => $interviewed, 'pct' => round($interviewed / $applied * 100, 1)],
+                        ['stage' => 'Offered',      'count' => $offered,     'pct' => round($offered / $applied * 100, 1)],
+                        ['stage' => 'Hired',        'count' => $hired,       'pct' => $conv],
+                    ],
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Offer / contract acceptance rate --------------------------
+        try {
+            $rows = \DB::table('applicant_offer_contracts')
+                ->where('resort_id', $resortId)
+                ->select('type', 'status', \DB::raw('COUNT(*) as c'))
+                ->groupBy('type', 'status')->get();
+            $agg = [
+                'offer_letter' => ['Sent' => 0, 'Accepted' => 0, 'Rejected' => 0],
+                'contract'     => ['Sent' => 0, 'Accepted' => 0, 'Rejected' => 0],
+            ];
+            foreach ($rows as $r) {
+                if (isset($agg[$r->type][$r->status])) $agg[$r->type][$r->status] += (int) $r->c;
+            }
+            $rate = function ($a) {
+                $tot = $a['Sent'] + $a['Accepted'] + $a['Rejected'];
+                return $tot > 0 ? round($a['Accepted'] / $tot * 100, 1) : 0;
+            };
+            $offerTot = array_sum($agg['offer_letter']);
+            $contractTot = array_sum($agg['contract']);
+            if ($offerTot > 0 || $contractTot > 0) {
+                $parts = [];
+                if ($offerTot > 0)    $parts[] = 'offers ' . $rate($agg['offer_letter']) . '% accepted';
+                if ($contractTot > 0) $parts[] = 'contracts ' . $rate($agg['contract']) . '% accepted';
+                $insights['acceptance']['body'] = ucfirst(implode(', ', $parts)) . '.';
+                $insights['acceptance']['details'] = [
+                    'rows' => [
+                        ['type' => 'Offer Letter', 'sent' => $agg['offer_letter']['Sent'], 'accepted' => $agg['offer_letter']['Accepted'], 'rejected' => $agg['offer_letter']['Rejected'], 'total' => $offerTot, 'rate' => $rate($agg['offer_letter'])],
+                        ['type' => 'Contract',     'sent' => $agg['contract']['Sent'],     'accepted' => $agg['contract']['Accepted'],     'rejected' => $agg['contract']['Rejected'],     'total' => $contractTot, 'rate' => $rate($agg['contract'])],
+                    ],
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 4: Time to hire ----------------------------------------------
+        try {
+            $hires = \DB::table('applicant_offer_contracts as oc')
+                ->join('applicant_form_data as a', 'a.id', '=', 'oc.applicant_id')
+                ->leftJoin('vacancies as v', 'v.id', '=', 'a.Parent_v_id')
+                ->leftJoin('resort_departments as d', 'd.id', '=', 'v.department')
+                ->where('oc.resort_id', $resortId)
+                ->where('oc.type', 'contract')->where('oc.status', 'Accepted')
+                ->whereNotNull('oc.responded_at')
+                ->select(
+                    \DB::raw("TRIM(CONCAT(COALESCE(a.first_name,''),' ',COALESCE(a.last_name,''))) as name"),
+                    \DB::raw("COALESCE(d.name,'—') as dept"),
+                    \DB::raw("DATEDIFF(oc.responded_at, COALESCE(a.Application_date, a.created_at)) as days")
+                )->get();
+            $days = [];
+            $list = [];
+            foreach ($hires as $h) {
+                if ($h->days === null || (int) $h->days < 0) continue;
+                $days[] = (int) $h->days;
+                $list[] = ['name' => $h->name ?: '—', 'dept' => $h->dept, 'days' => (int) $h->days];
+            }
+            if (!empty($days)) {
+                $avg = round(array_sum($days) / count($days), 1);
+                usort($list, function ($a, $b) { return $b['days'] <=> $a['days']; });
+                $insights['tth']['body'] = 'Average time to hire is ' . $avg . ' day' . ($avg == 1 ? '' : 's') . ' across ' . count($days) . ' hire' . (count($days) == 1 ? '' : 's') . ' (fastest ' . min($days) . ', slowest ' . max($days) . ').';
+                $insights['tth']['details'] = ['avg' => $avg, 'min' => min($days), 'max' => max($days), 'rows' => array_slice($list, 0, 15)];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 5: Hiring demand by department -------------------------------
+        try {
+            $vacs = \DB::table('vacancies as v')
+                ->leftJoin('resort_departments as d', 'd.id', '=', 'v.department')
+                ->where('v.Resort_id', $resortId)
+                ->select('v.id', 'v.Total_position_required as req', \DB::raw("COALESCE(d.name,'Unassigned') as dept"))
+                ->get();
+            // "Filled" = applicants hired against the vacancy (Contract Accepted),
+            // matching the funnel's hired definition. Avoids depending on the newer
+            // employees.vacancy_id column which may not exist on every environment.
+            $filled = \DB::table('applicant_wise_statuses as s')
+                ->join('applicant_form_data as a', 'a.id', '=', 's.Applicant_id')
+                ->where('a.resort_id', $resortId)
+                ->where('s.status', 'Contract Accepted')
+                ->select('a.Parent_v_id', \DB::raw('COUNT(DISTINCT s.Applicant_id) as c'))
+                ->groupBy('a.Parent_v_id')->pluck('c', 'Parent_v_id');
+            $byDept = [];
+            foreach ($vacs as $v) {
+                $req = (int) $v->req; if ($req < 1) $req = 1;
+                $remaining = $req - (int) ($filled[$v->id] ?? 0);
+                if ($remaining <= 0) continue;
+                $byDept[$v->dept] = ($byDept[$v->dept] ?? 0) + $remaining;
+            }
+            arsort($byDept);
+            $openTotal = array_sum($byDept);
+            if ($openTotal > 0) {
+                $rows = [];
+                foreach ($byDept as $dept => $cnt) $rows[] = ['dept' => $dept, 'open' => $cnt];
+                $top = $rows[0];
+                $insights['demand']['body'] = $openTotal . ' open position' . ($openTotal == 1 ? '' : 's') . ' across ' . count($rows) . ' department' . (count($rows) == 1 ? '' : 's') . '; ' . $top['dept'] . ' leads with ' . $top['open'] . '.';
+                $insights['demand']['details'] = ['total' => $openTotal, 'rows' => $rows];
+            }
+        } catch (\Throwable $e) {}
+
+        return $insights;
+    }
+
     public function hod_dashboard()
     {
         try {

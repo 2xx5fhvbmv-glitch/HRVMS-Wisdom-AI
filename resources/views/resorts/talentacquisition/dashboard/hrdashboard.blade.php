@@ -456,6 +456,44 @@
                             </div>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="card card-wiINsight" id="card-wiINsightTa">
+                            @php $taMeta = $taInsights['_meta'] ?? null; @endphp
+                            <div class="card-title">
+                                <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                    <div class="col">
+                                        <h3 class="text-nowrap">WAI Insight's</h3>
+                                    </div>
+                                    <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                        @if($taMeta)
+                                            <div class="text-muted">Updated {{ $taMeta['generated_at']->diffForHumans() }}</div>
+                                            @if($taMeta['can_regenerate'])
+                                                <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                            @else
+                                                <span class="text-muted" title="{{ $taMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $taMeta['next_available']->diffForHumans() }}</span>
+                                            @endif
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="leaveUser-main">
+                                @foreach([['key'=>'rejection','modal'=>'taInsightRejectionModal'],['key'=>'funnel','modal'=>'taInsightFunnelModal'],['key'=>'acceptance','modal'=>'taInsightAcceptanceModal'],['key'=>'tth','modal'=>'taInsightTthModal'],['key'=>'demand','modal'=>'taInsightDemandModal']] as $tc)
+                                <div class="leaveUser-block">
+                                    <div class="img">
+                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
+                                        <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
+                                        <div>
+                                            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -810,6 +848,7 @@
     </div>
 </div>
 <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id" >
+@includeWhen(isset($taInsights), 'resorts.talentacquisition.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
