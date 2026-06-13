@@ -186,9 +186,16 @@
                                                                                 $totalMothwisecost = (float)$monthdataCollection[$ak]->salary;
                                                                             
                                                                             }
-                                                                            else 
+                                                                            else
                                                                             {
-                                                                                $totalMothwisecost = (float)    Common::CheckemployeeBudgetCost($employee->nationality, $employee->resort_id, $monthlySalary);
+                                                                                // No base salary → budget $0, not fabricated overhead.
+                                                                                // (Operational/expat costs on a $0 salary were rendering
+                                                                                // as a dummy $180.) Filling the role is recommended via
+                                                                                // the AI "justified reason" on compare-budget, not a
+                                                                                // made-up salary here.
+                                                                                $totalMothwisecost = ((float) $monthlySalary <= 0)
+                                                                                    ? 0
+                                                                                    : (float) Common::CheckemployeeBudgetCost($employee->nationality, $employee->resort_id, $monthlySalary);
                                                                             }
                                                                             $ak++;
                                                                     @endphp
