@@ -639,7 +639,83 @@ class TalentAcquisitionDashboardController extends Controller
             }
         } catch (\Throwable $e) {}
 
+        // Layer the FastAPI LLM on top of the deterministic numbers: it
+        // rewrites each card's body into a richer insight and adds a
+        // recommendation. Numbers stay authoritative (computed above); if the
+        // AI service is unreachable the computed one-liners are kept as-is.
+        $this->enrichTaInsightsWithAi($insights);
+
         return $insights;
+    }
+
+    /**
+     * Send the computed TA metric cards to the FastAPI /ta_insights endpoint
+     * and overlay the AI-written body + recommendation. Best-effort: any
+     * failure (service down, timeout, bad JSON) leaves the computed bodies
+     * untouched. Only called on (re)generation, so it is not on the hot path.
+     */
+    private function enrichTaInsightsWithAi(array &$insights): void
+    {
+        $cardKeys = ['rejection', 'funnel', 'acceptance', 'tth', 'demand'];
+        $cards = [];
+        foreach ($cardKeys as $k) {
+            if (!isset($insights[$k])) continue;
+            $cards[] = [
+                'key'     => $k,
+                'title'   => $insights[$k]['title'] ?? '',
+                'body'    => $insights[$k]['body'] ?? '',
+                'details' => $insights[$k]['details'] ?? (object) [],
+            ];
+        }
+        if (empty($cards)) return;
+
+        // Respect the resort's display-currency menu setting: USD by default
+        // (figures are stored in USD), MVR when the resort has switched to it.
+        $currency = 'USD';
+        try { $currency = Common::getDisplayCurrency() ?: 'USD'; } catch (\Throwable $e) {}
+
+        $url = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/ta_insights';
+        $payload = [
+            'resort_country' => 'Maldives',
+            'currency'       => $currency,
+            'cards'          => $cards,
+        ];
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_TIMEOUT        => 45,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        curl_close($curl);
+
+        if ($errno !== 0 || !$response) {
+            \Log::warning("TA insights AI enrichment failed (url={$url}): " . ($err ?: 'no response'));
+            return;
+        }
+
+        $decoded = json_decode($response, true);
+        $aiCards = $decoded['cards'] ?? null;
+        if (!is_array($aiCards)) {
+            \Log::warning("TA insights AI enrichment returned unexpected payload");
+            return;
+        }
+
+        foreach ($cardKeys as $k) {
+            if (!isset($insights[$k]) || empty($aiCards[$k]) || !is_array($aiCards[$k])) continue;
+            $body = trim((string) ($aiCards[$k]['body'] ?? ''));
+            $rec  = trim((string) ($aiCards[$k]['recommendation'] ?? ''));
+            if ($body !== '') $insights[$k]['body'] = $body;
+            if ($rec !== '')  $insights[$k]['recommendation'] = $rec;
+            $insights[$k]['ai'] = ($body !== '' || $rec !== '');
+        }
     }
 
     public function hod_dashboard()

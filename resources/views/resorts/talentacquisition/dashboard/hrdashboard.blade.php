@@ -504,6 +504,9 @@
                                     <div>
                                         <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
                                         <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
+                                        @if(!empty($taInsights[$tc['key']]['recommendation']))
+                                            <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights[$tc['key']]['recommendation'] }}</p>
+                                        @endif
                                         <div>
                                             <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
                                         </div>

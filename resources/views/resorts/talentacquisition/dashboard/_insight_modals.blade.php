@@ -18,6 +18,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $taInsights['rejection']['body'] ?? '' }}</p>
+                @if(!empty($taInsights['rejection']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['rejection']['recommendation'] }}</p>@endif
                 @if(!empty($rejD['rows']))
                     <div class="table-responsive">
                         <table class="table table-sm table-striped align-middle">
@@ -47,6 +48,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $taInsights['funnel']['body'] ?? '' }}</p>
+                @if(!empty($taInsights['funnel']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['funnel']['recommendation'] }}</p>@endif
                 @if(!empty($funD['stages']))
                     <div class="table-responsive">
                         <table class="table table-sm table-striped align-middle">
@@ -74,6 +76,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $taInsights['acceptance']['body'] ?? '' }}</p>
+                @if(!empty($taInsights['acceptance']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['acceptance']['recommendation'] }}</p>@endif
                 @if(!empty($accD['rows']))
                     <div class="table-responsive">
                         <table class="table table-sm table-striped align-middle">
@@ -111,6 +114,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $taInsights['tth']['body'] ?? '' }}</p>
+                @if(!empty($taInsights['tth']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['tth']['recommendation'] }}</p>@endif
                 @if(!empty($tthD['rows']))
                     <p class="mb-1 fw-bold">Recent hires (application → contract accepted)</p>
                     <div class="table-responsive">
@@ -141,6 +145,7 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted">{{ $taInsights['demand']['body'] ?? '' }}</p>
+                @if(!empty($taInsights['demand']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['demand']['recommendation'] }}</p>@endif
                 @if(!empty($demD['rows']))
                     <p class="mb-1">Open positions still to fill (total {{ $demD['total'] ?? 0 }}):</p>
                     <div class="table-responsive">
