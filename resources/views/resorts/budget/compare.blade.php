@@ -72,10 +72,20 @@
                                      of hardcoded "$12,241" / "$11,985" placeholders.
                                      Show monthly + annual together since the AI returns
                                      monthly and HR plans yearly. --}}
-                                <span class="badge badge-dark" title="Monthly basic-salary spend">
+                                <span class="badge badge-dark" title="Monthly basic-salary spend (filled positions only)">
                                     HOD: {{ $currencySymbol }} {{ number_format($totalHodBudget, 0) }} / mo
                                     <span class="ms-1 opacity-75">({{ $currencySymbol }} {{ number_format($totalHodBudget * 12, 0) }} / yr)</span>
                                 </span>
+                                {{-- Vacancy highlight: the HOD total above is filled-positions
+                                     only, so it reads lower than the manning-plan total. Surface
+                                     the vacant count + cost so the gap is clearly "vacant
+                                     positions", not a calculation error. --}}
+                                @if(!empty($totalVacant) && $totalVacant > 0)
+                                    <span class="badge" style="background:#fff3cd;color:#664d03;border:1px solid #ffe69c;"
+                                          title="Vacant positions are budgeted in the manning plan but not in the HOD spend above — this is why the HOD total is lower than the manning-plan total.">
+                                        + {{ $totalVacant }} vacant{{ (!empty($totalVacantCost) && $totalVacantCost > 0) ? ' (~'.$currencySymbol.' '.number_format($totalVacantCost, 0).' / mo)' : '' }} — not in HOD
+                                    </span>
+                                @endif
                                 <span class="badge badge-themeWarning" title="Wisdom AI's monthly recommendation" id="wisdom-badge">
                                     Wisdom: {{ $currencySymbol }} <span id="wisdom-monthly-val">{{ number_format($totalAiBudget, 0) }}</span> / mo
                                     <span class="ms-1 opacity-75">({{ $currencySymbol }} <span id="wisdom-annual-val">{{ number_format($totalAiBudget * 12, 0) }}</span> / yr)</span>
