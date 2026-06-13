@@ -455,9 +455,7 @@
                                 @endif
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card card-wiINsight" id="card-wiINsightTa">
+                        <div class="card card-wiINsight mt-4" id="card-wiINsightTa">
                             @php $taMeta = $taInsights['_meta'] ?? null; @endphp
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-md-3 g-1">
