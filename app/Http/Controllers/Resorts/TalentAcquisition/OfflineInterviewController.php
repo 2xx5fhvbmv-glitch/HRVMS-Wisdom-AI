@@ -670,6 +670,22 @@ class OfflineInterviewController extends Controller
 
             DB::commit();
 
+            // Best-effort: file the uploaded offer letter / contract documents
+            // into the new employee's File Management folder. Offline-interview
+            // docs live in OfflineInterviewDocument (not ApplicantOfferContract),
+            // so we file them directly via the shared primitive. Idempotent;
+            // never throws.
+            if ($oi->is_selected === 'Yes' && $oi->created_employee_id) {
+                $emp = \App\Models\Employee::find($oi->created_employee_id);
+                if ($emp) {
+                    $oiDocs = \App\Models\OfflineInterviewDocument::where('offline_interview_id', $oi->id)->get();
+                    foreach ($oiDocs as $oiDoc) {
+                        $displayName = pathinfo((string) $oiDoc->original_name, PATHINFO_FILENAME) ?: 'Onboarding Document';
+                        \App\Helpers\EmployeeDocumentFiler::fileDocToEmployeeFolder($emp, $oiDoc->file_path, $displayName);
+                    }
+                }
+            }
+
             // ── Email the offer letter + contract to the candidate ─────
             // Sent only when Selected AND at least one new attachment was
             // uploaded in this submit. All files go in ONE email. Failures

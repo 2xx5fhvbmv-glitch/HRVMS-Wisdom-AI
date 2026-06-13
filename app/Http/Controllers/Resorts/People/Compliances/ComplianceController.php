@@ -34,6 +34,7 @@ use App\Models\ResortNotification;
 use Carbon\Carbon;
 use App\Models\EmployeeOnboardingAcknowledgements;
 use App\Models\EmployeePromotion;
+use App\Models\JobDescription;
 use App\Models\ResortSiteSettings;
 use App\Models\ResortHoliday;
 
@@ -1628,22 +1629,38 @@ class ComplianceController extends Controller
                               if ($employee->promotions && $employee->promotions->count() > 0) 
                               {
                                    $employee->promotions->each(function ($promotion) use (&$EmployeePromotion, $employee) {
-                                        if (is_null($promotion->Jd_id)) 
-                                        {
-                                             $employee->PromotionDate = Carbon::parse($promotion->created_at)->format('d M Y');
-                                             $employee->PromotionPosition = $promotion->newPosition->position_title;
-                                               $EmployeePromotion[] = 
-                                               [
-                                                  'resort_id' => $this->resort->resort_id,
-                                                  'employee_id' => $employee->id,
-                                                  'module_name' => 'Employee Promotion',
-                                                  'compliance_breached_name' => 'Job Description Not Received',
-                                                  'description' => "Employee {$employee->Emp_name} ({$employee->Position_name}) was promoted to {$employee->PromotionPosition} on {$employee->PromotionDate} but has not received the job description.",
-                                                  'reported_on' => Carbon::now(),
-                                                  'status' => 'Breached',
-                                             ];
-                                           
+                                        if (!is_null($promotion->Jd_id)) {
+                                             return; // already linked to a JD template
                                         }
+
+                                        // Re-sync: Jd_id is written once at promotion creation
+                                        // (PromotionController) and never updated, so a JD template
+                                        // created for the position AFTER the promotion leaves this
+                                        // NULL forever. If a template now exists for the new
+                                        // position, back-fill it — the breach is then not raised
+                                        // below and the auto-resolve sweep closes any open row.
+                                        $jdTemplate = JobDescription::where('Resort_id', $this->resort->resort_id)
+                                             ->where('Position_id', $promotion->new_position_id)
+                                             ->first();
+                                        if ($jdTemplate) {
+                                             $promotion->Jd_id = $jdTemplate->id;
+                                             $promotion->save();
+                                             return; // JD template exists → not a breach
+                                        }
+
+                                        // No JD template exists for the new position → genuine breach.
+                                        $employee->PromotionDate = Carbon::parse($promotion->created_at)->format('d M Y');
+                                        $employee->PromotionPosition = $promotion->newPosition->position_title;
+                                        $EmployeePromotion[] =
+                                        [
+                                             'resort_id' => $this->resort->resort_id,
+                                             'employee_id' => $employee->id,
+                                             'module_name' => 'Employee Promotion',
+                                             'compliance_breached_name' => 'Job Description Not Received',
+                                             'description' => "Employee {$employee->Emp_name} ({$employee->Position_name}) was promoted to {$employee->PromotionPosition} on {$employee->PromotionDate} but has not received the job description.",
+                                             'reported_on' => Carbon::now(),
+                                             'status' => 'Breached',
+                                        ];
                                    });
                                  
                                  
