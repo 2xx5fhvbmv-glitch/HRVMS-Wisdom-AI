@@ -779,7 +779,7 @@ class ComplianceController extends Controller
                          if($resortBenifitsGrid && $payroll->service_charge_amount > 0) 
                          {
                              
-                                   $row = Compliance::create([
+                                   $row = $this->createComplianceOncePerDay([
                                         'resort_id' => $resort->resort_id,
                                         'employee_id' => $employee->id,
                                         'module_name' => 'Payroll Compliance',
@@ -788,6 +788,7 @@ class ComplianceController extends Controller
                                         'reported_on' => Carbon::now(),
                                         'status' => 'Breached'
                                    ]);
+                                   if ($row) {
                                    $this->enrichComplianceWithAi($row, [
                                         'grade'           => $grade,
                                         'expected_amount' => (float) $resortBenifitsGrid->service_charge_amount,
@@ -803,6 +804,7 @@ class ComplianceController extends Controller
                                         $notify_person->id,
                                         'Service Charge Compliance'
                                    )));
+                                   }
                          }
                     }
                }
@@ -834,7 +836,7 @@ class ComplianceController extends Controller
 
                          // Check if probation period is more than 3 months
                          if ($probationMonths > 3 && $probation->probation_status == 'Active') {
-                              $row = Compliance::create([
+                              $row = $this->createComplianceOncePerDay([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $probation->id,
                                    'module_name' => 'Probation',
@@ -843,6 +845,7 @@ class ComplianceController extends Controller
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
+                              if ($row) {
                               $this->enrichComplianceWithAi($row, [
                                    'position'           => optional($probation->position)->position_title,
                                    'joining_date'       => optional($probation->joining_date)->format('Y-m-d') ?? $probation->joining_date,
@@ -860,6 +863,7 @@ class ComplianceController extends Controller
                                    $notify_person->id,
                                    'Probation'
                               )));
+                              }
 
                          }
                     }
@@ -888,7 +892,7 @@ class ComplianceController extends Controller
                               ->first();
 
                          if ($resortBenifitsGrid && $attendance) {
-                              $row = Compliance::create([
+                              $row = $this->createComplianceOncePerDay([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $overtime->id,
                                    'module_name' => ' Overtime  Agreement',
@@ -897,6 +901,7 @@ class ComplianceController extends Controller
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
+                              if ($row) {
                               $this->enrichComplianceWithAi($row, [
                                    'position'           => optional($overtime->position)->position_title,
                                    'grade'              => $grade,
@@ -912,6 +917,7 @@ class ComplianceController extends Controller
                                    $notify_person->id,
                                    'Overtime Agreement Lacked'
                               )));
+                              }
                          }
 
                     }
@@ -928,7 +934,7 @@ class ComplianceController extends Controller
                          $seniorHR = Employee::where('resort_id', $resort->resort_id)->where('rank', '3')->first();
                         
                          if ($seniorHR && $seniorHR->nationality != 'Maldivian') {
-                              $row = Compliance::create([
+                              $row = $this->createComplianceOncePerDay([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $seniorHR->id,
                                    'module_name' => 'Senior HR and Management ',
@@ -937,6 +943,7 @@ class ComplianceController extends Controller
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
+                              if ($row) {
                               $this->enrichComplianceWithAi($row, [
                                    'position'       => optional($seniorHR->position)->position_title,
                                    'nationality'    => $seniorHR->nationality,
@@ -954,6 +961,7 @@ class ComplianceController extends Controller
                                    $notify_person->id,
                                    'Senior HR and Management'
                               )));
+                              }
                          }
 
                          // Management positions should be at least N% Maldivian.
@@ -978,7 +986,7 @@ class ComplianceController extends Controller
 
                          if ($maldivianCount < ($managementCount * $localRatioFraction)) {
                               $breachDesc = "Management positions at " . $resort->resort_name . " should have at least {$localRatioLabel}% Maldivian representation. Current ratio is " . $maldivianCount . "/" . $managementCount;
-                              $row = Compliance::create([
+                              $row = $this->createComplianceOncePerDay([
                                    'resort_id' => $resort->resort_id,
                                    'module_name' => 'Senior HR and Management',
                                    'compliance_breached_name' => 'Management Non-Maldivian',
@@ -986,6 +994,7 @@ class ComplianceController extends Controller
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
+                              if ($row) {
                               $this->enrichComplianceWithAi($row, [
                                    'resort_name'        => $resort->resort_name,
                                    'management_count'   => $managementCount,
@@ -1003,10 +1012,11 @@ class ComplianceController extends Controller
                                    $notify_person->id,
                                    'Senior HR and Management'
                               )));
+                              }
                          }
 
                          foreach ($NonMaldivian as $nonMaldivian) {
-                              $row = Compliance::create([
+                              $row = $this->createComplianceOncePerDay([
                                    'resort_id' => $resort->resort_id,
                                    'employee_id' => $nonMaldivian->id,
                                    'module_name' => 'Senior HR and Management',
@@ -1016,6 +1026,7 @@ class ComplianceController extends Controller
                                    'reported_on' => Carbon::now(),
                                    'status' => 'Breached'
                               ]);
+                              if ($row) {
                               $this->enrichComplianceWithAi($row, [
                                    'position'      => optional($nonMaldivian->position)->position_title,
                                    'nationality'   => $nonMaldivian->nationality,
@@ -1033,6 +1044,7 @@ class ComplianceController extends Controller
                                    $notify_person->id,
                                    'Senior HR and Management'
                               )));
+                              }
                          }
                     }
                     // Senior HR and Management end
@@ -1068,7 +1080,7 @@ class ComplianceController extends Controller
                                              $sevenPercentOfSalary = $basicSalary * 0.07;
                                              
                                              if ($deduction->pension < $sevenPercentOfSalary) {
-                                                  $row = Compliance::create([
+                                                  $row = $this->createComplianceOncePerDay([
                                                        'resort_id' => $resort->resort_id,
                                                        'employee_id' => $employee->id,
                                                        'module_name' => 'Pension Compliance',
@@ -1077,6 +1089,7 @@ class ComplianceController extends Controller
                                                        'reported_on' => Carbon::now(),
                                                        'status' => 'Breached'
                                                   ]);
+                                                  if ($row) {
                                                   $this->enrichComplianceWithAi($row, [
                                                        'age'                => $age,
                                                        'basic_salary'       => (float) $basicSalary,
@@ -1084,7 +1097,7 @@ class ComplianceController extends Controller
                                                        'actual_pension'     => (float) $deduction->pension,
                                                        'payroll_period'     => $startOfLastMonth . ' to ' . $endOfLastMonth,
                                                   ]);
-                                                  
+
                                                   event(new ResortNotificationEvent(Common::nofitication(
                                                        $this->resort->resort_id,
                                                        10,
@@ -1094,6 +1107,7 @@ class ComplianceController extends Controller
                                                        $notify_person->id,
                                                        'Pension Deduction Below 7%'
                                                   )));
+                                                  }
                                              }
                                         }
                               }
@@ -1145,15 +1159,19 @@ class ComplianceController extends Controller
                                      'Workforce Planning'
                                )));
 
-                               $compliance = Compliance::firstOrCreate([
-                                     'resort_id' => $resort->resort_id,
-                                     'employee_id' => null,
-                                     'module_name' => 'Workforce Planning',
-                                     'compliance_breached_name' => 'Expat-Local Ratio',
-                                     'description' => "Expat count ({$expatCount}) exceeds expected ({$expected_expat}) or Local count ({$localCount}) is below expected ({$expected_local})",
-                                     'reported_on' => Carbon::now(),
-                                     'status' => 'Breached'
-                               ]);
+                               $compliance = Compliance::firstOrCreate(
+                                     [
+                                          'resort_id' => $resort->resort_id,
+                                          'employee_id' => null,
+                                          'module_name' => 'Workforce Planning',
+                                          'compliance_breached_name' => 'Expat-Local Ratio',
+                                     ],
+                                     [
+                                          'description' => "Expat count ({$expatCount}) exceeds expected ({$expected_expat}) or Local count ({$localCount}) is below expected ({$expected_local})",
+                                          'reported_on' => Carbon::now(),
+                                          'status' => 'Breached',
+                                     ]
+                               );
                          }
                   }
                // Expat-Local Ratio compliance End
@@ -1174,15 +1192,19 @@ class ComplianceController extends Controller
                if ($employeesBelowMinWage->isNotEmpty()) {
                     foreach ($employeesBelowMinWage as $employee) 
                     {
-                         $compliance = Compliance::firstOrCreate([
-                              'resort_id' => $resort->resort_id,
-                              'employee_id' => $employee->id,
-                              'module_name' => 'Workforce Planning',
-                              'compliance_breached_name' => 'Minimum Wage',
-                              'description' => "Employee {$employee->resortAdmin->full_name} has a basic salary below the minimum wage.",
-                              'reported_on' => Carbon::now(),
-                              'status' => 'Breached'
-                         ]);
+                         $compliance = Compliance::firstOrCreate(
+                              [
+                                   'resort_id' => $resort->resort_id,
+                                   'employee_id' => $employee->id,
+                                   'module_name' => 'Workforce Planning',
+                                   'compliance_breached_name' => 'Minimum Wage',
+                              ],
+                              [
+                                   'description' => "Employee {$employee->resortAdmin->full_name} has a basic salary below the minimum wage.",
+                                   'reported_on' => Carbon::now(),
+                                   'status' => 'Breached',
+                              ]
+                         );
                     }
                }
                // Minumum Wage Compliance End
@@ -1274,7 +1296,7 @@ class ComplianceController extends Controller
                // Insert all compliance breaches in one go
                if (!empty($employeesWithoutBreak)) 
                {
-                    Compliance::insert($employeesWithoutBreak);
+                    $this->insertComplianceOncePerDay($employeesWithoutBreak);
                }
 
                // Time & Attendance Compliance End
@@ -1320,7 +1342,7 @@ class ComplianceController extends Controller
                }
                
                if (!empty($overworkedEmployees)) {
-                    Compliance::insert($overworkedEmployees);
+                    $this->insertComplianceOncePerDay($overworkedEmployees);
                }
 
                // Weekly Working Hours Compliance End
@@ -1334,26 +1356,38 @@ class ComplianceController extends Controller
                     $propsed_salary = $vacancy->propsed_salary;
                     // Usd
                     if($propsed_salary > $base_salary){
-                         $compliance = Compliance::firstOrCreate([
-                              'resort_id' => $resort->resort_id,
-                              'employee_id' => null,
-                              'module_name' => 'Talent Acquisition',
-                              'compliance_breached_name' => 'Salary Compliance',
-                              'description' => "Vacancy {$vacancy->Getposition->position_title} has a proposed salary ({$propsed_salary}) exceeding the budgeted salary ({$base_salary}).",
-                              'reported_on' => Carbon::now(),
-                              'status' => 'Breached'
-                         ]);
+                         // Per-vacancy breach: there is no vacancy_id column, so the description
+                         // (which embeds the position title) is what distinguishes one vacancy
+                         // from another. Keep it in the match key; only reported_on must be excluded.
+                         $compliance = Compliance::firstOrCreate(
+                              [
+                                   'resort_id' => $resort->resort_id,
+                                   'employee_id' => null,
+                                   'module_name' => 'Talent Acquisition',
+                                   'compliance_breached_name' => 'Salary Compliance',
+                                   'description' => "Vacancy {$vacancy->Getposition->position_title} has a proposed salary ({$propsed_salary}) exceeding the budgeted salary ({$base_salary}).",
+                              ],
+                              [
+                                   'reported_on' => Carbon::now(),
+                                   'status' => 'Breached',
+                              ]
+                         );
                     }
                     if($base_salary > $minWageUSD){
-                         $compliance = Compliance::firstOrCreate([
-                              'resort_id' => $resort->resort_id,
-                              'employee_id' => null,
-                              'module_name' => 'Talent Acquisition',
-                              'compliance_breached_name' => 'Minimum Wage Compliance',
-                              'description' => "Vacancy {$vacancy->Getposition->position_title} has a budgeted salary ({$base_salary}) below the minimum wage.",
-                              'reported_on' => Carbon::now(),
-                              'status' => 'Breached'
-                         ]);
+                         // Per-vacancy breach (no vacancy_id column) — keep description in the match key.
+                         $compliance = Compliance::firstOrCreate(
+                              [
+                                   'resort_id' => $resort->resort_id,
+                                   'employee_id' => null,
+                                   'module_name' => 'Talent Acquisition',
+                                   'compliance_breached_name' => 'Minimum Wage Compliance',
+                                   'description' => "Vacancy {$vacancy->Getposition->position_title} has a budgeted salary ({$base_salary}) below the minimum wage.",
+                              ],
+                              [
+                                   'reported_on' => Carbon::now(),
+                                   'status' => 'Breached',
+                              ]
+                         );
                     }
                }
                // Vacancy compliance end
@@ -1459,7 +1493,7 @@ class ComplianceController extends Controller
                })->filter();
                if(!empty($overworkedEmployeesVisa))
                {
-                    Compliance::insert($overworkedEmployeesVisa);
+                    $this->insertComplianceOncePerDay($overworkedEmployeesVisa);
                }
           // VisaEnd
 
@@ -1491,7 +1525,7 @@ class ComplianceController extends Controller
 
                     if(!empty($Incidentemployees))
                     {
-                         $compliance = Compliance::insert($Incidentemployees);
+                         $this->insertComplianceOncePerDay($Incidentemployees);
                     }
 
           // End Incident Compliance Start
@@ -1559,7 +1593,7 @@ class ComplianceController extends Controller
                // Insert all compliance records at once
                if (!empty($EmployeeOnBording)) 
                {                                                                           
-                    Compliance::insert($EmployeeOnBording);
+                    $this->insertComplianceOncePerDay($EmployeeOnBording);
                }
 
           //End of On Bording
@@ -1609,7 +1643,7 @@ class ComplianceController extends Controller
     
                           if (!empty($EmployeePromotion)) 
                          {                                                                           
-                              Compliance::insert($EmployeePromotion);
+                              $this->insertComplianceOncePerDay($EmployeePromotion);
                          }
 
 
@@ -1657,15 +1691,19 @@ class ComplianceController extends Controller
                               $notify_person->id,
                               'People Management (TIN Requirement)'
                          )));
-                         Compliance::firstOrCreate([
-                              'resort_id' => $this->resort->resort_id,
-                              'employee_id' => $employee->id,
-                              'module_name' => 'People Management',
-                              'compliance_breached_name' => 'TIN Requirement',
-                              'description' => "{$employee->Emp_name} ({$employee->Emp_id} - {$employee->Position_name}) (RSWT: MVR {$totalMonthlyEarningMvr}/month) not registered. Submit MIRA 118 form.",
-                              'reported_on' => Carbon::now(),
-                              'status' => 'Breached'
-                         ]);
+                         Compliance::firstOrCreate(
+                              [
+                                   'resort_id' => $this->resort->resort_id,
+                                   'employee_id' => $employee->id,
+                                   'module_name' => 'People Management',
+                                   'compliance_breached_name' => 'TIN Requirement',
+                              ],
+                              [
+                                   'description' => "{$employee->Emp_name} ({$employee->Emp_id} - {$employee->Position_name}) (RSWT: MVR {$totalMonthlyEarningMvr}/month) not registered. Submit MIRA 118 form.",
+                                   'reported_on' => Carbon::now(),
+                                   'status' => 'Breached',
+                              ]
+                         );
                     }
                     return $employee;
                });
@@ -1689,20 +1727,26 @@ class ComplianceController extends Controller
                     $employee->Department_name = $employee->department->name;
                     $employee->Position_name = $employee->position->position_title;
 
-                    $employee->EmployeeAttandance->each(function ($attendance) use ($employee){
-                           if ($attendance->OTStatus =="Approved" &&  $employee->entitled_overtime  =="no" ) 
-                              {
-                                   Compliance::firstOrCreate([
-                                        'resort_id' => $this->resort->resort_id,
-                                        'employee_id' => $employee->id,
-                                        'module_name' => 'Time and Attendance',
-                                        'compliance_breached_name' => 'Over Time Not Eligibile',
-                                        'description' => "{$employee->Emp_name} ({$employee->Emp_id} - {$employee->Position_name}) is not eligible for overtime.",
-                                        'reported_on' => Carbon::now(),
-                                        'status' => 'Compliant'
-                                   ]);
-                              }
-                    });
+                    // Overtime eligibility is an employee-level fact, so record at most one
+                    // breach per employee regardless of how many approved-OT attendance rows exist.
+                    $hasApprovedOvertime = $employee->EmployeeAttandance
+                         ->contains(fn ($attendance) => $attendance->OTStatus == "Approved");
+
+                    if ($hasApprovedOvertime && $employee->entitled_overtime == "no") {
+                         Compliance::firstOrCreate(
+                              [
+                                   'resort_id' => $this->resort->resort_id,
+                                   'employee_id' => $employee->id,
+                                   'module_name' => 'Time and Attendance',
+                                   'compliance_breached_name' => 'Over Time Not Eligibile',
+                              ],
+                              [
+                                   'description' => "{$employee->Emp_name} ({$employee->Emp_id} - {$employee->Position_name}) is not eligible for overtime.",
+                                   'reported_on' => Carbon::now(),
+                                   'status' => 'Compliant',
+                              ]
+                         );
+                    }
                     // Check if the employee is eligible for overtime
                   
                     return $employee;
@@ -1749,7 +1793,7 @@ class ComplianceController extends Controller
                                              
                                              // Bulk insert compliance records if any
                                              if (!empty($complianceRecords)) {
-                                                  Compliance::insert($complianceRecords);
+                                                  $this->insertComplianceOncePerDay($complianceRecords);
                                              }
                                              
                                              return $employee;
@@ -1789,13 +1833,93 @@ class ComplianceController extends Controller
                                            
                                            // Bulk insert compliance records if any
                                             if (!empty($complianceRecords)) {
-                                                  Compliance::insert($complianceRecords);
+                                                  $this->insertComplianceOncePerDay($complianceRecords);
                                              }
                                              
                                              return $employee;
                                         });
 
-          return redirect()->route('people.compliance.index')->with('success', 'Compliance checks completed successfully.');  
+          return redirect()->route('people.compliance.index')->with('success', 'Compliance checks completed successfully.');
+     }
+
+     /**
+      * Dedup guard for breaches generated by checkCompliance().
+      *
+      * checkCompliance() appends breaches on every run and never clears prior
+      * rows, so without a guard each run re-creates the same breaches. This
+      * returns true when an identical breach (same resort, employee, module,
+      * breach name and description) has already been reported today — allowing a
+      * genuinely new breach to still be recorded on a later day.
+      */
+     private function complianceReportedToday(array $row)
+     {
+          $query = Compliance::query()
+               ->where('resort_id', $row['resort_id'])
+               ->where('module_name', $row['module_name'])
+               ->where('compliance_breached_name', $row['compliance_breached_name'])
+               ->whereDate('reported_on', Carbon::today());
+
+          if (array_key_exists('employee_id', $row) && $row['employee_id'] !== null) {
+               $query->where('employee_id', $row['employee_id']);
+          } else {
+               $query->whereNull('employee_id');
+          }
+
+          // Some breaches (leave-on-holiday, promotions) legitimately produce
+          // several rows per employee that differ only by description, so the
+          // description is part of the identity when present.
+          if (array_key_exists('description', $row) && $row['description'] !== null) {
+               $query->where('description', $row['description']);
+          }
+
+          return $query->exists();
+     }
+
+     /**
+      * Create a breach only if an identical one has not already been reported
+      * today. Returns the new row, or null if it was skipped as a duplicate (so
+      * the caller can skip AI enrichment and notifications too).
+      */
+     private function createComplianceOncePerDay(array $attributes)
+     {
+          if ($this->complianceReportedToday($attributes)) {
+               return null;
+          }
+
+          return Compliance::create($attributes);
+     }
+
+     /**
+      * Bulk-insert a batch of breaches, dropping any that were already reported
+      * today so re-running the compliance check does not duplicate them.
+      */
+     private function insertComplianceOncePerDay(array $rows)
+     {
+          $fresh = [];
+          $seen = [];
+          foreach ($rows as $row) {
+               // Skip rows already queued in this same batch (the DB check below
+               // can't catch those, as they are not persisted yet).
+               $key = implode('|', [
+                    $row['resort_id'] ?? '',
+                    $row['employee_id'] ?? '',
+                    $row['module_name'] ?? '',
+                    $row['compliance_breached_name'] ?? '',
+                    $row['description'] ?? '',
+               ]);
+               if (isset($seen[$key])) {
+                    continue;
+               }
+               $seen[$key] = true;
+
+               if (!$this->complianceReportedToday($row)) {
+                    $fresh[] = $row;
+               }
+          }
+
+          if (!empty($fresh)) {
+               Compliance::insert($fresh);
+          }
      }
 
      public function isExpired($date)
@@ -1950,29 +2074,35 @@ class ComplianceController extends Controller
                                    $sickLeaveDaysInCurrentMonth = $checkCurrentMonthLeaves->sum('total_days');
 
                                    if ($sickLeaveDaysInCurrentMonth >= 15) {
-                                        $compliance = Compliance::firstOrCreate([
-                                        'resort_id' => $resort->resort_id,
-                                        'employee_id' => $employeeLeave->emp_id,
-                                        'module_name' => 'Sick Leave',
-                                        'compliance_breached_name' => 'Medical certificates Required',
-                                        'description' => "Employee {$employee->resortAdmin->full_name} has taken more than {$sickLeaveDaysInCurrentMonth} days of Sick Leave without a medical certificate.",
-                                        'reported_on' => Carbon::now(),
-                                        'status' => 'Breached'
+                                        $compliance = Compliance::firstOrCreate(
+                                        [
+                                             'resort_id' => $resort->resort_id,
+                                             'employee_id' => $employeeLeave->emp_id,
+                                             'module_name' => 'Sick Leave',
+                                             'compliance_breached_name' => 'Medical certificates Required',
+                                        ],
+                                        [
+                                             'description' => "Employee {$employee->resortAdmin->full_name} has taken more than {$sickLeaveDaysInCurrentMonth} days of Sick Leave without a medical certificate.",
+                                             'reported_on' => Carbon::now(),
+                                             'status' => 'Breached',
                                         ]);
                                    }
                               }
 
                               if($employeeLeave->total_days > 2){
                               
-                                   $compliance = Compliance::firstOrCreate([
-                                        'resort_id' => $resort->resort_id,
-                                        'employee_id' => $employeeLeave->emp_id,
-                                        'module_name' => 'Sick Leave',
-                                        'compliance_breached_name' => 'Medical certificates Required',
-                                        'description' => "Employee {$employee->resortAdmin->full_name} has taken more than {$sickLeaveDaysInCurrentMonth} days of Sick Leave without a medical certificate.",
-                                        'reported_on' => Carbon::now(),
-                                        'status' => 'Breached'
-                                   ]);
+                                   $compliance = Compliance::firstOrCreate(
+                                        [
+                                             'resort_id' => $resort->resort_id,
+                                             'employee_id' => $employeeLeave->emp_id,
+                                             'module_name' => 'Sick Leave',
+                                             'compliance_breached_name' => 'Medical certificates Required',
+                                        ],
+                                        [
+                                             'description' => "Employee {$employee->resortAdmin->full_name} has taken more than {$sickLeaveDaysInCurrentMonth} days of Sick Leave without a medical certificate.",
+                                             'reported_on' => Carbon::now(),
+                                             'status' => 'Breached',
+                                        ]);
                               }
 
 
