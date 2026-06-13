@@ -14,6 +14,10 @@ use App\Models\ResortDepartment;
 use App\Models\DutyRosterEntry;
 use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
+use App\Models\ResortBenifitGrid;
+use App\Models\BreakAttendaces;
+use App\Models\LeaveCategory;
+use App\Models\EmployeeLeave;
 use Carbon\CarbonInterval;
 
 use DB;
@@ -175,6 +179,194 @@ class TimeandAttendanceDashboardController extends Controller
         }
 
         return 0;
+    }
+
+    /**
+     * Build the "WAI Insight's" compliance panel for the dashboard.
+     *
+     * All four metrics are recomputed for the current day / current week on
+     * every page load, so the panel stays up to date on a daily basis.
+     * Each metric returns a count plus the matching employee list (name +
+     * photo + a short detail) used to populate the "View all" modal.
+     *
+     * Thresholds:
+     *   - Weekly Working Hours : per-employee weekly hours over the
+     *     benefit-grid limit (working_hrs_per_week, fallback 48).
+     *   - Excessive Overtime   : more than 3 hours overtime today.
+     *   - Mandatory Break      : worked more than 5 hours today with no break.
+     *   - Day-Off Balance      : more than 4 unused day-offs in the current
+     *     employment-year cycle (accrued 1/week minus taken).
+     *
+     * @return array<string,array{count:int,employees:array}>
+     */
+    protected function getWaiInsights($canViewAll, $isDeptHOD, $Dept_id)
+    {
+        $resortId = $this->resort->resort_id;
+        $today    = Carbon::now()->format('Y-m-d');
+
+        // Scoped, active employees (same scoping rules as the dashboard counts).
+        $empQuery = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+            ->where('ra.resort_id', $resortId)
+            ->where('employees.status', 'Active')
+            ->select(
+                'employees.id',
+                'employees.Admin_Parent_id',
+                'employees.rank',
+                'employees.joining_date',
+                'ra.first_name',
+                'ra.last_name'
+            );
+        if (!$canViewAll && $Dept_id) {
+            $empQuery->where('employees.Dept_id', $Dept_id);
+        }
+        if (!$canViewAll && !$isDeptHOD) {
+            $empQuery->whereIn('employees.id', $this->underEmp_id);
+        }
+        $employees = $empQuery->get();
+        $empById   = $employees->keyBy('id');
+        $empIds    = $employees->pluck('id')->all();
+
+        $person = function ($emp, $detail) {
+            return [
+                'name'   => ucwords(trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? ''))) ?: '-',
+                'photo'  => Common::getResortUserPicture($emp->Admin_Parent_id),
+                'detail' => $detail,
+            ];
+        };
+
+        $weeklyHoursEmp = [];
+        $overtimeEmp    = [];
+        $noBreakEmp     = [];
+        $dayOffEmp      = [];
+
+        if (!empty($empIds)) {
+            // 1. Weekly Working Hours Exceeded (current week vs benefit-grid limit).
+            $startOfWeek = Carbon::now()->startOfWeek()->format('Y-m-d');
+            $endOfWeek   = Carbon::now()->endOfWeek()->format('Y-m-d');
+
+            // Weekly-hour limit per employee grade for this resort (fallback 48).
+            $gridLimits = ResortBenifitGrid::where('resort_id', $resortId)
+                ->whereNotNull('working_hrs_per_week')
+                ->pluck('working_hrs_per_week', 'emp_grade');
+
+            $weeklyRows = ParentAttendace::where('resort_id', $resortId)
+                ->whereIn('Emp_id', $empIds)
+                ->whereBetween('date', [$startOfWeek, $endOfWeek])
+                ->where('Status', 'Present')
+                ->whereNotNull('CheckingTime')
+                ->whereNotNull('CheckingOutTime')
+                ->get(['Emp_id', 'CheckingTime', 'CheckingOutTime']);
+
+            $weeklyTotals = [];
+            foreach ($weeklyRows as $row) {
+                $in  = Carbon::parse($row->CheckingTime);
+                $out = Carbon::parse($row->CheckingOutTime);
+                $weeklyTotals[$row->Emp_id] = ($weeklyTotals[$row->Emp_id] ?? 0) + $in->diffInHours($out);
+            }
+            foreach ($weeklyTotals as $eid => $hours) {
+                $emp = $empById->get($eid);
+                if (!$emp) {
+                    continue;
+                }
+                $grade = Common::getEmpGrade($emp->rank);
+                $limit = (int) ($gridLimits[$grade] ?? 48);
+                if ($limit <= 0) {
+                    $limit = 48;
+                }
+                if ($hours > $limit) {
+                    $weeklyHoursEmp[] = $person($emp, $hours . ' hrs / ' . $limit . ' hr limit');
+                }
+            }
+
+            // 2. Excessive Overtime Hours (more than 3 hours today).
+            $otRows = DutyRosterEntry::where('resort_id', $resortId)
+                ->whereIn('Emp_id', $empIds)
+                ->where('date', $today)
+                ->whereNotNull('OverTime')
+                ->get(['Emp_id', 'OverTime']);
+            $otTotals = [];
+            foreach ($otRows as $row) {
+                $otTotals[$row->Emp_id] = ($otTotals[$row->Emp_id] ?? 0) + $this->timeToHours($row->OverTime);
+            }
+            foreach ($otTotals as $eid => $ot) {
+                if ($ot > 3) {
+                    $emp = $empById->get($eid);
+                    if (!$emp) {
+                        continue;
+                    }
+                    $overtimeEmp[] = $person($emp, round($ot, 1) . ' hrs overtime');
+                }
+            }
+
+            // 3. Mandatory Break Not Taken (worked more than 5 hours today, no break).
+            $attRows = ParentAttendace::where('resort_id', $resortId)
+                ->whereIn('Emp_id', $empIds)
+                ->whereDate('date', $today)
+                ->whereNotNull('CheckingTime')
+                ->where('Status', 'Present')
+                ->get(['id', 'Emp_id', 'CheckingTime', 'CheckingOutTime']);
+            foreach ($attRows as $att) {
+                $checkIn = Carbon::parse($att->CheckingTime);
+                $endRef  = !empty($att->CheckingOutTime) ? Carbon::parse($att->CheckingOutTime) : Carbon::now();
+                $worked  = $checkIn->diffInHours($endRef);
+                $hasBreak = BreakAttendaces::where('Parent_attd_id', $att->id)->exists();
+                if (!$hasBreak && $worked > 5) {
+                    $emp = $empById->get($att->Emp_id);
+                    if (!$emp) {
+                        continue;
+                    }
+                    $noBreakEmp[] = $person($emp, $worked . ' hrs, no break');
+                }
+            }
+
+            // 4. Accumulated Day-Off Balance Exceeding Limit (more than 4 unused in cycle).
+            $dayOffCatId = LeaveCategory::where('resort_id', $resortId)
+                ->where('leave_type', 'Day Off')
+                ->value('id');
+            $now = Carbon::now();
+            foreach ($employees as $emp) {
+                if (empty($emp->joining_date)) {
+                    continue;
+                }
+                $joining = Carbon::parse($emp->joining_date);
+                if ($joining->greaterThan($now)) {
+                    continue;
+                }
+                // Current employment-year cycle window.
+                $completedYears = (int) floor($joining->floatDiffInYears($now));
+                $cycleStart = $joining->copy()->addYears($completedYears);
+                if ($cycleStart->greaterThan($now)) {
+                    $cycleStart = $joining->copy()->addYears(max(0, $completedYears - 1));
+                }
+                $accrued = (int) floor($cycleStart->floatDiffInDays($now) / 7);
+
+                $usedLeaves = 0;
+                if ($dayOffCatId) {
+                    $usedLeaves = (float) EmployeeLeave::where('emp_id', $emp->id)
+                        ->where('leave_category_id', $dayOffCatId)
+                        ->where('status', 'Approved')
+                        ->whereBetween('from_date', [$cycleStart->format('Y-m-d'), $now->format('Y-m-d')])
+                        ->sum('total_days');
+                }
+                $usedScheduled = ParentAttendace::where('resort_id', $resortId)
+                    ->where('Emp_id', $emp->id)
+                    ->where('Status', 'DayOff')
+                    ->whereBetween('date', [$cycleStart->format('Y-m-d'), $now->format('Y-m-d')])
+                    ->count();
+
+                $balance = max(0, $accrued - $usedLeaves - $usedScheduled);
+                if ($balance > 4) {
+                    $dayOffEmp[] = $person($emp, $balance . ' days unused');
+                }
+            }
+        }
+
+        return [
+            'weekly_hours' => ['count' => count($weeklyHoursEmp), 'employees' => $weeklyHoursEmp],
+            'overtime'     => ['count' => count($overtimeEmp),    'employees' => $overtimeEmp],
+            'no_break'     => ['count' => count($noBreakEmp),      'employees' => $noBreakEmp],
+            'day_off'      => ['count' => count($dayOffEmp),       'employees' => $dayOffEmp],
+        ];
     }
 
     public function admin_dashboard()
@@ -403,8 +595,9 @@ class TimeandAttendanceDashboardController extends Controller
                 $attendanceCounts[] = $totalPresent;
             }
 
+        $waiInsights = $this->getWaiInsights($canViewAll, $isDeptHOD, $Dept_id);
 
-        return view('resorts.timeandattendance.dashboard.hrdashboard',compact('attendanceDataTodoList', 'page_title','ResortPosition','ResortDepartment','EmployeesCount','totalPresentEmployee','totalAbsantEmployee','totalLeaveEmployee','attendanceCounts','totalunknown_status_Employee'));
+        return view('resorts.timeandattendance.dashboard.hrdashboard',compact('attendanceDataTodoList', 'page_title','ResortPosition','ResortDepartment','EmployeesCount','totalPresentEmployee','totalAbsantEmployee','totalLeaveEmployee','attendanceCounts','totalunknown_status_Employee','waiInsights'));
     }
 
     public function HrDashboardCount($date)
@@ -1039,7 +1232,9 @@ class TimeandAttendanceDashboardController extends Controller
         $totalunknown_status_Employee = $EmployeesCount - $totalPresentEmployee - $totalLeaveEmployee - $totalAbsantEmployee;
         $totalunknown_status_Employee = max(0, $totalunknown_status_Employee);
 
-        return view('resorts.timeandattendance.dashboard.hoddashboard', compact('page_header','attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee', 'totalunknown_status_Employee'));
+        $waiInsights = $this->getWaiInsights($canViewAll, $isDeptHOD, $Dept_id);
+
+        return view('resorts.timeandattendance.dashboard.hoddashboard', compact('page_header','attendanceDataTodoList', 'page_title', 'ResortPosition', 'EmployeesCount', 'totalPresentEmployee', 'totalAbsantEmployee', 'totalLeaveEmployee', 'totalunknown_status_Employee','waiInsights'));
     }
 
     public function excom_dashboard()

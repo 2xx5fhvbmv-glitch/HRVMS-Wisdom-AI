@@ -136,38 +136,7 @@
                 </div>
             </div>
             <div class="col-xl-3 col-lg-6 col-md-6">
-                <div class="card">
-                    <div class="card-title d-flex justify-content-between">
-                        <h3>Compliance Tracking</h3>
-                    </div>
-                    <div>
-                        <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                            <p class="mb-0">Employees who's number of Weekly Working Hours Exceeded</p>
-                            <span class="d-inline-block w-25 text-end text-danger">12</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                            <p class="mb-0">Excessive Overtime Hours</p>
-                            <span class="d-inline-block w-25 text-end">00</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                            <p class="mb-0">Mandatory Break Not Taken</p>
-                            <span class="d-inline-block w-25 text-end text-danger">03</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                            <p class="mb-0">Consecutive Days Worked Exceeding Limit</p>
-                            <span class="d-inline-block w-25 text-end text-danger">03</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                            <p class="mb-0">Overtime Without Prior Approval</p>
-                            <span class="d-inline-block w-25 text-end text-danger">03</span>
-                        </div>
-                        <div class="d-flex justify-content-between  border-bottom pb-2">
-                            <p class="mb-0">Accumulated Day-Off Balances Exceeding Limits</p>
-                            <span class="d-inline-block w-25 text-end text-danger">03</span>
-                        </div>
-                    </div>
-
-                </div>
+                @include('resorts.timeandattendance.dashboard.partials.wai-insights', ['waiInsights' => $waiInsights ?? []])
             </div>
             <!-- <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card">
