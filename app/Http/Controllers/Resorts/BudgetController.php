@@ -437,6 +437,12 @@ class BudgetController extends Controller
         $totalHodBudget     = 0.0;
         $totalAiHeadcount   = 0;
         $totalAiBudget      = 0.0;
+        // Vacant (planned-but-unfilled) positions. The HOD budget below counts
+        // only filled salaries, so the manning-plan total is higher by the
+        // vacant-position cost. We surface this so the difference reads as
+        // "vacant positions", not an error.
+        $totalVacant        = 0;
+        $totalVacantCost    = 0.0;
         $currencySymbol     = Common::GetResortCurrencySymbol();
 
         if ($deptID && $budgetId) {
@@ -496,6 +502,8 @@ class BudgetController extends Controller
                 $p->current_budget  = (float) $emps->sum('basic_salary');
                 $totalHodHeadcount += $p->headcount;
                 $totalHodBudget    += $p->current_budget;
+                // Planned vacant slots for this position (from position_monthly_data).
+                $totalVacant       += (int) ($p->vacantcount ?? 0);
             }
 
             // Try to use the cached AI recommendation. If none — or the user
@@ -549,12 +557,27 @@ class BudgetController extends Controller
             }
         }
 
+        // Cost the vacant positions the same way the manning plan does, so the
+        // note on this page reconciles with the manning-plan total.
+        if ($totalVacant > 0) {
+            try {
+                $vacantCostArr   = Common::CheckVacantBudgetCost($totalVacant);
+                $totalVacantCost = (float) ($vacantCostArr['total_cost'] ?? 0);
+            } catch (\Throwable $e) {
+                // Don't let a budget-config issue break the page — the count
+                // still highlights the vacancy even if the cost can't compute.
+                \Log::warning('CompareBudget vacant-cost calc failed: ' . $e->getMessage());
+                $totalVacantCost = 0.0;
+            }
+        }
+
         return view('resorts.budget.compare', compact(
             'page_title', 'available_rank',
             'positions', 'department', 'manningResponse',
             'aiSuggestions', 'aiStatus', 'aiGeneratedAt',
             'totalHodHeadcount', 'totalHodBudget',
             'totalAiHeadcount', 'totalAiBudget',
+            'totalVacant', 'totalVacantCost',
             'currencySymbol'
         ));
     }
