@@ -8,25 +8,36 @@
     ];
 @endphp
 
-<div class="card">
-    <div class="card-title d-flex justify-content-between">
+<style>
+    /* Match the leave module's WAI Insight's card: fixed shell, scrolling list. */
+    .card-wiINsight { display: flex; flex-direction: column; }
+    .card-wiINsight .leaveUser-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    .card-wiINsight .wai-count { font-size: 20px; font-weight: 600; line-height: 1; }
+</style>
+
+<div class="card card-wiINsight">
+    <div class="card-title d-flex justify-content-between align-items-start">
         <h3>WAI Insight's</h3>
     </div>
-    <div>
+    <div class="leaveUser-main">
         @foreach ($waiRows as $row)
             @php $insight = $waiInsights[$row['key']] ?? ['count' => 0, 'employees' => []]; @endphp
-            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                <p class="mb-0">{{ $row['label'] }}</p>
-                <span class="d-inline-flex align-items-center gap-2">
-                    <span class="d-inline-block text-end {{ $insight['count'] > 0 ? 'text-danger' : '' }}">{{ sprintf('%02d', $insight['count']) }}</span>
+            <div class="leaveUser-block">
+                <div class="img">
+                    <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                </div>
+                <div class="flex-grow-1">
+                    <h6>{{ $row['label'] }}</h6>
+                    <p class="mb-0">{{ $insight['count'] }} {{ $insight['count'] == 1 ? 'employee' : 'employees' }} flagged</p>
                     @if ($insight['count'] > 0)
-                        <a href="javascript:void(0)" class="wai-view-all" title="View all details"
+                        <a href="javascript:void(0)" class="a-linkTheme wai-view-all"
                            data-wai-key="{{ $row['key'] }}" data-wai-title="{{ $row['label'] }}"
-                           data-bs-toggle="modal" data-bs-target="#waiInsightModal">
-                            <i class="fa-regular fa-eye"></i>
-                        </a>
+                           data-bs-toggle="modal" data-bs-target="#waiInsightModal">View Details</a>
                     @endif
-                </span>
+                </div>
+                <div class="text-end">
+                    <span class="wai-count {{ $insight['count'] > 0 ? 'text-danger' : 'text-muted' }}">{{ sprintf('%02d', $insight['count']) }}</span>
+                </div>
             </div>
         @endforeach
     </div>
@@ -34,7 +45,7 @@
 
 {{-- WAI Insight's details modal --}}
 <div class="modal fade" id="waiInsightModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="waiInsightModalTitle">WAI Insight's</h5>

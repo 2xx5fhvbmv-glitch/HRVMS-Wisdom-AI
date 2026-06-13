@@ -163,13 +163,224 @@ class PerformanceDashboardController extends Controller
                 return $dept;
             });
 
+        $performanceInsights = $this->getCachedPerformanceInsights($resort_id, $scopedIds, $scopedDeptIds);
+
         return view('resorts.Performance.dashboard.hrdashboard', compact(
             'page_title', 'Employee_count', 'appraisal_total', 'appraisal_pending',
             'department_data', 'performance_cycles', 'approved_checkins_count',
             'pip_count', 'pdp_count', 'availableYears', 'selectedYear',
-            'appraisalDepartments'
+            'appraisalDepartments', 'performanceInsights'
         ));
 
+    }
+
+    /**
+     * Build the three AI-insight cards (appraisal completion, performance risk,
+     * review throughput) for the performance dashboard from live data. Mirrors
+     * the leave module's buildLeaveInsights(): deterministic figures first, then
+     * the FastAPI LLM layers a richer body + recommendation on top. Pass scoped
+     * employee/department ids (null = whole resort) to respect the viewer's
+     * visibility. Wrapped so any data hiccup degrades to sensible defaults.
+     */
+    private function buildPerformanceInsights($resortId, $scopedIds = null, $scopedDeptIds = null): array
+    {
+        $insights = [
+            'completion' => ['title' => 'Appraisal Completion Outlook', 'body' => 'No active appraisal cycle for this period yet.'],
+            'risk'       => ['title' => 'Performance Risk & PIP Watch', 'body' => 'No employees are flagged as at-risk right now.'],
+            'throughput' => ['title' => 'Self vs Manager Review Throughput', 'body' => 'Not enough review activity to analyse yet.'],
+        ];
+
+        try {
+            $year = (int) date('Y');
+
+            // Active cycles for the current year.
+            $activeCycleIds = DB::table('performance_cycles')
+                ->where('resort_id', $resortId)
+                ->whereIn('status', ['OnGoing', 'Pending'])
+                ->where(function ($q) use ($year) {
+                    $q->whereYear('Start_Date', $year)->orWhereYear('End_Date', $year);
+                })
+                ->pluck('id');
+
+            // Base scoped child-cycle query for the active cycles.
+            $childQ = DB::table('performa_child_cycles')->whereIn('Parent_cycle_id', $activeCycleIds);
+            if (is_array($scopedIds)) {
+                $childQ->whereIn('Emp_main_id', $scopedIds);
+            }
+            $total       = (clone $childQ)->count();
+            $managerDone = (clone $childQ)->where('manager_review_status', 'completed')->count();
+
+            // Card 1 — Appraisal Completion Outlook (overall % + per-department).
+            if ($total > 0) {
+                $pct = (int) round(($managerDone / $total) * 100);
+
+                $deptRows = [];
+                $depts = ResortDepartment::where('resort_id', $resortId)
+                    ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('id', $scopedDeptIds))
+                    ->get();
+                foreach ($depts as $dept) {
+                    $deptEmpIds = Employee::where('resort_id', $resortId)
+                        ->where('Dept_id', $dept->id)
+                        ->where('status', 'Active')
+                        ->pluck('id');
+                    if ($deptEmpIds->isEmpty()) {
+                        continue;
+                    }
+                    $dTotal = DB::table('performa_child_cycles')
+                        ->whereIn('Parent_cycle_id', $activeCycleIds)
+                        ->whereIn('Emp_main_id', $deptEmpIds)
+                        ->count();
+                    if ($dTotal == 0) {
+                        continue;
+                    }
+                    $dDone = DB::table('performa_child_cycles')
+                        ->whereIn('Parent_cycle_id', $activeCycleIds)
+                        ->whereIn('Emp_main_id', $deptEmpIds)
+                        ->where('manager_review_status', 'completed')
+                        ->count();
+                    $deptRows[] = [
+                        'name'      => $dept->name,
+                        'total'     => $dTotal,
+                        'completed' => $dDone,
+                        'pending'   => $dTotal - $dDone,
+                        'pct'       => (int) round(($dDone / $dTotal) * 100),
+                    ];
+                }
+
+                $lagging = null;
+                foreach ($deptRows as $r) {
+                    if ($r['pending'] > 0 && ($lagging === null || $r['pct'] < $lagging['pct'])) {
+                        $lagging = $r;
+                    }
+                }
+                $body = "{$pct}% of this year's appraisals are complete ({$managerDone} of {$total} manager reviews).";
+                if ($lagging) {
+                    $body .= " {$lagging['name']} is furthest behind at {$lagging['pct']}%.";
+                }
+                $insights['completion'] = ['title' => 'Appraisal Completion Outlook', 'body' => $body];
+                $insights['completion']['details'] = [
+                    'overall_pct' => $pct,
+                    'total'       => $total,
+                    'completed'   => $managerDone,
+                    'departments' => $deptRows,
+                ];
+            }
+
+            // Card 2 — Performance Risk & PIP Watch (active PIP/PDP employees).
+            $pipQ = DB::table('employee_pip_plans')->where('resort_id', $resortId)->where('status', 'active');
+            if (is_array($scopedIds)) {
+                $pipQ->whereIn('employee_id', $scopedIds);
+            }
+            $pipIds = $pipQ->pluck('employee_id');
+            $pdpQ = DB::table('employee_pdp_plans')->where('resort_id', $resortId)->where('status', 'active');
+            if (is_array($scopedIds)) {
+                $pdpQ->whereIn('employee_id', $scopedIds);
+            }
+            $pdpIds = $pdpQ->pluck('employee_id');
+
+            $pipCount = $pipIds->count();
+            $pdpCount = $pdpIds->count();
+            if ($pipCount > 0 || $pdpCount > 0) {
+                $allIds = $pipIds->merge($pdpIds)->unique()->values();
+                $emps = DB::table('employees as e')
+                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                    ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+                    ->whereIn('e.id', $allIds)
+                    ->select('e.id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name"), 'd.name as dept')
+                    ->get()->keyBy('id');
+
+                $riskEmployees = [];
+                foreach ($allIds as $eid) {
+                    $e = $emps->get($eid);
+                    $types = [];
+                    if ($pipIds->contains($eid)) {
+                        $types[] = 'PIP';
+                    }
+                    if ($pdpIds->contains($eid)) {
+                        $types[] = 'PDP';
+                    }
+                    $riskEmployees[] = [
+                        'name' => ($e && trim((string) $e->name) !== '') ? $e->name : ('Employee #' . $eid),
+                        'dept' => ($e && $e->dept) ? $e->dept : '—',
+                        'type' => implode(' + ', $types),
+                    ];
+                }
+                $body = "{$pipCount} employee" . ($pipCount == 1 ? '' : 's') . " on active PIPs and {$pdpCount} on PDPs need close follow-up.";
+                $insights['risk'] = ['title' => 'Performance Risk & PIP Watch', 'body' => $body];
+                $insights['risk']['details'] = ['pip' => $pipCount, 'pdp' => $pdpCount, 'employees' => $riskEmployees];
+            }
+
+            // Card 3 — Self vs Manager Review Throughput (where the bottleneck is).
+            if ($total > 0) {
+                $selfDone = (clone $childQ)->where('self_review_status', 'completed')->count();
+                $selfPct  = (int) round(($selfDone / $total) * 100);
+                $mgrPct   = (int) round(($managerDone / $total) * 100);
+                $bottleneck = $selfPct < $mgrPct ? 'self-review' : 'manager-review';
+                $insights['throughput'] = [
+                    'title' => 'Self vs Manager Review Throughput',
+                    'body'  => "Self-reviews are {$selfPct}% complete and manager reviews {$mgrPct}% — the {$bottleneck} stage is the current bottleneck.",
+                ];
+                $insights['throughput']['details'] = [
+                    'self_pct'          => $selfPct,
+                    'manager_pct'       => $mgrPct,
+                    'total'             => $total,
+                    'self_completed'    => $selfDone,
+                    'manager_completed' => $managerDone,
+                ];
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Performance dashboard AI insights failed: ' . $e->getMessage());
+        }
+
+        // Layer the FastAPI LLM on top of the deterministic numbers (same bridge
+        // the leave module uses); falls back to the computed text if AI is down.
+        $insights = Common::enrichDashboardInsights(
+            $insights, 'performance management', ['completion', 'risk', 'throughput']
+        );
+
+        return $insights;
+    }
+
+    /**
+     * Cached wrapper around buildPerformanceInsights() with a 48h "Regenerate"
+     * cooldown (mirrors the leave module). ?regenerate_insights=1 recomputes once
+     * the cooldown elapses. Returns the insights plus a '_meta' block.
+     */
+    private function getCachedPerformanceInsights($resortId, $scopedIds = null, $scopedDeptIds = null): array
+    {
+        $cooldownHours = 48;
+        $scopeSig = is_array($scopedIds) ? substr(md5(json_encode($scopedIds)), 0, 8) : 'all';
+        $cacheKey = 'performance_insights:' . $resortId . ':' . $scopeSig;
+        $now = Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildPerformanceInsights($resortId, $scopedIds, $scopedDeptIds),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
     }
 
     public function Hod_dashboard(Request $request)

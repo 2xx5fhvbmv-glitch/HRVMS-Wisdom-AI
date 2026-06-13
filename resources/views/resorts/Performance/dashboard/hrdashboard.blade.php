@@ -184,79 +184,50 @@
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="card card-wiINsightPayroll card-wiINsightperformance">
-                    <div class=" card-title">
-                        <div class="row justify-content-between align-items-center g-md-3 g-1">
+                @php
+                    $pi = $performanceInsights ?? [];
+                    $piMeta = $pi['_meta'] ?? null;
+                    $piCards = [
+                        ['key' => 'completion', 'fallback' => 'Appraisal Completion Outlook',      'modal' => 'perfInsightCompletionModal'],
+                        ['key' => 'risk',       'fallback' => 'Performance Risk & PIP Watch',       'modal' => 'perfInsightRiskModal'],
+                        ['key' => 'throughput', 'fallback' => 'Self vs Manager Review Throughput',  'modal' => 'perfInsightThroughputModal'],
+                    ];
+                @endphp
+                <div class="card card-wiINsightPayroll card-wiINsightperformance card-wiINsight">
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-start g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">WI Insight's</h3>
+                                <h3 class="text-nowrap">WAI Insight's</h3>
                             </div>
-                            <div class="col-auto">
-                                <a href="#" class="a-link">View All</a>
-                            </div>
+                            @if($piMeta)
+                                <div class="col-auto text-end" style="font-size:12px;line-height:1.4;">
+                                    <div class="text-muted">Updated {{ $piMeta['generated_at']->diffForHumans() }}</div>
+                                    @if($piMeta['can_regenerate'])
+                                        <a href="?regenerate_insights=1" class="a-linkTheme">Regenerate</a>
+                                    @else
+                                        <span class="text-muted" title="{{ $piMeta['next_available']->format('d M Y, H:i') }}">Regenerate available {{ $piMeta['next_available']->diffForHumans() }}</span>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div class="leaveUser-main">
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                            </div>
-                            <div>
-                                <h6>Lorem Ipsum is dummy text</h6>
-                                <P>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting industry
-                                    Lorem typesetting industry ipsum.
-                                </P>
+                        @foreach($piCards as $card)
+                            @php $c = $pi[$card['key']] ?? []; @endphp
+                            <div class="leaveUser-block">
+                                <div class="img">
+                                    <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                </div>
                                 <div>
-                                    <a href="#" class="a-linkTheme">View Details</a>
+                                    <h6>{{ $c['title'] ?? $card['fallback'] }}</h6>
+                                    <p>{{ $c['body'] ?? '' }}</p>
+                                    @if(!empty($c['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $c['recommendation'] }}</p>@endif
+                                </div>
+                                <div>
+                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $card['modal'] }}" class="a-linkTheme">View Details</a>
                                 </div>
                             </div>
-                        </div>
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                            </div>
-                            <div>
-                                <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                                <P>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting industry
-                                    Lorem typesetting industry ipsum.
-                                </P>
-                                <div>
-                                    <a href="#" class="a-linkTheme">View Details</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                            </div>
-                            <div>
-                                <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                                <P>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting industry
-                                    Lorem typesetting industry ipsum.
-                                </P>
-                                <div>
-                                    <a href="#" class="a-linkTheme">View Details</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                            </div>
-                            <div>
-                                <h6>typesetting industry Lorem typesetting industry ipsum.</h6>
-                                <P>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting
-                                    industry ipsum. Lorem ipsum is simply dummy text of the typesetting industry
-                                    Lorem typesetting industry ipsum.
-                                </P>
-                                <div>
-                                    <a href="#" class="a-linkTheme">View Details</a>
-                                </div>
-                            </div>
-                        </div>
-
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -469,6 +440,8 @@
         </div>
     </div>
 </div>
+
+@include('resorts.Performance.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
