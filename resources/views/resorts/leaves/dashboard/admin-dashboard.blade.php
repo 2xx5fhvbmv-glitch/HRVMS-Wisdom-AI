@@ -221,6 +221,7 @@
                             <div>
                                 <h6>{{ $leaveInsights['occupancy']['title'] ?? 'Occupancy & Leave Window' }}</h6>
                                 <p>{{ $leaveInsights['occupancy']['body'] ?? '' }}</p>
+                                @if(!empty($leaveInsights["occupancy"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["occupancy"]["recommendation"] }}</p>@endif
                             </div>
                             <div>
                                 <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightOccupancyModal" class="a-linkTheme">View Details</a>
@@ -234,6 +235,7 @@
                             <div>
                                 <h6>{{ $leaveInsights['peak']['title'] ?? 'AI Forecasted Peak Leave Periods' }}</h6>
                                 <p>{{ $leaveInsights['peak']['body'] ?? '' }}</p>
+                                @if(!empty($leaveInsights["peak"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["peak"]["recommendation"] }}</p>@endif
                             </div>
                             <div>
                                 <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightPeakModal" class="a-linkTheme">View Details</a>
@@ -246,6 +248,7 @@
                             <div>
                                 <h6>{{ $leaveInsights['behavior']['title'] ?? 'Employee Leave Behavior Analysis' }}</h6>
                                 <p>{{ $leaveInsights['behavior']['body'] ?? '' }}</p>
+                                @if(!empty($leaveInsights["behavior"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["behavior"]["recommendation"] }}</p>@endif
                             </div>
                             <div>
                                 <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightBehaviorModal" class="a-linkTheme">View Details</a>

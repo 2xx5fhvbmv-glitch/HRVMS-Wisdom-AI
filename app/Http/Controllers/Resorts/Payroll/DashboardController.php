@@ -416,6 +416,13 @@ class DashboardController extends Controller
             }
         } catch (\Throwable $e) { \Log::warning('Payroll insight trend failed: ' . $e->getMessage()); }
 
+        // Layer the FastAPI LLM on top of the deterministic numbers: richer
+        // body + a recommendation per card. Numbers stay authoritative; if the
+        // AI service is unreachable the computed one-liners are kept as-is.
+        $insights = Common::enrichDashboardInsights(
+            $insights, 'payroll', ['trend', 'overtime', 'expat', 'allowance']
+        );
+
         return $insights;
     }
 

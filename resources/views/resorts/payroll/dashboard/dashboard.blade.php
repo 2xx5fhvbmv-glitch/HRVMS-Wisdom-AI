@@ -262,6 +262,9 @@
                             <div>
                                 <h6>{{ $payrollInsights[$pc['key']]['title'] ?? '' }}</h6>
                                 <p>{{ $payrollInsights[$pc['key']]['body'] ?? '' }}</p>
+                                @if(!empty($payrollInsights[$pc['key']]['recommendation']))
+                                    <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $payrollInsights[$pc['key']]['recommendation'] }}</p>
+                                @endif
                                 <div>
                                     <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $pc['modal'] }}" class="a-linkTheme">View Details</a>
                                 </div>
