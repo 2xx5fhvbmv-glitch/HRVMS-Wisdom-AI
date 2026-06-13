@@ -823,10 +823,9 @@ class OfflineInterviewController extends Controller
             'status'         => 'active',
         ]);
 
-        // Generate Emp_id.
-        $resort_prefix = $this->resort->resort->resort_prefix ?? 'EMP';
-        $last_emp = Employee::withTrashed()->where('resort_id', $resort_id)->orderByDesc('id')->first();
-        $emp_id   = $resort_prefix . '-' . ($last_emp ? ($last_emp->id + 1) : 1);
+        // Next sequential employee id per resort (prefix-aware, off the highest
+        // existing Emp_id — NOT the table primary key).
+        $emp_id = Common::nextEmployeeId($resort_id);
 
         $dob = null;
         if (!empty($applicant->dob)) {

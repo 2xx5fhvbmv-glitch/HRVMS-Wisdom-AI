@@ -156,13 +156,8 @@ class ContractResponseController extends Controller
             ->selectRaw('t1.id as position_id, t1.Rank as position_rank, t2.id as dept_id, t2.division_id, vacancies.reporting_to')
             ->first();
 
-        // Generate Employee ID (DR-{next number})
-        $maxEmpNum = DB::table('employees')
-            ->where('resort_id', $contract->resort_id)
-            ->where('Emp_id', 'like', 'DR-%')
-            ->selectRaw("MAX(CAST(SUBSTRING(Emp_id, 4) AS UNSIGNED)) as max_num")
-            ->value('max_num');
-        $empId = 'DR-' . (($maxEmpNum ?? 0) + 1);
+        // Generate Employee ID (next sequential per resort, prefix-aware).
+        $empId = Common::nextEmployeeId($contract->resort_id);
 
         // Look up country name for nationality
         $countryName = DB::table('countries')->where('id', $applicant->country)->value('name');
