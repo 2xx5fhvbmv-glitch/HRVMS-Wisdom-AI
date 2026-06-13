@@ -293,9 +293,9 @@ class EmployeeController extends Controller
         $page_title ='Create Employee';
         $resort_id = $this->resort->resort_id;
         $scopedDeptIds = Common::getScopedDepartmentIds();
-        $last_emp = Employee::orderBy('id', 'desc')->where('resort_id', $resort_id)->first();
-        $resort_prefix = $this->resort->resort->resort_prefix;
-        $last_emp ? $employee_id = $resort_prefix.'-'.$last_emp->id+ 1 : $employee_id = $resort_prefix.'-'. 1;
+        // Next sequential employee id per resort (prefix-aware, off the highest
+        // existing Emp_id — NOT the table primary key). User can still edit it.
+        $employee_id = Common::nextEmployeeId($resort_id);
         $resort_divisions = ResortDivision::where('resort_id',$resort_id)->where('status','active')->get();
         $departments = ResortDepartment::where('resort_id',$resort_id)
             ->where('status','active')

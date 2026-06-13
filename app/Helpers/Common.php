@@ -84,6 +84,29 @@ use App\Models\User;
 
 class Common
 {
+    /**
+     * Next sequential employee id for a resort, e.g. "DR-32".
+     *
+     * Numbers off the highest EXISTING Emp_id for the resort (MAX of the
+     * numeric suffix) + 1 — NOT the table primary key. Several hire paths used
+     * `last employee row->id + 1`, which leaked the global auto-increment id
+     * (producing e.g. DR-485 in a resort with ~30 staff). Includes soft-deleted
+     * rows so a freed number is never reused (avoids Emp_id collisions), and
+     * uses the resort's own prefix.
+     */
+    public static function nextEmployeeId($resortId): string
+    {
+        $prefix   = optional(Resort::find($resortId))->resort_prefix ?: 'DR';
+        $startPos = strlen($prefix) + 2; // 1-indexed position of the number after "PREFIX-"
+
+        $maxNum = Employee::withTrashed()
+            ->where('resort_id', $resortId)
+            ->where('Emp_id', 'like', $prefix . '-%')
+            ->selectRaw("MAX(CAST(SUBSTRING(Emp_id, {$startPos}) AS UNSIGNED)) as max_num")
+            ->value('max_num');
+
+        return $prefix . '-' . (((int) $maxNum) + 1);
+    }
 
     public static function isHrAdmin(): bool
 	{
