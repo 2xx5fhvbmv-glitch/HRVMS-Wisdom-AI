@@ -357,6 +357,25 @@
                           
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card h-auto">
+                    <div class="mb-4 overflow-hidden">
+                        <div id="calendar"></div>
+                    </div>
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-3">
+                            <div class="col">
+                                <h3>Upcoming Interviews</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="upinterviews" style="max-height: 320px; overflow-y: auto;">
+                    </div>
+                </div>
+            </div>
                     <div class="col-lg-4 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.TalentPool',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card" style="height: 450px; overflow: auto;">
                             <div class="card-title">
@@ -494,25 +513,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card h-auto">
-                    <div class="mb-4 overflow-hidden">
-                        <div id="calendar"></div>
-                    </div>
-                    <div class="card-title">
-                        <div class="row justify-content-between align-items-center g-3">
-                            <div class="col">
-                                <h3>Upcoming Interviews</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="upinterviews" style="max-height: 320px; overflow-y: auto;">
-                    </div>
-                </div>
-            </div>
 
             @if(isset($approvalHistory) && $approvalHistory->count() > 0)
             <div class="col-xl-8 col-lg-6">
