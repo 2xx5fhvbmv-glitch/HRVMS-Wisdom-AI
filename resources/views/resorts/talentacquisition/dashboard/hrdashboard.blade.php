@@ -411,7 +411,7 @@
                          already ensures each user sees only the vacancies
                          that need THEIR action (Common::GetTheFreshVacancies). --}}
                     <div class="col-md-6">
-                        <div class="card">
+                        <div class="card" style="height:auto;">
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-3">
                                     <div class="col">
@@ -455,7 +455,7 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="card card-wiINsight mt-4" id="card-wiINsightTa">
+                        <div class="card card-wiINsight mt-4" id="card-wiINsightTa" style="height:auto !important;max-height:none !important;">
                             @php $taMeta = $taInsights['_meta'] ?? null; @endphp
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-md-3 g-1">
