@@ -263,54 +263,81 @@ class JobDescriptionController extends Controller
 
             $pdf->save($absolute_path);
 
-            // Call AI compliance check API with the PDF
-            // try {
-            //     $url = env('AI_URL').'check_agreement_compliance';
-            //     $curl = curl_init();
-            //     $postFields = [
-            //         'contract' => new \CURLFile($absolute_path, 'application/pdf', $filename),
-            //     ];
-            //     curl_setopt_array($curl, [
-            //         CURLOPT_URL => $url,
-            //         CURLOPT_RETURNTRANSFER => true,
-            //         CURLOPT_POST => true,
-            //         CURLOPT_POSTFIELDS => $postFields,
-            //         CURLOPT_HTTPHEADER => [
-            //             'Accept: application/json',
-            //         ],
-            //     ]);
-            //     $response = curl_exec($curl);
-            //     $err = curl_error($curl);
-            //     curl_close($curl);
-            //     if($err)
-            //     {
-            //         \Log::error("AI compliance API curl error: " . $err);
-            //     }
-            //     else
-            //     {
-            //         $AI_Data = json_decode($response, true);
-            //         \Log::info("AI Compliance Response: ", $AI_Data ?? []);
-            //
-            //         if(!empty($AI_Data)) {
-            //             $complianceStatus = $AI_Data['compliance_status'] ?? $AI_Data['status'] ?? null;
-            //             $reason = $AI_Data['reason'] ?? $AI_Data['message'] ?? $AI_Data['details'] ?? null;
-            //
-            //             if($complianceStatus === 'Approved' || $complianceStatus === true || $complianceStatus === 'passed') {
-            //                 $jobDescription->compliance = 'Approved';
-            //             } else {
-            //                 $jobDescription->compliance = 'Rejected';
-            //             }
-            //
-            //             if($reason) {
-            //                 $jobDescription->reason = is_array($reason) ? json_encode($reason) : $reason;
-            //             }
-            //
-            //             $jobDescription->save();
-            //         }
-            //     }
-            // } catch (\Exception $e) {
-            //     \Log::error("PDF extraction API error: " . $e->getMessage());
-            // }
+            // Run the AI job-description compliance check on the generated PDF
+            // and persist the result. The /check_compliance endpoint returns a
+            // per-element Pass/Fail map; we mark Approved only when EVERY
+            // required element is present, otherwise Rejected with the missing
+            // elements as the reason. The endpoint MUST be /check_compliance
+            // (PDF) — /check_agreement_compliance only accepts .docx and would
+            // 422 on a JD PDF. Failures are logged and surfaced as a reason so
+            // the column is never a blank "-".
+            $requiredElements = [
+                'employer_details'    => 'Employer details',
+                'employee_details'    => 'Employee details',
+                'job_title_duties'    => 'Job title and duties',
+                'place_of_employment' => 'Place of employment',
+                'working_hours'       => 'Working hours',
+            ];
+            try {
+                $aiUrl = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/check_compliance';
+                $curl = curl_init();
+                curl_setopt_array($curl, [
+                    CURLOPT_URL            => $aiUrl,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => [
+                        'job_description' => new \CURLFile($absolute_path, 'application/pdf', $filename),
+                    ],
+                    CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+                    // OCR + LLM can be slow; allow generous wall before giving up.
+                    CURLOPT_TIMEOUT        => 90,
+                    CURLOPT_CONNECTTIMEOUT => 5,
+                ]);
+                $response = curl_exec($curl);
+                $errno    = curl_errno($curl);
+                $err      = curl_error($curl);
+                curl_close($curl);
+
+                $checks = null;
+                if ($errno === 0 && $response) {
+                    $decoded = json_decode($response, true);
+                    $checks  = (is_array($decoded) && isset($decoded['compliance']) && is_array($decoded['compliance']))
+                        ? $decoded['compliance']
+                        : null;
+                }
+
+                if (!is_array($checks) || empty($checks)) {
+                    \Log::warning("JD compliance check unavailable (jd #{$jobDescription->id}, url={$aiUrl}): " . ($err ?: substr((string) $response, 0, 300)));
+                    $jobDescription->compliance = 'Rejected';
+                    $jobDescription->reason     = 'Automated compliance check could not be completed; please review manually.';
+                    $jobDescription->save();
+                } else {
+                    // An element passes when its value is truthy / "Pass".
+                    $missing = [];
+                    foreach ($requiredElements as $key => $label) {
+                        $val = $checks[$key] ?? false;
+                        $passed = $val === true || $val === 1
+                            || (is_string($val) && in_array(strtolower($val), ['pass', 'true', 'yes', '1'], true));
+                        if (!$passed) {
+                            $missing[] = $label;
+                        }
+                    }
+
+                    if (empty($missing)) {
+                        $jobDescription->compliance = 'Approved';
+                        $jobDescription->reason     = null;
+                    } else {
+                        $jobDescription->compliance = 'Rejected';
+                        $jobDescription->reason     = 'Missing required content: ' . implode(', ', $missing) . '.';
+                    }
+                    $jobDescription->save();
+                }
+            } catch (\Throwable $e) {
+                \Log::error("JD compliance check error (jd #{$jobDescription->id}): " . $e->getMessage());
+                $jobDescription->compliance = 'Rejected';
+                $jobDescription->reason     = 'Automated compliance check could not be completed; please review manually.';
+                $jobDescription->save();
+            }
 
             return response()->json(['success' => true, 'message' => 'Job Description Added successfully.'],200);
 
