@@ -84,25 +84,45 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('resort.visa.PaymentRequestIndex',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card card-incidentSeverity">
+                {{-- WAI Insight's — AI-narrated visa metrics (took the Payment Request Tracker slot) --}}
+                <div class="col-xl-3 col-sm-6">
+                    <div class="card card-wiINsight card-wiINsightVisa h-100" id="card-wiINsightVisa">
+                        @php $vMeta = $visaInsights['_meta'] ?? null; @endphp
                         <div class="card-title">
-                            <h3>Payment Request Tracker</h3>
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">WAI Insight's</h3>
+                                </div>
+                                <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                    @if($vMeta)
+                                        <div class="text-muted">Updated {{ $vMeta['generated_at']->diffForHumans() }}</div>
+                                        @if($vMeta['can_regenerate'])
+                                            <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                        @else
+                                            <span class="text-muted" title="{{ $vMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $vMeta['next_available']->diffForHumans() }}</span>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
                         </div>
                         <div class="leaveUser-main">
-
-                            <div class="leaveUser-bgBlock">
-                                <h6>Pending</h6>
-                                <strong>{{$DetermineSeverity['Pending']}}</strong>
+                            @foreach([['key'=>'payments','modal'=>'visaInsightPaymentsModal'],['key'=>'liability','modal'=>'visaInsightLiabilityModal'],['key'=>'renewal','modal'=>'visaInsightRenewalModal'],['key'=>'expiry','modal'=>'visaInsightExpiryModal']] as $vc)
+                            <div class="leaveUser-block">
+                                <div class="img">
+                                    <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                </div>
+                                <div>
+                                    <h6>{{ $visaInsights[$vc['key']]['title'] ?? '' }}</h6>
+                                    <p>{{ $visaInsights[$vc['key']]['body'] ?? '' }}</p>
+                                    @if(!empty($visaInsights[$vc['key']]['recommendation']))
+                                        <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $visaInsights[$vc['key']]['recommendation'] }}</p>
+                                    @endif
+                                    <div>
+                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $vc['modal'] }}" class="a-link">View Details</a>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="leaveUser-bgBlock">
-                                <h6>Requested</h6>
-                                <strong>{{$DetermineSeverity['Requested']}}</strong>
-                            </div>
-                            <div class="leaveUser-bgBlock">
-                                <h6>Completed</h6>
-                                <strong>{{$DetermineSeverity['Complete']}}</strong>
-                            </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
@@ -268,59 +288,25 @@
                         </table>
                     </div>
                 </div>
-                <div class="col-xl-3 col-lg-4">
-                    <div class="card card-wiINsightPayroll card-visa-manINsightPayroll" id="card-wiINsightPayroll">
-                        <div class=" card-title">
-                            <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                <div class="col">
-                                    <h3 class="text-nowrap">WI Insight's</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="#" class="a-link">View All</a>
-                                </div>
-                            </div>
+                {{-- Payment Request Tracker — moved here from the top row (took the WI Insight's slot) --}}
+                <div class="col-xl-3 col-lg-4 @if(Common::checkRouteWisePermission('resort.visa.PaymentRequestIndex',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="card card-incidentSeverity h-100">
+                        <div class="card-title">
+                            <h3>Payment Request Tracker</h3>
                         </div>
                         <div class="leaveUser-main">
-                            <div class="leaveUser-block">
-                                <div class="img">
-                                    <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                                </div>
-                                <div>
-                                    <h6>Lorem Ipsum is dummy text</h6>
-                                    <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                    </p>
-                                    <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
-                                    </div>
-                                </div>
+                            <div class="leaveUser-bgBlock">
+                                <h6>Pending</h6>
+                                <strong>{{$DetermineSeverity['Pending']}}</strong>
                             </div>
-                            <div class="leaveUser-block">
-                                <div class="img">
-                                    <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                                </div>
-                                <div>
-                                    <h6>Lorem Ipsum is dummy text</h6>
-                                    <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                    </p>
-                                    <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
-                                    </div>
-                                </div>
+                            <div class="leaveUser-bgBlock">
+                                <h6>Requested</h6>
+                                <strong>{{$DetermineSeverity['Requested']}}</strong>
                             </div>
-                            <div class="leaveUser-block">
-                                <div class="img">
-                                    <img src="assets/images/wisdom-ai-small.svg" alt="image">
-                                </div>
-                                <div>
-                                    <h6>Lorem Ipsum is dummy text</h6>
-                                    <p>Lorem ipsum is simply dummy text of the typesetting industry Lorem typesetting.
-                                    </p>
-                                    <div>
-                                        <a href="#" class="a-linkTheme">View Details</a>
-                                    </div>
-                                </div>
+                            <div class="leaveUser-bgBlock">
+                                <h6>Completed</h6>
+                                <strong>{{$DetermineSeverity['Complete']}}</strong>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -612,10 +598,25 @@
         </div>
     </div>
 </div>
+@includeWhen(isset($visaInsights), 'resorts.Visa.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
-
+<style>
+    /* WAI Insight's — visa card in the Payment Request Tracker slot. Fixed
+       height with the insight list scrolling inside the narrow column. */
+    .card-wiINsightVisa {
+        height: 100% !important;
+        max-height: 420px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .card-wiINsightVisa .leaveUser-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
