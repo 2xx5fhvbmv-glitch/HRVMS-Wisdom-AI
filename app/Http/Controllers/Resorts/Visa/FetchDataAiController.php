@@ -137,7 +137,11 @@ class FetchDataAiController extends Controller
             // and threw "Trying to access array offset on value of type
             // null" (live 500 on POST /resort/visa/store).
             $passportRaw = $AI_Data['extracted_fields']["Employee's Passport Number"] ?? null;
-            if (empty($passportRaw)) {
+            // Treat AI placeholders ("Unavailable", "N/A", ...) as "not read" so
+            // the user gets the clear re-upload message instead of a failed
+            // lookup against a junk passport value.
+            $passportPlaceholder = in_array(strtolower(trim((string) $passportRaw)), ['unavailable', 'n/a', 'na', 'none', 'null', 'not found', '-'], true);
+            if (empty($passportRaw) || $passportPlaceholder) {
                 return response()->json([
                     'success' => false,
                     'errors' => ['message' => 'Could not read passport number from the document. Please upload a clearer scan.'],
