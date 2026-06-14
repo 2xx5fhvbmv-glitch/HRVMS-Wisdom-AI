@@ -570,56 +570,54 @@ class ReportController extends Controller
             ]
         ];
         
-        if(!isset($report->AiInsights))
-        {
-              $jsonData = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $url = env('AI_Report_fetch_URL');
-                $curl = curl_init();
-                curl_setopt_array($curl, [
-                    CURLOPT_URL => $url,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $jsonData,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        'Accept: application/json',
-                        'Content-Length: ' . strlen($jsonData)
-                    ],
-                ]);
-                $response = curl_exec($curl);
-                $err = curl_error($curl);
-                curl_close($curl);
-                if($err) 
-                {
-                    return response()->json(['status' => false, 'message' =>  $err]);
-                } 
-                $AI_Data = json_decode($response, true); 
-                if($AI_Data)
-                {
-                    $report->AiInsights = $AI_Data;
-                    $report->save();
+        // Pull the "analysis" string out of whatever shape we have — the FastAPI
+        // response or the cached AiInsights column. Returns '' for anything that
+        // isn't a valid {"analysis": ...} payload (incl. legacy corrupt values),
+        // so a bad cache simply triggers a clean re-fetch below.
+        $extractAnalysis = function ($value) {
+            if (is_array($value))  { return (string) ($value['analysis'] ?? ''); }
+            if (is_object($value)) { return (string) ($value->analysis ?? ''); }
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                return is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '';
+            }
+            return '';
+        };
 
-                }
-            
-        }
-        else
-        {
-            $AI_Data = $report->AiInsights;
+        // Use the cached insight when it's valid; otherwise (empty or legacy
+        // corrupt) fall through and regenerate.
+        $analysisText = empty($report->AiInsights) ? '' : $extractAnalysis($report->AiInsights);
+
+        if ($analysisText === '') {
+            $jsonData = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $url = env('AI_Report_fetch_URL');
+            $curl = curl_init();
+            curl_setopt_array($curl, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $jsonData,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                    'Content-Length: ' . strlen($jsonData)
+                ],
+            ]);
+            $response = curl_exec($curl);
+            $err = curl_error($curl);
+            curl_close($curl);
+            if ($err) {
+                return response()->json(['status' => false, 'message' => $err]);
+            }
+            $analysisText = $extractAnalysis($response);
+            if ($analysisText !== '') {
+                // Cache as canonical JSON so future reads are unambiguous.
+                $report->AiInsights = json_encode(['analysis' => $analysisText]);
+                $report->save();
+            }
         }
 
-        $Analysis  = json_decode($AI_Data);
-        if($Analysis)
-        {
-
-              $AI_Data =$Analysis->analysis;
-        }
-        else
-        {
-            $AI_Data = '';
-        }
-        
-
-    return response()->json(['status' => true, 'data' => $AI_Data]);
+        return response()->json(['status' => true, 'data' => $analysisText]);
     }
 
 }   
