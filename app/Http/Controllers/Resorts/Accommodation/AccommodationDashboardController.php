@@ -691,7 +691,209 @@ class AccommodationDashboardController extends Controller
                                  
             $ResortDepartment= ResortDepartment::where("resort_id",$this->globalUser->resort_id)->get();
             $InventoryCategory = InventoryCategoryModel::where("resort_id",$this->globalUser->resort_id)->get();
-            return view('resorts.Accommodation.dashboard.hrdashboard',compact('InventoryCategory','ResortDepartment','BedStatistics','TotalnumberofInProgressrequests','TotalnumberofHighrequests','Totalnumberofopenrequests','EmployeesCount','AvailableAccomodation','OccupiedBed','TotalBed','buildings','page_title','Employee'));
+            $accommodationInsights = $this->getCachedAccommodationInsights($this->globalUser->resort_id);
+            return view('resorts.Accommodation.dashboard.hrdashboard',compact('InventoryCategory','ResortDepartment','BedStatistics','TotalnumberofInProgressrequests','TotalnumberofHighrequests','Totalnumberofopenrequests','EmployeesCount','AvailableAccomodation','OccupiedBed','TotalBed','buildings','page_title','Employee','accommodationInsights'));
+    }
+
+    /**
+     * Cached wrapper around buildAccommodationInsights() with a manual 2-day
+     * refresh, mirroring the TA/Leave/Payroll/Learning dashboards. Cached per
+     * resort; "Regenerate" loads ?regenerate_insights=1 and recomputes only once
+     * the 48h cooldown has elapsed. Returns a '_meta' key for the card header.
+     */
+    private function getCachedAccommodationInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'accommodation_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildAccommodationInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the four Accommodation AI-insight cards for a resort:
+     *   1. maintenance  Maintenance SLA & backlog (open/closed, priority, resolution, aging)
+     *   2. occupancy    Bed & room occupancy (% occupied, male/female split, top building)
+     *   3. hotspots     Maintenance hotspots (buildings / inventory items by request volume)
+     *   4. demand       Vacancy vs demand (vacant beds by gender vs incoming new hires)
+     * Each card is wrapped so one failing query degrades just that card; the
+     * deterministic numbers are then narrated by the FastAPI LLM (best-effort).
+     */
+    private function buildAccommodationInsights($resortId): array
+    {
+        $insights = [
+            'maintenance' => ['title' => 'Maintenance SLA & Backlog', 'body' => 'No maintenance requests logged yet.'],
+            'occupancy'   => ['title' => 'Bed & Room Occupancy',      'body' => 'No beds configured yet.'],
+            'hotspots'    => ['title' => 'Maintenance Hotspots',      'body' => 'No maintenance requests logged yet.'],
+            'demand'      => ['title' => 'Vacancy vs Demand',         'body' => 'No bed or hiring data yet to compare.'],
+        ];
+
+        $openStatuses = ['Open', 'pending', 'On-Hold', 'In-Progress', 'Assigned'];
+
+        // --- Card 1: Maintenance SLA & backlog ---------------------------------
+        try {
+            $byStatus = MaintanaceRequest::where('resort_id', $resortId)
+                ->select('Status', DB::raw('COUNT(*) as c'))->groupBy('Status')->pluck('c', 'Status');
+            $total = (int) $byStatus->sum();
+            if ($total > 0) {
+                $closed = (int) ($byStatus['Closed'] ?? 0);
+                $open = $total - $closed;
+                $byPriority = MaintanaceRequest::where('resort_id', $resortId)
+                    ->select('priority', DB::raw('COUNT(*) as c'))->groupBy('priority')->pluck('c', 'priority');
+                $high = (int) ($byPriority['High'] ?? 0);
+                $med  = (int) ($byPriority['Medium'] ?? 0);
+                $low  = (int) ($byPriority['Low'] ?? 0);
+                $avgDays = MaintanaceRequest::where('resort_id', $resortId)->where('Status', 'Closed')
+                    ->whereNotNull('date')->value(DB::raw('AVG(DATEDIFF(updated_at, `date`))'));
+                $avgDays = $avgDays !== null ? round((float) $avgDays, 1) : null;
+                $aging = MaintanaceRequest::where('resort_id', $resortId)
+                    ->whereIn('Status', $openStatuses)
+                    ->whereDate('date', '<', \Carbon\Carbon::now()->subDays(7)->toDateString())->count();
+                $resTxt = $avgDays === null ? 'no closed requests yet' : 'avg resolution ' . $avgDays . ' days';
+                $insights['maintenance']['body'] = $open . ' open / ' . $closed . ' closed of ' . $total . ' requests; ' . $high . ' high-priority; ' . $resTxt . '; ' . $aging . ' aging (>7 days).';
+                $insights['maintenance']['details'] = [
+                    'total' => $total, 'open' => $open, 'closed' => $closed,
+                    'by_status' => $byStatus->toArray(),
+                    'priority' => ['High' => $high, 'Medium' => $med, 'Low' => $low],
+                    'avg_resolution_days' => $avgDays, 'aging' => (int) $aging,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: Bed & room occupancy --------------------------------------
+        try {
+            $bs = AvailableAccommodationModel::join('assing_accommodations as a', 'a.available_a_id', '=', 'available_accommodation_models.id')
+                ->where('available_accommodation_models.resort_id', $resortId)
+                ->select(
+                    DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male"   AND a.emp_id != 0 THEN 1 END) as MaleOccupied'),
+                    DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male"   AND a.emp_id = 0 THEN 1 END) as MaleVacant'),
+                    DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND a.emp_id != 0 THEN 1 END) as FemaleOccupied'),
+                    DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND a.emp_id = 0 THEN 1 END) as FemaleVacant')
+                )->first();
+            $mo = (int) ($bs->MaleOccupied ?? 0); $mv = (int) ($bs->MaleVacant ?? 0);
+            $fo = (int) ($bs->FemaleOccupied ?? 0); $fv = (int) ($bs->FemaleVacant ?? 0);
+            $occupied = $mo + $fo; $totalBeds = $mo + $mv + $fo + $fv;
+            if ($totalBeds > 0) {
+                $occPct = round($occupied / $totalBeds * 100, 1);
+                $malePct = ($mo + $mv) > 0 ? round($mo / ($mo + $mv) * 100, 1) : 0;
+                $femalePct = ($fo + $fv) > 0 ? round($fo / ($fo + $fv) * 100, 1) : 0;
+                // Per-building occupancy (BuildingName stores the building id).
+                $byBuilding = AvailableAccommodationModel::join('assing_accommodations as a', 'a.available_a_id', '=', 'available_accommodation_models.id')
+                    ->leftJoin('building_models as b', 'b.id', '=', 'available_accommodation_models.BuildingName')
+                    ->where('available_accommodation_models.resort_id', $resortId)
+                    ->groupBy('available_accommodation_models.BuildingName', 'b.BuildingName')
+                    ->select(DB::raw("COALESCE(b.BuildingName,'Unnamed') as bname"),
+                             DB::raw('COUNT(*) as total'),
+                             DB::raw('COUNT(CASE WHEN a.emp_id != 0 THEN 1 END) as occupied'))
+                    ->get()
+                    ->map(fn ($r) => ['building' => $r->bname, 'total' => (int) $r->total, 'occupied' => (int) $r->occupied,
+                                      'pct' => (int) $r->total > 0 ? round((int) $r->occupied / (int) $r->total * 100, 1) : 0])
+                    ->sortByDesc('pct')->values()->all();
+                $top = $byBuilding[0] ?? null;
+                $topTxt = $top ? ' ' . $top['building'] . ' is nearest capacity at ' . $top['pct'] . '%.' : '';
+                $insights['occupancy']['body'] = $occPct . '% bed occupancy (' . $occupied . ' of ' . $totalBeds . '); male ' . $malePct . '%, female ' . $femalePct . '%.' . $topTxt;
+                $insights['occupancy']['details'] = [
+                    'occupancy_pct' => $occPct, 'occupied' => $occupied, 'total' => $totalBeds,
+                    'male' => ['occupied' => $mo, 'vacant' => $mv, 'pct' => $malePct],
+                    'female' => ['occupied' => $fo, 'vacant' => $fv, 'pct' => $femalePct],
+                    'buildings' => array_slice($byBuilding, 0, 15),
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Maintenance hotspots --------------------------------------
+        try {
+            $byBuilding = MaintanaceRequest::leftJoin('building_models as b', 'b.id', '=', 'maintanace_requests.building_id')
+                ->where('maintanace_requests.resort_id', $resortId)
+                ->groupBy('b.BuildingName')
+                ->select(DB::raw("COALESCE(b.BuildingName,'Unknown') as name"), DB::raw('COUNT(*) as c'))
+                ->orderByDesc('c')->limit(10)->get()
+                ->map(fn ($r) => ['building' => $r->name, 'count' => (int) $r->c])->all();
+            $byItem = MaintanaceRequest::leftJoin('inventory_modules as i', 'i.id', '=', 'maintanace_requests.item_id')
+                ->where('maintanace_requests.resort_id', $resortId)
+                ->groupBy('i.ItemName')
+                ->select(DB::raw("COALESCE(i.ItemName,'Unknown') as name"), DB::raw('COUNT(*) as c'))
+                ->orderByDesc('c')->limit(10)->get()
+                ->map(fn ($r) => ['item' => $r->name, 'count' => (int) $r->c])->all();
+            if (!empty($byBuilding) || !empty($byItem)) {
+                $tb = $byBuilding[0] ?? null; $ti = $byItem[0] ?? null;
+                $parts = [];
+                if ($tb) $parts[] = $tb['building'] . ' leads with ' . $tb['count'] . ' requests';
+                if ($ti) $parts[] = $ti['item'] . ' is the most-reported item (' . $ti['count'] . ')';
+                $insights['hotspots']['body'] = ucfirst(implode('; ', $parts)) . '.';
+                $insights['hotspots']['details'] = ['buildings' => $byBuilding, 'items' => $byItem];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 4: Vacancy vs demand -----------------------------------------
+        try {
+            // Vacant beds by gender (re-uses the occupancy figures if present).
+            $bs = AvailableAccommodationModel::join('assing_accommodations as a', 'a.available_a_id', '=', 'available_accommodation_models.id')
+                ->where('available_accommodation_models.resort_id', $resortId)
+                ->select(
+                    DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Male"   AND a.emp_id = 0 THEN 1 END) as MaleVacant'),
+                    DB::raw('COUNT(CASE WHEN available_accommodation_models.blockFor = "Female" AND a.emp_id = 0 THEN 1 END) as FemaleVacant')
+                )->first();
+            $mv = (int) ($bs->MaleVacant ?? 0); $fv = (int) ($bs->FemaleVacant ?? 0);
+            // Incoming new hires by gender (accepted contracts, gender from applicant form).
+            $incoming = DB::table('applicant_offer_contracts as oc')
+                ->join('applicant_form_data as a', 'a.id', '=', 'oc.applicant_id')
+                ->where('oc.resort_id', $resortId)->where('oc.type', 'contract')->where('oc.status', 'Accepted')
+                ->select(DB::raw("LOWER(a.gender) as g"), DB::raw('COUNT(DISTINCT a.id) as c'))
+                ->groupBy('g')->pluck('c', 'g');
+            $im = (int) ($incoming['male'] ?? 0); $if = (int) ($incoming['female'] ?? 0);
+            // Current unhoused active staff (no bed assignment), overall.
+            $housedIds = AssingAccommodation::where('resort_id', $resortId)->where('emp_id', '!=', 0)->pluck('emp_id')->all();
+            $unhoused = Employee::where('resort_id', $resortId)->where('status', 'Active')
+                ->when(!empty($housedIds), fn ($q) => $q->whereNotIn('id', $housedIds))->count();
+            if ($mv + $fv + $im + $if > 0) {
+                $maleShort = max(0, $im - $mv); $femaleShort = max(0, $if - $fv);
+                $shortTxt = ($maleShort + $femaleShort) > 0
+                    ? ' Projected shortfall: ' . $maleShort . ' male, ' . $femaleShort . ' female beds.'
+                    : ' Vacant beds cover the incoming cohort.';
+                $insights['demand']['body'] = 'Vacant beds: ' . $mv . ' male, ' . $fv . ' female. Incoming hires: ' . $im . ' male, ' . $if . ' female; ' . $unhoused . ' active staff currently unhoused.' . $shortTxt;
+                $insights['demand']['details'] = [
+                    'vacant' => ['male' => $mv, 'female' => $fv],
+                    'incoming' => ['male' => $im, 'female' => $if],
+                    'shortfall' => ['male' => $maleShort, 'female' => $femaleShort],
+                    'unhoused' => (int) $unhoused,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // Narrate the deterministic numbers via the FastAPI LLM (best-effort).
+        $insights = Common::enrichDashboardInsights(
+            $insights, 'staff accommodation & facilities', ['maintenance', 'occupancy', 'hotspots', 'demand']
+        );
+
+        return $insights;
     }
 
     public function Hod_dashboard(Request $request)

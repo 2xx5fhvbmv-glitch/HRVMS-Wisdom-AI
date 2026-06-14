@@ -77,7 +77,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-9 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.MaintanaceRequestlist',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.MaintanaceRequestlist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
@@ -121,29 +121,7 @@
                 </div>
             </div>
 
-            <div class="col-xl-3 col-md-6">
-                <div class="card card-accomSummary">
-                    <div class="card-title">
-                        <h3>Summary</h3>
-                    </div>
-                    <div class="leaveUser-main">
-                        <div class="leaveUser-bgBlock">
-                            <h6>Total number of open requests</h6>
-                            <h3>{{ $Totalnumberofopenrequests }}</h3>
-                        </div>
-                        <div class="leaveUser-bgBlock">
-                            <h6>Number of high-priority requests</h6>
-                            <h3>{{ $TotalnumberofHighrequests }}</h3>
-                        </div>
-                        <div class="leaveUser-bgBlock">
-                            <h6>Number of requests nearing completion.</h6>
-                            <h3>{{ $TotalnumberofInProgressrequests }}</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-xl-9 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.MaintanaceRequestlist',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-6 col-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.MaintanaceRequestlist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
@@ -185,6 +163,27 @@
                     </table>
                     </div>
 
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="card card-accomSummary">
+                    <div class="card-title">
+                        <h3>Summary</h3>
+                    </div>
+                    <div class="leaveUser-main">
+                        <div class="leaveUser-bgBlock">
+                            <h6>Total number of open requests</h6>
+                            <h3>{{ $Totalnumberofopenrequests }}</h3>
+                        </div>
+                        <div class="leaveUser-bgBlock">
+                            <h6>Number of high-priority requests</h6>
+                            <h3>{{ $TotalnumberofHighrequests }}</h3>
+                        </div>
+                        <div class="leaveUser-bgBlock">
+                            <h6>Number of requests nearing completion.</h6>
+                            <h3>{{ $TotalnumberofInProgressrequests }}</h3>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-xl-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.AvailableAccommodation',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -247,6 +246,53 @@
                             <div class="doughnut-label">
                                 <span class="bg-themeLightBlue"></span>Female Staff
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- WAI Insight's — AI-narrated accommodation metrics, beside Summary & Bed Statistics --}}
+            <div class="col-xl-6 col-md-12">
+                <div class="card card-wiINsight card-wiINsightAccom h-100" id="card-wiINsightAccom">
+                    @php $aMeta = $accommodationInsights['_meta'] ?? null; @endphp
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-md-3 g-1">
+                            <div class="col">
+                                <h3 class="text-nowrap">WAI Insight's</h3>
+                            </div>
+                            <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                @if($aMeta)
+                                    <div class="text-muted">Updated {{ $aMeta['generated_at']->diffForHumans() }}</div>
+                                    @if($aMeta['can_regenerate'])
+                                        <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                    @else
+                                        <span class="text-muted" title="{{ $aMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $aMeta['next_available']->diffForHumans() }}</span>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    <div class="leaveUser-main">
+                        <div class="row g-3">
+                            @foreach([['key'=>'maintenance','modal'=>'accomInsightMaintenanceModal'],['key'=>'occupancy','modal'=>'accomInsightOccupancyModal'],['key'=>'hotspots','modal'=>'accomInsightHotspotsModal'],['key'=>'demand','modal'=>'accomInsightDemandModal']] as $ac)
+                            <div class="col-md-6">
+                                <div class="leaveUser-block h-100">
+                                    <div class="img">
+                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>{{ $accommodationInsights[$ac['key']]['title'] ?? '' }}</h6>
+                                        <p>{{ $accommodationInsights[$ac['key']]['body'] ?? '' }}</p>
+                                        @if(!empty($accommodationInsights[$ac['key']]['recommendation']))
+                                            <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $accommodationInsights[$ac['key']]['recommendation'] }}</p>
+                                        @endif
+                                        <div>
+                                            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $ac['modal'] }}" class="a-link">View Details</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
@@ -616,10 +662,36 @@
         </div>
     </div>
 </div>
+@includeWhen(isset($accommodationInsights), 'resorts.Accommodation.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
 <style>
+    /* WAI Insight's — accommodation card beside Summary & Bed Statistics.
+       Fixed height with a 2-up grid of insight mini-cards that scroll inside. */
+    .card-wiINsightAccom {
+        height: 415px !important;
+        max-height: 415px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .card-wiINsightAccom .leaveUser-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+    .card-wiINsightAccom .leaveUser-block {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        border: 1px solid #E6ECEC;
+        border-radius: 12px;
+        padding: 14px;
+        margin: 0;
+    }
+    .card-wiINsightAccom .leaveUser-block .img { flex: 0 0 auto; }
+    .card-wiINsightAccom .leaveUser-block > div:last-child { min-width: 0; }
+
     #selectBed-modal .table-sm th,
     #selectBed-modal .table-sm td {
         padding: 6px 10px;
