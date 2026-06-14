@@ -70,7 +70,160 @@ class DashboardController extends Controller
         // "Four Season's"). Falls back gracefully if the relation is missing.
         $resortName = optional(optional($this->resort)->resort)->resort_name ?? 'Resort';
 
-        return view('resorts.Visa.dashboard.hrdashboard',compact('page_title','Position','VisaWallets','VisaXpactAmounts','reconiliation','DetermineSeverity','XpatEmployeeCount','resortName'));
+        $visaInsights = $this->getCachedVisaInsights($this->resort->resort_id);
+
+        return view('resorts.Visa.dashboard.hrdashboard',compact('page_title','Position','VisaWallets','VisaXpactAmounts','reconiliation','DetermineSeverity','XpatEmployeeCount','resortName','visaInsights'));
+    }
+
+    /**
+     * Cached wrapper around buildVisaInsights() with a manual 2-day refresh,
+     * mirroring the other module dashboards. Cached per resort; "Regenerate"
+     * loads ?regenerate_insights=1 and recomputes only once the 48h cooldown has
+     * elapsed. Returns a '_meta' key for the card header.
+     */
+    private function getCachedVisaInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'visa_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildVisaInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the four Visa AI-insight cards for a resort:
+     *   1. payments   Quota & work-permit fee payment compliance (paid/unpaid/overdue)
+     *   2. liability  Expat deposit liability by nationality (rate x active headcount)
+     *   3. renewal    Renewal backlog (visa renewals pending/paid + due soon)
+     *   4. expiry     Visa/permit expiry pipeline (expired, <=30/60/90 days)
+     * Each card is wrapped so one failing query degrades just that card; the
+     * deterministic numbers are then narrated by the FastAPI LLM (best-effort).
+     */
+    private function buildVisaInsights($resortId): array
+    {
+        $insights = [
+            'payments'  => ['title' => 'Quota & Work-Permit Payments', 'body' => 'No quota or work-permit payments recorded yet.'],
+            'liability' => ['title' => 'Expat Liability by Nationality', 'body' => 'No nationality deposit rates configured yet.'],
+            'renewal'   => ['title' => 'Renewal Backlog',               'body' => 'No renewal records yet.'],
+            'expiry'    => ['title' => 'Visa & Permit Expiry Pipeline',  'body' => 'No visa records with expiry dates yet.'],
+        ];
+        $today = \Carbon\Carbon::now();
+        $num = function ($v) { return (float) preg_replace('/[^0-9.\-]/', '', (string) $v); };
+
+        // --- Card 1: Quota & work-permit payment compliance --------------------
+        try {
+            $rows = collect();
+            foreach (['quota_slot_renewals' => 'Quota slot', 'work_permits' => 'Work permit'] as $table => $label) {
+                foreach (\DB::table($table)->where('resort_id', $resortId)->get(['Status', 'Due_Date', 'Amt']) as $r) {
+                    $rows->push(['kind' => $label, 'status' => $r->Status, 'due' => $r->Due_Date, 'amt' => $num($r->Amt)]);
+                }
+            }
+            if ($rows->isNotEmpty()) {
+                $total = $rows->count();
+                $unpaid = $rows->where('status', 'Unpaid');
+                $unpaidCount = $unpaid->count();
+                $paidCount = $total - $unpaidCount;
+                $overdue = $unpaid->filter(fn ($r) => $r['due'] && $r['due'] < $today->toDateString())->count();
+                $outstanding = round($unpaid->sum('amt'), 0);
+                $insights['payments']['body'] = $unpaidCount . ' of ' . $total . ' quota/work-permit payments unpaid (' . $paidCount . ' paid); ' . $overdue . ' overdue; ~' . number_format($outstanding, 0) . ' outstanding.';
+                $insights['payments']['details'] = [
+                    'total' => $total, 'paid' => $paidCount, 'unpaid' => $unpaidCount, 'overdue' => $overdue, 'outstanding' => $outstanding,
+                    'by_kind' => $rows->groupBy('kind')->map(fn ($g) => [
+                        'total' => $g->count(), 'unpaid' => $g->where('status', 'Unpaid')->count(),
+                        'outstanding' => round($g->where('status', 'Unpaid')->sum('amt'), 0),
+                    ])->toArray(),
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: Expat liability by nationality ----------------------------
+        try {
+            $nats = VisaNationality::where('resort_id', $resortId)->get(['nationality', 'amt']);
+            $rows = []; $totalLiability = 0; $totalHeads = 0;
+            foreach ($nats as $n) {
+                $count = Employee::where('resort_id', $resortId)->where('status', 'Active')
+                    ->where('nationality', $n->nationality)->count();
+                if ($count === 0) continue;
+                $rate = $num($n->amt);
+                $liab = $rate * $count;
+                $totalLiability += $liab; $totalHeads += $count;
+                $rows[] = ['nationality' => $n->nationality ?: '—', 'headcount' => $count, 'rate' => $rate, 'liability' => round($liab, 0)];
+            }
+            if (!empty($rows)) {
+                usort($rows, fn ($a, $b) => $b['liability'] <=> $a['liability']);
+                $top = $rows[0];
+                $insights['liability']['body'] = '~' . number_format(round($totalLiability, 0), 0) . ' total deposit liability across ' . $totalHeads . ' expats in ' . count($rows) . ' nationalities; ' . $top['nationality'] . ' leads (~' . number_format($top['liability'], 0) . ').';
+                $insights['liability']['details'] = ['total_liability' => round($totalLiability, 0), 'total_heads' => $totalHeads, 'rows' => array_slice($rows, 0, 15)];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Renewal backlog -------------------------------------------
+        try {
+            $totalRenewals = VisaRenewal::where('resort_id', $resortId)->count();
+            if ($totalRenewals > 0) {
+                $pending = VisaRenewal::where('resort_id', $resortId)->where('Status', 'Pending')->count();
+                $paid = $totalRenewals - $pending;
+                $dueSoon = VisaRenewal::where('resort_id', $resortId)
+                    ->whereDate('end_date', '>=', $today->toDateString())
+                    ->whereDate('end_date', '<=', $today->copy()->addDays(30)->toDateString())->count();
+                $wpUnpaid = (int) \DB::table('work_permits')->where('resort_id', $resortId)->where('Status', 'Unpaid')->count();
+                $quotaUnpaid = (int) \DB::table('quota_slot_renewals')->where('resort_id', $resortId)->where('Status', 'Unpaid')->count();
+                $insights['renewal']['body'] = $totalRenewals . ' visa renewals (' . $pending . ' pending, ' . $paid . ' paid); ' . $dueSoon . ' due within 30 days; ' . $wpUnpaid . ' work-permit + ' . $quotaUnpaid . ' quota payments pending.';
+                $insights['renewal']['details'] = [
+                    'visa_total' => $totalRenewals, 'visa_pending' => $pending, 'visa_paid' => $paid, 'due_soon' => $dueSoon,
+                    'work_permit_pending' => $wpUnpaid, 'quota_pending' => $quotaUnpaid,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 4: Visa & permit expiry pipeline -----------------------------
+        try {
+            $base = VisaRenewal::where('resort_id', $resortId)->whereNotNull('end_date');
+            $total = (clone $base)->count();
+            if ($total > 0) {
+                $d = fn ($n) => $today->copy()->addDays($n)->toDateString();
+                $expired = (clone $base)->whereDate('end_date', '<', $today->toDateString())->count();
+                $in30 = (clone $base)->whereDate('end_date', '>=', $today->toDateString())->whereDate('end_date', '<=', $d(30))->count();
+                $in60 = (clone $base)->whereDate('end_date', '>', $d(30))->whereDate('end_date', '<=', $d(60))->count();
+                $in90 = (clone $base)->whereDate('end_date', '>', $d(60))->whereDate('end_date', '<=', $d(90))->count();
+                $insights['expiry']['body'] = $expired . ' expired; ' . $in30 . ' expiring within 30 days, ' . $in60 . ' in 31-60, ' . $in90 . ' in 61-90 days.';
+                $insights['expiry']['details'] = ['expired' => $expired, 'in_30' => $in30, 'in_60' => $in60, 'in_90' => $in90, 'total' => $total];
+            }
+        } catch (\Throwable $e) {}
+
+        // Narrate the deterministic numbers via the FastAPI LLM (best-effort).
+        $insights = \App\Helpers\Common::enrichDashboardInsights(
+            $insights, 'expat visa, work-permit & immigration compliance', ['payments', 'liability', 'renewal', 'expiry']
+        );
+
+        return $insights;
     }
 
 
