@@ -85,7 +85,7 @@
                      (the same set the HOD dashboard uses). Mirrors the
                      `card-todoIncidentHOD` widget from the HOD dashboard so HR
                      and GM can see the live incident feed too. --}}
-                <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
+                <div class="col-xl-4 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card card-todoIncidentHOD" id="card-todoIncidentHOD">
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -103,7 +103,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-6 @if(!Common::hasFullDataAccess()) d-none @endif">
+                <div class="col-xl-4 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class=" card">
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-1">
@@ -144,6 +144,49 @@
                                     </tr>
                                 @endforeach
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- WAI Insight's — AI-narrated incident metrics, beside Incident List & Delegated Cases --}}
+                <div class="col-xl-4 @if(!Common::hasFullDataAccess()) d-none @endif">
+                    <div class="card card-wiINsight card-wiINsightIncident h-100" id="card-wiINsightIncident">
+                        @php $iMeta = $incidentInsights['_meta'] ?? null; @endphp
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">WAI Insight's</h3>
+                                </div>
+                                <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                    @if($iMeta)
+                                        <div class="text-muted">Updated {{ $iMeta['generated_at']->diffForHumans() }}</div>
+                                        @if($iMeta['can_regenerate'])
+                                            <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                        @else
+                                            <span class="text-muted" title="{{ $iMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $iMeta['next_available']->diffForHumans() }}</span>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main">
+                            @foreach([['key'=>'volume','modal'=>'incidentInsightVolumeModal'],['key'=>'hotspots','modal'=>'incidentInsightHotspotsModal'],['key'=>'outcomes','modal'=>'incidentInsightOutcomesModal']] as $ic)
+                            <div class="leaveUser-block">
+                                <div class="img">
+                                    <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                </div>
+                                <div>
+                                    <h6>{{ $incidentInsights[$ic['key']]['title'] ?? '' }}</h6>
+                                    <p>{{ $incidentInsights[$ic['key']]['body'] ?? '' }}</p>
+                                    @if(!empty($incidentInsights[$ic['key']]['recommendation']))
+                                        <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $incidentInsights[$ic['key']]['recommendation'] }}</p>
+                                    @endif
+                                    <div>
+                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $ic['modal'] }}" class="a-link">View Details</a>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
@@ -452,9 +495,25 @@
             </div>
         </div>
     </div>
+@includeWhen(isset($incidentInsights), 'resorts.incident.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
+<style>
+    /* WAI Insight's — incident card beside Incident List & Delegated Cases.
+       Fixed height with the insight list scrolling inside. */
+    .card-wiINsightIncident {
+        height: 450px !important;
+        max-height: 450px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .card-wiINsightIncident .leaveUser-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
