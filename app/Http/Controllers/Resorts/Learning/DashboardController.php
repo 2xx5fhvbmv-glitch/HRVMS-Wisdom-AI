@@ -134,7 +134,198 @@ class DashboardController extends Controller
         $learningHoursByProg  = $this->computeLearningHoursByProgram($resort_id);
         $learningAttendance   = $this->computeLearningAttendanceBreakdown($resort_id);
 
-        return view('resorts.learning.dashboard.hrdashboard',compact('page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count','pending_learning_request','trainings','completionData','feedbackAvgScore','onboardingProgress','learningHoursByProg','learningAttendance'));
+        $learningInsights     = $this->getCachedLearningInsights($resort_id);
+
+        return view('resorts.learning.dashboard.hrdashboard',compact('page_title','scheduled_trainings_count','pending_trainings_count','completed_trainings_count','pending_learning_request','trainings','completionData','feedbackAvgScore','onboardingProgress','learningHoursByProg','learningAttendance','learningInsights'));
+    }
+
+    /**
+     * Cached wrapper around buildLearningInsights() with a manual 2-day refresh,
+     * mirroring the TA/Leave/Payroll dashboards. Cached per resort; the
+     * "Regenerate" link loads ?regenerate_insights=1 and recomputes only once the
+     * 48h cooldown has elapsed. The returned array carries a '_meta' key.
+     */
+    private function getCachedLearningInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'learning_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildLearningInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the four Learning & Development AI-insight cards for a resort:
+     *   1. completion    Training completion rate vs the attendance threshold
+     *   2. mandatory     Mandatory-program compliance across targeted staff
+     *   3. requests      Learning-request pipeline (status mix, categories, denials)
+     *   4. probationary  Probationary new-hire required-training completion
+     * Each card is wrapped so one failing query degrades just that card. The
+     * deterministic numbers are then narrated by the FastAPI LLM (best-effort).
+     */
+    private function buildLearningInsights($resortId): array
+    {
+        $insights = [
+            'completion'   => ['title' => 'Training Completion Rate',     'body' => 'No training attendance recorded yet to measure completion.'],
+            'mandatory'    => ['title' => 'Mandatory Training Compliance', 'body' => 'No mandatory programs configured yet.'],
+            'requests'     => ['title' => 'Learning Request Pipeline',     'body' => 'No learning requests submitted yet.'],
+            'probationary' => ['title' => 'Probationary Training Progress', 'body' => 'No probationary programs or staff on probation yet.'],
+        ];
+
+        // --- Card 1: Training completion rate (mirrors the page's completionData) ---
+        try {
+            $threshold = (float) (AttendanceParameters::where('resort_id', $resortId)->value('threshold_percentage') ?? 0);
+            $schedules = TrainingSchedule::with(['learningProgram', 'trainingAttendances', 'participants'])
+                ->where('resort_id', $resortId)->get();
+            $rows = []; $sumParticipants = 0; $sumCompleted = 0;
+            foreach ($schedules as $s) {
+                $total = $s->participants->count();
+                if ($total === 0) continue;
+                $totalSessions = $s->trainingAttendances->count();
+                $done = 0;
+                foreach ($s->participants as $p) {
+                    $attended = $s->trainingAttendances->where('employee_id', $p->employee_id)->count();
+                    $pct = $totalSessions > 0 ? ($attended / $totalSessions) * 100 : 0;
+                    if ($pct >= $threshold) $done++;
+                }
+                $sumParticipants += $total; $sumCompleted += $done;
+                $rows[] = [
+                    'program'      => $s->learningProgram->name ?? 'Unnamed Program',
+                    'participants' => $total,
+                    'completed'    => $done,
+                    'rate'         => round($total > 0 ? $done / $total * 100 : 0, 1),
+                ];
+            }
+            if ($sumParticipants > 0) {
+                $overall = round($sumCompleted / $sumParticipants * 100, 1);
+                usort($rows, fn ($a, $b) => $a['rate'] <=> $b['rate']);
+                $lowest = $rows[0];
+                $insights['completion']['body'] = $overall . '% of ' . $sumParticipants . ' participants met the ' . (int) $threshold . '% attendance threshold across ' . count($rows) . ' programs; lowest is "' . $lowest['program'] . '" at ' . $lowest['rate'] . '%.';
+                $insights['completion']['details'] = ['overall' => $overall, 'threshold' => (int) $threshold, 'rows' => array_slice($rows, 0, 15)];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: Mandatory training compliance ------------------------------
+        try {
+            $mps = \DB::table('mandatory_learning_programs as m')
+                ->leftJoin('learning_programs as p', 'p.id', '=', 'm.program_id')
+                ->where('m.resort_id', $resortId)
+                ->select('m.program_id', 'm.department_id', 'm.position_id', 'p.name')->get();
+            $totReq = 0; $totDone = 0; $rows = [];
+            foreach ($mps as $m) {
+                $eligible = Employee::where('resort_id', $resortId)->where('status', 'Active');
+                if ($m->department_id) $eligible->where('Dept_id', $m->department_id);
+                if ($m->position_id)   $eligible->where('Position_id', $m->position_id);
+                $empIds = $eligible->pluck('id');
+                $req = $empIds->count();
+                if ($req === 0) continue;
+                $done = (int) \DB::table('training_attendance as ta')
+                    ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                    ->where('ts.resort_id', $resortId)->where('ts.training_id', $m->program_id)
+                    ->whereIn('ta.employee_id', $empIds)->where('ta.status', 'Present')
+                    ->distinct()->count('ta.employee_id');
+                $totReq += $req; $totDone += $done;
+                $rows[] = ['program' => $m->name ?: 'Program', 'required' => $req, 'completed' => $done, 'pct' => round($req > 0 ? $done / $req * 100 : 0, 1)];
+            }
+            if ($totReq > 0) {
+                $pct = round($totDone / $totReq * 100, 1);
+                $outstanding = $totReq - $totDone;
+                usort($rows, fn ($a, $b) => $a['pct'] <=> $b['pct']);
+                $insights['mandatory']['body'] = $pct . '% mandatory-training compliance; ' . $outstanding . ' of ' . $totReq . ' required completions still outstanding across ' . count($rows) . ' programs.';
+                $insights['mandatory']['details'] = ['pct' => $pct, 'required' => $totReq, 'completed' => $totDone, 'outstanding' => $outstanding, 'rows' => array_slice($rows, 0, 15)];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Learning request pipeline ----------------------------------
+        try {
+            $byStatus = LearningRequest::where('resort_id', $resortId)
+                ->select('status', \DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status');
+            $total = (int) $byStatus->sum();
+            if ($total > 0) {
+                $pending  = (int) ($byStatus['Pending'] ?? 0);
+                $approved = (int) ($byStatus['Approved'] ?? 0);
+                $denied   = (int) ($byStatus['Denied'] ?? 0);
+                $onHold   = (int) ($byStatus['On Hold'] ?? 0);
+                $decided  = $approved + $denied;
+                $approvalRate = $decided > 0 ? round($approved / $decided * 100, 1) : null;
+                $byCat = \DB::table('learning_requests as lr')
+                    ->join('learning_programs as p', 'p.id', '=', 'lr.learning_id')
+                    ->leftJoin('learning_categories as c', 'c.id', '=', 'p.learning_category_id')
+                    ->where('lr.resort_id', $resortId)
+                    ->select(\DB::raw("COALESCE(c.name,'Uncategorised') as cat"), \DB::raw('COUNT(*) as c'))
+                    ->groupBy('cat')->orderByDesc('c')->limit(10)->get()
+                    ->map(fn ($r) => ['category' => $r->cat, 'count' => (int) $r->c])->all();
+                $denials = \DB::table('learning_requests')->where('resort_id', $resortId)
+                    ->where('status', 'Denied')->whereNotNull('rejection_reason')->where('rejection_reason', '!=', '')
+                    ->select('rejection_reason as reason', \DB::raw('COUNT(*) as c'))
+                    ->groupBy('rejection_reason')->orderByDesc('c')->limit(10)->get()
+                    ->map(fn ($r) => ['reason' => $r->reason, 'count' => (int) $r->c])->all();
+                $rateTxt = $approvalRate === null ? 'no decisions yet' : $approvalRate . '% approval';
+                $insights['requests']['body'] = $total . ' learning requests (' . $pending . ' pending, ' . $approved . ' approved, ' . $denied . ' denied, ' . $onHold . ' on hold); ' . $rateTxt . '.';
+                $insights['requests']['details'] = [
+                    'counts' => ['Pending' => $pending, 'Approved' => $approved, 'Denied' => $denied, 'On Hold' => $onHold],
+                    'approval_rate' => $approvalRate, 'categories' => $byCat, 'denials' => $denials,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 4: Probationary training progress -----------------------------
+        try {
+            $programIds = \App\Models\ProbationaryLearningProgram::where('resort_id', $resortId)->pluck('program_id');
+            $probationary = Employee::where('resort_id', $resortId)->where('status', 'Active')
+                ->where(function ($q) {
+                    $q->where('employment_type', 'Probationary')->orWhereIn('probation_status', ['Active', 'Extended']);
+                })->pluck('id');
+            if ($programIds->isNotEmpty() && $probationary->isNotEmpty()) {
+                $totalPairs = $probationary->count() * $programIds->count();
+                $completedPairs = (int) \DB::table('training_attendance as ta')
+                    ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
+                    ->where('ts.resort_id', $resortId)->whereIn('ts.training_id', $programIds)
+                    ->whereIn('ta.employee_id', $probationary)->where('ta.status', 'Present')
+                    ->distinct()->count(\DB::raw('CONCAT(ta.employee_id, "-", ts.training_id)'));
+                $pct = $totalPairs > 0 ? round($completedPairs / $totalPairs * 100, 1) : 0;
+                $outstanding = $totalPairs - $completedPairs;
+                $insights['probationary']['body'] = $probationary->count() . ' staff on probation × ' . $programIds->count() . ' required programs: ' . $pct . '% complete, ' . $outstanding . ' of ' . $totalPairs . ' completions outstanding.';
+                $insights['probationary']['details'] = [
+                    'employees' => $probationary->count(), 'programs' => $programIds->count(),
+                    'pct' => $pct, 'completed' => $completedPairs, 'total' => $totalPairs, 'outstanding' => $outstanding,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // Narrate the deterministic numbers via the FastAPI LLM (best-effort).
+        $insights = Common::enrichDashboardInsights(
+            $insights, 'learning & development', ['completion', 'mandatory', 'requests', 'probationary']
+        );
+
+        return $insights;
     }
 
     public function admin_dashboard()
