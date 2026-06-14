@@ -43,11 +43,36 @@ class FetchDataAiController extends Controller
     {
         $Xpatfile = $request->file('Xpatfile');
 
+        // Validate uploads BEFORE hitting the AI extraction service. An empty
+        // (0-byte) or non-PDF upload — e.g. a file whose body never finished
+        // uploading — previously got shipped to the OCR service, which stalled
+        // until the 50 s timeout and surfaced as an opaque "service did not
+        // respond" error. Fail fast with a clear message instead.
+        $validatePdf = function ($file, string $label) {
+            if (!$file) return null; // absent is handled by the existing branches
+            if (!$file->isValid() || !$file->getSize()) {
+                return "The {$label} is empty or could not be read. Please re-select the file and try again.";
+            }
+            $ext  = strtolower((string) $file->getClientOriginalExtension());
+            $mime = (string) $file->getMimeType();
+            if ($ext !== 'pdf' && stripos($mime, 'pdf') === false) {
+                return "The {$label} must be a PDF document.";
+            }
+            return null;
+        };
+
+        if ($validationError = $validatePdf($Xpatfile, 'Xpat document')) {
+            return response()->json(['success' => false, 'errors' => ['message' => $validationError]], 422);
+        }
+        if ($validationError = $validatePdf($request->file('QuotaSlotFees'), 'Quota slot fees document')) {
+            return response()->json(['success' => false, 'errors' => ['message' => $validationError]], 422);
+        }
+
         /*
-            Visa renewal cost 
+            Visa renewal cost
             Work permit medical renewal is a  Work Visa Medical test fee
             Insurance renewal is a medical insurance - international
-        */  
+        */
 
         $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
 
