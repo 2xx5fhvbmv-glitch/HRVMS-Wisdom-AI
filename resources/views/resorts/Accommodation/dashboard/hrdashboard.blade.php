@@ -165,7 +165,7 @@
 
                 </div>
             </div>
-            <div class="col-xl-3 col-md-6">
+            <div class="col-xl-4 col-md-6">
                 <div class="card card-accomSummary">
                     <div class="card-title">
                         <h3>Summary</h3>
@@ -186,7 +186,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.AvailableAccommodation',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-4 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.AvailableAccommodation',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
                         <h3>Bed Statistics</h3>
@@ -252,7 +252,7 @@
             </div>
 
             {{-- WAI Insight's — AI-narrated accommodation metrics, beside Summary & Bed Statistics --}}
-            <div class="col-xl-6 col-md-12">
+            <div class="col-xl-4 col-md-12">
                 <div class="card card-wiINsight card-wiINsightAccom h-100" id="card-wiINsightAccom">
                     @php $aMeta = $accommodationInsights['_meta'] ?? null; @endphp
                     <div class="card-title">
@@ -275,7 +275,7 @@
                     <div class="leaveUser-main">
                         <div class="row g-3">
                             @foreach([['key'=>'maintenance','modal'=>'accomInsightMaintenanceModal'],['key'=>'occupancy','modal'=>'accomInsightOccupancyModal'],['key'=>'hotspots','modal'=>'accomInsightHotspotsModal'],['key'=>'demand','modal'=>'accomInsightDemandModal']] as $ac)
-                            <div class="col-md-6">
+                            <div class="col-12">
                                 <div class="leaveUser-block h-100">
                                     <div class="img">
                                         <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
