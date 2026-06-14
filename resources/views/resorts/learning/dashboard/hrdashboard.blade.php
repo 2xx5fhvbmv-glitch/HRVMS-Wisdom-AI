@@ -304,13 +304,81 @@
                     </div>
                 </div>
 
+                {{-- Row 6: WAI Insight's (AI-narrated L&D metrics), full width --}}
+                <div class="col-12">
+                    <div class="card card-wiINsight card-wiINsightLearning" id="card-wiINsightLearning">
+                        @php $lMeta = $learningInsights['_meta'] ?? null; @endphp
+                        <div class="card-title">
+                            <div class="row justify-content-between align-items-center g-md-3 g-1">
+                                <div class="col">
+                                    <h3 class="text-nowrap">WAI Insight's</h3>
+                                </div>
+                                <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                    @if($lMeta)
+                                        <div class="text-muted">Updated {{ $lMeta['generated_at']->diffForHumans() }}</div>
+                                        @if($lMeta['can_regenerate'])
+                                            <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                        @else
+                                            <span class="text-muted" title="{{ $lMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $lMeta['next_available']->diffForHumans() }}</span>
+                                        @endif
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leaveUser-main">
+                            <div class="row g-3">
+                                @foreach([['key'=>'completion','modal'=>'learningInsightCompletionModal'],['key'=>'mandatory','modal'=>'learningInsightMandatoryModal'],['key'=>'requests','modal'=>'learningInsightRequestsModal'],['key'=>'probationary','modal'=>'learningInsightProbationaryModal']] as $lc)
+                                <div class="col-xl-3 col-md-6">
+                                    <div class="leaveUser-block h-100">
+                                        <div class="img">
+                                            <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                        </div>
+                                        <div>
+                                            <h6>{{ $learningInsights[$lc['key']]['title'] ?? '' }}</h6>
+                                            <p>{{ $learningInsights[$lc['key']]['body'] ?? '' }}</p>
+                                            @if(!empty($learningInsights[$lc['key']]['recommendation']))
+                                                <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $learningInsights[$lc['key']]['recommendation'] }}</p>
+                                            @endif
+                                            <div>
+                                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $lc['modal'] }}" class="a-link">View Details</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
+@includeWhen(isset($learningInsights), 'resorts.learning.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
 <style>
+    /* WAI Insight's — full-width L&D card; the four insights sit in a grid as
+       equal bordered mini-cards. Let the card size to its content (overrides
+       the inherited .card-wiINsight 415px cap). */
+    .card-wiINsightLearning {
+        height: auto !important;
+        max-height: none !important;
+    }
+    .card-wiINsightLearning .leaveUser-block {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        width: 100%;
+        border: 1px solid #E6ECEC;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 0;
+    }
+    .card-wiINsightLearning .leaveUser-block .img { flex: 0 0 auto; }
+    .card-wiINsightLearning .leaveUser-block > div:last-child { min-width: 0; }
+
     /* Chart wrapper used by Learning Hours bar chart — fixed-height container so
        the canvas fills it via responsive: true / maintainAspectRatio: false. */
     .chart-flex-wrap {
