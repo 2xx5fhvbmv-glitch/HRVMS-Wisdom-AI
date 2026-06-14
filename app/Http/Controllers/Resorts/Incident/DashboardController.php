@@ -134,7 +134,171 @@ class DashboardController extends Controller
         $categoryData = $categoryCounts->pluck('total')->toArray();
         $totalIncidents = array_sum($categoryData);
 
-        return view('resorts.incident.dashboard.hrdashboard',compact('page_title','total_incidents','open_incidents','under_investigation_incidents','averageResolutionDays','committeeSummary','severityCounts','resolvedCount','unresolvedCount','categoryLabels','categoryData','totalIncidents'));
+        $incidentInsights = $this->getCachedIncidentInsights($resort_id);
+
+        return view('resorts.incident.dashboard.hrdashboard',compact('page_title','total_incidents','open_incidents','under_investigation_incidents','averageResolutionDays','committeeSummary','severityCounts','resolvedCount','unresolvedCount','categoryLabels','categoryData','totalIncidents','incidentInsights'));
+    }
+
+    /**
+     * Cached wrapper around buildIncidentInsights() with a manual 2-day refresh,
+     * mirroring the other module dashboards. Cached per resort; "Regenerate"
+     * loads ?regenerate_insights=1 and recomputes only once the 48h cooldown has
+     * elapsed. Returns a '_meta' key for the card header.
+     */
+    private function getCachedIncidentInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'incident_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildIncidentInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the three Incident AI-insight cards for a resort:
+     *   1. volume    Incident volume & trend (open/resolved, MoM, priority/severity mix)
+     *   2. hotspots  Category & severity hotspots (top categories, severity split, locations)
+     *   3. outcomes  Outcomes & preventive actions (outcome/action mix, preventive coverage)
+     * Each card is wrapped so one failing query degrades just that card; the
+     * deterministic numbers are then narrated by the FastAPI LLM (best-effort).
+     */
+    private function buildIncidentInsights($resortId): array
+    {
+        $insights = [
+            'volume'   => ['title' => 'Incident Volume & Trend',     'body' => 'No incidents recorded yet.'],
+            'hotspots' => ['title' => 'Category & Severity Hotspots', 'body' => 'No incidents recorded yet.'],
+            'outcomes' => ['title' => 'Outcomes & Preventive Actions', 'body' => 'No resolved incidents yet to analyse.'],
+        ];
+        $monthNames = [1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'May',6=>'Jun',7=>'Jul',8=>'Aug',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dec'];
+
+        // --- Card 1: Incident volume & trend -----------------------------------
+        try {
+            $total = Incidents::where('resort_id', $resortId)->count();
+            if ($total > 0) {
+                $resolved = Incidents::where('resort_id', $resortId)->where('status', 'Resolved')->count();
+                $open = $total - $resolved;
+                $byPriority = Incidents::where('resort_id', $resortId)
+                    ->select('priority', \DB::raw('count(*) as c'))->groupBy('priority')->pluck('c', 'priority');
+                $bySeverity = Incidents::where('resort_id', $resortId)->whereNotNull('severity')->where('severity', '!=', '')
+                    ->select('severity', \DB::raw('count(*) as c'))->groupBy('severity')->pluck('c', 'severity');
+                // Month-over-month (last 6 months by incident_date).
+                $since = \Carbon\Carbon::now()->subMonths(5)->startOfMonth();
+                $byMonth = Incidents::where('resort_id', $resortId)
+                    ->whereNotNull('incident_date')->whereDate('incident_date', '>=', $since->toDateString())
+                    ->select(\DB::raw('YEAR(incident_date) as y'), \DB::raw('MONTH(incident_date) as m'), \DB::raw('count(*) as c'))
+                    ->groupBy('y', 'm')->orderBy('y')->orderBy('m')->get();
+                $series = [];
+                foreach ($byMonth as $r) $series[(int)$r->y . '-' . str_pad((int)$r->m, 2, '0', STR_PAD_LEFT)] = (int) $r->c;
+                $thisKey = \Carbon\Carbon::now()->format('Y-m');
+                $lastKey = \Carbon\Carbon::now()->subMonth()->format('Y-m');
+                $thisM = $series[$thisKey] ?? 0; $lastM = $series[$lastKey] ?? 0;
+                $dir = $thisM > $lastM ? 'up' : ($thisM < $lastM ? 'down' : 'flat');
+                $high = (int) ($byPriority['High'] ?? 0);
+                $trendTxt = $dir === 'flat' ? 'level with last month (' . $thisM . ')' : ($dir === 'up' ? 'up to ' . $thisM . ' from ' . $lastM . ' last month' : 'down to ' . $thisM . ' from ' . $lastM . ' last month');
+                $insights['volume']['body'] = $total . ' incidents (' . $open . ' open, ' . $resolved . ' resolved); this month ' . $trendTxt . '; ' . $high . ' high-priority.';
+                $monthsLabelled = [];
+                foreach ($series as $k => $v) { [$yy,$mm] = explode('-', $k); $monthsLabelled[] = ['month' => ($monthNames[(int)$mm] ?? $mm) . ' ' . $yy, 'count' => $v]; }
+                $insights['volume']['details'] = [
+                    'total' => $total, 'open' => $open, 'resolved' => $resolved, 'direction' => $dir,
+                    'priority' => ['High' => (int)($byPriority['High'] ?? 0), 'Medium' => (int)($byPriority['Medium'] ?? 0), 'Low' => (int)($byPriority['Low'] ?? 0)],
+                    'severity' => $bySeverity->toArray(),
+                    'months' => $monthsLabelled,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: Category & severity hotspots ------------------------------
+        try {
+            $byCat = Incidents::where('incidents.resort_id', $resortId)
+                ->leftJoin('incident_categories as c', 'c.id', '=', 'incidents.category')
+                ->select(\DB::raw("COALESCE(c.category_name,'Uncategorised') as name"), \DB::raw('count(*) as cnt'))
+                ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                ->map(fn ($r) => ['category' => $r->name, 'count' => (int) $r->cnt])->all();
+            $bySub = Incidents::where('incidents.resort_id', $resortId)
+                ->leftJoin('incident_subcategories as s', 's.id', '=', 'incidents.subcategory')
+                ->select(\DB::raw("COALESCE(s.subcategory_name,'—') as name"), \DB::raw('count(*) as cnt'))
+                ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                ->map(fn ($r) => ['subcategory' => $r->name, 'count' => (int) $r->cnt])->all();
+            $bySev = Incidents::where('resort_id', $resortId)->whereNotNull('severity')->where('severity', '!=', '')
+                ->select('severity', \DB::raw('count(*) as c'))->groupBy('severity')->pluck('c', 'severity');
+            $byLoc = Incidents::where('resort_id', $resortId)->whereNotNull('location')->where('location', '!=', '')
+                ->select('location', \DB::raw('count(*) as cnt'))->groupBy('location')->orderByDesc('cnt')->limit(10)->get()
+                ->map(fn ($r) => ['location' => $r->location, 'count' => (int) $r->cnt])->all();
+            if (!empty($byCat)) {
+                $tc = $byCat[0]; $tl = $byLoc[0] ?? null;
+                $severe = (int) ($bySev['Severe'] ?? 0); $moderate = (int) ($bySev['Moderate'] ?? 0); $minor = (int) ($bySev['Minor'] ?? 0);
+                $locTxt = $tl ? ' ' . $tl['location'] . ' is the most-affected location (' . $tl['count'] . ').' : '';
+                $insights['hotspots']['body'] = 'Top category: ' . $tc['category'] . ' (' . $tc['count'] . '); severity ' . $severe . ' severe / ' . $moderate . ' moderate / ' . $minor . ' minor.' . $locTxt;
+                $insights['hotspots']['details'] = [
+                    'categories' => $byCat, 'subcategories' => $bySub,
+                    'severity' => ['Severe' => $severe, 'Moderate' => $moderate, 'Minor' => $minor],
+                    'locations' => $byLoc,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Outcomes & preventive actions -----------------------------
+        try {
+            $resolved = Incidents::where('resort_id', $resortId)->where('status', 'Resolved')->count();
+            if ($resolved > 0) {
+                $byOutcome = Incidents::where('incidents.resort_id', $resortId)->where('incidents.status', 'Resolved')
+                    ->leftJoin('incident_outcome_types as o', 'o.id', '=', 'incidents.outcome_type')
+                    ->select(\DB::raw("COALESCE(o.outcome_type,'Unspecified') as name"), \DB::raw('count(*) as cnt'))
+                    ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                    ->map(fn ($r) => ['outcome' => $r->name, 'count' => (int) $r->cnt])->all();
+                $byAction = Incidents::where('incidents.resort_id', $resortId)->where('incidents.status', 'Resolved')
+                    ->leftJoin('incident_actions_taken as a', 'a.id', '=', 'incidents.action_taken')
+                    ->select(\DB::raw("COALESCE(a.action_taken,'Unspecified') as name"), \DB::raw('count(*) as cnt'))
+                    ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                    ->map(fn ($r) => ['action' => $r->name, 'count' => (int) $r->cnt])->all();
+                $withPrev = Incidents::where('resort_id', $resortId)->where('status', 'Resolved')
+                    ->whereNotNull('preventive_measures')->where('preventive_measures', '!=', '')->count();
+                $prevPct = round($withPrev / $resolved * 100, 1);
+                $to = $byOutcome[0] ?? null; $ta = $byAction[0] ?? null;
+                $parts = [];
+                if ($to) $parts[] = 'top outcome ' . $to['outcome'] . ' (' . $to['count'] . ')';
+                if ($ta) $parts[] = 'most common action ' . $ta['action'] . ' (' . $ta['count'] . ')';
+                $insights['outcomes']['body'] = 'Of ' . $resolved . ' resolved: ' . implode('; ', $parts) . '; ' . $prevPct . '% have preventive measures recorded.';
+                $insights['outcomes']['details'] = [
+                    'resolved' => $resolved, 'outcomes' => $byOutcome, 'actions' => $byAction,
+                    'preventive_recorded' => $withPrev, 'preventive_missing' => $resolved - $withPrev, 'preventive_pct' => $prevPct,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // Narrate the deterministic numbers via the FastAPI LLM (best-effort).
+        $insights = \App\Helpers\Common::enrichDashboardInsights(
+            $insights, 'workplace incident management & safety', ['volume', 'hotspots', 'outcomes']
+        );
+
+        return $insights;
     }
 
     public function getDepartmentWiseParticipation()
