@@ -149,26 +149,45 @@
                     : 0;
             @endphp
 
+            {{-- WAI Insight's — AI-narrated survey metrics (took the Participation Rate slot) --}}
             <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card card-participationRate">
-                    <div class="card-title mb-md-4">
-                        <h3>Participation Rate</h3>
+                <div class="card card-wiINsight card-wiINsightSurvey h-100" id="card-wiINsightSurvey">
+                    @php $sMeta = $surveyInsights['_meta'] ?? null; @endphp
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-md-3 g-1">
+                            <div class="col">
+                                <h3 class="text-nowrap">WAI Insight's</h3>
+                            </div>
+                            <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                @if($sMeta)
+                                    <div class="text-muted">Updated {{ $sMeta['generated_at']->diffForHumans() }}</div>
+                                    @if($sMeta['can_regenerate'])
+                                        <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                    @else
+                                        <span class="text-muted" title="{{ $sMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $sMeta['next_available']->diffForHumans() }}</span>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
                     </div>
-                    <div class="progressOneCenText-block mb-0">
-                        <div class="progress-container blue" 
-                            data-progress="{{ $participationRate }}" 
-                            data-bs-toggle="tooltip" 
-                            data-bs-placement="bottom" 
-                            title="Participation Rate {{ $participationRate }}%">
-                            <svg class="progress-circle" viewBox="0 0 120 120">
-                                <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                <circle class="progress" cx="60" cy="60" r="54"></circle>
-                            </svg>
+                    <div class="leaveUser-main">
+                        @foreach([['key'=>'participation','modal'=>'surveyInsightParticipationModal'],['key'=>'activity','modal'=>'surveyInsightActivityModal'],['key'=>'sentiment','modal'=>'surveyInsightSentimentModal'],['key'=>'hotspots','modal'=>'surveyInsightHotspotsModal']] as $sc)
+                        <div class="leaveUser-block">
+                            <div class="img">
+                                <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                            </div>
+                            <div>
+                                <h6>{{ $surveyInsights[$sc['key']]['title'] ?? '' }}</h6>
+                                <p>{{ $surveyInsights[$sc['key']]['body'] ?? '' }}</p>
+                                @if(!empty($surveyInsights[$sc['key']]['recommendation']))
+                                    <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $surveyInsights[$sc['key']]['recommendation'] }}</p>
+                                @endif
+                                <div>
+                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $sc['modal'] }}" class="a-link">View Details</a>
+                                </div>
+                            </div>
                         </div>
-                        <div class="text">
-                            <h5>{{ $participationRate }}%</h5>
-                            <p>PARTICIPATION</p>
-                        </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -208,7 +227,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-4 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class=" card">
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-1">
@@ -250,7 +269,7 @@
             {{-- Survey-wise Participation Rates now pairs with Recent Survey
                  Results above (6 + 6). Department-wise Participation has been
                  moved to the bottom row, after Draft Surveys. --}}
-            <div class="col-xl-6 col-sm-12 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-4 col-sm-12 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
                         <h3>Survey-wise Participation Rates</h3>
@@ -262,6 +281,31 @@
                             <canvas id="myAttendance"></canvas>
                         </div>
                     @endif
+                </div>
+            </div>
+
+            {{-- Participation Rate moved here to pair with Recent Survey Results & Survey-wise Participation Rates --}}
+            <div class="col-xl-4 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card card-participationRate h-100">
+                    <div class="card-title mb-md-4">
+                        <h3>Participation Rate</h3>
+                    </div>
+                    <div class="progressOneCenText-block mb-0">
+                        <div class="progress-container blue"
+                            data-progress="{{ $participationRate }}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="bottom"
+                            title="Participation Rate {{ $participationRate }}%">
+                            <svg class="progress-circle" viewBox="0 0 120 120">
+                                <circle class="progress-background" cx="60" cy="60" r="54"></circle>
+                                <circle class="progress" cx="60" cy="60" r="54"></circle>
+                            </svg>
+                        </div>
+                        <div class="text">
+                            <h5>{{ $participationRate }}%</h5>
+                            <p>PARTICIPATION</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="col-xl-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -440,10 +484,25 @@
         </div>
     </div>
 </div>
+@includeWhen(isset($surveyInsights), 'resorts.survey.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
 <style>
+    /* WAI Insight's — survey card in the Participation Rate slot. Fixed height
+       with the insight list scrolling inside the narrow column. */
+    .card-wiINsightSurvey {
+        height: 100% !important;
+        max-height: 420px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .card-wiINsightSurvey .leaveUser-main {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
     /* Truncate long department / survey names in the chart legend pills.
        Full text remains in the title attribute so hover shows it. */
     .doughnut-label {
