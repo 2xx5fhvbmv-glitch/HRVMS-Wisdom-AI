@@ -233,8 +233,11 @@ class DashboardController extends Controller
 
         $page_title = 'People Relation';
 
+        $grievanceInsights = $this->getCachedGrievanceInsights($resort_id);
+
         return view('resorts.GrievanceAndDisciplinery.dashboard.hrdashboard', compact(
             'page_title',
+            'grievanceInsights',
             'grivanceCategoryWiseCount',
             'totalPercengate',
             'DelegatedCases',
@@ -467,6 +470,198 @@ class DashboardController extends Controller
     {
         request()->merge(['dashboard_label' => 'XCOM']);
         return $this->Hod_dashboard(request());
+    }
+
+    /**
+     * Cached wrapper around buildGrievanceInsights() with a manual 2-day refresh,
+     * mirroring the other module dashboards. Cached per resort; "Regenerate"
+     * loads ?regenerate_insights=1 and recomputes only once the 48h cooldown has
+     * elapsed. Returns a '_meta' key for the card header.
+     */
+    private function getCachedGrievanceInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'grievance_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildGrievanceInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the four Grievance & Disciplinary AI-insight cards for a resort:
+     *   1. volume    Case volume & status (grievance + disciplinary, open/resolved mix)
+     *   2. sla       SLA compliance & overdue (past-deadline, due-soon, avg resolution)
+     *   3. hotspots  Category & offense hotspots (top grievance cats + disciplinary offenses)
+     *   4. outcomes  Disciplinary outcomes & severity (action/severity mix, repeat offenders)
+     * Each card is wrapped so one failing query degrades just that card; the
+     * deterministic numbers are then narrated by the FastAPI LLM (best-effort).
+     */
+    private function buildGrievanceInsights($resortId): array
+    {
+        $insights = [
+            'volume'   => ['title' => 'Case Volume & Status',          'body' => 'No grievance or disciplinary cases yet.'],
+            'sla'      => ['title' => 'SLA Compliance & Overdue',      'body' => 'No cases to measure against SLA yet.'],
+            'hotspots' => ['title' => 'Category & Offense Hotspots',   'body' => 'No cases recorded yet.'],
+            'outcomes' => ['title' => 'Disciplinary Outcomes & Severity', 'body' => 'No disciplinary cases yet to analyse.'],
+        ];
+        $now = \Carbon\Carbon::now();
+        $closedStatuses = ['resolved', 'rejected'];
+
+        // --- Card 1: Case volume & status --------------------------------------
+        try {
+            $gr = GrivanceSubmissionModel::where('resort_id', $resortId)
+                ->select('status', \DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status');
+            $di = \App\Models\disciplinarySubmit::where('resort_id', $resortId)
+                ->select('status', \DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status');
+            $grTotal = (int) $gr->sum(); $diTotal = (int) $di->sum();
+            $total = $grTotal + $diTotal;
+            if ($total > 0) {
+                $norm = function ($coll) {
+                    $out = ['pending' => 0, 'in_review' => 0, 'resolved' => 0, 'rejected' => 0];
+                    foreach ($coll as $st => $c) {
+                        $k = strtolower((string) $st);
+                        if (!isset($out[$k])) $out[$k] = 0;
+                        $out[$k] += (int) $c;
+                    }
+                    return $out;
+                };
+                $g = $norm($gr); $d = $norm($di);
+                $resolved = $g['resolved'] + $d['resolved'];
+                $open = $total - ($g['resolved'] + $g['rejected'] + $d['resolved'] + $d['rejected']);
+                $rate = round($resolved / $total * 100, 1);
+                $insights['volume']['body'] = $total . ' cases (' . $grTotal . ' grievance, ' . $diTotal . ' disciplinary); ' . $open . ' open, ' . $resolved . ' resolved (' . $rate . '% resolution).';
+                $insights['volume']['details'] = [
+                    'total' => $total, 'grievance' => $grTotal, 'disciplinary' => $diTotal,
+                    'open' => $open, 'resolved' => $resolved, 'resolution_rate' => $rate,
+                    'grievance_status' => $g, 'disciplinary_status' => $d,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: SLA compliance & overdue ----------------------------------
+        try {
+            $slaMap = $this->resolveSlaMap((int) $resortId);
+            $overdue = 0; $dueSoon = 0; $openCount = 0;
+            $grievances = GrivanceSubmissionModel::where('resort_id', $resortId)->get(['status', 'Priority', 'Grivance_date_time', 'created_at']);
+            foreach ($grievances as $c) {
+                if (in_array(strtolower((string) $c->status), $closedStatuses, true)) continue;
+                $openCount++;
+                $filed = $c->Grivance_date_time ? \Carbon\Carbon::parse($c->Grivance_date_time) : ($c->created_at ? \Carbon\Carbon::parse($c->created_at) : null);
+                if (!$filed) continue;
+                $deadline = $this->slaDeadline($filed, $c->Priority, $slaMap);
+                if ($deadline->lt($now)) $overdue++;
+                elseif ($deadline->lte($now->copy()->addDays(3))) $dueSoon++;
+            }
+            $disc = \App\Models\disciplinarySubmit::where('resort_id', $resortId)->get(['status', 'Priority', 'Expiry_date', 'created_at']);
+            foreach ($disc as $d) {
+                if (in_array(strtolower((string) $d->status), $closedStatuses, true)) continue;
+                $openCount++;
+                $filed = $d->created_at ? \Carbon\Carbon::parse($d->created_at) : null;
+                if (!$filed) continue;
+                $deadline = $this->disciplinaryDeadline($filed, $d->Priority, $d->Expiry_date, $slaMap);
+                if ($deadline->lt($now)) $overdue++;
+                elseif ($deadline->lte($now->copy()->addDays(3))) $dueSoon++;
+            }
+            $durations = [];
+            foreach (GrivanceSubmissionModel::where('resort_id', $resortId)->where('status', 'resolved')->get(['created_at', 'updated_at']) as $c) {
+                if ($c->created_at && $c->updated_at) $durations[] = \Carbon\Carbon::parse($c->created_at)->diffInDays(\Carbon\Carbon::parse($c->updated_at));
+            }
+            foreach (\App\Models\disciplinarySubmit::where('resort_id', $resortId)->whereRaw('LOWER(status) = ?', ['resolved'])->get(['created_at', 'updated_at']) as $d) {
+                if ($d->created_at && $d->updated_at) $durations[] = \Carbon\Carbon::parse($d->created_at)->diffInDays(\Carbon\Carbon::parse($d->updated_at));
+            }
+            $avgDays = !empty($durations) ? round(array_sum($durations) / count($durations), 1) : null;
+            if ($openCount > 0 || $avgDays !== null) {
+                $avgTxt = $avgDays === null ? 'no resolved cases yet' : 'avg resolution ' . $avgDays . ' days';
+                $insights['sla']['body'] = $overdue . ' cases past SLA, ' . $dueSoon . ' due within 3 days (of ' . $openCount . ' open); ' . $avgTxt . '.';
+                $insights['sla']['details'] = ['overdue' => $overdue, 'due_soon' => $dueSoon, 'open' => $openCount, 'avg_resolution_days' => $avgDays];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Category & offense hotspots -------------------------------
+        try {
+            $grCats = GrivanceSubmissionModel::where('grivance_submission_models.resort_id', $resortId)
+                ->leftJoin('grievance_categories as c', 'c.id', '=', 'grivance_submission_models.Grivance_Cat_id')
+                ->select(\DB::raw("COALESCE(c.Category_Name,'Uncategorised') as name"), \DB::raw('COUNT(*) as cnt'))
+                ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                ->map(fn ($r) => ['category' => $r->name, 'count' => (int) $r->cnt])->all();
+            $offenses = \App\Models\disciplinarySubmit::where('disciplinary_submits.resort_id', $resortId)
+                ->leftJoin('offenses_models as o', 'o.id', '=', 'disciplinary_submits.Offence_id')
+                ->select(\DB::raw("COALESCE(o.OffensesName,'Unspecified') as name"), \DB::raw('COUNT(*) as cnt'))
+                ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                ->map(fn ($r) => ['offense' => $r->name, 'count' => (int) $r->cnt])->all();
+            $sev = \App\Models\disciplinarySubmit::where('disciplinary_submits.resort_id', $resortId)
+                ->leftJoin('severity_stores as s', 's.id', '=', 'disciplinary_submits.Severity_id')
+                ->select(\DB::raw("COALESCE(s.SeverityName,'Unspecified') as name"), \DB::raw('COUNT(*) as cnt'))
+                ->groupBy('name')->orderByDesc('cnt')->get()
+                ->map(fn ($r) => ['severity' => $r->name, 'count' => (int) $r->cnt])->all();
+            if (!empty($grCats) || !empty($offenses)) {
+                $tc = $grCats[0] ?? null; $to = $offenses[0] ?? null;
+                $parts = [];
+                if ($tc) $parts[] = 'top grievance category ' . $tc['category'] . ' (' . $tc['count'] . ')';
+                if ($to) $parts[] = 'most common offense ' . $to['offense'] . ' (' . $to['count'] . ')';
+                $insights['hotspots']['body'] = ucfirst(implode('; ', $parts)) . '.';
+                $insights['hotspots']['details'] = ['grievance_categories' => $grCats, 'offenses' => $offenses, 'severity' => $sev];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 4: Disciplinary outcomes & severity --------------------------
+        try {
+            $diTotal = \App\Models\disciplinarySubmit::where('resort_id', $resortId)->count();
+            if ($diTotal > 0) {
+                $byAction = \App\Models\disciplinarySubmit::where('disciplinary_submits.resort_id', $resortId)
+                    ->leftJoin('action_stores as a', 'a.id', '=', 'disciplinary_submits.Action_id')
+                    ->select(\DB::raw("COALESCE(a.ActionName,'Unspecified') as name"), \DB::raw('COUNT(*) as cnt'))
+                    ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                    ->map(fn ($r) => ['action' => $r->name, 'count' => (int) $r->cnt])->all();
+                $bySeverity = \App\Models\disciplinarySubmit::where('disciplinary_submits.resort_id', $resortId)
+                    ->leftJoin('severity_stores as s', 's.id', '=', 'disciplinary_submits.Severity_id')
+                    ->select(\DB::raw("COALESCE(s.SeverityName,'Unspecified') as name"), \DB::raw('COUNT(*) as cnt'))
+                    ->groupBy('name')->orderByDesc('cnt')->limit(10)->get()
+                    ->map(fn ($r) => ['severity' => $r->name, 'count' => (int) $r->cnt])->all();
+                $repeatCount = \App\Models\disciplinarySubmit::where('resort_id', $resortId)
+                    ->select('Employee_id', \DB::raw('COUNT(*) as c'))->groupBy('Employee_id')->having('c', '>', 1)->get()->count();
+                $ta = $byAction[0] ?? null; $ts = $bySeverity[0] ?? null;
+                $parts = [];
+                if ($ta) $parts[] = 'top action ' . $ta['action'] . ' (' . $ta['count'] . ')';
+                if ($ts) $parts[] = 'most common severity ' . $ts['severity'] . ' (' . $ts['count'] . ')';
+                $insights['outcomes']['body'] = 'Of ' . $diTotal . ' disciplinary cases: ' . implode('; ', $parts) . '; ' . $repeatCount . ' repeat offender' . ($repeatCount == 1 ? '' : 's') . '.';
+                $insights['outcomes']['details'] = ['total' => $diTotal, 'actions' => $byAction, 'severity' => $bySeverity, 'repeat_offenders' => $repeatCount];
+            }
+        } catch (\Throwable $e) {}
+
+        // Narrate the deterministic numbers via the FastAPI LLM (best-effort).
+        $insights = \App\Helpers\Common::enrichDashboardInsights(
+            $insights, 'employee grievance & disciplinary case management', ['volume', 'sla', 'hotspots', 'outcomes']
+        );
+
+        return $insights;
     }
 
     /**

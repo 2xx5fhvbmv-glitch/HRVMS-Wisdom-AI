@@ -486,12 +486,80 @@
                     </div>
                 </div>
             </div> -->
+
+            {{-- WAI Insight's — AI-narrated grievance & disciplinary metrics, full-width row --}}
+            <div class="col-12">
+                <div class="card card-wiINsight card-wiINsightGriev" id="card-wiINsightGriev">
+                    @php $grMeta = $grievanceInsights['_meta'] ?? null; @endphp
+                    <div class="card-title">
+                        <div class="row justify-content-between align-items-center g-md-3 g-1">
+                            <div class="col">
+                                <h3 class="text-nowrap">WAI Insight's</h3>
+                            </div>
+                            <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                                @if($grMeta)
+                                    <div class="text-muted">Updated {{ $grMeta['generated_at']->diffForHumans() }}</div>
+                                    @if($grMeta['can_regenerate'])
+                                        <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                    @else
+                                        <span class="text-muted" title="{{ $grMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $grMeta['next_available']->diffForHumans() }}</span>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    <div class="leaveUser-main">
+                        <div class="row g-3">
+                            @foreach([['key'=>'volume','modal'=>'grievInsightVolumeModal'],['key'=>'sla','modal'=>'grievInsightSlaModal'],['key'=>'hotspots','modal'=>'grievInsightHotspotsModal'],['key'=>'outcomes','modal'=>'grievInsightOutcomesModal']] as $gc)
+                            <div class="col-xl-3 col-md-6">
+                                <div class="leaveUser-block h-100">
+                                    <div class="img">
+                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                                    </div>
+                                    <div>
+                                        <h6>{{ $grievanceInsights[$gc['key']]['title'] ?? '' }}</h6>
+                                        <p>{{ $grievanceInsights[$gc['key']]['body'] ?? '' }}</p>
+                                        @if(!empty($grievanceInsights[$gc['key']]['recommendation']))
+                                            <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $grievanceInsights[$gc['key']]['recommendation'] }}</p>
+                                        @endif
+                                        <div>
+                                            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $gc['modal'] }}" class="a-link">View Details</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+@includeWhen(isset($grievanceInsights), 'resorts.GrievanceAndDisciplinery.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
+<style>
+    /* WAI Insight's — full-width grievance card; four insights as bordered
+       mini-cards in a 4-up grid. Sizes to content (overrides 415px cap). */
+    .card-wiINsightGriev {
+        height: auto !important;
+        max-height: none !important;
+    }
+    .card-wiINsightGriev .leaveUser-block {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        width: 100%;
+        border: 1px solid #E6ECEC;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 0;
+    }
+    .card-wiINsightGriev .leaveUser-block .img { flex: 0 0 auto; }
+    .card-wiINsightGriev .leaveUser-block > div:last-child { min-width: 0; }
+</style>
 @endsection
 
 @section('import-scripts')
