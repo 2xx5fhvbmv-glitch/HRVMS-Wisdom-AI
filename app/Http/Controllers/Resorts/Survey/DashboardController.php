@@ -475,7 +475,180 @@ class DashboardController extends Controller
                                                 return $a;
                                             });
 
-        return view('resorts.Survey.dashboard.hrdashboard',compact('page_title','RecentSurveyResults','SurveyComparison','ParticipationRate','SurveyWiseParticipationRates','departmentWise','NearingDeadline','OngoingSurvey','CompleteSurvey_count','DraftSurvey_count','OngoingSurvey_count','total_Survey_count','SaveAsDraft'));
+        $surveyInsights = $this->getCachedSurveyInsights($this->resort->resort_id);
+
+        return view('resorts.Survey.dashboard.hrdashboard',compact('page_title','RecentSurveyResults','SurveyComparison','ParticipationRate','SurveyWiseParticipationRates','departmentWise','NearingDeadline','OngoingSurvey','CompleteSurvey_count','DraftSurvey_count','OngoingSurvey_count','total_Survey_count','SaveAsDraft','surveyInsights'));
+    }
+
+    /**
+     * Cached wrapper around buildSurveyInsights() with a manual 2-day refresh,
+     * mirroring the other module dashboards. Cached per resort; "Regenerate"
+     * loads ?regenerate_insights=1 and recomputes only once the 48h cooldown has
+     * elapsed. Returns a '_meta' key for the card header.
+     */
+    private function getCachedSurveyInsights($resortId): array
+    {
+        $cooldownHours = 48;
+        $cacheKey = 'survey_insights:' . $resortId;
+        $now = \Carbon\Carbon::now();
+
+        $cached = \Cache::get($cacheKey);
+        $regenerate = request()->boolean('regenerate_insights');
+
+        $stale = !is_array($cached) || empty($cached['generated_at']);
+        if (!$stale) {
+            $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+            if ($regenerate && $generatedAt->diffInHours($now) >= $cooldownHours) {
+                $stale = true;
+            }
+        }
+
+        if ($stale) {
+            $cached = [
+                'insights'     => $this->buildSurveyInsights($resortId),
+                'generated_at' => $now->toIso8601String(),
+            ];
+            \Cache::put($cacheKey, $cached, $now->copy()->addDays(30));
+        }
+
+        $generatedAt = \Carbon\Carbon::parse($cached['generated_at']);
+        $insights = $cached['insights'];
+        $insights['_meta'] = [
+            'generated_at'   => $generatedAt,
+            'can_regenerate' => $generatedAt->diffInHours($now) >= $cooldownHours,
+            'next_available' => $generatedAt->copy()->addHours($cooldownHours),
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Compute the four Survey AI-insight cards for a resort:
+     *   1. participation  Invited vs responded, overall response rate, lagging surveys
+     *   2. activity       Survey status mix, active/closing-soon, recurring cadence
+     *   3. sentiment      Avg rating + favourable/neutral/unfavourable split (Rating Qs)
+     *   4. hotspots       Top choice answers + questions with most negative responses
+     * Each card is wrapped so one failing query degrades just that card; the
+     * deterministic numbers are then narrated by the FastAPI LLM (best-effort).
+     */
+    private function buildSurveyInsights($resortId): array
+    {
+        $insights = [
+            'participation' => ['title' => 'Participation & Response Rate', 'body' => 'No surveys with recipients yet.'],
+            'activity'      => ['title' => 'Survey Activity & Status',      'body' => 'No surveys created yet.'],
+            'sentiment'     => ['title' => 'Sentiment / Score Pulse',       'body' => 'No rating responses yet to analyse.'],
+            'hotspots'      => ['title' => 'Answer Hotspots',               'body' => 'No choice responses yet to analyse.'],
+        ];
+        $today = \Carbon\Carbon::now();
+
+        // --- Card 1: Participation & response rate ------------------------------
+        try {
+            $surveys = \DB::table('parent_surveys')->where('resort_id', $resortId)->get(['id', 'Surevey_title']);
+            if ($surveys->isNotEmpty()) {
+                $invitedBy = \DB::table('survey_employees')->whereIn('Parent_survey_id', $surveys->pluck('id'))
+                    ->select('Parent_survey_id', \DB::raw('COUNT(*) as c'))->groupBy('Parent_survey_id')->pluck('c', 'Parent_survey_id');
+                $respondedBy = \DB::table('survey_employees')->whereIn('Parent_survey_id', $surveys->pluck('id'))
+                    ->whereNotNull('Complete_time')
+                    ->select('Parent_survey_id', \DB::raw('COUNT(*) as c'))->groupBy('Parent_survey_id')->pluck('c', 'Parent_survey_id');
+                $totInvited = 0; $totResponded = 0; $rows = [];
+                foreach ($surveys as $s) {
+                    $inv = (int) ($invitedBy[$s->id] ?? 0);
+                    if ($inv === 0) continue;
+                    $resp = (int) ($respondedBy[$s->id] ?? 0);
+                    $totInvited += $inv; $totResponded += $resp;
+                    $rows[] = ['survey' => $s->Surevey_title ?: 'Untitled', 'invited' => $inv, 'responded' => $resp,
+                               'rate' => round($resp / $inv * 100, 1)];
+                }
+                if ($totInvited > 0) {
+                    $overall = round($totResponded / $totInvited * 100, 1);
+                    usort($rows, fn ($a, $b) => $a['rate'] <=> $b['rate']);
+                    $lowest = $rows[0];
+                    $insights['participation']['body'] = $overall . '% response rate (' . $totResponded . ' of ' . $totInvited . ' across ' . count($rows) . ' surveys); lowest: "' . $lowest['survey'] . '" at ' . $lowest['rate'] . '%.';
+                    $insights['participation']['details'] = ['overall' => $overall, 'invited' => $totInvited, 'responded' => $totResponded, 'rows' => array_slice($rows, 0, 15)];
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 2: Survey activity & status ----------------------------------
+        try {
+            $byStatus = \DB::table('parent_surveys')->where('resort_id', $resortId)
+                ->select('Status', \DB::raw('COUNT(*) as c'))->groupBy('Status')->pluck('c', 'Status');
+            $total = (int) $byStatus->sum();
+            if ($total > 0) {
+                $active = \DB::table('parent_surveys')->where('resort_id', $resortId)
+                    ->whereIn('Status', ['Publish', 'OnGoing'])
+                    ->whereDate('End_date', '>=', $today->toDateString())->count();
+                $closingSoon = \DB::table('parent_surveys')->where('resort_id', $resortId)
+                    ->whereIn('Status', ['Publish', 'OnGoing'])
+                    ->whereDate('End_date', '>=', $today->toDateString())
+                    ->whereDate('End_date', '<=', $today->copy()->addDays(7)->toDateString())->count();
+                $byCadence = \DB::table('parent_surveys')->where('resort_id', $resortId)
+                    ->select('Recurring_survey', \DB::raw('COUNT(*) as c'))->groupBy('Recurring_survey')->pluck('c', 'Recurring_survey');
+                $published = (int) ($byStatus['Publish'] ?? 0); $draft = (int) ($byStatus['SaveAsDraft'] ?? 0);
+                $complete = (int) ($byStatus['Complete'] ?? 0);
+                $insights['activity']['body'] = $total . ' surveys: ' . $published . ' published, ' . $draft . ' draft, ' . $complete . ' complete; ' . $active . ' active, ' . $closingSoon . ' closing within 7 days.';
+                $insights['activity']['details'] = [
+                    'total' => $total, 'by_status' => $byStatus->toArray(), 'active' => $active,
+                    'closing_soon' => $closingSoon, 'cadence' => $byCadence->toArray(),
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 3: Sentiment / score pulse (Rating questions) ----------------
+        try {
+            $ratings = \DB::table('survey_results as r')
+                ->join('survey_questions as q', 'q.id', '=', 'r.Question_id')
+                ->join('parent_surveys as p', 'p.id', '=', 'r.Parent_survey_id')
+                ->where('p.resort_id', $resortId)->where('q.Question_Type', 'Rating')
+                ->whereRaw("r.Emp_Ans REGEXP '^[0-9]+(\\\\.[0-9]+)?$'")
+                ->select('r.Emp_Ans', 'p.Surevey_title')->get();
+            if ($ratings->isNotEmpty()) {
+                $vals = []; $perSurvey = [];
+                foreach ($ratings as $r) {
+                    $v = (float) $r->Emp_Ans; $vals[] = $v;
+                    $perSurvey[$r->Surevey_title ?: 'Untitled'][] = $v;
+                }
+                $avg = round(array_sum($vals) / count($vals), 2);
+                $fav = count(array_filter($vals, fn ($v) => $v >= 4));
+                $neu = count(array_filter($vals, fn ($v) => $v >= 3 && $v < 4));
+                $unfav = count(array_filter($vals, fn ($v) => $v < 3));
+                $favPct = round($fav / count($vals) * 100, 1);
+                $surveyAvgs = [];
+                foreach ($perSurvey as $title => $vs) $surveyAvgs[] = ['survey' => $title, 'avg' => round(array_sum($vs) / count($vs), 2), 'responses' => count($vs)];
+                usort($surveyAvgs, fn ($a, $b) => $b['avg'] <=> $a['avg']);
+                $best = $surveyAvgs[0] ?? null; $worst = end($surveyAvgs) ?: null;
+                $bw = ($best && $worst && $best['survey'] !== $worst['survey']) ? ' Best: "' . $best['survey'] . '" (' . $best['avg'] . '); worst: "' . $worst['survey'] . '" (' . $worst['avg'] . ').' : '';
+                $insights['sentiment']['body'] = 'Avg rating ' . $avg . '/5 across ' . count($vals) . ' responses; ' . $favPct . '% favourable.' . $bw;
+                $insights['sentiment']['details'] = [
+                    'avg' => $avg, 'favourable' => $fav, 'neutral' => $neu, 'unfavourable' => $unfav, 'total' => count($vals),
+                    'surveys' => $surveyAvgs,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        // --- Card 4: Answer hotspots (choice questions) ------------------------
+        try {
+            $choices = \DB::table('survey_results as r')
+                ->join('survey_questions as q', 'q.id', '=', 'r.Question_id')
+                ->join('parent_surveys as p', 'p.id', '=', 'r.Parent_survey_id')
+                ->where('p.resort_id', $resortId)->whereIn('q.Question_Type', ['Single-Choice', 'Multi-Choice'])
+                ->whereNotNull('r.Emp_Ans')->where('r.Emp_Ans', '!=', '')
+                ->select('r.Emp_Ans', \DB::raw('COUNT(*) as c'))->groupBy('r.Emp_Ans')
+                ->orderByDesc('c')->limit(15)->get();
+            if ($choices->isNotEmpty()) {
+                $rows = $choices->map(fn ($r) => ['answer' => $r->Emp_Ans, 'count' => (int) $r->c])->all();
+                $top = $rows[0];
+                $insights['hotspots']['body'] = 'Most common answer: "' . $top['answer'] . '" (' . $top['count'] . ') across ' . count($rows) . ' answer options.';
+                $insights['hotspots']['details'] = ['rows' => $rows];
+            }
+        } catch (\Throwable $e) {}
+
+        // Narrate the deterministic numbers via the FastAPI LLM (best-effort).
+        $insights = \App\Helpers\Common::enrichDashboardInsights(
+            $insights, 'employee survey & engagement', ['participation', 'activity', 'sentiment', 'hotspots']
+        );
+
+        return $insights;
     }
 
    
