@@ -61,23 +61,34 @@
                     data-parsley-maxlength-message="Description cannot exceed 250 characters"></textarea>
             </div>
 
-            <!-- Select Database Table -->
-            <div class="col-md-6 form-group mb-3">
-                <label for="table_name">Select Database Table <span class="req_span">*</span></label>
+            <!-- Select Module -->
+            <div class="col-md-3 form-group mb-3">
+                <label for="module_name">Select Module <span class="req_span">*</span></label>
                 <select class="form-control"
-                    id="table_name"
-                    name="table_name"
+                    id="module_name"
                     required
                     data-parsley-required
-                    data-parsley-required-message="Please select a table"
-                    data-parsley-errors-container="#error-msg">
-                    <option value="">Select a table</option>
-                    @foreach($tables as $table)
-                        @foreach($table as $key => $value)
-                            <option value="{{ $value }}">{{ ucfirst(str_replace('_', ' ', $value)) }}</option>
-                        @endforeach
+                    data-parsley-required-message="Please select a module">
+                    <option value="">Select a module</option>
+                    @foreach($catalog as $module => $entities)
+                        <option value="{{ $module }}">{{ $module }}</option>
                     @endforeach
                 </select>
+            </div>
+
+            <!-- Select Entity (within the module) -->
+            <div class="col-md-3 form-group mb-3">
+                <label for="entity_name">Select Data <span class="req_span">*</span></label>
+                <select class="form-control"
+                    id="entity_name"
+                    required
+                    data-parsley-required
+                    data-parsley-required-message="Please select what to report on"
+                    data-parsley-errors-container="#error-msg">
+                    <option value="">Select a module first</option>
+                </select>
+                {{-- The resolved real table name is carried here for the controller. --}}
+                <input type="hidden" id="table_name" name="table_name" value="">
                 <div id="error-msg" class="text-danger mt-1"></div>
             </div>
 
@@ -165,12 +176,41 @@
         });
      
         $('#report-create-form').parsley();
-        $("#table_name").select2({
-            placeholder: "Select a Table"
-        })
-        $(document).on('change', '#table_name', function(){
+
+        // Module -> Entity catalog (friendly names -> real table). HR never
+        // sees a table name; selecting an Entity resolves to its table.
+        const reportCatalog = @json($catalog);
+
+        $("#module_name, #entity_name").select2({ placeholder: "Select..." });
+
+        // Populate the Entity dropdown when a Module is chosen.
+        $(document).on('change', '#module_name', function(){
+            const entities = reportCatalog[$(this).val()] || {};
+            let opts = '<option value="">Select data</option>';
+            $.each(entities, function(label, table){
+                opts += `<option value="${table}">${label}</option>`;
+            });
+            $('#entity_name').html(opts).val('').trigger('change.select2');
+            $('#table_name').val('');
+            $('#columns-container').html('<p>Please select data first</p>');
+            $('#columns-ForeignKeyscontainer').html('');
+            $('#add-filter').hide();
+        });
+
+        // Selecting an Entity sets the resolved table and loads its columns.
+        $(document).on('change', '#entity_name', function(){
             const tableName = $(this).val();
+            $('#table_name').val(tableName);
             if (tableName) {
+                loadColumns(tableName);
+            } else {
+                $('#columns-container').html('<p>Please select data first</p>');
+                $('#columns-ForeignKeyscontainer').html('');
+                $('#add-filter').hide();
+            }
+        });
+
+        function loadColumns(tableName) {
                 $.ajax({
                     url: '{{ route("resort.reports.get-columns") }}',
                     method: 'GET',
@@ -270,13 +310,8 @@
                         $('#columns-ForeignKeyscontainer').html('');
                     }
                 });
-            } else {
-                $('#columns-container').html('<p>Please select a table first</p>');
-                $('#columns-ForeignKeyscontainer').html('');
-                $('#add-filter').hide();
-            }
-        });
-        
+        }
+
         let filterCount = 0;
         $('#add-filter').click(function() {
             const filterHtml = `

@@ -58,8 +58,43 @@ class ReportController extends Controller
             return abort(403, 'Unauthorized access');
          }
          $page_title = 'Create Report';
-        $tables = DB::select('SHOW TABLES');
-        return view('resorts.reports.create', compact('tables', 'page_title'));
+        // HR picks by Module -> Entity (friendly names), never raw table names.
+        // The catalog below is the curated, module-based vocabulary.
+        $catalog = $this->reportCatalog();
+        return view('resorts.reports.create', compact('catalog', 'page_title'));
+    }
+
+    /**
+     * The module-based report catalog, filtered to entities whose table
+     * actually exists in this database. Shape: [ Module => [ Entity => table ] ].
+     * This doubles as the security allow-list of report-able tables.
+     */
+    private function reportCatalog(): array
+    {
+        $catalog = [];
+        foreach ((array) config('report_catalog', []) as $module => $entities) {
+            foreach ((array) $entities as $label => $table) {
+                if (Schema::hasTable($table)) {
+                    $catalog[$module][$label] = $table;
+                }
+            }
+        }
+        return $catalog;
+    }
+
+    /**
+     * Flat list of every table the report builder is allowed to touch.
+     * Anything not in here is rejected by getTableColumns()/store().
+     */
+    private function allowedReportTables(): array
+    {
+        $tables = [];
+        foreach ($this->reportCatalog() as $entities) {
+            foreach ($entities as $table) {
+                $tables[$table] = true;
+            }
+        }
+        return array_keys($tables);
     }
     public function store(Request $request)
     {
@@ -74,6 +109,11 @@ class ReportController extends Controller
             'from_date' => 'nullable|date_format:Y-m-d',
             'to_date' => 'nullable|date_format:Y-m-d',
         ]);
+
+        // Reject any table not exposed through the module catalog.
+        if (!in_array($validated['table_name'], $this->allowedReportTables(), true)) {
+            return response()->json(['success' => false, 'message' => 'That data source is not available for reporting.'], 422);
+        }
 
         $relationTables = [];
         if (!empty($validated['related_columns'])) 
@@ -272,6 +312,10 @@ class ReportController extends Controller
     public function getTableColumns(Request $request)
     {
         $tableName = $request->input('table');
+        // Only expose columns for tables in the curated catalog allow-list.
+        if (!in_array($tableName, $this->allowedReportTables(), true)) {
+            return response()->json(['data' => ['parent_columns' => [], 'related_tables' => []]]);
+        }
         $columns = collect(DB::getSchemaBuilder()->getColumnListing($tableName))->sort()->values();
         $foreignKeys = $this->getTableForeignKeys($tableName);
         
