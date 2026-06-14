@@ -484,7 +484,7 @@
         </div>
     </div>
 </div>
-@includeWhen(isset($surveyInsights), 'resorts.survey.dashboard._insight_modals')
+@includeWhen(isset($surveyInsights), 'resorts.Survey.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
