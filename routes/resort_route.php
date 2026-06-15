@@ -1404,6 +1404,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       //  Xpact Sync
       Route::get('visa/xpact-sync', 'Visa\FetchDataAiController@index')->name('resort.visa.XpactSync');
       Route::post('visa/store', 'Visa\FetchDataAiController@store')->name('resorts.visa.xpactsync.store');
+      Route::get('visa/xpact-sync/status/{id}', 'Visa\FetchDataAiController@syncStatus')->name('resorts.visa.xpactsync.status');
 
       //  Visa Expiry page
 

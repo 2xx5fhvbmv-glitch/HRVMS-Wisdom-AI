@@ -75,7 +75,14 @@ class FetchDataAiController extends Controller
         */
 
         $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
+        $resortId = $this->resort->resort_id;
 
+        // The heavy OCR/LLM extraction is wrapped in this closure so it can run
+        // AFTER the HTTP response is sent (see app()->terminating below). The
+        // browser receives an instant job id and polls for the result, so it
+        // never waits on the slow extraction and can't hit the 50s proxy
+        // timeout. Closures auto-bind $this, so $this->resort still works here.
+        $work = function () use ($Xpatfile, $request, $ResortBudgetCost) : \Illuminate\Http\JsonResponse {
         if(isset($Xpatfile))
         {
             $xpat_sync = env('AI_extract_work_details_URL').'xpat_sync';
@@ -200,21 +207,31 @@ class FetchDataAiController extends Controller
                         $workPermitAmt=0.00;
                         $workPermitMedicalAmt=0.00;
                         $visaAmt=0.00;
-                        if($AI_Data['extracted_fields']['Visa Issued Date'])
+
+                        // AI can return the envelope without an
+                        // extracted_fields sub-array (or with it null) on
+                        // empty/unreadable scans. Normalise to an array so the
+                        // direct key lookups below never hit "Trying to access
+                        // array offset on value of type null".
+                        $fields = (isset($AI_Data['extracted_fields']) && is_array($AI_Data['extracted_fields']))
+                            ? $AI_Data['extracted_fields']
+                            : [];
+
+                        if(!empty($fields['Visa Issued Date']))
                         {
                             $visaAmtCost =  $ResortBudgetCost['VISA FEE'] ?? null;
 
                             VisaRenewal::create([
                                 'resort_id' => $this->resort->resort_id,
                                 'employee_id' => $employee->id,
-                                'WP_No'=> $AI_Data['extracted_fields']['Work Permit Number'] ?? null,
-                                'start_date' => Carbon::parse($AI_Data['extracted_fields']['Visa Issued Date'])->format('Y-m-d'),
-                                'end_date' => Carbon::parse($AI_Data['extracted_fields']['Visa Expiry Date'])->format('Y-m-d'),
+                                'WP_No'=> $fields['Work Permit Number'] ?? null,
+                                'start_date' => Carbon::parse($fields['Visa Issued Date'])->format('Y-m-d'),
+                                'end_date' => Carbon::parse($fields['Visa Expiry Date'] ?? null)->format('Y-m-d'),
                                 'Amt' => $visaAmtCost['amount'] ?? 0.00,
                             ]);
                             $visaAmt = $visaAmtCost['amount'] ?? 0.00;
                         }
-                        if($AI_Data['extracted_fields']['Insurance Expiry Date'])
+                        if(!empty($fields['Insurance Expiry Date']))
                         {
                             $medical_data =  $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
 
@@ -223,19 +240,18 @@ class FetchDataAiController extends Controller
                                 'employee_id' => $employee->id,
                                 'Premium' => $medical_data['amount'] ?? 0.00,
                                 "Currency"=> $medical_data['unit'] ?? null,
-                                'insurance_start_date' => Carbon::parse($AI_Data['extracted_fields']['Insurance Expiry Date'])->format('Y-m-d'),
-                                'insurance_end_date' => Carbon::parse($AI_Data['extracted_fields']['Insurance Expiry Date'])->format('Y-m-d'),
+                                'insurance_start_date' => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
+                                'insurance_end_date' => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
                             ]);
 
-                             $insuranceAmt=$medical_data['amount'];
+                             $insuranceAmt=$medical_data['amount'] ?? 0.00;
                         }
 
                         $monthlyEntries = [];
-                        if (!empty($AI_Data['extracted_fields']['Work Permit Expiry Date (Expiry On)'])) 
+                        if (!empty($fields['Work Permit Expiry Date (Expiry On)']))
                         {
                              $Work_permit_cost =  $ResortBudgetCost['WORK PERMIT FEE'] ?? null;
-dd($Work_permit_cost);
-                            $expiryDate = Carbon::parse($AI_Data['extracted_fields']['Work Permit Expiry Date (Expiry On)'])->endOfMonth(); // e.g., 2025-05-31
+                            $expiryDate = Carbon::parse($fields['Work Permit Expiry Date (Expiry On)'])->endOfMonth(); // e.g., 2025-05-31
 
                             $totalMonths = $joiningDate->diffInMonths($endMonth) + 1;
                             $totalCost = $Work_permit_cost['amount'] ?? 0.00;
@@ -262,7 +278,6 @@ dd($Work_permit_cost);
                                         ];
                             }
 
-                            dd( $monthlyEntries);
                             WorkPermit::insert($monthlyEntries);
                         }
 
@@ -270,10 +285,10 @@ dd($Work_permit_cost);
                                 ->filter(fn($entry) => $entry['Month'] === '12')
                                 ->last()['Due_Date'] ?? null;
                  
-                        if($AI_Data['extracted_fields']['Insurance Expiry Date'])
+                        if(!empty($fields['Insurance Expiry Date']))
                         {
 
-                            // Here Work permit 
+                            // Here Work permit
                             $medical_data =  $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'] ?? null;
 
                                 
@@ -289,10 +304,11 @@ dd($Work_permit_cost);
                         }
 
                         //$qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? null;
-                        $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? 0.00;
-                        $Eleven_month_installment= ($qotaslotAMt['amount'] - 174) / 11 ?? 0.00;
+                        $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? [];
+                        $qotaslotDeposit = $qotaslotAMt['amount'] ?? 0.00;
+                        $Eleven_month_installment= ($qotaslotDeposit - 174) / 11;
 
-                        $totalCost = $qotaslotAMt['amount'] ?? 0.00;
+                        $totalCost = $qotaslotDeposit;
                         TotalExpensessSinceJoing::create(['resort_id'=> $this->resort->resort_id,
                                                         'employees_id' => $employee->id,
                                                         'Deposit_Amt' =>   $VisaNationality->amt?? 0.00,
@@ -404,6 +420,54 @@ dd($Work_permit_cost);
                 ], 422);
             }
         }
+
+        // Safety net so the closure always returns a JsonResponse.
+        return response()->json(['success' => false, 'errors' => ['message' => 'Could not process the document.']], 422);
+        };
+
+        // Persist a job row, run the extraction AFTER the response is flushed,
+        // and hand the browser an id to poll. No queue worker required.
+        $job = \App\Models\VisaSyncJob::create(['resort_id' => $resortId, 'status' => 'processing']);
+
+        app()->terminating(function () use ($work, $job) {
+            @set_time_limit(0);
+            try {
+                $data = $work()->getData(true);
+                $job->update([
+                    'status' => !empty($data['success']) ? 'done' : 'failed',
+                    'result' => $data,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::error('Visa xpact-sync job ' . $job->id . ' failed: ' . $e->getMessage());
+                $job->update([
+                    'status' => 'failed',
+                    'result' => ['success' => false, 'errors' => ['message' => 'Extraction failed unexpectedly. Please try again.']],
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success'    => true,
+            'processing' => true,
+            'job_id'     => $job->id,
+            'status_url' => route('resorts.visa.xpactsync.status', $job->id),
+        ], 202);
+    }
+
+    /**
+     * Polled by the Xpat-sync page to get the async extraction result.
+     */
+    public function syncStatus($id)
+    {
+        $job = \App\Models\VisaSyncJob::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$job) {
+            return response()->json(['success' => false, 'errors' => ['message' => 'Job not found']], 404);
+        }
+        return response()->json([
+            'success' => true,
+            'status'  => $job->status,   // processing | done | failed
+            'data'    => $job->result,   // the original {success,msg,errors} payload when finished
+        ]);
     }
 
     

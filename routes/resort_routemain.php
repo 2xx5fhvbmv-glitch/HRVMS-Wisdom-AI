@@ -1205,6 +1205,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
       //  Xpact Sync
       Route::get('Visa/XpactSync', 'Visa\FetchDataAiController@index')->name('resort.visa.XpactSync');
       Route::post('Visa/store', 'Visa\FetchDataAiController@store')->name('resorts.visa.xpactsync.store');
+      Route::get('Visa/xpact-sync/status/{id}', 'Visa\FetchDataAiController@syncStatus')->name('resorts.visa.xpactsync.status');
       
       //  Visa Expiry page 
       
