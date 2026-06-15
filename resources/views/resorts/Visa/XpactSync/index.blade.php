@@ -227,9 +227,51 @@
         reader.readAsDataURL(file);
     });
 
+    // Reset the Submit button back to its idle state.
+    function restoreXpatSubmit() {
+        $(".SubmitFile").removeClass('btn-danger').addClass('btn-themeBlue')
+                        .html('Submit').attr('data-processing', 'false');
+    }
+
+    // The upload now returns instantly with a job id; the extraction runs in the
+    // background on the server. Poll the status endpoint until it's done/failed
+    // so the page never waits on the slow OCR (and can't hit the 50s timeout).
+    function pollXpatSync(statusUrl) {
+        var tries = 0, maxTries = 160; // ~8 min ceiling at 3s
+        var iv = setInterval(function () {
+            tries++;
+            $.ajax({ url: statusUrl, type: 'GET' })
+              .done(function (res) {
+                  if (res && res.status === 'processing') {
+                      if (tries >= maxTries) {
+                          clearInterval(iv); $(window).off('beforeunload'); restoreXpatSubmit();
+                          toastr.error("Still processing — please check back shortly.", "Timeout",
+                              { positionClass: 'toast-bottom-right' });
+                      }
+                      return; // keep waiting
+                  }
+                  clearInterval(iv);
+                  $(window).off('beforeunload');
+                  var d = (res && res.data) ? res.data : {};
+                  if (d.success) {
+                      toastr.success(d.msg || 'Completed successfully.', "Success",
+                          { positionClass: 'toast-bottom-right' });
+                  } else {
+                      var msg = (d.errors && d.errors.message) ? d.errors.message : (d.msg || 'Extraction failed.');
+                      toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+                  }
+                  restoreXpatSubmit();
+              })
+              .fail(function () {
+                  // transient network blip — keep polling until the ceiling
+                  if (tries >= maxTries) { clearInterval(iv); $(window).off('beforeunload'); restoreXpatSubmit(); }
+              });
+        }, 3000);
+    }
+
     $('#XpatSyncForm').on('submit', function(e) {
         e.preventDefault();
-        if ($(this).parsley().isValid()) 
+        if ($(this).parsley().isValid())
         {
             $(".SubmitFile").addClass('btn-danger').removeClass('btn-themeBlue')
                    .html("Please Wait AI Insights is Working Don't Refresh Page")
@@ -253,27 +295,26 @@
             contentType: false,
             processData: false,
             success: function(response) {
-                // Remove beforeunload event when processing is complete
+                // Async path: the server accepted the upload and is processing
+                // it in the background — poll for the result instead of waiting.
+                if (response && response.processing && response.job_id) {
+                    var statusUrl = response.status_url
+                        || ("{{ url('resort/visa/xpact-sync/status') }}/" + response.job_id);
+                    pollXpatSync(statusUrl);
+                    return;
+                }
+
+                // Fallback: synchronous response (kept for safety).
                 $(window).off('beforeunload');
-                
-                if (response.success) 
+                if (response.success)
                 {
-                toastr.success(response.msg, "Success", {
-                    positionClass: 'toast-bottom-right'
-                });
-                // Restore original button state
-                $(".SubmitFile").removeClass('btn-danger').addClass('btn-themeBlue')
-                           .html('Submit').attr('data-processing', 'false');
-                } 
+                    toastr.success(response.msg, "Success", { positionClass: 'toast-bottom-right' });
+                }
                 else
                 {
-                toastr.error(response.msg, "Success", 
-                {
-                    positionClass: 'toast-bottom-right'
-                });
-                $(".SubmitFile").removeClass('btn-danger').addClass('btn-themeBlue')
-                           .html('Submit').attr('data-processing', 'false');
+                    toastr.error(response.msg, "Error", { positionClass: 'toast-bottom-right' });
                 }
+                restoreXpatSubmit();
             },
             error: function(response) {
                 // Remove beforeunload event when processing is complete
