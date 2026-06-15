@@ -37,6 +37,11 @@
                                         <h3>{{ $page_title }}</h3>
                                     </div>
                                 </div>
+                                <div class="col-auto">
+                                    <div class="d-flex justify-content-end align-items-center">
+                                        <input type="text" id="NationalitySearch" class="form-control" placeholder="Search nationality...">
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -81,12 +86,23 @@ $(document).ready(function(){
         ajax: {
             url: '{{ route("resort.visa.NationalityIndex") }}',
             type: 'GET',
+            data: function (d) {
+                d.search_text = $('#NationalitySearch').val();
+            }
         },
         columns: [
             { data: 'nationality', name: 'nationality', className: 'text-nowrap' },
             { data: 'Amount', name: 'Amount', className: 'text-nowrap' },
             { data: 'Action', name: 'Action', orderable: false, searchable: false }
         ]
+    });
+
+    var nationalitySearchTimer;
+    $('#NationalitySearch').on('keyup', function () {
+        clearTimeout(nationalitySearchTimer);
+        nationalitySearchTimer = setTimeout(function () {
+            hiringsource.ajax.reload();
+        }, 400);
     });
 
 });
