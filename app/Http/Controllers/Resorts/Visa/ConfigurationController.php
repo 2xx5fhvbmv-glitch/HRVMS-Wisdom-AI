@@ -144,9 +144,17 @@ class ConfigurationController extends Controller
     }
     public function NationalityIndex(Request $request)
     {
-        $nationalitydata = VisaNationality::where('resort_id', $this->resort->resort_id)->orderBy('id','desc')->get();
+        $nationalitydata = VisaNationality::where('resort_id', $this->resort->resort_id)
+            ->when($request->filled('search_text'), function ($query) use ($request) {
+                $search = $request->input('search_text');
+                $query->where(function ($q) use ($search) {
+                    $q->where('nationality', 'like', "%{$search}%")
+                      ->orWhere('amt', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('id','desc')->get();
 
-        if ($request->ajax()) 
+        if ($request->ajax())
         {
             return datatables()->of($nationalitydata)
                 ->editColumn('nationality', function ($row) 
