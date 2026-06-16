@@ -150,7 +150,12 @@ class FetchDataAiController extends Controller
             return response()->json(['success' => true, 'status' => 'processing', 'data' => null]);
         }
 
-        $payload = $this->finalizeXpactSync((int) $job->resort_id, $xpat, $quota);
+        try {
+            $payload = $this->finalizeXpactSync((int) $job->resort_id, $xpat, $quota);
+        } catch (\Throwable $e) {
+            \Log::error('Visa xpact-sync finalize crashed: ' . $e->getMessage(), ['job' => $job->id]);
+            $payload = ['success' => false, 'errors' => ['message' => 'Could not save the extracted details. Please verify the document and try again.']];
+        }
         $job->update(['status' => !empty($payload['success']) ? 'done' : 'failed', 'result' => $payload]);
 
         return response()->json(['success' => true, 'status' => $job->status, 'data' => $payload]);
@@ -225,6 +230,27 @@ class FetchDataAiController extends Controller
     }
 
     /**
+     * The OCR/LLM returns placeholder strings ("Unavailable", "N/A", …) for
+     * fields it couldn't read. Treat those as "no value" so we never feed them
+     * to Carbon::parse() (which throws) or store them as real data.
+     */
+    private function aiPlaceholder($v): bool
+    {
+        return in_array(strtolower(trim((string) $v)), ['', 'unavailable', 'n/a', 'na', 'none', 'null', 'not found', 'not available', '-'], true);
+    }
+
+    /** Parse an AI date field to a Carbon instance, or null for placeholders/garbage. */
+    private function aiDate($v): ?\Carbon\Carbon
+    {
+        if ($this->aiPlaceholder($v)) return null;
+        try {
+            return Carbon::parse($v);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * Persist the renewal records once both extractions are ready. The OCR
      * results now arrive via the async AI tasks (passed in) instead of inline
      * cURL — the rest mirrors the original synchronous save logic. Returns the
@@ -264,36 +290,40 @@ class FetchDataAiController extends Controller
         $endMonth = Carbon::create($joiningDate->year, 12, 1);
         $insuranceAmt = 0.00; $workPermitAmt = 0.00; $workPermitMedicalAmt = 0.00; $visaAmt = 0.00;
 
-        if (!empty($fields['Visa Issued Date'])) {
+        $visaIssued = $this->aiDate($fields['Visa Issued Date'] ?? null);
+        if ($visaIssued) {
+            $visaExpiry = $this->aiDate($fields['Visa Expiry Date'] ?? null);
             $visaAmtCost = $ResortBudgetCost['VISA FEE'] ?? null;
             VisaRenewal::create([
                 'resort_id'   => $resortId,
                 'employee_id' => $employee->id,
                 'WP_No'       => $fields['Work Permit Number'] ?? null,
-                'start_date'  => Carbon::parse($fields['Visa Issued Date'])->format('Y-m-d'),
-                'end_date'    => Carbon::parse($fields['Visa Expiry Date'] ?? null)->format('Y-m-d'),
+                'start_date'  => $visaIssued->format('Y-m-d'),
+                'end_date'    => $visaExpiry ? $visaExpiry->format('Y-m-d') : null,
                 'Amt'         => $visaAmtCost['amount'] ?? 0.00,
             ]);
             $visaAmt = $visaAmtCost['amount'] ?? 0.00;
         }
 
-        if (!empty($fields['Insurance Expiry Date'])) {
+        $insuranceExpiry = $this->aiDate($fields['Insurance Expiry Date'] ?? null);
+        if ($insuranceExpiry) {
             $medical_data = $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
             EmployeeInsurance::create([
                 'resort_id'            => $resortId,
                 'employee_id'          => $employee->id,
                 'Premium'              => $medical_data['amount'] ?? 0.00,
                 'Currency'             => $medical_data['unit'] ?? null,
-                'insurance_start_date' => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
-                'insurance_end_date'   => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
+                'insurance_start_date' => $insuranceExpiry->format('Y-m-d'),
+                'insurance_end_date'   => $insuranceExpiry->format('Y-m-d'),
             ]);
             $insuranceAmt = $medical_data['amount'] ?? 0.00;
         }
 
         $monthlyEntries = [];
-        if (!empty($fields['Work Permit Expiry Date (Expiry On)'])) {
+        $wpExpiry = $this->aiDate($fields['Work Permit Expiry Date (Expiry On)'] ?? null);
+        if ($wpExpiry) {
             $Work_permit_cost = $ResortBudgetCost['WORK PERMIT FEE'] ?? null;
-            $expiryDate = Carbon::parse($fields['Work Permit Expiry Date (Expiry On)'])->endOfMonth();
+            $expiryDate = $wpExpiry->copy()->endOfMonth();
             $totalMonths = $joiningDate->diffInMonths($endMonth) + 1;
             $totalCost = $Work_permit_cost['amount'] ?? 0.00;
             $monthlyCost = $totalMonths > 0 ? round($totalCost / $totalMonths, 2) : 0.00;
@@ -320,7 +350,7 @@ class FetchDataAiController extends Controller
 
         $lastDueDateForDecember = collect($monthlyEntries)->filter(fn ($e) => $e['Month'] === '12')->last()['Due_Date'] ?? null;
 
-        if (!empty($fields['Insurance Expiry Date'])) {
+        if ($insuranceExpiry && $lastDueDateForDecember) {
             $medical_data = $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'] ?? null;
             WorkPermitMedicalRenewal::create([
                 'resort_id'   => $resortId,
@@ -365,9 +395,10 @@ class FetchDataAiController extends Controller
             foreach ($quotaRows as $key => $value) {
                 $amt = ($key == 0) ? 174 : $Eleven_month_installment;
                 $status = (($value['State'] ?? '') === 'FULLY PAID') ? 'Paid' : 'Unpaid';
+                $dueDate = $this->aiDate($value['DatePaymentDueOn'] ?? null);
                 QuotaSlotRenewal::create([
                     'resort_id'   => $resortId,
-                    'Due_Date'    => $value['DatePaymentDueOn'] ?? null,
+                    'Due_Date'    => $dueDate ? $dueDate->format('Y-m-d') : null,
                     'employee_id' => $employee->id,
                     'Month'       => $value['Month'] ?? null,
                     'Currency'    => 'MVR',
