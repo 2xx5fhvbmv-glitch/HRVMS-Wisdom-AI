@@ -237,7 +237,7 @@
     // background on the server. Poll the status endpoint until it's done/failed
     // so the page never waits on the slow OCR (and can't hit the 50s timeout).
     function pollXpatSync(statusUrl) {
-        var tries = 0, maxTries = 160; // ~8 min ceiling at 3s
+        var tries = 0, maxTries = 24; // ~12 min ceiling at 30s
         var iv = setInterval(function () {
             tries++;
             $.ajax({ url: statusUrl, type: 'GET' })
@@ -256,6 +256,12 @@
                   if (d.success) {
                       toastr.success(d.msg || 'Completed successfully.', "Success",
                           { positionClass: 'toast-bottom-right' });
+                      // Redirect to verify-details, pre-filtered to the employee
+                      // whose documents were just updated.
+                      var verifyUrl = "{{ route('resort.visa.VerifyDetails') }}";
+                      if (d.employee) { verifyUrl += '?search=' + encodeURIComponent(d.employee); }
+                      setTimeout(function () { window.location.href = verifyUrl; }, 1200);
+                      return; // navigating away — don't restore the button
                   } else {
                       var msg = (d.errors && d.errors.message) ? d.errors.message : (d.msg || 'Extraction failed.');
                       toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
@@ -266,7 +272,7 @@
                   // transient network blip — keep polling until the ceiling
                   if (tries >= maxTries) { clearInterval(iv); $(window).off('beforeunload'); restoreXpatSubmit(); }
               });
-        }, 3000);
+        }, 30000); // poll every 30s to avoid hammering the status endpoint
     }
 
     $('#XpatSyncForm').on('submit', function(e) {

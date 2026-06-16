@@ -101,6 +101,41 @@
             </div>
         </div>
    </div>
+
+   {{-- Per-column edit (Work Permit / Slot / Visa / Insurance): amount + expiry + status --}}
+   <div class="modal fade" id="ExpiryEdit-modal" tabindex="-1" aria-hidden="true">
+       <div class="modal-dialog modal-dialog-centered">
+           <div class="modal-content">
+               <div class="modal-header">
+                   <h5 class="modal-title">Edit <span id="ExpiryEdit_typeLabel"></span></h5>
+                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+               </div>
+               <form id="ExpiryEditForm" data-parsley-validate>
+                   @csrf
+                   <div class="modal-body">
+                       <input type="hidden" name="type" id="ExpiryEdit_type">
+                       <input type="hidden" name="id" id="ExpiryEdit_id">
+                       <div class="form-group mb-3">
+                           <label class="form-label">Amount (MVR)</label>
+                           <input type="number" step="0.01" min="0" name="amount" id="ExpiryEdit_amount" class="form-control" placeholder="0.00">
+                       </div>
+                       <div class="form-group mb-3">
+                           <label class="form-label">Expiry / Due Date</label>
+                           <input type="date" name="expiry_date" id="ExpiryEdit_date" class="form-control">
+                       </div>
+                       <div class="form-group mb-3" id="ExpiryEdit_statusWrap" style="display:none;">
+                           <label class="form-label d-block">Status</label>
+                           <div id="ExpiryEdit_statusOptions"></div>
+                       </div>
+                   </div>
+                   <div class="modal-footer">
+                       <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                       <button type="submit" class="btn btn-themeBlue">Save</button>
+                   </div>
+               </form>
+           </div>
+       </div>
+   </div>
 @endsection
 
 @section('import-css')
@@ -109,8 +144,12 @@
 @section('import-scripts')
 <script>
 
-$(document).ready(function() 
+$(document).ready(function()
 {
+    // When arriving from the Xpat-sync flow, pre-filter to the employee whose
+    // documents were just updated (?search=<name>).
+    var _preSearch = new URLSearchParams(window.location.search).get('search');
+    if (_preSearch) { $('.Search').val(_preSearch); }
     FetchIndexDate();
     $("#datepickerXpact").datepicker({
         format: 'yyyy-mm-dd',
@@ -141,7 +180,66 @@ $(document).ready(function()
         var id = $(this).data('id');
         $("#ExpiryUpdate-modal").modal('show');
     });
-    
+
+    // --- Per-column edit (amount + expiry + status) ----------------------
+    var EXPIRY_STATUS_OPTS = {
+        visa: ['Pending', 'Paid'],
+        work_permit: ['Paid', 'Unpaid'],
+        slot: ['Paid', 'Unpaid'],
+        insurance: []
+    };
+    var EXPIRY_TYPE_LABEL = { visa: 'Visa', work_permit: 'Work Permit', slot: 'Slot Payment', insurance: 'Insurance' };
+
+    $(document).on('click', '.EditExpiry', function () {
+        var type = $(this).data('type');
+        $('#ExpiryEdit_type').val(type);
+        $('#ExpiryEdit_id').val($(this).data('id'));
+        $('#ExpiryEdit_amount').val($(this).data('amount'));
+        $('#ExpiryEdit_date').val($(this).data('date'));
+        $('#ExpiryEdit_typeLabel').text(EXPIRY_TYPE_LABEL[type] || '');
+
+        var opts = EXPIRY_STATUS_OPTS[type] || [];
+        var cur = String($(this).data('status') || '');
+        if (opts.length) {
+            var html = '';
+            opts.forEach(function (o) {
+                html += '<div class="form-check form-check-inline">'
+                      + '<input type="radio" class="form-check-input" name="status" id="ExpEdit_st_' + o + '" value="' + o + '" ' + (cur === o ? 'checked' : '') + '>'
+                      + '<label class="form-check-label" for="ExpEdit_st_' + o + '">' + o + '</label></div>';
+            });
+            $('#ExpiryEdit_statusOptions').html(html);
+            $('#ExpiryEdit_statusWrap').show();
+        } else {
+            $('#ExpiryEdit_statusOptions').html('');
+            $('#ExpiryEdit_statusWrap').hide();
+        }
+        $('#ExpiryEdit-modal').modal('show');
+    });
+
+    $(document).on('submit', '#ExpiryEditForm', function (e) {
+        e.preventDefault();
+        var $btn = $(this).find('button[type=submit]');
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: "{{ route('resort.visa.UpdateExpiryRecord') }}",
+            type: 'POST',
+            data: $(this).serialize()
+        }).done(function (res) {
+            $('#ExpiryEdit-modal').modal('hide');
+            if (res && res.success) {
+                toastr.success(res.msg || 'Updated.', 'Success', { positionClass: 'toast-bottom-right' });
+                FetchIndexDate($('.Categories.active').data('flag') || 'all');
+            } else {
+                var m = (res && res.errors && res.errors.message) ? res.errors.message : 'Update failed.';
+                toastr.error(m, 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        }).fail(function (xhr) {
+            $('#ExpiryEdit-modal').modal('hide');
+            var m = 'Update failed.';
+            try { m = xhr.responseJSON.errors.message || xhr.responseJSON.message || m; } catch (e) {}
+            toastr.error(m, 'Error', { positionClass: 'toast-bottom-right' });
+        }).always(function () { $btn.prop('disabled', false); });
+    });
 
 });
 

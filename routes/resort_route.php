@@ -70,6 +70,16 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     /*** Logout ***/
     Route::get( '/logout', ['App\Http\Controllers\Resorts\ResortLoginController','logout'] )->name('resort.logout');
 
+    /*** Wisdom AI chatbot — available to any logged-in resort user; the
+     *   controller/WisdomAccess enforces the three-tier access model.
+     *   Page-permission middleware is skipped (these are widget endpoints,
+     *   not menu pages). ***/
+    Route::withoutMiddleware('checkResortPermission')->group(function () {
+        Route::post('/wisdom-ai/chat', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'chat'])->name('resort.wisdom.chat');
+        Route::get('/wisdom-ai/history', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'history'])->name('resort.wisdom.history');
+        Route::post('/wisdom-ai/clear', [\App\Http\Controllers\Resorts\WisdomChatController::class, 'clear'])->name('resort.wisdom.clear');
+    });
+
     /*** Notifications ***/
     Route::middleware('redirectIfNotCorrect.dashboard')->group(function () {
       Route::get('workforce-planning/hr-dashboard', 'WorkforcePlanningDashboardController@hr_dashboard')->name('resort.workforceplan.dashboard');
@@ -1383,6 +1393,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     // VerifyDetails
 
      Route::get('visa/verify-details','Visa\RenewalController@VerifyDetails')->name('resort.visa.VerifyDetails');
+     Route::post('visa/verify-details/update','Visa\RenewalController@UpdateExpiryRecord')->name('resort.visa.UpdateExpiryRecord');
 
 
       // Visa Dashboard Routes

@@ -68,6 +68,9 @@
             $user_id =  isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->id : '' ;
             print_r(Common::ResortNotification($user_id,$resort_id));
         @endphp
-        
+
     </div>
 </div>
+
+{{-- Wisdom AI — floating HR assistant (self-gates by access tier) --}}
+@include('resorts.partials.wisdom-chat')

@@ -1182,6 +1182,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     // VerifyDetails
 
      Route::get('Visa/VerifyDetails','Visa\RenewalController@VerifyDetails')->name('resort.visa.VerifyDetails');
+     Route::post('Visa/VerifyDetails/update','Visa\RenewalController@UpdateExpiryRecord')->name('resort.visa.UpdateExpiryRecord');
       
 
       
