@@ -16,9 +16,11 @@ use Carbon\Carbon;
 use App\Models\WorkPermit;
 use App\Models\VisaNationality;
 use App\Models\TotalExpensessSinceJoing;
+use App\Models\VisaSyncJob;
+
 class FetchDataAiController extends Controller
 {
-    
+
     protected $resort;
     protected $underEmp_id=[];
 
@@ -33,23 +35,27 @@ class FetchDataAiController extends Controller
             }
         }
     }
+
     public function index()
     {
         $page_title = 'Xpat Sync';
-        return view('resorts.Visa.XpactSync.index',compact('page_title'));  
+        return view('resorts.Visa.XpactSync.index',compact('page_title'));
     }
 
+    /**
+     * Kick off the extraction. The heavy OCR/LLM runs ASYNCHRONOUSLY on the AI
+     * server (it returns a task id instantly), so this request finishes well
+     * under the web timeout — no queue worker / cron needed on the web host.
+     * The browser polls syncStatus(), which checks the AI tasks and, once both
+     * are ready, performs the (fast) DB saves.
+     */
     public function store(Request $request)
     {
-        $Xpatfile = $request->file('Xpatfile');
+        $Xpatfile  = $request->file('Xpatfile');
+        $quotaFile = $request->file('QuotaSlotFees');
 
-        // Validate uploads BEFORE hitting the AI extraction service. An empty
-        // (0-byte) or non-PDF upload — e.g. a file whose body never finished
-        // uploading — previously got shipped to the OCR service, which stalled
-        // until the 50 s timeout and surfaced as an opaque "service did not
-        // respond" error. Fail fast with a clear message instead.
         $validatePdf = function ($file, string $label) {
-            if (!$file) return null; // absent is handled by the existing branches
+            if (!$file) return null;
             if (!$file->isValid() || !$file->getSize()) {
                 return "The {$label} is empty or could not be read. Please re-select the file and try again.";
             }
@@ -64,387 +70,36 @@ class FetchDataAiController extends Controller
         if ($validationError = $validatePdf($Xpatfile, 'Xpat document')) {
             return response()->json(['success' => false, 'errors' => ['message' => $validationError]], 422);
         }
-        if ($validationError = $validatePdf($request->file('QuotaSlotFees'), 'Quota slot fees document')) {
+        if ($validationError = $validatePdf($quotaFile, 'Quota slot fees document')) {
             return response()->json(['success' => false, 'errors' => ['message' => $validationError]], 422);
         }
+        if (!$Xpatfile) {
+            return response()->json(['success' => false, 'errors' => ['message' => 'Xpact File is Missing']], 422);
+        }
 
-        /*
-            Visa renewal cost
-            Work permit medical renewal is a  Work Visa Medical test fee
-            Insurance renewal is a medical insurance - international
-        */
-
-        $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
         $resortId = $this->resort->resort_id;
+        $base = $this->aiBaseUrl();
 
-        // The heavy OCR/LLM extraction is wrapped in this closure so it can run
-        // AFTER the HTTP response is sent (see app()->terminating below). The
-        // browser receives an instant job id and polls for the result, so it
-        // never waits on the slow extraction and can't hit the 50s proxy
-        // timeout. Closures auto-bind $this, so $this->resort still works here.
-        $work = function () use ($Xpatfile, $request, $ResortBudgetCost) : \Illuminate\Http\JsonResponse {
-        if(isset($Xpatfile))
-        {
-            $xpat_sync = env('AI_extract_work_details_URL').'xpat_sync';
-            $curl = curl_init();
-
-            $postFields = ['file' => new \CURLFile($Xpatfile->getRealPath(), $Xpatfile->getMimeType(), $Xpatfile->getClientOriginalName()),'doc_type' => "xpat_sync",];
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $xpat_sync,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $postFields,
-                CURLOPT_HTTPHEADER => [
-                    'Accept: application/json',
-                ],
-                // Explicit timeouts. Without these, cURL waits forever
-                // and Hostinger's reverse proxy kills the request at
-                // ~60 s, returning its own "Request Timeout" HTML page
-                // that the user can't parse. 50 s is well under that
-                // limit so we always fail inside PHP and can return a
-                // clean JSON error. CONNECTTIMEOUT covers the case
-                // where the AI host is unreachable.
-                CURLOPT_TIMEOUT => 50,
-                CURLOPT_CONNECTTIMEOUT => 10,
-            ]);
-            $response = curl_exec($curl);
-            $err = curl_error($curl);
-            $errno = curl_errno($curl);
-            curl_close($curl);
-            if ($err)
-            {
-                // Distinguish timeout from generic curl errors so the
-                // user sees an actionable message ("try again" / "AI
-                // service unreachable") instead of raw libcurl text.
-                if ($errno === CURLE_OPERATION_TIMEDOUT) {
-                    return response()->json([
-                        'success' => false,
-                        'errors'  => ['message' => 'The AI extraction service did not respond within 50 seconds. The document may be very large or the service may be busy — please try again in a moment.'],
-                    ], 504);
-                }
-                if (in_array($errno, [CURLE_COULDNT_CONNECT, CURLE_COULDNT_RESOLVE_HOST], true)) {
-                    return response()->json([
-                        'success' => false,
-                        'errors'  => ['message' => 'Could not reach the AI extraction service. Please contact support if this persists.'],
-                    ], 502);
-                }
-                return response()->json([
-                    'success' => false,
-                    'errors' => ['message' => $err]
-                ], 422);
-            }
-            $response1= $response;
-            $AI_Data = json_decode($response, true);
-
-            // Null-safe access — AI service can return invalid JSON
-            // (timeout, partial response) which leaves $AI_Data as null,
-            // or it can return the envelope without an extracted_fields
-            // sub-array, or with the passport key missing. The previous
-            // code accessed $AI_Data['extracted_fields'][...] directly
-            // and threw "Trying to access array offset on value of type
-            // null" (live 500 on POST /resort/visa/store).
-            $passportRaw = $AI_Data['extracted_fields']["Employee's Passport Number"] ?? null;
-            // Treat AI placeholders ("Unavailable", "N/A", ...) as "not read" so
-            // the user gets the clear re-upload message instead of a failed
-            // lookup against a junk passport value.
-            $passportPlaceholder = in_array(strtolower(trim((string) $passportRaw)), ['unavailable', 'n/a', 'na', 'none', 'null', 'not found', '-'], true);
-            if (empty($passportRaw) || $passportPlaceholder) {
-                return response()->json([
-                    'success' => false,
-                    'errors' => ['message' => 'Could not read passport number from the document. Please upload a clearer scan.'],
-                ], 422);
-            }
-            $passport_number = preg_replace('/[^A-Za-z0-9]/', '', (string) $passportRaw);
-
-            // Look up the employee by the OCR-extracted passport number
-            // (not a hardcoded value — the previous query passed the
-            // literal 'z6979971' and matched the same person on every
-            // submission, leaking data and completing visa renewals
-            // against the wrong employee).
-            $employee    = Employee::with(['resortAdmin'])
-                ->where('resort_id', $this->resort->resort_id)
-                ->where('passport_number', $passport_number)
-                ->first();
-            
-            if (!$employee) 
-            {
-                return response()->json([
-                    'success' => false,
-                    'errors' => ['message' => 'Employee not found']
-                ], 422);
-            }
-            else
-            {
-            
-                $VisaNationality = VisaNationality::where('resort_id', $this->resort->resort_id)
-                                                    ->where('nationality', $employee->nationality)
-                                                    ->first();
-                if (!$VisaNationality) 
-                {
-                    return response()->json([
-                        'success' => false,
-                        'errors' => ['message' => 'Please Add  Deposit Rate for the'.$employee->nationality]
-                    ], 422);
-                }
-                else
-                {
-                    $QuotaSlotExit = QuotaSlotRenewal::where('employee_id', $employee->id)->first();
-                    if($QuotaSlotExit) 
-                    {
-                        $name =  $employee->resortAdmin->first_name.' '.$employee->resortAdmin->last_name;
-                        return response()->json([
-                            'success' => false,
-                            'errors' => ['message' => "Quota Slot Renewal already exists for {$name}. Please proceed with renewal."]
-                        ], 422);
-                    }
-                    
-                    $joiningDate = Carbon::parse($employee->joining_date)->startOfMonth(); // e.g., 2025-02-01
-                    $endMonth = Carbon::create($joiningDate->year, 12, 1); // End at Dec of joining year
-                    $QuotaSlotFees = $request->file('QuotaSlotFees');
-                    if(isset($QuotaSlotFees))
-                    { 
-                        $insuranceAmt=0.00;
-                        $workPermitAmt=0.00;
-                        $workPermitMedicalAmt=0.00;
-                        $visaAmt=0.00;
-
-                        // AI can return the envelope without an
-                        // extracted_fields sub-array (or with it null) on
-                        // empty/unreadable scans. Normalise to an array so the
-                        // direct key lookups below never hit "Trying to access
-                        // array offset on value of type null".
-                        $fields = (isset($AI_Data['extracted_fields']) && is_array($AI_Data['extracted_fields']))
-                            ? $AI_Data['extracted_fields']
-                            : [];
-
-                        if(!empty($fields['Visa Issued Date']))
-                        {
-                            $visaAmtCost =  $ResortBudgetCost['VISA FEE'] ?? null;
-
-                            VisaRenewal::create([
-                                'resort_id' => $this->resort->resort_id,
-                                'employee_id' => $employee->id,
-                                'WP_No'=> $fields['Work Permit Number'] ?? null,
-                                'start_date' => Carbon::parse($fields['Visa Issued Date'])->format('Y-m-d'),
-                                'end_date' => Carbon::parse($fields['Visa Expiry Date'] ?? null)->format('Y-m-d'),
-                                'Amt' => $visaAmtCost['amount'] ?? 0.00,
-                            ]);
-                            $visaAmt = $visaAmtCost['amount'] ?? 0.00;
-                        }
-                        if(!empty($fields['Insurance Expiry Date']))
-                        {
-                            $medical_data =  $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
-
-                            EmployeeInsurance::create([
-                                'resort_id' => $this->resort->resort_id,
-                                'employee_id' => $employee->id,
-                                'Premium' => $medical_data['amount'] ?? 0.00,
-                                "Currency"=> $medical_data['unit'] ?? null,
-                                'insurance_start_date' => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
-                                'insurance_end_date' => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
-                            ]);
-
-                             $insuranceAmt=$medical_data['amount'] ?? 0.00;
-                        }
-
-                        $monthlyEntries = [];
-                        if (!empty($fields['Work Permit Expiry Date (Expiry On)']))
-                        {
-                             $Work_permit_cost =  $ResortBudgetCost['WORK PERMIT FEE'] ?? null;
-                            $expiryDate = Carbon::parse($fields['Work Permit Expiry Date (Expiry On)'])->endOfMonth(); // e.g., 2025-05-31
-
-                            $totalMonths = $joiningDate->diffInMonths($endMonth) + 1;
-                            $totalCost = $Work_permit_cost['amount'] ?? 0.00;
-                            $monthlyCost = round($totalCost / $totalMonths, 2);
-                            $currency = $Work_permit_cost['unit'] ?? null;
-                  
-                            $workPermitAmt = $totalCost;
-                            for ($i = 0; $i < $totalMonths; $i++) 
-                            {
-                                $monthStart = $joiningDate->copy()->addMonths($i);
-                                $monthEnd = $monthStart->copy()->endOfMonth();
-                                $nextMonthStart = $monthStart->copy()->addMonth()->startOfMonth();
-                                $monthlyEntries[] = 
-                                        [
-                                            'resort_id'    => $this->resort->resort_id,
-                                            'employee_id'  => $employee->id,
-                                            'Month'        => $monthStart->format('m'),
-                                            'Payment_Date' => $monthEnd->format('Y-m-d'),
-                                            'Due_Date'     => $nextMonthStart->format('Y-m-d'),
-                                            'status'       => $monthEnd->lte($expiryDate) ? 'Paid' : 'Unpaid',
-                                            'Amt'          => $monthlyCost,
-                                            'currency'     => $currency,
-                                            'created_at'   => now(),    
-                                        ];
-                            }
-
-                            WorkPermit::insert($monthlyEntries);
-                        }
-
-                        $lastDueDateForDecember = collect($monthlyEntries)
-                                ->filter(fn($entry) => $entry['Month'] === '12')
-                                ->last()['Due_Date'] ?? null;
-                 
-                        if(!empty($fields['Insurance Expiry Date']))
-                        {
-
-                            // Here Work permit
-                            $medical_data =  $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'] ?? null;
-
-                                
-                                WorkPermitMedicalRenewal::create([
-                                            'resort_id' => $this->resort->resort_id,
-                                            'employee_id' => $employee->id,
-                                            'Amt' => $medical_data['amount'] ?? 0.00,
-                                            'Currency'=>$medical_data['unit']?? null,
-                                            'start_date' => Carbon::parse($joiningDate)->format('Y-m-d'),
-                                            'end_date'=>Carbon::parse($lastDueDateForDecember)->format('Y-m-d')
-                                        ]);
-                             $workPermitMedicalAmt =  $medical_data['amount'] ?? 0.00;
-                        }
-
-                        //$qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? null;
-                        $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? [];
-                        $qotaslotDeposit = $qotaslotAMt['amount'] ?? 0.00;
-                        $Eleven_month_installment= ($qotaslotDeposit - 174) / 11;
-
-                        $totalCost = $qotaslotDeposit;
-                        TotalExpensessSinceJoing::create(['resort_id'=> $this->resort->resort_id,
-                                                        'employees_id' => $employee->id,
-                                                        'Deposit_Amt' =>   $VisaNationality->amt?? 0.00,
-                                                        'Total_work_permit' => $workPermitAmt ?? 0.00,
-                                                        'Total_slot_Payment' => $totalCost ?? 0.00,
-                                                        'Total_insurance_Payment' => $insuranceAmt ?? 0.00,
-                                                        'Total_Work_Permit_Medical_Payment' => $workPermitMedicalAmt ?? 0.00,
-                                                        "Total_Visa_Payment"=>$visaAmt ?? 0.00,
-                                                        'Date' => Carbon::now()->format('Y-m-d'),
-                                                        'Year'=> Carbon::now()->format('Y'),
-                                                    ]);
-                        VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
-                                                        ->where('employee_id', $employee->id)
-                                                        ->where('DocumentName', 'Other')
-                                                        ->delete();
-                        VisaEmployeeExpiryData::create(['resort_id' => $this->resort->resort_id,
-                                                            'employee_id' => $employee->id,
-                                                            'File_child_id' =>  null,
-                                                            'Ai_extracted_data' => $response1,
-                                                            'DocumentName' =>"Other" ?? null
-                                                        ]);
-
-                                                        
-                            $payment_schedule = env('AI_extract_work_details_URL').'payment_schedule';   
-                            $curl = curl_init();
-                            $postFields = ['file' => new \CURLFile($QuotaSlotFees->getRealPath(),
-                                            $QuotaSlotFees->getMimeType(), 
-                                            $QuotaSlotFees->getClientOriginalName()),
-                                            'doc_type' => "payment_schedule"
-                                            ];
-                                curl_setopt_array($curl, [
-                                    CURLOPT_URL => $payment_schedule,
-                                    CURLOPT_RETURNTRANSFER => true,
-                                    CURLOPT_POST => true,
-                                    CURLOPT_POSTFIELDS => $postFields,
-                                    CURLOPT_HTTPHEADER => ['Accept: application/json',],
-                                    // Without timeouts, cURL waits forever and Hostinger's
-                                    // reverse proxy kills the request at ~60 s with its own
-                                    // HTML 500. 50 s sits well under that so we always
-                                    // fail inside PHP and return a clean JSON error.
-                                    CURLOPT_TIMEOUT => 50,
-                                    CURLOPT_CONNECTTIMEOUT => 10,
-                                ]);
-                                $responseQuotaSlot = curl_exec($curl);
-                                $err = curl_error($curl);
-                                curl_close($curl);
-                            if($err) 
-                            {
-                                return response()->json([
-                                    'success' => false,
-                                    'errors' => ['message' => $err]
-                                ], 422);
-                            }   
-                            $monthly_data =  json_decode($responseQuotaSlot, true);
-                            if(!empty($monthly_data['extracted_fields']))
-                            {
-                                DB::beginTransaction();
-                                foreach($monthly_data['extracted_fields'] as $key => $value)
-                                {
-                                    $amt = ( $key == 0 ) ?  174 : $Eleven_month_installment;
-                                    if($value['State'] == 'FULLY PAID')
-                                    {
-                                    $status = "Paid";
-                                    }
-                                    else
-                                    {
-                                        $status = "Unpaid";
-                                    }
-                                    QuotaSlotRenewal::create([
-                                                                'resort_id'=>$this->resort->resort_id,
-                                                                'Due_Date'=>$value['DatePaymentDueOn'],
-                                                                'employee_id'=> $employee->id,
-                                                                'Month'=> $value['Month'],
-                                                                "Currency"=>"MVR",
-                                                                "Amt"=> $amt,
-                                                                "Status"=> $status,
-                                                            ]); 
-                                }
-                                DB::commit();
-                                return response()->json(['success' => true,'msg' => 'Quota Slot renewal Created Successfully.',],200);
-                            }
-                            else
-                            {
-                                DB::rollBack();
-                                return response()->json([
-                                    'success' => false,
-                                    'errors' => ['message' => 'Quota Slot Fees file is not valid']
-                                ], 422);
-                            }
-                    }
-                    else
-                    {
-                        return response()->json([
-                            'success' => false,
-                            'errors' => ['message' => 'Quota Slot Fees file is missing']
-                        ], 422);
-                    }
-                }
-              
-            }
-        }
-        else
-        {
-            if(!isset($Xpatfile))
-            {
-                return response()->json([
-                'success' => false,
-                'errors' => ['message' => 'Xpact File is Missing ']
-                ], 422);
-            }
+        $xpatTask = $this->startAiExtraction($base, $Xpatfile, 'xpat_sync');
+        if (isset($xpatTask['__error'])) {
+            return response()->json(['success' => false, 'errors' => ['message' => $xpatTask['__error']]], 502);
         }
 
-        // Safety net so the closure always returns a JsonResponse.
-        return response()->json(['success' => false, 'errors' => ['message' => 'Could not process the document.']], 422);
-        };
-
-        // Persist a job row, run the extraction AFTER the response is flushed,
-        // and hand the browser an id to poll. No queue worker required.
-        $job = \App\Models\VisaSyncJob::create(['resort_id' => $resortId, 'status' => 'processing']);
-
-        app()->terminating(function () use ($work, $job) {
-            @set_time_limit(0);
-            try {
-                $data = $work()->getData(true);
-                $job->update([
-                    'status' => !empty($data['success']) ? 'done' : 'failed',
-                    'result' => $data,
-                ]);
-            } catch (\Throwable $e) {
-                \Log::error('Visa xpact-sync job ' . $job->id . ' failed: ' . $e->getMessage());
-                $job->update([
-                    'status' => 'failed',
-                    'result' => ['success' => false, 'errors' => ['message' => 'Extraction failed unexpectedly. Please try again.']],
-                ]);
+        $quotaTaskId = null;
+        if ($quotaFile) {
+            $quotaTask = $this->startAiExtraction($base, $quotaFile, 'payment_schedule');
+            if (isset($quotaTask['__error'])) {
+                return response()->json(['success' => false, 'errors' => ['message' => $quotaTask['__error']]], 502);
             }
-        });
+            $quotaTaskId = $quotaTask['task_id'];
+        }
+
+        $job = VisaSyncJob::create([
+            'resort_id'     => $resortId,
+            'status'        => 'processing',
+            'xpat_task_id'  => $xpatTask['task_id'],
+            'quota_task_id' => $quotaTaskId,
+        ]);
 
         return response()->json([
             'success'    => true,
@@ -455,20 +110,286 @@ class FetchDataAiController extends Controller
     }
 
     /**
-     * Polled by the Xpat-sync page to get the async extraction result.
+     * Polled by the Xpat-sync page (every ~30s). Checks the async AI tasks;
+     * once both are ready it runs the DB saves exactly once and records the
+     * final result on the job row.
      */
     public function syncStatus($id)
     {
-        $job = \App\Models\VisaSyncJob::where('resort_id', $this->resort->resort_id)->find($id);
+        $job = VisaSyncJob::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$job) {
             return response()->json(['success' => false, 'errors' => ['message' => 'Job not found']], 404);
         }
-        return response()->json([
-            'success' => true,
-            'status'  => $job->status,   // processing | done | failed
-            'data'    => $job->result,   // the original {success,msg,errors} payload when finished
-        ]);
+        if (in_array($job->status, ['done', 'failed'], true)) {
+            return response()->json(['success' => true, 'status' => $job->status, 'data' => $job->result]);
+        }
+
+        $base  = $this->aiBaseUrl();
+        $xpat  = $this->fetchAiResult($base, $job->xpat_task_id);
+        $quota = $job->quota_task_id ? $this->fetchAiResult($base, $job->quota_task_id) : ['status' => 'done', 'extracted_fields' => null];
+
+        // Can't reach the AI right now → transient, keep polling.
+        if (($xpat['status'] ?? '') === '__unreachable' || ($quota['status'] ?? '') === '__unreachable') {
+            return response()->json(['success' => true, 'status' => 'processing', 'data' => null]);
+        }
+        // Extraction errored on the AI side.
+        if (($xpat['status'] ?? '') === 'error' || ($quota['status'] ?? '') === 'error') {
+            $payload = ['success' => false, 'errors' => ['message' => $xpat['message'] ?? $quota['message'] ?? 'Extraction failed. Please try again.']];
+            $job->update(['status' => 'failed', 'result' => $payload]);
+            return response()->json(['success' => true, 'status' => 'failed', 'data' => $payload]);
+        }
+        // Still working.
+        if (($xpat['status'] ?? '') !== 'done' || ($quota['status'] ?? '') !== 'done') {
+            return response()->json(['success' => true, 'status' => 'processing', 'data' => null]);
+        }
+
+        // Both ready — atomically claim the job so two overlapping polls can't
+        // both run the saves (which would duplicate records).
+        $claimed = VisaSyncJob::where('id', $job->id)->where('status', 'processing')->update(['status' => 'finalizing']);
+        if (!$claimed) {
+            return response()->json(['success' => true, 'status' => 'processing', 'data' => null]);
+        }
+
+        $payload = $this->finalizeXpactSync((int) $job->resort_id, $xpat, $quota);
+        $job->update(['status' => !empty($payload['success']) ? 'done' : 'failed', 'result' => $payload]);
+
+        return response()->json(['success' => true, 'status' => $job->status, 'data' => $payload]);
     }
 
-    
+    /** Base URL of the AI service, reusing the proven host from
+     *  AI_extract_work_details_URL (just stripping its path/query). */
+    private function aiBaseUrl(): string
+    {
+        $u = (string) env('AI_extract_work_details_URL');
+        $base = preg_replace('#extract_work_details.*$#', '', $u);
+        if (!$base) {
+            $base = rtrim((string) env('AI_URL', 'http://localhost:8001/'), '/') . '/';
+        }
+        return rtrim($base, '/') . '/';
+    }
+
+    /** Start a background extraction on the AI server; returns ['task_id'=>..]
+     *  or ['__error'=>message]. This call returns near-instantly (just the
+     *  upload), so it never approaches the web timeout. */
+    private function startAiExtraction(string $base, $file, string $docType): array
+    {
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $base . 'extract_async',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => [
+                'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
+                'doc_type' => $docType,
+            ],
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+        $resp  = curl_exec($curl);
+        $errno = curl_errno($curl);
+        $err   = curl_error($curl);
+        curl_close($curl);
+
+        if ($err) {
+            if (in_array($errno, [CURLE_COULDNT_CONNECT, CURLE_COULDNT_RESOLVE_HOST], true)) {
+                return ['__error' => 'Could not reach the AI extraction service. Please contact support if this persists.'];
+            }
+            return ['__error' => $err];
+        }
+        $data = json_decode($resp, true);
+        if (empty($data['task_id'])) {
+            return ['__error' => 'The AI service did not start the extraction. Please try again.'];
+        }
+        return ['task_id' => $data['task_id']];
+    }
+
+    /** Poll one async extraction. Returns the AI payload, or status
+     *  '__unreachable' on a transport blip so the caller keeps polling. */
+    private function fetchAiResult(string $base, ?string $taskId): array
+    {
+        if (!$taskId) return ['status' => 'done', 'extracted_fields' => null];
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $base . 'extract_result/' . $taskId,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+        $resp = curl_exec($curl);
+        $err  = curl_error($curl);
+        curl_close($curl);
+        if ($err) return ['status' => '__unreachable'];
+        $data = json_decode($resp, true);
+        return is_array($data) ? $data : ['status' => '__unreachable'];
+    }
+
+    /**
+     * Persist the renewal records once both extractions are ready. The OCR
+     * results now arrive via the async AI tasks (passed in) instead of inline
+     * cURL — the rest mirrors the original synchronous save logic. Returns the
+     * {success,msg} / {success:false,errors} payload.
+     */
+    private function finalizeXpactSync(int $resortId, array $xpat, array $quota): array
+    {
+        $fail = fn ($m) => ['success' => false, 'errors' => ['message' => $m]];
+
+        $fields = (isset($xpat['extracted_fields']) && is_array($xpat['extracted_fields'])) ? $xpat['extracted_fields'] : [];
+        $ResortBudgetCost = Common::VisaRenewalCost($resortId);
+
+        $passportRaw = $fields["Employee's Passport Number"] ?? null;
+        $placeholder = in_array(strtolower(trim((string) $passportRaw)), ['unavailable', 'n/a', 'na', 'none', 'null', 'not found', '-'], true);
+        if (empty($passportRaw) || $placeholder) {
+            return $fail('Could not read passport number from the document. Please upload a clearer scan.');
+        }
+        $passport_number = preg_replace('/[^A-Za-z0-9]/', '', (string) $passportRaw);
+
+        $employee = Employee::with(['resortAdmin'])->where('resort_id', $resortId)->where('passport_number', $passport_number)->first();
+        if (!$employee) return $fail('Employee not found');
+
+        $VisaNationality = VisaNationality::where('resort_id', $resortId)->where('nationality', $employee->nationality)->first();
+        if (!$VisaNationality) return $fail('Please Add  Deposit Rate for the' . $employee->nationality);
+
+        if (QuotaSlotRenewal::where('employee_id', $employee->id)->first()) {
+            $name = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
+            return $fail("Quota Slot Renewal already exists for {$name}. Please proceed with renewal.");
+        }
+
+        $quotaRows = (isset($quota['extracted_fields']) && is_array($quota['extracted_fields'])) ? $quota['extracted_fields'] : [];
+        if (empty($quotaRows)) {
+            return $fail('Quota Slot Fees file is missing or could not be read.');
+        }
+
+        $joiningDate = Carbon::parse($employee->joining_date)->startOfMonth();
+        $endMonth = Carbon::create($joiningDate->year, 12, 1);
+        $insuranceAmt = 0.00; $workPermitAmt = 0.00; $workPermitMedicalAmt = 0.00; $visaAmt = 0.00;
+
+        if (!empty($fields['Visa Issued Date'])) {
+            $visaAmtCost = $ResortBudgetCost['VISA FEE'] ?? null;
+            VisaRenewal::create([
+                'resort_id'   => $resortId,
+                'employee_id' => $employee->id,
+                'WP_No'       => $fields['Work Permit Number'] ?? null,
+                'start_date'  => Carbon::parse($fields['Visa Issued Date'])->format('Y-m-d'),
+                'end_date'    => Carbon::parse($fields['Visa Expiry Date'] ?? null)->format('Y-m-d'),
+                'Amt'         => $visaAmtCost['amount'] ?? 0.00,
+            ]);
+            $visaAmt = $visaAmtCost['amount'] ?? 0.00;
+        }
+
+        if (!empty($fields['Insurance Expiry Date'])) {
+            $medical_data = $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
+            EmployeeInsurance::create([
+                'resort_id'            => $resortId,
+                'employee_id'          => $employee->id,
+                'Premium'              => $medical_data['amount'] ?? 0.00,
+                'Currency'             => $medical_data['unit'] ?? null,
+                'insurance_start_date' => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
+                'insurance_end_date'   => Carbon::parse($fields['Insurance Expiry Date'])->format('Y-m-d'),
+            ]);
+            $insuranceAmt = $medical_data['amount'] ?? 0.00;
+        }
+
+        $monthlyEntries = [];
+        if (!empty($fields['Work Permit Expiry Date (Expiry On)'])) {
+            $Work_permit_cost = $ResortBudgetCost['WORK PERMIT FEE'] ?? null;
+            $expiryDate = Carbon::parse($fields['Work Permit Expiry Date (Expiry On)'])->endOfMonth();
+            $totalMonths = $joiningDate->diffInMonths($endMonth) + 1;
+            $totalCost = $Work_permit_cost['amount'] ?? 0.00;
+            $monthlyCost = $totalMonths > 0 ? round($totalCost / $totalMonths, 2) : 0.00;
+            $currency = $Work_permit_cost['unit'] ?? null;
+            $workPermitAmt = $totalCost;
+            for ($i = 0; $i < $totalMonths; $i++) {
+                $monthStart = $joiningDate->copy()->addMonths($i);
+                $monthEnd = $monthStart->copy()->endOfMonth();
+                $nextMonthStart = $monthStart->copy()->addMonth()->startOfMonth();
+                $monthlyEntries[] = [
+                    'resort_id'    => $resortId,
+                    'employee_id'  => $employee->id,
+                    'Month'        => $monthStart->format('m'),
+                    'Payment_Date' => $monthEnd->format('Y-m-d'),
+                    'Due_Date'     => $nextMonthStart->format('Y-m-d'),
+                    'status'       => $monthEnd->lte($expiryDate) ? 'Paid' : 'Unpaid',
+                    'Amt'          => $monthlyCost,
+                    'currency'     => $currency,
+                    'created_at'   => now(),
+                ];
+            }
+            WorkPermit::insert($monthlyEntries);
+        }
+
+        $lastDueDateForDecember = collect($monthlyEntries)->filter(fn ($e) => $e['Month'] === '12')->last()['Due_Date'] ?? null;
+
+        if (!empty($fields['Insurance Expiry Date'])) {
+            $medical_data = $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'] ?? null;
+            WorkPermitMedicalRenewal::create([
+                'resort_id'   => $resortId,
+                'employee_id' => $employee->id,
+                'Amt'         => $medical_data['amount'] ?? 0.00,
+                'Currency'    => $medical_data['unit'] ?? null,
+                'start_date'  => Carbon::parse($joiningDate)->format('Y-m-d'),
+                'end_date'    => Carbon::parse($lastDueDateForDecember)->format('Y-m-d'),
+            ]);
+            $workPermitMedicalAmt = $medical_data['amount'] ?? 0.00;
+        }
+
+        $qotaslotAMt = $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? [];
+        $qotaslotDeposit = $qotaslotAMt['amount'] ?? 0.00;
+        $Eleven_month_installment = $qotaslotDeposit ? ($qotaslotDeposit - 174) / 11 : 0.00;
+
+        TotalExpensessSinceJoing::create([
+            'resort_id'                         => $resortId,
+            'employees_id'                      => $employee->id,
+            'Deposit_Amt'                       => $VisaNationality->amt ?? 0.00,
+            'Total_work_permit'                 => $workPermitAmt ?? 0.00,
+            'Total_slot_Payment'                => $qotaslotDeposit ?? 0.00,
+            'Total_insurance_Payment'           => $insuranceAmt ?? 0.00,
+            'Total_Work_Permit_Medical_Payment' => $workPermitMedicalAmt ?? 0.00,
+            'Total_Visa_Payment'                => $visaAmt ?? 0.00,
+            'Date'                              => Carbon::now()->format('Y-m-d'),
+            'Year'                              => Carbon::now()->format('Y'),
+        ]);
+
+        VisaEmployeeExpiryData::where('resort_id', $resortId)
+            ->where('employee_id', $employee->id)->where('DocumentName', 'Other')->delete();
+        VisaEmployeeExpiryData::create([
+            'resort_id'         => $resortId,
+            'employee_id'       => $employee->id,
+            'File_child_id'     => null,
+            'Ai_extracted_data' => json_encode($xpat),
+            'DocumentName'      => 'Other',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            foreach ($quotaRows as $key => $value) {
+                $amt = ($key == 0) ? 174 : $Eleven_month_installment;
+                $status = (($value['State'] ?? '') === 'FULLY PAID') ? 'Paid' : 'Unpaid';
+                QuotaSlotRenewal::create([
+                    'resort_id'   => $resortId,
+                    'Due_Date'    => $value['DatePaymentDueOn'] ?? null,
+                    'employee_id' => $employee->id,
+                    'Month'       => $value['Month'] ?? null,
+                    'Currency'    => 'MVR',
+                    'Amt'         => $amt,
+                    'Status'      => $status,
+                ]);
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Visa xpact-sync finalize failed: ' . $e->getMessage());
+            return $fail('Could not save the renewal records. Please try again.');
+        }
+
+        // Return the employee name so the page can redirect to verify-details
+        // pre-filtered to the staff member whose documents were just updated.
+        $empName = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''));
+        return [
+            'success'  => true,
+            'msg'      => 'Quota Slot renewal Created Successfully.',
+            'employee' => $empName,
+            'emp_id'   => $employee->Emp_id,
+        ];
+    }
 }

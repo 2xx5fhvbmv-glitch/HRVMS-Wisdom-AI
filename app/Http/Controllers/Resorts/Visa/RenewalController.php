@@ -729,6 +729,12 @@ class RenewalController extends Controller
                     $employee->Position_name = $employee->position->position_title ?? 'N/A';
                     $employee->ProfilePic = Common::getResortUserPicture($employee->resortAdmin->id);
                     $employee->VisaExpiryExpiryDate = $employee->InsuranceExpiryDate = $employee->WorkPermitExpiryDate = $employee->WorkPermitMedicalPermitExpiryDate = $employee->QuotaSlotAmtForThisMonth = 'N/A';
+                    // Raw values + record ids for the per-column Edit (null = no
+                    // record this month, so no edit icon is shown for that box).
+                    $employee->VisaRecordId = $employee->VisaAmtRaw = $employee->VisaDateRaw = $employee->VisaStatusRaw = null;
+                    $employee->InsuranceRecordId = $employee->InsuranceAmtRaw = $employee->InsuranceDateRaw = null;
+                    $employee->WorkPermitRecordId = $employee->WorkPermitAmtRaw = $employee->WorkPermitDateRaw = $employee->WorkPermitStatusRaw = null;
+                    $employee->SlotRecordId = $employee->SlotAmtRaw = $employee->SlotDateRaw = $employee->SlotStatusRaw = null;
 
                     $employeeData = [];
                     $hasAnyFlagData = false;
@@ -740,6 +746,10 @@ class RenewalController extends Controller
                         if ($visa && Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) {
                             $employee->VisaExpiryDate = $this->getFormattedExpiryStatus($visa->end_date);
                             $employee->VisaExpiryExpiryAmt = $visa->Amt;
+                            $employee->VisaRecordId  = $visa->id;
+                            $employee->VisaAmtRaw    = $visa->Amt;
+                            $employee->VisaDateRaw   = Carbon::parse($visa->end_date)->format('Y-m-d');
+                            $employee->VisaStatusRaw = $visa->Status ?? null;
                             $hasAnyFlagData = true;
                     
                            
@@ -751,6 +761,9 @@ class RenewalController extends Controller
                         if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
                             $employee->InsuranceExpiryDate = $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                             $employee->Premium = $insurance->Premium;
+                            $employee->InsuranceRecordId = $insurance->id;
+                            $employee->InsuranceAmtRaw   = $insurance->Premium;
+                            $employee->InsuranceDateRaw  = Carbon::parse($insurance->insurance_end_date)->format('Y-m-d');
                             $hasAnyFlagData = true;
                    
                         }
@@ -762,6 +775,10 @@ class RenewalController extends Controller
                         {
                             $employee->WorkPermitExpiryDate =  $this->getFormattedExpiryStatus($currentWP->Due_Date);
                              $employee->WorkPermitAmt = number_format($currentWP->Amt,2);
+                            $employee->WorkPermitRecordId  = $currentWP->id;
+                            $employee->WorkPermitAmtRaw    = $currentWP->Amt;
+                            $employee->WorkPermitDateRaw   = Carbon::parse($currentWP->Due_Date)->format('Y-m-d');
+                            $employee->WorkPermitStatusRaw = $currentWP->Status ?? null;
                             $hasAnyFlagData = true;
                          
                            
@@ -790,10 +807,14 @@ class RenewalController extends Controller
                             ->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))
                             ->first();
                         $encodedId = base64_encode($employee->id);
-                        if ($currentQuota) 
+                        if ($currentQuota)
                         {
                             $employee->QuotaSlotAmtForThisMonth = $this->getFormattedExpiryStatus($currentQuota->Due_Date);
                             $employee->QuotaSlotAmtForThisMonthAmt =$currentQuota->Amt;
+                            $employee->SlotRecordId  = $currentQuota->id;
+                            $employee->SlotAmtRaw    = $currentQuota->Amt;
+                            $employee->SlotDateRaw   = Carbon::parse($currentQuota->Due_Date)->format('Y-m-d');
+                            $employee->SlotStatusRaw = $currentQuota->Status ?? null;
                             $hasAnyFlagData = true;
 
                            
@@ -813,22 +834,36 @@ class RenewalController extends Controller
                 return datatables()->of($Employee)
                         ->addColumn('profile_view', function ($row) {
                             $expiryBoxes = '';
-                      
+
+                            // Renders a small Edit pencil for a column, carrying the
+                            // record id + current values so the modal can pre-fill.
+                            // Empty when there's no record for that column this month.
+                            $editIcon = function ($type, $id, $amount, $date, $status) {
+                                if (!$id) return '';
+                                return ' <a href="javascript:void(0)" class="EditExpiry" title="Edit"'
+                                    . ' data-type="' . $type . '"'
+                                    . ' data-id="' . $id . '"'
+                                    . ' data-amount="' . htmlspecialchars((string) $amount, ENT_QUOTES) . '"'
+                                    . ' data-date="' . htmlspecialchars((string) $date, ENT_QUOTES) . '"'
+                                    . ' data-status="' . htmlspecialchars((string) $status, ENT_QUOTES) . '">'
+                                    . '<i class="fa-regular fa-pen-to-square"></i></a>';
+                            };
+
                                 $expiryBoxes .= '<div>
-                                    <label>Work Permit: '.Common::formatCurrency($row->WorkPermitAmt, 'MVR').'</label>
+                                    <label>Work Permit: '.Common::formatCurrency($row->WorkPermitAmt, 'MVR').$editIcon('work_permit', $row->WorkPermitRecordId, $row->WorkPermitAmtRaw, $row->WorkPermitDateRaw, $row->WorkPermitStatusRaw).'</label>
                                     <p>Expires: ' . ($row->WorkPermitExpiryDate ?? '-') . '</p>
                                 </div>';
-                           
+
                                 $expiryBoxes .= '<div>
-                                    <label>Slot Payment: '.Common::formatCurrency($row->QuotaSlotAmtForThisMonthAmt, 'MVR').'</label>
+                                    <label>Slot Payment: '.Common::formatCurrency($row->QuotaSlotAmtForThisMonthAmt, 'MVR').$editIcon('slot', $row->SlotRecordId, $row->SlotAmtRaw, $row->SlotDateRaw, $row->SlotStatusRaw).'</label>
                                     <p>Expires: ' . ($row->QuotaSlotAmtForThisMonth ?? '-') . '</p>
                                 </div>';
                                $expiryBoxes .= '<div>
-                                    <label>Visa: ' . ($row->VisaExpiryExpiryAmt !== null ? Common::formatCurrency($row->VisaExpiryExpiryAmt, 'MVR') : '-') . '</label>
+                                    <label>Visa: ' . ($row->VisaExpiryExpiryAmt !== null ? Common::formatCurrency($row->VisaExpiryExpiryAmt, 'MVR') : '-') . $editIcon('visa', $row->VisaRecordId, $row->VisaAmtRaw, $row->VisaDateRaw, $row->VisaStatusRaw) . '</label>
                                     <p>Expires: ' . ($row->VisaExpiryDate ?? '-') . '</p>
                                 </div>';
                                $expiryBoxes .= '<div>
-                                    <label>Insurance: ' . ($row->Premium !== null ? Common::formatCurrency($row->Premium, 'MVR') : '-') . '</label>
+                                    <label>Insurance: ' . ($row->Premium !== null ? Common::formatCurrency($row->Premium, 'MVR') : '-') . $editIcon('insurance', $row->InsuranceRecordId, $row->InsuranceAmtRaw, $row->InsuranceDateRaw, '') . '</label>
                                     <p>Expires: ' . ($row->InsuranceExpiryDate ?? '-') . '</p>
                                 </div>';
                            
@@ -873,6 +908,52 @@ class RenewalController extends Controller
         }
 
 
+    }
+
+    /**
+     * Inline edit for the verify-details columns. Updates the amount, expiry/due
+     * date and (where applicable) status of a single Visa / Work Permit / Slot /
+     * Insurance record — scoped to the current resort so one resort can't edit
+     * another's data.
+     */
+    public function UpdateExpiryRecord(Request $request)
+    {
+        $request->validate([
+            'type'        => 'required|in:visa,work_permit,slot,insurance',
+            'id'          => 'required|integer',
+            'amount'      => 'nullable|numeric',
+            'expiry_date' => 'nullable|date',
+            'status'      => 'nullable|string',
+        ]);
+
+        // type => [model, amountColumn, dateColumn, statusColumn|null, allowedStatuses]
+        $map = [
+            'visa'        => [\App\Models\VisaRenewal::class,      'Amt',     'end_date',           'Status', ['Pending', 'Paid']],
+            'work_permit' => [\App\Models\WorkPermit::class,       'Amt',     'Due_Date',           'Status', ['Paid', 'Unpaid']],
+            'slot'        => [\App\Models\QuotaSlotRenewal::class,  'Amt',     'Due_Date',           'Status', ['Paid', 'Unpaid']],
+            'insurance'   => [\App\Models\EmployeeInsurance::class, 'Premium', 'insurance_end_date',  null,     []],
+        ];
+        [$modelClass, $amountCol, $dateCol, $statusCol, $allowedStatuses] = $map[$request->type];
+
+        $record = $modelClass::where('id', $request->id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$record) {
+            return response()->json(['success' => false, 'errors' => ['message' => 'Record not found.']], 404);
+        }
+
+        if ($request->filled('amount')) {
+            $record->{$amountCol} = $request->amount;
+        }
+        if ($request->filled('expiry_date')) {
+            $record->{$dateCol} = Carbon::parse($request->expiry_date)->format('Y-m-d');
+        }
+        if ($statusCol && $request->filled('status') && in_array($request->status, $allowedStatuses, true)) {
+            $record->{$statusCol} = $request->status;
+        }
+        $record->save();
+
+        return response()->json(['success' => true, 'msg' => 'Updated successfully.']);
     }
 
     public function OrverviewDashbordExpiry(Request $request)

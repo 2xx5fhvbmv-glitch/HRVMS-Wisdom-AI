@@ -33,4 +33,17 @@ return [
     'websocket' => [
         'url' => env('WEBSOCKET_URL'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | OpenRouter (Wisdom AI chatbot)
+    |--------------------------------------------------------------------------
+    | Powers the in-app "Wisdom AI" HR assistant. The model is an
+    | OpenAI-compatible chat-completions endpoint that supports tool calling.
+    */
+    'openrouter' => [
+        'key'      => env('OPENROUTER_API_KEY'),
+        'model'    => env('OPENROUTER_MODEL', 'meta-llama/llama-3.3-70b-instruct'),
+        'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+    ],
 ];
