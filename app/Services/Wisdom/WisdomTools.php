@@ -12,6 +12,9 @@ use App\Models\ParentAttendace;
 use App\Models\Vacancies;
 use App\Models\Applicant_form_data;
 use App\Models\ResortDepartment;
+use App\Models\SOSHistoryModel;
+use App\Services\Wisdom\ReadQueryGuard;
+use Carbon\Carbon;
 
 /**
  * Wisdom AI — read-only data tools exposed to the LLM via function calling.
@@ -75,6 +78,19 @@ class WisdomTools
                 [
                     'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format. Defaults to today.'],
                 ]),
+            self::fn('get_employee_attendance',
+                'Check whether ONE specific employee was present (checked in) on a given date, with their check-in / check-out times. Defaults to today. Use for "was X present", "did X come in on <date>", "is X here today" questions.',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Full or partial employee name, or employee ID.'],
+                    'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format. Defaults to today. For "yesterday" pass yesterday\'s date.'],
+                ], ['name']),
+            self::fn('get_upcoming_birthdays',
+                'List active employees whose birthday falls in a given month (defaults to the current month). Use for "whose birthday is coming up", "birthdays this month" type questions.',
+                [
+                    'month' => ['type' => 'integer', 'description' => 'Month number 1-12. Defaults to the current month.'],
+                ]),
+            self::fn('get_active_sos',
+                'List active / ongoing SOS emergency incidents at the resort (those not yet resolved, rejected or closed): emergency type, who raised it, location, date/time and status. Use for "any active SOS", "current emergencies" questions.', []),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -86,6 +102,20 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name.'],
                 ], ['name']);
+
+            // Escape hatch for questions the dedicated tools don't cover. Full
+            // (HR) tier only — that tier may already see all data, so the only
+            // invariant left to protect is resort isolation (enforced by the
+            // mandatory :resort_id bind + table allow-list in ReadQueryGuard).
+            $tools[] = self::fn('run_read_query',
+                "Run a custom READ-ONLY MySQL SELECT for questions the other tools don't cover. Use this as a LAST RESORT after checking the dedicated tools. STRICT RULES:\n"
+                . "1) SELECT only — no INSERT/UPDATE/DELETE/DDL, single statement, no semicolons.\n"
+                . "2) You MUST scope every query to the resort by adding `resort_id = :resort_id` (do NOT write a number — `:resort_id` is bound automatically).\n"
+                . "3) Allowed tables only: employees, resort_admins, resort_departments, resort_positions, employees_leaves, leave_categories, parent_attendaces, sos_history, sos_emergency_types, vacancies, applicant_form_data, payroll.\n"
+                . "Schema notes: employee NAMES live on resort_admins — join `employees.Admin_Parent_id = resort_admins.id` (first_name,last_name). Department: `employees.Dept_id = resort_departments.id`(name). Position: `employees.Position_id = resort_positions.id`(position_title). Attendance: `parent_attendaces.Emp_id = employees.id` (date, CheckingTime, CheckingOutTime, Status). SOS: `sos_history.emergency_id = sos_emergency_types.id`(name), `sos_history.emp_initiated_by = employees.id`. Employee date-of-birth column is `employees.dob`. Filter active staff with `employees.status = 'Active'`. Results are capped at 200 rows.",
+                [
+                    'sql' => ['type' => 'string', 'description' => 'A single MySQL SELECT statement, scoped with `resort_id = :resort_id`.'],
+                ], ['sql']);
         }
 
         return $tools;
@@ -102,6 +132,10 @@ class WisdomTools
         // model somehow asks for it.
         if (in_array($name, self::PAYROLL_TOOLS, true) && empty($ctx['can_payroll'])) {
             return ['error' => 'Access denied: payroll and compensation data is restricted for your role.'];
+        }
+        // The ad-hoc SQL tool is full-access (HR) only.
+        if ($name === 'run_read_query' && empty($ctx['can_payroll'])) {
+            return ['error' => 'Access denied: custom queries are restricted for your role.'];
         }
         if (empty($ctx['can_db'])) {
             return ['error' => 'Access denied: your role does not have database access.'];
@@ -120,8 +154,12 @@ class WisdomTools
                 case 'find_employee':            return self::findEmployee($rid, $args);
                 case 'get_recruitment_pipeline': return self::getRecruitmentPipeline($rid);
                 case 'get_attendance_summary':   return self::getAttendanceSummary($rid, $args);
+                case 'get_employee_attendance':  return self::getEmployeeAttendance($rid, $args);
+                case 'get_upcoming_birthdays':   return self::getUpcomingBirthdays($rid, $args);
+                case 'get_active_sos':           return self::getActiveSos($rid);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
                 case 'get_employee_salary':      return self::getEmployeeSalary($rid, $args);
+                case 'run_read_query':           return self::runReadQuery($rid, $args);
                 default:                         return ['error' => "Unknown tool: {$name}"];
             }
         } catch (\Throwable $e) {
@@ -359,6 +397,121 @@ class WisdomTools
         ];
     }
 
+    private static function getEmployeeAttendance(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+        $date = self::cleanDate($args['date'] ?? null);
+
+        $employee = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                        $r->where('first_name', 'like', "%{$term}%")
+                          ->orWhere('last_name', 'like', "%{$term}%")
+                          ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                    })
+                  ->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with(['resortAdmin:id,first_name,last_name', 'department:id,name'])
+            ->first();
+
+        if (!$employee) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        // parent_attendaces.Emp_id is the employees.id foreign key (see
+        // ParentAttendace::Employee()).
+        $att = ParentAttendace::where('resort_id', $rid)
+            ->where('Emp_id', $employee->id)
+            ->whereDate('date', $date)
+            ->first();
+
+        $present = $att && !empty($att->CheckingTime);
+
+        return [
+            'employee'   => self::empName($employee),
+            'department' => $employee->department->name ?? null,
+            'date'       => $date,
+            'present'    => $present,
+            'status'     => $att?->Status ?? ($present ? 'Present' : 'No attendance record for this date'),
+            'check_in'   => $att?->CheckingTime ?: null,
+            'check_out'  => $att?->CheckingOutTime ?: null,
+        ];
+    }
+
+    private static function getUpcomingBirthdays(int $rid, array $args): array
+    {
+        $month = (int) ($args['month'] ?? 0);
+        if ($month < 1 || $month > 12) {
+            $month = (int) now()->format('n');
+        }
+
+        $rows = Employee::where('resort_id', $rid)
+            ->where('status', 'Active')
+            ->whereNotNull('dob')
+            ->whereMonth('dob', $month)
+            ->with(['resortAdmin:id,first_name,last_name', 'department:id,name'])
+            ->get();
+
+        $list = $rows->map(function ($e) {
+            $raw = $e->getRawOriginal('dob');
+            $day = null;
+            try {
+                $day = $raw ? (int) Carbon::parse($raw)->format('j') : null;
+            } catch (\Throwable $ex) {
+                $day = null;
+            }
+            return [
+                'name'          => self::empName($e),
+                'department'    => $e->department->name ?? null,
+                'date_of_birth' => $raw,
+                'day'           => $day,
+            ];
+        })->filter(fn ($r) => $r['day'] !== null)->sortBy('day')->values();
+
+        return [
+            'month'     => Carbon::create(null, $month, 1)->format('F'),
+            'count'     => $list->count(),
+            'birthdays' => $list,
+        ];
+    }
+
+    private static function getActiveSos(int $rid): array
+    {
+        // "Active" = anything not in a terminal state. Status values seen in the
+        // SOS module: Pending, Active, Real-Active, Drill-Active (active) vs
+        // Resolved / Rejected / Closed / Inactive (terminal).
+        $terminal = ['resolved', 'rejected', 'closed', 'inactive'];
+
+        $rows = SOSHistoryModel::where('resort_id', $rid)
+            ->whereNull('deleted_at')
+            ->whereNotIn(DB::raw('LOWER(status)'), $terminal)
+            ->with(['getSos:id,name', 'employee:id,Admin_Parent_id', 'employee.resortAdmin:id,first_name,last_name'])
+            ->orderByDesc('date')->orderByDesc('time')
+            ->limit(50)
+            ->get();
+
+        $list = $rows->map(function ($s) {
+            $emp = $s->employee;
+            return [
+                'type'        => $s->getSos->name ?? 'Unknown',
+                'raised_by'   => $emp ? self::empName($emp) : 'Unknown',
+                'location'    => $s->location,
+                'date'        => $s->getRawOriginal('date'),
+                'time'        => $s->time,
+                'status'      => $s->status,
+                'description' => $s->emergency_description,
+            ];
+        })->values();
+
+        return [
+            'active_count' => $list->count(),
+            'incidents'    => $list,
+        ];
+    }
+
     private static function getPayrollSummary(int $rid): array
     {
         $p = Payroll::where('resort_id', $rid)->orderByDesc('id')->first();
@@ -413,6 +566,34 @@ class WisdomTools
         ])->values();
 
         return ['query' => $term, 'matches' => $list->count(), 'employees' => $list];
+    }
+
+    /**
+     * Ad-hoc read-only query. Every safety check lives in ReadQueryGuard; here
+     * we only bind the resort id and run it on the read-only connection.
+     */
+    private static function runReadQuery(int $rid, array $args): array
+    {
+        $check = ReadQueryGuard::validate((string) ($args['sql'] ?? ''));
+        if (empty($check['ok'])) {
+            return ['error' => $check['error'], 'hint' => 'Rewrite the SQL to satisfy this rule, or fall back to a dedicated tool.'];
+        }
+
+        try {
+            $rows = DB::connection('mysql_readonly')
+                ->select($check['sql'], ['resort_id' => $rid]);
+        } catch (\Throwable $e) {
+            Log::warning('Wisdom AI run_read_query failed', ['error' => $e->getMessage()]);
+            return ['error' => 'The query could not be executed. Check the column/table names and try again.'];
+        }
+
+        $rows = array_map(fn ($r) => (array) $r, $rows);
+
+        return [
+            'row_count' => count($rows),
+            'truncated' => count($rows) >= ReadQueryGuard::MAX_ROWS,
+            'rows'      => $rows,
+        ];
     }
 
     // ---------------------------------------------------------------------
