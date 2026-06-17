@@ -14,7 +14,6 @@ use App\Models\Vacancies;
 use App\Models\Applicant_form_data;
 use App\Models\ResortDepartment;
 use App\Models\SOSHistoryModel;
-use App\Models\ManningResponse;
 use App\Services\Wisdom\ReadQueryGuard;
 use Carbon\Carbon;
 
@@ -109,7 +108,7 @@ class WisdomTools
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name.'],
                 ], ['name']);
             $tools[] = self::fn('get_budget_summary',
-                'Get the resort HR salary-cost budget for a year (defaults to the current year): budgeted vs actual annual staff salary cost, the headcount and average salary it is based on. This mirrors the figure on the Workforce Planning HR dashboard. Use for "total HR budget", "salary budget this year" questions. Payroll-restricted.',
+                'Get the resort annual HR budget for a year (defaults to the current year): the total budget and a per-department breakdown, using the exact same engine as the official View Budget page. Each figure = staff salaries + budgeted cost components + allowances + vacant-slot costs. Use for "total HR budget", "<department> budget", "budget this year" questions. To answer one department, read its value from the breakdown. Payroll-restricted.',
                 [
                     'year' => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
                 ]);
@@ -595,10 +594,14 @@ class WisdomTools
     }
 
     /**
-     * HR salary-cost budget for a year. Mirrors the Workforce Planning HR
-     * dashboard: budgeted/actual annual staff cost = headcount × average basic
-     * salary × 12. Budgeted headcount comes from the year's manning submission
-     * (falls back to live active headcount when none exists). Money is in USD.
+     * Resort annual budget for a year, total + per-department breakdown.
+     *
+     * Reuses the SAME canonical engine as the official View Budget page so the
+     * numbers match exactly: a department's budget is the sum of
+     * Common::annualBudgetForEmployee() over its active employees plus
+     * Common::annualBudgetForVacantSlot() over its budgeted vacant slots (see
+     * BudgetController::viewConsolidatedBudget + Common::calculatePositionTotal).
+     * All figures are USD; rendered via formatCurrency in the resort's currency.
      */
     private static function getBudgetSummary(int $rid, array $args): array
     {
@@ -607,42 +610,45 @@ class WisdomTools
             $year = (int) now()->format('Y');
         }
 
-        $avgBasicSalary = (float) Employee::where('resort_id', $rid)
-            ->where('status', 'Active')
-            ->whereNotNull('basic_salary')
-            ->avg('basic_salary');
-        if ($avgBasicSalary <= 0) {
-            $avgBasicSalary = 1500; // dashboard fallback
+        $departments = ResortDepartment::where('resort_id', $rid)
+            ->where('status', 'active')
+            ->get(['id', 'name']);
+
+        $byDept = [];
+        $grandTotal = 0.0;
+
+        foreach ($departments as $dept) {
+            $deptTotal = 0.0;
+
+            $employees = Employee::where('resort_id', $rid)
+                ->where('Dept_id', $dept->id)
+                ->where('status', 'Active')
+                ->get();
+            foreach ($employees as $emp) {
+                $deptTotal += Common::annualBudgetForEmployee($rid, $year, $emp);
+            }
+
+            $vacants = DB::table('resort_vacant_budget_costs')
+                ->where('resort_id', $rid)
+                ->where('department_id', $dept->id)
+                ->where('year', $year)
+                ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
+            foreach ($vacants as $vacant) {
+                $deptTotal += Common::annualBudgetForVacantSlot($rid, $year, $vacant);
+            }
+
+            if ($deptTotal > 0) {
+                $byDept[$dept->name] = Common::formatCurrency($deptTotal, 'USD');
+            }
+            $grandTotal += $deptTotal;
         }
-
-        $liveActive = Employee::where('resort_id', $rid)->where('status', 'Active')->count();
-
-        $manning = ManningResponse::where('resort_id', $rid)->where('year', $year)
-            ->selectRaw('COALESCE(SUM(total_headcount),0) as budgeted, COALESCE(SUM(total_filled_positions),0) as filled')
-            ->first();
-
-        $budgetedHeadcount = (int) ($manning->budgeted ?? 0);
-        $filledHeadcount   = (int) ($manning->filled ?? 0);
-        $usedLiveFallback  = false;
-        if ($budgetedHeadcount === 0 && $filledHeadcount === 0) {
-            $budgetedHeadcount = $filledHeadcount = $liveActive;
-            $usedLiveFallback  = true;
-        }
-
-        $budgetedAnnual = round($budgetedHeadcount * $avgBasicSalary * 12);
-        $actualAnnual   = round($filledHeadcount * $avgBasicSalary * 12);
 
         return [
-            'year'                   => $year,
-            'budgeted_headcount'     => $budgetedHeadcount,
-            'filled_headcount'       => $filledHeadcount,
-            'average_basic_salary'   => Common::formatCurrency($avgBasicSalary, 'USD'),
-            'budgeted_annual_cost'   => Common::formatCurrency((float) $budgetedAnnual, 'USD'),
-            'actual_annual_cost'     => Common::formatCurrency((float) $actualAnnual, 'USD'),
-            'basis'                  => 'Annual staff salary cost = headcount × average basic salary × 12 (same as the Workforce Planning HR dashboard).',
-            'note'                   => $usedLiveFallback
-                ? "No manning/budget submission found for {$year}; based on the current active headcount ({$liveActive})."
-                : null,
+            'year'          => $year,
+            'total_budget'  => Common::formatCurrency($grandTotal, 'USD'),
+            'by_department' => $byDept,
+            'basis'         => 'Annual budget per department = staff salaries + budgeted cost components + allowances + vacant-slot costs (same engine as the View Budget page). Total is the sum of all departments.',
+            'note'          => empty($byDept) ? "No budget data found for {$year}." : null,
         ];
     }
 
