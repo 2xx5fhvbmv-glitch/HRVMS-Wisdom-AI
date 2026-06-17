@@ -4,6 +4,7 @@ namespace App\Services\Wisdom;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Helpers\Common;
 use App\Models\Employee;
 use App\Models\EmployeeLeave;
@@ -13,6 +14,7 @@ use App\Models\Vacancies;
 use App\Models\Applicant_form_data;
 use App\Models\ResortDepartment;
 use App\Models\SOSHistoryModel;
+use App\Models\ManningResponse;
 use App\Services\Wisdom\ReadQueryGuard;
 use Carbon\Carbon;
 
@@ -31,7 +33,7 @@ use Carbon\Carbon;
 class WisdomTools
 {
     /** Tools that expose salary / payroll / compensation data (HR / FULL tier only). */
-    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary'];
+    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_budget_summary'];
 
     /**
      * OpenAI-compatible tool schema list, filtered by the caller's capabilities.
@@ -93,6 +95,8 @@ class WisdomTools
                 ]),
             self::fn('get_active_sos',
                 'List active / ongoing SOS emergency incidents at the resort (those not yet resolved, rejected or closed): emergency type, who raised it, location, date/time and status. Use for "any active SOS", "current emergencies" questions.', []),
+            self::fn('get_accommodation_summary',
+                'Staff accommodation capacity & occupancy: total rooms, total beds (capacity), occupied beds, available (free) beds and occupancy rate. Use for "how many beds are available", "accommodation occupancy", "free rooms" questions.', []),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -104,6 +108,11 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name.'],
                 ], ['name']);
+            $tools[] = self::fn('get_budget_summary',
+                'Get the resort HR salary-cost budget for a year (defaults to the current year): budgeted vs actual annual staff salary cost, the headcount and average salary it is based on. This mirrors the figure on the Workforce Planning HR dashboard. Use for "total HR budget", "salary budget this year" questions. Payroll-restricted.',
+                [
+                    'year' => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
+                ]);
 
             // Escape hatch + schema discovery for questions the dedicated tools
             // don't cover. Full (HR) tier only — that tier may already see all
@@ -169,6 +178,8 @@ class WisdomTools
                 case 'get_employee_attendance':  return self::getEmployeeAttendance($rid, $args);
                 case 'get_upcoming_birthdays':   return self::getUpcomingBirthdays($rid, $args);
                 case 'get_active_sos':           return self::getActiveSos($rid);
+                case 'get_accommodation_summary':return self::getAccommodationSummary($rid);
+                case 'get_budget_summary':       return self::getBudgetSummary($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
                 case 'get_employee_salary':      return self::getEmployeeSalary($rid, $args);
                 case 'list_tables':              return self::listTables($args);
@@ -562,6 +573,79 @@ class WisdomTools
         ];
     }
 
+    /**
+     * Staff accommodation capacity & occupancy. A room's bed count is its
+     * `Capacity`; a bed is occupied when there is a matching row in
+     * assing_accommodations (see AssignAccommodationController occupancy logic).
+     */
+    private static function getAccommodationSummary(int $rid): array
+    {
+        $totalRooms = DB::table('available_accommodation_models')->where('resort_id', $rid)->count();
+        $totalBeds  = (int) DB::table('available_accommodation_models')->where('resort_id', $rid)->sum('Capacity');
+        $occupied   = DB::table('assing_accommodations')->where('resort_id', $rid)->count();
+        $available  = max(0, $totalBeds - $occupied);
+
+        return [
+            'total_rooms'     => $totalRooms,
+            'total_beds'      => $totalBeds,
+            'occupied_beds'   => $occupied,
+            'available_beds'  => $available,
+            'occupancy_rate'  => $totalBeds > 0 ? round($occupied / $totalBeds * 100, 1) . '%' : 'n/a',
+        ];
+    }
+
+    /**
+     * HR salary-cost budget for a year. Mirrors the Workforce Planning HR
+     * dashboard: budgeted/actual annual staff cost = headcount × average basic
+     * salary × 12. Budgeted headcount comes from the year's manning submission
+     * (falls back to live active headcount when none exists). Money is in USD.
+     */
+    private static function getBudgetSummary(int $rid, array $args): array
+    {
+        $year = (int) ($args['year'] ?? 0);
+        if ($year < 2000 || $year > 2100) {
+            $year = (int) now()->format('Y');
+        }
+
+        $avgBasicSalary = (float) Employee::where('resort_id', $rid)
+            ->where('status', 'Active')
+            ->whereNotNull('basic_salary')
+            ->avg('basic_salary');
+        if ($avgBasicSalary <= 0) {
+            $avgBasicSalary = 1500; // dashboard fallback
+        }
+
+        $liveActive = Employee::where('resort_id', $rid)->where('status', 'Active')->count();
+
+        $manning = ManningResponse::where('resort_id', $rid)->where('year', $year)
+            ->selectRaw('COALESCE(SUM(total_headcount),0) as budgeted, COALESCE(SUM(total_filled_positions),0) as filled')
+            ->first();
+
+        $budgetedHeadcount = (int) ($manning->budgeted ?? 0);
+        $filledHeadcount   = (int) ($manning->filled ?? 0);
+        $usedLiveFallback  = false;
+        if ($budgetedHeadcount === 0 && $filledHeadcount === 0) {
+            $budgetedHeadcount = $filledHeadcount = $liveActive;
+            $usedLiveFallback  = true;
+        }
+
+        $budgetedAnnual = round($budgetedHeadcount * $avgBasicSalary * 12);
+        $actualAnnual   = round($filledHeadcount * $avgBasicSalary * 12);
+
+        return [
+            'year'                   => $year,
+            'budgeted_headcount'     => $budgetedHeadcount,
+            'filled_headcount'       => $filledHeadcount,
+            'average_basic_salary'   => Common::formatCurrency($avgBasicSalary, 'USD'),
+            'budgeted_annual_cost'   => Common::formatCurrency((float) $budgetedAnnual, 'USD'),
+            'actual_annual_cost'     => Common::formatCurrency((float) $actualAnnual, 'USD'),
+            'basis'                  => 'Annual staff salary cost = headcount × average basic salary × 12 (same as the Workforce Planning HR dashboard).',
+            'note'                   => $usedLiveFallback
+                ? "No manning/budget submission found for {$year}; based on the current active headcount ({$liveActive})."
+                : null,
+        ];
+    }
+
     private static function getPayrollSummary(int $rid): array
     {
         $p = Payroll::where('resort_id', $rid)->orderByDesc('id')->first();
@@ -673,10 +757,10 @@ class WisdomTools
         }
 
         try {
-            if (!\Schema::connection('mysql_readonly')->hasTable($table)) {
+            if (!Schema::connection('mysql_readonly')->hasTable($table)) {
                 return ['error' => "Table \"{$table}\" does not exist. Use list_tables to find the right name."];
             }
-            $columns = \Schema::connection('mysql_readonly')->getColumnListing($table);
+            $columns = Schema::connection('mysql_readonly')->getColumnListing($table);
         } catch (\Throwable $e) {
             Log::warning('Wisdom AI describe_table failed', ['error' => $e->getMessage()]);
             return ['error' => 'Could not describe this table right now.'];
