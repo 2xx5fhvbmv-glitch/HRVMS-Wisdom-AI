@@ -79,10 +79,12 @@ class WisdomTools
                     'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format. Defaults to today.'],
                 ]),
             self::fn('get_employee_attendance',
-                'Check whether ONE specific employee was present (checked in) on a given date, with their check-in / check-out times. Defaults to today. Use for "was X present", "did X come in on <date>", "is X here today" questions.',
+                'Attendance for ONE specific employee. For a single day pass `date` (defaults today) → present/absent with check-in/out times. For a period (e.g. "this month", "last week") pass `from` and `to` → a per-day breakdown plus present/absent day counts. Use for "was X present", "X\'s attendance this month" questions.',
                 [
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name, or employee ID.'],
-                    'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format. Defaults to today. For "yesterday" pass yesterday\'s date.'],
+                    'date' => ['type' => 'string', 'description' => 'Single date YYYY-MM-DD. Defaults to today. Ignored if from/to are given.'],
+                    'from' => ['type' => 'string', 'description' => 'Range start YYYY-MM-DD (use with to). For "this month" pass the 1st of the month.'],
+                    'to'   => ['type' => 'string', 'description' => 'Range end YYYY-MM-DD (use with from).'],
                 ], ['name']),
             self::fn('get_upcoming_birthdays',
                 'List active employees whose birthday falls in a given month (defaults to the current month). Use for "whose birthday is coming up", "birthdays this month" type questions.',
@@ -103,16 +105,26 @@ class WisdomTools
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name.'],
                 ], ['name']);
 
-            // Escape hatch for questions the dedicated tools don't cover. Full
-            // (HR) tier only — that tier may already see all data, so the only
-            // invariant left to protect is resort isolation (enforced by the
-            // mandatory :resort_id bind + table allow-list in ReadQueryGuard).
+            // Escape hatch + schema discovery for questions the dedicated tools
+            // don't cover. Full (HR) tier only — that tier may already see all
+            // data, so the only invariant left to protect is resort isolation
+            // (mandatory :resort_id bind) plus hiding credentials/system tables.
+            $tools[] = self::fn('list_tables',
+                'Discover which database tables exist before writing a custom query. Returns business table names, optionally filtered by a keyword (e.g. "accommodation", "budget", "overtime"). Use this first when unsure of the exact table name.',
+                [
+                    'keyword' => ['type' => 'string', 'description' => 'Optional substring to filter table names by.'],
+                ]);
+            $tools[] = self::fn('describe_table',
+                'Show the column names of a specific table so you can write a correct query. Describe a table before querying it if unsure of its columns.',
+                [
+                    'table' => ['type' => 'string', 'description' => 'Exact table name (from list_tables).'],
+                ], ['table']);
             $tools[] = self::fn('run_read_query',
-                "Run a custom READ-ONLY MySQL SELECT for questions the other tools don't cover. Use this as a LAST RESORT after checking the dedicated tools. STRICT RULES:\n"
+                "Run a custom READ-ONLY MySQL SELECT for questions the dedicated tools don't cover (budget, accommodation, overtime, etc.). WORKFLOW: if unsure of names, call `list_tables` then `describe_table` FIRST, then write the query. STRICT RULES:\n"
                 . "1) SELECT only — no INSERT/UPDATE/DELETE/DDL, single statement, no semicolons.\n"
-                . "2) You MUST scope every query to the resort by adding `resort_id = :resort_id` (do NOT write a number — `:resort_id` is bound automatically).\n"
-                . "3) Allowed tables only: employees, resort_admins, resort_departments, resort_positions, employees_leaves, leave_categories, parent_attendaces, sos_history, sos_emergency_types, vacancies, applicant_form_data, payroll.\n"
-                . "Schema notes: employee NAMES live on resort_admins — join `employees.Admin_Parent_id = resort_admins.id` (first_name,last_name). Department: `employees.Dept_id = resort_departments.id`(name). Position: `employees.Position_id = resort_positions.id`(position_title). Attendance: `parent_attendaces.Emp_id = employees.id` (date, CheckingTime, CheckingOutTime, Status). SOS: `sos_history.emergency_id = sos_emergency_types.id`(name), `sos_history.emp_initiated_by = employees.id`. Employee date-of-birth column is `employees.dob`. Filter active staff with `employees.status = 'Active'`. Results are capped at 200 rows.",
+                . "2) You MUST scope to the resort by adding `resort_id = :resort_id` somewhere (never write a literal number — `:resort_id` is bound automatically). Use the resort_id column of the main table, or join through a table that has one.\n"
+                . "3) System/auth tables and credential columns (passwords, tokens) are blocked.\n"
+                . "Schema notes: employee NAMES live on resort_admins — join `employees.Admin_Parent_id = resort_admins.id` (first_name,last_name). Department: `employees.Dept_id = resort_departments.id`(name). Position: `employees.Position_id = resort_positions.id`(position_title). Attendance: `parent_attendaces.Emp_id = employees.id` (date, CheckingTime, CheckingOutTime, Status, OverTime, OTStatus). Employee date-of-birth column is `employees.dob`. Filter active staff with `employees.status = 'Active'`. Results are capped at 200 rows. If a query errors, use describe_table to check the real column names, then retry once.",
                 [
                     'sql' => ['type' => 'string', 'description' => 'A single MySQL SELECT statement, scoped with `resort_id = :resort_id`.'],
                 ], ['sql']);
@@ -133,8 +145,8 @@ class WisdomTools
         if (in_array($name, self::PAYROLL_TOOLS, true) && empty($ctx['can_payroll'])) {
             return ['error' => 'Access denied: payroll and compensation data is restricted for your role.'];
         }
-        // The ad-hoc SQL tool is full-access (HR) only.
-        if ($name === 'run_read_query' && empty($ctx['can_payroll'])) {
+        // The ad-hoc SQL + schema-discovery tools are full-access (HR) only.
+        if (in_array($name, ['run_read_query', 'list_tables', 'describe_table'], true) && empty($ctx['can_payroll'])) {
             return ['error' => 'Access denied: custom queries are restricted for your role.'];
         }
         if (empty($ctx['can_db'])) {
@@ -159,6 +171,8 @@ class WisdomTools
                 case 'get_active_sos':           return self::getActiveSos($rid);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
                 case 'get_employee_salary':      return self::getEmployeeSalary($rid, $args);
+                case 'list_tables':              return self::listTables($args);
+                case 'describe_table':           return self::describeTable($args);
                 case 'run_read_query':           return self::runReadQuery($rid, $args);
                 default:                         return ['error' => "Unknown tool: {$name}"];
             }
@@ -403,7 +417,6 @@ class WisdomTools
         if ($term === '') {
             return ['error' => 'Please provide an employee name.'];
         }
-        $date = self::cleanDate($args['date'] ?? null);
 
         $employee = Employee::where('resort_id', $rid)
             ->where(function ($q) use ($term) {
@@ -421,8 +434,45 @@ class WisdomTools
             return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
         }
 
-        // parent_attendaces.Emp_id is the employees.id foreign key (see
-        // ParentAttendace::Employee()).
+        $from = $args['from'] ?? null;
+        $to   = $args['to'] ?? null;
+
+        // Range mode: per-day breakdown + present/absent counts.
+        if ($from && $to) {
+            $from = self::cleanDate($from);
+            $to   = self::cleanDate($to);
+
+            // parent_attendaces.Emp_id is the employees.id foreign key.
+            $rows = ParentAttendace::where('resort_id', $rid)
+                ->where('Emp_id', $employee->id)
+                ->whereBetween('date', [$from, $to])
+                ->orderBy('date')
+                ->get();
+
+            $days = $rows->map(fn ($a) => [
+                'date'      => $a->getRawOriginal('date'),
+                'present'   => !empty($a->CheckingTime),
+                'status'    => $a->Status ?: (!empty($a->CheckingTime) ? 'Present' : 'Absent'),
+                'check_in'  => $a->CheckingTime ?: null,
+                'check_out' => $a->CheckingOutTime ?: null,
+            ])->values();
+
+            $presentDays = $days->where('present', true)->count();
+
+            return [
+                'employee'      => self::empName($employee),
+                'department'    => $employee->department->name ?? null,
+                'from'          => $from,
+                'to'            => $to,
+                'days_with_records' => $days->count(),
+                'present_days'  => $presentDays,
+                'absent_or_no_record_days' => max(0, $days->count() - $presentDays),
+                'daily'         => $days,
+            ];
+        }
+
+        // Single-day mode.
+        $date = self::cleanDate($args['date'] ?? null);
         $att = ParentAttendace::where('resort_id', $rid)
             ->where('Emp_id', $employee->id)
             ->whereDate('date', $date)
@@ -569,14 +619,92 @@ class WisdomTools
     }
 
     /**
+     * List business tables (for schema discovery), optionally filtered by a
+     * keyword. Auth/system tables are hidden.
+     */
+    private static function listTables(array $args): array
+    {
+        $keyword = strtolower(trim($args['keyword'] ?? ''));
+
+        try {
+            $raw = DB::connection('mysql_readonly')->select('SHOW TABLES');
+        } catch (\Throwable $e) {
+            Log::warning('Wisdom AI list_tables failed', ['error' => $e->getMessage()]);
+            return ['error' => 'Could not list tables right now.'];
+        }
+
+        $tables = [];
+        foreach ($raw as $row) {
+            $name = array_values((array) $row)[0] ?? null;
+            if (!$name || ReadQueryGuard::isDeniedTable($name)) {
+                continue;
+            }
+            if ($keyword !== '' && strpos(strtolower($name), $keyword) === false) {
+                continue;
+            }
+            $tables[] = $name;
+        }
+        sort($tables);
+
+        // Bound the payload — there are hundreds of tables.
+        $shown = array_slice($tables, 0, 80);
+
+        return [
+            'keyword'     => $keyword !== '' ? $keyword : null,
+            'match_count' => count($tables),
+            'tables'      => $shown,
+            'truncated'   => count($tables) > count($shown),
+            'note'        => count($tables) > count($shown) ? 'Too many matches — refine with a more specific keyword.' : null,
+        ];
+    }
+
+    /**
+     * Describe a table's columns (for schema discovery). Credential columns and
+     * denied tables are not exposed.
+     */
+    private static function describeTable(array $args): array
+    {
+        $table = trim($args['table'] ?? '');
+        if ($table === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            return ['error' => 'Provide a valid table name (letters, numbers, underscores).'];
+        }
+        if (ReadQueryGuard::isDeniedTable($table)) {
+            return ['error' => "Table \"{$table}\" is restricted."];
+        }
+
+        try {
+            if (!\Schema::connection('mysql_readonly')->hasTable($table)) {
+                return ['error' => "Table \"{$table}\" does not exist. Use list_tables to find the right name."];
+            }
+            $columns = \Schema::connection('mysql_readonly')->getColumnListing($table);
+        } catch (\Throwable $e) {
+            Log::warning('Wisdom AI describe_table failed', ['error' => $e->getMessage()]);
+            return ['error' => 'Could not describe this table right now.'];
+        }
+
+        $columns = array_values(array_filter($columns, fn ($c) => !ReadQueryGuard::isSensitiveColumn($c)));
+        $hasResortId = in_array('resort_id', array_map('strtolower', $columns), true);
+
+        return [
+            'table'           => $table,
+            'columns'         => $columns,
+            'has_resort_id'   => $hasResortId,
+            'scoping_hint'    => $hasResortId
+                ? "Scope with `{$table}.resort_id = :resort_id`."
+                : 'No resort_id column — join through a table that has one (e.g. employees) and scope on that.',
+        ];
+    }
+
+    /**
      * Ad-hoc read-only query. Every safety check lives in ReadQueryGuard; here
-     * we only bind the resort id and run it on the read-only connection.
+     * we bind the resort id, run it on the read-only connection, and strip any
+     * credential columns from the rows as a final safety net.
      */
     private static function runReadQuery(int $rid, array $args): array
     {
         $check = ReadQueryGuard::validate((string) ($args['sql'] ?? ''));
         if (empty($check['ok'])) {
-            return ['error' => $check['error'], 'hint' => 'Rewrite the SQL to satisfy this rule, or fall back to a dedicated tool.'];
+            return ['error' => $check['error'], 'hint' => 'Fix the SQL to satisfy this rule (use list_tables / describe_table if unsure), or fall back to a dedicated tool.'];
         }
 
         try {
@@ -584,16 +712,44 @@ class WisdomTools
                 ->select($check['sql'], ['resort_id' => $rid]);
         } catch (\Throwable $e) {
             Log::warning('Wisdom AI run_read_query failed', ['error' => $e->getMessage()]);
-            return ['error' => 'The query could not be executed. Check the column/table names and try again.'];
+            // Surface the DB's own message (column/table not found etc.) so the
+            // model can correct itself — it's not sensitive and aids recovery.
+            return [
+                'error' => 'Query failed: ' . self::dbErrorHint($e->getMessage()),
+                'hint'  => 'Use describe_table to confirm the real column names, then retry once.',
+            ];
         }
 
-        $rows = array_map(fn ($r) => (array) $r, $rows);
+        $rows = array_map(function ($r) {
+            $arr = (array) $r;
+            foreach (array_keys($arr) as $k) {
+                if (ReadQueryGuard::isSensitiveColumn($k)) {
+                    unset($arr[$k]);
+                }
+            }
+            return $arr;
+        }, $rows);
 
         return [
             'row_count' => count($rows),
             'truncated' => count($rows) >= ReadQueryGuard::MAX_ROWS,
             'rows'      => $rows,
         ];
+    }
+
+    /** Extract the meaningful part of a MySQL error for the model. */
+    private static function dbErrorHint(string $msg): string
+    {
+        if (preg_match("/Unknown column '([^']+)'/", $msg, $m)) {
+            return "unknown column '{$m[1]}'.";
+        }
+        if (preg_match("/Table '[^']*\.([^']+)' doesn't exist/", $msg, $m)) {
+            return "table '{$m[1]}' doesn't exist.";
+        }
+        if (stripos($msg, 'syntax') !== false) {
+            return 'SQL syntax error.';
+        }
+        return 'check the table and column names.';
     }
 
     // ---------------------------------------------------------------------

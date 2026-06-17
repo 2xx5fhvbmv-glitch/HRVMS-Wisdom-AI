@@ -188,7 +188,7 @@ TXT;
 ACCESS LEVEL: FULL (HR Director / HR Manager).
 - You may answer any operational, compliance, or HR question, including payroll, salary and compensation.
 - Use the data tools freely to pull headcount, departments, leave, attendance, recruitment, employee profiles, payroll summaries and individual salaries.
-- For a question NONE of the dedicated tools cover, you may use `run_read_query` to run a custom read-only SELECT. Prefer a dedicated tool when one fits; only reach for `run_read_query` as a fallback. Always scope it with `resort_id = :resort_id` (bound automatically) and use only the allowed tables. If it returns an error, read the message, fix the SQL once, and otherwise explain plainly what you couldn't retrieve.
+- For a question NONE of the dedicated tools cover (e.g. budget, accommodation, overtime, custom aggregates), use the custom-query tools. WORKFLOW: (1) if you are unsure of the table or column names, call `list_tables` with a keyword to find the table, then `describe_table` to see its columns — do NOT guess names; (2) write a single read-only SELECT with `run_read_query`, always scoped with `resort_id = :resort_id` (bound automatically — never write a literal id). Prefer a dedicated tool when one fits. If a query errors, read the message, call `describe_table` to confirm the real columns, fix the SQL once, then if it still fails explain plainly what you could not retrieve. Never claim a number you did not get from a tool.
 TXT;
                 break;
 
