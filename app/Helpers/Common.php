@@ -7337,7 +7337,19 @@ class Common
                                                                         ]];
                                                                     })->toArray();
 
-        return $ResortBudgetCost;
+        // Guarantee every key the callers access exists, so a resort that hasn't
+        // configured a given Xpat cost doesn't trigger "Undefined array key"
+        // (which is promoted to an ErrorException / 500 in web requests). Real
+        // configured values still override these zero defaults.
+        $defaults = [
+            'VISA FEE'                          => ['amount' => 0, 'unit' => 'MVR'],
+            'QUOTA SLOT DEPOSIT'                => ['amount' => 0, 'unit' => 'MVR'],
+            'WORK PERMIT FEE'                   => ['amount' => 0, 'unit' => 'MVR'],
+            'WORK VISA MEDICAL TEST FEE'        => ['amount' => 0, 'unit' => 'MVR'],
+            'MEDICAL INSURANCE - INTERNATIONAL' => ['amount' => 0, 'unit' => 'MVR'],
+        ];
+
+        return array_merge($defaults, $ResortBudgetCost);
     }
 
     public static function PaymentRequest($resort_id)

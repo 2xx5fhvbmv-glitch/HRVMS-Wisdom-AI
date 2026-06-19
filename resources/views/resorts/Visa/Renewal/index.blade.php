@@ -194,7 +194,7 @@ $(document).ready(function ()
                     var WorkPermitMedicalRenewal = data.WorkPermitMedicalRenewal;
                    var WorkPermitRenewal = data.WorkPermitRenewal;
                     var html='';
-                    if(isNaN(EmployeeInsurance))
+                    if(EmployeeInsurance)
                     {
                           html+=`<div class="col-xl-6">  
                                     <div class="renewal-box mb-4">
@@ -222,7 +222,7 @@ $(document).ready(function ()
                                             </div>
                                             <div class="col-sm-6">
                                                 <div class="renewal-innerbox">
-                                                    <label>Premium</label>
+                                                    <label>Premium Amount</label>
                                                     <p>${EmployeeInsurance.cost}</p>
                                                 </div>
                                             </div>
@@ -254,13 +254,18 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                <p class="mb-2">No Record Found</p>
+                                                <div class="col-12">
+                                                    <a href="javascript:void(0)" data-emp_id="${id}" data-flag="insurance" class="SendFile btn btn-themeBlue btn-sm">
+                                                        Upload The New Insurance Policy
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>`;
                     }
-                    if(isNaN(WorkPermitMedicalRenewal))
+                    if(WorkPermitMedicalRenewal)
                     {
                         html+=`<div class="col-xl-6">
                                     <div class="renewal-box mb-4">
@@ -289,7 +294,7 @@ $(document).ready(function ()
                                             </div>
                                             <div class="col-sm-6">
                                                 <div class="renewal-innerbox">
-                                                    <label> Cost</label>
+                                                    <label>Test Cost</label>
                                                     <p> ${WorkPermitMedicalRenewal.workpermitcost}</p>
                                                 </div>
                                             </div>
@@ -320,13 +325,18 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                <p class="mb-2">No Record Found</p>
+                                                <div class="col-12">
+                                                    <a href="javascript:void(0)" data-emp_id="${id}" data-flag="work_permit_card_Test_Fee" class="SendFile btn btn-themeBlue btn-sm">
+                                                        Upload The New Work Permit
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>`;
                     }
-                    if(isNaN(VisaRenewal))
+                    if(VisaRenewal)
                     {
                         html+=`<div class="col-xl-6">
                             <div class="renewal-box mb-4">
@@ -399,7 +409,7 @@ $(document).ready(function ()
                                     </div>
                                 </div>`;
                     }
-                    if(isNaN(QuotaSlotRenewal))
+                    if(QuotaSlotRenewal)
                     {
                         html+=`<div class="col-xl-6">
                             <div class="renewal-box mb-4">
@@ -453,7 +463,7 @@ $(document).ready(function ()
                                 </div>`;
                     }
 
-                     if(isNaN(WorkPermitRenewal))
+                     if(WorkPermitRenewal)
                     {
                         html+=`<div class="col-xl-6">
                             <div class="renewal-box mb-4">
@@ -623,7 +633,7 @@ $(document).ready(function ()
                     });
 
 
-                    $("#Updated_Employee_details").html(''); // Clear the previous employee details
+                    $(".Updated_Employee_details").html(''); // Clear the previous employee details
                     $("#Visa_select_emp").val('').trigger('change'); // Reset the select2 dropdown
                  
                 } else {

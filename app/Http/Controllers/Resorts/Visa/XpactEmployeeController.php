@@ -284,14 +284,14 @@ class XpactEmployeeController extends Controller
             if(isset($Ai_extracted_data['extracted_fields']['Visa Expiry Date']) && $Ai_extracted_data['extracted_fields']['Visa Expiry Date'])
             {
                 $statisctic_emp_header->Name ="Visa Expiry";
-                $statisctic_emp_header->VisaExpiryDate = Carbon::parse($Ai_extracted_data['extracted_fields']['Visa Expiry Date'])->format('d M Y');
+                $statisctic_emp_header->VisaExpiryDate = $this->safeDate($Ai_extracted_data['extracted_fields']['Visa Expiry Date']);
                 $statisctic_emp_header->VisaRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Visa Expiry Date']);
             }
              // Insurance Expiry Date ->
             if(isset($Ai_extracted_data) && $Ai_extracted_data['extracted_fields']['Insurance Expiry Date'])
             {
                 $statisctic_emp_header->Name ="Insurance Expiry";
-                $statisctic_emp_header->InsuranceExpiryDate = Carbon::parse($Ai_extracted_data['extracted_fields']['Insurance Expiry Date'])->format('d M Y');
+                $statisctic_emp_header->InsuranceExpiryDate = $this->safeDate($Ai_extracted_data['extracted_fields']['Insurance Expiry Date']);
                 $statisctic_emp_header->InsuranceRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Insurance Expiry Date']);
                 $statisctic_emp_header->QuotaSlotNumber = $Ai_extracted_data['extracted_fields']['Quota Slot Number'];
             }
@@ -299,7 +299,7 @@ class XpactEmployeeController extends Controller
             if(isset($Ai_extracted_data) && $Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)'])
             {
                 $statisctic_emp_header->Name ="Work Permit Expiry";
-                $statisctic_emp_header->WorkPermitExpiryDate = Carbon::parse($Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)'])->format('d M Y');
+                $statisctic_emp_header->WorkPermitExpiryDate = $this->safeDate($Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)']);
                 $statisctic_emp_header->WorkPermitRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)']);
             }
         }
@@ -308,12 +308,12 @@ class XpactEmployeeController extends Controller
         {
             $date = $statisctic_emp_headerWorkPermit['Ai_extracted_data']['extracted_fields']['Last Entry Allowed'];
             $statisctic_emp_header->Name = "Work Permit Entry Pass";
-            $statisctic_emp_header->LastEntryDate = Carbon::parse($date)->format('d M Y');
+            $statisctic_emp_header->LastEntryDate = $this->safeDate($date);
             $statisctic_emp_header->WorkPermitPassRemingDays = $this->getFormattedExpiryStatus($date);
         }
         if($QuotaSlotRenewal)
         {
-            $QuotaSlotRenewal->QuotaslotExpiryDate = Carbon::parse($QuotaSlotRenewal->Due_Date)->format('d M Y');
+            $QuotaSlotRenewal->QuotaslotExpiryDate = $this->safeDate($QuotaSlotRenewal->Due_Date);
             $QuotaSlotRenewal->QuotaslotRemingDays = $this->getFormattedExpiryStatus($QuotaSlotRenewal->Due_Date);
         }
 
@@ -915,10 +915,46 @@ class XpactEmployeeController extends Controller
         }
     }
     
+    /**
+     * Safely parse a date that may come from OCR/AI extraction, where missing
+     * values arrive as literal strings like "Unavailable" or "N/A". Returns a
+     * Carbon instance, or null when the value is empty / a placeholder /
+     * unparseable (so callers never hit Carbon's InvalidFormatException).
+     */
+    private function safeParse($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+        $value = trim((string) $value);
+        $placeholders = ['', 'unavailable', 'n/a', 'na', 'not available', 'none', '-', '--'];
+        if (in_array(strtolower($value), $placeholders, true)) {
+            return null;
+        }
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Format a possibly-placeholder date, falling back to a readable label
+     * instead of throwing.
+     */
+    private function safeDate($value, $format = 'd M Y', $fallback = 'Unavailable')
+    {
+        $c = $this->safeParse($value);
+        return $c ? $c->format($format) : $fallback;
+    }
+
     function getFormattedExpiryStatus($endDate)
     {
+        $end = $this->safeParse($endDate);
+        if (!$end) {
+            return 'Unavailable';
+        }
         $start = Carbon::today();
-        $end = Carbon::parse($endDate);
         $daysDiff = $start->diffInDays($end, false);
         if ($daysDiff < 0) 
         {

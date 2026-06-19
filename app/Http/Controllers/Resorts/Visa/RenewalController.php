@@ -261,7 +261,10 @@ class RenewalController extends Controller
 
         $emp_id =  base64_decode($request->emp_id);
 
-        $child_id =  base64_decode($request->child_id);
+        // child_id is only present when the upload is launched from the
+        // payment-request workflow. On the standalone Renewal page it is absent,
+        // so keep it null and skip the payment-request bookkeeping below.
+        $child_id =  $request->filled('child_id') ? base64_decode($request->child_id) : null;
         $employee = Employee::where('resort_id', $this->resort->resort_id)->where('id', $emp_id)->first("Emp_id");
         $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $emp_id)->first();
         if (!$TotalExpensessSinceJoing) 
@@ -407,21 +410,25 @@ class RenewalController extends Controller
                             ]);
 
 
-                            $PaymentRequestChild = PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first();
-                            $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
-                            if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
-                            {
-                                $PaymentRequestChild->ChildStatus = 'Complete';
-                                PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
+                            // Payment-request bookkeeping only applies when this upload came
+                            // from the payment-request workflow (child_id present).
+                            $PaymentRequestChild = $child_id ? PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first() : null;
+                            if ($PaymentRequestChild) {
+                                $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
+                                if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
+                                {
+                                    $PaymentRequestChild->ChildStatus = 'Complete';
+                                    PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
+                                }
+                                $PaymentRequestChild->InsuranceShow = 'No';
+                                $PaymentRequestChild->InsuranceStep = 'Yes';
+                                $PaymentRequestChild->save();
                             }
-                            $PaymentRequestChild->InsuranceShow = 'No';
-                            $PaymentRequestChild->InsuranceStep = 'Yes';
-                            $PaymentRequestChild->save();
                             DB::Commit();
 
-                            return response()->json(['success'=>true,'message'=>'MedicaMedical Insurance - International Renewal Completed','status'=>200]);
+                            return response()->json(['success'=>true,'message'=>'Medical Insurance - International Renewal Completed','status'=>200]);
                         }
-                        catch(\Exception $e)
+                        catch(\Throwable $e)
                         {
                             DB::rollBack();
                             return response()->json(['success'=>false,'message'=>'File Upload Failed','status'=>500]);
@@ -429,7 +436,48 @@ class RenewalController extends Controller
                 }
                 else
                 {
-                    return response()->json(['success'=>false,'message'=>'File Upload Failed','status'=>500]);
+                    // No existing insurance record — create the first one from the OCR data.
+                    $aws = Common::AWSEmployeeFileUpload($this->resort->resort_id, $file, $employee->Emp_id);
+                    if ($aws['status'] == false) {
+                        return response()->json(['success'=>false,'message'=>$aws['msg'],'status'=>500]);
+                    }
+                    DB::beginTransaction();
+                    try {
+                        $Insurance_data = $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
+                        $insExpiry = optional(\App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null))->format('Y-m-d');
+                        EmployeeInsurance::create([
+                            'resort_id'               => $this->resort->resort_id,
+                            'employee_id'             => $emp_id,
+                            'insurance_company'       => $AI_Data['extracted_fields']['Insurance Company Name'] ?? null,
+                            'insurance_policy_number' => $AI_Data['extracted_fields']['Policy Number'] ?? null,
+                            'Premium'                 => $Insurance_data['amount'] ?? 0.00,
+                            'Currency'                => $Insurance_data['unit'] ?? null,
+                            'insurance_start_date'    => $insExpiry,
+                            'insurance_end_date'      => $insExpiry,
+                            'insurance_file'          => $aws['Chil_file_id'] ?? null,
+                        ]);
+
+                        $TotalExpensessSinceJoing->Total_insurance_Payment += $Insurance_data['amount'] ?? 0.00;
+                        $TotalExpensessSinceJoing->save();
+
+                        VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
+                            ->where('employee_id', $employee->id)
+                            ->where('DocumentName', $doc_type)
+                            ->delete();
+                        VisaEmployeeExpiryData::create([
+                            'resort_id'         => $this->resort->resort_id,
+                            'employee_id'       => $employee->id,
+                            'File_child_id'     => $aws['Chil_file_id'] ?? null,
+                            'Ai_extracted_data' => $ai_encode ?? null,
+                            'DocumentName'      => $doc_type ?? null,
+                        ]);
+
+                        DB::Commit();
+                        return response()->json(['success'=>true,'message'=>'Medical Insurance - International Renewal Completed','status'=>200]);
+                    } catch (\Throwable $e) {
+                        DB::rollBack();
+                        return response()->json(['success'=>false,'message'=>'File Upload Failed','status'=>500]);
+                    }
                 }
             }
             if($doc_type=="medical_report")
@@ -477,31 +525,65 @@ class RenewalController extends Controller
                                 $TotalExpensessSinceJoing->Total_Work_Permit_Medical_Payment += $workPermitMedicalAmt ?? 0.00;
                                 $TotalExpensessSinceJoing->save();
                                  
-                            $PaymentRequestChild = PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first();
-                            $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
-                            if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
-                            {
-                                $PaymentRequestChild->ChildStatus = 'Complete';
-                                PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
+                            // Payment-request bookkeeping only when launched from that workflow.
+                            $PaymentRequestChild = $child_id ? PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first() : null;
+                            if ($PaymentRequestChild) {
+                                $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
+                                if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
+                                {
+                                    $PaymentRequestChild->ChildStatus = 'Complete';
+                                    PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
+                                }
+                                $PaymentRequestChild->MedicalReportShow = 'No';
+                                $PaymentRequestChild->MedicalReportStep = 'Yes';
+                                $PaymentRequestChild->save();
                             }
-                            $PaymentRequestChild->MedicalReportShow = 'No';
-                            $PaymentRequestChild->MedicalReportStep = 'Yes';
-                            $PaymentRequestChild->save();  
-                        
-                        
+
+
                         DB::Commit();
                                 return response()->json(['success'=>true,'message'=>'Work Permit Medical Test Fee Renewal Successfully','status'=>200]);
                             }
-                            catch(\Exception $e)
+                            catch(\Throwable $e)
                             {
                                 // If any error occurs, rollback the transaction
                                 DB::rollBack();
                                 return response()->json(['success'=>false,'message'=>'File Upload Failed','status'=>500]);
                             }
                     }
-                    else    
+                    else
                     {
-                        return response()->json(['success'=>false,'message'=>'File Upload Failed','status'=>500]);
+                        // No existing medical record — create the first one from the OCR data.
+                        $aws = Common::AWSEmployeeFileUpload($this->resort->resort_id, $file, $employee->Emp_id);
+                        if ($aws['status'] == false) {
+                            return response()->json(['success'=>false,'message'=>$aws['msg'],'status'=>500]);
+                        }
+                        DB::beginTransaction();
+                        try {
+                            $medical_data = $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'] ?? null;
+                            $medParsed = \App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Last Medical Test Date(Mentioned in Certification of Doctor)'] ?? null);
+                            $start_date = ($medParsed ?: \Carbon\Carbon::now())->format('Y-m-d');
+                            $end_date   = ($medParsed ? $medParsed->copy() : \Carbon\Carbon::now())->addYear();
+                            WorkPermitMedicalRenewal::create([
+                                'resort_id'           => $this->resort->resort_id,
+                                'employee_id'         => $emp_id,
+                                'Reference_Number'    => $AI_Data['extracted_fields']['Reference Number(Generally starts with MOH)'] ?? null,
+                                'Medical_Center_name' => $AI_Data['extracted_fields']['Medical Center Name'] ?? null,
+                                'Amt'                 => $medical_data['amount'] ?? 0.00,
+                                'Currency'            => $medical_data['unit'] ?? null,
+                                'start_date'          => $start_date,
+                                'end_date'            => $end_date->format('Y-m-d'),
+                                'medical_file'        => $aws['Chil_file_id'] ?? null,
+                            ]);
+
+                            $TotalExpensessSinceJoing->Total_Work_Permit_Medical_Payment += $medical_data['amount'] ?? 0.00;
+                            $TotalExpensessSinceJoing->save();
+
+                            DB::Commit();
+                            return response()->json(['success'=>true,'message'=>'Work Permit Medical Test Fee Renewal Successfully','status'=>200]);
+                        } catch (\Throwable $e) {
+                            DB::rollBack();
+                            return response()->json(['success'=>false,'message'=>'File Upload Failed','status'=>500]);
+                        }
                     }
             }
             if($doc_type=="visa")
@@ -545,16 +627,19 @@ class RenewalController extends Controller
                                 'Ai_extracted_data' => $ai_encode ?? null,
                                 'DocumentName' => $doc_type ?? null
                             ]);
-                        $PaymentRequestChild = PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first();
-                        $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
-                        if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
-                        {
-                            $PaymentRequestChild->ChildStatus = 'Complete';
-                            PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
+                        // Payment-request bookkeeping only when launched from that workflow.
+                        $PaymentRequestChild = $child_id ? PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first() : null;
+                        if ($PaymentRequestChild) {
+                            $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
+                            if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
+                            {
+                                $PaymentRequestChild->ChildStatus = 'Complete';
+                                PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
+                            }
+                            $PaymentRequestChild->VisaShow = 'No';
+                            $PaymentRequestChild->VisaStep = 'Yes';
+                            $PaymentRequestChild->save();
                         }
-                        $PaymentRequestChild->VisaShow = 'No';
-                        $PaymentRequestChild->VisaStep = 'Yes';
-                        $PaymentRequestChild->save();  
                         DB::Commit();
                    
                         return response()->json(['success'=>true,'message'=>'Visa Renewal Successfully','status'=>200]);
@@ -757,20 +842,29 @@ class RenewalController extends Controller
           
 
            
-                        $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->first();
-                        if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
+                        // Latest insurance by expiry date (not id — a higher id can hold an
+                        // older end_date). Insurance always displays its latest record so the
+                        // card + edit pencil show regardless of month; the current-month gate
+                        // below only governs whether insurance alone pulls the row into the list.
+                        $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('insurance_end_date', 'desc')->orderBy('id', 'desc')->first();
+                        if ($insurance) {
                             $employee->InsuranceExpiryDate = $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                             $employee->Premium = $insurance->Premium;
                             $employee->InsuranceRecordId = $insurance->id;
                             $employee->InsuranceAmtRaw   = $insurance->Premium;
                             $employee->InsuranceDateRaw  = Carbon::parse($insurance->insurance_end_date)->format('Y-m-d');
-                            $hasAnyFlagData = true;
-                   
+                            if (Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
+                                $hasAnyFlagData = true;
+                            }
                         }
                   
-                        $wpEntries = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('id');
-                        $currentWP = $wpEntries->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))->first();
-                       
+                        // Work permit: prefer an actual work_permits row (latest unpaid by due
+                        // date) so it can be edited inline; show it regardless of month and only
+                        // flag the current-month list when it's actually due this month. When no
+                        // row exists, fall back to the OCR-extracted Work Permit expiry from the
+                        // employee's documents (the 'Other' blob, same source employee-details
+                        // uses). HR can always create an editable record via the Add (+) control.
+                        $currentWP = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('Due_Date')->first();
                         if ($currentWP)
                         {
                             $employee->WorkPermitExpiryDate =  $this->getFormattedExpiryStatus($currentWP->Due_Date);
@@ -779,9 +873,25 @@ class RenewalController extends Controller
                             $employee->WorkPermitAmtRaw    = $currentWP->Amt;
                             $employee->WorkPermitDateRaw   = Carbon::parse($currentWP->Due_Date)->format('Y-m-d');
                             $employee->WorkPermitStatusRaw = $currentWP->Status ?? null;
-                            $hasAnyFlagData = true;
-                         
-                           
+                            if (Carbon::parse($currentWP->Due_Date)->between($filterStart, $filterEnd)) {
+                                $hasAnyFlagData = true;
+                            }
+                        }
+                        else
+                        {
+                            $ocr = \App\Models\VisaEmployeeExpiryData::where('employee_id', $employee->id)
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->where('DocumentName', 'Other')
+                                ->orderBy('id', 'desc')
+                                ->first();
+                            if ($ocr) {
+                                $fields = json_decode($ocr->Ai_extracted_data, true)['extracted_fields'] ?? [];
+                                $wpDate = \App\Helpers\Common::safeAiDate($fields['Work Permit Expiry Date (Expiry On)'] ?? null);
+                                if ($wpDate) {
+                                    $employee->WorkPermitExpiryDate = $this->getFormattedExpiryStatus($wpDate->format('Y-m-d'));
+                                    $employee->WorkPermitDateRaw     = $wpDate->format('Y-m-d');
+                                }
+                            }
                         }
 
                         $med = $employee->WorkPermitMedicalRenewal;
@@ -838,11 +948,22 @@ class RenewalController extends Controller
                             // Renders a small Edit pencil for a column, carrying the
                             // record id + current values so the modal can pre-fill.
                             // Empty when there's no record for that column this month.
-                            $editIcon = function ($type, $id, $amount, $date, $status) {
-                                if (!$id) return '';
+                            $editIcon = function ($type, $id, $amount, $date, $status, $empId = null) {
+                                // No record yet: only Work Permit can be added manually from here
+                                // (HR enters the data), shown as a + icon carrying the employee id.
+                                // Other columns stay edit-only. A pre-filled date (e.g. OCR expiry)
+                                // is carried into the Add modal as a suggestion.
+                                if (!$id) {
+                                    if ($type !== 'work_permit' || !$empId) return '';
+                                    return ' <a href="javascript:void(0)" class="EditExpiry" title="Add Work Permit"'
+                                        . ' data-type="work_permit" data-id="" data-emp="' . $empId . '"'
+                                        . ' data-amount="" data-date="' . htmlspecialchars((string) $date, ENT_QUOTES) . '" data-status="">'
+                                        . '<i class="fa-regular fa-circle-plus"></i></a>';
+                                }
                                 return ' <a href="javascript:void(0)" class="EditExpiry" title="Edit"'
                                     . ' data-type="' . $type . '"'
                                     . ' data-id="' . $id . '"'
+                                    . ' data-emp="' . ($empId ?: '') . '"'
                                     . ' data-amount="' . htmlspecialchars((string) $amount, ENT_QUOTES) . '"'
                                     . ' data-date="' . htmlspecialchars((string) $date, ENT_QUOTES) . '"'
                                     . ' data-status="' . htmlspecialchars((string) $status, ENT_QUOTES) . '">'
@@ -850,7 +971,7 @@ class RenewalController extends Controller
                             };
 
                                 $expiryBoxes .= '<div>
-                                    <label>Work Permit: '.Common::formatCurrency($row->WorkPermitAmt, 'MVR').$editIcon('work_permit', $row->WorkPermitRecordId, $row->WorkPermitAmtRaw, $row->WorkPermitDateRaw, $row->WorkPermitStatusRaw).'</label>
+                                    <label>Work Permit: '.Common::formatCurrency($row->WorkPermitAmt, 'MVR').$editIcon('work_permit', $row->WorkPermitRecordId, $row->WorkPermitAmtRaw, $row->WorkPermitDateRaw, $row->WorkPermitStatusRaw, $row->id).'</label>
                                     <p>Expires: ' . ($row->WorkPermitExpiryDate ?? '-') . '</p>
                                 </div>';
 
@@ -920,7 +1041,8 @@ class RenewalController extends Controller
     {
         $request->validate([
             'type'        => 'required|in:visa,work_permit,slot,insurance',
-            'id'          => 'required|integer',
+            'id'          => 'nullable|integer',
+            'emp_id'      => 'nullable|integer',
             'amount'      => 'nullable|numeric',
             'expiry_date' => 'nullable|date',
             'status'      => 'nullable|string',
@@ -935,11 +1057,33 @@ class RenewalController extends Controller
         ];
         [$modelClass, $amountCol, $dateCol, $statusCol, $allowedStatuses] = $map[$request->type];
 
-        $record = $modelClass::where('id', $request->id)
-            ->where('resort_id', $this->resort->resort_id)
-            ->first();
-        if (!$record) {
-            return response()->json(['success' => false, 'errors' => ['message' => 'Record not found.']], 404);
+        if ($request->filled('id')) {
+            $record = $modelClass::where('id', $request->id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+            if (!$record) {
+                return response()->json(['success' => false, 'errors' => ['message' => 'Record not found.']], 404);
+            }
+        } else {
+            // Manual Add — HR creates a record where none existed. Only Work Permit
+            // supports this from the verify screen; a due date is required.
+            if ($request->type !== 'work_permit') {
+                return response()->json(['success' => false, 'errors' => ['message' => 'Adding a new record is not supported for this item.']], 422);
+            }
+            if (!$request->filled('expiry_date')) {
+                return response()->json(['success' => false, 'errors' => ['message' => 'Expiry / Due Date is required.']], 422);
+            }
+            $employee = \App\Models\Employee::where('id', $request->emp_id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+            if (!$employee) {
+                return response()->json(['success' => false, 'errors' => ['message' => 'Employee not found.']], 404);
+            }
+            $record = new $modelClass();
+            $record->resort_id   = $this->resort->resort_id;
+            $record->employee_id = $employee->id;
+            $record->Currency    = 'MVR';
+            $record->Status      = 'Unpaid';
         }
 
         if ($request->filled('amount')) {
@@ -951,9 +1095,10 @@ class RenewalController extends Controller
         if ($statusCol && $request->filled('status') && in_array($request->status, $allowedStatuses, true)) {
             $record->{$statusCol} = $request->status;
         }
+        $wasAdd = !$request->filled('id');
         $record->save();
 
-        return response()->json(['success' => true, 'msg' => 'Updated successfully.']);
+        return response()->json(['success' => true, 'msg' => $wasAdd ? 'Added successfully.' : 'Updated successfully.']);
     }
 
     public function OrverviewDashbordExpiry(Request $request)

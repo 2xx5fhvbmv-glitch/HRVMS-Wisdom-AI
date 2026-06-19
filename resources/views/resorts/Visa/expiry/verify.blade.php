@@ -107,7 +107,7 @@
        <div class="modal-dialog modal-dialog-centered">
            <div class="modal-content">
                <div class="modal-header">
-                   <h5 class="modal-title">Edit <span id="ExpiryEdit_typeLabel"></span></h5>
+                   <h5 class="modal-title"><span id="ExpiryEdit_verb">Edit</span> <span id="ExpiryEdit_typeLabel"></span></h5>
                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                </div>
                <form id="ExpiryEditForm" data-parsley-validate>
@@ -115,6 +115,7 @@
                    <div class="modal-body">
                        <input type="hidden" name="type" id="ExpiryEdit_type">
                        <input type="hidden" name="id" id="ExpiryEdit_id">
+                       <input type="hidden" name="emp_id" id="ExpiryEdit_emp">
                        <div class="form-group mb-3">
                            <label class="form-label">Amount (MVR)</label>
                            <input type="number" step="0.01" min="0" name="amount" id="ExpiryEdit_amount" class="form-control" placeholder="0.00">
@@ -192,10 +193,14 @@ $(document).ready(function()
 
     $(document).on('click', '.EditExpiry', function () {
         var type = $(this).data('type');
+        var id = $(this).data('id');
+        var isAdd = !id;
         $('#ExpiryEdit_type').val(type);
-        $('#ExpiryEdit_id').val($(this).data('id'));
+        $('#ExpiryEdit_id').val(id || '');
+        $('#ExpiryEdit_emp').val($(this).data('emp') || '');
         $('#ExpiryEdit_amount').val($(this).data('amount'));
         $('#ExpiryEdit_date').val($(this).data('date'));
+        $('#ExpiryEdit_verb').text(isAdd ? 'Add' : 'Edit');
         $('#ExpiryEdit_typeLabel').text(EXPIRY_TYPE_LABEL[type] || '');
 
         var opts = EXPIRY_STATUS_OPTS[type] || [];
