@@ -56,6 +56,13 @@
                                             Permit</label>
                                     </div>
                                 </div>
+                                <div class="col-auto ">
+                                    <div class="form-check">
+                                        <input class="form-check-input PaymentType" data-flag="slot_payment"   type="checkbox" id="slot-fee-check"
+                                            value="Status1" >
+                                        <label class="form-check-label" for="slot-fee-check">Slot Fee</label>
+                                    </div>
+                                </div>
                                 {{-- <div class="col-auto ">
                                     <div class="form-check">
                                         <input class="form-check-input PaymentType" data-flag="visa" type="checkbox" id="work-permit-check"
@@ -76,13 +83,6 @@
                                             value="Status1" >
                                         <label class="form-check-label text-nowrap" for="medical-check">Medical (work
                                             permit)</label>
-                                    </div>
-                                </div>
-                                <div class="col-auto ">
-                                    <div class="form-check">
-                                        <input class="form-check-input PaymentType" data-flag="slot_payment"   type="checkbox" id="slot-fee-check"
-                                            value="Status1" >
-                                        <label class="form-check-label" for="slot-fee-check">Slot Fee</label>
                                     </div>
                                 </div>
                                 <!-- <div class="col-auto ">
@@ -118,7 +118,8 @@
                                 <th>Employee Name</th>
                                 <th>Position</th>
                                 <th>Department</th>
-                                <th class="d-none">Visa Expiry</th>
+                                {{-- Visa Expiry column commented out per request --}}
+                                {{-- <th class="d-none">Visa Expiry</th> --}}
                                 <th>Work Permit</th>
                                 <th>Slot Fee</th>
                                 <th>Insurance</th>
@@ -135,7 +136,8 @@
                                 <th></th>
                                 <th></th>
                                 <th></th>
-                                <th class="d-none">MVR 0.00</th>
+                                {{-- Visa Expiry total cell commented out per request --}}
+                                {{-- <th class="d-none">MVR 0.00</th> --}}
                                 <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                 <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
                                 <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
@@ -308,7 +310,7 @@ function PaymentRequestTable() {
             iDisplayLength: 15,
             processing: true,
             serverSide: true,
-            order:[[10, 'desc']],
+            order:[[9, 'desc']], {{-- created_at column (index shifted from 10 -> 9 after the Visa Expiry column was removed) --}}
             ajax: {
                 url: "{{ route('resort.visa.PaymentRequest') }}",
                 type: 'GET',
@@ -329,7 +331,7 @@ function PaymentRequestTable() {
                 { data: 'EmployeeName', name: 'EmployeeName' },
                 { data: 'Position', name: 'Position' },
                 { data: 'Department', name: 'Department' },
-                { data: 'VisaExpiry', name: 'VisaExpiry', visible: false },
+                // { data: 'VisaExpiry', name: 'VisaExpiry', visible: false }, // Visa Expiry column commented out per request
                 { data: 'WorkPermit', name: 'WorkPermit' },
                 { data: 'SlotFees', name: 'SlotFees' },
                 { data: 'Insurance', name: 'Insurance' },
@@ -338,22 +340,24 @@ function PaymentRequestTable() {
             ],
             footerCallback: function (row, data, start, end, display) {
                 var api = this.api();
-                if (api.ajax.json().totals) {
-                    const totals = api.ajax.json().totals;
-                    // column(5) = VisaExpiry (hidden), column(6) = WorkPermit, column(7) = SlotFees, column(8) = Insurance, column(9) = Medical
-                    $(api.column(5).footer()).html('<b>' + totals.visa + '</b>');
-                    $(api.column(6).footer()).html('<b>' + totals.work_permit + '</b>');
-                    $(api.column(7).footer()).html('<b>' + totals.slot_payment + '</b>');
-                    $(api.column(8).footer()).html('<b>' + totals.insurance + '</b>');
-                    $(api.column(9).footer()).html('<b>' + totals.medical + '</b>');
-                $('.Overall-tot-amount').html('<b>{{ Common::GetResortCurrencySymbol() }} ' + totals.overall + '</b>');
+                // api.ajax.json() is undefined if the AJAX failed (e.g. server
+                // error / DB down) — guard it so the footer fails gracefully
+                // instead of throwing "Cannot read properties of undefined".
+                var resJson = api.ajax.json();
+                if (resJson && resJson.totals) {
+                    const totals = resJson.totals;
+                    // Visa Expiry column removed. column(5) = WorkPermit, column(6) = SlotFees, column(7) = Insurance, column(8) = Medical
+                    $(api.column(5).footer()).html('<b>' + totals.work_permit + '</b>');
+                    $(api.column(6).footer()).html('<b>' + totals.slot_payment + '</b>');
+                    $(api.column(7).footer()).html('<b>' + totals.insurance + '</b>');
+                    $(api.column(8).footer()).html('<b>' + totals.medical + '</b>');
+                $('.Overall-tot-amount').html('<b>' + totals.overall + '</b>');
                 $("#selectedCount").html(totals.totalChecked + ' Employees Selected');
                 } else {
                     $(api.column(5).footer()).html('<b>0</b>');
                     $(api.column(6).footer()).html('<b>0</b>');
                     $(api.column(7).footer()).html('<b>0</b>');
                     $(api.column(8).footer()).html('<b>0</b>');
-                    $(api.column(9).footer()).html('<b>0</b>');
                     $('.Overall-tot-amount').html('<b>Total Amount: {{ Common::GetResortCurrencySymbol() }} 0</b>');
                 }
             }

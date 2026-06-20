@@ -32,7 +32,7 @@ use Carbon\Carbon;
 class WisdomTools
 {
     /** Tools that expose salary / payroll / compensation data (HR / FULL tier only). */
-    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_budget_summary'];
+    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_workforce_budget', 'get_employee_cost'];
 
     /**
      * OpenAI-compatible tool schema list, filtered by the caller's capabilities.
@@ -96,6 +96,38 @@ class WisdomTools
                 'List active / ongoing SOS emergency incidents at the resort (those not yet resolved, rejected or closed): emergency type, who raised it, location, date/time and status. Use for "any active SOS", "current emergencies" questions.', []),
             self::fn('get_accommodation_summary',
                 'Staff accommodation capacity & occupancy: total rooms, total beds (capacity), occupied beds, available (free) beds and occupancy rate. Use for "how many beds are available", "accommodation occupancy", "free rooms" questions.', []),
+
+            // --- Workforce Planning (non-monetary) ---------------------------
+            self::fn('get_budgeted_headcount',
+                'Workforce Planning: approved/budgeted headcount vs filled vs vacant seats for a year, from the manning plan. group_by "total" (default), "division", "department" or "position". Use for "approved headcount", "budgeted manpower", "how many positions are approved", "manpower by division/department".',
+                [
+                    'year'     => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
+                    'group_by' => ['type' => 'string', 'description' => 'One of: total, division, department, position. Default total.'],
+                ]),
+            self::fn('get_vacancy_analysis',
+                'Workforce Planning: vacant positions for a year with fill rate, grouped by "department" (default), "position" or "total". Set critical_only=true to list only groups that still have vacancies (most understaffed first). Use for "how many vacancies", "vacancy by department", "which positions are vacant", "most critical vacancies", "understaffed departments".',
+                [
+                    'year'          => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
+                    'group_by'      => ['type' => 'string', 'description' => 'One of: total, department, position. Default department.'],
+                    'critical_only' => ['type' => 'boolean', 'description' => 'If true, only groups with vacancies, sorted most-vacant first.'],
+                ]),
+            self::fn('get_gender_breakdown',
+                'Count active employees by gender (male/female), optionally filtered by department, with the female ratio. Use for "how many males/females", "gender ratio", "female workforce by department".',
+                [
+                    'department' => ['type' => 'string', 'description' => 'Optional department name to filter by.'],
+                ]),
+            self::fn('get_manning_status',
+                'Workforce Planning: status of departmental manning / budget requests — counts by status and the latest status per department (Genrated/sent, Approved, Rejected, Pending, Completed). Use for "which departments submitted their manning plan", "pending manning requests", "approved/rejected requests".', []),
+            self::fn('get_occupancy',
+                'Resort room occupancy: the latest recorded occupancy (or as of a given date) — occupancy percentage, total rooms and occupied rooms. Use for "current occupancy", "what is our occupancy".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Optional date YYYY-MM-DD; returns the latest record on/before it. Defaults to the most recent.'],
+                ]),
+            self::fn('get_workforce_compliance',
+                'Workforce compliance check. type "localization" (default) = Maldivian vs expat split and localization %. type "minimum_wage" = count of current staff paid below the statutory minimum (HR only). Use for "localization percentage", "are we meeting local employment ratio", "employees under minimum wage".',
+                [
+                    'type' => ['type' => 'string', 'description' => 'One of: localization, minimum_wage. Default localization.'],
+                ]),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -107,11 +139,18 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name.'],
                 ], ['name']);
-            $tools[] = self::fn('get_budget_summary',
-                'Get the resort annual HR budget for a year (defaults to the current year): the total budget and a per-department breakdown, using the exact same engine as the official View Budget page. Each figure = staff salaries + budgeted cost components + allowances + vacant-slot costs. Use for "total HR budget", "<department> budget", "budget this year" questions. To answer one department, read its value from the breakdown. Payroll-restricted.',
+            $tools[] = self::fn('get_workforce_budget',
+                'Resort annual workforce budget for a year (USD), using the exact same engine as the official View Budget page (staff salaries + budgeted cost components + allowances + vacant-slot costs). Returns a total plus a breakdown grouped by group_by: "department" (default), "division", "section", "position", "nationality" (local vs expat budget) or "gender", or "total" for just the grand total. Use for "total HR budget", "<department>/<division> budget", "budget by position", "budget for local/expat employees", "budget this year". Budget is annual; for a single month divide by 12. To answer one group, read its value from the breakdown. Payroll-restricted.',
                 [
-                    'year' => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
+                    'year'     => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
+                    'group_by' => ['type' => 'string', 'description' => 'One of: total, division, department, section, position, nationality, gender. Default department.'],
                 ]);
+            $tools[] = self::fn('get_employee_cost',
+                'Annual budgeted cost for ONE employee (USD) for a year, with the monthly average — salary + budgeted cost components + allowances, same engine as View Budget. Use for "what is <employee>\'s annual budget/cost", "monthly cost of this employee". Payroll-restricted.',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Full or partial employee name, or employee ID.'],
+                    'year' => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
+                ], ['name']);
 
             // Escape hatch + schema discovery for questions the dedicated tools
             // don't cover. Full (HR) tier only — that tier may already see all
@@ -178,7 +217,19 @@ class WisdomTools
                 case 'get_upcoming_birthdays':   return self::getUpcomingBirthdays($rid, $args);
                 case 'get_active_sos':           return self::getActiveSos($rid);
                 case 'get_accommodation_summary':return self::getAccommodationSummary($rid);
-                case 'get_budget_summary':       return self::getBudgetSummary($rid, $args);
+                case 'get_budgeted_headcount':   return self::getBudgetedHeadcount($rid, $args);
+                case 'get_vacancy_analysis':     return self::getVacancyAnalysis($rid, $args);
+                case 'get_gender_breakdown':     return self::getGenderBreakdown($rid, $args);
+                case 'get_manning_status':       return self::getManningStatus($rid, $args);
+                case 'get_occupancy':            return self::getOccupancy($rid, $args);
+                case 'get_workforce_compliance':
+                    // Minimum-wage breakdown exposes compensation data → HR only.
+                    if (strtolower(trim($args['type'] ?? '')) === 'minimum_wage' && empty($ctx['can_payroll'])) {
+                        return ['error' => 'Access denied: minimum-wage / compensation data is restricted for your role.'];
+                    }
+                    return self::getWorkforceCompliance($rid, $args);
+                case 'get_workforce_budget':     return self::getWorkforceBudget($rid, $args);
+                case 'get_employee_cost':        return self::getEmployeeCost($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
                 case 'get_employee_salary':      return self::getEmployeeSalary($rid, $args);
                 case 'list_tables':              return self::listTables($args);
@@ -593,62 +644,365 @@ class WisdomTools
         ];
     }
 
-    /**
-     * Resort annual budget for a year, total + per-department breakdown.
-     *
-     * Reuses the SAME canonical engine as the official View Budget page so the
-     * numbers match exactly: a department's budget is the sum of
-     * Common::annualBudgetForEmployee() over its active employees plus
-     * Common::annualBudgetForVacantSlot() over its budgeted vacant slots (see
-     * BudgetController::viewConsolidatedBudget + Common::calculatePositionTotal).
-     * All figures are USD; rendered via formatCurrency in the resort's currency.
-     */
-    private static function getBudgetSummary(int $rid, array $args): array
+    // =====================================================================
+    // Workforce Planning module
+    // Budget + cost use the SAME canonical engine as the View Budget page
+    // (Common::annualBudgetForEmployee / annualBudgetForVacantSlot, USD).
+    // Headcount / vacancy mirror the Workforce Planning dashboard's
+    // position_monthly_data MAX-per-month aggregation. All resort-scoped.
+    // =====================================================================
+
+    /** Resolve a 4-digit year argument, defaulting to the current year. */
+    private static function wpYear(array $args): int
     {
         $year = (int) ($args['year'] ?? 0);
-        if ($year < 2000 || $year > 2100) {
-            $year = (int) now()->format('Y');
+        return ($year < 2000 || $year > 2100) ? (int) now()->format('Y') : $year;
+    }
+
+    /**
+     * Annual workforce budget (USD) for a year, grouped by the requested
+     * dimension. Same engine as the official View Budget page: each figure =
+     * per-employee (salary + budgeted cost components + allowances) over active
+     * employees + per-vacant-slot costs over budgeted vacancies.
+     */
+    private static function getWorkforceBudget(int $rid, array $args): array
+    {
+        $year    = self::wpYear($args);
+        $groupBy = strtolower(trim($args['group_by'] ?? 'department'));
+        if (!in_array($groupBy, ['total', 'division', 'department', 'section', 'position', 'nationality', 'gender'], true)) {
+            $groupBy = 'department';
         }
 
-        $departments = ResortDepartment::where('resort_id', $rid)
-            ->where('status', 'active')
-            ->get(['id', 'name']);
+        $depts     = DB::table('resort_departments')->where('resort_id', $rid)->get(['id', 'name', 'division_id'])->keyBy('id');
+        $divs      = DB::table('resort_divisions')->where('resort_id', $rid)->get(['id', 'name'])->keyBy('id');
+        $positions = DB::table('resort_positions')->where('resort_id', $rid)->get(['id', 'position_title', 'section_id'])->keyBy('id');
+        $sections  = DB::table('resort_sections')->where('resort_id', $rid)->get(['id', 'name'])->keyBy('id');
+        $genders   = DB::table('employees as e')->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->where('e.resort_id', $rid)->pluck('ra.gender', 'e.id');
 
-        $byDept = [];
-        $grandTotal = 0.0;
+        $buckets = [];
+        $add = function ($key, float $amt) use (&$buckets) {
+            if ($amt <= 0) return;
+            $key = ($key === null || $key === '') ? 'Unspecified' : $key;
+            $buckets[$key] = ($buckets[$key] ?? 0) + $amt;
+        };
 
-        foreach ($departments as $dept) {
-            $deptTotal = 0.0;
-
-            $employees = Employee::where('resort_id', $rid)
-                ->where('Dept_id', $dept->id)
-                ->where('status', 'Active')
-                ->get();
-            foreach ($employees as $emp) {
-                $deptTotal += Common::annualBudgetForEmployee($rid, $year, $emp);
+        foreach (Employee::where('resort_id', $rid)->where('status', 'Active')->get() as $emp) {
+            $amt = Common::annualBudgetForEmployee($rid, $year, $emp);
+            if ($amt <= 0) continue;
+            switch ($groupBy) {
+                case 'total':       $key = 'Total'; break;
+                case 'division':    $key = optional($divs->get(optional($depts->get($emp->Dept_id))->division_id))->name ?? 'No division'; break;
+                case 'department':  $key = optional($depts->get($emp->Dept_id))->name ?? 'Unassigned'; break;
+                case 'section':     $key = optional($sections->get($emp->Section_id))->name ?? 'No section'; break;
+                case 'position':    $key = optional($positions->get($emp->Position_id))->position_title ?? 'No position'; break;
+                case 'nationality': $key = $emp->nationality === 'Maldivian' ? 'Local (Maldivian)' : ($emp->nationality ? 'Expatriate' : 'Unspecified'); break;
+                case 'gender':      $g = $genders->get($emp->id); $key = $g ? ucfirst(strtolower($g)) : 'Unspecified'; break;
+                default:            $key = 'Total';
             }
+            $add($key, $amt);
+        }
 
-            $vacants = DB::table('resort_vacant_budget_costs')
-                ->where('resort_id', $rid)
-                ->where('department_id', $dept->id)
-                ->where('year', $year)
-                ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
-            foreach ($vacants as $vacant) {
-                $deptTotal += Common::annualBudgetForVacantSlot($rid, $year, $vacant);
+        $vacants = DB::table('resort_vacant_budget_costs')->where('resort_id', $rid)->where('year', $year)
+            ->get(['id', 'position_id', 'department_id', 'vacant_index', 'basic_salary', 'current_salary']);
+        foreach ($vacants as $v) {
+            $amt = Common::annualBudgetForVacantSlot($rid, $year, $v);
+            if ($amt <= 0) continue;
+            switch ($groupBy) {
+                case 'total':       $key = 'Total'; break;
+                case 'division':    $key = optional($divs->get(optional($depts->get($v->department_id))->division_id))->name ?? 'No division'; break;
+                case 'department':  $key = optional($depts->get($v->department_id))->name ?? 'Unassigned'; break;
+                case 'section':     $key = optional($sections->get(optional($positions->get($v->position_id))->section_id))->name ?? 'No section'; break;
+                case 'position':    $key = optional($positions->get($v->position_id))->position_title ?? 'No position'; break;
+                default:            $key = 'Vacant (unassigned)'; // nationality / gender unknown for empty slots
             }
+            $add($key, $amt);
+        }
 
-            if ($deptTotal > 0) {
-                $byDept[$dept->name] = Common::formatCurrency($deptTotal, 'USD');
-            }
-            $grandTotal += $deptTotal;
+        $rate = self::dollarToMvr($rid);
+        $grand = array_sum($buckets);
+        arsort($buckets);
+        $formatted = [];
+        foreach ($buckets as $k => $v) {
+            $formatted[$k] = self::dualMoney((float) $v, $rate);
         }
 
         return [
-            'year'          => $year,
-            'total_budget'  => Common::formatCurrency($grandTotal, 'USD'),
+            'year'            => $year,
+            'group_by'        => $groupBy,
+            'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
+            'total_budget'    => self::dualMoney($grand, $rate),
+            'breakdown'       => $formatted,
+            'basis'           => 'Annual workforce budget = per-employee salary + budgeted cost components + allowances, plus vacant-slot costs (same engine as the View Budget page). Each figure is given in BOTH USD and MVR (MVR = USD × the resort USD→MVR rate). Budget is planned annually; for one month divide by 12 (even split).',
+            'note'            => empty($formatted) ? "No budget data found for {$year}." : null,
+        ];
+    }
+
+    /** Annual budgeted cost for one employee (USD), with monthly average. */
+    private static function getEmployeeCost(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') return ['error' => 'Please provide an employee name.'];
+        $year = self::wpYear($args);
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                        $r->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"])
+                          ->orWhere('first_name', 'like', "%{$term}%")
+                          ->orWhere('last_name', 'like', "%{$term}%");
+                    })
+                  ->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with(['resortAdmin:id,first_name,last_name', 'department:id,name', 'position:id,position_title'])
+            ->first();
+        if (!$emp) return ['query' => $term, 'matches' => 0];
+
+        $total = Common::annualBudgetForEmployee($rid, $year, $emp);
+        $rate  = self::dollarToMvr($rid);
+        return [
+            'employee'        => self::empName($emp),
+            'employee_id'     => $emp->Emp_id,
+            'department'      => $emp->department->name ?? null,
+            'position'        => $emp->position->position_title ?? null,
+            'year'            => $year,
+            'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
+            'annual_budget'   => self::dualMoney($total, $rate),
+            'monthly_average' => self::dualMoney($total / 12, $rate),
+            'basis'           => 'Annual budgeted cost (salary + budgeted cost components + allowances), same engine as View Budget. Given in BOTH USD and MVR.',
+        ];
+    }
+
+    /**
+     * Per-(position, manning_response) seat totals for a year: MAX headcount /
+     * filled / vacant across the 12 monthly rows, exactly like the Workforce
+     * Planning dashboard. Each manning_response is one department.
+     */
+    private static function wpSeatRows(int $rid, int $year)
+    {
+        return DB::table('position_monthly_data as pmd')
+            ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
+            ->where('mr.resort_id', $rid)
+            ->where('mr.year', $year)
+            ->groupBy('pmd.position_id', 'pmd.manning_response_id', 'mr.dept_id')
+            ->get([
+                'pmd.position_id',
+                'mr.dept_id',
+                DB::raw('MAX(pmd.headcount)   as budget'),
+                DB::raw('MAX(pmd.filledcount) as filled'),
+                DB::raw('MAX(pmd.vacantcount) as vacant'),
+            ]);
+    }
+
+    /** Budgeted vs filled vs vacant headcount for a year, grouped. */
+    private static function getBudgetedHeadcount(int $rid, array $args): array
+    {
+        $year    = self::wpYear($args);
+        $groupBy = strtolower(trim($args['group_by'] ?? 'total'));
+        if (!in_array($groupBy, ['total', 'division', 'department', 'position'], true)) {
+            $groupBy = 'total';
+        }
+
+        $rows = self::wpSeatRows($rid, $year);
+        if ($rows->isEmpty()) {
+            $active = Employee::where('resort_id', $rid)->where('status', 'Active')->count();
+            return [
+                'year' => $year, 'group_by' => $groupBy,
+                'total_budgeted' => $active, 'total_filled' => $active, 'total_vacant' => 0,
+                'note' => "No manning plan submitted for {$year}; showing live active headcount as both budgeted and filled.",
+            ];
+        }
+
+        $depts     = DB::table('resort_departments')->where('resort_id', $rid)->get(['id', 'name', 'division_id'])->keyBy('id');
+        $divs      = DB::table('resort_divisions')->where('resort_id', $rid)->get(['id', 'name'])->keyBy('id');
+        $positions = DB::table('resort_positions')->where('resort_id', $rid)->get(['id', 'position_title'])->keyBy('id');
+
+        $tot = ['budgeted' => 0, 'filled' => 0, 'vacant' => 0];
+        $groups = [];
+        foreach ($rows as $r) {
+            $tot['budgeted'] += (int) $r->budget;
+            $tot['filled']   += (int) $r->filled;
+            $tot['vacant']   += (int) $r->vacant;
+            if ($groupBy === 'total') continue;
+            switch ($groupBy) {
+                case 'division':   $key = optional($divs->get(optional($depts->get($r->dept_id))->division_id))->name ?? 'No division'; break;
+                case 'department': $key = optional($depts->get($r->dept_id))->name ?? 'Unassigned'; break;
+                default:           $key = optional($positions->get($r->position_id))->position_title ?? ('Position #' . $r->position_id);
+            }
+            $groups[$key] = $groups[$key] ?? ['budgeted' => 0, 'filled' => 0, 'vacant' => 0];
+            $groups[$key]['budgeted'] += (int) $r->budget;
+            $groups[$key]['filled']   += (int) $r->filled;
+            $groups[$key]['vacant']   += (int) $r->vacant;
+        }
+
+        $out = [
+            'year' => $year, 'group_by' => $groupBy,
+            'total_budgeted' => $tot['budgeted'], 'total_filled' => $tot['filled'], 'total_vacant' => $tot['vacant'],
+        ];
+        if ($groupBy !== 'total') {
+            uasort($groups, fn ($a, $b) => $b['budgeted'] <=> $a['budgeted']);
+            $out['breakdown'] = $groups;
+        }
+        return $out;
+    }
+
+    /** Vacancy analysis for a year: vacant seats + fill rate, grouped. */
+    private static function getVacancyAnalysis(int $rid, array $args): array
+    {
+        $year    = self::wpYear($args);
+        $groupBy = strtolower(trim($args['group_by'] ?? 'department'));
+        if (!in_array($groupBy, ['total', 'department', 'position'], true)) {
+            $groupBy = 'department';
+        }
+        $criticalOnly = !empty($args['critical_only']);
+
+        $rows = self::wpSeatRows($rid, $year);
+        if ($rows->isEmpty()) {
+            return ['year' => $year, 'total_vacant' => 0, 'note' => "No manning plan submitted for {$year}; vacancy analysis is unavailable."];
+        }
+
+        $depts     = DB::table('resort_departments')->where('resort_id', $rid)->get(['id', 'name'])->keyBy('id');
+        $positions = DB::table('resort_positions')->where('resort_id', $rid)->get(['id', 'position_title'])->keyBy('id');
+
+        $totalVac = 0;
+        $groups = [];
+        foreach ($rows as $r) {
+            $totalVac += (int) $r->vacant;
+            switch ($groupBy) {
+                case 'department': $key = optional($depts->get($r->dept_id))->name ?? 'Unassigned'; break;
+                case 'position':   $key = optional($positions->get($r->position_id))->position_title ?? ('Position #' . $r->position_id); break;
+                default:           $key = 'Total';
+            }
+            $groups[$key] = $groups[$key] ?? ['budgeted' => 0, 'filled' => 0, 'vacant' => 0];
+            $groups[$key]['budgeted'] += (int) $r->budget;
+            $groups[$key]['filled']   += (int) $r->filled;
+            $groups[$key]['vacant']   += (int) $r->vacant;
+        }
+
+        if ($groupBy === 'total') {
+            return [
+                'year' => $year, 'total_vacant' => $totalVac,
+                'total_budgeted' => array_sum(array_column($groups, 'budgeted')),
+                'total_filled'   => array_sum(array_column($groups, 'filled')),
+            ];
+        }
+
+        foreach ($groups as &$g) {
+            $g['fill_rate'] = $g['budgeted'] > 0 ? round($g['filled'] / $g['budgeted'] * 100) . '%' : '—';
+        }
+        unset($g);
+        if ($criticalOnly) {
+            $groups = array_filter($groups, fn ($g) => $g['vacant'] > 0);
+        }
+        uasort($groups, fn ($a, $b) => $b['vacant'] <=> $a['vacant']);
+
+        return ['year' => $year, 'group_by' => $groupBy, 'total_vacant' => $totalVac, 'critical_only' => $criticalOnly, 'breakdown' => $groups];
+    }
+
+    /** Active-staff gender split, optionally filtered by department. */
+    private static function getGenderBreakdown(int $rid, array $args): array
+    {
+        $dept = trim($args['department'] ?? '');
+        $q = Employee::where('employees.resort_id', $rid)->where('employees.status', 'Active')
+            ->join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id');
+        if ($dept !== '') {
+            $q->whereHas('department', fn ($d) => $d->where('name', 'like', "%{$dept}%"));
+        }
+        $rows = $q->selectRaw('LOWER(COALESCE(NULLIF(ra.gender, ""), "unspecified")) g, COUNT(*) c')
+            ->groupBy('g')->pluck('c', 'g');
+
+        $male = (int) $rows->get('male', 0);
+        $female = (int) $rows->get('female', 0);
+        $other = 0;
+        foreach ($rows as $k => $v) {
+            if (!in_array($k, ['male', 'female'], true)) $other += (int) $v;
+        }
+        $total = $male + $female + $other;
+        return [
+            'scope'        => $dept !== '' ? $dept : 'All departments',
+            'total'        => $total,
+            'male'         => $male,
+            'female'       => $female,
+            'unspecified'  => $other,
+            'female_ratio' => $total > 0 ? round($female / $total * 100) . '%' : '—',
+        ];
+    }
+
+    /** Manning / budget request approval status, by status and by department. */
+    private static function getManningStatus(int $rid, array $args): array
+    {
+        $depts = DB::table('resort_departments')->where('resort_id', $rid)->get(['id', 'name'])->keyBy('id');
+        $statuses = DB::table('budget_statuses')->where('resort_id', $rid)
+            ->orderBy('created_at')->get(['Department_id', 'status']);
+        if ($statuses->isEmpty()) {
+            return ['note' => 'No manning / budget request records found for this resort.'];
+        }
+        $byStatus = [];
+        $byDept = [];
+        foreach ($statuses as $s) {
+            $st = $s->status ?: 'Unknown';
+            $byStatus[$st] = ($byStatus[$st] ?? 0) + 1;
+            $dn = optional($depts->get($s->Department_id))->name ?? ('Dept #' . $s->Department_id);
+            $byDept[$dn] = $st; // ordered by created_at → latest status per dept wins
+        }
+        return [
+            'by_status'     => $byStatus,
             'by_department' => $byDept,
-            'basis'         => 'Annual budget per department = staff salaries + budgeted cost components + allowances + vacant-slot costs (same engine as the View Budget page). Total is the sum of all departments.',
-            'note'          => empty($byDept) ? "No budget data found for {$year}." : null,
+            'note'          => 'Status meanings: Genrated = request generated/sent to HODs; Approved; Rejected; Pending; Completed.',
+        ];
+    }
+
+    /** Resort occupancy (latest, or as of a given date). */
+    private static function getOccupancy(int $rid, array $args): array
+    {
+        $date = (isset($args['date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim((string) $args['date'])))
+            ? trim((string) $args['date']) : null;
+        $q = DB::table('occuplanies')->where('resort_id', $rid)->whereNull('deleted_at');
+        if ($date) $q->where('occupancydate', '<=', $date);
+        $row = $q->orderByDesc('occupancydate')->first();
+        if (!$row) return ['note' => 'No occupancy data recorded for this resort.'];
+        return [
+            'date'              => $row->occupancydate,
+            'occupancy_percent' => $row->occupancyinPer,
+            'total_rooms'       => $row->occupancytotalRooms,
+            'occupied_rooms'    => $row->occupancyOccupiedRooms,
+        ];
+    }
+
+    /** Workforce compliance: localization ratio, or minimum-wage breaches. */
+    private static function getWorkforceCompliance(int $rid, array $args): array
+    {
+        $type = strtolower(trim($args['type'] ?? 'localization'));
+        $current = ['Active', 'Probationary'];
+
+        if ($type === 'minimum_wage') {
+            $base = fn () => Employee::where('resort_id', $rid)->whereIn('status', $current);
+            $usd = $base()->where('basic_salary_currency', 'USD')
+                ->where(fn ($q) => $q->where('basic_salary', '<', 520)->orWhereNull('basic_salary'))->count();
+            $mvr = $base()->where('basic_salary_currency', 'MVR')
+                ->where(fn ($q) => $q->where('basic_salary', '<', 8021)->orWhereNull('basic_salary'))->count();
+            $unconfigured = $base()->whereNull('basic_salary_currency')->count();
+            return [
+                'type'                => 'minimum_wage',
+                'thresholds'          => ['USD' => 520, 'MVR' => 8021],
+                'under_min_wage_usd'  => $usd,
+                'under_min_wage_mvr'  => $mvr,
+                'salary_unconfigured' => $unconfigured,
+                'total_flagged'       => $usd + $mvr + $unconfigured,
+                'note'                => 'Current (Active/Probationary) staff paid below the statutory minimum wage, plus those with no salary configured.',
+            ];
+        }
+
+        $local = Employee::where('resort_id', $rid)->whereIn('status', $current)->where('nationality', 'Maldivian')->count();
+        $expat = Employee::where('resort_id', $rid)->whereIn('status', $current)->where('nationality', '!=', 'Maldivian')->count();
+        $total = $local + $expat;
+        return [
+            'type'                 => 'localization',
+            'local_maldivian'      => $local,
+            'expatriate'           => $expat,
+            'total'                => $total,
+            'localization_percent' => $total > 0 ? round($local / $total * 100, 1) . '%' : '—',
+            'note'                 => 'Localization = Maldivian share of the current (Active/Probationary) workforce.',
         ];
     }
 
@@ -660,6 +1014,7 @@ class WisdomTools
         }
 
         $unit = $p->payroll_unit ?: 'USD';
+        $rate = self::dollarToMvr($rid);
 
         return [
             'period_start'    => $p->getRawOriginal('start_date'),
@@ -667,7 +1022,8 @@ class WisdomTools
             'status'          => $p->status,
             'payment_date'    => $p->getRawOriginal('payment_date'),
             'total_employees' => $p->total_employees,
-            'total_payroll'   => Common::formatCurrency((float) $p->total_payroll, $unit),
+            'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
+            'total_payroll'   => self::dualMoney((float) $p->total_payroll, $rate, $unit),
         ];
     }
 
@@ -695,17 +1051,23 @@ class WisdomTools
             return ['query' => $term, 'matches' => 0, 'employees' => []];
         }
 
+        $rate = self::dollarToMvr($rid);
         $list = $employees->map(fn ($e) => [
             'name'         => self::empName($e),
             'employee_id'  => $e->Emp_id,
             'department'   => $e->department->name ?? null,
             'position'     => $e->position->position_title ?? null,
             'basic_salary' => $e->basic_salary !== null
-                ? Common::formatCurrency((float) $e->basic_salary, $e->basic_salary_currency ?: 'USD')
+                ? self::dualMoney((float) $e->basic_salary, $rate, $e->basic_salary_currency ?: 'USD')
                 : 'Not set',
         ])->values();
 
-        return ['query' => $term, 'matches' => $list->count(), 'employees' => $list];
+        return [
+            'query'           => $term,
+            'matches'         => $list->count(),
+            'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
+            'employees'       => $list,
+        ];
     }
 
     /**
@@ -863,6 +1225,35 @@ class WisdomTools
             return trim($value);
         }
         return now()->toDateString();
+    }
+
+    /** Resort USD→MVR rate (DollertoMVR), defaulting to 15.42. */
+    private static function dollarToMvr(int $rid): float
+    {
+        $r = (float) (DB::table('resort_site_settings')->where('resort_id', $rid)->value('DollertoMVR') ?: 15.42);
+        return $r > 0 ? $r : 15.42;
+    }
+
+    /**
+     * Format a money amount in BOTH USD and MVR so the assistant can answer in
+     * either currency or show a conversion. $src is the amount's stored
+     * currency; the other side is derived from the resort USD↔MVR rate —
+     * USD→MVR multiply, MVR→USD divide (never the stored inverse rate).
+     */
+    private static function dualMoney(float $amount, float $rate, string $src = 'USD'): array
+    {
+        $src = strtoupper(trim($src)) ?: 'USD';
+        if ($src === 'MVR') {
+            $mvr = $amount;
+            $usd = $rate > 0 ? $amount / $rate : 0.0;
+        } else {
+            $usd = $amount;
+            $mvr = $amount * $rate;
+        }
+        return [
+            'usd' => 'USD ' . number_format($usd, 2),
+            'mvr' => 'MVR ' . number_format($mvr, 2),
+        ];
     }
 
     /**
