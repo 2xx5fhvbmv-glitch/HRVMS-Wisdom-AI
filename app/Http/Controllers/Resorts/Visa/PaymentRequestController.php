@@ -178,7 +178,11 @@ class PaymentRequestController extends Controller
             $search = $request->search;
             $date = $request->date;
 
-            if (in_array('all', $flags)) {
+            // No payment type selected (default view) → list EVERY active foreign
+            // employee, not only those with a due this period. We still compute all
+            // fee types below so any current dues show against them.
+            $showAll = empty($flags);
+            if ($showAll || in_array('all', $flags)) {
                 // 'visa' intentionally excluded — the Visa payment-type checkbox
                 // has been removed from the UI. Even "All" must not pull visa.
                 $flags = ['insurance', 'work_permit', 'MedicalReport', 'slot_payment'];
@@ -213,7 +217,7 @@ class PaymentRequestController extends Controller
                 ->where("nationality", '!=', "Maldivian")
                 ->where('resort_id', $this->resort->resort_id)
                 ->get()
-                ->map(function ($employee) use (&$totalChecked, $isChecked, $flags, $filterStart, $filterEnd, &$totalVisa, &$totalInsurance, &$totalPermit, &$totalMedical, &$totalQuota) {
+                ->map(function ($employee) use (&$totalChecked, $isChecked, $flags, $showAll, $filterStart, $filterEnd, &$totalVisa, &$totalInsurance, &$totalPermit, &$totalMedical, &$totalQuota) {
                     $employee->isChecked = $isChecked;
                     $employee->Emp_name = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
                     $employee->Emp_id = $employee->Emp_id;
@@ -354,7 +358,9 @@ class PaymentRequestController extends Controller
                         $totalChecked++;
                     }
 
-                    return $hasAnyFlagData ? $employee : null;
+                    // Default view ($showAll) lists every foreign employee, even
+                    // with no due this period; a specific filter keeps only matches.
+                    return ($showAll || $hasAnyFlagData) ? $employee : null;
                 })->filter();
 
             $overallTotal = $totalVisa + $totalInsurance + $totalPermit + $totalMedical + $totalQuota;
