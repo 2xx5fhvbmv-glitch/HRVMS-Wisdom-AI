@@ -960,11 +960,17 @@ class RenewalController extends Controller
                                         . ' data-amount="" data-date="' . htmlspecialchars((string) $date, ENT_QUOTES) . '" data-status="">'
                                         . '<i class="fa-regular fa-circle-plus"></i></a>';
                                 }
+                                // Records are stored in MVR; the edit modal shows/accepts the
+                                // resort's currently displayed currency (menu MVR/$ toggle), so
+                                // pre-fill the amount converted into that display currency.
+                                $displayAmount = ($amount === null || $amount === '')
+                                    ? ''
+                                    : Common::convertToDisplayCurrency($amount, 'MVR');
                                 return ' <a href="javascript:void(0)" class="EditExpiry" title="Edit"'
                                     . ' data-type="' . $type . '"'
                                     . ' data-id="' . $id . '"'
                                     . ' data-emp="' . ($empId ?: '') . '"'
-                                    . ' data-amount="' . htmlspecialchars((string) $amount, ENT_QUOTES) . '"'
+                                    . ' data-amount="' . htmlspecialchars((string) $displayAmount, ENT_QUOTES) . '"'
                                     . ' data-date="' . htmlspecialchars((string) $date, ENT_QUOTES) . '"'
                                     . ' data-status="' . htmlspecialchars((string) $status, ENT_QUOTES) . '">'
                                     . '<i class="fa-regular fa-pen-to-square"></i></a>';
@@ -1087,7 +1093,19 @@ class RenewalController extends Controller
         }
 
         if ($request->filled('amount')) {
-            $record->{$amountCol} = $request->amount;
+            // The amount is typed in the resort's currently displayed currency
+            // (the menu MVR/$ toggle). These records are stored in MVR, so when
+            // the resort is viewing in Dollars, convert USD -> MVR (multiply by
+            // the canonical DollertoMVR rate) before saving. In MVR mode it is
+            // stored as-is.
+            $amountToStore = (float) $request->amount;
+            if (Common::GetResortCurrentCurrency() === 'Dollar') {
+                $settings = \App\Models\ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first();
+                $rate = (float) (optional($settings)->DollertoMVR ?: 15.42);
+                if ($rate <= 0) $rate = 15.42;
+                $amountToStore = round($amountToStore * $rate, 2);
+            }
+            $record->{$amountCol} = $amountToStore;
         }
         if ($request->filled('expiry_date')) {
             $record->{$dateCol} = Carbon::parse($request->expiry_date)->format('Y-m-d');

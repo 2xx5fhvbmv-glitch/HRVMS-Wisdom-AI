@@ -117,7 +117,7 @@
                        <input type="hidden" name="id" id="ExpiryEdit_id">
                        <input type="hidden" name="emp_id" id="ExpiryEdit_emp">
                        <div class="form-group mb-3">
-                           <label class="form-label">Amount (MVR)</label>
+                           <label class="form-label">Amount ({{ Common::GetResortCurrencySymbol() }})</label>
                            <input type="number" step="0.01" min="0" name="amount" id="ExpiryEdit_amount" class="form-control" placeholder="0.00">
                        </div>
                        <div class="form-group mb-3">

@@ -251,7 +251,7 @@ class PaymentRequestController extends Controller
                     if (in_array('insurance', $flags)) {
                         $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->first();
                         if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
-                            $employee->InsuranceExpiryDate = '<b>MVR ' . number_format($insurance->Premium, 2) . '</b>' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
+                            $employee->InsuranceExpiryDate = '<b>' . \App\Helpers\Common::formatCurrency($insurance->Premium, 'MVR') . '</b>' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                             $totalInsurance += $insurance->Premium;
                             $hasAnyFlagData = true;
                             $employeeData[base64_encode($employee->id)]['InsuranceAmt'] = $insurance->Premium;
@@ -270,7 +270,7 @@ class PaymentRequestController extends Controller
                         $encodedId = base64_encode($employee->id);
                         if ($currentWP)
                         {
-                            $employee->WorkPermitExpiryDate = '<b>MVR ' . number_format($currentWP->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($currentWP->Due_Date);
+                            $employee->WorkPermitExpiryDate = '<b>' . \App\Helpers\Common::formatCurrency($currentWP->Amt, 'MVR') . '</b>' . $this->getFormattedExpiryStatus($currentWP->Due_Date);
                             $totalPermit += $currentWP->Amt;
                             $hasAnyFlagData = true;
                             $employeeData[$encodedId]['WorkPermitAmt'] = $currentWP->Amt;
@@ -296,7 +296,7 @@ class PaymentRequestController extends Controller
                         $med = $employee->WorkPermitMedicalRenewal;
                         if ($med && Carbon::parse($med->end_date)->between($filterStart, $filterEnd)) 
                         {
-                            $employee->WorkPermitMedicalPermitExpiryDate = '<b>MVR ' . number_format($med->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($med->end_date);
+                            $employee->WorkPermitMedicalPermitExpiryDate = '<b>' . \App\Helpers\Common::formatCurrency($med->Amt, 'MVR') . '</b>' . $this->getFormattedExpiryStatus($med->end_date);
                             $totalMedical += $med->Amt;
                             $hasAnyFlagData = true;
                             $employeeData[base64_encode($employee->id)]['MedicalAmt'] = $med->Amt;
@@ -326,7 +326,7 @@ class PaymentRequestController extends Controller
                         $encodedId = base64_encode($employee->id);
                         if ($currentQuota) 
                         {
-                            $employee->QuotaSlotAmtForThisMonth = '<b> MVR ' . number_format($currentQuota->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($currentQuota->Due_Date);
+                            $employee->QuotaSlotAmtForThisMonth = '<b>' . \App\Helpers\Common::formatCurrency($currentQuota->Amt, 'MVR') . '</b>' . $this->getFormattedExpiryStatus($currentQuota->Due_Date);
                             $totalQuota += $currentQuota->Amt;
                             $hasAnyFlagData = true;
 
@@ -389,12 +389,12 @@ class PaymentRequestController extends Controller
                 ->rawColumns(['EmployeeID','CheckBox','SlotFees','VisaExpiry','Medical','Insurance','WorkPermit','Department','Position','EmployeeName'])
                 ->with([
                     'totals' => [
-                        'visa' => number_format($totalVisa, 2),
-                        'insurance' => number_format($totalInsurance, 2),
-                        'work_permit' => number_format($totalPermit, 2),
-                        'medical' => number_format($totalMedical, 2),
-                        'slot_payment' => number_format($totalQuota, 2),
-                        'overall' => number_format($overallTotal, 2),
+                        'visa' => \App\Helpers\Common::formatCurrency($totalVisa, 'MVR'),
+                        'insurance' => \App\Helpers\Common::formatCurrency($totalInsurance, 'MVR'),
+                        'work_permit' => \App\Helpers\Common::formatCurrency($totalPermit, 'MVR'),
+                        'medical' => \App\Helpers\Common::formatCurrency($totalMedical, 'MVR'),
+                        'slot_payment' => \App\Helpers\Common::formatCurrency($totalQuota, 'MVR'),
+                        'overall' => \App\Helpers\Common::formatCurrency($overallTotal, 'MVR'),
                         'totalChecked' => $totalChecked,
                     ]
                 ])
@@ -560,7 +560,7 @@ class PaymentRequestController extends Controller
                         $query->whereDate('Request_date', carbon::parse($date)->format('Y-m-d'));
                     })
                     ->orderBy('id', 'desc')
-                    ->get(['id', 'Requestd_id', 'Request_date', 'Status']);
+                    ->get(['id', 'Requestd_id', 'Request_date', 'Status', 'created_at']);
 
                     $edit_class = '';
                     if(Common::checkRouteWisePermission('resort.visa.PaymentRequestIndex',config('settings.resort_permissions.edit')) == false){
