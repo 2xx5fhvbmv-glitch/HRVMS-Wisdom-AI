@@ -1394,6 +1394,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
      Route::get('visa/verify-details','Visa\RenewalController@VerifyDetails')->name('resort.visa.VerifyDetails');
      Route::post('visa/verify-details/update','Visa\RenewalController@UpdateExpiryRecord')->name('resort.visa.UpdateExpiryRecord');
+     Route::post('visa/verify-details/submit','Visa\RenewalController@SubmitVerifiedDetails')->name('resort.visa.SubmitVerifiedDetails');
 
 
       // Visa Dashboard Routes

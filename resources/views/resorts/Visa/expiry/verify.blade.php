@@ -55,8 +55,9 @@
                   
 
                 </div>
-                <div class="card-footer mt-3">
-                    <!-- <a href="#" class=" btn btn-themeBlue btn-sm float-end next ">Submit</a> -->
+                <div class="card-footer mt-3 d-flex align-items-center justify-content-between">
+                    <p class="fw-600 mb-0" id="verifySelectedCount">0 selected</p>
+                    <button type="button" class="btn btn-themeBlue btn-sm SubmitVerified">Submit</button>
                 </div>
             </div>
         </div>
@@ -219,6 +220,38 @@ $(document).ready(function()
             $('#ExpiryEdit_statusWrap').hide();
         }
         $('#ExpiryEdit-modal').modal('show');
+    });
+
+    // --- Select rows + Submit (verified → pushes to employee details page) ---
+    $(document).on('change', '.VerifyCheck', function () {
+        $('#verifySelectedCount').text($('.VerifyCheck:checked').length + ' selected');
+    });
+
+    $(document).on('click', '.SubmitVerified', function () {
+        var ids = $('.VerifyCheck:checked').map(function () { return $(this).val(); }).get();
+        if (!ids.length) {
+            toastr.error('Please select at least one employee.', 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        var $btn = $(this).prop('disabled', true);
+        $.ajax({
+            url: "{{ route('resort.visa.SubmitVerifiedDetails') }}",
+            type: 'POST',
+            data: { employee_ids: ids, _token: '{{ csrf_token() }}' }
+        }).done(function (res) {
+            if (res && res.success) {
+                toastr.success(res.msg || 'Submitted.', 'Success', { positionClass: 'toast-bottom-right' });
+                // Submitted employees are now excluded server-side → they vanish on reload.
+                FetchIndexDate($('.Categories.active').data('flag') || 'all');
+                $('#verifySelectedCount').text('0 selected');
+            } else {
+                toastr.error((res && res.errors && res.errors.message) ? res.errors.message : 'Submit failed.', 'Error', { positionClass: 'toast-bottom-right' });
+            }
+        }).fail(function (xhr) {
+            var m = 'Submit failed.';
+            try { m = xhr.responseJSON.errors.message || xhr.responseJSON.message || m; } catch (e) {}
+            toastr.error(m, 'Error', { positionClass: 'toast-bottom-right' });
+        }).always(function () { $btn.prop('disabled', false); });
     });
 
     $(document).on('submit', '#ExpiryEditForm', function (e) {

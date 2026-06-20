@@ -806,6 +806,13 @@ class RenewalController extends Controller
                 ->where('status','Active')
                 ->where("nationality", '!=', "Maldivian")
                 ->where('resort_id', $this->resort->resort_id)
+                ->whereNotIn('id', function ($q) {
+                    // Employees already verified & submitted drop off this list —
+                    // their data now lives on the employee-details page.
+                    $q->select('employee_id')->from('visa_verification_statuses')
+                      ->where('resort_id', $this->resort->resort_id)
+                      ->where('status', 'verified');
+                })
                 ->get()
                 ->map(function ($employee) use (  $filterStart, $filterEnd) {
                     $employee->Emp_name = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
@@ -996,6 +1003,11 @@ class RenewalController extends Controller
                            
                             return '<div class="exp-Date-userbox">
                                 <div class="row align-items-lg-center">
+                                    <div class="col-auto">
+                                        <div class="form-check no-label">
+                                            <input class="form-check-input VerifyCheck" type="checkbox" value="' . $row->id . '">
+                                        </div>
+                                    </div>
                                     <div class="col-lg-3 col-md-4">
                                         <div class="user-profilebox d-flex">
                                             <div class="img-circle">
@@ -1035,6 +1047,91 @@ class RenewalController extends Controller
         }
 
 
+    }
+
+    /**
+     * Verify-details "Submit": for the selected employees, push their verified
+     * renewal values into the OCR 'Other' blob the employee-details page reads
+     * (Visa / Insurance / Work-Permit expiry), then mark them verified so they
+     * drop off the verify list. Resort-scoped. Quota Slot already reflects on the
+     * details page via its own record, so it needs no blob write.
+     */
+    public function SubmitVerifiedDetails(Request $request)
+    {
+        $request->validate([
+            'employee_ids'   => 'required|array|min:1',
+            'employee_ids.*' => 'integer',
+        ]);
+
+        $rid  = $this->resort->resort_id;
+        $uid  = optional(auth()->guard('resort-admin')->user())->id;
+        $done = 0;
+
+        foreach (array_unique($request->employee_ids) as $empId) {
+            $employee = \App\Models\Employee::where('id', $empId)->where('resort_id', $rid)->first();
+            if (!$employee) {
+                continue;
+            }
+
+            \DB::transaction(function () use ($employee, $rid, $uid, &$done) {
+                // Latest verified records (same selection rules as the verify list).
+                $visa = \App\Models\VisaRenewal::where('employee_id', $employee->id)->where('resort_id', $rid)
+                    ->orderBy('id', 'desc')->first();
+                $insurance = \App\Models\EmployeeInsurance::where('employee_id', $employee->id)->where('resort_id', $rid)
+                    ->orderBy('insurance_end_date', 'desc')->orderBy('id', 'desc')->first();
+                $workPermit = \App\Models\WorkPermit::where('employee_id', $employee->id)->where('resort_id', $rid)
+                    ->where('Status', 'Unpaid')->orderBy('Due_Date', 'desc')->first();
+
+                // Merge verified expiries into the OCR 'Other' blob, preserving every
+                // other extracted field (passport, WP number, quota slot number…).
+                $ocr = \App\Models\VisaEmployeeExpiryData::where('employee_id', $employee->id)->where('resort_id', $rid)
+                    ->where('DocumentName', 'Other')->orderBy('id', 'desc')->first();
+                $payload = $ocr ? (json_decode($ocr->Ai_extracted_data, true) ?: []) : [];
+                $fields  = $payload['extracted_fields'] ?? [];
+
+                if ($visa && $visa->end_date) {
+                    $fields['Visa Expiry Date'] = Carbon::parse($visa->end_date)->format('Y-m-d');
+                }
+                if ($insurance && $insurance->insurance_end_date) {
+                    $fields['Insurance Expiry Date'] = Carbon::parse($insurance->insurance_end_date)->format('Y-m-d');
+                }
+                if ($workPermit && $workPermit->Due_Date) {
+                    $fields['Work Permit Expiry Date (Expiry On)'] = Carbon::parse($workPermit->Due_Date)->format('Y-m-d');
+                }
+                $payload['extracted_fields'] = $fields;
+
+                if ($ocr) {
+                    $ocr->Ai_extracted_data = json_encode($payload);
+                    $ocr->save();
+                } else {
+                    \App\Models\VisaEmployeeExpiryData::create([
+                        'resort_id'         => $rid,
+                        'employee_id'       => $employee->id,
+                        'File_child_id'     => null,
+                        'Ai_extracted_data' => json_encode($payload),
+                        'DocumentName'      => 'Other',
+                    ]);
+                }
+
+                // Mark verified → employee drops off the verify list.
+                \App\Models\VisaVerificationStatus::updateOrCreate(
+                    ['resort_id' => $rid, 'employee_id' => $employee->id],
+                    ['status' => 'verified', 'verified_at' => now(), 'verified_by' => $uid]
+                );
+
+                $done++;
+            });
+        }
+
+        if ($done === 0) {
+            return response()->json(['success' => false, 'errors' => ['message' => 'No valid employees to submit.']], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'msg'     => $done . ' employee(s) submitted — their data now shows on the employee details page.',
+            'count'   => $done,
+        ]);
     }
 
     /**
