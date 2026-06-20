@@ -38,9 +38,11 @@ class OpenRouterClient
 
         $tools = WisdomTools::definitions($ctx);
 
-        // Reply budget. Kept modest so it fits a low/free OpenRouter balance;
-        // auto-shrinks further on a 402 (see below).
-        $maxTokens = 700;
+        // Reply budget. Kept small so the request fits a low/free OpenRouter
+        // balance on the first try (the free-tier per-request budget observed
+        // is ~150-250 tokens); auto-shrinks further on a 402 (see below).
+        // With credits added, this can safely be raised (e.g. 800-1200).
+        $maxTokens = (int) config('services.openrouter.max_tokens', 140);
 
         $send = function (array $payload) use ($key, $base) {
             return Http::withToken($key)
@@ -74,7 +76,9 @@ class OpenRouterClient
                 if ($resp->status() === 402) {
                     $afford = $this->affordableTokens($resp->body());
                     if ($afford !== null && $afford >= 60) {
-                        $maxTokens = min($maxTokens, $afford);
+                        // The affordable amount fluctuates downward between calls,
+                        // so leave a buffer below it.
+                        $maxTokens = max(60, min($maxTokens, $afford - 40));
                         $payload['max_tokens'] = $maxTokens;
                         $resp = $send($payload);
                     }
