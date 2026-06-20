@@ -144,6 +144,18 @@ class OpenRouterClient
     }
 
     /**
+     * Parse the affordable token count from an OpenRouter 402 body
+     * ("... but can only afford 436 ..."). Returns null if not present.
+     */
+    private function affordableTokens(string $body): ?int
+    {
+        if (preg_match('/can only afford (\d+)/i', $body, $m)) {
+            return (int) $m[1];
+        }
+        return null;
+    }
+
+    /**
      * Detect a tool call the model wrote as plain-text JSON in its reply
      * (some providers do this instead of using native tool_calls). Returns
      * ['name' => ..., 'args' => [...]] when it matches a known tool.
