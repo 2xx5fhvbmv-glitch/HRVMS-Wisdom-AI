@@ -38,12 +38,26 @@ class OpenRouterClient
 
         $tools = WisdomTools::definitions($ctx);
 
+        // Reply budget. Kept modest so it fits a low/free OpenRouter balance;
+        // auto-shrinks further on a 402 (see below).
+        $maxTokens = 700;
+
+        $send = function (array $payload) use ($key, $base) {
+            return Http::withToken($key)
+                ->withHeaders([
+                    'HTTP-Referer' => config('app.url', 'https://app.thewisdom.ai'),
+                    'X-Title'      => 'HRVMS Wisdom AI',
+                ])
+                ->timeout(60)
+                ->post($base . '/chat/completions', $payload);
+        };
+
         for ($round = 0; $round < self::MAX_TOOL_ROUNDS; $round++) {
             $payload = [
                 'model'       => $model,
                 'messages'    => $messages,
                 'temperature' => 0.3,
-                'max_tokens'  => 1200,
+                'max_tokens'  => $maxTokens,
             ];
             if (!empty($tools)) {
                 $payload['tools'] = $tools;
@@ -51,13 +65,20 @@ class OpenRouterClient
             }
 
             try {
-                $resp = Http::withToken($key)
-                    ->withHeaders([
-                        'HTTP-Referer' => config('app.url', 'https://app.thewisdom.ai'),
-                        'X-Title'      => 'HRVMS Wisdom AI',
-                    ])
-                    ->timeout(60)
-                    ->post($base . '/chat/completions', $payload);
+                $resp = $send($payload);
+
+                // Free-tier credit guard: OpenRouter returns 402 when the
+                // requested reply budget exceeds the remaining balance
+                // ("... can only afford N tokens"). Shrink to fit and retry
+                // once so the assistant still answers (just more concisely).
+                if ($resp->status() === 402) {
+                    $afford = $this->affordableTokens($resp->body());
+                    if ($afford !== null && $afford >= 60) {
+                        $maxTokens = min($maxTokens, $afford);
+                        $payload['max_tokens'] = $maxTokens;
+                        $resp = $send($payload);
+                    }
+                }
             } catch (\Throwable $e) {
                 Log::error('Wisdom AI request failed', ['error' => $e->getMessage()]);
                 return ['ok' => false, 'reply' => '', 'error' => 'Could not reach the AI service. Please try again.'];
@@ -65,7 +86,10 @@ class OpenRouterClient
 
             if (!$resp->successful()) {
                 Log::error('Wisdom AI non-200', ['status' => $resp->status(), 'body' => $resp->body()]);
-                return ['ok' => false, 'reply' => '', 'error' => 'The AI service returned an error. Please try again.'];
+                $err = $resp->status() === 402
+                    ? 'The Wisdom AI assistant is out of OpenRouter credits. Please top up at openrouter.ai/settings/credits, or set OPENROUTER_MODEL to a free model.'
+                    : 'The AI service returned an error. Please try again.';
+                return ['ok' => false, 'reply' => '', 'error' => $err];
             }
 
             $message = $resp->json('choices.0.message');
