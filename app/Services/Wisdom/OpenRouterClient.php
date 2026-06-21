@@ -171,21 +171,36 @@ class OpenRouterClient
         }
         $names = array_map(fn ($t) => $t['function']['name'], $tools);
 
-        if (!preg_match('/\{\s*"name"\s*:\s*"([a-zA-Z_]+)"\s*(?:,\s*"(?:parameters|arguments)"\s*:\s*(\{.*?\}))?\s*\}/s', $content, $m)) {
+        // Find a KNOWN tool name appearing as "name":"<tool>" ANYWHERE in the text,
+        // regardless of key order or nesting. This catches every shape models leak:
+        //   {"name":"x","parameters":{...}}
+        //   {"type":"function","name":"x", ...}
+        //   {"type":"function","function":{"name":"x","arguments":{...}}}
+        //   ```json { ... } ```  (fenced)
+        if (!preg_match_all('/"name"\s*:\s*"([a-zA-Z_]+)"/', $content, $nameMatches)) {
             return null;
         }
-        if (!in_array($m[1], $names, true)) {
+        $name = null;
+        foreach ($nameMatches[1] as $candidate) {
+            if (in_array($candidate, $names, true)) {
+                $name = $candidate;
+                break;
+            }
+        }
+        if ($name === null) {
             return null;
         }
 
+        // Pull arguments from a "parameters"/"arguments" object (tolerate one level
+        // of nesting). Absent → empty args.
         $args = [];
-        if (!empty($m[2])) {
-            $decoded = json_decode($m[2], true);
+        if (preg_match('/"(?:parameters|arguments)"\s*:\s*(\{(?:[^{}]|\{[^{}]*\})*\})/s', $content, $am)) {
+            $decoded = json_decode($am[1], true);
             if (is_array($decoded)) {
                 $args = $decoded;
             }
         }
-        return ['name' => $m[1], 'args' => $args];
+        return ['name' => $name, 'args' => $args];
     }
 
     /**
@@ -194,9 +209,64 @@ class OpenRouterClient
      */
     private function stripInlineToolCall(string $content): string
     {
-        $content = preg_replace('/\{\s*"name"\s*:\s*"[a-zA-Z_]+"\s*(?:,\s*"(?:parameters|arguments)"\s*:\s*\{.*?\})?\s*\}/s', '', $content);
-        $content = preg_replace('/(Let me try again[^.]*\.|The function call did not return the expected result\.?)/i', '', $content);
+        // 1) Drop fenced code blocks (```...```) that wrap a leaked tool call.
+        $content = preg_replace_callback('/```[a-zA-Z]*\s*(.*?)```/s', function ($m) {
+            return (strpos($m[1], '"function"') !== false
+                || preg_match('/"name"\s*:\s*"[a-zA-Z_]+"/', $m[1]))
+                ? '' : $m[0];
+        }, $content);
+
+        // 2) Brace-balanced removal of any remaining JSON object that looks like a
+        //    tool call (handles arbitrary nesting, which regex cannot).
+        $content = $this->removeToolCallObjects($content);
+
+        // 3) Hallucinated filler that often surrounds leaked calls.
+        $content = preg_replace('/(Let me try again[^.]*\.|The function call did not return the expected result\.?|Then look at[^.]*returned by the function\.?)/i', '', $content);
+
         return trim($content);
+    }
+
+    /**
+     * Remove JSON objects that look like tool calls, matching braces by depth so
+     * nested objects are handled correctly.
+     */
+    private function removeToolCallObjects(string $text): string
+    {
+        $out = '';
+        $len = strlen($text);
+        for ($i = 0; $i < $len; $i++) {
+            if ($text[$i] !== '{') {
+                $out .= $text[$i];
+                continue;
+            }
+            // Find the matching closing brace.
+            $depth = 0;
+            $j = $i;
+            for (; $j < $len; $j++) {
+                if ($text[$j] === '{') {
+                    $depth++;
+                } elseif ($text[$j] === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        break;
+                    }
+                }
+            }
+            if ($depth !== 0) {
+                // Unbalanced — leave the rest as-is.
+                $out .= substr($text, $i);
+                break;
+            }
+            $obj = substr($text, $i, $j - $i + 1);
+            $looksLikeToolCall = strpos($obj, '"function"') !== false
+                || (preg_match('/"name"\s*:\s*"[a-zA-Z_]+"/', $obj)
+                    && preg_match('/"(?:parameters|arguments)"\s*:/', $obj));
+            if (!$looksLikeToolCall) {
+                $out .= $obj;
+            }
+            $i = $j; // skip the object
+        }
+        return $out;
     }
 
     /**

@@ -14,6 +14,13 @@ use App\Models\Vacancies;
 use App\Models\Applicant_form_data;
 use App\Models\ResortDepartment;
 use App\Models\SOSHistoryModel;
+use App\Models\PerformanceCycle;
+use App\Models\PerformaChildCycle;
+use App\Models\EmployeePipPlan;
+use App\Models\EmployeePdpPlan;
+use App\Models\PerformanceKpiParent;
+use App\Models\MonthlyCheckingModel;
+use App\Models\PeformanceMeeting;
 use App\Services\Wisdom\ReadQueryGuard;
 use Carbon\Carbon;
 
@@ -128,6 +135,40 @@ class WisdomTools
                 [
                     'type' => ['type' => 'string', 'description' => 'One of: localization, minimum_wage. Default localization.'],
                 ]),
+
+            // ---- Performance Management ----
+            self::fn('get_performance_summary',
+                'Performance Management dashboard summary: pending appraisals, employees on PIP, employees on PDP, monthly check-in status, active performance cycles and total KPIs. Use for "give me a performance summary", "how many appraisals are pending", "how many employees are in PIP/PDP", "how many under review".', []),
+            self::fn('get_pip_overview',
+                'Employees on a Performance Improvement Plan (PIP): count and list (name, department, duration, status). Use for "how many employees are on PIP", "show employees on PIP", "which departments have PIP".',
+                [
+                    'status'     => ['type' => 'string', 'description' => 'Filter: active (default), completed, cancelled, or all.'],
+                    'department' => ['type' => 'string', 'description' => 'Optional department name filter.'],
+                ]),
+            self::fn('get_pdp_overview',
+                'Employees on a Professional Development Plan (PDP): count and list (name, department, duration, status). Use for "how many on PDP", "show PDP employees".',
+                [
+                    'status'     => ['type' => 'string', 'description' => 'Filter: active (default), completed, cancelled, or all.'],
+                    'department' => ['type' => 'string', 'description' => 'Optional department name filter.'],
+                ]),
+            self::fn('get_appraisal_status',
+                'Appraisal completion across active performance cycles: total appraisals, completed, manager-review pending, self-review pending, and completion rate %. Use for "how many appraisals are pending", "appraisal completion rate", "how many reviews still pending".', []),
+            self::fn('get_performance_cycles',
+                'List performance (appraisal) cycles with status (Active/Pending/Closed) and dates. Use for "what performance cycles are active", "which cycle is running", "show cycle status".', []),
+            self::fn('get_kpi_overview',
+                'KPI overview: total KPIs and counts grouped by workflow status (pending, responded, approved, rejected). Use for "show all KPIs", "how many KPIs exist", "which KPIs are pending/approved".', []),
+            self::fn('get_monthly_checkins',
+                'Monthly check-in status: totals grouped by check-in status (Pending/Conducted/Confirm/Rescheduled) and by approval status (pending/approved). Use for "how many check-ins are pending", "monthly check-in status".', []),
+            self::fn('get_performance_meetings',
+                'Upcoming performance meetings from a date (defaults to today): title, date, time, location, participant count. Use for "what performance meetings are scheduled", "upcoming review meetings".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD. Defaults to today.'],
+                ]),
+            self::fn('get_employee_performance',
+                'Performance snapshot for one employee by name: their PIP, PDP, latest appraisal (self/manager review status) and latest monthly check-in. Use for "has Ahmed completed his appraisal", "why is Ahmed on PIP", "show Ahmed\'s performance".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
+                ], ['name']),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -228,6 +269,15 @@ class WisdomTools
                         return ['error' => 'Access denied: minimum-wage / compensation data is restricted for your role.'];
                     }
                     return self::getWorkforceCompliance($rid, $args);
+                case 'get_performance_summary':  return self::getPerformanceSummary($rid);
+                case 'get_pip_overview':         return self::getPlanOverview($rid, $args, 'pip');
+                case 'get_pdp_overview':         return self::getPlanOverview($rid, $args, 'pdp');
+                case 'get_appraisal_status':     return self::getAppraisalStatus($rid);
+                case 'get_performance_cycles':   return self::getPerformanceCycles($rid);
+                case 'get_kpi_overview':         return self::getKpiOverview($rid);
+                case 'get_monthly_checkins':     return self::getMonthlyCheckins($rid);
+                case 'get_performance_meetings': return self::getPerformanceMeetings($rid, $args);
+                case 'get_employee_performance': return self::getEmployeePerformance($rid, $args);
                 case 'get_workforce_budget':     return self::getWorkforceBudget($rid, $args);
                 case 'get_employee_cost':        return self::getEmployeeCost($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
@@ -1212,6 +1262,199 @@ class WisdomTools
      * Employee display name. The `employees` table has no name columns — the
      * name lives on the linked resort_admins row (resortAdmin relation).
      */
+    // ---------------------------------------------------------------------
+    // Performance Management
+    // ---------------------------------------------------------------------
+
+    private static function getPerformanceSummary(int $rid): array
+    {
+        $activeCycleIds = PerformanceCycle::where('resort_id', $rid)
+            ->whereIn('status', ['OnGoing', 'Pending'])->pluck('id');
+
+        return [
+            'appraisals_pending' => PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)
+                ->where('manager_review_status', 'pending')->count(),
+            'employees_on_pip'  => EmployeePipPlan::where('resort_id', $rid)->where('status', 'active')->count(),
+            'employees_on_pdp'  => EmployeePdpPlan::where('resort_id', $rid)->where('status', 'active')->count(),
+            'active_cycles'     => PerformanceCycle::where('resort_id', $rid)->where('status', 'OnGoing')->count(),
+            'pending_cycles'    => PerformanceCycle::where('resort_id', $rid)->where('status', 'Pending')->count(),
+            'total_kpis'        => PerformanceKpiParent::where('resort_id', $rid)->count(),
+            'checkins_pending'  => MonthlyCheckingModel::where('resort_id', $rid)->where('approval_status', 'pending')->count(),
+            'checkins_approved' => MonthlyCheckingModel::where('resort_id', $rid)->where('approval_status', 'approved')->count(),
+        ];
+    }
+
+    private static function getPlanOverview(int $rid, array $args, string $type): array
+    {
+        /** @var class-string $model */
+        $model = $type === 'pip' ? EmployeePipPlan::class : EmployeePdpPlan::class;
+        $status = strtolower(trim($args['status'] ?? 'active'));
+
+        $q = $model::where('resort_id', $rid)
+            ->with([
+                'employee:id,Emp_id,Admin_Parent_id,Dept_id',
+                'employee.resortAdmin:id,first_name,last_name',
+                'employee.department:id,name',
+            ]);
+        if ($status !== 'all' && $status !== '') {
+            $q->where('status', $status);
+        }
+        $dept = trim($args['department'] ?? '');
+        if ($dept !== '') {
+            $q->whereHas('employee.department', fn ($d) => $d->where('name', 'like', "%{$dept}%"));
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($p) => [
+            'employee'   => $p->employee ? self::empName($p->employee) : 'Unknown',
+            'department' => optional(optional($p->employee)->department)->name,
+            'duration'   => $p->duration,
+            'status'     => $p->status,
+        ])->values();
+
+        $byDept = $list->groupBy(fn ($r) => $r['department'] ?: 'Unassigned')->map->count();
+
+        return [
+            'plan'          => strtoupper($type),
+            'status_filter' => $status,
+            'count'         => $list->count(),
+            'by_department' => $byDept,
+            'employees'     => $list,
+        ];
+    }
+
+    private static function getAppraisalStatus(int $rid): array
+    {
+        $activeCycleIds = PerformanceCycle::where('resort_id', $rid)
+            ->whereIn('status', ['OnGoing', 'Pending'])->pluck('id');
+
+        if ($activeCycleIds->isEmpty()) {
+            return ['message' => 'No active or pending performance cycles right now.', 'total_appraisals' => 0];
+        }
+
+        $total = PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)->count();
+        $done = PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)
+            ->where(function ($q) {
+                $q->where('manager_review_status', 'completed')
+                  ->orWhere(function ($q2) {
+                      $q2->where('manager_review_status', 'not_applicable')->where('self_review_status', 'completed');
+                  });
+            })->count();
+        $managerPending = PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)
+            ->where('manager_review_status', 'pending')->count();
+        $selfPending = PerformaChildCycle::whereIn('Parent_cycle_id', $activeCycleIds)
+            ->where('self_review_status', 'pending')->count();
+
+        return [
+            'total_appraisals'       => $total,
+            'completed'              => $done,
+            'manager_review_pending' => $managerPending,
+            'self_review_pending'    => $selfPending,
+            'completion_rate_pct'    => $total > 0 ? round($done / $total * 100, 1) : 0,
+        ];
+    }
+
+    private static function getPerformanceCycles(int $rid): array
+    {
+        $cycles = PerformanceCycle::where('resort_id', $rid)->orderByDesc('id')->limit(50)
+            ->get(['id', 'Cycle_Name', 'Start_Date', 'End_Date', 'status']);
+        $label = ['OnGoing' => 'Active', 'Pending' => 'Pending', 'Close' => 'Closed'];
+
+        $list = $cycles->map(fn ($c) => [
+            'name'   => $c->Cycle_Name,
+            'status' => $label[$c->status] ?? $c->status,
+            'start'  => $c->getRawOriginal('Start_Date'),
+            'end'    => $c->getRawOriginal('End_Date'),
+        ])->values();
+        $byStatus = $cycles->groupBy(fn ($c) => $label[$c->status] ?? $c->status)->map->count();
+
+        return ['total' => $cycles->count(), 'by_status' => $byStatus, 'cycles' => $list];
+    }
+
+    private static function getKpiOverview(int $rid): array
+    {
+        $byStatus = PerformanceKpiParent::where('resort_id', $rid)
+            ->select('status', DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status');
+        return [
+            'total_kpis' => array_sum($byStatus->toArray()),
+            'by_status'  => $byStatus->toArray(),
+        ];
+    }
+
+    private static function getMonthlyCheckins(int $rid): array
+    {
+        $byStatus = MonthlyCheckingModel::where('resort_id', $rid)
+            ->select('status', DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status');
+        $byApproval = MonthlyCheckingModel::where('resort_id', $rid)
+            ->select('approval_status', DB::raw('COUNT(*) as c'))->groupBy('approval_status')->pluck('c', 'approval_status');
+        return [
+            'total'       => array_sum($byStatus->toArray()),
+            'by_status'   => $byStatus->toArray(),
+            'by_approval' => $byApproval->toArray(),
+        ];
+    }
+
+    private static function getPerformanceMeetings(int $rid, array $args): array
+    {
+        $date = self::cleanDate($args['date'] ?? null);
+        $meetings = PeformanceMeeting::where('resort_id', $rid)
+            ->whereNotNull('date')->whereDate('date', '>=', $date)
+            ->withCount('participants')
+            ->orderBy('date')->limit(50)
+            ->get(['id', 'title', 'date', 'start_time', 'end_time', 'location']);
+
+        $list = $meetings->map(fn ($m) => [
+            'title'        => $m->title,
+            'date'         => $m->getRawOriginal('date'),
+            'start_time'   => $m->start_time,
+            'location'     => $m->location,
+            'participants' => $m->participants_count,
+        ])->values();
+
+        return ['from_date' => $date, 'count' => $list->count(), 'meetings' => $list];
+    }
+
+    private static function getEmployeePerformance(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                      $r->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                  })->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with('resortAdmin:id,first_name,last_name')
+            ->first();
+
+        if (!$emp) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        $pip = EmployeePipPlan::where('resort_id', $rid)->where('employee_id', $emp->id)->latest('id')->first();
+        $pdp = EmployeePdpPlan::where('resort_id', $rid)->where('employee_id', $emp->id)->latest('id')->first();
+        $child = PerformaChildCycle::where(function ($q) use ($emp) {
+            $q->where('Emp_main_id', (string) $emp->id)->orWhere('Emp_main_id', $emp->Emp_id);
+        })->latest('id')->first();
+        $checkin = MonthlyCheckingModel::where('resort_id', $rid)
+            ->where(function ($q) use ($emp) {
+                $q->where('emp_id', (string) $emp->id)->orWhere('emp_id', $emp->Emp_id);
+            })->latest('id')->first();
+
+        return [
+            'employee'         => self::empName($emp),
+            'pip'              => $pip ? ['status' => $pip->status, 'duration' => $pip->duration] : 'No PIP record',
+            'pdp'              => $pdp ? ['status' => $pdp->status, 'duration' => $pdp->duration] : 'No PDP record',
+            'latest_appraisal' => $child ? ['self_review' => $child->self_review_status, 'manager_review' => $child->manager_review_status] : 'No appraisal record',
+            'latest_checkin'   => $checkin ? ['status' => $checkin->status, 'approval' => $checkin->approval_status, 'date' => $checkin->date_discussion] : 'No check-in record',
+        ];
+    }
+
     private static function empName(Employee $e): string
     {
         $ra = $e->resortAdmin;

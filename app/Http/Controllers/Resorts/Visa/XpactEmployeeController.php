@@ -277,34 +277,39 @@ class XpactEmployeeController extends Controller
         if($statisctic_emp_header)
         {
             $Ai_extracted_data = $statisctic_emp_header->Ai_extracted_data;
+            // Read fields null-safely — the OCR blob (or a manually-submitted one
+            // from verify-details) may not contain every key, so accessing them
+            // directly threw "Undefined array key …" on the details page.
+            $fields = (is_array($Ai_extracted_data) ? ($Ai_extracted_data['extracted_fields'] ?? []) : []);
+
             // Visa Expiry Date -> previously rendered "Visa Issued Date" as the
             // visa-expiry value, which made the visible date wrong. Use the
             // dedicated Visa Expiry Date field (same field already feeds the
             // "remaining days" tag below).
-            if(isset($Ai_extracted_data['extracted_fields']['Visa Expiry Date']) && $Ai_extracted_data['extracted_fields']['Visa Expiry Date'])
+            if(!empty($fields['Visa Expiry Date']))
             {
                 $statisctic_emp_header->Name ="Visa Expiry";
-                $statisctic_emp_header->VisaExpiryDate = $this->safeDate($Ai_extracted_data['extracted_fields']['Visa Expiry Date']);
-                $statisctic_emp_header->VisaRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Visa Expiry Date']);
+                $statisctic_emp_header->VisaExpiryDate = $this->safeDate($fields['Visa Expiry Date']);
+                $statisctic_emp_header->VisaRemingDays = $this->getFormattedExpiryStatus($fields['Visa Expiry Date']);
             }
              // Insurance Expiry Date ->
-            if(isset($Ai_extracted_data) && $Ai_extracted_data['extracted_fields']['Insurance Expiry Date'])
+            if(!empty($fields['Insurance Expiry Date']))
             {
                 $statisctic_emp_header->Name ="Insurance Expiry";
-                $statisctic_emp_header->InsuranceExpiryDate = $this->safeDate($Ai_extracted_data['extracted_fields']['Insurance Expiry Date']);
-                $statisctic_emp_header->InsuranceRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Insurance Expiry Date']);
-                $statisctic_emp_header->QuotaSlotNumber = $Ai_extracted_data['extracted_fields']['Quota Slot Number'];
+                $statisctic_emp_header->InsuranceExpiryDate = $this->safeDate($fields['Insurance Expiry Date']);
+                $statisctic_emp_header->InsuranceRemingDays = $this->getFormattedExpiryStatus($fields['Insurance Expiry Date']);
+                $statisctic_emp_header->QuotaSlotNumber = $fields['Quota Slot Number'] ?? null;
             }
-            // Work permit Expiry 
-            if(isset($Ai_extracted_data) && $Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)'])
+            // Work permit Expiry
+            if(!empty($fields['Work Permit Expiry Date (Expiry On)']))
             {
                 $statisctic_emp_header->Name ="Work Permit Expiry";
-                $statisctic_emp_header->WorkPermitExpiryDate = $this->safeDate($Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)']);
-                $statisctic_emp_header->WorkPermitRemingDays = $this->getFormattedExpiryStatus($Ai_extracted_data['extracted_fields']['Work Permit Expiry Date (Expiry On)']);
+                $statisctic_emp_header->WorkPermitExpiryDate = $this->safeDate($fields['Work Permit Expiry Date (Expiry On)']);
+                $statisctic_emp_header->WorkPermitRemingDays = $this->getFormattedExpiryStatus($fields['Work Permit Expiry Date (Expiry On)']);
             }
         }
         // Work Permit Card Expiry
-        if(isset($Ai_extracted_data) && isset($statisctic_emp_headerWorkPermit) && isset($statisctic_emp_headerWorkPermit['Ai_extracted_data']) && isset($statisctic_emp_headerWorkPermit['Ai_extracted_data']['extracted_fields']))
+        if(!empty($statisctic_emp_headerWorkPermit['Ai_extracted_data']['extracted_fields']['Last Entry Allowed']))
         {
             $date = $statisctic_emp_headerWorkPermit['Ai_extracted_data']['extracted_fields']['Last Entry Allowed'];
             $statisctic_emp_header->Name = "Work Permit Entry Pass";
