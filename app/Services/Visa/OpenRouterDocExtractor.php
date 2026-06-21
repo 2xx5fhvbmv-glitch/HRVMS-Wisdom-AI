@@ -76,8 +76,14 @@ class OpenRouterDocExtractor
             return ['status' => 'error', 'message' => 'OpenRouter credits are exhausted. Top up at openrouter.ai/settings/credits.'];
         }
         if (!$resp->successful()) {
-            Log::error('Visa doc extract non-200', ['status' => $resp->status(), 'body' => $resp->body()]);
-            return ['status' => 'error', 'message' => 'The extraction model returned an error (HTTP ' . $resp->status() . ').'];
+            $detail = trim((string) $resp->json('error.message', ''));
+            Log::error('Visa doc extract non-200', ['status' => $resp->status(), 'model' => $model, 'body' => $resp->body()]);
+            $msg = "The extraction model '{$model}' returned HTTP {$resp->status()}";
+            $msg .= $detail !== '' ? ": {$detail}" : '.';
+            if ($resp->status() === 404) {
+                $msg .= ' (Set OPENROUTER_VISION_MODEL in .env to a valid model id from openrouter.ai/models.)';
+            }
+            return ['status' => 'error', 'message' => $msg];
         }
 
         $content = (string) $resp->json('choices.0.message.content', '');
