@@ -256,8 +256,12 @@ class XpactEmployeeController extends Controller
         $id = base64_decode($id);
         $page_title = "Xpat Employee Details";
         $Employee = Employee::with(['resortAdmin', 'position', 'department'])->where("id",$id)->where("nationality",'!=',"Maldivian")->where('resort_id', $this->resort->resort_id)->first();
-        // $Employee->passport_number = $Employee->passport_number; //uncomment if you want to show passport number
-        
+        // Guard: a bad id, another resort's employee, or a Maldivian (excluded
+        // above) yields null — without this the page 500s on the next line.
+        if (!$Employee) {
+            return redirect()->route('resort.visa.xpactEmployee')->with('error', 'Employee not found.');
+        }
+
         $Employee->profilePic = Common::getResortUserPicture($Employee->resortAdmin->id);
 
         $start = Carbon::now();
@@ -973,18 +977,36 @@ class XpactEmployeeController extends Controller
 
    private function  TotalExpensessSinceJoing($id)
    {
-        $data = array();
-        $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id',$this->resort->resort_id)
-                                    ->where('employees_id',$id)
-                                    ->get();
-                                
-        
-        $data['totalDepositAmount']               =  $TotalExpensessSinceJoing->sum('Deposit_Amt') ?? 0.00;
-        $data['totalWorkPermitAmount']            =  $TotalExpensessSinceJoing->sum('Total_work_permit')?? 0.00;
-        $data['totalQuotaSlotPayment']            =  $TotalExpensessSinceJoing->sum('Total_slot_Payment')?? 0.00;
-        $data['totalInsurancePayment']            =  $TotalExpensessSinceJoing->sum('Total_insurance_Payment')?? 0.00;
-        $data['totalWorkPermitMedicalFeePayment'] =  $TotalExpensessSinceJoing->sum('Total_Work_Permit_Medical_Payment')?? 0.00;
-        $data['totalVisa']                        =  $TotalExpensessSinceJoing->sum('Total_Visa_Payment')?? 0.00;
+        $rid = $this->resort->resort_id;
+
+        // Normalise a stored amount (in its own currency) to USD — the cards
+        // render every figure via formatCurrency(..,'USD').
+        $toUsd = function ($amount, $currency = 'MVR') use ($rid) {
+            $cur = strtoupper(trim((string) $currency));
+            if (in_array($cur, ['USD', '$'], true)) {
+                return (float) $amount;
+            }
+            return (float) Common::RateConversion('MVRToDoller', (float) $amount, $rid);
+        };
+        $sumPaidUsd = function ($rows, string $amountCol) use ($toUsd) {
+            return (float) $rows->sum(fn ($r) => $toUsd($r->{$amountCol}, $r->Currency ?? 'MVR'));
+        };
+
+        // Actual expenses = the PAID records, summed live and converted to USD.
+        // The old total_expensess_since_joings snapshot was written once at sync
+        // time from the cost config, so it never reflected later edits and showed
+        // 0 wherever the config lookup missed — no longer used for the fee totals.
+        $data = [];
+        $data['totalWorkPermitAmount']            = $sumPaidUsd(\App\Models\WorkPermit::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalQuotaSlotPayment']            = $sumPaidUsd(\App\Models\QuotaSlotRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalInsurancePayment']            = $sumPaidUsd(\App\Models\EmployeeInsurance::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Premium');
+        $data['totalWorkPermitMedicalFeePayment'] = $sumPaidUsd(\App\Models\WorkPermitMedicalRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalVisa']                        = $sumPaidUsd(\App\Models\VisaRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+
+        // Deposit is a one-time amount with no per-payment record — keep it from
+        // the snapshot row written at sync time.
+        $snapshot = TotalExpensessSinceJoing::where('resort_id',$rid)->where('employees_id',$id)->get();
+        $data['totalDepositAmount'] = (float) ($snapshot->sum('Deposit_Amt') ?? 0.00);
 
         return $data;
    }

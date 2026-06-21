@@ -83,7 +83,7 @@
                                 <div>
                                     <h6>Visa Expiry</h6>
 
-                                        @if($statisctic_emp_header)
+                                        @if(!empty(optional($statisctic_emp_header)->VisaExpiryDate))
                                             <strong>{{$statisctic_emp_header->VisaExpiryDate}}</strong>
                                             <span class="text-danger">{{$statisctic_emp_header->VisaRemingDays}} </span>
                                         @else
@@ -98,9 +98,9 @@
                         <div class="empDetail-block XpatDetail-box">
                             <div>
                                 <h6>Work Permit Fee Expiry</h6>
-                              
 
-                                @if(isset($statisctic_emp_header) )
+
+                                @if(!empty(optional($statisctic_emp_header)->WorkPermitExpiryDate))
                                     <strong>{{$statisctic_emp_header->WorkPermitExpiryDate}}</strong>
                                     <span class="text-danger">{{$statisctic_emp_header->WorkPermitRemingDays}} </span>
                                 @else
@@ -131,7 +131,7 @@
                             <div>
                                 <h6>Insurance Expiry</h6>
 
-                                @if(isset($statisctic_emp_header) )
+                                @if(!empty(optional($statisctic_emp_header)->InsuranceExpiryDate))
 
                                     <strong>{{$statisctic_emp_header->InsuranceExpiryDate}}</strong>
                                     <span class="text-danger">{{$statisctic_emp_header->InsuranceRemingDays}} </span>
@@ -426,7 +426,7 @@
 
                         <div class="row mb-3">
                             <div class="mt-3 mb-3">
-                                <input type="hidden" name="emp_id" id="employee_id" class="form-control" value="{{base64_encode($Employee->id)}}"> 
+                                <input type="hidden" name="emp_id" id="upload_emp_id" class="form-control" value="{{base64_encode($Employee->id)}}">
 
                                 <label for="DocumentType" class="form-label">Document Type <span class="red-mark">*</span></label>
                                 <select class="form-select" id="DocumentType" name="DocumentType" required 
