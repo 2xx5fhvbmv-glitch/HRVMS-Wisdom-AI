@@ -151,6 +151,12 @@
 
     $("#DepositRefundForm").on("submit", function (e) {
         e.preventDefault();
+        // Nothing to refund unless at least one employee's wallet is selected —
+        // show a clear prompt instead of the server "wallet option is required".
+        if ($("input[name^='wallet_option']:checked").length === 0) {
+            toastr.error("Please tick an employee and select a wallet to refund the deposit from.", "Error", { positionClass: 'toast-bottom-right' });
+            return;
+        }
         if ($(this).parsley().isValid()) {
             // Handle form submission
             let formData = $(this).serialize();
