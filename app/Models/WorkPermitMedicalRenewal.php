@@ -16,5 +16,10 @@ class WorkPermitMedicalRenewal extends Model
     {
         return $this->hasMany(WorkPermitMedicalRenewalChild::class, 'permit_medical_id', 'id');
     }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
 }
 

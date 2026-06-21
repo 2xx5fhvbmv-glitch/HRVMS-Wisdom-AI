@@ -28,4 +28,9 @@ class EmployeeInsurance extends Model
     {
         return $this->hasMany(EmployeeInsuranceChild::class, 'employee_insurances_id', 'id');
     }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
 }
