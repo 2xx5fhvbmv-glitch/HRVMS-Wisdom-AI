@@ -11,6 +11,9 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center mt-sm-0 mt-3 justify-content-end">
+                    @if(empty($resignation['has_deposit']))
+                        <span class="badge badge-warning text-nowrap">No deposit on record</span>
+                    @else
                     <div class="form-check me-3">
                         <input class="form-check-input toggle-checkbox Paymentcheck" type="checkbox" data-id="{{$resignation['id']}}" id="Paymentcheck_{{$resignation['id']}}-yes-check"
                             value="Status1" >
@@ -21,8 +24,10 @@
                             value="Status1">
                         <label class="form-check-label text-nowrap" for="check">No</label>
                     </div>
+                    @endif
                 </div>
             </div>
+            @if(!empty($resignation['has_deposit']))
             <div class="border-top d-none" id="Toggle-{{$resignation['id']}}">
                 <div class="row gx-md-3 g-2">
 
@@ -51,6 +56,7 @@
                 
                 </div>
             </div>
+            @endif
 
         </div>
     @endforeach

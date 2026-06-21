@@ -7287,55 +7287,43 @@ class Common
     {
 
 
-         $ResortBudgetCost = ResortBudgetCost::whereIn('particulars',[
-                                                                    'Visa Fee',
-                                                                    'visa fee',
-                                                                    'VISA FEE',
-                                                                    'QUOTA SLOT DEPOSIT',
-                                                                    'Quota Slot Deposit',
-                                                                    'quota slot deposit',
-                                                                    'Quota Slot Deposit',
-                                                                    'Work Permit Fee',
-                                                                    'work permit fee',
-                                                                    'WORK PERMIT FEE',
-                                                                    'Work Visa Medical test fee',
-                                                                    'Work Visa Medical Test Fee',
-                                                                    'work visa medical test fee',
-                                                                    'MEDICAL INSURANCE - INTERNATIONAL',
-                                                                    'medical insurance - international',
-                                                                    'Medical Insurance - International',
-                                                                    'MEDICAL INSURANCE'])
-                                                                    ->where("details","Xpat Only")
-                                                                    ->where('status','active')
-                                                                    ->where('resort_id',$resort_id)
-                                                                    ->orderBy('updated_at', 'DESC')
-                                                                    ->get(['particulars','amount','amount_unit'])
-                                                                    ->map(function ($item) use($resort_id){
-                                                                        $item->particulars = strtoupper(trim($item->particulars));
+        // Resorts label these cost rows inconsistently (wording + casing), and a
+        // cost tagged "Both" applies to expats too — so match leniently by a
+        // canonical-name alias map across both "Xpat Only" and "Both" rows
+        // (the old exact-name + "Xpat Only"-only filter silently returned 0 for
+        // slot / insurance / medical, breaking the liabilities + sync amounts).
+        // Amounts are returned in their CONFIGURED currency; callers convert as
+        // needed. (NOTE: the old code ran amounts through Common::RateConversion,
+        // which is itself broken — DollerToMVR returns 0, MVRToDoller multiplies
+        // ×rate — so it produced garbage like 5397 from a 350 MVR fee.)
+        $aliases = [
+            'visa fee'                          => 'VISA FEE',
+            'quota slot deposit'                => 'QUOTA SLOT DEPOSIT',
+            'quota slot payment'                => 'QUOTA SLOT DEPOSIT',
+            'work permit fee'                   => 'WORK PERMIT FEE',
+            'work visa medical test fee'        => 'WORK VISA MEDICAL TEST FEE',
+            'work visa medical test'            => 'WORK VISA MEDICAL TEST FEE',
+            'medical insurance - international'  => 'MEDICAL INSURANCE - INTERNATIONAL',
+        ];
 
-                                                                        if(in_array($item->amount_unit, ["$", "USD"]))
-                                                                        {
-                                                                            $type = 'DollerToMVR';
-                                                                            $Amt_type ="MVR";
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            $Amt_type ="$";
-                                                                            $type = 'MVRToDoller';
-                                                                        }
-                                                                        $item->Amount_unit = $Amt_type;
+        $rows = ResortBudgetCost::whereIn('details', ['Xpat Only', 'Both'])
+            ->where('status', 'active')
+            ->where('resort_id', $resort_id)
+            ->orderBy('updated_at', 'DESC')
+            ->get(['particulars', 'amount', 'amount_unit']);
 
-
-                                                                        $item->Newamount = self::RateConversion($type, $item->amount, $resort_id);
-                                                                        return $item;
-                                                                    })->mapWithKeys(function ($item) {
-
-                                                                        $key = strtoupper(trim($item->particulars));
-                                                                        return [$key => [
-                                                                            'amount' =>$item->Newamount,
-                                                                            'unit'   => $item->Amount_unit,
-                                                                        ]];
-                                                                    })->toArray();
+        $ResortBudgetCost = [];
+        foreach ($rows as $item) {
+            $canonical = $aliases[strtolower(trim($item->particulars))] ?? null;
+            // Skip unknown costs, or a key already set by a more-recent row.
+            if (!$canonical || isset($ResortBudgetCost[$canonical])) {
+                continue;
+            }
+            $ResortBudgetCost[$canonical] = [
+                'amount' => (float) $item->amount,
+                'unit'   => in_array($item->amount_unit, ['$', 'USD'], true) ? '$' : 'MVR',
+            ];
+        }
 
         // Guarantee every key the callers access exists, so a resort that hasn't
         // configured a given Xpat cost doesn't trigger "Undefined array key"

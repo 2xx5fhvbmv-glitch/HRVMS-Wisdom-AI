@@ -11,4 +11,8 @@ class QuotaSlotRenewal extends Model
       public $table = 'quota_slot_renewals';
     public $fillable = ['ReceiptNumber','PaymentType','Paid_Date','resort_id','employee_id','Month','Amt','Currency','Due_Date','Status','Payment_Date','Reciept_file'];
 
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
 }
