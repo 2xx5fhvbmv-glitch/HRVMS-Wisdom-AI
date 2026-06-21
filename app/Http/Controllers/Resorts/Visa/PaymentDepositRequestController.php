@@ -87,9 +87,13 @@ class PaymentDepositRequestController extends Controller
                         ->where('employees_id', $EmployeeId)
                         ->first();
 
-                    if(!$TotalExpensessSinceJoing) 
+                    if(!$TotalExpensessSinceJoing)
                     {
-                        $insufficientWallets[] = "No expense record found for employee ID {$EmployeeId}.";
+                        $emp = Employee::with('resortAdmin')->find($EmployeeId);
+                        $nm  = ($emp && $emp->resortAdmin)
+                            ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name)
+                            : "Employee #{$EmployeeId}";
+                        $insufficientWallets[] = "No deposit on record for {$nm} to refund.";
                         continue;
                     }
 
@@ -196,9 +200,14 @@ class PaymentDepositRequestController extends Controller
                                     'position'         => $resignation->employee->position->position_title ?? '',
                                     'resignation_date' => $resignation->resignation_date,
                                     'profile_pic'      =>   Common::getResortUserPicture($resignation->employee->resortAdmin->id),
+                                    // Whether a deposit was recorded for this employee. Without it the
+                                    // refund has nothing to pay back, so the row shows a clear notice
+                                    // instead of offering a wallet to refund from.
+                                    'has_deposit'      => TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)
+                                                            ->where('employees_id', $resignation->employee_id)->exists(),
 
                                 ];
-                            }); 
+                            });
 
     }
 
@@ -228,6 +237,8 @@ class PaymentDepositRequestController extends Controller
                     'position'         => $resignation->employee->position->position_title ?? '',
                     'resignation_date' => $resignation->resignation_date,
                     'profile_pic'      =>   Common::getResortUserPicture($resignation->employee->resortAdmin->id),
+                    'has_deposit'      => TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)
+                                            ->where('employees_id', $resignation->employee_id)->exists(),
                 ];
             });
 
