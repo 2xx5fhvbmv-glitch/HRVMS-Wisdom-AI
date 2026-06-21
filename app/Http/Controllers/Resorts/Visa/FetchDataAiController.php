@@ -77,28 +77,42 @@ class FetchDataAiController extends Controller
             return response()->json(['success' => false, 'errors' => ['message' => 'Xpact File is Missing']], 422);
         }
 
-        $resortId = $this->resort->resort_id;
-        $base = $this->aiBaseUrl();
+        $resortId  = $this->resort->resort_id;
+        $extractor = new \App\Services\Visa\OpenRouterDocExtractor();
 
-        $xpatTask = $this->startAiExtraction($base, $Xpatfile, 'xpat_sync');
-        if (isset($xpatTask['__error'])) {
-            return response()->json(['success' => false, 'errors' => ['message' => $xpatTask['__error']]], 502);
+        // Records a failed job and returns the 202 the page polls (status -> failed).
+        $failJob = function (string $message) use ($resortId) {
+            $payload = ['success' => false, 'errors' => ['message' => $message]];
+            $job = VisaSyncJob::create(['resort_id' => $resortId, 'status' => 'failed', 'result' => $payload]);
+            return response()->json([
+                'success' => true, 'processing' => true, 'job_id' => $job->id,
+                'status_url' => route('resorts.visa.xpactsync.status', $job->id),
+            ], 202);
+        };
+
+        // Extract straight from the PDFs via OpenRouter vision (no external OCR
+        // service). Synchronous — a couple of vision calls fit under the web
+        // timeout, so no queue worker is needed on this host.
+        $xpat = $extractor->extract($Xpatfile, 'xpat_sync');
+        if (($xpat['status'] ?? '') !== 'done') {
+            return $failJob($xpat['message'] ?? 'Could not read the Xpat document.');
         }
 
-        $quotaTaskId = null;
+        $quota = ['extracted_fields' => null];
         if ($quotaFile) {
-            $quotaTask = $this->startAiExtraction($base, $quotaFile, 'payment_schedule');
-            if (isset($quotaTask['__error'])) {
-                return response()->json(['success' => false, 'errors' => ['message' => $quotaTask['__error']]], 502);
+            $quota = $extractor->extract($quotaFile, 'payment_schedule');
+            if (($quota['status'] ?? '') !== 'done') {
+                return $failJob($quota['message'] ?? 'Could not read the Quota Slot Fees document.');
             }
-            $quotaTaskId = $quotaTask['task_id'];
         }
 
+        // Both extracted — run the (fast) DB saves and store the result on the
+        // job, which the page's status poll then reads.
+        $payload = $this->finalizeXpactSync($resortId, $xpat, $quota);
         $job = VisaSyncJob::create([
-            'resort_id'     => $resortId,
-            'status'        => 'processing',
-            'xpat_task_id'  => $xpatTask['task_id'],
-            'quota_task_id' => $quotaTaskId,
+            'resort_id' => $resortId,
+            'status'    => !empty($payload['success']) ? 'done' : 'failed',
+            'result'    => $payload,
         ]);
 
         return response()->json([

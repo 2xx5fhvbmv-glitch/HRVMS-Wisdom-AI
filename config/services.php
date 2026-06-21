@@ -46,5 +46,8 @@ return [
         'model'    => env('OPENROUTER_MODEL', 'meta-llama/llama-3.3-70b-instruct'),
         'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
         'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 800),
+        // Vision/PDF-capable model for in-app visa document extraction
+        // (replaces the external PaddleOCR service). Must accept PDF/image input.
+        'vision_model' => env('OPENROUTER_VISION_MODEL', 'google/gemini-2.0-flash-001'),
     ],
 ];
