@@ -162,7 +162,7 @@ class LiabilitiesController extends Controller
                             if ($visa && Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) 
                             {
                                 $employee->VisaExpiryExpiryDate = '<b>MVR ' . number_format($visa->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($visa->end_date);
-                                $totalVisa += $visa->Amt;
+                                $totalVisa += $this->toUsd($visa->Amt, $visa->Currency ?? 'MVR');
                                 $hasAnyFlagData = true;
                                 $employeeData[base64_encode($employee->id)]['VisaAmt'] = $visa->Amt;
                                 $employeeData[base64_encode($employee->id)]['VisaExpiry'] = $visa->end_date;
@@ -179,7 +179,7 @@ class LiabilitiesController extends Controller
                             if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) 
                             {
                                 $employee->InsuranceExpiryDate = '<b>MVR ' . number_format($insurance->Premium, 2) . '</b>' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
-                                $totalInsurance += $insurance->Premium;
+                                $totalInsurance += $this->toUsd($insurance->Premium, $insurance->Currency ?? 'MVR');
                                 $hasAnyFlagData = true;
                                 $totalInsuranceEmployee++;
                             
@@ -206,7 +206,7 @@ class LiabilitiesController extends Controller
                             // double-counting the most recent permit. Now added once.
                             if ($currentWP) {
                                 $employee->WorkPermitExpiryDate = '<b>MVR ' . number_format($totalWpAmount, 2) . '</b>' . $this->getFormattedExpiryStatus($currentWP->Due_Date);
-                                $totalPermit += $totalWpAmount;
+                                $totalPermit += $this->toUsd($totalWpAmount, $currentWP->currency ?? 'MVR');
                                 $hasAnyFlagData = true;
                                 $totalPermitEmployee++;
                             }
@@ -218,7 +218,7 @@ class LiabilitiesController extends Controller
                             if ($med && Carbon::parse($med->end_date)->between($filterStart, $filterEnd)) 
                             {
                                 $employee->WorkPermitMedicalPermitExpiryDate = '<b>MVR ' . number_format($med->Amt, 2) . '</b>' . $this->getFormattedExpiryStatus($med->end_date);
-                                $totalMedical += $med->Amt;
+                                $totalMedical += $this->toUsd($med->Amt, $med->Currency ?? 'MVR');
                                 $hasAnyFlagData = true;
                                 $totalMedicalEmployee++;
                             }
@@ -241,7 +241,7 @@ class LiabilitiesController extends Controller
                             {
                                 $latestQuota = $quotaBetweenDates->sortByDesc('id')->first();
                                 $employee->QuotaSlotAmtForThisMonth = '<b> MVR ' . number_format($quotaTotalAmount, 2) . '</b>' . $this->getFormattedExpiryStatus($latestQuota->Due_Date);
-                                $totalQuota += $quotaTotalAmount;
+                                $totalQuota += $this->toUsd($quotaTotalAmount, $latestQuota->Currency ?? 'MVR');
                                 $hasAnyFlagData = true;
                                 $totalQuotaEmployee++;
                             }
@@ -272,11 +272,14 @@ class LiabilitiesController extends Controller
                 $TotalExpactEmployeecounts = $TotalExpactEmployeecounts > 0 ? $TotalExpactEmployeecounts : 1; // zero can not be used in multiplication, so we set it to 1 if zero
 
 
-                $TotalBudgetQuotaSlotDeposit               = $NewResosrBudgetCost->has('QUOTA SLOT DEPOSIT') ? $NewResosrBudgetCost['QUOTA SLOT DEPOSIT']['amount']  * $TotalExpactEmployeecounts : 0;
-                $TotalBudgetMedicalInsuranceInternational  = $NewResosrBudgetCost->has('MEDICAL INSURANCE - INTERNATIONAL') ? $NewResosrBudgetCost['MEDICAL INSURANCE - INTERNATIONAL']['amount'] *  $TotalExpactEmployeecounts : 0;
-                $TotalBudgetWorkPermitFees                 = $NewResosrBudgetCost->has('WORK PERMIT FEE') ? $NewResosrBudgetCost['WORK PERMIT FEE']['amount']*  $TotalExpactEmployeecounts  : 0;
-                $TotalBudgetWorkPermitMedicalTestFee       = $NewResosrBudgetCost->has('WORK VISA MEDICAL TEST FEE') ? $NewResosrBudgetCost['WORK VISA MEDICAL TEST FEE']['amount'] *  $TotalExpactEmployeecounts  : 0;
-                $TotalBudgetVisaFees                       = $NewResosrBudgetCost->has('VISA FEE') ? $NewResosrBudgetCost['VISA FEE']['amount']*  $TotalExpactEmployeecounts  : 0;
+                // Each configured cost is in its own currency (MVR or USD) — convert
+                // to USD by its unit before projecting across the expat headcount,
+                // so the budget total matches the USD the view renders.
+                $TotalBudgetQuotaSlotDeposit               = $this->toUsd($ResortBudgetCost['QUOTA SLOT DEPOSIT']['amount'] ?? 0, $ResortBudgetCost['QUOTA SLOT DEPOSIT']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
+                $TotalBudgetMedicalInsuranceInternational  = $this->toUsd($ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL']['amount'] ?? 0, $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
+                $TotalBudgetWorkPermitFees                 = $this->toUsd($ResortBudgetCost['WORK PERMIT FEE']['amount'] ?? 0, $ResortBudgetCost['WORK PERMIT FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
+                $TotalBudgetWorkPermitMedicalTestFee       = $this->toUsd($ResortBudgetCost['WORK VISA MEDICAL TEST FEE']['amount'] ?? 0, $ResortBudgetCost['WORK VISA MEDICAL TEST FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
+                $TotalBudgetVisaFees                       = $this->toUsd($ResortBudgetCost['VISA FEE']['amount'] ?? 0, $ResortBudgetCost['VISA FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
 
             
                 $TotalBudgetCost    = $TotalBudgetQuotaSlotDeposit+
@@ -328,6 +331,20 @@ class LiabilitiesController extends Controller
             $page_title =  'Liabilities';
             return view('resorts.Visa.liabilities.index',compact('page_title'));
     }
+    /**
+     * Convert a stored amount (in its own currency) to USD. The liability
+     * summary view renders every figure via formatCurrency(..,'USD'), so all
+     * totals must reach it in USD; MVR amounts are derived from DollertoMVR.
+     */
+    private function toUsd($amount, $currency = 'MVR')
+    {
+        $cur = strtoupper(trim((string) $currency));
+        if (in_array($cur, ['USD', '$'], true)) {
+            return (float) $amount;
+        }
+        return (float) Common::RateConversion('MVRToDoller', (float) $amount, $this->resort->resort_id);
+    }
+
     public function getFormattedExpiryStatus($endDate)
     {
         $start = Carbon::today();

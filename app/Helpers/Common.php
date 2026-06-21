@@ -7250,37 +7250,28 @@ class Common
     }
 
 
-    public static function RateConversion($type,$amt,$resort_id)
+    public static function RateConversion($type, $amt, $resort_id)
     {
-        $ResortSiteSettings =  ResortSiteSettings::where('resort_id',$resort_id)->first(['MVRtoDoller','DollerToMVR']);
-
-        if($type == "MVRToDoller")
-        {
-            if($ResortSiteSettings && $ResortSiteSettings->MVRtoDoller > 0)
-            {
-                $convertedAmount = round($amt / $ResortSiteSettings->MVRtoDoller);
-                return $convertedAmount;
-            }
-            else
-            {
-                return 0;
-            }
-        }
-        elseif($type=="DollerToMVR")
-        {
-
-            if($ResortSiteSettings && $ResortSiteSettings->DollertoMVR > 0)
-            {
-                $convertedAmount = round($amt * $ResortSiteSettings->DollertoMVR);
-                return $convertedAmount;
-            }
-            else
-            {
-                return 0;
-            }
+        // Single source of truth: DollertoMVR (e.g. 15.42). The stored inverse
+        // (MVRtoDoller ≈ 0.0648) is lossy and must NEVER be used — always derive
+        // from DollertoMVR: USD→MVR = ×rate, MVR→USD = ÷rate. The old code
+        // divided by the inverse (350 MVR → 5397) for MVR→USD, and read a
+        // wrong-cased attribute (→ 0) for USD→MVR. Type match is case-insensitive
+        // because callers pass "MVRToDoller", "MVRtoDoller" and "DollerToMVR".
+        $rate = (float) (ResortSiteSettings::where('resort_id', $resort_id)->value('DollertoMVR') ?: 15.42);
+        if ($rate <= 0) {
+            $rate = 15.42;
         }
 
+        $t = strtolower(trim((string) $type));
+        if ($t === 'mvrtodoller') {   // MVR → USD
+            return round(((float) $amt) / $rate, 2);
+        }
+        if ($t === 'dollertomvr') {   // USD → MVR
+            return round(((float) $amt) * $rate, 2);
+        }
 
+        return (float) $amt;
     }
 
     public static function VisaRenewalCost($resort_id)
