@@ -16,4 +16,9 @@ class VisaRenewal extends Model
     {
         return $this->hasMany(VisaRenewalChild::class, 'visa_renewal_id', 'id');
     }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
 }
