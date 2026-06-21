@@ -24,7 +24,7 @@ class OpenRouterDocExtractor
     public function extract(UploadedFile $file, string $docType): array
     {
         $key   = config('services.openrouter.key');
-        $model = config('services.openrouter.vision_model', 'google/gemini-2.0-flash-001');
+        $model = config('services.openrouter.vision_model', 'google/gemini-2.5-flash');
         $base  = rtrim((string) config('services.openrouter.base_url', 'https://openrouter.ai/api/v1'), '/');
 
         if (empty($key)) {
