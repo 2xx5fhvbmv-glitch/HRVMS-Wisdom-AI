@@ -337,29 +337,34 @@ class FetchDataAiController extends Controller
         $wpExpiry = $this->aiDate($fields['Work Permit Expiry Date (Expiry On)'] ?? null);
         if ($wpExpiry) {
             $Work_permit_cost = $ResortBudgetCost['WORK PERMIT FEE'] ?? null;
-            $expiryDate = $wpExpiry->copy()->endOfMonth();
-            $totalMonths = $joiningDate->diffInMonths($endMonth) + 1;
-            $totalCost = $Work_permit_cost['amount'] ?? 0.00;
-            $monthlyCost = $totalMonths > 0 ? round($totalCost / $totalMonths, 2) : 0.00;
-            $currency = $Work_permit_cost['unit'] ?? null;
-            $workPermitAmt = $totalCost;
-            for ($i = 0; $i < $totalMonths; $i++) {
-                $monthStart = $joiningDate->copy()->addMonths($i);
-                $monthEnd = $monthStart->copy()->endOfMonth();
-                $nextMonthStart = $monthStart->copy()->addMonth()->startOfMonth();
+            $monthlyCost = (float) ($Work_permit_cost['amount'] ?? 0.00);   // config monthly work-permit fee
+            $currency    = $Work_permit_cost['unit'] ?? 'MVR';
+
+            // Installments fall on the EXPIRY DAY, starting the month AFTER the
+            // work-permit expiry, and run through December of that year (the next
+            // year's set is generated on the next renewal). e.g. expiry 18 Jun
+            // 2026 -> 18 Jul, 18 Aug … 18 Dec 2026, each at the full config fee.
+            $cursor       = $wpExpiry->copy()->addMonthNoOverflow();
+            $decemberEnd  = Carbon::create((int) $cursor->format('Y'), 12, 31)->endOfDay();
+            $workPermitAmt = 0.00;
+            while ($cursor->lte($decemberEnd)) {
                 $monthlyEntries[] = [
                     'resort_id'    => $resortId,
                     'employee_id'  => $employee->id,
-                    'Month'        => $monthStart->format('m'),
-                    'Payment_Date' => $monthEnd->format('Y-m-d'),
-                    'Due_Date'     => $nextMonthStart->format('Y-m-d'),
-                    'status'       => $monthEnd->lte($expiryDate) ? 'Paid' : 'Unpaid',
+                    'Month'        => $cursor->format('m'),
+                    'Payment_Date' => null,
+                    'Due_Date'     => $cursor->format('Y-m-d'),
+                    'Status'       => 'Unpaid',
                     'Amt'          => $monthlyCost,
-                    'currency'     => $currency,
+                    'Currency'     => $currency,
                     'created_at'   => now(),
                 ];
+                $workPermitAmt += $monthlyCost;
+                $cursor->addMonthNoOverflow();
             }
-            WorkPermit::insert($monthlyEntries);
+            if (!empty($monthlyEntries)) {
+                WorkPermit::insert($monthlyEntries);
+            }
         }
 
         $lastDueDateForDecember = collect($monthlyEntries)->filter(fn ($e) => $e['Month'] === '12')->last()['Due_Date'] ?? null;
