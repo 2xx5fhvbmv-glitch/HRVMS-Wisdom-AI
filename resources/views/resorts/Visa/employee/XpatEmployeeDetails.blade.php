@@ -36,6 +36,7 @@
 
                         <div class="col-auto">
                             <div class="d-flex align-items-center">
+                                <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm EditXpatDetails @if(Common::checkRouteWisePermission('resort.visa.xpactEmployee',config('settings.resort_permissions.edit')) == false) d-none @endif">Edit Expiry Dates</a>
                                 {{-- <ul class="employee-details-nav">
                                     <li>Slot Reference: #SR12345</li>
                                     <li>Payment Type: {{$QuotaSlotRenewal->PaymentType ?? '-'}}</li>
@@ -472,6 +473,36 @@
             </div>
         </div>
     </div>
+    {{-- Manual edit of expiry dates (when the AI sync couldn't read a field) --}}
+    <div class="modal fade" id="EditXpatDetails-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Expiry Dates</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="EditXpatDetailsForm" data-parsley-validate>
+                    @csrf
+                    <input type="hidden" name="employee_id" value="{{ base64_encode($Employee->id) }}">
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">Enter the correct date for any field the sync couldn't read. Leave a field blank to keep its current value.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">Passport Expiry</label><input type="date" name="passport_expiry" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Visa Expiry</label><input type="date" name="visa_expiry" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Work Permit Fee Expiry</label><input type="date" name="work_permit_expiry" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Insurance Expiry</label><input type="date" name="insurance_expiry" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Last Entry Date</label><input type="date" name="last_entry" class="form-control"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-themeBlue">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Second Modal (Separate from the First One) -->
     <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
         aria-hidden="true">
@@ -866,5 +897,28 @@ function PastTransectionData()
         });
 }
 
+$(document).on("click", ".EditXpatDetails", function () {
+    $("#EditXpatDetails-modal").modal('show');
+});
+$("#EditXpatDetailsForm").on("submit", function (e) {
+    e.preventDefault();
+    var $btn = $(this).find('button[type=submit]').prop('disabled', true);
+    $.ajax({
+        url: "{{ route('resort.visa.UpdateXpatDetails') }}",
+        type: "POST",
+        data: $(this).serialize()
+    }).done(function (res) {
+        if (res && res.status) {
+            toastr.success(res.message || 'Updated.', "Success", { positionClass: 'toast-bottom-right' });
+            setTimeout(function () { location.reload(); }, 800);
+        } else {
+            toastr.error((res && res.message) || 'Update failed.', "Error", { positionClass: 'toast-bottom-right' });
+        }
+    }).fail(function (xhr) {
+        var m = 'Update failed.';
+        try { m = xhr.responseJSON.message || m; } catch (e) {}
+        toastr.error(m, "Error", { positionClass: 'toast-bottom-right' });
+    }).always(function () { $btn.prop('disabled', false); });
+});
 </script>
 @endsection

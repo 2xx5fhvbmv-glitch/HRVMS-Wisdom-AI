@@ -1385,6 +1385,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       // Expat Employee
       Route::get('visa/xpact-employee', 'Visa\XpactEmployeeController@XpactEmpIndex')->name('resort.visa.xpactEmployee');
       Route::get('visa/xpact-employee/details/{id}', 'Visa\XpactEmployeeController@XpactEmpDetails')->name('resort.visa.XpactEmpDetails');
+      Route::post('visa/xpact-employee/details/update', 'Visa\XpactEmployeeController@UpdateXpatDetails')->name('resort.visa.UpdateXpatDetails');
       Route::get('visa/quota-slot/pending-fee', 'Visa\XpactEmployeeController@XpactEmpBudgetCost')->name('resort.visa.Quota_Slot_PendingFee');
       Route::post('visa/quota-slot/makr-as-paid', 'Visa\XpactEmployeeController@QuotaSlotMakrasPaid')->name('resort.visa.Quota_Slot_MakrasPaid');
       Route::get('visa/past-transection-history', 'Visa\XpactEmployeeController@PastTransectionHistory')->name('resort.visa.PastTransectionHistory');

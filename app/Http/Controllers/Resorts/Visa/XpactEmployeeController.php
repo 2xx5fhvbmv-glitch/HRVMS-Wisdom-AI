@@ -356,6 +356,62 @@ class XpactEmployeeController extends Controller
         return view('resorts.Visa.employee.XpatEmployeeDetails', compact('page_title','Employee','statisctic_emp_header','QuotaSlotRenewal','VisaEmployeeExpiryData','TotalExpensessSinceJoing','passportExpiryDate','passportExpiryStatus'));
     }
 
+    /**
+     * Manual override of an employee's visa expiry dates from the details page
+     * (used when the AI sync couldn't read a field). Writes each date into the
+     * OCR blob the details cards read, creating the blob row if needed. Only
+     * filled fields are updated — blank inputs keep the current value.
+     */
+    public function UpdateXpatDetails(Request $request)
+    {
+        $request->validate([
+            'employee_id'        => 'required',
+            'visa_expiry'        => 'nullable|date',
+            'work_permit_expiry' => 'nullable|date',
+            'insurance_expiry'   => 'nullable|date',
+            'passport_expiry'    => 'nullable|date',
+            'last_entry'         => 'nullable|date',
+        ]);
+
+        $eid = (int) base64_decode($request->employee_id);
+        $rid = $this->resort->resort_id;
+        $employee = Employee::where('id', $eid)->where('resort_id', $rid)->first();
+        if (!$employee) {
+            return response()->json(['status' => false, 'message' => 'Employee not found.'], 404);
+        }
+
+        // Upsert one extracted field into a given OCR document blob.
+        $upsert = function (string $docName, string $field, $value) use ($eid, $rid) {
+            if (empty($value)) {
+                return;
+            }
+            $value = \Carbon\Carbon::parse($value)->format('Y-m-d');
+            $row = VisaEmployeeExpiryData::where('employee_id', $eid)->where('resort_id', $rid)
+                ->where('DocumentName', $docName)->orderBy('id', 'desc')->first();
+            $payload = $row ? (json_decode($row->Ai_extracted_data, true) ?: []) : [];
+            $fields = $payload['extracted_fields'] ?? [];
+            $fields[$field] = $value;
+            $payload['extracted_fields'] = $fields;
+            if ($row) {
+                $row->Ai_extracted_data = json_encode($payload);
+                $row->save();
+            } else {
+                VisaEmployeeExpiryData::create([
+                    'resort_id' => $rid, 'employee_id' => $eid, 'File_child_id' => null,
+                    'Ai_extracted_data' => json_encode($payload), 'DocumentName' => $docName,
+                ]);
+            }
+        };
+
+        $upsert('Other', 'Visa Expiry Date', $request->visa_expiry);
+        $upsert('Other', 'Work Permit Expiry Date (Expiry On)', $request->work_permit_expiry);
+        $upsert('Other', 'Insurance Expiry Date', $request->insurance_expiry);
+        $upsert('Passport_Copy', 'Date of Expiry', $request->passport_expiry);
+        $upsert('Work_Permit_Entry_Pass', 'Last Entry Allowed', $request->last_entry);
+
+        return response()->json(['status' => true, 'message' => 'Details updated successfully.']);
+    }
+
     public function XpactEmpBudgetCost(Request $request)
     {
 
