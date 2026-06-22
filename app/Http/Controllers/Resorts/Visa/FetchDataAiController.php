@@ -108,7 +108,7 @@ class FetchDataAiController extends Controller
 
         // Both extracted — run the (fast) DB saves and store the result on the
         // job, which the page's status poll then reads.
-        $payload = $this->finalizeXpactSync($resortId, $xpat, $quota);
+        $payload = $this->finalizeXpactSync($resortId, $xpat, $quota, $Xpatfile, $quotaFile);
         $job = VisaSyncJob::create([
             'resort_id' => $resortId,
             'status'    => !empty($payload['success']) ? 'done' : 'failed',
@@ -270,7 +270,7 @@ class FetchDataAiController extends Controller
      * cURL — the rest mirrors the original synchronous save logic. Returns the
      * {success,msg} / {success:false,errors} payload.
      */
-    private function finalizeXpactSync(int $resortId, array $xpat, array $quota): array
+    private function finalizeXpactSync(int $resortId, array $xpat, array $quota, $xpatFile = null, $quotaFile = null): array
     {
         $fail = fn ($m) => ['success' => false, 'errors' => ['message' => $m]];
 
@@ -413,6 +413,33 @@ class FetchDataAiController extends Controller
             'Ai_extracted_data' => json_encode($xpat),
             'DocumentName'      => 'Other',
         ]);
+
+        // Persist the uploaded source PDFs so they appear under "Documents" on
+        // the employee details page (the AI 'Other' blob is excluded from that
+        // list). Best-effort — a storage hiccup must not fail the whole sync.
+        $storeDoc = function ($file, string $docName) use ($resortId, $employee) {
+            if (!$file) {
+                return;
+            }
+            try {
+                $aws = Common::AWSEmployeeFileUpload($resortId, $file, $employee->Emp_id);
+                if (!empty($aws['status'])) {
+                    VisaEmployeeExpiryData::where('resort_id', $resortId)
+                        ->where('employee_id', $employee->id)->where('DocumentName', $docName)->delete();
+                    VisaEmployeeExpiryData::create([
+                        'resort_id'         => $resortId,
+                        'employee_id'       => $employee->id,
+                        'File_child_id'     => $aws['Chil_file_id'] ?? null,
+                        'Ai_extracted_data' => json_encode([]),
+                        'DocumentName'      => $docName,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('xpact-sync document store failed: ' . $e->getMessage());
+            }
+        };
+        $storeDoc($xpatFile, 'Xpat_Document');
+        $storeDoc($quotaFile, 'Quota_Slot_Fees');
 
         DB::beginTransaction();
         try {
