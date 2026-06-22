@@ -62,8 +62,13 @@ class ConfigurationController extends Controller
             ->orderBy('updated_at', 'DESC')->get()
         ->map(function($i)
         {
-            $sourceCurrency = in_array($i->amount_unit, ['$', 'USD']) ? 'USD' : 'MVR';
-            $i->New_Amount  = Common::convertToDisplayCurrency($i->amount, $sourceCurrency);
+            // Visa fees are shown/edited in MVR (kept permanently in MVR). A
+            // legacy USD row is converted to MVR for display; MVR rows show as-is.
+            $rate = (float) (\DB::table('resort_site_settings')->where('resort_id', $this->resort->resort_id)->value('DollertoMVR') ?: 15.42);
+            if ($rate <= 0) { $rate = 15.42; }
+            $i->New_Amount = in_array($i->amount_unit, ['$', 'USD'], true)
+                ? round(((float) $i->amount) * $rate, 2)
+                : (float) $i->amount;
             // Display-only label cleanup: strip the trailing "Test" from "Work
             // Visa Medical Test" so the UI shows "Work Visa Medical". The DB
             // row's particulars stays intact so downstream lookups
@@ -337,10 +342,9 @@ class ConfigurationController extends Controller
 
             if(isset($amount1))
             {
-                $usdAmount = $displayCurrency === 'MVR'
-                    ? Common::RateConversion('MVRToDoller', $amount1, $this->resort->resort_id)
-                    : $amount1;
-                ResortBudgetCost::where('id',$id)->update(['amount'=>$usdAmount,'amount_unit'=>'USD']);
+                // Visa fees are stored in MVR (entered in MVR on the config
+                // screen) — no MVR->USD conversion; stays MVR permanently.
+                ResortBudgetCost::where('id',$id)->update(['amount'=>$amount1,'amount_unit'=>'MVR']);
             }
         }
         DB::beginTransaction();
