@@ -396,9 +396,9 @@
 
                         <div class="row mb-3">
                             <div class="col-12">
-                                <label for="Receipt_number" class="form-label">Receipt Number <span class="red-mark">*</label>
+                                <label for="Receipt_number" class="form-label">Receipt Number</label>
                                 <input type="text" class="form-control" id="Receipt_number" name="Receipt_number"
-                                    placeholder="Enter Receipt Number" required data-parsley-required-message="Please enter receipt number."
+                                    placeholder="Enter Receipt Number"
                                     data-parsley-errors-container="#div-Receipt_number">
                             </div>
                         </div>

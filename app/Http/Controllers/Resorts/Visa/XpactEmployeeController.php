@@ -104,8 +104,9 @@ class XpactEmployeeController extends Controller
                                 $i->MedicalExpiryDate = null;
                                 if($WorkPermitMedicalRenewal)
                                 {
-                                    $medicalStatus = $this->getFormattedExpiryStatus($WorkPermitMedicalRenewal->end_date);
-                                    $i->MedicalExpiryDate = Carbon::parse($WorkPermitMedicalRenewal->end_date)->format('d M Y') . ' ' . $medicalStatus;
+                                    // getFormattedExpiryStatus already prefixes the formatted date,
+                                    // so don't prepend it again (was showing "01 Jan 2027 01 Jan 2027 …").
+                                    $i->MedicalExpiryDate = $this->getFormattedExpiryStatus($WorkPermitMedicalRenewal->end_date);
                                 }
 
                                 // Work Permit FEE due — next unpaid work permit row for this
@@ -117,7 +118,7 @@ class XpactEmployeeController extends Controller
                                     ->orderBy('Due_Date', 'asc')
                                     ->first(['employee_id', 'Due_Date', 'Status']);
                                 $i->WorkPermitDueDate = $workPermitFee
-                                    ? Carbon::parse($workPermitFee->Due_Date)->format('d M Y') . ' ' . $this->getFormattedExpiryStatus($workPermitFee->Due_Date)
+                                    ? $this->getFormattedExpiryStatus($workPermitFee->Due_Date)
                                     : null;
    
                                 $QuotaSlotRenewal = QuotaSlotRenewal::where('employee_id', $i->id)
@@ -567,8 +568,8 @@ class XpactEmployeeController extends Controller
             $quotaSlotData = $quotaSlotData->where('Status', 'Paid')
                             ->orderBy('id', 'DESC')
                             ->get([
-                                'id', 'employee_id', 'Month', 'Amt', 'Payment_Date', 
-                                'Due_Date', 'Currency', 'Reciept_file', 'PaymentType',
+                                'id', 'employee_id', 'Month', 'Amt', 'Payment_Date',
+                                'Due_Date', 'Currency', 'Reciept_file', 'PaymentType', 'ReceiptNumber',
                                 'created_at'
                             ])
                             ->map(function($item) {
@@ -586,8 +587,8 @@ class XpactEmployeeController extends Controller
             $workPermitData = $workPermitData->where('Status', 'Paid')
                             ->orderBy('id', 'DESC')
                             ->get([
-                                'id', 'employee_id', 'Month', 'Amt', 'Payment_Date', 
-                                'Due_Date', 'Currency', 'Reciept_file', 'PaymentType','created_at'
+                                'id', 'employee_id', 'Month', 'Amt', 'Payment_Date',
+                                'Due_Date', 'Currency', 'Reciept_file', 'PaymentType', 'ReceiptNumber', 'created_at'
                             ])
                             ->map(function($item) {
                                 $item->transaction_type = 'Work Permit';
@@ -604,7 +605,12 @@ class XpactEmployeeController extends Controller
                   return  Carbon::parse($row->Due_Date)->format('Y');
                 })
                 ->editColumn('TransactionType', function ($row) {
-                  return '<b>'.$row->transaction_type.'</b> ('.$row->PaymentType.')';
+                  // Work Permit should not show the "(Installment)" payment-type bracket.
+                  $label = '<b>'.$row->transaction_type.'</b>';
+                  if ($row->transaction_type !== 'Work Permit' && !empty($row->PaymentType)) {
+                      $label .= ' ('.$row->PaymentType.')';
+                  }
+                  return $label;
                 })
                 ->editColumn('Amount', function ($row) {
                   return $row->Amt. ' ' . $row->Currency;
@@ -613,7 +619,7 @@ class XpactEmployeeController extends Controller
                    return Carbon::parse($row->Due_Date)->format('F Y');
                 })
                 ->editColumn('ReceiptNo', function ($row) {
-                     return "ReceiptNo";
+                     return $row->ReceiptNumber ?: '-';
                 })
                 ->editColumn('Status', function ($row) 
                 {
