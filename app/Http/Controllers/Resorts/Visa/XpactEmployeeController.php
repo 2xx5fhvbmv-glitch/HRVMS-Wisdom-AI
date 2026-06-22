@@ -433,7 +433,10 @@ class XpactEmployeeController extends Controller
                 $PaidAmt = $QuotaSlotRenewalPaid->where("Status","Paid")->sum('Amt');
                 $UnPaidAmt = $QuotaSlotRenewalPaid->where("Status","Unpaid")->sum('Amt');
 
-                $CommonVariable = QuotaSlotRenewal::where('employee_id', $employee_id)->where("Status","Unpaid")->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')
+                // Show ALL installments (paid + pending), chronologically — the
+                // schedule previously hid paid rows (Status=Unpaid filter), which
+                // dropped the paid months (e.g. the paid August installment).
+                $CommonVariable = QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Due_Date', 'ASC')
                                 ->get()
                                 ->map(function($i)
                                 {
@@ -452,13 +455,13 @@ class XpactEmployeeController extends Controller
                     $PaidAmt = $WorkPermit->where("Status","Paid")->sum('Amt');
                     $UnPaidAmt = $WorkPermit->where("Status","Unpaid")->sum('Amt');
 
-                    $CommonVariable = WorkPermit::where('employee_id', $employee_id)->where("Status","Unpaid")->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')
+                    $CommonVariable = WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Due_Date', 'ASC')
                                     ->get()
                                      ->map(function($i)
                                     {
                                         $i->type="WorkPermit";
                                         return $i;
-                                    });;
+                                    });
                     $PayableAmt = $PaidAmt + $UnPaidAmt;
 
             }

@@ -377,9 +377,14 @@ class FetchDataAiController extends Controller
             $workPermitMedicalAmt = $medical_data['amount'] ?? 0.00;
         }
 
-        $qotaslotAMt = $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? [];
-        $qotaslotDeposit = $qotaslotAMt['amount'] ?? 0.00;
-        $Eleven_month_installment = $qotaslotDeposit ? ($qotaslotDeposit - 174) / 11 : 0.00;
+        // Quota Slot yearly amount from the budget config, split into monthly
+        // installments: months 1..n-1 = floor(yearly/n), and the LAST month
+        // absorbs the rounding remainder (e.g. 2000/12 -> 11 x 166 + 174 = 2000).
+        $qotaslotAMt     = $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? [];
+        $qotaslotDeposit = (float) ($qotaslotAMt['amount'] ?? 0.00);
+        $quotaCount      = max(1, count($quotaRows));
+        $quotaBase       = floor($qotaslotDeposit / $quotaCount);
+        $quotaLast       = $qotaslotDeposit - ($quotaBase * ($quotaCount - 1));
 
         TotalExpensessSinceJoing::create([
             'resort_id'                         => $resortId,
@@ -407,7 +412,7 @@ class FetchDataAiController extends Controller
         DB::beginTransaction();
         try {
             foreach ($quotaRows as $key => $value) {
-                $amt = ($key == 0) ? 174 : $Eleven_month_installment;
+                $amt = ($key === ($quotaCount - 1)) ? $quotaLast : $quotaBase;
                 $status = (($value['State'] ?? '') === 'FULLY PAID') ? 'Paid' : 'Unpaid';
                 $dueDate = $this->aiDate($value['DatePaymentDueOn'] ?? null);
                 QuotaSlotRenewal::create([
