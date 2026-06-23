@@ -253,7 +253,7 @@ class PaymentRequestController extends Controller
                     */
 
                     if (in_array('insurance', $flags)) {
-                        $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->first();
+                        $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('insurance_end_date', 'desc')->orderBy('id', 'desc')->first();
                         if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
                             $employee->InsuranceExpiryDate = '<b>' . \App\Helpers\Common::formatCurrency($insurance->Premium, 'MVR') . '</b>' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                             $totalInsurance += $insurance->Premium;
@@ -324,8 +324,11 @@ class PaymentRequestController extends Controller
                         // }
 
                         $quotaEntries = $employee->QuotaSlotRenewal->sortByDesc('id'); // All entries sorted descending by ID
+                        // quota_slot_renewals has NO Expiry_Date column — the old
+                        // $item->Expiry_Date was null, so Carbon::parse(null)=today and
+                        // the duration window never matched correctly. Use Due_Date.
                         $currentQuota = $quotaEntries
-                            ->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))
+                            ->filter(fn($item) => $item->Due_Date && Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))
                             ->first();
                         $encodedId = base64_encode($employee->id);
                         if ($currentQuota) 
@@ -352,6 +355,15 @@ class PaymentRequestController extends Controller
                             }
                         }
                     }
+
+                    // Per-employee fee total (in the resort display currency) for the
+                    // live "selected total" on top — summed client-side from data-total.
+                    $encId = base64_encode($employee->id);
+                    $rowTotalMvr = 0.0;
+                    foreach (['WorkPermitAmt','QuotaAmt','InsuranceAmt','MedicalAmt','VisaAmt'] as $kk) {
+                        $rowTotalMvr += (float) ($employeeData[$encId][$kk] ?? 0);
+                    }
+                    $employee->RowTotalDisplay = round((float) \App\Helpers\Common::convertToDisplayCurrency($rowTotalMvr, 'MVR'), 2);
 
                     $employee->extra= json_encode($employeeData);
                     if ($hasAnyFlagData && $employee->isChecked === "true") {
@@ -389,7 +401,7 @@ class PaymentRequestController extends Controller
                   
                     return "<div class=\"form-check no-label\">" .
                      
-                        "<input class=\"form-check-input ChildCheck\" name=\"employee_ids[".$id."]\" type=\"checkbox\"  value=".$row->extra." ".$isChecked.">" .
+                        "<input class=\"form-check-input ChildCheck\" data-total=\"".($row->RowTotalDisplay ?? 0)."\" name=\"employee_ids[".$id."]\" type=\"checkbox\"  value=".$row->extra." ".$isChecked.">" .
                         "</div>";
                 })
                 ->rawColumns(['EmployeeID','CheckBox','SlotFees','VisaExpiry','Medical','Insurance','WorkPermit','Department','Position','EmployeeName'])

@@ -192,6 +192,9 @@ $(document).ready(function(){
     $("#hiddenInput").on('apply.daterangepicker', function (ev, picker) {
         $("#startDate").text("Start Date: " + picker.startDate.format("DD-MM-YYYY"));
         $("#endDate").text("End Date: " + picker.endDate.format("DD-MM-YYYY"));
+        // Reload the list for the chosen duration (the input's 'change' event is
+        // not reliably fired when daterangepicker sets the value programmatically).
+        PaymentRequestTable();
     });
 
     $("#hiddenInput").on("change", function() {
@@ -280,16 +283,26 @@ $(document).ready(function(){
     });
 
     $(document).on("click",".ChildCheck", function() {
-        
+
         var selectedEmployees = [];
-        $('#payment-request-table tbody input[type="checkbox"]:checked').each(function() {
+        $('#payment-request-table tbody input.ChildCheck:checked').each(function() {
             selectedEmployees.push($(this).val());
         });
         $("#selectedCount").html(selectedEmployees.length + ' Employees Selected');
-
+        updateTopTotal();
     });
 });
 
+
+// Live total on top = sum of the SELECTED employees' fees (data-total is the
+// per-employee amount in the resort display currency). 0 when nothing selected.
+function updateTopTotal() {
+    var total = 0;
+    $('#payment-request-table tbody input.ChildCheck:checked').each(function () {
+        total += parseFloat($(this).data('total')) || 0;
+    });
+    $('.Overall-tot-amount').html('<b>{{ Common::GetResortCurrencySymbol() }} ' + total.toFixed(2) + '</b>');
+}
 
 function PaymentRequestTable() {
 
@@ -351,8 +364,9 @@ function PaymentRequestTable() {
                     $(api.column(6).footer()).html('<b>' + totals.slot_payment + '</b>');
                     $(api.column(7).footer()).html('<b>' + totals.insurance + '</b>');
                     $(api.column(8).footer()).html('<b>' + totals.medical + '</b>');
-                $('.Overall-tot-amount').html('<b>' + totals.overall + '</b>');
-                $("#selectedCount").html(totals.totalChecked + ' Employees Selected');
+                // Top total reflects the SELECTED employees, not every shown row.
+                updateTopTotal();
+                $("#selectedCount").html($('#payment-request-table tbody input.ChildCheck:checked').length + ' Employees Selected');
                 } else {
                     $(api.column(5).footer()).html('<b>0</b>');
                     $(api.column(6).footer()).html('<b>0</b>');
